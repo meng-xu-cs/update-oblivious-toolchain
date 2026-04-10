@@ -1,0 +1,14 @@
+[package]
+name = "uo-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uo-core = { path = "../../crates/uo-core" }
