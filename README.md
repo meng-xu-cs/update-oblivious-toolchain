@@ -25,4 +25,4 @@ cargo test
 ./scripts/run_validation.sh
 ```
 
-The current prototype is intentionally narrow. The exact supported subset, rejected features, and the remaining assumptions are documented in [docs/supported-subset.md](/home/m285xu/update-oblivious-toolchain/docs/supported-subset.md) and [docs/engineering-note.md](/home/m285xu/update-oblivious-toolchain/docs/engineering-note.md).
+The current prototype is intentionally narrow. The exact supported subset, rejected features, remaining assumptions, and the formal proof roadmap are documented in [docs/supported-subset.md](/home/m285xu/update-oblivious-toolchain/docs/supported-subset.md), [docs/engineering-note.md](/home/m285xu/update-oblivious-toolchain/docs/engineering-note.md), and [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md).
