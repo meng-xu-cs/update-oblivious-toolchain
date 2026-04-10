@@ -3,6 +3,15 @@
     {
       "benchmark": "ConfidentialMixer",
       "logical_access_equal": true,
+      "logical_write_equal": true,
+      "mode": "oram",
+      "opcode_equal": true,
+      "physical_trace_equal": true
+    },
+    {
+      "benchmark": "ERC20Lite",
+      "logical_access_equal": true,
+      "logical_write_equal": true,
       "mode": "oram",
       "opcode_equal": true,
       "physical_trace_equal": true
@@ -12,6 +21,7 @@
     {
       "benchmark": "FixedSlotClassifier",
       "logical_access_equal": true,
+      "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
       "physical_trace_equal": true
@@ -19,6 +29,7 @@
     {
       "benchmark": "AuthScan",
       "logical_access_equal": true,
+      "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
       "physical_trace_equal": true
@@ -26,6 +37,23 @@
     {
       "benchmark": "ConfidentialMixer",
       "logical_access_equal": true,
+      "logical_write_equal": true,
+      "mode": "uo",
+      "opcode_equal": true,
+      "physical_trace_equal": true
+    },
+    {
+      "benchmark": "ERC20Lite",
+      "logical_access_equal": true,
+      "logical_write_equal": true,
+      "mode": "uo",
+      "opcode_equal": true,
+      "physical_trace_equal": true
+    },
+    {
+      "benchmark": "RegistryCRUD",
+      "logical_access_equal": true,
+      "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
       "physical_trace_equal": true
@@ -34,6 +62,7 @@
   "positive_control": {
     "benchmark": "FixedSlotClassifier",
     "raw_logical_access_equal": true,
+    "raw_logical_write_equal": true,
     "raw_opcode_equal": true,
     "raw_physical_equal": false,
     "same_same_control_equal": true

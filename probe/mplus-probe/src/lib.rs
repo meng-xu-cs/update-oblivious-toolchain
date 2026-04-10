@@ -344,18 +344,27 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
     let classifier_uo = run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)?;
     let classifier_same_same = run_classifier_same_same(&suite["FixedSlotClassifier"].raw)?;
     let auth_uo = run_authscan_experiment(&suite["AuthScan"].uo)?;
-    let mixer_uo = run_mixer_experiment(&suite["ConfidentialMixer"].uo)?;
-    let mixer_oram = run_mixer_experiment(
+    let mixer_uo = run_mixer_key_experiment(&suite["ConfidentialMixer"].uo)?;
+    let mixer_oram = run_mixer_key_experiment(
         suite["ConfidentialMixer"]
             .oram
             .as_ref()
             .ok_or_else(|| anyhow!("missing mixer oram"))?,
     )?;
+    let erc20_uo = run_erc20_allowance_key_experiment(&suite["ERC20Lite"].uo)?;
+    let erc20_oram = run_erc20_allowance_key_experiment(
+        suite["ERC20Lite"]
+            .oram
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing erc20 oram"))?,
+    )?;
+    let registry_uo = run_registry_key_experiment(&suite["RegistryCRUD"].uo)?;
     Ok(json!({
         "positive_control": {
             "benchmark": "FixedSlotClassifier",
             "raw_opcode_equal": classifier_raw.opcode_equal,
             "raw_logical_access_equal": classifier_raw.logical_equal,
+            "raw_logical_write_equal": classifier_raw.logical_write_equal,
             "raw_physical_equal": classifier_raw.physical_equal,
             "same_same_control_equal": classifier_same_same.physical_equal,
         },
@@ -363,9 +372,12 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
             trace_summary("FixedSlotClassifier", "uo", &classifier_uo),
             trace_summary("AuthScan", "uo", &auth_uo),
             trace_summary("ConfidentialMixer", "uo", &mixer_uo),
+            trace_summary("ERC20Lite", "uo", &erc20_uo),
+            trace_summary("RegistryCRUD", "uo", &registry_uo),
         ],
         "computational_uo": [
             trace_summary("ConfidentialMixer", "oram", &mixer_oram),
+            trace_summary("ERC20Lite", "oram", &erc20_oram),
         ],
     }))
 }
@@ -388,6 +400,18 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
                     .oram
                     .as_ref()
                     .ok_or_else(|| anyhow!("missing mixer oram"))?,
+            )?,
+        ),
+        ("ERC20Lite", "raw", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)?),
+        ("ERC20Lite", "uo", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)?),
+        (
+            "ERC20Lite",
+            "oram",
+            run_erc20_allowance_value_experiment(
+                suite["ERC20Lite"]
+                    .oram
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("missing erc20 oram"))?,
             )?,
         ),
     ];
@@ -422,6 +446,18 @@ fn run_mutual_information_reports(suite: &BTreeMap<&'static str, BenchArtifacts>
                     .oram
                     .as_ref()
                     .ok_or_else(|| anyhow!("missing mixer oram"))?,
+            )?,
+        ),
+        ("ERC20Lite", "raw", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)?),
+        ("ERC20Lite", "uo", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)?),
+        (
+            "ERC20Lite",
+            "oram",
+            run_erc20_allowance_value_experiment(
+                suite["ERC20Lite"]
+                    .oram
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("missing erc20 oram"))?,
             )?,
         ),
     ];
@@ -516,6 +552,7 @@ struct ExperimentOutcome {
     class1_metrics: Vec<BTreeMap<String, f64>>,
     opcode_equal: bool,
     logical_equal: bool,
+    logical_write_equal: bool,
     physical_equal: bool,
 }
 
@@ -599,6 +636,88 @@ fn run_mixer_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome
     )
 }
 
+fn run_mixer_key_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome> {
+    run_binary_experiment(
+        artifact,
+        &[],
+        "deposit(bytes32,uint256)",
+        vec![
+            vec![b32(1), Value::Uint(3)],
+            vec![b32(2), Value::Uint(3)],
+            vec![b32(3), Value::Uint(3)],
+            vec![b32(4), Value::Uint(3)],
+        ],
+        vec![
+            vec![b32(9), Value::Uint(3)],
+            vec![b32(10), Value::Uint(3)],
+            vec![b32(11), Value::Uint(3)],
+            vec![b32(12), Value::Uint(3)],
+        ],
+    )
+}
+
+fn run_registry_key_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome> {
+    run_binary_experiment(
+        artifact,
+        &[],
+        "upsert(bytes32,uint256)",
+        vec![
+            vec![b32(1), Value::Uint(7)],
+            vec![b32(2), Value::Uint(7)],
+            vec![b32(3), Value::Uint(7)],
+            vec![b32(4), Value::Uint(7)],
+        ],
+        vec![
+            vec![b32(9), Value::Uint(7)],
+            vec![b32(10), Value::Uint(7)],
+            vec![b32(11), Value::Uint(7)],
+            vec![b32(12), Value::Uint(7)],
+        ],
+    )
+}
+
+fn run_erc20_allowance_value_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome> {
+    let owner = addr(0x11);
+    let spender = addr(0x22);
+    run_binary_experiment(
+        artifact,
+        &[],
+        "approve(address,address,uint256)",
+        vec![
+            vec![owner.clone(), spender.clone(), Value::Uint(0)],
+            vec![owner.clone(), spender.clone(), Value::Uint(0)],
+            vec![owner.clone(), spender.clone(), Value::Uint(0)],
+            vec![owner.clone(), spender.clone(), Value::Uint(0)],
+        ],
+        vec![
+            vec![owner.clone(), spender.clone(), Value::Uint(1)],
+            vec![owner.clone(), spender.clone(), Value::Uint(2)],
+            vec![owner.clone(), spender.clone(), Value::Uint(3)],
+            vec![owner, spender, Value::Uint(4)],
+        ],
+    )
+}
+
+fn run_erc20_allowance_key_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome> {
+    run_binary_experiment(
+        artifact,
+        &[],
+        "approve(address,address,uint256)",
+        vec![
+            vec![addr(0x11), addr(0x21), Value::Uint(3)],
+            vec![addr(0x12), addr(0x22), Value::Uint(3)],
+            vec![addr(0x13), addr(0x23), Value::Uint(3)],
+            vec![addr(0x14), addr(0x24), Value::Uint(3)],
+        ],
+        vec![
+            vec![addr(0x31), addr(0x41), Value::Uint(3)],
+            vec![addr(0x32), addr(0x42), Value::Uint(3)],
+            vec![addr(0x33), addr(0x43), Value::Uint(3)],
+            vec![addr(0x34), addr(0x44), Value::Uint(3)],
+        ],
+    )
+}
+
 fn run_binary_experiment(
     artifact: &CompiledArtifact,
     setup: &[CallSpec],
@@ -623,6 +742,7 @@ fn run_binary_experiment(
     Ok(ExperimentOutcome {
         opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.opcode_trace_hash),
         logical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.logical_access_trace_hash),
+        logical_write_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.logical_write_trace_hash),
         physical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.physical_write_trace_hash),
         class0_metrics,
         class1_metrics,
@@ -661,6 +781,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         "mode": mode,
         "opcode_equal": outcome.opcode_equal,
         "logical_access_equal": outcome.logical_equal,
+        "logical_write_equal": outcome.logical_write_equal,
         "physical_trace_equal": outcome.physical_equal,
     })
 }
@@ -821,8 +942,8 @@ This results bundle was generated from the local Rust workspace using the benchm
 
 Security tiers:
 
-- Exact-UO: `FixedSlotClassifier`, `AuthScan`, `ConfidentialMixer` full-scan, and `RegistryCRUD` use fixed-shape commits and normalized `M+` traces that are identical across secret variations in this instrumented abstract machine.
-- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use a public-schedule append-style ORAM surrogate that rewrites a logarithmic bucket batch while keeping `M+` update classes secret-independent.
+- Exact-UO: `FixedSlotClassifier`, `AuthScan`, `ConfidentialMixer` full-scan, `ERC20Lite` full-scan, and `RegistryCRUD` use fixed-shape commits and normalized `M+` traces that are identical across secret variations in this instrumented abstract machine.
+- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use a public-schedule ORAM surrogate that rewrites fixed-shape control metadata and a logarithmic bucket batch while keeping `M+` update classes secret-independent.
 
 Unsupported / rejected:
 
@@ -834,7 +955,7 @@ Unsupported / rejected:
 Prototype assumptions:
 
 - `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
-- The ORAM backend is an instrumented runtime prototype with a trusted in-memory logical index and public-schedule bucket rewrites; it is reported as computational-UO only.
+- The ORAM backend is an instrumented runtime prototype with fixed-shape committed control metadata and public-schedule bucket rewrites; it is reported as computational-UO only.
 - The guarantees are with respect to the abstract/runtime traces emitted by this artifact, not every downstream machine-code or microarchitectural observer.
 "#
 }

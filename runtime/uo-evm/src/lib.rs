@@ -184,4 +184,82 @@ mod tests {
         assert_eq!(carol_balance.return_value, Some(Value::Uint(3)));
         assert_eq!(allowance.return_value, Some(Value::Uint(1)));
     }
+
+    #[test]
+    fn mixer_oram_hides_secret_commitment_schedule() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
+            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.oram.yaml"),
+            ProgramMode::Uo,
+        );
+        let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
+        let first_trace = first
+            .call("deposit(bytes32,uint256)", vec![Value::Bytes32([1u8; 32]), Value::Uint(3)])
+            .unwrap();
+        let mut second = ContractInstance::deploy(artifact).unwrap();
+        let second_trace = second
+            .call("deposit(bytes32,uint256)", vec![Value::Bytes32([9u8; 32]), Value::Uint(3)])
+            .unwrap();
+        assert_eq!(
+            first_trace.trace.hashes().logical_access_trace_hash,
+            second_trace.trace.hashes().logical_access_trace_hash
+        );
+        assert_eq!(
+            first_trace.trace.hashes().logical_write_trace_hash,
+            second_trace.trace.hashes().logical_write_trace_hash
+        );
+        assert_eq!(
+            first_trace.trace.hashes().physical_write_trace_hash,
+            second_trace.trace.hashes().physical_write_trace_hash
+        );
+        assert!(first_trace
+            .trace
+            .physical_writes
+            .iter()
+            .all(|event| event.class == WriteClass::Update));
+        assert!(second_trace
+            .trace
+            .physical_writes
+            .iter()
+            .all(|event| event.class == WriteClass::Update));
+        assert_eq!(first_trace.trace.gas_used, 12288);
+        assert_eq!(second_trace.trace.gas_used, 12288);
+    }
+
+    #[test]
+    fn erc20_oram_hides_secret_allowance_keys() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
+            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.oram.yaml"),
+            ProgramMode::Uo,
+        );
+        let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
+        let first_trace = first
+            .call(
+                "approve(address,address,uint256)",
+                vec![Value::Address([0x11; 20]), Value::Address([0x21; 20]), Value::Uint(3)],
+            )
+            .unwrap();
+        let mut second = ContractInstance::deploy(artifact).unwrap();
+        let second_trace = second
+            .call(
+                "approve(address,address,uint256)",
+                vec![Value::Address([0x31; 20]), Value::Address([0x41; 20]), Value::Uint(3)],
+            )
+            .unwrap();
+        assert_eq!(
+            first_trace.trace.hashes().logical_access_trace_hash,
+            second_trace.trace.hashes().logical_access_trace_hash
+        );
+        assert_eq!(
+            first_trace.trace.hashes().logical_write_trace_hash,
+            second_trace.trace.hashes().logical_write_trace_hash
+        );
+        assert_eq!(
+            first_trace.trace.hashes().physical_write_trace_hash,
+            second_trace.trace.hashes().physical_write_trace_hash
+        );
+        assert_eq!(first_trace.trace.gas_used, 14336);
+        assert_eq!(second_trace.trace.gas_used, 14336);
+    }
 }

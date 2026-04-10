@@ -7,7 +7,7 @@ Exact-UO in this artifact:
 
 Computational-UO in this artifact:
 
-- The ORAM backend uses a public-schedule, fixed-size bucket rewrite discipline with a trusted in-memory logical index.
+- The ORAM backend uses a public-schedule, fixed-size bucket rewrite discipline plus fixed-shape committed control-metadata rewrites.
 - It is reported as computational-UO only; the implementation is an instrumented prototype rather than a full production ORAM proof.
 
 Remaining assumptions:

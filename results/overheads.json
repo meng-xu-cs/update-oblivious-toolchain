@@ -8,9 +8,9 @@
         "physical_writes": 65
       },
       "oram_64": {
-        "bytes_written": 1412.0,
+        "bytes_written": 10072.0,
         "gas_used": 12288,
-        "physical_writes": 9
+        "physical_writes": 18
       },
       "oram_improves_physical_writes": true,
       "raw": {

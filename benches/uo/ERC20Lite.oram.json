@@ -640,7 +640,7 @@
       "entrypoints": {
         "allowanceOf(address,address)": {
           "secret_args": [],
-          "public_gas_budget": 2318,
+          "public_gas_budget": 2811,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "uocell_reads": 0,
@@ -649,7 +649,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 9
+          "max_commit_ops": 26
         },
         "approve(address,address,uint256)": {
           "secret_args": [
@@ -666,11 +666,11 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 1,
-          "max_commit_ops": 9
+          "max_commit_ops": 26
         },
         "balanceOf(address)": {
           "secret_args": [],
-          "public_gas_budget": 2257,
+          "public_gas_budget": 2518,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "uocell_reads": 0,
@@ -679,11 +679,11 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 8
+          "max_commit_ops": 17
         },
         "mint(address,uint256)": {
           "secret_args": [],
-          "public_gas_budget": 2278,
+          "public_gas_budget": 2539,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "uocell_reads": 0,
@@ -692,7 +692,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 8
+          "max_commit_ops": 17
         },
         "transfer(address,address,uint256)": {
           "secret_args": [
@@ -709,7 +709,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 2,
           "uomap_writes": 2,
-          "max_commit_ops": 8
+          "max_commit_ops": 17
         },
         "transferFrom(address,address,address,uint256)": {
           "secret_args": [
@@ -727,7 +727,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 3,
           "uomap_writes": 3,
-          "max_commit_ops": 17
+          "max_commit_ops": 43
         }
       }
     }

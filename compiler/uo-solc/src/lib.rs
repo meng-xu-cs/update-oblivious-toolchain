@@ -1716,7 +1716,9 @@ fn diagnostics_error(message: impl Into<String>) -> Result<()> {
 }
 
 fn oram_batch_ops(capacity: usize) -> usize {
-    ((capacity.max(2) as f64).log2().ceil() as usize + 2).max(3)
+    let batch = ((capacity.max(2) as f64).log2().ceil() as usize + 2).max(3);
+    let metadata_pages = capacity.max(1).div_ceil(8) + 1;
+    batch + metadata_pages
 }
 
 fn disassemble_contract(contract: &CompiledContract) -> Vec<String> {

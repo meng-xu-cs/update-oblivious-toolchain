@@ -333,7 +333,7 @@
       "entrypoints": {
         "balanceOf(bytes32)": {
           "secret_args": [],
-          "public_gas_budget": 2257,
+          "public_gas_budget": 2518,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "uocell_reads": 0,
@@ -342,7 +342,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 8
+          "max_commit_ops": 17
         },
         "deposit(bytes32,uint256)": {
           "secret_args": [
@@ -358,7 +358,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 9
+          "max_commit_ops": 18
         },
         "totalValue()": {
           "secret_args": [],
@@ -387,7 +387,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 9
+          "max_commit_ops": 18
         }
       }
     }
