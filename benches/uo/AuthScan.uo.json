@@ -300,7 +300,8 @@
           "backend": "full_scan",
           "capacity": 4,
           "value_type": "bytes32",
-          "key_type": null
+          "key_type": null,
+          "oram": null
         },
         {
           "id": 2,
@@ -309,7 +310,8 @@
           "backend": "full_scan",
           "capacity": null,
           "value_type": "uint256",
-          "key_type": null
+          "key_type": null,
+          "oram": null
         }
       ],
       "entrypoints": {
@@ -326,7 +328,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 0,
-          "max_commit_ops": 5
+          "max_commit_ops": 5,
+          "oram_accesses": {}
         },
         "readLast()": {
           "secret_args": [],
@@ -339,7 +342,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 0,
-          "max_commit_ops": 1
+          "max_commit_ops": 1,
+          "oram_accesses": {}
         },
         "seed(uint256,bytes32)": {
           "secret_args": [],
@@ -352,7 +356,8 @@
           "uoarray_writes": 1,
           "uomap_reads": 0,
           "uomap_writes": 0,
-          "max_commit_ops": 4
+          "max_commit_ops": 4,
+          "oram_accesses": {}
         }
       }
     }

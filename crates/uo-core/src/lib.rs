@@ -10,7 +10,7 @@ pub use ir::{
     BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
     Statement, UnaryOp,
 };
-pub use manifest::{EntrypointManifest, RuntimeManifest, StateObjectManifest};
+pub use manifest::{EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest};
 pub use metadata::{BoundsMetadata, ContractMetadata, EntrypointMetadata, StateMetadata};
 pub use trace::{
     classify_write, ExecutionTrace, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent,

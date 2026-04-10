@@ -106,7 +106,10 @@ impl ContractInstance {
         }
         host_proxy_metrics.insert("bytes_read".into(), bytes_read(&physical_reads) as f64);
         host_proxy_metrics.insert("backend_reads".into(), physical_reads.len() as f64);
-        host_proxy_metrics.insert("bytes_written".into(), bytes_written(&physical_writes) as f64);
+        host_proxy_metrics.insert(
+            "bytes_written".into(),
+            bytes_written(&physical_writes) as f64,
+        );
         host_proxy_metrics.insert("backend_writes".into(), physical_writes.len() as f64);
         host_proxy_metrics.insert(
             "zero_writes".into(),
@@ -283,7 +286,8 @@ fn exec_statement(
         } => {
             let index = eval_expr(contract, function, index, objects, state)?
                 .as_uint()
-                .ok_or_else(|| anyhow!("array index must be uint"))? as usize;
+                .ok_or_else(|| anyhow!("array index must be uint"))?
+                as usize;
             let value = eval_expr(contract, function, value, objects, state)?;
             let predicate = predicate
                 .as_ref()
@@ -382,26 +386,29 @@ fn eval_expr(
         Expr::ArrayGet { object_id, index } => {
             let index = eval_expr(contract, function, index, objects, state)?
                 .as_uint()
-                .ok_or_else(|| anyhow!("array index must be uint"))? as usize;
+                .ok_or_else(|| anyhow!("array index must be uint"))?
+                as usize;
             object_mut(objects, *object_id)?.get_array(index)
         }
         Expr::MapGet { object_id, key } => {
             let key = eval_expr(contract, function, key, objects, state)?;
             object_mut(objects, *object_id)?.get_map(&key)
         }
-        Expr::StructField { base, field } => match eval_expr(contract, function, base, objects, state)?
-        {
-            Value::Struct(fields) => fields
-                .into_iter()
-                .find_map(|(name, value)| if name == *field { Some(value) } else { None })
-                .ok_or_else(|| anyhow!("unknown struct field {field}")),
-            _ => bail!("struct field access requires struct value"),
-        },
+        Expr::StructField { base, field } => {
+            match eval_expr(contract, function, base, objects, state)? {
+                Value::Struct(fields) => fields
+                    .into_iter()
+                    .find_map(|(name, value)| if name == *field { Some(value) } else { None })
+                    .ok_or_else(|| anyhow!("unknown struct field {field}")),
+                _ => bail!("struct field access requires struct value"),
+            }
+        }
         Expr::ArrayIndex { base, index } => {
             let base = eval_expr(contract, function, base, objects, state)?;
             let index = eval_expr(contract, function, index, objects, state)?
                 .as_uint()
-                .ok_or_else(|| anyhow!("array index must be uint"))? as usize;
+                .ok_or_else(|| anyhow!("array index must be uint"))?
+                as usize;
             match base {
                 Value::Array(values) => values
                     .get(index)

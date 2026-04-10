@@ -84,8 +84,16 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
     suite.insert(
         "AuthScan",
         BenchArtifacts {
-            raw: compile_artifact("benches/raw/AuthScan.sol", "benches/raw/AuthScan.raw.yaml", ProgramMode::Raw)?,
-            uo: compile_artifact("benches/raw/AuthScan.sol", "benches/raw/AuthScan.uo.yaml", ProgramMode::Uo)?,
+            raw: compile_artifact(
+                "benches/raw/AuthScan.sol",
+                "benches/raw/AuthScan.raw.yaml",
+                ProgramMode::Raw,
+            )?,
+            uo: compile_artifact(
+                "benches/raw/AuthScan.sol",
+                "benches/raw/AuthScan.uo.yaml",
+                ProgramMode::Uo,
+            )?,
             oram: None,
             fullscan64: None,
         },
@@ -118,8 +126,16 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
     suite.insert(
         "ERC20Lite",
         BenchArtifacts {
-            raw: compile_artifact("benches/raw/ERC20Lite.sol", "benches/raw/ERC20Lite.raw.yaml", ProgramMode::Raw)?,
-            uo: compile_artifact("benches/raw/ERC20Lite.sol", "benches/raw/ERC20Lite.uo.yaml", ProgramMode::Uo)?,
+            raw: compile_artifact(
+                "benches/raw/ERC20Lite.sol",
+                "benches/raw/ERC20Lite.raw.yaml",
+                ProgramMode::Raw,
+            )?,
+            uo: compile_artifact(
+                "benches/raw/ERC20Lite.sol",
+                "benches/raw/ERC20Lite.uo.yaml",
+                ProgramMode::Uo,
+            )?,
             oram: Some(compile_artifact(
                 "benches/raw/ERC20Lite.sol",
                 "benches/raw/ERC20Lite.oram.yaml",
@@ -252,7 +268,10 @@ fn check_mixer_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     let raw = run_scenario(&artifacts.raw, &setup, &target, &getters)?;
     let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)?;
     let oram = run_scenario(
-        artifacts.oram.as_ref().ok_or_else(|| anyhow!("missing mixer oram"))?,
+        artifacts
+            .oram
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing mixer oram"))?,
         &setup,
         &target,
         &getters,
@@ -301,7 +320,10 @@ fn check_erc20_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     let raw = run_scenario(&artifacts.raw, &setup, &target, &getters)?;
     let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)?;
     let oram = run_scenario(
-        artifacts.oram.as_ref().ok_or_else(|| anyhow!("missing erc20 oram"))?,
+        artifacts
+            .oram
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing erc20 oram"))?,
         &setup,
         &target,
         &getters,
@@ -385,14 +407,46 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
 
 fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let experiments = vec![
-        ("FixedSlotClassifier", "raw", run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)?),
-        ("FixedSlotClassifier", "uo", run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)?),
-        ("AuthScan", "raw", run_authscan_experiment(&suite["AuthScan"].raw)?),
-        ("AuthScan", "uo", run_authscan_experiment(&suite["AuthScan"].uo)?),
-        ("RegistryCRUD", "raw", run_registry_experiment(&suite["RegistryCRUD"].raw)?),
-        ("RegistryCRUD", "uo", run_registry_experiment(&suite["RegistryCRUD"].uo)?),
-        ("ConfidentialMixer", "raw", run_mixer_experiment(&suite["ConfidentialMixer"].raw)?),
-        ("ConfidentialMixer", "uo", run_mixer_experiment(&suite["ConfidentialMixer"].uo)?),
+        (
+            "FixedSlotClassifier",
+            "raw",
+            run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)?,
+        ),
+        (
+            "FixedSlotClassifier",
+            "uo",
+            run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)?,
+        ),
+        (
+            "AuthScan",
+            "raw",
+            run_authscan_experiment(&suite["AuthScan"].raw)?,
+        ),
+        (
+            "AuthScan",
+            "uo",
+            run_authscan_experiment(&suite["AuthScan"].uo)?,
+        ),
+        (
+            "RegistryCRUD",
+            "raw",
+            run_registry_experiment(&suite["RegistryCRUD"].raw)?,
+        ),
+        (
+            "RegistryCRUD",
+            "uo",
+            run_registry_experiment(&suite["RegistryCRUD"].uo)?,
+        ),
+        (
+            "ConfidentialMixer",
+            "raw",
+            run_mixer_experiment(&suite["ConfidentialMixer"].raw)?,
+        ),
+        (
+            "ConfidentialMixer",
+            "uo",
+            run_mixer_experiment(&suite["ConfidentialMixer"].uo)?,
+        ),
         (
             "ConfidentialMixer",
             "oram",
@@ -403,8 +457,16 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
                     .ok_or_else(|| anyhow!("missing mixer oram"))?,
             )?,
         ),
-        ("ERC20Lite", "raw", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)?),
-        ("ERC20Lite", "uo", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)?),
+        (
+            "ERC20Lite",
+            "raw",
+            run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)?,
+        ),
+        (
+            "ERC20Lite",
+            "uo",
+            run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)?,
+        ),
         (
             "ERC20Lite",
             "oram",
@@ -429,16 +491,50 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
     Ok(json!({ "reports": reports }))
 }
 
-fn run_mutual_information_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+fn run_mutual_information_reports(
+    suite: &BTreeMap<&'static str, BenchArtifacts>,
+) -> Result<JsonValue> {
     let experiments = vec![
-        ("FixedSlotClassifier", "raw", run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)?),
-        ("FixedSlotClassifier", "uo", run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)?),
-        ("AuthScan", "raw", run_authscan_experiment(&suite["AuthScan"].raw)?),
-        ("AuthScan", "uo", run_authscan_experiment(&suite["AuthScan"].uo)?),
-        ("RegistryCRUD", "raw", run_registry_experiment(&suite["RegistryCRUD"].raw)?),
-        ("RegistryCRUD", "uo", run_registry_experiment(&suite["RegistryCRUD"].uo)?),
-        ("ConfidentialMixer", "raw", run_mixer_experiment(&suite["ConfidentialMixer"].raw)?),
-        ("ConfidentialMixer", "uo", run_mixer_experiment(&suite["ConfidentialMixer"].uo)?),
+        (
+            "FixedSlotClassifier",
+            "raw",
+            run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)?,
+        ),
+        (
+            "FixedSlotClassifier",
+            "uo",
+            run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)?,
+        ),
+        (
+            "AuthScan",
+            "raw",
+            run_authscan_experiment(&suite["AuthScan"].raw)?,
+        ),
+        (
+            "AuthScan",
+            "uo",
+            run_authscan_experiment(&suite["AuthScan"].uo)?,
+        ),
+        (
+            "RegistryCRUD",
+            "raw",
+            run_registry_experiment(&suite["RegistryCRUD"].raw)?,
+        ),
+        (
+            "RegistryCRUD",
+            "uo",
+            run_registry_experiment(&suite["RegistryCRUD"].uo)?,
+        ),
+        (
+            "ConfidentialMixer",
+            "raw",
+            run_mixer_experiment(&suite["ConfidentialMixer"].raw)?,
+        ),
+        (
+            "ConfidentialMixer",
+            "uo",
+            run_mixer_experiment(&suite["ConfidentialMixer"].uo)?,
+        ),
         (
             "ConfidentialMixer",
             "oram",
@@ -449,8 +545,16 @@ fn run_mutual_information_reports(suite: &BTreeMap<&'static str, BenchArtifacts>
                     .ok_or_else(|| anyhow!("missing mixer oram"))?,
             )?,
         ),
-        ("ERC20Lite", "raw", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)?),
-        ("ERC20Lite", "uo", run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)?),
+        (
+            "ERC20Lite",
+            "raw",
+            run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)?,
+        ),
+        (
+            "ERC20Lite",
+            "uo",
+            run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)?,
+        ),
         (
             "ERC20Lite",
             "oram",
@@ -542,7 +646,11 @@ fn run_scenario(
     let target = instance.call(target.entrypoint, target.args.clone())?;
     let getters = getters
         .iter()
-        .map(|call| instance.call(call.entrypoint, call.args.clone()).map(|result| result.return_value))
+        .map(|call| {
+            instance
+                .call(call.entrypoint, call.args.clone())
+                .map(|result| result.return_value)
+        })
         .collect::<Result<Vec<_>>>()?;
     Ok(ScenarioResult { target, getters })
 }
@@ -563,8 +671,18 @@ fn run_fixed_classifier_experiment(artifact: &CompiledArtifact) -> Result<Experi
         artifact,
         &[],
         "classify(uint256)",
-        vec![vec![Value::Uint(0)], vec![Value::Uint(2)], vec![Value::Uint(4)], vec![Value::Uint(6)]],
-        vec![vec![Value::Uint(1)], vec![Value::Uint(3)], vec![Value::Uint(5)], vec![Value::Uint(7)]],
+        vec![
+            vec![Value::Uint(0)],
+            vec![Value::Uint(2)],
+            vec![Value::Uint(4)],
+            vec![Value::Uint(6)],
+        ],
+        vec![
+            vec![Value::Uint(1)],
+            vec![Value::Uint(3)],
+            vec![Value::Uint(5)],
+            vec![Value::Uint(7)],
+        ],
     )
 }
 
@@ -742,11 +860,21 @@ fn run_binary_experiment(
         class1_metrics.push(extract_metrics(&trace));
     }
     Ok(ExperimentOutcome {
-        opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.opcode_trace_hash),
-        logical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.logical_access_trace_hash),
-        logical_write_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.logical_write_trace_hash),
-        physical_read_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.physical_read_trace_hash),
-        physical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.physical_access_trace_hash),
+        opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
+            &hash.opcode_trace_hash
+        }),
+        logical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
+            &hash.logical_access_trace_hash
+        }),
+        logical_write_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
+            &hash.logical_write_trace_hash
+        }),
+        physical_read_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
+            &hash.physical_read_trace_hash
+        }),
+        physical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
+            &hash.physical_access_trace_hash
+        }),
         class0_metrics,
         class1_metrics,
     })
@@ -794,19 +922,35 @@ fn extract_metrics(trace: &uo_core::ExecutionTrace) -> BTreeMap<String, f64> {
     let mut metrics = trace.host_proxy_metrics.clone();
     metrics.insert(
         "same_writes".into(),
-        trace.physical_writes.iter().filter(|event| event.class == WriteClass::Same).count() as f64,
+        trace
+            .physical_writes
+            .iter()
+            .filter(|event| event.class == WriteClass::Same)
+            .count() as f64,
     );
     metrics.insert(
         "set_writes".into(),
-        trace.physical_writes.iter().filter(|event| event.class == WriteClass::Set).count() as f64,
+        trace
+            .physical_writes
+            .iter()
+            .filter(|event| event.class == WriteClass::Set)
+            .count() as f64,
     );
     metrics.insert(
         "clear_writes".into(),
-        trace.physical_writes.iter().filter(|event| event.class == WriteClass::Clear).count() as f64,
+        trace
+            .physical_writes
+            .iter()
+            .filter(|event| event.class == WriteClass::Clear)
+            .count() as f64,
     );
     metrics.insert(
         "update_writes".into(),
-        trace.physical_writes.iter().filter(|event| event.class == WriteClass::Update).count() as f64,
+        trace
+            .physical_writes
+            .iter()
+            .filter(|event| event.class == WriteClass::Update)
+            .count() as f64,
     );
     metrics.insert("gas_used".into(), trace.gas_used as f64);
     metrics
@@ -841,7 +985,10 @@ fn mi_report(class0: &[BTreeMap<String, f64>], class1: &[BTreeMap<String, f64>])
             .iter()
             .map(|metrics| *metrics.get(&metric).unwrap_or(&0.0))
             .collect::<Vec<_>>();
-        report.insert(metric, json!(mutual_information_bits(&negatives, &positives)));
+        report.insert(
+            metric,
+            json!(mutual_information_bits(&negatives, &positives)),
+        );
     }
     JsonValue::Object(report)
 }

@@ -5,12 +5,12 @@ use uo_core::ir::{
     BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
     StateObject, Statement, UnaryOp,
 };
-use uo_core::manifest::{EntrypointManifest, RuntimeManifest, StateObjectManifest};
+use uo_core::manifest::{EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ContractMetadata, ScalarType, StateMetadata, StructField, Type, Value,
 };
 
-use solang_parser::{diagnostics::Diagnostic, pt, parse};
+use solang_parser::{diagnostics::Diagnostic, parse, pt};
 
 #[derive(Clone, Debug)]
 pub struct ValidationOutput {
@@ -106,7 +106,10 @@ pub fn compile(
             loop_counter: 0,
         };
         let compiled = lower_function(function, &entry_meta, mode.clone(), &mut ctx)?;
-        manifest_entrypoints.insert(signature.clone(), build_manifest_entry(&compiled, &frontend, &entry_meta)?);
+        manifest_entrypoints.insert(
+            signature.clone(),
+            build_manifest_entry(&compiled, &frontend, &entry_meta)?,
+        );
         functions.push(compiled);
     }
     let manifest = RuntimeManifest {
@@ -118,24 +121,31 @@ pub fn compile(
         objects: frontend
             .state_by_name
             .values()
-            .map(|object| StateObjectManifest {
-                id: object.id,
-                name: object.name.clone(),
-                kind: match object.kind {
-                    ContainerKind::Cell => "cell".into(),
-                    ContainerKind::Array => "array".into(),
-                    ContainerKind::Map => "map".into(),
-                },
-                backend: match object.backend {
-                    BackendKind::Raw => "raw".into(),
-                    BackendKind::FullScan => "full_scan".into(),
-                    BackendKind::Oram => "oram".into(),
-                },
-                capacity: object.capacity,
-                value_type: Some(object.value_type.short_name()),
-                key_type: object.key_type.as_ref().map(Type::short_name),
+            .map(|object| {
+                Ok(StateObjectManifest {
+                    id: object.id,
+                    name: object.name.clone(),
+                    kind: match object.kind {
+                        ContainerKind::Cell => "cell".into(),
+                        ContainerKind::Array => "array".into(),
+                        ContainerKind::Map => "map".into(),
+                    },
+                    backend: match object.backend {
+                        BackendKind::Raw => "raw".into(),
+                        BackendKind::FullScan => "full_scan".into(),
+                        BackendKind::Oram => "oram".into(),
+                    },
+                    capacity: object.capacity,
+                    value_type: Some(object.value_type.short_name()),
+                    key_type: object.key_type.as_ref().map(Type::short_name),
+                    oram: if object.backend == BackendKind::Oram {
+                        Some(OramManifest::for_object(object)?)
+                    } else {
+                        None
+                    },
+                })
             })
-            .collect(),
+            .collect::<Result<Vec<_>>>()?,
         entrypoints: manifest_entrypoints,
     };
     let contract = CompiledContract {
@@ -156,7 +166,11 @@ pub fn compile(
     })
 }
 
-fn parse_frontend(source_path: &str, source: &str, metadata: &ContractMetadata) -> Result<Frontend> {
+fn parse_frontend(
+    source_path: &str,
+    source: &str,
+    metadata: &ContractMetadata,
+) -> Result<Frontend> {
     let (unit, _) = parse(source, 0).map_err(render_parse_errors)?;
     let contract = unit
         .0
@@ -219,7 +233,10 @@ fn parse_frontend(source_path: &str, source: &str, metadata: &ContractMetadata) 
                     .get(&name)
                     .ok_or_else(|| anyhow!("state variable {} is missing metadata", name))?;
                 let id = (state_by_name.len() + 1) as u32;
-                state_by_name.insert(name.clone(), lower_state_object(id, &name, def, state_meta, &structs)?);
+                state_by_name.insert(
+                    name.clone(),
+                    lower_state_object(id, &name, def, state_meta, &structs)?,
+                );
             }
             pt::ContractPart::FunctionDefinition(def) => {
                 reject_function_shape(def)?;
@@ -234,9 +251,13 @@ fn parse_frontend(source_path: &str, source: &str, metadata: &ContractMetadata) 
             pt::ContractPart::EventDefinition(_) => bail!("events are unsupported"),
             pt::ContractPart::ErrorDefinition(_) => bail!("custom errors are unsupported"),
             pt::ContractPart::EnumDefinition(_) => bail!("enums are unsupported"),
-            pt::ContractPart::TypeDefinition(_) => bail!("user-defined type aliases are unsupported"),
+            pt::ContractPart::TypeDefinition(_) => {
+                bail!("user-defined type aliases are unsupported")
+            }
             pt::ContractPart::Using(_) => bail!("using directives are unsupported"),
-            pt::ContractPart::Annotation(_) => bail!("annotations in Solidity source are unsupported"),
+            pt::ContractPart::Annotation(_) => {
+                bail!("annotations in Solidity source are unsupported")
+            }
             pt::ContractPart::StraySemicolon(_) => {}
         }
     }
@@ -430,14 +451,18 @@ fn lower_expression_statement(
 fn lower_assignment(expression: &pt::Expression, ctx: &mut LowerCtx<'_>) -> Result<Statement> {
     let (left, rhs, op) = match expression {
         pt::Expression::Assign(_, left, right) => (left.as_ref(), right.as_ref(), None),
-        pt::Expression::AssignAdd(_, left, right) => (left.as_ref(), right.as_ref(), Some(BinaryOp::Add)),
+        pt::Expression::AssignAdd(_, left, right) => {
+            (left.as_ref(), right.as_ref(), Some(BinaryOp::Add))
+        }
         pt::Expression::AssignSubtract(_, left, right) => {
             (left.as_ref(), right.as_ref(), Some(BinaryOp::Sub))
         }
         pt::Expression::AssignAnd(_, left, right) => {
             (left.as_ref(), right.as_ref(), Some(BinaryOp::BitAnd))
         }
-        pt::Expression::AssignOr(_, left, right) => (left.as_ref(), right.as_ref(), Some(BinaryOp::BitOr)),
+        pt::Expression::AssignOr(_, left, right) => {
+            (left.as_ref(), right.as_ref(), Some(BinaryOp::BitOr))
+        }
         pt::Expression::AssignXor(_, left, right) => {
             (left.as_ref(), right.as_ref(), Some(BinaryOp::BitXor))
         }
@@ -470,8 +495,13 @@ fn lower_expr(
         }
         if let Some(state) = ctx.frontend.state_by_name.get(&identifier.name) {
             return match state.kind {
-                ContainerKind::Cell => Ok(Expr::CellGet { object_id: state.id }),
-                _ => bail!("state object {} must be accessed through index/key", identifier.name),
+                ContainerKind::Cell => Ok(Expr::CellGet {
+                    object_id: state.id,
+                }),
+                _ => bail!(
+                    "state object {} must be accessed through index/key",
+                    identifier.name
+                ),
             };
         }
         bail!("unknown identifier {}", identifier.name);
@@ -503,9 +533,15 @@ fn lower_expr(
             op: UnaryOp::Not,
             expr: Box::new(lower_expr(expr, ctx, subst)?),
         }),
-        pt::Expression::BitwiseAnd(_, lhs, rhs) => lower_binary(BinaryOp::BitAnd, lhs, rhs, ctx, subst),
-        pt::Expression::BitwiseOr(_, lhs, rhs) => lower_binary(BinaryOp::BitOr, lhs, rhs, ctx, subst),
-        pt::Expression::BitwiseXor(_, lhs, rhs) => lower_binary(BinaryOp::BitXor, lhs, rhs, ctx, subst),
+        pt::Expression::BitwiseAnd(_, lhs, rhs) => {
+            lower_binary(BinaryOp::BitAnd, lhs, rhs, ctx, subst)
+        }
+        pt::Expression::BitwiseOr(_, lhs, rhs) => {
+            lower_binary(BinaryOp::BitOr, lhs, rhs, ctx, subst)
+        }
+        pt::Expression::BitwiseXor(_, lhs, rhs) => {
+            lower_binary(BinaryOp::BitXor, lhs, rhs, ctx, subst)
+        }
         pt::Expression::Add(_, lhs, rhs) => lower_binary(BinaryOp::Add, lhs, rhs, ctx, subst),
         pt::Expression::Subtract(_, lhs, rhs) => lower_binary(BinaryOp::Sub, lhs, rhs, ctx, subst),
         pt::Expression::Multiply(_, lhs, rhs) => lower_binary(BinaryOp::Mul, lhs, rhs, ctx, subst),
@@ -731,10 +767,9 @@ fn lower_lvalue(
             if let pt::Expression::Variable(identifier) = base.as_ref() {
                 if let Some(state) = ctx.frontend.state_by_name.get(&identifier.name) {
                     return match state.kind {
-                        ContainerKind::Array => Ok(LValue::Array(
-                            state.id,
-                            lower_expr(index, ctx, subst)?,
-                        )),
+                        ContainerKind::Array => {
+                            Ok(LValue::Array(state.id, lower_expr(index, ctx, subst)?))
+                        }
                         ContainerKind::Map => {
                             Ok(LValue::Map(state.id, lower_expr(index, ctx, subst)?))
                         }
@@ -796,17 +831,17 @@ fn lower_for_bound(
 
 fn lower_for_increment(expression: &pt::Expression, index_var: &str) -> Result<()> {
     match expression {
-        pt::Expression::PostIncrement(_, expr)
-        | pt::Expression::PreIncrement(_, expr) => match expr.as_ref() {
-            pt::Expression::Variable(identifier) if identifier.name == index_var => Ok(()),
-            _ => bail!("for-loop increment must update {}", index_var),
-        },
-        pt::Expression::AssignAdd(_, left, right) => match (left.as_ref(), right.as_ref()) {
-            (pt::Expression::Variable(identifier), pt::Expression::NumberLiteral(_, integer, fraction, _))
-                if identifier.name == index_var && integer == "1" && fraction.is_empty() =>
-            {
-                Ok(())
+        pt::Expression::PostIncrement(_, expr) | pt::Expression::PreIncrement(_, expr) => {
+            match expr.as_ref() {
+                pt::Expression::Variable(identifier) if identifier.name == index_var => Ok(()),
+                _ => bail!("for-loop increment must update {}", index_var),
             }
+        }
+        pt::Expression::AssignAdd(_, left, right) => match (left.as_ref(), right.as_ref()) {
+            (
+                pt::Expression::Variable(identifier),
+                pt::Expression::NumberLiteral(_, integer, fraction, _),
+            ) if identifier.name == index_var && integer == "1" && fraction.is_empty() => Ok(()),
             _ => bail!("for-loop increment must be {} += 1", index_var),
         },
         _ => bail!("unsupported for-loop increment"),
@@ -947,7 +982,8 @@ fn lower_params(
                 .as_ref()
                 .ok_or_else(|| anyhow!("malformed parameter"))?;
             Ok((
-                param.name
+                param
+                    .name
                     .as_ref()
                     .ok_or_else(|| anyhow!("parameter without name"))?
                     .name
@@ -982,18 +1018,17 @@ fn build_manifest_entry(
 ) -> Result<EntrypointManifest> {
     let counts = count_body(&function.body);
     let accessed_objects = accessed_objects(&function.body);
+    let oram_accesses = count_oram_accesses(&function.body, frontend)?;
     let max_commit_ops = accessed_objects
         .iter()
         .map(|object_id| {
-            let object = frontend
-                .state_by_name
-                .values()
-                .find(|object| object.id == *object_id)
-                .ok_or_else(|| anyhow!("unknown object id {} in manifest counting", object_id))?;
+            let object = state_object_by_id(frontend, *object_id)?;
             Ok(match object.kind {
                 ContainerKind::Cell => 1usize,
-                ContainerKind::Array | ContainerKind::Map if object.backend == BackendKind::Oram => {
-                    oram_batch_ops(object.capacity.unwrap_or(8))
+                ContainerKind::Array | ContainerKind::Map
+                    if object.backend == BackendKind::Oram =>
+                {
+                    OramManifest::for_object(object)?.total_commit_ops()
                 }
                 ContainerKind::Array | ContainerKind::Map => object.capacity.unwrap_or(1),
             })
@@ -1002,8 +1037,7 @@ fn build_manifest_entry(
         .into_iter()
         .sum::<usize>();
     let budget = entry_meta.public_gas_budget.unwrap_or(
-        2000
-            + counts.statement_count as u64 * 11
+        2000 + counts.statement_count as u64 * 11
             + counts.expr_count as u64 * 7
             + max_commit_ops as u64 * 29,
     );
@@ -1019,6 +1053,7 @@ fn build_manifest_entry(
         uomap_reads: counts.map_reads,
         uomap_writes: counts.map_writes,
         max_commit_ops,
+        oram_accesses,
     })
 }
 
@@ -1045,7 +1080,9 @@ fn count_body(statements: &[Statement]) -> CountSummary {
                 count_expr(value, &mut counts);
             }
             Statement::Assign { value, .. } => count_expr(value, &mut counts),
-            Statement::Require { cond } | Statement::AbortIf { cond } => count_expr(cond, &mut counts),
+            Statement::Require { cond } | Statement::AbortIf { cond } => {
+                count_expr(cond, &mut counts)
+            }
             Statement::If {
                 cond,
                 then_body,
@@ -1057,13 +1094,17 @@ fn count_body(statements: &[Statement]) -> CountSummary {
                 let else_counts = count_body(else_body);
                 merge_counts(&mut counts, else_counts);
             }
-            Statement::For { start, end, body, .. } => {
+            Statement::For {
+                start, end, body, ..
+            } => {
                 count_expr(start, &mut counts);
                 count_expr(end, &mut counts);
                 let body_counts = count_body(body);
                 merge_counts(&mut counts, body_counts);
             }
-            Statement::CellSet { value, predicate, .. } => {
+            Statement::CellSet {
+                value, predicate, ..
+            } => {
                 counts.cell_writes += 1;
                 count_expr(value, &mut counts);
                 if let Some(predicate) = predicate {
@@ -1166,12 +1207,165 @@ fn accessed_objects(statements: &[Statement]) -> BTreeSet<u32> {
     ids
 }
 
+fn count_oram_accesses(
+    statements: &[Statement],
+    frontend: &Frontend,
+) -> Result<BTreeMap<u32, usize>> {
+    let mut counts = BTreeMap::new();
+    for statement in statements {
+        collect_oram_statement_accesses(statement, frontend, &mut counts)?;
+    }
+    Ok(counts)
+}
+
+fn collect_oram_statement_accesses(
+    statement: &Statement,
+    frontend: &Frontend,
+    counts: &mut BTreeMap<u32, usize>,
+) -> Result<()> {
+    match statement {
+        Statement::Declare { value, .. } | Statement::Assign { value, .. } => {
+            collect_oram_expr_accesses(value, frontend, counts)
+        }
+        Statement::Require { cond } | Statement::AbortIf { cond } => {
+            collect_oram_expr_accesses(cond, frontend, counts)
+        }
+        Statement::If {
+            cond,
+            then_body,
+            else_body,
+        } => {
+            collect_oram_expr_accesses(cond, frontend, counts)?;
+            for stmt in then_body {
+                collect_oram_statement_accesses(stmt, frontend, counts)?;
+            }
+            for stmt in else_body {
+                collect_oram_statement_accesses(stmt, frontend, counts)?;
+            }
+            Ok(())
+        }
+        Statement::For {
+            start, end, body, ..
+        } => {
+            collect_oram_expr_accesses(start, frontend, counts)?;
+            collect_oram_expr_accesses(end, frontend, counts)?;
+            for stmt in body {
+                collect_oram_statement_accesses(stmt, frontend, counts)?;
+            }
+            Ok(())
+        }
+        Statement::CellSet {
+            value, predicate, ..
+        } => {
+            collect_oram_expr_accesses(value, frontend, counts)?;
+            if let Some(predicate) = predicate {
+                collect_oram_expr_accesses(predicate, frontend, counts)?;
+            }
+            Ok(())
+        }
+        Statement::ArraySet {
+            index,
+            value,
+            predicate,
+            ..
+        } => {
+            collect_oram_expr_accesses(index, frontend, counts)?;
+            collect_oram_expr_accesses(value, frontend, counts)?;
+            if let Some(predicate) = predicate {
+                collect_oram_expr_accesses(predicate, frontend, counts)?;
+            }
+            Ok(())
+        }
+        Statement::MapPut {
+            object_id,
+            key,
+            value,
+            predicate,
+        } => {
+            record_oram_access(*object_id, frontend, counts)?;
+            collect_oram_expr_accesses(key, frontend, counts)?;
+            collect_oram_expr_accesses(value, frontend, counts)?;
+            if let Some(predicate) = predicate {
+                collect_oram_expr_accesses(predicate, frontend, counts)?;
+            }
+            Ok(())
+        }
+        Statement::Return { value } => {
+            if let Some(value) = value {
+                collect_oram_expr_accesses(value, frontend, counts)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn collect_oram_expr_accesses(
+    expr: &Expr,
+    frontend: &Frontend,
+    counts: &mut BTreeMap<u32, usize>,
+) -> Result<()> {
+    match expr {
+        Expr::Unary { expr, .. } => collect_oram_expr_accesses(expr, frontend, counts),
+        Expr::Binary { lhs, rhs, .. } => {
+            collect_oram_expr_accesses(lhs, frontend, counts)?;
+            collect_oram_expr_accesses(rhs, frontend, counts)
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            collect_oram_expr_accesses(cond, frontend, counts)?;
+            collect_oram_expr_accesses(when_true, frontend, counts)?;
+            collect_oram_expr_accesses(when_false, frontend, counts)
+        }
+        Expr::ArrayGet { index, .. } => collect_oram_expr_accesses(index, frontend, counts),
+        Expr::MapGet { object_id, key } => {
+            record_oram_access(*object_id, frontend, counts)?;
+            collect_oram_expr_accesses(key, frontend, counts)
+        }
+        Expr::StructField { base, .. } => collect_oram_expr_accesses(base, frontend, counts),
+        Expr::ArrayIndex { base, index } => {
+            collect_oram_expr_accesses(base, frontend, counts)?;
+            collect_oram_expr_accesses(index, frontend, counts)
+        }
+        Expr::Keccak256 { parts } => {
+            for part in parts {
+                collect_oram_expr_accesses(part, frontend, counts)?;
+            }
+            Ok(())
+        }
+        Expr::Literal(_) | Expr::Var(_) | Expr::CellGet { .. } => Ok(()),
+    }
+}
+
+fn record_oram_access(
+    object_id: u32,
+    frontend: &Frontend,
+    counts: &mut BTreeMap<u32, usize>,
+) -> Result<()> {
+    if state_object_by_id(frontend, object_id)?.backend == BackendKind::Oram {
+        *counts.entry(object_id).or_default() += 1;
+    }
+    Ok(())
+}
+
+fn state_object_by_id(frontend: &Frontend, object_id: u32) -> Result<&StateObject> {
+    frontend
+        .state_by_name
+        .values()
+        .find(|object| object.id == object_id)
+        .ok_or_else(|| anyhow!("unknown object id {} in manifest counting", object_id))
+}
+
 fn collect_statement_objects(statement: &Statement, ids: &mut BTreeSet<u32>) {
     match statement {
         Statement::Declare { value, .. } | Statement::Assign { value, .. } => {
             collect_expr_objects(value, ids);
         }
-        Statement::Require { cond } | Statement::AbortIf { cond } => collect_expr_objects(cond, ids),
+        Statement::Require { cond } | Statement::AbortIf { cond } => {
+            collect_expr_objects(cond, ids)
+        }
         Statement::If {
             cond,
             then_body,
@@ -1185,7 +1379,9 @@ fn collect_statement_objects(statement: &Statement, ids: &mut BTreeSet<u32>) {
                 collect_statement_objects(stmt, ids);
             }
         }
-        Statement::For { start, end, body, .. } => {
+        Statement::For {
+            start, end, body, ..
+        } => {
             collect_expr_objects(start, ids);
             collect_expr_objects(end, ids);
             for stmt in body {
@@ -1310,7 +1506,11 @@ fn linearize_statement(statement: &Statement, predicate: &Expr) -> Result<Vec<St
         Statement::Declare { name, ty, value } => Ok(vec![Statement::Declare {
             name: name.clone(),
             ty: ty.clone(),
-            value: gate_expr(predicate, value.clone(), Expr::Literal(Value::zero_for_type(ty))),
+            value: gate_expr(
+                predicate,
+                value.clone(),
+                Expr::Literal(Value::zero_for_type(ty)),
+            ),
         }]),
         Statement::Assign { name, value } => Ok(vec![Statement::Assign {
             name: name.clone(),
@@ -1349,7 +1549,8 @@ fn linearize_statement(statement: &Statement, predicate: &Expr) -> Result<Vec<St
             let end = const_expr_uint(end)?;
             let mut out = Vec::new();
             for index in start..end {
-                let substituted = substitute_block(body, index_var, &Expr::Literal(Value::Uint(index)))?;
+                let substituted =
+                    substitute_block(body, index_var, &Expr::Literal(Value::Uint(index)))?;
                 out.extend(linearize_statements(&substituted, predicate)?);
             }
             Ok(out)
@@ -1404,16 +1605,28 @@ fn linearize_statement(statement: &Statement, predicate: &Expr) -> Result<Vec<St
     }
 }
 
-fn substitute_block(statements: &[Statement], name: &str, replacement: &Expr) -> Result<Vec<Statement>> {
+fn substitute_block(
+    statements: &[Statement],
+    name: &str,
+    replacement: &Expr,
+) -> Result<Vec<Statement>> {
     statements
         .iter()
         .map(|statement| substitute_statement(statement, name, replacement))
         .collect()
 }
 
-fn substitute_statement(statement: &Statement, name: &str, replacement: &Expr) -> Result<Statement> {
+fn substitute_statement(
+    statement: &Statement,
+    name: &str,
+    replacement: &Expr,
+) -> Result<Statement> {
     Ok(match statement {
-        Statement::Declare { name: var, ty, value } => Statement::Declare {
+        Statement::Declare {
+            name: var,
+            ty,
+            value,
+        } => Statement::Declare {
             name: var.clone(),
             ty: ty.clone(),
             value: substitute_expr(value, name, replacement),
@@ -1634,19 +1847,23 @@ fn is_helper_function(function: &pt::FunctionDefinition) -> bool {
 }
 
 fn is_internal(function: &pt::FunctionDefinition) -> bool {
-    function.attributes.iter().any(|attribute| matches!(
-        attribute,
-        pt::FunctionAttribute::Visibility(pt::Visibility::Internal(_))
-            | pt::FunctionAttribute::Visibility(pt::Visibility::Private(_))
-    ))
+    function.attributes.iter().any(|attribute| {
+        matches!(
+            attribute,
+            pt::FunctionAttribute::Visibility(pt::Visibility::Internal(_))
+                | pt::FunctionAttribute::Visibility(pt::Visibility::Private(_))
+        )
+    })
 }
 
 fn is_pure_or_view(function: &pt::FunctionDefinition) -> bool {
-    function.attributes.iter().any(|attribute| matches!(
-        attribute,
-        pt::FunctionAttribute::Mutability(pt::Mutability::Pure(_))
-            | pt::FunctionAttribute::Mutability(pt::Mutability::View(_))
-    ))
+    function.attributes.iter().any(|attribute| {
+        matches!(
+            attribute,
+            pt::FunctionAttribute::Mutability(pt::Mutability::Pure(_))
+                | pt::FunctionAttribute::Mutability(pt::Mutability::View(_))
+        )
+    })
 }
 
 fn has_visibility(function: &pt::FunctionDefinition, visibility: pt::Visibility) -> bool {
@@ -1662,7 +1879,8 @@ fn function_signature(function: &pt::FunctionDefinition) -> Option<String> {
         .params
         .iter()
         .map(|(_, param)| {
-            param.as_ref()
+            param
+                .as_ref()
                 .map(|param| type_expr_name(&param.ty))
                 .unwrap_or_else(|| "<error>".into())
         })
@@ -1679,7 +1897,11 @@ fn type_expr_name(expression: &pt::Expression) -> String {
             pt::Type::Bytes(32) => "bytes32".into(),
             pt::Type::Address | pt::Type::AddressPayable => "address".into(),
             pt::Type::Mapping { key, value, .. } => {
-                format!("mapping({}=>{})", type_expr_name(key), type_expr_name(value))
+                format!(
+                    "mapping({}=>{})",
+                    type_expr_name(key),
+                    type_expr_name(value)
+                )
             }
             other => format!("{other:?}"),
         },
@@ -1713,12 +1935,6 @@ fn render_parse_errors(errors: Vec<Diagnostic>) -> anyhow::Error {
 
 fn diagnostics_error(message: impl Into<String>) -> Result<()> {
     bail!("{}", message.into())
-}
-
-fn oram_batch_ops(capacity: usize) -> usize {
-    let batch = ((capacity.max(2) as f64).log2().ceil() as usize + 2).max(3);
-    let metadata_pages = capacity.max(1).div_ceil(8) + 1;
-    batch + metadata_pages
 }
 
 fn disassemble_contract(contract: &CompiledContract) -> Vec<String> {
@@ -1790,7 +2006,10 @@ fn render_statement(statement: &Statement) -> String {
             index_var,
             render_expr(start),
             render_expr(end),
-            body.iter().map(render_statement).collect::<Vec<_>>().join("; ")
+            body.iter()
+                .map(render_statement)
+                .collect::<Vec<_>>()
+                .join("; ")
         ),
         Statement::CellSet {
             object_id,
@@ -1828,7 +2047,10 @@ fn render_statement(statement: &Statement) -> String {
         ),
         Statement::Return { value } => format!(
             "return {}",
-            value.as_ref().map(render_expr).unwrap_or_else(|| "()".into())
+            value
+                .as_ref()
+                .map(render_expr)
+                .unwrap_or_else(|| "()".into())
         ),
     }
 }
@@ -1859,7 +2081,9 @@ fn render_expr(expr: &Expr) -> String {
             format!("map_get({}, {})", object_id, render_expr(key))
         }
         Expr::StructField { base, field } => format!("{}.{}", render_expr(base), field),
-        Expr::ArrayIndex { base, index } => format!("{}[{}]", render_expr(base), render_expr(index)),
+        Expr::ArrayIndex { base, index } => {
+            format!("{}[{}]", render_expr(base), render_expr(index))
+        }
         Expr::Keccak256 { parts } => format!(
             "keccak256({})",
             parts.iter().map(render_expr).collect::<Vec<_>>().join(", ")
@@ -1875,7 +2099,11 @@ mod tests {
     use uo_core::{ContractMetadata, ProgramMode};
 
     fn write_temp(name: &str, contents: &str) -> PathBuf {
-        let path = PathBuf::from(format!("/tmp/uo-solc-test-{}-{}.sol", name, std::process::id()));
+        let path = PathBuf::from(format!(
+            "/tmp/uo-solc-test-{}-{}.sol",
+            name,
+            std::process::id()
+        ));
         fs::write(&path, contents).unwrap();
         path
     }

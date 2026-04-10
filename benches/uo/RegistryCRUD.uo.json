@@ -269,7 +269,8 @@
           "backend": "full_scan",
           "capacity": 8,
           "value_type": "uint256",
-          "key_type": "bytes32"
+          "key_type": "bytes32",
+          "oram": null
         }
       ],
       "entrypoints": {
@@ -286,7 +287,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 1,
-          "max_commit_ops": 8
+          "max_commit_ops": 8,
+          "oram_accesses": {}
         },
         "clearIfMatch(bytes32,uint256)": {
           "secret_args": [
@@ -302,7 +304,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 8
+          "max_commit_ops": 8,
+          "oram_accesses": {}
         },
         "read(bytes32)": {
           "secret_args": [],
@@ -315,7 +318,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 8
+          "max_commit_ops": 8,
+          "oram_accesses": {}
         },
         "upsert(bytes32,uint256)": {
           "secret_args": [
@@ -331,7 +335,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 1,
-          "max_commit_ops": 8
+          "max_commit_ops": 8,
+          "oram_accesses": {}
         }
       }
     }

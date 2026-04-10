@@ -1,10 +1,11 @@
+use crate::oram::{map_record_bytes, MapEntry, OramState, OramTranscript};
 use anyhow::{anyhow, bail, Result};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
 use uo_core::trace::{classify_write, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
-use uo_core::{ScalarType, Type, Value};
+use uo_core::Value;
 use uo_store::{NonZeroCodec, StoreExecutionMetrics};
 
 #[derive(Clone, Debug)]
@@ -51,6 +52,14 @@ impl Tape {
             location: location.into(),
             len,
         });
+    }
+
+    fn record_oram(&mut self, transcript: OramTranscript) {
+        let _ = transcript.schedule;
+        self.metrics.logical_reads += transcript.logical_accesses.len();
+        self.metrics.physical_reads += transcript.physical_reads.len();
+        self.logical_accesses.extend(transcript.logical_accesses);
+        self.physical_reads.extend(transcript.physical_reads);
     }
 }
 
@@ -114,13 +123,6 @@ impl RawMapObject {
 }
 
 #[derive(Clone, Debug)]
-struct MapEntry {
-    occupied: bool,
-    key: Value,
-    value: Value,
-}
-
-#[derive(Clone, Debug)]
 pub(crate) struct SmallMapObject {
     spec: StateObject,
     entries: Vec<MapEntry>,
@@ -142,13 +144,9 @@ impl SmallMapObject {
 #[derive(Clone, Debug)]
 pub(crate) struct OramMapObject {
     spec: StateObject,
-    entries: Vec<MapEntry>,
-    directory_pages: Vec<Vec<u8>>,
-    buckets: Vec<Vec<u8>>,
-    access_counter_slot: Vec<u8>,
+    oram: OramState,
     accessed: bool,
     dirty: bool,
-    access_counter: u64,
     tape: Tape,
     rng: ChaCha20Rng,
 }
@@ -277,37 +275,14 @@ impl RuntimeObject {
                     rng,
                 }))
             }
-            (ContainerKind::Map, BackendKind::Oram) => {
-                let capacity = spec
-                    .capacity
-                    .ok_or_else(|| anyhow!("map {} is missing capacity", spec.name))?;
-                let empty_entry = empty_map_entry(spec)?;
-                let entries = vec![empty_entry.clone(); capacity];
-                let directory_pages = (0..oram_directory_page_count(capacity))
-                    .map(|page| {
-                        let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
-                        let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(entries.len());
-                        let payload = encode_oram_directory_page(&entries[start..end], &empty_entry);
-                        NonZeroCodec::encode(&payload, &mut rng)
-                    })
-                    .collect();
-                let bucket_count = capacity.next_power_of_two().max(8) / 2;
-                let bucket_bytes = (0..bucket_count)
-                    .map(|_| NonZeroCodec::filler(64, &mut rng))
-                    .collect();
-                Ok(Self::UoOramMap(OramMapObject {
-                    spec: spec.clone(),
-                    entries,
-                    directory_pages,
-                    buckets: bucket_bytes,
-                    access_counter_slot: NonZeroCodec::encode(&0u64.to_be_bytes(), &mut rng),
-                    accessed: false,
-                    dirty: false,
-                    access_counter: 0,
-                    tape: Tape::default(),
-                    rng,
-                }))
-            }
+            (ContainerKind::Map, BackendKind::Oram) => Ok(Self::UoOramMap(OramMapObject {
+                spec: spec.clone(),
+                oram: OramState::instantiate(spec, &mut rng)?,
+                accessed: false,
+                dirty: false,
+                tape: Tape::default(),
+                rng,
+            })),
         }
     }
 
@@ -315,7 +290,10 @@ impl RuntimeObject {
         let mut cloned = self.clone();
         cloned.clear_transient();
         if let Self::UoOramMap(object) = &mut cloned {
-            refresh_oram_cache(object).expect("valid ORAM control metadata");
+            object
+                .oram
+                .refresh_from_storage(&object.spec)
+                .expect("valid ORAM control metadata");
         }
         cloned
     }
@@ -335,9 +313,11 @@ impl RuntimeObject {
             Self::RawCell(object) | Self::UoCell(object) => {
                 object.accessed = true;
                 object.tape.read("cell_get", &object.spec.name, "");
-                object
-                    .tape
-                    .physical_read(&object.spec.name, object.spec.name.clone(), object.physical.len());
+                object.tape.physical_read(
+                    &object.spec.name,
+                    object.spec.name.clone(),
+                    object.physical.len(),
+                );
                 Ok(object.value.clone())
             }
             _ => bail!("{} is not a cell", self.name()),
@@ -350,9 +330,11 @@ impl RuntimeObject {
             Self::RawCell(object) | Self::UoCell(object) => {
                 object.accessed = true;
                 object.tape.write("cell_set", &object.spec.name, "slot");
-                object
-                    .tape
-                    .physical_read(&object.spec.name, object.spec.name.clone(), object.physical.len());
+                object.tape.physical_read(
+                    &object.spec.name,
+                    object.spec.name.clone(),
+                    object.physical.len(),
+                );
                 if apply {
                     object.value = value;
                     object.written = true;
@@ -367,11 +349,13 @@ impl RuntimeObject {
         match self {
             Self::RawArray(object) => {
                 object.accessed = true;
-                let value = object
-                    .values
-                    .get(index)
-                    .cloned()
-                    .ok_or_else(|| anyhow!("array index {} out of bounds for {}", index, object.spec.name))?;
+                let value = object.values.get(index).cloned().ok_or_else(|| {
+                    anyhow!(
+                        "array index {} out of bounds for {}",
+                        index,
+                        object.spec.name
+                    )
+                })?;
                 object
                     .tape
                     .read("array_get", &object.spec.name, format!("[{index}]"));
@@ -384,11 +368,13 @@ impl RuntimeObject {
             }
             Self::UoArray(object) => {
                 object.accessed = true;
-                let value = object
-                    .values
-                    .get(index)
-                    .cloned()
-                    .ok_or_else(|| anyhow!("array index {} out of bounds for {}", index, object.spec.name))?;
+                let value = object.values.get(index).cloned().ok_or_else(|| {
+                    anyhow!(
+                        "array index {} out of bounds for {}",
+                        index,
+                        object.spec.name
+                    )
+                })?;
                 object
                     .tape
                     .read("array_get", &object.spec.name, format!("[{index}]"));
@@ -404,10 +390,13 @@ impl RuntimeObject {
         match self {
             Self::RawArray(object) => {
                 object.accessed = true;
-                object
-                    .values
-                    .get(index)
-                    .ok_or_else(|| anyhow!("array index {} out of bounds for {}", index, object.spec.name))?;
+                object.values.get(index).ok_or_else(|| {
+                    anyhow!(
+                        "array index {} out of bounds for {}",
+                        index,
+                        object.spec.name
+                    )
+                })?;
                 object
                     .tape
                     .write("array_set", &object.spec.name, format!("[{index}]"));
@@ -424,10 +413,13 @@ impl RuntimeObject {
             }
             Self::UoArray(object) => {
                 object.accessed = true;
-                object
-                    .values
-                    .get(index)
-                    .ok_or_else(|| anyhow!("array index {} out of bounds for {}", index, object.spec.name))?;
+                object.values.get(index).ok_or_else(|| {
+                    anyhow!(
+                        "array index {} out of bounds for {}",
+                        index,
+                        object.spec.name
+                    )
+                })?;
                 object
                     .tape
                     .write("array_set", &object.spec.name, format!("[{index}]"));
@@ -484,13 +476,9 @@ impl RuntimeObject {
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
-                record_oram_schedule(object);
-                Ok(object
-                    .entries
-                    .iter()
-                    .find(|entry| entry.occupied && entry.key == *key)
-                    .map(|entry| entry.value.clone())
-                    .unwrap_or_else(|| Value::zero_for_type(&object.spec.value_type)))
+                let (value, transcript) = object.oram.get(&object.spec, key)?;
+                object.tape.record_oram(transcript);
+                Ok(value)
             }
             _ => bail!("{} is not a map", self.name()),
         }
@@ -542,7 +530,9 @@ impl RuntimeObject {
                             .entries
                             .iter_mut()
                             .find(|entry| !entry.occupied)
-                            .ok_or_else(|| anyhow!("map {} exceeded public capacity", object.spec.name))?;
+                            .ok_or_else(|| {
+                                anyhow!("map {} exceeded public capacity", object.spec.name)
+                            })?;
                         entry.occupied = true;
                         entry.key = key;
                         entry.value = value;
@@ -553,30 +543,12 @@ impl RuntimeObject {
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
-                record_oram_schedule(object);
-                object.tape.write("uooram_put", &object.spec.name, "oblivious");
+                let transcript = object.oram.put(&object.spec, key, value, apply)?;
+                object.tape.record_oram(transcript);
+                object
+                    .tape
+                    .write("uooram_put", &object.spec.name, "oblivious");
                 if apply {
-                    let value_is_zero = value.is_zero_like();
-                    if let Some(entry) = object
-                        .entries
-                        .iter_mut()
-                        .find(|entry| entry.occupied && entry.key == key)
-                    {
-                        if value_is_zero {
-                            *entry = empty_map_entry(&object.spec)?;
-                        } else {
-                            entry.value = value;
-                        }
-                    } else if !value_is_zero {
-                        let entry = object
-                            .entries
-                            .iter_mut()
-                            .find(|entry| !entry.occupied)
-                            .ok_or_else(|| anyhow!("map {} exceeded public capacity", object.spec.name))?;
-                        entry.occupied = true;
-                        entry.key = key;
-                        entry.value = value;
-                    }
                     object.dirty = true;
                 }
                 Ok(())
@@ -627,10 +599,8 @@ impl RuntimeObject {
                 };
                 if new.accessed {
                     let old_physical = old.physical.clone();
-                    let new_physical = NonZeroCodec::encode(
-                        &committed_value.canonical_bytes(),
-                        &mut next.rng,
-                    );
+                    let new_physical =
+                        NonZeroCodec::encode(&committed_value.canonical_bytes(), &mut next.rng);
                     physical_writes.push(PhysicalWriteEvent {
                         object: next.spec.name.clone(),
                         location: next.spec.name.clone(),
@@ -796,61 +766,23 @@ impl RuntimeObject {
             (Self::UoOramMap(mut new), Self::UoOramMap(old)) => {
                 let mut physical_writes = Vec::new();
                 let mut next = new.clone();
-                let source_entries = if aborted { &old.entries } else { &new.entries };
                 if new.accessed {
-                    let empty_entry = empty_map_entry(&new.spec)?;
-                    for page in 0..old.directory_pages.len() {
-                        let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
-                        let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(source_entries.len());
-                        let old_physical = old.directory_pages[page].clone();
-                        let payload = encode_oram_directory_page(&source_entries[start..end], &empty_entry);
-                        let new_physical = NonZeroCodec::encode(&payload, &mut next.rng);
+                    let commit = new
+                        .oram
+                        .commit(&new.spec, &old.oram, aborted, &mut next.rng)?;
+                    for write in commit.writes {
                         physical_writes.push(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
-                            location: format!("{}@meta{page}", new.spec.name),
-                            class: classify_write(&old_physical, &new_physical),
-                            old: old_physical,
-                            new: new_physical.clone(),
+                            location: write.location,
+                            class: classify_write(&write.old, &write.new),
+                            old: write.old,
+                            new: write.new,
                         });
-                        next.directory_pages[page] = new_physical;
                         next.tape.metrics.physical_writes += 1;
                     }
-                    let old_counter_physical = old.access_counter_slot.clone();
-                    let next_counter = old.access_counter + 1;
-                    let new_counter_physical = NonZeroCodec::encode(&next_counter.to_be_bytes(), &mut next.rng);
-                    physical_writes.push(PhysicalWriteEvent {
-                        object: new.spec.name.clone(),
-                        location: format!("{}@counter", new.spec.name),
-                        class: classify_write(&old_counter_physical, &new_counter_physical),
-                        old: old_counter_physical,
-                        new: new_counter_physical.clone(),
-                    });
-                    next.access_counter_slot = new_counter_physical;
-                    next.tape.metrics.physical_writes += 1;
-                    let batch = oram_batch_len(new.spec.capacity.unwrap_or(8));
-                    for offset in 0..batch {
-                        let index = ((old.access_counter as usize) + offset) % old.buckets.len();
-                        let old_physical = old.buckets[index].clone();
-                        let payload = oram_bucket_bytes(source_entries, old.access_counter, index);
-                        let new_physical = NonZeroCodec::encode(&payload, &mut next.rng);
-                        physical_writes.push(PhysicalWriteEvent {
-                            object: new.spec.name.clone(),
-                            location: format!("{}@bucket{index}", new.spec.name),
-                            class: classify_write(&old_physical, &new_physical),
-                            old: old_physical,
-                            new: new_physical.clone(),
-                        });
-                        next.buckets[index] = new_physical;
-                        next.tape.metrics.physical_writes += 1;
-                    }
-                    next.entries = source_entries.clone();
-                    next.access_counter = next_counter;
+                    next.oram = commit.next;
                 } else {
-                    next.entries = old.entries.clone();
-                    next.directory_pages = old.directory_pages.clone();
-                    next.buckets = old.buckets.clone();
-                    next.access_counter = old.access_counter;
-                    next.access_counter_slot = old.access_counter_slot.clone();
+                    next.oram = old.oram.clone();
                 }
                 next.reset_tape();
                 Ok(ObjectCommit {
@@ -909,53 +841,6 @@ fn raw_encode(value: &Value) -> Vec<u8> {
     }
 }
 
-fn map_record_bytes(entry: &MapEntry) -> Vec<u8> {
-    let mut out = vec![if entry.occupied { 0x7d } else { 0x53 }];
-    out.extend_from_slice(&entry.key.canonical_bytes());
-    out.extend_from_slice(&entry.value.canonical_bytes());
-    out
-}
-
-const ORAM_DIRECTORY_PAGE_ENTRIES: usize = 8;
-
-fn oram_batch_len(capacity: usize) -> usize {
-    let log = (capacity.max(2) as f64).log2().ceil() as usize;
-    (log + 2).max(3)
-}
-
-fn record_oram_schedule(object: &mut OramMapObject) {
-    object
-        .tape
-        .read("uooram_counter", &object.spec.name, "counter");
-    object
-        .tape
-        .physical_read(&object.spec.name, format!("{}@counter", object.spec.name), object.access_counter_slot.len());
-    for page in 0..object.directory_pages.len() {
-        object
-            .tape
-            .read("uooram_meta_scan", &object.spec.name, format!("page:{page}"));
-        object.tape.physical_read(
-            &object.spec.name,
-            format!("{}@meta{page}", object.spec.name),
-            object.directory_pages[page].len(),
-        );
-    }
-    for index in oram_bucket_window(
-        object.access_counter,
-        object.buckets.len(),
-        object.spec.capacity.unwrap_or(8),
-    ) {
-        object
-            .tape
-            .read("uooram_bucket_scan", &object.spec.name, format!("bucket:{index}"));
-        object.tape.physical_read(
-            &object.spec.name,
-            format!("{}@bucket{index}", object.spec.name),
-            object.buckets[index].len(),
-        );
-    }
-}
-
 fn record_array_scan(object: &mut ArrayObject) {
     for index in 0..object.physical_slots.len() {
         object.tape.physical_read(
@@ -964,168 +849,4 @@ fn record_array_scan(object: &mut ArrayObject) {
             object.physical_slots[index].len(),
         );
     }
-}
-
-fn refresh_oram_cache(object: &mut OramMapObject) -> Result<()> {
-    let payload_len = oram_directory_page_payload_len(&object.spec)?;
-    let capacity = object
-        .spec
-        .capacity
-        .ok_or_else(|| anyhow!("map {} is missing capacity", object.spec.name))?;
-    let mut entries = Vec::new();
-    for page in &object.directory_pages {
-        let payload = NonZeroCodec::decode(payload_len, page)
-            .ok_or_else(|| anyhow!("failed to decode ORAM metadata page for {}", object.spec.name))?;
-        entries.extend(decode_oram_directory_page(&payload, &object.spec)?);
-    }
-    entries.truncate(capacity);
-    let counter_bytes = NonZeroCodec::decode(8, &object.access_counter_slot)
-        .ok_or_else(|| anyhow!("failed to decode ORAM counter for {}", object.spec.name))?;
-    let mut counter = [0u8; 8];
-    counter.copy_from_slice(&counter_bytes);
-    object.entries = entries;
-    object.access_counter = u64::from_be_bytes(counter);
-    Ok(())
-}
-
-fn empty_map_entry(spec: &StateObject) -> Result<MapEntry> {
-    Ok(MapEntry {
-        occupied: false,
-        key: Value::zero_for_type(
-            spec.key_type
-                .as_ref()
-                .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?,
-        ),
-        value: Value::zero_for_type(&spec.value_type),
-    })
-}
-
-fn oram_directory_page_count(capacity: usize) -> usize {
-    capacity.max(1).div_ceil(ORAM_DIRECTORY_PAGE_ENTRIES)
-}
-
-fn oram_directory_page_payload_len(spec: &StateObject) -> Result<usize> {
-    Ok(ORAM_DIRECTORY_PAGE_ENTRIES * oram_directory_record_len(spec)?)
-}
-
-fn oram_directory_record_len(spec: &StateObject) -> Result<usize> {
-    let key_len = fixed_scalar_width(
-        spec.key_type
-            .as_ref()
-            .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?,
-    )?;
-    let value_len = fixed_scalar_width(&spec.value_type)?;
-    Ok(1 + key_len + value_len)
-}
-
-fn encode_oram_directory_page(entries: &[MapEntry], empty_entry: &MapEntry) -> Vec<u8> {
-    let mut out = Vec::new();
-    for index in 0..ORAM_DIRECTORY_PAGE_ENTRIES {
-        let entry = entries.get(index).unwrap_or(empty_entry);
-        out.extend_from_slice(&map_record_bytes(entry));
-    }
-    out
-}
-
-fn decode_oram_directory_page(payload: &[u8], spec: &StateObject) -> Result<Vec<MapEntry>> {
-    let record_len = oram_directory_record_len(spec)?;
-    let expected_len = ORAM_DIRECTORY_PAGE_ENTRIES * record_len;
-    if payload.len() != expected_len {
-        bail!(
-            "unexpected ORAM directory payload length for {}: {} != {}",
-            spec.name,
-            payload.len(),
-            expected_len
-        );
-    }
-    let key_type = spec
-        .key_type
-        .as_ref()
-        .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
-    let key_len = fixed_scalar_width(key_type)?;
-    let value_len = fixed_scalar_width(&spec.value_type)?;
-    let mut entries = Vec::with_capacity(ORAM_DIRECTORY_PAGE_ENTRIES);
-    for record in payload.chunks_exact(record_len) {
-        let occupied = match record[0] {
-            0x7d => true,
-            0x53 => false,
-            other => bail!("invalid ORAM directory tag {other:#x} for {}", spec.name),
-        };
-        let key = decode_scalar_value(key_type, &record[1..1 + key_len])?;
-        let value = decode_scalar_value(&spec.value_type, &record[1 + key_len..1 + key_len + value_len])?;
-        entries.push(MapEntry { occupied, key, value });
-    }
-    Ok(entries)
-}
-
-fn fixed_scalar_width(ty: &Type) -> Result<usize> {
-    match ty {
-        Type::Scalar(ScalarType::Bool) => Ok(1),
-        Type::Scalar(ScalarType::Uint(_)) => Ok(32),
-        Type::Scalar(ScalarType::Bytes32) => Ok(32),
-        Type::Scalar(ScalarType::Address) => Ok(20),
-        _ => bail!("ORAM control metadata only supports scalar map key/value types"),
-    }
-}
-
-fn decode_scalar_value(ty: &Type, bytes: &[u8]) -> Result<Value> {
-    match ty {
-        Type::Scalar(ScalarType::Bool) => {
-            if bytes.len() != 1 {
-                bail!("expected 1 byte for bool, got {}", bytes.len());
-            }
-            Ok(Value::Bool(bytes[0] != 0))
-        }
-        Type::Scalar(ScalarType::Uint(_)) => {
-            if bytes.len() != 32 {
-                bail!("expected 32 bytes for uint, got {}", bytes.len());
-            }
-            let mut out = [0u8; 16];
-            out.copy_from_slice(&bytes[16..]);
-            Ok(Value::Uint(u128::from_be_bytes(out)))
-        }
-        Type::Scalar(ScalarType::Bytes32) => {
-            let array: [u8; 32] = bytes
-                .try_into()
-                .map_err(|_| anyhow!("expected 32 bytes for bytes32, got {}", bytes.len()))?;
-            Ok(Value::Bytes32(array))
-        }
-        Type::Scalar(ScalarType::Address) => {
-            let array: [u8; 20] = bytes
-                .try_into()
-                .map_err(|_| anyhow!("expected 20 bytes for address, got {}", bytes.len()))?;
-            Ok(Value::Address(array))
-        }
-        _ => bail!("ORAM control metadata only supports scalar map key/value types"),
-    }
-}
-
-fn oram_bucket_window(access_counter: u64, bucket_count: usize, capacity: usize) -> Vec<usize> {
-    let batch = oram_batch_len(capacity);
-    (0..batch)
-        .map(|offset| ((access_counter as usize) + offset) % bucket_count)
-        .collect()
-}
-
-fn oram_bucket_bytes(entries: &[MapEntry], access_counter: u64, index: usize) -> Vec<u8> {
-    let mut out = Vec::new();
-    out.extend_from_slice(&access_counter.to_be_bytes());
-    out.extend_from_slice(&(index as u64).to_be_bytes());
-    out.extend_from_slice(&(entries.iter().filter(|entry| entry.occupied).count() as u64).to_be_bytes());
-    for entry in entries.iter().filter(|entry| entry.occupied).take(2) {
-        let key = entry.key.canonical_bytes();
-        out.extend_from_slice(&(key.len() as u64).to_be_bytes());
-        out.extend_from_slice(&key);
-        let value = entry.value.canonical_bytes();
-        out.extend_from_slice(&(value.len() as u64).to_be_bytes());
-        out.extend_from_slice(&value);
-    }
-    if out.is_empty() {
-        out.push(1);
-    }
-    out.truncate(64);
-    while out.len() < 64 {
-        out.push(0xAA);
-    }
-    out
 }

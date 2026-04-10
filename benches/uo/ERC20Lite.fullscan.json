@@ -625,7 +625,8 @@
           "backend": "full_scan",
           "capacity": 16,
           "value_type": "uint256",
-          "key_type": "bytes32"
+          "key_type": "bytes32",
+          "oram": null
         },
         {
           "id": 1,
@@ -634,7 +635,8 @@
           "backend": "full_scan",
           "capacity": 8,
           "value_type": "uint256",
-          "key_type": "address"
+          "key_type": "address",
+          "oram": null
         }
       ],
       "entrypoints": {
@@ -649,7 +651,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 16
+          "max_commit_ops": 16,
+          "oram_accesses": {}
         },
         "approve(address,address,uint256)": {
           "secret_args": [
@@ -666,7 +669,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 1,
-          "max_commit_ops": 16
+          "max_commit_ops": 16,
+          "oram_accesses": {}
         },
         "balanceOf(address)": {
           "secret_args": [],
@@ -679,7 +683,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 8
+          "max_commit_ops": 8,
+          "oram_accesses": {}
         },
         "mint(address,uint256)": {
           "secret_args": [],
@@ -692,7 +697,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 8
+          "max_commit_ops": 8,
+          "oram_accesses": {}
         },
         "transfer(address,address,uint256)": {
           "secret_args": [
@@ -709,7 +715,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 2,
           "uomap_writes": 2,
-          "max_commit_ops": 8
+          "max_commit_ops": 8,
+          "oram_accesses": {}
         },
         "transferFrom(address,address,address,uint256)": {
           "secret_args": [
@@ -727,7 +734,8 @@
           "uoarray_writes": 0,
           "uomap_reads": 3,
           "uomap_writes": 3,
-          "max_commit_ops": 24
+          "max_commit_ops": 24,
+          "oram_accesses": {}
         }
       }
     }

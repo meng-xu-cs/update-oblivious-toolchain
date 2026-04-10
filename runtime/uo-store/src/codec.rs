@@ -76,6 +76,9 @@ mod tests {
         let mut rng = ChaCha20Rng::seed_from_u64(11);
         let payload = [0u8, 0xAB, 0xCD, 0xEF];
         let encoded = NonZeroCodec::encode(&payload, &mut rng);
-        assert_eq!(NonZeroCodec::decode(payload.len(), &encoded), Some(payload.to_vec()));
+        assert_eq!(
+            NonZeroCodec::decode(payload.len(), &encoded),
+            Some(payload.to_vec())
+        );
     }
 }

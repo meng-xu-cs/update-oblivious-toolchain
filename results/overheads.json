@@ -8,7 +8,7 @@
         "physical_writes": 65
       },
       "oram_64": {
-        "bytes_written": 10072.0,
+        "bytes_written": 11512.0,
         "gas_used": 12288,
         "physical_writes": 18
       },
