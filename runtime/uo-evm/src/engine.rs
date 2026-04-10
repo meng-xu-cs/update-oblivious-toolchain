@@ -85,6 +85,7 @@ impl ContractInstance {
         )?;
         let mut logical_accesses = Vec::new();
         let mut logical_writes = Vec::new();
+        let mut physical_reads = Vec::new();
         let mut physical_writes = Vec::new();
         let mut host_proxy_metrics = BTreeMap::new();
         let mut gas_used = 0u64;
@@ -99,9 +100,12 @@ impl ContractInstance {
             gas_used += committed_object.metrics.physical_writes as u64 * 17;
             logical_accesses.extend(committed_object.logical_accesses);
             logical_writes.extend(committed_object.logical_writes);
+            physical_reads.extend(committed_object.physical_reads);
             physical_writes.extend(committed_object.physical_writes);
             next_objects.insert(id, committed_object.next);
         }
+        host_proxy_metrics.insert("bytes_read".into(), bytes_read(&physical_reads) as f64);
+        host_proxy_metrics.insert("backend_reads".into(), physical_reads.len() as f64);
         host_proxy_metrics.insert("bytes_written".into(), bytes_written(&physical_writes) as f64);
         host_proxy_metrics.insert("backend_writes".into(), physical_writes.len() as f64);
         host_proxy_metrics.insert(
@@ -148,6 +152,7 @@ impl ContractInstance {
                 opcode_trace,
                 logical_accesses,
                 logical_writes,
+                physical_reads,
                 physical_writes,
                 host_proxy_metrics,
                 gas_used,
@@ -176,6 +181,10 @@ fn exec_block(
         exec_statement(contract, function, statement, objects, state, opcode_trace)?;
     }
     Ok(())
+}
+
+fn bytes_read(reads: &[uo_core::PhysicalReadEvent]) -> usize {
+    reads.iter().map(|event| event.len).sum()
 }
 
 fn exec_statement(

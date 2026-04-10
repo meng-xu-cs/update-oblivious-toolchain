@@ -3,7 +3,9 @@
     {
       "benchmark": "FixedSlotClassifier",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -18,7 +20,9 @@
     {
       "benchmark": "FixedSlotClassifier",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -33,7 +37,9 @@
     {
       "benchmark": "AuthScan",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -48,7 +54,9 @@
     {
       "benchmark": "AuthScan",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -63,7 +71,9 @@
     {
       "benchmark": "RegistryCRUD",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -78,7 +88,9 @@
     {
       "benchmark": "RegistryCRUD",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -93,7 +105,9 @@
     {
       "benchmark": "ConfidentialMixer",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -108,7 +122,9 @@
     {
       "benchmark": "ConfidentialMixer",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -123,7 +139,9 @@
     {
       "benchmark": "ConfidentialMixer",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -138,7 +156,9 @@
     {
       "benchmark": "ERC20Lite",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -153,7 +173,9 @@
     {
       "benchmark": "ERC20Lite",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,
@@ -168,7 +190,9 @@
     {
       "benchmark": "ERC20Lite",
       "metric_auc": {
+        "backend_reads": 0.5,
         "backend_writes": 0.5,
+        "bytes_read": 0.5,
         "bytes_written": 0.5,
         "clear_writes": 0.5,
         "gas_used": 0.5,

@@ -21,6 +21,13 @@ pub struct PhysicalWriteEvent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PhysicalReadEvent {
+    pub object: String,
+    pub location: String,
+    pub len: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LogicalEvent {
     pub kind: String,
     pub object: String,
@@ -32,7 +39,9 @@ pub struct TraceHashBundle {
     pub opcode_trace_hash: String,
     pub logical_access_trace_hash: String,
     pub logical_write_trace_hash: String,
+    pub physical_read_trace_hash: String,
     pub physical_write_trace_hash: String,
+    pub physical_access_trace_hash: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
@@ -43,6 +52,8 @@ pub struct ExecutionTrace {
     pub logical_accesses: Vec<LogicalEvent>,
     #[serde(default)]
     pub logical_writes: Vec<LogicalEvent>,
+    #[serde(default)]
+    pub physical_reads: Vec<PhysicalReadEvent>,
     #[serde(default)]
     pub physical_writes: Vec<PhysicalWriteEvent>,
     #[serde(default)]
@@ -65,11 +76,18 @@ impl ExecutionTrace {
                 )
             })
             .collect::<Vec<_>>();
+        let normalized_reads = self
+            .physical_reads
+            .iter()
+            .map(|event| (event.object.clone(), event.location.clone(), event.len))
+            .collect::<Vec<_>>();
         TraceHashBundle {
             opcode_trace_hash: hash_json(&self.opcode_trace),
             logical_access_trace_hash: hash_json(&self.logical_accesses),
             logical_write_trace_hash: hash_json(&self.logical_writes),
+            physical_read_trace_hash: hash_json(&normalized_reads),
             physical_write_trace_hash: hash_json(&normalized_physical),
+            physical_access_trace_hash: hash_json(&(normalized_reads, normalized_physical)),
         }
     }
 }

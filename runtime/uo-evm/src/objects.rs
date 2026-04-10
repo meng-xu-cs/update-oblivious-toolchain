@@ -3,7 +3,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
-use uo_core::trace::{classify_write, LogicalEvent, PhysicalWriteEvent};
+use uo_core::trace::{classify_write, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::{ScalarType, Type, Value};
 use uo_store::{NonZeroCodec, StoreExecutionMetrics};
 
@@ -12,6 +12,7 @@ pub(crate) struct ObjectCommit {
     pub next: RuntimeObject,
     pub logical_accesses: Vec<LogicalEvent>,
     pub logical_writes: Vec<LogicalEvent>,
+    pub physical_reads: Vec<PhysicalReadEvent>,
     pub physical_writes: Vec<PhysicalWriteEvent>,
     pub metrics: StoreExecutionMetrics,
 }
@@ -20,6 +21,7 @@ pub(crate) struct ObjectCommit {
 struct Tape {
     logical_accesses: Vec<LogicalEvent>,
     logical_writes: Vec<LogicalEvent>,
+    physical_reads: Vec<PhysicalReadEvent>,
     metrics: StoreExecutionMetrics,
 }
 
@@ -39,6 +41,15 @@ impl Tape {
             kind: kind.into(),
             object: object.into(),
             detail: detail.into(),
+        });
+    }
+
+    fn physical_read(&mut self, object: &str, location: impl Into<String>, len: usize) {
+        self.metrics.physical_reads += 1;
+        self.physical_reads.push(PhysicalReadEvent {
+            object: object.into(),
+            location: location.into(),
+            len,
         });
     }
 }
@@ -324,6 +335,9 @@ impl RuntimeObject {
             Self::RawCell(object) | Self::UoCell(object) => {
                 object.accessed = true;
                 object.tape.read("cell_get", &object.spec.name, "");
+                object
+                    .tape
+                    .physical_read(&object.spec.name, object.spec.name.clone(), object.physical.len());
                 Ok(object.value.clone())
             }
             _ => bail!("{} is not a cell", self.name()),
@@ -336,6 +350,9 @@ impl RuntimeObject {
             Self::RawCell(object) | Self::UoCell(object) => {
                 object.accessed = true;
                 object.tape.write("cell_set", &object.spec.name, "slot");
+                object
+                    .tape
+                    .physical_read(&object.spec.name, object.spec.name.clone(), object.physical.len());
                 if apply {
                     object.value = value;
                     object.written = true;
@@ -348,7 +365,7 @@ impl RuntimeObject {
 
     pub fn get_array(&mut self, index: usize) -> Result<Value> {
         match self {
-            Self::RawArray(object) | Self::UoArray(object) => {
+            Self::RawArray(object) => {
                 object.accessed = true;
                 let value = object
                     .values
@@ -358,6 +375,24 @@ impl RuntimeObject {
                 object
                     .tape
                     .read("array_get", &object.spec.name, format!("[{index}]"));
+                object.tape.physical_read(
+                    &object.spec.name,
+                    format!("{}[{index}]", object.spec.name),
+                    object.physical_slots[index].len(),
+                );
+                Ok(value)
+            }
+            Self::UoArray(object) => {
+                object.accessed = true;
+                let value = object
+                    .values
+                    .get(index)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("array index {} out of bounds for {}", index, object.spec.name))?;
+                object
+                    .tape
+                    .read("array_get", &object.spec.name, format!("[{index}]"));
+                record_array_scan(object);
                 Ok(value)
             }
             _ => bail!("{} is not an array", self.name()),
@@ -367,7 +402,7 @@ impl RuntimeObject {
     pub fn set_array(&mut self, index: usize, value: Value, predicate: Option<bool>) -> Result<()> {
         let apply = predicate.unwrap_or(true);
         match self {
-            Self::RawArray(object) | Self::UoArray(object) => {
+            Self::RawArray(object) => {
                 object.accessed = true;
                 object
                     .values
@@ -376,6 +411,27 @@ impl RuntimeObject {
                 object
                     .tape
                     .write("array_set", &object.spec.name, format!("[{index}]"));
+                object.tape.physical_read(
+                    &object.spec.name,
+                    format!("{}[{index}]", object.spec.name),
+                    object.physical_slots[index].len(),
+                );
+                if apply {
+                    object.values[index] = value;
+                    object.written_indices.insert(index);
+                }
+                Ok(())
+            }
+            Self::UoArray(object) => {
+                object.accessed = true;
+                object
+                    .values
+                    .get(index)
+                    .ok_or_else(|| anyhow!("array index {} out of bounds for {}", index, object.spec.name))?;
+                object
+                    .tape
+                    .write("array_set", &object.spec.name, format!("[{index}]"));
+                record_array_scan(object);
                 if apply {
                     object.values[index] = value;
                     object.written_indices.insert(index);
@@ -393,6 +449,11 @@ impl RuntimeObject {
                 object
                     .tape
                     .read("raw_map_get", &object.spec.name, key_name.clone());
+                object.tape.physical_read(
+                    &object.spec.name,
+                    format!("{}::{key_name}", object.spec.name),
+                    32,
+                );
                 if let Some((_, staged_value)) = object.staged.get(&key_name) {
                     return Ok(staged_value.clone());
                 }
@@ -408,6 +469,11 @@ impl RuntimeObject {
                     object
                         .tape
                         .read("uomap_scan", &object.spec.name, format!("slot:{index}"));
+                    object.tape.physical_read(
+                        &object.spec.name,
+                        format!("{}#{index}", object.spec.name),
+                        object.physical_slots[index].len(),
+                    );
                 }
                 Ok(object
                     .entries
@@ -449,6 +515,11 @@ impl RuntimeObject {
                     object
                         .tape
                         .read("uomap_scan", &object.spec.name, format!("slot:{index}"));
+                    object.tape.physical_read(
+                        &object.spec.name,
+                        format!("{}#{index}", object.spec.name),
+                        object.physical_slots[index].len(),
+                    );
                 }
                 object
                     .tape
@@ -541,6 +612,7 @@ impl RuntimeObject {
                     next: Self::RawCell(next),
                     logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
                     logical_writes: std::mem::take(&mut new.tape.logical_writes),
+                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
                     physical_writes,
                     metrics: new.tape.metrics,
                 })
@@ -578,6 +650,7 @@ impl RuntimeObject {
                     next: Self::UoCell(next),
                     logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
                     logical_writes: std::mem::take(&mut new.tape.logical_writes),
+                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
                     physical_writes,
                     metrics: new.tape.metrics,
                 })
@@ -606,6 +679,7 @@ impl RuntimeObject {
                     next: Self::RawArray(next),
                     logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
                     logical_writes: std::mem::take(&mut new.tape.logical_writes),
+                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
                     physical_writes,
                     metrics: new.tape.metrics,
                 })
@@ -639,6 +713,7 @@ impl RuntimeObject {
                     next: Self::UoArray(next),
                     logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
                     logical_writes: std::mem::take(&mut new.tape.logical_writes),
+                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
                     physical_writes,
                     metrics: new.tape.metrics,
                 })
@@ -679,6 +754,7 @@ impl RuntimeObject {
                     next: Self::RawMap(next),
                     logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
                     logical_writes: std::mem::take(&mut new.tape.logical_writes),
+                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
                     physical_writes,
                     metrics: new.tape.metrics,
                 })
@@ -712,6 +788,7 @@ impl RuntimeObject {
                     next: Self::UoSmallMap(next),
                     logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
                     logical_writes: std::mem::take(&mut new.tape.logical_writes),
+                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
                     physical_writes,
                     metrics: new.tape.metrics,
                 })
@@ -780,6 +857,7 @@ impl RuntimeObject {
                     next: Self::UoOramMap(next),
                     logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
                     logical_writes: std::mem::take(&mut new.tape.logical_writes),
+                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
                     physical_writes,
                     metrics: new.tape.metrics,
                 })
@@ -849,10 +927,18 @@ fn record_oram_schedule(object: &mut OramMapObject) {
     object
         .tape
         .read("uooram_counter", &object.spec.name, "counter");
+    object
+        .tape
+        .physical_read(&object.spec.name, format!("{}@counter", object.spec.name), object.access_counter_slot.len());
     for page in 0..object.directory_pages.len() {
         object
             .tape
             .read("uooram_meta_scan", &object.spec.name, format!("page:{page}"));
+        object.tape.physical_read(
+            &object.spec.name,
+            format!("{}@meta{page}", object.spec.name),
+            object.directory_pages[page].len(),
+        );
     }
     for index in oram_bucket_window(
         object.access_counter,
@@ -862,6 +948,21 @@ fn record_oram_schedule(object: &mut OramMapObject) {
         object
             .tape
             .read("uooram_bucket_scan", &object.spec.name, format!("bucket:{index}"));
+        object.tape.physical_read(
+            &object.spec.name,
+            format!("{}@bucket{index}", object.spec.name),
+            object.buckets[index].len(),
+        );
+    }
+}
+
+fn record_array_scan(object: &mut ArrayObject) {
+    for index in 0..object.physical_slots.len() {
+        object.tape.physical_read(
+            &object.spec.name,
+            format!("{}[{index}]", object.spec.name),
+            object.physical_slots[index].len(),
+        );
     }
 }
 

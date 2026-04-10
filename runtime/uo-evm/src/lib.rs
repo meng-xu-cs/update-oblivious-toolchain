@@ -63,8 +63,8 @@ mod tests {
             .iter()
             .all(|event| event.class == WriteClass::Update));
         assert_eq!(
-            zero.trace.hashes().physical_write_trace_hash,
-            one.trace.hashes().physical_write_trace_hash
+            zero.trace.hashes().physical_access_trace_hash,
+            one.trace.hashes().physical_access_trace_hash
         );
         assert_eq!(zero.trace.gas_used, 4096);
         assert_eq!(one.trace.gas_used, 4096);
@@ -104,8 +104,8 @@ mod tests {
             miss.trace.hashes().logical_access_trace_hash
         );
         assert_eq!(
-            hit.trace.hashes().physical_write_trace_hash,
-            miss.trace.hashes().physical_write_trace_hash
+            hit.trace.hashes().physical_access_trace_hash,
+            miss.trace.hashes().physical_access_trace_hash
         );
         assert_eq!(hit.trace.gas_used, 8192);
         assert_eq!(miss.trace.gas_used, 8192);
@@ -141,8 +141,8 @@ mod tests {
         assert_eq!(ok.trace.gas_used, 16384);
         assert_eq!(abort.trace.gas_used, 16384);
         assert_eq!(
-            ok.trace.hashes().physical_write_trace_hash,
-            abort.trace.hashes().physical_write_trace_hash
+            ok.trace.hashes().physical_access_trace_hash,
+            abort.trace.hashes().physical_access_trace_hash
         );
         assert_eq!(ok.return_value, Some(Value::Uint(2)));
         assert_eq!(abort.return_value, None);
@@ -209,8 +209,8 @@ mod tests {
             second_trace.trace.hashes().logical_write_trace_hash
         );
         assert_eq!(
-            first_trace.trace.hashes().physical_write_trace_hash,
-            second_trace.trace.hashes().physical_write_trace_hash
+            first_trace.trace.hashes().physical_access_trace_hash,
+            second_trace.trace.hashes().physical_access_trace_hash
         );
         assert!(first_trace
             .trace
@@ -256,8 +256,8 @@ mod tests {
             second_trace.trace.hashes().logical_write_trace_hash
         );
         assert_eq!(
-            first_trace.trace.hashes().physical_write_trace_hash,
-            second_trace.trace.hashes().physical_write_trace_hash
+            first_trace.trace.hashes().physical_access_trace_hash,
+            second_trace.trace.hashes().physical_access_trace_hash
         );
         assert_eq!(first_trace.trace.gas_used, 14336);
         assert_eq!(second_trace.trace.gas_used, 14336);

@@ -365,6 +365,7 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
             "raw_opcode_equal": classifier_raw.opcode_equal,
             "raw_logical_access_equal": classifier_raw.logical_equal,
             "raw_logical_write_equal": classifier_raw.logical_write_equal,
+            "raw_physical_read_equal": classifier_raw.physical_read_equal,
             "raw_physical_equal": classifier_raw.physical_equal,
             "same_same_control_equal": classifier_same_same.physical_equal,
         },
@@ -553,6 +554,7 @@ struct ExperimentOutcome {
     opcode_equal: bool,
     logical_equal: bool,
     logical_write_equal: bool,
+    physical_read_equal: bool,
     physical_equal: bool,
 }
 
@@ -743,7 +745,8 @@ fn run_binary_experiment(
         opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.opcode_trace_hash),
         logical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.logical_access_trace_hash),
         logical_write_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.logical_write_trace_hash),
-        physical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.physical_write_trace_hash),
+        physical_read_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.physical_read_trace_hash),
+        physical_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| &hash.physical_access_trace_hash),
         class0_metrics,
         class1_metrics,
     })
@@ -782,6 +785,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         "opcode_equal": outcome.opcode_equal,
         "logical_access_equal": outcome.logical_equal,
         "logical_write_equal": outcome.logical_write_equal,
+        "physical_read_equal": outcome.physical_read_equal,
         "physical_trace_equal": outcome.physical_equal,
     })
 }
@@ -956,6 +960,6 @@ Prototype assumptions:
 
 - `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
 - The ORAM backend is an instrumented runtime prototype with fixed-shape committed control metadata and public-schedule bucket rewrites; it is reported as computational-UO only.
-- The guarantees are with respect to the abstract/runtime traces emitted by this artifact, not every downstream machine-code or microarchitectural observer.
+- The guarantees are with respect to the abstract/runtime traces emitted by this artifact, including the normalized physical read/write schedules captured by the runtime, not every downstream machine-code or microarchitectural observer.
 "#
 }

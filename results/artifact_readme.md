@@ -18,4 +18,4 @@ Prototype assumptions:
 
 - `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
 - The ORAM backend is an instrumented runtime prototype with fixed-shape committed control metadata and public-schedule bucket rewrites; it is reported as computational-UO only.
-- The guarantees are with respect to the abstract/runtime traces emitted by this artifact, not every downstream machine-code or microarchitectural observer.
+- The guarantees are with respect to the abstract/runtime traces emitted by this artifact, including the normalized physical read/write schedules captured by the runtime, not every downstream machine-code or microarchitectural observer.

@@ -13,6 +13,7 @@ pub use ir::{
 pub use manifest::{EntrypointManifest, RuntimeManifest, StateObjectManifest};
 pub use metadata::{BoundsMetadata, ContractMetadata, EntrypointMetadata, StateMetadata};
 pub use trace::{
-    classify_write, ExecutionTrace, LogicalEvent, PhysicalWriteEvent, TraceHashBundle, WriteClass,
+    classify_write, ExecutionTrace, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent,
+    TraceHashBundle, WriteClass,
 };
 pub use types::{ScalarType, StructField, Type, Value};
