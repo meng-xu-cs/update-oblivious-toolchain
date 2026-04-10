@@ -7,8 +7,15 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tiny-keccak.workspace = true
 uo-core = { path = "../../crates/uo-core" }
+uo-allocator = { path = "../uo-allocator" }
 uo-store = { path = "../uo-store" }
 
+[dev-dependencies]
+serde_yaml.workspace = true
+uo-solc = { path = "../../compiler/uo-solc" }

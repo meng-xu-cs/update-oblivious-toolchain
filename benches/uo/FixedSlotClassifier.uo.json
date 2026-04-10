@@ -1,0 +1,234 @@
+{
+  "compiler_version": "0.1.0",
+  "contract": {
+    "contract": "FixedSlotClassifier",
+    "mode": "Uo",
+    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+    "state": [
+      {
+        "id": 1,
+        "name": "last",
+        "kind": "Cell",
+        "backend": "FullScan",
+        "value_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "key_type": null,
+        "capacity": null,
+        "confidential": true
+      }
+    ],
+    "functions": [
+      {
+        "signature": "classify(uint256)",
+        "params": [
+          [
+            "secret",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": null,
+        "body": [
+          {
+            "Declare": {
+              "name": "bit",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "Binary": {
+                  "op": "BitAnd",
+                  "lhs": {
+                    "Var": "secret"
+                  },
+                  "rhs": {
+                    "Literal": {
+                      "Uint": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "CellSet": {
+              "object_id": 1,
+              "value": {
+                "Var": "bit"
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0
+        ],
+        "confidential": true
+      },
+      {
+        "signature": "sameSame(uint256)",
+        "params": [
+          [
+            "secret",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": null,
+        "body": [
+          {
+            "Declare": {
+              "name": "ignored",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "Binary": {
+                  "op": "BitAnd",
+                  "lhs": {
+                    "Var": "secret"
+                  },
+                  "rhs": {
+                    "Literal": {
+                      "Uint": 7
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "CellSet": {
+              "object_id": 1,
+              "value": {
+                "Literal": {
+                  "Uint": 1
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0
+        ],
+        "confidential": true
+      },
+      {
+        "signature": "peek()",
+        "params": [],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Return": {
+              "value": {
+                "CellGet": {
+                  "object_id": 1
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [],
+        "confidential": false
+      }
+    ],
+    "manifest": {
+      "contract": "FixedSlotClassifier",
+      "compilation_mode": "uo",
+      "objects": [
+        {
+          "id": 1,
+          "name": "last",
+          "kind": "cell",
+          "backend": "full_scan",
+          "capacity": null,
+          "value_type": "uint256",
+          "key_type": null
+        }
+      ],
+      "entrypoints": {
+        "classify(uint256)": {
+          "secret_args": [
+            0
+          ],
+          "public_gas_budget": 4096,
+          "arena_bytes": 4160,
+          "max_stack_words": 65,
+          "uocell_reads": 0,
+          "uocell_writes": 1,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 0,
+          "uomap_writes": 0,
+          "max_commit_ops": 1
+        },
+        "peek()": {
+          "secret_args": [],
+          "public_gas_budget": 2047,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "uocell_reads": 1,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 0,
+          "uomap_writes": 0,
+          "max_commit_ops": 1
+        },
+        "sameSame(uint256)": {
+          "secret_args": [
+            0
+          ],
+          "public_gas_budget": 4096,
+          "arena_bytes": 4160,
+          "max_stack_words": 65,
+          "uocell_reads": 0,
+          "uocell_writes": 1,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 0,
+          "uomap_writes": 0,
+          "max_commit_ops": 1
+        }
+      }
+    }
+  },
+  "diagnostics": [],
+  "transformed_source": "function classify(uint256)(uint256 secret) {\n  let bit = (secret BitAnd 1)\n  cell[1] = bit @ Some(\"true\")\n}\n\nfunction sameSame(uint256)(uint256 secret) {\n  let ignored = (secret BitAnd 7)\n  cell[1] = 1 @ Some(\"true\")\n}\n\nfunction peek()() {\n  return cell_get(1)\n}",
+  "disassembly": [
+    "fn classify(uint256):",
+    "  0000 let bit = (secret BitAnd 1)",
+    "  0001 cell[1] = bit @ Some(\"true\")",
+    "fn sameSame(uint256):",
+    "  0000 let ignored = (secret BitAnd 7)",
+    "  0001 cell[1] = 1 @ Some(\"true\")",
+    "fn peek():",
+    "  0000 return cell_get(1)"
+  ]
+}

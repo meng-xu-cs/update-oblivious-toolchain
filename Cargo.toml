@@ -30,3 +30,4 @@ serde_json = "=1.0.138"
 serde_yaml = "=0.9.34"
 solang-parser = "=0.3.3"
 thiserror = "=1.0.69"
+tiny-keccak = { version = "=2.0.2", features = ["keccak"] }

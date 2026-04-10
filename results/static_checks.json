@@ -1,0 +1,129 @@
+{
+  "reports": [
+    {
+      "benchmark": "AuthScan",
+      "fullscan64_artifact": null,
+      "oram_artifact": null,
+      "raw_artifact": [
+        "artifact contract AuthScan mode Raw",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "source": [
+        "validated contract AuthScan",
+        "entrypoints: seed(uint256,bytes32), auth(bytes32), readLast()",
+        "diagnostics: none"
+      ],
+      "uo_artifact": [
+        "artifact contract AuthScan mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ]
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "fullscan64_artifact": [
+        "artifact contract ConfidentialMixer mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "oram_artifact": [
+        "artifact contract ConfidentialMixer mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "raw_artifact": [
+        "artifact contract ConfidentialMixer mode Raw",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "source": [
+        "validated contract ConfidentialMixer",
+        "entrypoints: deposit(bytes32,uint256), withdraw(bytes32,uint256), balanceOf(bytes32), totalValue()",
+        "diagnostics: none"
+      ],
+      "uo_artifact": [
+        "artifact contract ConfidentialMixer mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ]
+    },
+    {
+      "benchmark": "ERC20Lite",
+      "fullscan64_artifact": null,
+      "oram_artifact": [
+        "artifact contract ERC20Lite mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "raw_artifact": [
+        "artifact contract ERC20Lite mode Raw",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "source": [
+        "validated contract ERC20Lite",
+        "entrypoints: mint(address,uint256), approve(address,address,uint256), transfer(address,address,uint256), transferFrom(address,address,address,uint256), balanceOf(address), allowanceOf(address,address)",
+        "diagnostics: none"
+      ],
+      "uo_artifact": [
+        "artifact contract ERC20Lite mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ]
+    },
+    {
+      "benchmark": "FixedSlotClassifier",
+      "fullscan64_artifact": null,
+      "oram_artifact": null,
+      "raw_artifact": [
+        "artifact contract FixedSlotClassifier mode Raw",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "source": [
+        "validated contract FixedSlotClassifier",
+        "entrypoints: classify(uint256), sameSame(uint256), peek()",
+        "diagnostics: none"
+      ],
+      "uo_artifact": [
+        "artifact contract FixedSlotClassifier mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ]
+    },
+    {
+      "benchmark": "RegistryCRUD",
+      "fullscan64_artifact": null,
+      "oram_artifact": null,
+      "raw_artifact": [
+        "artifact contract RegistryCRUD mode Raw",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ],
+      "source": [
+        "validated contract RegistryCRUD",
+        "entrypoints: upsert(bytes32,uint256), clear(bytes32), clearIfMatch(bytes32,uint256), read(bytes32)",
+        "diagnostics: none"
+      ],
+      "uo_artifact": [
+        "artifact contract RegistryCRUD mode Uo",
+        "manifest/object consistency: ok",
+        "forbidden control flow in confidential IR: none",
+        "raw storage backend for confidential objects: none"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+contract: RegistryCRUD
+entrypoints:
+  upsert(bytes32,uint256):
+    secret_args: [key, value]
+    confidential: true
+  clear(bytes32):
+    secret_args: [key]
+    confidential: true
+  clearIfMatch(bytes32,uint256):
+    secret_args: [key, value]
+    confidential: true
+  read(bytes32):
+    confidential: false
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 8
+    backend: raw
+    confidential: true
+bounds:
+  loops: {}

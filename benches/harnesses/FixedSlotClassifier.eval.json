@@ -1,0 +1,7 @@
+{
+  "benchmark": "FixedSlotClassifier",
+  "kind": "evaluation",
+  "entrypoint": "sameSame(uint256)",
+  "class0_args": [[1], [3]],
+  "class1_args": [[5], [7]]
+}

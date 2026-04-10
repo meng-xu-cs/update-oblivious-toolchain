@@ -33,6 +33,14 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn bool(value: bool) -> Self {
+        Self::Bool(value)
+    }
+
+    pub fn uint(value: u128) -> Self {
+        Self::Uint(value)
+    }
+
     pub fn zero_for_type(ty: &Type) -> Self {
         match ty {
             Type::Scalar(ScalarType::Bool) => Value::Bool(false),
@@ -97,6 +105,53 @@ impl Value {
                 }
                 out
             }
+        }
+    }
+
+    pub fn canonical_key(&self) -> String {
+        hex::encode(self.canonical_bytes())
+    }
+
+    pub fn is_zero_like(&self) -> bool {
+        match self {
+            Value::Bool(value) => !value,
+            Value::Uint(value) => *value == 0,
+            Value::Bytes32(bytes) => bytes.iter().all(|byte| *byte == 0),
+            Value::Address(bytes) => bytes.iter().all(|byte| *byte == 0),
+            Value::Struct(fields) => fields.iter().all(|(_, value)| value.is_zero_like()),
+            Value::Array(values) => values.iter().all(Value::is_zero_like),
+        }
+    }
+
+    pub fn as_bytes32(&self) -> Option<[u8; 32]> {
+        match self {
+            Value::Bytes32(bytes) => Some(*bytes),
+            Value::Uint(value) => {
+                let mut out = [0u8; 32];
+                out[16..].copy_from_slice(&value.to_be_bytes());
+                Some(out)
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Type {
+    pub fn short_name(&self) -> String {
+        match self {
+            Type::Scalar(ScalarType::Bool) => "bool".into(),
+            Type::Scalar(ScalarType::Uint(bits)) => format!("uint{bits}"),
+            Type::Scalar(ScalarType::Bytes32) => "bytes32".into(),
+            Type::Scalar(ScalarType::Address) => "address".into(),
+            Type::Struct(fields) => {
+                let joined = fields
+                    .iter()
+                    .map(|field| format!("{}:{}", field.name, field.ty.short_name()))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!("struct{{{joined}}}")
+            }
+            Type::Array(element, size) => format!("{}[{size}]", element.short_name()),
         }
     }
 }

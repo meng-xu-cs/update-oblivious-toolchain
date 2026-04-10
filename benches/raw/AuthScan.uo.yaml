@@ -1,0 +1,24 @@
+contract: AuthScan
+entrypoints:
+  seed(uint256,bytes32):
+    confidential: false
+  auth(bytes32):
+    secret_args: [token]
+    confidential: true
+    public_gas_budget: 8192
+  readLast():
+    confidential: false
+state:
+  TOKENS:
+    kind: array
+    value: bytes32
+    capacity: 4
+    backend: full_scan
+    confidential: true
+  lastAuth:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}

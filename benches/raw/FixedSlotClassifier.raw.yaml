@@ -1,0 +1,18 @@
+contract: FixedSlotClassifier
+entrypoints:
+  classify(uint256):
+    secret_args: [secret]
+    confidential: true
+  sameSame(uint256):
+    secret_args: [secret]
+    confidential: true
+  peek():
+    confidential: false
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: true
+bounds:
+  loops: {}

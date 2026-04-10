@@ -1,0 +1,8 @@
+{
+  "benchmark": "FixedSlotClassifier",
+  "kind": "small_domain",
+  "entrypoint": "classify(uint256)",
+  "class0_args": [[0], [2], [4], [6]],
+  "class1_args": [[1], [3], [5], [7]],
+  "getter_sequence": [{"entrypoint": "peek()", "args": []}]
+}

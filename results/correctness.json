@@ -1,0 +1,141 @@
+{
+  "scenarios": [
+    {
+      "benchmark": "FixedSlotClassifier",
+      "equivalent": true,
+      "raw": {
+        "aborted": false,
+        "gas_used": 5,
+        "getters": [
+          1
+        ],
+        "physical_writes": 1,
+        "return": null
+      },
+      "uo": {
+        "aborted": false,
+        "gas_used": 4096,
+        "getters": [
+          1
+        ],
+        "physical_writes": 1,
+        "return": null
+      }
+    },
+    {
+      "benchmark": "AuthScan",
+      "equivalent": true,
+      "raw": {
+        "aborted": false,
+        "gas_used": 17,
+        "getters": [
+          1
+        ],
+        "physical_writes": 1,
+        "return": 1
+      },
+      "uo": {
+        "aborted": false,
+        "gas_used": 8192,
+        "getters": [
+          1
+        ],
+        "physical_writes": 5,
+        "return": 1
+      }
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "equivalent": true,
+      "oram": {
+        "aborted": false,
+        "gas_used": 12288,
+        "getters": [
+          3,
+          3
+        ],
+        "physical_writes": 9,
+        "return": 2
+      },
+      "raw": {
+        "aborted": false,
+        "gas_used": 16,
+        "getters": [
+          3,
+          3
+        ],
+        "physical_writes": 2,
+        "return": 2
+      },
+      "uo": {
+        "aborted": false,
+        "gas_used": 16384,
+        "getters": [
+          3,
+          3
+        ],
+        "physical_writes": 9,
+        "return": 2
+      }
+    },
+    {
+      "benchmark": "ERC20Lite",
+      "equivalent": true,
+      "oram": {
+        "aborted": false,
+        "gas_used": 16384,
+        "getters": [
+          7,
+          3,
+          1
+        ],
+        "physical_writes": 17,
+        "return": 1
+      },
+      "raw": {
+        "aborted": false,
+        "gas_used": 24,
+        "getters": [
+          7,
+          3,
+          1
+        ],
+        "physical_writes": 3,
+        "return": 1
+      },
+      "uo": {
+        "aborted": false,
+        "gas_used": 24576,
+        "getters": [
+          7,
+          3,
+          1
+        ],
+        "physical_writes": 24,
+        "return": 1
+      }
+    },
+    {
+      "benchmark": "RegistryCRUD",
+      "equivalent": true,
+      "raw": {
+        "aborted": false,
+        "gas_used": 8,
+        "getters": [
+          0
+        ],
+        "physical_writes": 1,
+        "return": 1
+      },
+      "uo": {
+        "aborted": false,
+        "gas_used": 12288,
+        "getters": [
+          0
+        ],
+        "physical_writes": 8,
+        "return": 1
+      }
+    }
+  ]
+}

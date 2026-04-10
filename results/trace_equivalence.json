@@ -1,0 +1,41 @@
+{
+  "computational_uo": [
+    {
+      "benchmark": "ConfidentialMixer",
+      "logical_access_equal": true,
+      "mode": "oram",
+      "opcode_equal": true,
+      "physical_trace_equal": true
+    }
+  ],
+  "exact_uo": [
+    {
+      "benchmark": "FixedSlotClassifier",
+      "logical_access_equal": true,
+      "mode": "uo",
+      "opcode_equal": true,
+      "physical_trace_equal": true
+    },
+    {
+      "benchmark": "AuthScan",
+      "logical_access_equal": true,
+      "mode": "uo",
+      "opcode_equal": true,
+      "physical_trace_equal": true
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "logical_access_equal": true,
+      "mode": "uo",
+      "opcode_equal": true,
+      "physical_trace_equal": true
+    }
+  ],
+  "positive_control": {
+    "benchmark": "FixedSlotClassifier",
+    "raw_logical_access_equal": true,
+    "raw_opcode_equal": true,
+    "raw_physical_equal": false,
+    "same_same_control_equal": true
+  }
+}

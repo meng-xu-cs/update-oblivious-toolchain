@@ -1,0 +1,413 @@
+{
+  "compiler_version": "0.1.0",
+  "contract": {
+    "contract": "ConfidentialMixer",
+    "mode": "Uo",
+    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
+    "state": [
+      {
+        "id": 1,
+        "name": "balances",
+        "kind": "Map",
+        "backend": "Oram",
+        "value_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "key_type": {
+          "Scalar": "Bytes32"
+        },
+        "capacity": 64,
+        "confidential": true
+      },
+      {
+        "id": 2,
+        "name": "total",
+        "kind": "Cell",
+        "backend": "FullScan",
+        "value_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "key_type": null,
+        "capacity": null,
+        "confidential": true
+      }
+    ],
+    "functions": [
+      {
+        "signature": "deposit(bytes32,uint256)",
+        "params": [
+          [
+            "commitment",
+            {
+              "Scalar": "Bytes32"
+            }
+          ],
+          [
+            "amount",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": null,
+        "body": [
+          {
+            "Declare": {
+              "name": "oldBalance",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "commitment"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "MapPut": {
+              "object_id": 1,
+              "key": {
+                "Var": "commitment"
+              },
+              "value": {
+                "Binary": {
+                  "op": "Add",
+                  "lhs": {
+                    "Var": "oldBalance"
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          },
+          {
+            "CellSet": {
+              "object_id": 2,
+              "value": {
+                "Binary": {
+                  "op": "Add",
+                  "lhs": {
+                    "CellGet": {
+                      "object_id": 2
+                    }
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0,
+          1
+        ],
+        "confidential": true
+      },
+      {
+        "signature": "withdraw(bytes32,uint256)",
+        "params": [
+          [
+            "commitment",
+            {
+              "Scalar": "Bytes32"
+            }
+          ],
+          [
+            "amount",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Declare": {
+              "name": "oldBalance",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "commitment"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "AbortIf": {
+              "cond": {
+                "Unary": {
+                  "op": "Not",
+                  "expr": {
+                    "Binary": {
+                      "op": "Gte",
+                      "lhs": {
+                        "Var": "oldBalance"
+                      },
+                      "rhs": {
+                        "Var": "amount"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "MapPut": {
+              "object_id": 1,
+              "key": {
+                "Var": "commitment"
+              },
+              "value": {
+                "Binary": {
+                  "op": "Sub",
+                  "lhs": {
+                    "Var": "oldBalance"
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          },
+          {
+            "CellSet": {
+              "object_id": 2,
+              "value": {
+                "Binary": {
+                  "op": "Sub",
+                  "lhs": {
+                    "CellGet": {
+                      "object_id": 2
+                    }
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          },
+          {
+            "Return": {
+              "value": {
+                "Var": "amount"
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0,
+          1
+        ],
+        "confidential": true
+      },
+      {
+        "signature": "balanceOf(bytes32)",
+        "params": [
+          [
+            "commitment",
+            {
+              "Scalar": "Bytes32"
+            }
+          ]
+        ],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Return": {
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "commitment"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [],
+        "confidential": false
+      },
+      {
+        "signature": "totalValue()",
+        "params": [],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Return": {
+              "value": {
+                "CellGet": {
+                  "object_id": 2
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [],
+        "confidential": false
+      }
+    ],
+    "manifest": {
+      "contract": "ConfidentialMixer",
+      "compilation_mode": "uo",
+      "objects": [
+        {
+          "id": 1,
+          "name": "balances",
+          "kind": "map",
+          "backend": "oram",
+          "capacity": 64,
+          "value_type": "uint256",
+          "key_type": "bytes32"
+        },
+        {
+          "id": 2,
+          "name": "total",
+          "kind": "cell",
+          "backend": "full_scan",
+          "capacity": null,
+          "value_type": "uint256",
+          "key_type": null
+        }
+      ],
+      "entrypoints": {
+        "balanceOf(bytes32)": {
+          "secret_args": [],
+          "public_gas_budget": 2257,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "uocell_reads": 0,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 0,
+          "max_commit_ops": 8
+        },
+        "deposit(bytes32,uint256)": {
+          "secret_args": [
+            0,
+            1
+          ],
+          "public_gas_budget": 12288,
+          "arena_bytes": 4160,
+          "max_stack_words": 65,
+          "uocell_reads": 1,
+          "uocell_writes": 1,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 1,
+          "max_commit_ops": 9
+        },
+        "totalValue()": {
+          "secret_args": [],
+          "public_gas_budget": 2047,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "uocell_reads": 1,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 0,
+          "uomap_writes": 0,
+          "max_commit_ops": 1
+        },
+        "withdraw(bytes32,uint256)": {
+          "secret_args": [
+            0,
+            1
+          ],
+          "public_gas_budget": 12288,
+          "arena_bytes": 4160,
+          "max_stack_words": 65,
+          "uocell_reads": 1,
+          "uocell_writes": 1,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 1,
+          "max_commit_ops": 9
+        }
+      }
+    }
+  },
+  "diagnostics": [],
+  "transformed_source": "function deposit(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  map[1][commitment] = (oldBalance Add amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Add amount) @ Some(\"true\")\n}\n\nfunction withdraw(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  abort_if Not((oldBalance Gte amount))\n  map[1][commitment] = (oldBalance Sub amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Sub amount) @ Some(\"true\")\n  return amount\n}\n\nfunction balanceOf(bytes32)(bytes32 commitment) {\n  return map_get(1, commitment)\n}\n\nfunction totalValue()() {\n  return cell_get(2)\n}",
+  "disassembly": [
+    "fn deposit(bytes32,uint256):",
+    "  0000 let oldBalance = map_get(1, commitment)",
+    "  0001 map[1][commitment] = (oldBalance Add amount) @ Some(\"true\")",
+    "  0002 cell[2] = (cell_get(2) Add amount) @ Some(\"true\")",
+    "fn withdraw(bytes32,uint256):",
+    "  0000 let oldBalance = map_get(1, commitment)",
+    "  0001 abort_if Not((oldBalance Gte amount))",
+    "  0002 map[1][commitment] = (oldBalance Sub amount) @ Some(\"true\")",
+    "  0003 cell[2] = (cell_get(2) Sub amount) @ Some(\"true\")",
+    "  0004 return amount",
+    "fn balanceOf(bytes32):",
+    "  0000 return map_get(1, commitment)",
+    "fn totalValue():",
+    "  0000 return cell_get(2)"
+  ]
+}

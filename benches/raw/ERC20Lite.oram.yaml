@@ -1,0 +1,37 @@
+contract: ERC20Lite
+entrypoints:
+  mint(address,uint256):
+    confidential: false
+  approve(address,address,uint256):
+    secret_args: [owner, spender, amount]
+    confidential: true
+    public_gas_budget: 14336
+  transfer(address,address,uint256):
+    secret_args: [from, to, amount]
+    confidential: true
+    public_gas_budget: 14336
+  transferFrom(address,address,address,uint256):
+    secret_args: [owner, spender, to, amount]
+    confidential: true
+    public_gas_budget: 16384
+  balanceOf(address):
+    confidential: false
+  allowanceOf(address,address):
+    confidential: false
+state:
+  balances:
+    kind: map
+    key: address
+    value: uint256
+    capacity: 64
+    backend: oram
+    confidential: true
+  allowances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 128
+    backend: oram
+    confidential: true
+bounds:
+  loops: {}

@@ -1,0 +1,27 @@
+contract: ConfidentialMixer
+entrypoints:
+  deposit(bytes32,uint256):
+    secret_args: [commitment, amount]
+    confidential: true
+  withdraw(bytes32,uint256):
+    secret_args: [commitment, amount]
+    confidential: true
+  balanceOf(bytes32):
+    confidential: false
+  totalValue():
+    confidential: false
+state:
+  balances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 8
+    backend: raw
+    confidential: true
+  total:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: true
+bounds:
+  loops: {}

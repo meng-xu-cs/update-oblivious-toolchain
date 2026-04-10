@@ -12,3 +12,4 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 solang-parser.workspace = true
 uo-core = { path = "../../crates/uo-core" }
+uo-solc = { path = "../../compiler/uo-solc" }

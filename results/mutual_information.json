@@ -1,0 +1,139 @@
+{
+  "reports": [
+    {
+      "benchmark": "FixedSlotClassifier",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 1.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 1.0
+      },
+      "mode": "raw"
+    },
+    {
+      "benchmark": "FixedSlotClassifier",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 0.0,
+        "set_writes": 0.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 0.0
+      },
+      "mode": "uo"
+    },
+    {
+      "benchmark": "AuthScan",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 1.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 1.0
+      },
+      "mode": "raw"
+    },
+    {
+      "benchmark": "AuthScan",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 0.0,
+        "set_writes": 0.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 0.0
+      },
+      "mode": "uo"
+    },
+    {
+      "benchmark": "RegistryCRUD",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 1.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 1.0
+      },
+      "mode": "raw"
+    },
+    {
+      "benchmark": "RegistryCRUD",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 0.0,
+        "set_writes": 0.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 0.0
+      },
+      "mode": "uo"
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 1.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 1.0
+      },
+      "mode": "raw"
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 0.0,
+        "set_writes": 0.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 0.0
+      },
+      "mode": "uo"
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "metric_mi_bits": {
+        "backend_writes": 0.0,
+        "bytes_written": 0.0,
+        "clear_writes": 0.0,
+        "gas_used": 0.0,
+        "same_writes": 0.0,
+        "set_writes": 0.0,
+        "update_only_fraction": 0.0,
+        "update_writes": 0.0,
+        "zero_writes": 0.0
+      },
+      "mode": "oram"
+    }
+  ]
+}

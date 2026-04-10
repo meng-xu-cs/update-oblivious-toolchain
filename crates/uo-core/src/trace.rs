@@ -53,11 +53,23 @@ pub struct ExecutionTrace {
 
 impl ExecutionTrace {
     pub fn hashes(&self) -> TraceHashBundle {
+        let normalized_physical = self
+            .physical_writes
+            .iter()
+            .map(|event| {
+                (
+                    event.object.clone(),
+                    event.location.clone(),
+                    event.class,
+                    event.new.len(),
+                )
+            })
+            .collect::<Vec<_>>();
         TraceHashBundle {
             opcode_trace_hash: hash_json(&self.opcode_trace),
             logical_access_trace_hash: hash_json(&self.logical_accesses),
             logical_write_trace_hash: hash_json(&self.logical_writes),
-            physical_write_trace_hash: hash_json(&self.physical_writes),
+            physical_write_trace_hash: hash_json(&normalized_physical),
         }
     }
 }

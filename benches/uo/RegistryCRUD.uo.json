@@ -1,0 +1,355 @@
+{
+  "compiler_version": "0.1.0",
+  "contract": {
+    "contract": "RegistryCRUD",
+    "mode": "Uo",
+    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.sol",
+    "state": [
+      {
+        "id": 1,
+        "name": "records",
+        "kind": "Map",
+        "backend": "FullScan",
+        "value_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "key_type": {
+          "Scalar": "Bytes32"
+        },
+        "capacity": 8,
+        "confidential": true
+      }
+    ],
+    "functions": [
+      {
+        "signature": "upsert(bytes32,uint256)",
+        "params": [
+          [
+            "key",
+            {
+              "Scalar": "Bytes32"
+            }
+          ],
+          [
+            "value",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": null,
+        "body": [
+          {
+            "MapPut": {
+              "object_id": 1,
+              "key": {
+                "Var": "key"
+              },
+              "value": {
+                "Var": "value"
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0,
+          1
+        ],
+        "confidential": true
+      },
+      {
+        "signature": "clear(bytes32)",
+        "params": [
+          [
+            "key",
+            {
+              "Scalar": "Bytes32"
+            }
+          ]
+        ],
+        "return_type": null,
+        "body": [
+          {
+            "MapPut": {
+              "object_id": 1,
+              "key": {
+                "Var": "key"
+              },
+              "value": {
+                "Literal": {
+                  "Uint": 0
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0
+        ],
+        "confidential": true
+      },
+      {
+        "signature": "clearIfMatch(bytes32,uint256)",
+        "params": [
+          [
+            "key",
+            {
+              "Scalar": "Bytes32"
+            }
+          ],
+          [
+            "value",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Declare": {
+              "name": "current",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "key"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Declare": {
+              "name": "result",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "Literal": {
+                  "Uint": 0
+                }
+              }
+            }
+          },
+          {
+            "MapPut": {
+              "object_id": 1,
+              "key": {
+                "Var": "key"
+              },
+              "value": {
+                "Literal": {
+                  "Uint": 0
+                }
+              },
+              "predicate": {
+                "Binary": {
+                  "op": "Eq",
+                  "lhs": {
+                    "Var": "current"
+                  },
+                  "rhs": {
+                    "Var": "value"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Assign": {
+              "name": "result",
+              "value": {
+                "Select": {
+                  "cond": {
+                    "Binary": {
+                      "op": "Eq",
+                      "lhs": {
+                        "Var": "current"
+                      },
+                      "rhs": {
+                        "Var": "value"
+                      }
+                    }
+                  },
+                  "when_true": {
+                    "Literal": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "Var": "result"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Return": {
+              "value": {
+                "Var": "result"
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0,
+          1
+        ],
+        "confidential": true
+      },
+      {
+        "signature": "read(bytes32)",
+        "params": [
+          [
+            "key",
+            {
+              "Scalar": "Bytes32"
+            }
+          ]
+        ],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Return": {
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "key"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [],
+        "confidential": false
+      }
+    ],
+    "manifest": {
+      "contract": "RegistryCRUD",
+      "compilation_mode": "uo",
+      "objects": [
+        {
+          "id": 1,
+          "name": "records",
+          "kind": "map",
+          "backend": "full_scan",
+          "capacity": 8,
+          "value_type": "uint256",
+          "key_type": "bytes32"
+        }
+      ],
+      "entrypoints": {
+        "clear(bytes32)": {
+          "secret_args": [
+            0
+          ],
+          "public_gas_budget": 12288,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "uocell_reads": 0,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 0,
+          "uomap_writes": 1,
+          "max_commit_ops": 8
+        },
+        "clearIfMatch(bytes32,uint256)": {
+          "secret_args": [
+            0,
+            1
+          ],
+          "public_gas_budget": 12288,
+          "arena_bytes": 4224,
+          "max_stack_words": 66,
+          "uocell_reads": 0,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 1,
+          "max_commit_ops": 8
+        },
+        "read(bytes32)": {
+          "secret_args": [],
+          "public_gas_budget": 2257,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "uocell_reads": 0,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 0,
+          "max_commit_ops": 8
+        },
+        "upsert(bytes32,uint256)": {
+          "secret_args": [
+            0,
+            1
+          ],
+          "public_gas_budget": 12288,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "uocell_reads": 0,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 0,
+          "uomap_writes": 1,
+          "max_commit_ops": 8
+        }
+      }
+    }
+  },
+  "diagnostics": [],
+  "transformed_source": "function upsert(bytes32,uint256)(bytes32 key, uint256 value) {\n  map[1][key] = value @ Some(\"true\")\n}\n\nfunction clear(bytes32)(bytes32 key) {\n  map[1][key] = 0 @ Some(\"true\")\n}\n\nfunction clearIfMatch(bytes32,uint256)(bytes32 key, uint256 value) {\n  let current = map_get(1, key)\n  let result = 0\n  map[1][key] = 0 @ Some(\"(current Eq value)\")\n  result = select((current Eq value), 1, result)\n  return result\n}\n\nfunction read(bytes32)(bytes32 key) {\n  return map_get(1, key)\n}",
+  "disassembly": [
+    "fn upsert(bytes32,uint256):",
+    "  0000 map[1][key] = value @ Some(\"true\")",
+    "fn clear(bytes32):",
+    "  0000 map[1][key] = 0 @ Some(\"true\")",
+    "fn clearIfMatch(bytes32,uint256):",
+    "  0000 let current = map_get(1, key)",
+    "  0001 let result = 0",
+    "  0002 map[1][key] = 0 @ Some(\"(current Eq value)\")",
+    "  0003 result = select((current Eq value), 1, result)",
+    "  0004 return result",
+    "fn read(bytes32):",
+    "  0000 return map_get(1, key)"
+  ]
+}

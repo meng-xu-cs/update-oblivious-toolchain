@@ -1,0 +1,23 @@
+{
+  "cases": [
+    {
+      "benchmark": "ConfidentialMixer/deposit",
+      "full_scan_64": {
+        "bytes_written": 10724.0,
+        "gas_used": 32768,
+        "physical_writes": 65
+      },
+      "oram_64": {
+        "bytes_written": 1412.0,
+        "gas_used": 12288,
+        "physical_writes": 9
+      },
+      "oram_improves_physical_writes": true,
+      "raw": {
+        "bytes_written": 64.0,
+        "gas_used": 16,
+        "physical_writes": 2
+      }
+    }
+  ]
+}

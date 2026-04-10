@@ -335,9 +335,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "hex",
  "serde",
  "serde_json",
+ "serde_yaml",
+ "uo-check",
  "uo-core",
+ "uo-evm",
+ "uo-solc",
 ]
 
 [[package]]
@@ -743,6 +748,7 @@ dependencies = [
  "serde_yaml",
  "solang-parser",
  "uo-core",
+ "uo-solc",
 ]
 
 [[package]]
@@ -763,9 +769,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "rand",
+ "rand_chacha",
  "serde",
  "serde_json",
+ "serde_yaml",
+ "tiny-keccak",
+ "uo-allocator",
  "uo-core",
+ "uo-solc",
  "uo-store",
 ]
 
@@ -782,6 +794,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "hex",
  "serde",
  "serde_json",
  "serde_yaml",
