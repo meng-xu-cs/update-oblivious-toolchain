@@ -1,4 +1,4 @@
-import TraceModel
+import UOToolchain.TraceModel
 
 namespace UOToolchain
 

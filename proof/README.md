@@ -8,12 +8,12 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/lakefile.lean`
 - `proof/lean/lean-toolchain`
 - `proof/lean/UOToolchain.lean`
-- `proof/lean/TraceModel.lean`
-- `proof/lean/IRSemantics.lean`
-- `proof/lean/ExactObjects.lean`
-- `proof/lean/CompilerInvariant.lean`
-- `proof/lean/Composition.lean`
-- `proof/lean/OramGame.lean`
+- `proof/lean/UOToolchain/TraceModel.lean`
+- `proof/lean/UOToolchain/IRSemantics.lean`
+- `proof/lean/UOToolchain/ExactObjects.lean`
+- `proof/lean/UOToolchain/CompilerInvariant.lean`
+- `proof/lean/UOToolchain/Composition.lean`
+- `proof/lean/UOToolchain/OramGame.lean`
 
 These files only freeze the module split and theorem boundary. They do not yet
 contain mechanized proofs of the UO claims.

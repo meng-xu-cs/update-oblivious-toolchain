@@ -1,4 +1,4 @@
-import IRSemantics
+import UOToolchain.IRSemantics
 
 namespace UOToolchain
 

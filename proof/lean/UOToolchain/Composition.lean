@@ -1,6 +1,6 @@
-import ExactObjects
-import CompilerInvariant
-import OramGame
+import UOToolchain.ExactObjects
+import UOToolchain.CompilerInvariant
+import UOToolchain.OramGame
 
 namespace UOToolchain
 
