@@ -15,6 +15,7 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/Composition.lean`
 - `proof/lean/UOToolchain/OramGame.lean`
 - `proof/lean/UOToolchain/TeeDeployment.lean`
+- `proof/lean/UOToolchain/SgxBoundary.lean`
 
 These files only freeze the module split and theorem boundary. They do not yet
 contain mechanized proofs of the UO claims.
@@ -31,6 +32,14 @@ Current status:
 - `TeeDeployment.lean` now defines the idealized `View_TEE-Store` observer,
   proves that exact-UO artifact semantics transport to the TEE storage view,
   and packages the TEE deployment theorem boundary for the ORAM side.
+- `SgxBoundary.lean` now fixes a concrete future `View_SGX` shape in Lean,
+  including enclave-boundary events, paging, exits, shared-resource traces, and
+  public output shape, while leaving raw timing and physical side channels out
+  of scope.
+- the SGX observer boundary in
+  [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
+  now includes explicit public output shape plus a ZeroTrace-derived split into
+  boundary, paging, exit, and shared-resource traces
 - The remaining unproved boundary is the actual computational indistinguishability
   theorem for the ORAM backend. The TEE storage layer now reduces
   definitionally to that existing ORAM boundary rather than introducing a

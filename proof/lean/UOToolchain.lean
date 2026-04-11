@@ -5,3 +5,4 @@ import UOToolchain.CompilerInvariant
 import UOToolchain.Composition
 import UOToolchain.OramGame
 import UOToolchain.TeeDeployment
+import UOToolchain.SgxBoundary

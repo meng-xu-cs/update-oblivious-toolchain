@@ -36,6 +36,7 @@ deployment-facing theorem only about the host-visible storage boundary.
 More precisely, if the host observer is restricted to:
 
 - public call identity and public arguments
+- public output shape
 - normalized reads from encrypted/sealed persistent state
 - normalized writes to encrypted/sealed persistent state
 - public gas and public termination status
@@ -60,10 +61,16 @@ To make that claim meaningful, the host-visible SGX observer would need to be
 modeled explicitly, including at least:
 
 - the enclave call and return interface
+- public output shape
 - any OCALL, syscall, or host-service schedule
 - normalized persistent-state read and write schedules
 - enclave exit, interrupt, or fault-visible behavior
 - any page-granularity or EPC-paging behavior admitted by the model
+- any shared-resource trace admitted by the model, such as cache- or
+  branch-predictor-visible behavior
+
+Physical side channels such as power or electromagnetic leakage remain outside
+the claim boundary, following the same exclusion style used by ZeroTrace.
 
 The current repository does not define that observer and does not prove against
 it.
@@ -154,6 +161,7 @@ View_TEE-Store(trace) =
   ( entrypoint_id,
     public_args,
     termination_status,
+    public_output_shape,
     physical_reads_norm,
     physical_writes_norm,
     gas_used )
@@ -167,24 +175,43 @@ cache, interrupt, or OCALL side channels.
 ### 2.6 Future SGX host observer
 
 If the project later targets the stronger SGX claim in Section 1.4, the proof
-must define a different observer, for example:
+must define a different observer. Following the channel split made explicit in
+ZeroTrace, the current recommended boundary is:
 
 ```text
-View_SGX(trace) =
+View_SGX(call) =
   ( entrypoint_id,
     public_args,
-    enclave_call_schedule,
-    ocall_schedule,
+    boundary_schedule,
     persistent_reads_norm,
     persistent_writes_norm,
-    fault_or_exit_schedule,
-    gas_used,
-    termination_status )
+    page_trace,
+    exit_trace,
+    shared_resource_trace,
+    termination_status,
+    public_output_shape,
+    gas_used )
 ```
 
-This document does not currently define `View_SGX` formally enough to support a
-proof. It is included here to freeze the future claim boundary and to prevent
-confusion with `View_TEE-Store`.
+Where:
+
+- `boundary_schedule` is the public sequence of enclave-boundary events such as
+  ECALL and OCALL interactions, including public payload sizes
+- `persistent_reads_norm` and `persistent_writes_norm` are the normalized
+  untrusted-memory or persistent-storage traces already used by the artifact
+  semantics
+- `page_trace` is the admitted page-fault or EPC-paging trace
+- `exit_trace` is the admitted interrupt, resume, or termination trace
+- `shared_resource_trace` is an abstract trace for admitted cache or
+  branch-predictor style observations
+- `public_output_shape` is the public result shape, such as return presence and
+  return length
+- raw wall-clock timing is intentionally not a component of `View_SGX`; the
+  only timing-like public quantity currently modeled is `gas_used`
+
+This document now fixes `View_SGX` concretely enough for future mechanization.
+What remains open is not the observer shape, but the theorem and simulator that
+must justify it.
 
 ## 3. Leakage Functions
 
@@ -234,6 +261,7 @@ For the TEE-backed storage-oblivious deployment claim, the permitted leakage is:
 - everything already permitted by the artifact-level theorem for the relevant
   backend
 - public entrypoint identity and public arguments
+- public output shape
 - public termination status
 
 No further dependence on plaintext enclave memory is permitted, because that is
@@ -246,10 +274,12 @@ separately and cannot be imported from the artifact-level theorem unchanged.
 
 At minimum it would need to specify whether the proof allows leakage through:
 
-- ECALL and OCALL sizes or counts
+- enclave-boundary event identity and payload sizes
+- public output shape
 - page-fault or EPC-paging traces
-- interrupt or AEX timing classes
-- cache-set, branch, or other microarchitectural effects
+- interrupt, resume, or termination traces
+- cache-set, branch, or other shared-resource effects admitted by
+  `shared_resource_trace`
 
 Until this leakage function is fixed, there is no honest SGX execution theorem
 to prove.
