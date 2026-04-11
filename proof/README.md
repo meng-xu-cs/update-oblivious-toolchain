@@ -14,6 +14,7 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/CompilerInvariant.lean`
 - `proof/lean/UOToolchain/Composition.lean`
 - `proof/lean/UOToolchain/OramGame.lean`
+- `proof/lean/UOToolchain/TeeDeployment.lean`
 
 These files only freeze the module split and theorem boundary. They do not yet
 contain mechanized proofs of the UO claims.
@@ -27,9 +28,17 @@ Current status:
 - `OramGame.lean` now contains the concrete ORAM public-manifest model,
   public schedule extraction, secret-independence lemmas for leakage
   extraction, and manifest-budget lemmas for the current access schedule.
+- `TeeDeployment.lean` now defines the idealized `View_TEE-Store` observer,
+  proves that exact-UO artifact semantics transport to the TEE storage view,
+  and packages the TEE deployment theorem boundary for the ORAM side.
 - The remaining unproved boundary is the actual computational indistinguishability
-  theorem for the ORAM backend. That cryptographic game argument is still
-  axiomatized.
+  theorem for the ORAM backend, plus the projection from ORAM artifact views to
+  the TEE storage observer. Those game arguments are still axiomatized.
+- [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
+  now also fixes a separate TEE/SGX deployment boundary:
+  an idealized TEE storage theorem is in scope as a future deployment theorem,
+  while SGX execution obliviousness against a malicious host is explicitly out
+  of scope for the current repository state.
 
 The theorem boundary and the required runtime/compiler changes are defined in
 [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md).

@@ -15,3 +15,5 @@ Remaining assumptions:
 - arithmetic is executed in a bounded `u128` domain even when the accepted Solidity syntax spells `uint256`
 - guarantees are over the instrumented abstract/runtime traces emitted by this workspace, including the normalized physical read/write schedules captured by the current runtime
 - the prototype does not claim a proof for every downstream machine-code or microarchitectural observer
+- in a TEE deployment, the strongest current boundary is a storage-obliviousness claim for an idealized host that sees only the public API, normalized persistent I/O, and public gas
+- the prototype does not currently claim that SGX execution itself is oblivious against a malicious host

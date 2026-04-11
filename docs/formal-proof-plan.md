@@ -3,13 +3,15 @@
 This document defines the next proof-oriented milestone for the UO Toolchain.
 
 The goal is not to overclaim. The current repository can realistically target a
-mechanized proof for the instrumented abstract machine used by this workspace.
-It cannot honestly target a universal theorem over all downstream Rust machine
-code, host runtime effects, or microarchitectural observers.
+mechanized proof for the instrumented abstract machine used by this workspace,
+plus a narrowly stated TEE deployment theorem that reuses the same normalized
+storage trace under explicit enclave assumptions. It cannot honestly target a
+universal theorem over all downstream Rust machine code, host runtime effects,
+or microarchitectural observers.
 
 ## 1. Claim Boundary
 
-The proof target should be split into two claims.
+The proof target should be split into three claims.
 
 ### 1.1 Artifact-level exact-UO claim
 
@@ -24,7 +26,49 @@ prove that the normalized `M+`-visible trace distribution is computationally
 indistinguishable across secret variations, up to an explicitly declared
 leakage function.
 
-### 1.3 Explicit non-claims
+### 1.3 TEE-backed storage-oblivious deployment claim
+
+For deployments where the confidential EVM runs inside a trusted TEE that keeps
+plaintext enclave memory confidential and integral, and where persistent state
+leaving the enclave is cryptographically protected, the repository may target a
+deployment-facing theorem only about the host-visible storage boundary.
+
+More precisely, if the host observer is restricted to:
+
+- public call identity and public arguments
+- normalized reads from encrypted/sealed persistent state
+- normalized writes to encrypted/sealed persistent state
+- public gas and public termination status
+
+then the induced host-visible trace should be exact-UO or computational-UO
+according to the backend theorem already proved at the artifact level.
+
+This is a theorem about an idealized TEE storage observer. It is not yet a
+theorem about a malicious SGX host observing enclave execution itself.
+
+### 1.4 SGX execution-oblivious theorem boundary
+
+The stronger target statement discussed for SGX should be written down
+separately:
+
+> for any two executions with the same public inputs and public initial state,
+> SGX execution is oblivious against a malicious host
+
+This stronger claim is outside the current repository theorem boundary.
+
+To make that claim meaningful, the host-visible SGX observer would need to be
+modeled explicitly, including at least:
+
+- the enclave call and return interface
+- any OCALL, syscall, or host-service schedule
+- normalized persistent-state read and write schedules
+- enclave exit, interrupt, or fault-visible behavior
+- any page-granularity or EPC-paging behavior admitted by the model
+
+The current repository does not define that observer and does not prove against
+it.
+
+### 1.5 Explicit non-claims
 
 The proof should not claim:
 
@@ -32,6 +76,9 @@ The proof should not claim:
 - security for raw backends on confidential state
 - security against observers below the modeled abstract/runtime interface
 - security of the current ad hoc nonzero codec as a cryptographic primitive
+- SGX execution obliviousness against a malicious host
+- security against page-fault, cache, branch-predictor, interrupt, or other
+  microarchitectural observers
 
 ## 2. Formal Objects
 
@@ -97,6 +144,48 @@ For exact-UO objects, equality is literal equality of `View_M+`.
 For ORAM-backed objects, the theorem should instead quantify over the
 distribution of `View_M+` induced by the runtime coins.
 
+### 2.5 Idealized TEE storage observer
+
+For the deployment-facing TEE claim in Section 1.3, define the idealized
+host-visible view as:
+
+```text
+View_TEE-Store(trace) =
+  ( entrypoint_id,
+    public_args,
+    termination_status,
+    physical_reads_norm,
+    physical_writes_norm,
+    gas_used )
+```
+
+This observer is intentionally stronger than the sealed-storage backend alone,
+because it also includes public API shape and public gas, but it is weaker than
+an actual malicious SGX host because it does not include enclave-internal page,
+cache, interrupt, or OCALL side channels.
+
+### 2.6 Future SGX host observer
+
+If the project later targets the stronger SGX claim in Section 1.4, the proof
+must define a different observer, for example:
+
+```text
+View_SGX(trace) =
+  ( entrypoint_id,
+    public_args,
+    enclave_call_schedule,
+    ocall_schedule,
+    persistent_reads_norm,
+    persistent_writes_norm,
+    fault_or_exit_schedule,
+    gas_used,
+    termination_status )
+```
+
+This document does not currently define `View_SGX` formally enough to support a
+proof. It is included here to freeze the future claim boundary and to prevent
+confusion with `View_TEE-Store`.
+
 ## 3. Leakage Functions
 
 The proof must state leakage explicitly.
@@ -137,6 +226,33 @@ L_oram(A, f, pub_state, pub_in) =
 ```
 
 If the implementation leaks anything else, it is outside the theorem.
+
+### 3.3 Idealized TEE deployment leakage
+
+For the TEE-backed storage-oblivious deployment claim, the permitted leakage is:
+
+- everything already permitted by the artifact-level theorem for the relevant
+  backend
+- public entrypoint identity and public arguments
+- public termination status
+
+No further dependence on plaintext enclave memory is permitted, because that is
+hidden by the TEE assumption in Section 1.3.
+
+### 3.4 Future SGX execution leakage
+
+For the stronger SGX claim in Section 1.4, the permitted leakage must be stated
+separately and cannot be imported from the artifact-level theorem unchanged.
+
+At minimum it would need to specify whether the proof allows leakage through:
+
+- ECALL and OCALL sizes or counts
+- page-fault or EPC-paging traces
+- interrupt or AEX timing classes
+- cache-set, branch, or other microarchitectural effects
+
+Until this leakage function is fixed, there is no honest SGX execution theorem
+to prove.
 
 ## 4. Target Theorems
 
@@ -187,6 +303,30 @@ public gas budget and is therefore independent of secrets.
 If each confidential object backend satisfies its local theorem and the
 compiler emits only approved object operations, then the whole-entrypoint
 execution satisfies the top-level exact-UO or computational-UO theorem.
+
+### Theorem G: TEE-backed storage theorem
+
+Assume:
+
+- the artifact satisfies Theorem F
+- plaintext enclave memory is confidential and integral
+- the host sees only `View_TEE-Store`
+- persistent state leaving the enclave is cryptographically protected
+
+Then two executions with the same public projection induce equal or
+computationally indistinguishable `View_TEE-Store` distributions, according to
+the backend theorem used by the artifact.
+
+This theorem is a boundary statement for a deployment theorem. It is not a
+theorem about SGX page faults, caches, interrupts, or host scheduling.
+
+### Theorem H: Future SGX execution-oblivious theorem
+
+If the project later implements a standard ORAM backend, an oblivious enclave
+controller, a fixed enclave boundary, and an explicit SGX leakage model, then a
+separate theorem should target indistinguishability of `View_SGX`.
+
+The current repository does not satisfy the prerequisites for this theorem.
 
 ## 5. Recommended Mechanization Strategy
 
@@ -307,6 +447,28 @@ This should live near
 and the manifest builder in
 [lib.rs](/home/m285xu/update-oblivious-toolchain/compiler/uo-solc/src/lib.rs).
 
+### 6.8 Remove secret-dependent enclave-controller behavior before any SGX claim
+
+Current issue:
+
+- the current ORAM runtime still keeps plaintext logical entries in enclave
+  memory and performs secret-dependent searches and updates over that resident
+  structure
+- the repository does not model or normalize enclave-call, OCALL, fault, or
+  paging behavior
+
+Required change:
+
+- replace the surrogate with a standard ORAM backend
+- make the enclave-side ORAM controller data-oblivious, including stash and
+  position-map handling
+- eliminate secret-dependent early exits, branch shape, and memory footprints in
+  the enclave-resident controller logic
+- define a fixed public enclave boundary for host services and persistent I/O
+
+Without these changes, the repository may target Section 1.3 but not Section
+1.4.
+
 ## 7. Proof-Oriented Refactor Plan
 
 The most efficient implementation path is:
@@ -347,8 +509,21 @@ true:
 - the implemented runtime matches the proved model
 - the results bundle is regenerated against the proved transcript model
 
+Do not claim SGX execution obliviousness against a malicious host until all of
+the following are also true:
+
+- the host-visible SGX observer is defined explicitly
+- the ORAM backend is a standard construction rather than the current surrogate
+- the enclave-side controller is data-oblivious
+- enclave boundary behavior such as host calls and persistent I/O is normalized
+- the deployment assumptions for freshness, rollback resistance, and platform
+  patch level are stated explicitly
+
 Until then, the correct description of the repository is:
 
 - exact-UO for the exact backends on the instrumented abstract machine
 - computational-UO artifact evidence for the current ORAM path on the same
   abstract machine
+- a future TEE-backed storage theorem boundary under idealized enclave
+  assumptions
+- no current SGX execution-oblivious theorem against a malicious host
