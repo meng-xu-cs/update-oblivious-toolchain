@@ -146,6 +146,18 @@ def SGXViewRelation
   R.storageRel (sgxStorageDistribution views₁) (sgxStorageDistribution views₂) storageLeakage ∧
   R.microRel (sgxMicroDistribution views₁) (sgxMicroDistribution views₂) microLeakage
 
+def MicroTraceConsistentWithLeakage
+  (trace : SGXMicroTrace)
+  (leakage : SGXMicroLeakage) : Prop :=
+  trace.pageTrace.length = leakage.pageTraceBudget ∧
+    trace.exitTrace.length = leakage.exitTraceBudget ∧
+    trace.sharedResourceTrace.length = leakage.sharedResourceBudget
+
+def MicroDistributionConsistentWithLeakage
+  (traces : Distribution SGXMicroTrace)
+  (leakage : SGXMicroLeakage) : Prop :=
+  ∀ trace, trace ∈ traces → MicroTraceConsistentWithLeakage trace leakage
+
 def exactSGXStorageRelation : SGXStorageRelation :=
   fun storage₁ storage₂ _leakage => storage₁ = storage₂
 

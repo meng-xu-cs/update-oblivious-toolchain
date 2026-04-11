@@ -45,8 +45,9 @@ Current status:
   of scope.
 - `SgxRelation.lean` now defines the recommended mixed proof relation for
   `View_SGX`: exact public constancy on public outcome and boundary schedule,
-  plus
-  abstract storage and micro-trace subrelations.
+  plus abstract storage and micro-trace subrelations, together with a generic
+  predicate expressing that a micro trace is budget-consistent with
+  `L_sgx_micro`.
 - `SgxRelation.lean` also proves that the current exact TEE-storage theorem
   embeds into a degenerate SGX semantics with empty boundary, paging, exit, and
   shared-resource traces.
@@ -67,7 +68,8 @@ Current status:
   trace lengths match the budgets recorded in `L_sgx_micro`.
 - `SgxMicroGame.lean` now also contains an exact theorem for the deterministic
   public-controller instance, where the generated controller trace depends only
-  on the public controller shape.
+  on the public controller shape, and proves that every trace in that singleton
+  distribution is consistent with the derived `L_sgx_micro`.
 - `SgxJointProjection.lean` now models joint SGX samples carrying both storage
   and controller traces, and proves a joint lifting theorem into the mixed
   `View_SGX` relation from separate storage and controller assumptions.

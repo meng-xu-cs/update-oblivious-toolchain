@@ -89,4 +89,17 @@ theorem publicControllerMicroSemantics_exact :
   cases hPublic
   rfl
 
+theorem publicControllerMicroSemantics_consistent
+  (cfg : SGXMicroConfig) :
+  MicroDistributionConsistentWithLeakage
+    (publicControllerMicroSemantics cfg)
+    (sgxMicroLeakage cfg) := by
+  intro trace hMem
+  simp [publicControllerMicroSemantics] at hMem
+  rcases hMem with rfl
+  exact controllerMicroTraceOfShape_consistentWithLeakage
+    cfg.pubData.publicOutcome
+    cfg.pubData.modelTags
+    cfg.pubData.controllerShape
+
 end UOToolchain

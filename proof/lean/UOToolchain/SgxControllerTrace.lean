@@ -100,6 +100,16 @@ theorem controllerMicroTraceOfShape_lengths_match_leakage
     (controllerMicroTraceOfShape shape).sharedResourceTrace.length = leakage.sharedResourceBudget := by
   simp [controllerMicroTraceOfShape, sgxMicroLeakageOfController]
 
+theorem controllerMicroTraceOfShape_consistentWithLeakage
+  (publicOutcome : SGXPublicOutcome)
+  (modelTags : SGXModelTags)
+  (shape : SGXControllerShape) :
+  MicroTraceConsistentWithLeakage
+    (controllerMicroTraceOfShape shape)
+    (sgxMicroLeakageOfController publicOutcome modelTags shape) := by
+  simpa [MicroTraceConsistentWithLeakage] using
+    controllerMicroTraceOfShape_lengths_match_leakage publicOutcome modelTags shape
+
 def oramControllerMicroTrace (cfg : OramConfig) : SGXMicroTrace :=
   controllerMicroTraceOfShape (oramControllerShape cfg)
 
@@ -122,5 +132,15 @@ theorem oramControllerMicroTrace_lengths_match_leakage
   simpa [oramControllerMicroTrace, oramControllerMicroLeakage, oramControllerShape] using
     controllerMicroTraceOfShape_lengths_match_leakage (publicOutcome cfg) modelTags
       (sgxControllerShapeOfExecutionLeakage (executionLeakage cfg))
+
+theorem oramControllerMicroTrace_consistentWithLeakage
+  (cfg : OramConfig)
+  (publicOutcome : OramConfig → SGXPublicOutcome)
+  (modelTags : SGXModelTags) :
+  MicroTraceConsistentWithLeakage
+    (oramControllerMicroTrace cfg)
+    (oramControllerMicroLeakage publicOutcome modelTags cfg) := by
+  simpa [MicroTraceConsistentWithLeakage] using
+    oramControllerMicroTrace_lengths_match_leakage cfg publicOutcome modelTags
 
 end UOToolchain
