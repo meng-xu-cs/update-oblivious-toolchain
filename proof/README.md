@@ -104,3 +104,7 @@ Current status:
 
 The theorem boundary and the required runtime/compiler changes are defined in
 [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md).
+
+The paper-facing theorem statement corresponding to the current mechanization is
+summarized in
+[docs/paper-theorem-profile.md](/home/m285xu/update-oblivious-toolchain/docs/paper-theorem-profile.md).

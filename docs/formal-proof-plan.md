@@ -329,6 +329,9 @@ Paper-facing choice for this repository:
 - treat any normalized-boundary variant as optional future work rather than the
   headline claim
 
+The polished paper-facing statement for this profile is collected in
+[paper-theorem-profile.md](/home/m285xu/update-oblivious-toolchain/docs/paper-theorem-profile.md).
+
 This split matches the engineering intent:
 
 - public API shape, public outputs, and public gas should be literally equal
