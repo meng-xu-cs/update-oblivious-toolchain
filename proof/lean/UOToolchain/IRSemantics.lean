@@ -26,9 +26,48 @@ structure Config where
   secretState : List String
 deriving Repr, DecidableEq
 
+structure PublicProjection where
+  program : Program
+  publicArgs : List String
+  publicState : List String
+deriving Repr, DecidableEq
+
 abbrev Semantics := Config → Trace
 
+def publicProjection (cfg : Config) : PublicProjection :=
+  { program := cfg.program
+  , publicArgs := cfg.input.publicArgs
+  , publicState := cfg.publicState
+  }
+
 def samePublicProjection (lhs rhs : Config) : Prop :=
-  lhs.program = rhs.program ∧ lhs.input.publicArgs = rhs.input.publicArgs ∧ lhs.publicState = rhs.publicState
+  publicProjection lhs = publicProjection rhs
+
+theorem samePublicProjection_refl (cfg : Config) : samePublicProjection cfg cfg := rfl
+
+theorem samePublicProjection_symm {lhs rhs : Config} :
+    samePublicProjection lhs rhs → samePublicProjection rhs lhs := by
+  intro h
+  exact h.symm
+
+theorem samePublicProjection_trans {a b c : Config} :
+    samePublicProjection a b → samePublicProjection b c → samePublicProjection a c := by
+  intro hab hbc
+  exact hab.trans hbc
+
+theorem samePublicProjection_program_eq {lhs rhs : Config} :
+    samePublicProjection lhs rhs → lhs.program = rhs.program := by
+  intro h
+  exact congrArg PublicProjection.program h
+
+theorem samePublicProjection_publicArgs_eq {lhs rhs : Config} :
+    samePublicProjection lhs rhs → lhs.input.publicArgs = rhs.input.publicArgs := by
+  intro h
+  exact congrArg PublicProjection.publicArgs h
+
+theorem samePublicProjection_publicState_eq {lhs rhs : Config} :
+    samePublicProjection lhs rhs → lhs.publicState = rhs.publicState := by
+  intro h
+  exact congrArg PublicProjection.publicState h
 
 end UOToolchain

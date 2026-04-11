@@ -4,11 +4,47 @@ import UOToolchain.OramGame
 
 namespace UOToolchain
 
-axiom compositionTheorem
-  (run : Semantics)
-  (cfg₁ cfg₂ : Config)
+def withPublicGas (run : Semantics) (budget : Nat) : Semantics :=
+  fun cfg =>
+    { (run cfg) with gasUsed := budget }
+
+def exactEntrypointSemantics (runs : List Semantics) (manifest : ManifestWitness) : Semantics :=
+  withPublicGas (composeExactRuns runs) manifest.publicGasBudget
+
+theorem exactUO_withPublicGas {run : Semantics} {budget : Nat}
+  (hExact : ExactUO run) :
+  ExactUO (withPublicGas run budget) := by
+  intro cfg₁ cfg₂ hPublic
+  exact viewMPlus_overwriteGas (budget := budget) (hExact cfg₁ cfg₂ hPublic)
+
+theorem exactEntrypointPublicGasSafe
+  (runs : List Semantics)
   (manifest : ManifestWitness) :
+  PublicGasSafe (exactEntrypointSemantics runs manifest) manifest := by
+  intro cfg
+  simp [exactEntrypointSemantics, withPublicGas]
+
+theorem compositionTheorem
+  (runs : List Semantics)
+  (manifest : ManifestWitness)
+  (hRuns : ExactUOFamily runs) :
+  ExactUO (exactEntrypointSemantics runs manifest) := by
+  exact exactUO_withPublicGas (exactUO_compose hRuns)
+
+theorem compositionGasTheorem
+  (runs : List Semantics)
+  (manifest : ManifestWitness)
+  (cfg₁ cfg₂ : Config) :
   samePublicProjection cfg₁ cfg₂ →
-  (viewMPlus (run cfg₁) = viewMPlus (run cfg₂)) ∨ True
+  (exactEntrypointSemantics runs manifest cfg₁).gasUsed = manifest.publicGasBudget ∧
+    (exactEntrypointSemantics runs manifest cfg₂).gasUsed = manifest.publicGasBudget := by
+  intro hPublic
+  exact compilerSecrecyPreservation
+    (exactEntrypointSemantics runs manifest)
+    cfg₁
+    cfg₂
+    manifest
+    (exactEntrypointPublicGasSafe runs manifest)
+    hPublic
 
 end UOToolchain
