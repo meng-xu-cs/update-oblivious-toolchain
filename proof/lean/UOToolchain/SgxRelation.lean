@@ -68,6 +68,48 @@ def sgxStorageDistribution (views : Distribution SGXView) : Distribution SGXStor
 def sgxMicroDistribution (views : Distribution SGXView) : Distribution SGXMicroTrace :=
   views.map sgxMicroTrace
 
+def ConstantProjection
+  {α β : Type}
+  (project : α → β)
+  (views : Distribution α)
+  (value : β) : Prop :=
+  ∀ view, view ∈ views → project view = value
+
+def ExactProjectionRelation
+  {α β : Type}
+  (project : α → β)
+  (views₁ views₂ : Distribution α) : Prop :=
+  ∃ value,
+    ConstantProjection project views₁ value ∧
+    ConstantProjection project views₂ value
+
+theorem exactProjectionRelation_of_constant
+  {α β : Type}
+  {project : α → β}
+  {views₁ views₂ : Distribution α}
+  {value₁ value₂ : β}
+  (hValue : value₁ = value₂)
+  (hViews₁ : ConstantProjection project views₁ value₁)
+  (hViews₂ : ConstantProjection project views₂ value₂) :
+  ExactProjectionRelation project views₁ views₂ := by
+  refine ⟨value₁, hViews₁, ?_⟩
+  intro view hMem
+  rw [hValue]
+  exact hViews₂ view hMem
+
+theorem constantProjection_map_of_const
+  {α β γ : Type}
+  (project : β → γ)
+  (value : γ)
+  (f : α → β)
+  (views : Distribution α)
+  (hConst : ∀ view, view ∈ views → project (f view) = value) :
+  ConstantProjection project (views.map f) value := by
+  intro projectedView hMem
+  simp at hMem
+  rcases hMem with ⟨view, hView, rfl⟩
+  exact hConst view hView
+
 abbrev SGXStorageRelation :=
   Distribution SGXStorageTrace → Distribution SGXStorageTrace → List OramAccessLeakage → Prop
 
@@ -83,8 +125,8 @@ def SGXViewRelation
   (views₁ views₂ : Distribution SGXView)
   (storageLeakage : List OramAccessLeakage)
   (microLeakage : SGXMicroLeakage) : Prop :=
-  sgxPublicOutcomeDistribution views₁ = sgxPublicOutcomeDistribution views₂ ∧
-  sgxBoundaryDistribution views₁ = sgxBoundaryDistribution views₂ ∧
+  ExactProjectionRelation sgxPublicOutcome views₁ views₂ ∧
+  ExactProjectionRelation (fun view => view.boundarySchedule) views₁ views₂ ∧
   R.storageRel (sgxStorageDistribution views₁) (sgxStorageDistribution views₂) storageLeakage ∧
   R.microRel (sgxMicroDistribution views₁) (sgxMicroDistribution views₂) microLeakage
 
@@ -130,14 +172,32 @@ theorem microLeakageOfView_eq_of_publicOutcome_eq
   intro h
   simp [microLeakageOfView, h]
 
-theorem exactSGXViewRelation_of_eq
-  {views₁ views₂ : Distribution SGXView}
-  (hEq : views₁ = views₂)
+theorem exactProjectionRelation_singleton
+  {α β : Type}
+  (project : α → β)
+  (lhs rhs : α)
+  (hProject : project lhs = project rhs) :
+  ExactProjectionRelation project [lhs] [rhs] := by
+  refine ⟨project lhs, ?_, ?_⟩
+  · intro view hMem
+    simp at hMem
+    simp [hMem]
+  · intro view hMem
+    simp at hMem
+    simp [hMem, hProject]
+
+theorem exactSGXViewRelation_of_singleton_eq
+  {view₁ view₂ : SGXView}
+  (hEq : view₁ = view₂)
   (storageLeakage : List OramAccessLeakage)
   (microLeakage : SGXMicroLeakage) :
-  SGXViewRelation exactSGXProofRelation views₁ views₂ storageLeakage microLeakage := by
+  SGXViewRelation exactSGXProofRelation [view₁] [view₂] storageLeakage microLeakage := by
   subst hEq
-  simp [SGXViewRelation, exactSGXProofRelation, exactSGXStorageRelation, exactSGXMicroRelation]
+  constructor
+  · exact exactProjectionRelation_singleton sgxPublicOutcome view₁ view₁ rfl
+  constructor
+  · exact exactProjectionRelation_singleton (fun view => view.boundarySchedule) view₁ view₁ rfl
+  · simp [exactSGXProofRelation, exactSGXStorageRelation, exactSGXMicroRelation]
 
 def sgxViewOfDeployment (cfg : Config) (result : DeploymentResult) : SGXView :=
   { entrypointId := cfg.program.entrypoint
@@ -193,7 +253,7 @@ theorem exactTEEStorage_projects_to_exactSGX
     hTEE cfg₁ cfg₂ hPublic
   have hSGXView : sgxViewOfDeployment cfg₁ (run cfg₁) = sgxViewOfDeployment cfg₂ (run cfg₂) :=
     sgxViewOfDeployment_eq_of_viewTEEStore_eq hTEEView
-  apply exactSGXViewRelation_of_eq
-  simp [deploymentToSGXSemantics, hSGXView]
+  simpa [deploymentToSGXSemantics] using
+    exactSGXViewRelation_of_singleton_eq hSGXView [] (deploymentMicroLeakage run tags cfg₁)
 
 end UOToolchain

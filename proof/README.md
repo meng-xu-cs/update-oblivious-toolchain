@@ -17,6 +17,8 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/TeeDeployment.lean`
 - `proof/lean/UOToolchain/SgxBoundary.lean`
 - `proof/lean/UOToolchain/SgxRelation.lean`
+- `proof/lean/UOToolchain/SgxOramProjection.lean`
+- `proof/lean/UOToolchain/SgxExactProjection.lean`
 
 These files only freeze the module split and theorem boundary. They do not yet
 contain mechanized proofs of the UO claims.
@@ -38,11 +40,19 @@ Current status:
   public output shape, while leaving raw timing and physical side channels out
   of scope.
 - `SgxRelation.lean` now defines the recommended mixed proof relation for
-  `View_SGX`: exact equality on public outcome and boundary schedule, plus
+  `View_SGX`: exact public constancy on public outcome and boundary schedule,
+  plus
   abstract storage and micro-trace subrelations.
 - `SgxRelation.lean` also proves that the current exact TEE-storage theorem
   embeds into a degenerate SGX semantics with empty boundary, paging, exit, and
   shared-resource traces.
+- `SgxOramProjection.lean` now lifts the existing ORAM computational boundary
+  into the mixed SGX relation, assuming the SGX public outcome, boundary
+  schedule, and micro-trace envelope are public-safe functions of the public
+  projection.
+- `SgxExactProjection.lean` now lifts the exact artifact theorem into the same
+  SGX relation under an arbitrary public-safe SGX envelope, not just the
+  degenerate empty-trace case.
 - the SGX observer boundary in
   [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now includes explicit public output shape plus a ZeroTrace-derived split into

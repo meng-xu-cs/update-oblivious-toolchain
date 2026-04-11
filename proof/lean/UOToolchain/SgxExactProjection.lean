@@ -1,0 +1,107 @@
+import UOToolchain.SgxOramProjection
+
+namespace UOToolchain
+
+def PublicOutcomeSafe (publicOutcome : Config → SGXPublicOutcome) : Prop :=
+  ∀ cfg₁ cfg₂, samePublicProjection cfg₁ cfg₂ → publicOutcome cfg₁ = publicOutcome cfg₂
+
+def PublicBoundarySafe (boundarySchedule : Config → List BoundaryEvent) : Prop :=
+  ∀ cfg₁ cfg₂, samePublicProjection cfg₁ cfg₂ → boundarySchedule cfg₁ = boundarySchedule cfg₂
+
+def PublicMicroTraceSafe (microTrace : Config → SGXMicroTrace) : Prop :=
+  ∀ cfg₁ cfg₂, samePublicProjection cfg₁ cfg₂ → microTrace cfg₁ = microTrace cfg₂
+
+def sgxViewOfTrace
+  (_cfg : Config)
+  (publicOutcome : SGXPublicOutcome)
+  (boundarySchedule : List BoundaryEvent)
+  (microTrace : SGXMicroTrace)
+  (trace : Trace) : SGXView :=
+  { entrypointId := publicOutcome.entrypointId
+  , publicArgs := publicOutcome.publicArgs
+  , boundarySchedule := boundarySchedule
+  , persistentReads := trace.physicalReads
+  , persistentWrites := trace.physicalWrites
+  , pageTrace := microTrace.pageTrace
+  , exitTrace := microTrace.exitTrace
+  , sharedResourceTrace := microTrace.sharedResourceTrace
+  , terminationStatus := publicOutcome.terminationStatus
+  , outputShape := publicOutcome.outputShape
+  , gasUsed := publicOutcome.gasUsed
+  }
+
+def exactToSGXSemantics
+  (run : Semantics)
+  (publicOutcome : Config → SGXPublicOutcome)
+  (boundarySchedule : Config → List BoundaryEvent)
+  (microTrace : Config → SGXMicroTrace) :
+  SGXSemantics Config :=
+  fun cfg => [sgxViewOfTrace cfg (publicOutcome cfg) (boundarySchedule cfg) (microTrace cfg) (run cfg)]
+
+def exactMicroLeakage
+  (publicOutcome : Config → SGXPublicOutcome)
+  (modelTags : SGXModelTags) : Config → SGXMicroLeakage :=
+  fun cfg =>
+    { publicOutcome := publicOutcome cfg
+    , modelTags := modelTags
+    }
+
+theorem sgxViewOfTrace_eq_of_trace_eq
+  {cfg₁ cfg₂ : Config}
+  {publicOutcome₁ publicOutcome₂ : SGXPublicOutcome}
+  {boundary₁ boundary₂ : List BoundaryEvent}
+  {micro₁ micro₂ : SGXMicroTrace}
+  {trace₁ trace₂ : Trace}
+  (hOutcome : publicOutcome₁ = publicOutcome₂)
+  (hBoundary : boundary₁ = boundary₂)
+  (hMicro : micro₁ = micro₂)
+  (hTrace : trace₁ = trace₂) :
+  sgxViewOfTrace cfg₁ publicOutcome₁ boundary₁ micro₁ trace₁ =
+    sgxViewOfTrace cfg₂ publicOutcome₂ boundary₂ micro₂ trace₂ := by
+  subst hOutcome
+  subst hBoundary
+  subst hMicro
+  subst hTrace
+  rfl
+
+theorem exactMicroLeakage_public
+  {publicOutcome : Config → SGXPublicOutcome}
+  {modelTags : SGXModelTags}
+  (hOutcome : PublicOutcomeSafe publicOutcome) :
+  PublicMicroLeakage samePublicProjection (exactMicroLeakage publicOutcome modelTags) := by
+  intro cfg₁ cfg₂ hPublic
+  simp [exactMicroLeakage, hOutcome cfg₁ cfg₂ hPublic]
+
+theorem exactUO_projects_to_sgxExecution
+  {run : Semantics}
+  {publicOutcome : Config → SGXPublicOutcome}
+  {boundarySchedule : Config → List BoundaryEvent}
+  {microTrace : Config → SGXMicroTrace}
+  {modelTags : SGXModelTags}
+  (hExact : ExactUO run)
+  (hOutcome : PublicOutcomeSafe publicOutcome)
+  (hBoundary : PublicBoundarySafe boundarySchedule)
+  (hMicro : PublicMicroTraceSafe microTrace) :
+  SGXExecutionSecurity
+    samePublicProjection
+    exactSGXProofRelation
+    (exactToSGXSemantics run publicOutcome boundarySchedule microTrace)
+    emptyStorageLeakage
+    (exactMicroLeakage publicOutcome modelTags) := by
+  intro cfg₁ cfg₂ hPublic
+  have hTrace : run cfg₁ = run cfg₂ :=
+    viewMPlus_injective (hExact cfg₁ cfg₂ hPublic)
+  have hOutcomeEq : publicOutcome cfg₁ = publicOutcome cfg₂ :=
+    hOutcome cfg₁ cfg₂ hPublic
+  have hBoundaryEq : boundarySchedule cfg₁ = boundarySchedule cfg₂ :=
+    hBoundary cfg₁ cfg₂ hPublic
+  have hMicroEq : microTrace cfg₁ = microTrace cfg₂ :=
+    hMicro cfg₁ cfg₂ hPublic
+  have hView :
+      sgxViewOfTrace cfg₁ (publicOutcome cfg₁) (boundarySchedule cfg₁) (microTrace cfg₁) (run cfg₁) =
+        sgxViewOfTrace cfg₂ (publicOutcome cfg₂) (boundarySchedule cfg₂) (microTrace cfg₂) (run cfg₂) :=
+    sgxViewOfTrace_eq_of_trace_eq hOutcomeEq hBoundaryEq hMicroEq hTrace
+  simpa [exactToSGXSemantics] using
+    exactSGXViewRelation_of_singleton_eq hView [] (exactMicroLeakage publicOutcome modelTags cfg₁)
+
+end UOToolchain

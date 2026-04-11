@@ -312,6 +312,16 @@ The recommended proof relation is:
 3. a backend-specific storage relation `R_store` over `storage_trace`
 4. an SGX-controller relation `R_micro` over `micro_trace`
 
+For distribution-valued semantics, items 1 and 2 should be read as:
+
+- each sampled execution in both distributions carries the same
+  public-determined `public_outcome`
+- each sampled execution in both distributions carries the same
+  public-determined `boundary_schedule`
+
+The proof should not require positional equality of sampled lists. What matters
+is exact public constancy across both distributions.
+
 This split matches the engineering intent:
 
 - public API shape, public outputs, and public gas should be literally equal
@@ -412,6 +422,24 @@ Concretely, the theorem should prove:
 - the chosen `R_micro` relation on `micro_trace`
 
 The current repository does not satisfy the prerequisites for this theorem.
+
+### Theorem I: SGX envelope lifting theorem
+
+Once `View_SGX` and the mixed relation from Section 3.5 are fixed, the proof
+stack should also include a lifting theorem of the following form:
+
+- if the storage backend satisfies its artifact-level exact or computational
+  theorem
+- and `public_outcome`, `boundary_schedule`, and the admitted micro-trace
+  envelope are public-safe functions of the public projection
+
+then the induced SGX execution satisfies the mixed `View_SGX` relation with:
+
+- exact public constancy on `public_outcome`
+- exact public constancy on `boundary_schedule`
+- storage relation inherited from the backend theorem
+- micro relation inherited from the SGX-controller theorem or, in degenerate
+  envelope models, from exact public constancy of the admitted micro trace
 
 ## 5. Recommended Mechanization Strategy
 
