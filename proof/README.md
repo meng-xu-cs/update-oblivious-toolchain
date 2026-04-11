@@ -32,8 +32,9 @@ Current status:
   proves that exact-UO artifact semantics transport to the TEE storage view,
   and packages the TEE deployment theorem boundary for the ORAM side.
 - The remaining unproved boundary is the actual computational indistinguishability
-  theorem for the ORAM backend, plus the projection from ORAM artifact views to
-  the TEE storage observer. Those game arguments are still axiomatized.
+  theorem for the ORAM backend. The TEE storage layer now reduces
+  definitionally to that existing ORAM boundary rather than introducing a
+  second projection axiom.
 - [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now also fixes a separate TEE/SGX deployment boundary:
   an idealized TEE storage theorem is in scope as a future deployment theorem,

@@ -87,20 +87,28 @@ def OramPublicTerminationSafe (termination : OramConfig → Bool) : Prop :=
 
 abbrev TEEStorageLocalTheorem := Distribution TEEView → Distribution TEEView → List OramAccessLeakage → Prop
 
-axiom teeStorageLocalTheorem : TEEStorageLocalTheorem
+def teeStorageLocalTheorem : TEEStorageLocalTheorem :=
+  fun teeView₁ teeView₂ leakage =>
+    ∃ cfg₁ cfg₂ termination₁ termination₂ view₁ view₂,
+      sameOramPublicProjection cfg₁ cfg₂ ∧
+      termination₁ = termination₂ ∧
+      leakage = executionLeakage cfg₁ ∧
+      oramLocalTheorem view₁ view₂ leakage ∧
+      teeView₁ = view₁.map (viewTEEStoreFromOramView cfg₁ termination₁) ∧
+      teeView₂ = view₂.map (viewTEEStoreFromOramView cfg₂ termination₂)
 
-axiom oramLocalTheorem_projects_to_teeStorage
+theorem oramLocalTheorem_projects_to_teeStorage
   (cfg₁ cfg₂ : OramConfig)
-  (termination₁ termination₂ : Bool)
-  (view₁ view₂ : Distribution ViewMPlus)
-  (leakage : List OramAccessLeakage) :
+  (termination : Bool)
+  (view₁ view₂ : Distribution ViewMPlus) :
   sameOramPublicProjection cfg₁ cfg₂ →
-  termination₁ = termination₂ →
-  oramLocalTheorem view₁ view₂ leakage →
+  oramLocalTheorem view₁ view₂ (executionLeakage cfg₁) →
   teeStorageLocalTheorem
-    (view₁.map (viewTEEStoreFromOramView cfg₁ termination₁))
-    (view₂.map (viewTEEStoreFromOramView cfg₂ termination₂))
-    leakage
+    (view₁.map (viewTEEStoreFromOramView cfg₁ termination))
+    (view₂.map (viewTEEStoreFromOramView cfg₂ termination))
+    (executionLeakage cfg₁) := by
+  intro hPublic hLocal
+  refine ⟨cfg₁, cfg₂, termination, termination, view₁, view₂, hPublic, rfl, rfl, hLocal, rfl, rfl⟩
 
 def ComputationalTEEStorageOblivious
   (run : OramSemantics)
@@ -121,17 +129,15 @@ theorem computationalUO_projects_to_teeStorage
   intro cfg₁ cfg₂ hPublic
   have hTerm : termination cfg₁ = termination cfg₂ :=
     hTermination cfg₁ cfg₂ hPublic
-  exact oramLocalTheorem_projects_to_teeStorage
-    cfg₁
-    cfg₂
-    (termination cfg₁)
-    (termination cfg₂)
-    (run cfg₁)
-    (run cfg₂)
-    (executionLeakage cfg₁)
-    hPublic
-    hTerm
-    (hOram cfg₁ cfg₂ hPublic)
+  simpa [teeStoreDistribution, hTerm] using
+    (oramLocalTheorem_projects_to_teeStorage
+      cfg₁
+      cfg₂
+      (termination cfg₁)
+      (run cfg₁)
+      (run cfg₂)
+      hPublic
+      (hOram cfg₁ cfg₂ hPublic))
 
 def TEEStorageSecurity
   (exactRun : Semantics)
