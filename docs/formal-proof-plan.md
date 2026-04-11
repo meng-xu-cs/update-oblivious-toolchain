@@ -284,6 +284,53 @@ At minimum it would need to specify whether the proof allows leakage through:
 Until this leakage function is fixed, there is no honest SGX execution theorem
 to prove.
 
+### 3.5 Recommended proof relation for `View_SGX`
+
+The recommended future proof relation should not treat `View_SGX` as a single
+opaque object. It should factor the observer into four parts:
+
+```text
+View_SGX =
+  ( public_outcome,
+    boundary_schedule,
+    storage_trace,
+    micro_trace )
+```
+
+Where:
+
+- `public_outcome = (entrypoint_id, public_args, termination_status,
+  public_output_shape, gas_used)`
+- `boundary_schedule` is the enclave-boundary event sequence
+- `storage_trace = (persistent_reads_norm, persistent_writes_norm)`
+- `micro_trace = (page_trace, exit_trace, shared_resource_trace)`
+
+The recommended proof relation is:
+
+1. exact equality of `public_outcome`
+2. exact equality of `boundary_schedule`
+3. a backend-specific storage relation `R_store` over `storage_trace`
+4. an SGX-controller relation `R_micro` over `micro_trace`
+
+This split matches the engineering intent:
+
+- public API shape, public outputs, and public gas should be literally equal
+- enclave-boundary behavior should be normalized strongly enough to be literally
+  equal
+- persistent I/O should inherit either exact-UO equality or ORAM-style
+  computational security from the storage backend
+- page, exit, and shared-resource traces require a separate SGX-controller
+  theorem because they are not covered by standard ORAM security alone
+
+Recommended instantiations:
+
+- for exact backends, `R_store` is literal equality
+- for ORAM-backed maps, `R_store` is computational indistinguishability under
+  the storage leakage function
+- `R_micro` should be defined against an explicit SGX-controller leakage
+  function `L_sgx_micro` containing only public outcome data plus public model
+  tags for the page, exit, and shared-resource observers
+
 ## 4. Target Theorems
 
 The proof plan should target the following theorem stack.
@@ -354,7 +401,15 @@ theorem about SGX page faults, caches, interrupts, or host scheduling.
 
 If the project later implements a standard ORAM backend, an oblivious enclave
 controller, a fixed enclave boundary, and an explicit SGX leakage model, then a
-separate theorem should target indistinguishability of `View_SGX`.
+separate theorem should target the mixed relation from Section 3.5 on
+`View_SGX`.
+
+Concretely, the theorem should prove:
+
+- exact equality of `public_outcome`
+- exact equality of `boundary_schedule`
+- the chosen `R_store` relation on `storage_trace`
+- the chosen `R_micro` relation on `micro_trace`
 
 The current repository does not satisfy the prerequisites for this theorem.
 

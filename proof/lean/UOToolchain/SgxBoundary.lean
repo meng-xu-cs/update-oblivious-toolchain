@@ -53,11 +53,15 @@ structure SGXSetupPublic where
 deriving Repr, DecidableEq
 
 abbrev SGXExecutionView := SGXSetupPublic × List SGXView
-abbrev SGXSemantics := Config → Distribution SGXView
+abbrev SGXSemantics (κ : Type) := κ → Distribution SGXView
 abbrev SGXSecurityRelation := Distribution SGXView → Distribution SGXView → Prop
 
-def SGXExecutionOblivious (R : SGXSecurityRelation) (run : SGXSemantics) : Prop :=
-  ∀ cfg₁ cfg₂, samePublicProjection cfg₁ cfg₂ → R (run cfg₁) (run cfg₂)
+def SGXExecutionOblivious
+  {κ : Type}
+  (samePublic : κ → κ → Prop)
+  (R : SGXSecurityRelation)
+  (run : SGXSemantics κ) : Prop :=
+  ∀ cfg₁ cfg₂, samePublic cfg₁ cfg₂ → R (run cfg₁) (run cfg₂)
 
 def PhysicalSideChannelsExcluded : Prop := True
 def RawTimingExcluded : Prop := True
