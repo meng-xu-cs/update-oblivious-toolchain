@@ -203,4 +203,72 @@ theorem jointSecurity_projects_to_sgxExecution_with_oramController
   apply jointSecurity_projects_to_sgxExecution hStorage hMicro hOutcome hBoundary
   exact oramMicroLeakage_public hOutcome
 
+theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
+  {run : SGXJointSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {microLeakage : OramConfig → SGXMicroLeakage}
+  (hStorage :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      oramLocalTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+  (hMicro :
+    ∀ cfg,
+      NormalizedByLeakage
+        (jointMicroViews (run cfg))
+        (microLeakage cfg))
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    { storageRel := oramSGXStorageRelation, microRel := normalizedObservedSGXMicroRelation }
+    (jointToSGXSemantics run publicOutcome boundarySchedule)
+    executionLeakage
+    (jointMicroLeakage microLeakage) := by
+  intro cfg₁ cfg₂ hPublic
+  have _ := hMicroLeakage cfg₁ cfg₂ hPublic
+  constructor
+  · apply exactProjectionRelation_of_constant (hOutcome cfg₁ cfg₂ hPublic)
+    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₁) _ (run cfg₁) ?_
+      intro sample hMem
+      simp
+    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₂) _ (run cfg₂) ?_
+      intro sample hMem
+      simp
+  constructor
+  · apply exactProjectionRelation_of_constant (hBoundary cfg₁ cfg₂ hPublic)
+    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₁) _ (run cfg₁) ?_
+      intro sample hMem
+      simp
+    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₂) _ (run cfg₂) ?_
+      intro sample hMem
+      simp
+  constructor
+  · simpa [jointToSGXSemantics, sgxStorageDistribution, jointStorageViews, List.map_map] using
+      (jointStorageTheorem_projects_to_sgxStorage
+        cfg₁
+        cfg₂
+        (run cfg₁)
+        (run cfg₂)
+        hPublic
+        (hStorage cfg₁ cfg₂ hPublic))
+  · change
+      NormalizedByLeakage
+        (sgxMicroDistribution
+          ((jointToSGXSemantics run publicOutcome boundarySchedule) cfg₁))
+        (jointMicroLeakage microLeakage cfg₁) ∧
+      NormalizedByLeakage
+        (sgxMicroDistribution
+          ((jointToSGXSemantics run publicOutcome boundarySchedule) cfg₂))
+        (jointMicroLeakage microLeakage cfg₁)
+    constructor
+    · simpa [jointToSGXSemantics, jointMicroViews, jointMicroLeakage, sgxMicroDistribution, List.map_map] using
+        hMicro cfg₁
+    · exact normalizedByLeakage_of_eq
+        (hMicroLeakage cfg₂ cfg₁ (sameOramPublicProjection_symm hPublic))
+        (by
+          simpa [jointToSGXSemantics, jointMicroViews, jointMicroLeakage, sgxMicroDistribution, List.map_map] using
+            hMicro cfg₂)
+
 end UOToolchain

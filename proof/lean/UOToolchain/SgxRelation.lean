@@ -27,15 +27,38 @@ structure SGXModelTags where
   sharedResourceModel : String
 deriving Repr, DecidableEq
 
+inductive SGXControllerPhase where
+  | enclaveEnter
+  | stageRequest
+  | descendPositionMap
+  | loadMetadata
+  | fetchPath
+  | scanStash
+  | rewritePath
+  | ascendPositionMap
+  | sealPersistentState
+  | enclaveExit
+deriving Repr, DecidableEq
+
+structure SGXControllerPageBudget where
+  pageKind : String
+  eventBudget : Nat
+deriving Repr, DecidableEq
+
 structure SGXMicroLeakage where
   publicOutcome : SGXPublicOutcome
   modelTags : SGXModelTags
   boundaryEventBudget : Nat
   controllerPhaseCount : Nat
+  controllerPhaseOrder : List SGXControllerPhase
   pageTraceBudget : Nat
+  pageTraceRegions : List SGXControllerPageBudget
   exitTraceBudget : Nat
+  normalizedExitPattern : List ExitEvent
   sharedResourceBudget : Nat
+  sharedResourcePattern : SharedResourceTrace
   controllerWorksetPages : Nat
+  worksetRegions : List SGXControllerPageBudget
   recursivePositionMapDepth : Nat
   stashBound : Nat
 deriving Repr, DecidableEq
@@ -64,10 +87,15 @@ def microLeakageOfView (tags : SGXModelTags) (view : SGXView) : SGXMicroLeakage 
   , modelTags := tags
   , boundaryEventBudget := 0
   , controllerPhaseCount := 0
+  , controllerPhaseOrder := []
   , pageTraceBudget := 0
+  , pageTraceRegions := []
   , exitTraceBudget := 0
+  , normalizedExitPattern := []
   , sharedResourceBudget := 0
+  , sharedResourcePattern := []
   , controllerWorksetPages := 0
+  , worksetRegions := []
   , recursivePositionMapDepth := 0
   , stashBound := 0
   }

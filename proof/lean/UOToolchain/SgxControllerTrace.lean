@@ -52,29 +52,19 @@ def controllerPageTraceOfShape (shape : SGXControllerShape) : List PageEvent :=
   simpa [controllerPageTraceOfShape, SGXControllerShape.pageTraceBudget] using
     controllerPageTraceRegions_length shape.pageTraceRegions
 
-def controllerExitEventOfIndex
-  (budget : Nat)
-  (index : Nat) : ExitEvent :=
-  if index + 1 = budget then
-    ExitEvent.terminate
-  else if index % 2 = 0 then
-    ExitEvent.resume
-  else
-    ExitEvent.interruptExit
-
 def controllerExitTraceOfShape (shape : SGXControllerShape) : List ExitEvent :=
-  (List.range shape.exitTraceBudget).map (controllerExitEventOfIndex shape.exitTraceBudget)
+  controllerExitPatternOfShape shape
 
 @[simp] theorem controllerExitTraceOfShape_length (shape : SGXControllerShape) :
     (controllerExitTraceOfShape shape).length = shape.exitTraceBudget := by
-  simp [controllerExitTraceOfShape]
+  simp [controllerExitTraceOfShape, controllerExitPatternOfShape]
 
 def controllerSharedResourceTraceOfShape (shape : SGXControllerShape) : SharedResourceTrace :=
-  List.replicate shape.sharedResourceBudget "shared_resource_tick"
+  controllerSharedResourcePatternOfShape shape
 
 @[simp] theorem controllerSharedResourceTraceOfShape_length (shape : SGXControllerShape) :
     (controllerSharedResourceTraceOfShape shape).length = shape.sharedResourceBudget := by
-  simp [controllerSharedResourceTraceOfShape]
+  simp [controllerSharedResourceTraceOfShape, controllerSharedResourcePatternOfShape]
 
 def controllerMicroTraceOfShape (shape : SGXControllerShape) : SGXMicroTrace :=
   { pageTrace := controllerPageTraceOfShape shape

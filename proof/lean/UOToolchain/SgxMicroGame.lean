@@ -51,6 +51,65 @@ def budgetConsistentSGXMicroRelation : SGXMicroRelation :=
     MicroDistributionConsistentWithLeakage micro₁ leakage ∧
       MicroDistributionConsistentWithLeakage micro₂ leakage
 
+structure NormalizedPageEvent where
+  pageKind : String
+  kind : PageEventKind
+deriving Repr, DecidableEq
+
+structure NormalizedMicroTrace where
+  pageTrace : List NormalizedPageEvent
+  exitPattern : List ExitEvent
+  sharedResourcePattern : SharedResourceTrace
+deriving Repr, DecidableEq
+
+def normalizePageEvent (event : PageEvent) : NormalizedPageEvent :=
+  { pageKind := event.pageKind
+  , kind := event.kind
+  }
+
+def normalizePageTrace (pageTrace : List PageEvent) : List NormalizedPageEvent :=
+  pageTrace.map normalizePageEvent
+
+def normalizeMicroTrace (trace : SGXMicroTrace) : NormalizedMicroTrace :=
+  { pageTrace := normalizePageTrace trace.pageTrace
+  , exitPattern := trace.exitTrace
+  , sharedResourcePattern := trace.sharedResourceTrace
+  }
+
+def normalizedPageEventOfIndex
+  (pageKind : String)
+  (index : Nat) : NormalizedPageEvent :=
+  { pageKind := pageKind
+  , kind := if index % 2 = 0 then PageEventKind.faultIn else PageEventKind.evictOut
+  }
+
+def normalizedPageTraceOfRegion (region : SGXControllerPageBudget) : List NormalizedPageEvent :=
+  (List.range region.eventBudget).map (normalizedPageEventOfIndex region.pageKind)
+
+def simulateNormalizedPageTraceFromLeakage (leakage : SGXMicroLeakage) : List NormalizedPageEvent :=
+  concatLists (leakage.pageTraceRegions.map normalizedPageTraceOfRegion)
+
+def simulateNormalizedMicroTraceFromLeakage (leakage : SGXMicroLeakage) : NormalizedMicroTrace :=
+  { pageTrace := simulateNormalizedPageTraceFromLeakage leakage
+  , exitPattern := leakage.normalizedExitPattern
+  , sharedResourcePattern := leakage.sharedResourcePattern
+  }
+
+abbrev NormalizedSGXMicroSimulator := SGXMicroLeakage → Distribution NormalizedMicroTrace
+
+def normalizedLeakageSimulator : NormalizedSGXMicroSimulator :=
+  fun leakage => [simulateNormalizedMicroTraceFromLeakage leakage]
+
+def NormalizedByLeakage
+  (traces : Distribution SGXMicroTrace)
+  (leakage : SGXMicroLeakage) : Prop :=
+  ∀ trace, trace ∈ traces → normalizeMicroTrace trace = simulateNormalizedMicroTraceFromLeakage leakage
+
+def normalizedObservedSGXMicroRelation : SGXMicroRelation :=
+  fun micro₁ micro₂ leakage =>
+    NormalizedByLeakage micro₁ leakage ∧
+      NormalizedByLeakage micro₂ leakage
+
 def canonicalPageTrace (budget : Nat) : List PageEvent :=
   (List.range budget).map (controllerPageEventOfIndex "simulated")
 
@@ -98,6 +157,44 @@ def canonicalizedSGXMicroRelation : SGXMicroRelation :=
   fun micro₁ micro₂ leakage =>
     CanonicalizedByLeakage micro₁ leakage ∧
       CanonicalizedByLeakage micro₂ leakage
+
+@[simp] theorem normalizePageTrace_controllerPageEventsOfRegion
+  (region : SGXControllerPageBudget) :
+  normalizePageTrace (controllerPageEventsOfRegion region) =
+    normalizedPageTraceOfRegion region := by
+  simp [normalizePageTrace, controllerPageEventsOfRegion, normalizedPageTraceOfRegion,
+    normalizePageEvent, controllerPageEventOfIndex, normalizedPageEventOfIndex]
+
+theorem normalizePageTrace_controllerPageTraceRegions
+  (regions : List SGXControllerPageBudget) :
+  normalizePageTrace (concatLists (regions.map controllerPageEventsOfRegion)) =
+    concatLists (regions.map normalizedPageTraceOfRegion) := by
+  induction regions with
+  | nil =>
+      simp [normalizePageTrace, concatLists]
+  | cons region regions ih =>
+      have hRegion :
+          List.map normalizePageEvent (controllerPageEventsOfRegion region) =
+            normalizedPageTraceOfRegion region := by
+        simpa [normalizePageTrace] using normalizePageTrace_controllerPageEventsOfRegion region
+      have hTail :
+          List.map normalizePageEvent (concatLists (List.map controllerPageEventsOfRegion regions)) =
+            concatLists (List.map normalizedPageTraceOfRegion regions) := by
+        simpa [normalizePageTrace] using ih
+      simp [concatLists, normalizePageTrace, List.map_append]
+      rw [hRegion, hTail]
+
+theorem normalizeMicroTrace_controllerMicroTraceOfShape
+  (publicOutcome : SGXPublicOutcome)
+  (modelTags : SGXModelTags)
+  (shape : SGXControllerShape) :
+  normalizeMicroTrace (controllerMicroTraceOfShape shape) =
+    simulateNormalizedMicroTraceFromLeakage
+      (sgxMicroLeakageOfController publicOutcome modelTags shape) := by
+  simp [normalizeMicroTrace, simulateNormalizedMicroTraceFromLeakage,
+    controllerMicroTraceOfShape, controllerExitTraceOfShape,
+    controllerSharedResourceTraceOfShape, sgxMicroLeakageOfController]
+  exact normalizePageTrace_controllerPageTraceRegions shape.pageTraceRegions
 
 theorem sameSGXMicroPublicProjection_refl (cfg : SGXMicroConfig) :
     sameSGXMicroPublicProjection cfg cfg := rfl
@@ -173,6 +270,16 @@ theorem canonicalizedByLeakage_of_consistent
   intro hConsistent trace hMem
   exact canonicalizeMicroTrace_eq_simulate_of_consistent (hConsistent trace hMem)
 
+theorem normalizedByLeakage_of_eq
+  {traces : Distribution SGXMicroTrace}
+  {leakage₁ leakage₂ : SGXMicroLeakage} :
+  leakage₁ = leakage₂ →
+  NormalizedByLeakage traces leakage₁ →
+  NormalizedByLeakage traces leakage₂ := by
+  intro hEq hNormalized
+  subst hEq
+  exact hNormalized
+
 theorem canonicalLeakageSimulator_consistent
   (leakage : SGXMicroLeakage) :
   MicroDistributionConsistentWithLeakage
@@ -190,6 +297,28 @@ theorem canonicalLeakageSimulator_canonicalized
     leakage := by
   exact canonicalizedByLeakage_of_consistent
     (canonicalLeakageSimulator_consistent leakage)
+
+theorem normalizedLeakageSimulator_exact
+  (leakage : SGXMicroLeakage) :
+  ∀ trace, trace ∈ normalizedLeakageSimulator leakage →
+    trace = simulateNormalizedMicroTraceFromLeakage leakage := by
+  intro trace hMem
+  simp [normalizedLeakageSimulator] at hMem
+  rcases hMem with rfl
+  rfl
+
+theorem publicControllerMicroSemantics_normalized
+  (cfg : SGXMicroConfig) :
+  NormalizedByLeakage
+    (publicControllerMicroSemantics cfg)
+    (sgxMicroLeakage cfg) := by
+  intro trace hMem
+  simp [publicControllerMicroSemantics] at hMem
+  rcases hMem with rfl
+  exact normalizeMicroTrace_controllerMicroTraceOfShape
+    cfg.pubData.publicOutcome
+    cfg.pubData.modelTags
+    cfg.pubData.controllerShape
 
 theorem publicControllerMicroSemantics_budgetRelation
   {cfg₁ cfg₂ : SGXMicroConfig} :
@@ -220,5 +349,19 @@ theorem publicControllerMicroSemantics_canonicalizedRelation
       (microDistributionConsistentWithLeakage_of_eq
         (sgxMicroLeakage_eq_of_samePublicProjection hPublic).symm
         (publicControllerMicroSemantics_consistent cfg₂))
+
+theorem publicControllerMicroSemantics_normalizedRelation
+  {cfg₁ cfg₂ : SGXMicroConfig} :
+  sameSGXMicroPublicProjection cfg₁ cfg₂ →
+  normalizedObservedSGXMicroRelation
+    (publicControllerMicroSemantics cfg₁)
+    (publicControllerMicroSemantics cfg₂)
+    (sgxMicroLeakage cfg₁) := by
+  intro hPublic
+  constructor
+  · exact publicControllerMicroSemantics_normalized cfg₁
+  · exact normalizedByLeakage_of_eq
+      (sgxMicroLeakage_eq_of_samePublicProjection hPublic).symm
+      (publicControllerMicroSemantics_normalized cfg₂)
 
 end UOToolchain

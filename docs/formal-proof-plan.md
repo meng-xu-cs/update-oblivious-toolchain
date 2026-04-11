@@ -339,7 +339,7 @@ Recommended instantiations:
   the storage leakage function
 - `R_micro` should be defined against an explicit SGX-controller leakage
   function `L_sgx_micro` containing only public outcome data, public model
-  tags, and public controller-shape budgets for the admitted micro observers
+  tags, and public controller-shape data for the admitted micro observers
 
 Recommended shape:
 
@@ -349,10 +349,15 @@ L_sgx_micro =
     model_tags,
     boundary_event_budget,
     controller_phase_count,
+    controller_phase_order,
     page_trace_budget,
+    page_trace_regions,
     exit_trace_budget,
+    normalized_exit_pattern,
     shared_resource_budget,
+    shared_resource_pattern,
     controller_workset_pages,
+    workset_regions,
     recursive_position_map_depth,
     stash_bound )
 ```
@@ -385,7 +390,16 @@ budgets are grouped into public regions:
 - `stash`
 
 with total page-trace budgets aggregated over the public access schedule and
-workset-page budgets taken as public maxima over the same regions.
+workset-page budgets taken as public maxima over the same regions. The current
+Lean model also exposes:
+
+- the exact public controller phase order
+- the ordered per-region page-event counts
+- the normalized exit pattern
+- the normalized shared-resource event-class schedule
+
+This is still far from leaking the full raw SGX trace: concrete page IDs and
+any secret-dependent micro-event identities remain out of scope.
 
 ## 4. Target Theorems
 
@@ -509,11 +523,17 @@ exit, and shared-resource trace lengths are proved to match the corresponding
 budgets in `L_sgx_micro`. This is a concrete witness for a public controller
 envelope, not yet the general computational theorem above.
 
-The current mechanization also contains an explicit leakage-only canonical
-simulator: from `L_sgx_micro` alone it reconstructs a generic page/exit/shared
-trace with the leaked public budgets. The proved relation at this stage is that
-the real controller trace canonicalizes to that simulator output after erasing
-event identities down to public length shape.
+The current mechanization also contains an explicit normalized simulator: from
+`L_sgx_micro` alone it reconstructs a normalized micro trace consisting of:
+
+- page-kind plus fault/evict classes
+- the normalized exit pattern
+- the normalized shared-resource event schedule
+
+The proved relation at this stage is that the real controller trace normalizes
+exactly to that simulator output. This is stronger than the previous
+budget-only canonicalization theorem while still avoiding claims about full raw
+page identities.
 
 ### Theorem K: Joint SGX composition theorem
 

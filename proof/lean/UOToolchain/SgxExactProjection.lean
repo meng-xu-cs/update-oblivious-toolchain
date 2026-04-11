@@ -47,6 +47,11 @@ def exactMicroLeakage
   (modelTags : SGXModelTags) : Config → SGXMicroLeakage :=
   fun cfg => sgxMicroLeakageOfController (publicOutcome cfg) modelTags (controllerShape cfg)
 
+def exactNormalizedObservedSGXProofRelation : SGXProofRelation :=
+  { storageRel := exactSGXStorageRelation
+  , microRel := normalizedObservedSGXMicroRelation
+  }
+
 theorem sgxViewOfTrace_eq_of_trace_eq
   {cfg₁ cfg₂ : Config}
   {publicOutcome₁ publicOutcome₂ : SGXPublicOutcome}
@@ -77,6 +82,38 @@ theorem exactMicroLeakage_public
   · exact hOutcome cfg₁ cfg₂ hPublic
   · rfl
   · exact hController cfg₁ cfg₂ hPublic
+
+theorem exactControllerMicroTrace_public
+  {controllerShape : Config → SGXControllerShape}
+  (hController : PublicControllerShapeSafe controllerShape) :
+  PublicMicroTraceSafe (fun cfg => controllerMicroTraceOfShape (controllerShape cfg)) := by
+  intro cfg₁ cfg₂ hPublic
+  apply controllerMicroTraceOfShape_eq_of_eq
+  exact hController cfg₁ cfg₂ hPublic
+
+theorem exactControllerMicroDistribution_normalized
+  {run : Semantics}
+  {publicOutcome : Config → SGXPublicOutcome}
+  {boundarySchedule : Config → List BoundaryEvent}
+  {controllerShape : Config → SGXControllerShape}
+  {modelTags : SGXModelTags}
+  (cfg : Config) :
+  NormalizedByLeakage
+    (sgxMicroDistribution
+      ((exactToSGXSemantics
+        run
+        publicOutcome
+        boundarySchedule
+        (fun cfg => controllerMicroTraceOfShape (controllerShape cfg))) cfg))
+    (exactMicroLeakage publicOutcome controllerShape modelTags cfg) := by
+  intro trace hMem
+  simp [exactToSGXSemantics, sgxMicroDistribution] at hMem
+  rcases hMem with rfl
+  simpa [exactMicroLeakage] using
+    normalizeMicroTrace_controllerMicroTraceOfShape
+      (publicOutcome cfg)
+      modelTags
+      (controllerShape cfg)
 
 theorem exactUO_projects_to_sgxExecution
   {run : Semantics}
@@ -112,5 +149,113 @@ theorem exactUO_projects_to_sgxExecution
     sgxViewOfTrace_eq_of_trace_eq hOutcomeEq hBoundaryEq hMicroEq hTrace
   simpa [exactToSGXSemantics] using
     exactSGXViewRelation_of_singleton_eq hView [] (exactMicroLeakage publicOutcome controllerShape modelTags cfg₁)
+
+theorem exactUO_projects_to_sgxExecution_with_normalizedController
+  {run : Semantics}
+  {publicOutcome : Config → SGXPublicOutcome}
+  {boundarySchedule : Config → List BoundaryEvent}
+  {controllerShape : Config → SGXControllerShape}
+  {modelTags : SGXModelTags}
+  (hExact : ExactUO run)
+  (hOutcome : PublicOutcomeSafe publicOutcome)
+  (hBoundary : PublicBoundarySafe boundarySchedule)
+  (hController : PublicControllerShapeSafe controllerShape) :
+  SGXExecutionSecurity
+    samePublicProjection
+    exactNormalizedObservedSGXProofRelation
+    (exactToSGXSemantics
+      run
+      publicOutcome
+      boundarySchedule
+      (fun cfg => controllerMicroTraceOfShape (controllerShape cfg)))
+    emptyStorageLeakage
+    (exactMicroLeakage publicOutcome controllerShape modelTags) := by
+  intro cfg₁ cfg₂ hPublic
+  have hTrace : run cfg₁ = run cfg₂ :=
+    viewMPlus_injective (hExact cfg₁ cfg₂ hPublic)
+  have hOutcomeEq : publicOutcome cfg₁ = publicOutcome cfg₂ :=
+    hOutcome cfg₁ cfg₂ hPublic
+  have hBoundaryEq : boundarySchedule cfg₁ = boundarySchedule cfg₂ :=
+    hBoundary cfg₁ cfg₂ hPublic
+  have hControllerEq : controllerShape cfg₁ = controllerShape cfg₂ :=
+    hController cfg₁ cfg₂ hPublic
+  have hMicroEq :
+      controllerMicroTraceOfShape (controllerShape cfg₁) =
+        controllerMicroTraceOfShape (controllerShape cfg₂) :=
+    controllerMicroTraceOfShape_eq_of_eq hControllerEq
+  have hView :
+      sgxViewOfTrace
+          cfg₁
+          (publicOutcome cfg₁)
+          (boundarySchedule cfg₁)
+          (controllerMicroTraceOfShape (controllerShape cfg₁))
+          (run cfg₁) =
+        sgxViewOfTrace
+          cfg₂
+          (publicOutcome cfg₂)
+          (boundarySchedule cfg₂)
+          (controllerMicroTraceOfShape (controllerShape cfg₂))
+          (run cfg₂) :=
+    sgxViewOfTrace_eq_of_trace_eq hOutcomeEq hBoundaryEq hMicroEq hTrace
+  constructor
+  · simpa [exactToSGXSemantics] using
+      exactProjectionRelation_singleton
+        sgxPublicOutcome
+        (sgxViewOfTrace
+          cfg₁
+          (publicOutcome cfg₁)
+          (boundarySchedule cfg₁)
+          (controllerMicroTraceOfShape (controllerShape cfg₁))
+          (run cfg₁))
+        (sgxViewOfTrace
+          cfg₂
+          (publicOutcome cfg₂)
+          (boundarySchedule cfg₂)
+          (controllerMicroTraceOfShape (controllerShape cfg₂))
+          (run cfg₂))
+        (by simp [hView])
+  constructor
+  · simpa [exactToSGXSemantics] using
+      exactProjectionRelation_singleton
+        (fun view : SGXView => view.boundarySchedule)
+        (sgxViewOfTrace
+          cfg₁
+          (publicOutcome cfg₁)
+          (boundarySchedule cfg₁)
+          (controllerMicroTraceOfShape (controllerShape cfg₁))
+          (run cfg₁))
+        (sgxViewOfTrace
+          cfg₂
+          (publicOutcome cfg₂)
+          (boundarySchedule cfg₂)
+          (controllerMicroTraceOfShape (controllerShape cfg₂))
+          (run cfg₂))
+        (by simp [hView])
+  constructor
+  · simp [exactNormalizedObservedSGXProofRelation, exactSGXStorageRelation, exactToSGXSemantics, hView]
+  · change
+      NormalizedByLeakage
+        (sgxMicroDistribution
+          ((exactToSGXSemantics
+            run
+            publicOutcome
+            boundarySchedule
+            (fun cfg => controllerMicroTraceOfShape (controllerShape cfg))) cfg₁))
+        (exactMicroLeakage publicOutcome controllerShape modelTags cfg₁) ∧
+      NormalizedByLeakage
+        (sgxMicroDistribution
+          ((exactToSGXSemantics
+            run
+            publicOutcome
+            boundarySchedule
+            (fun cfg => controllerMicroTraceOfShape (controllerShape cfg))) cfg₂))
+        (exactMicroLeakage publicOutcome controllerShape modelTags cfg₁)
+    constructor
+    · exact exactControllerMicroDistribution_normalized (run := run) (cfg := cfg₁)
+    · exact normalizedByLeakage_of_eq
+        (exactMicroLeakage_public hOutcome hController cfg₂ cfg₁ (samePublicProjection_symm hPublic))
+        (exactControllerMicroDistribution_normalized
+          (run := run)
+          (cfg := cfg₂))
 
 end UOToolchain

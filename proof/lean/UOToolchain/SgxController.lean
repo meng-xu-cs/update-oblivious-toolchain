@@ -3,24 +3,6 @@ import UOToolchain.SgxRelation
 
 namespace UOToolchain
 
-inductive SGXControllerPhase where
-  | enclaveEnter
-  | stageRequest
-  | descendPositionMap
-  | loadMetadata
-  | fetchPath
-  | scanStash
-  | rewritePath
-  | ascendPositionMap
-  | sealPersistentState
-  | enclaveExit
-deriving Repr, DecidableEq
-
-structure SGXControllerPageBudget where
-  pageKind : String
-  eventBudget : Nat
-deriving Repr, DecidableEq
-
 structure SGXControllerShape where
   boundaryEventBudget : Nat
   phaseTrace : List SGXControllerPhase
@@ -130,6 +112,22 @@ def controllerRecursionDepthOfLeakage (leakage : List OramAccessLeakage) : Nat :
 def controllerStashBoundOfLeakage (leakage : List OramAccessLeakage) : Nat :=
   maxNatList (leakage.map fun leak => leak.stashBound)
 
+def controllerExitEventOfIndex
+  (budget : Nat)
+  (index : Nat) : ExitEvent :=
+  if index + 1 = budget then
+    ExitEvent.terminate
+  else if index % 2 = 0 then
+    ExitEvent.resume
+  else
+    ExitEvent.interruptExit
+
+def controllerExitPatternOfShape (shape : SGXControllerShape) : List ExitEvent :=
+  (List.range shape.exitTraceBudget).map (controllerExitEventOfIndex shape.exitTraceBudget)
+
+def controllerSharedResourcePatternOfShape (shape : SGXControllerShape) : SharedResourceTrace :=
+  List.replicate shape.sharedResourceBudget "shared_resource_tick"
+
 def sgxControllerShapeOfExecutionLeakage (leakage : List OramAccessLeakage) : SGXControllerShape :=
   let phaseTrace := controllerPhaseTraceOfLeakage leakage
   let pageTraceRegions := controllerPageTraceRegionsOfLeakage leakage
@@ -154,10 +152,15 @@ def sgxMicroLeakageOfController
   , modelTags := modelTags
   , boundaryEventBudget := controllerShape.boundaryEventBudget
   , controllerPhaseCount := controllerShape.controllerPhaseCount
+  , controllerPhaseOrder := controllerShape.phaseTrace
   , pageTraceBudget := controllerShape.pageTraceBudget
+  , pageTraceRegions := controllerShape.pageTraceRegions
   , exitTraceBudget := controllerShape.exitTraceBudget
+  , normalizedExitPattern := controllerExitPatternOfShape controllerShape
   , sharedResourceBudget := controllerShape.sharedResourceBudget
+  , sharedResourcePattern := controllerSharedResourcePatternOfShape controllerShape
   , controllerWorksetPages := controllerShape.controllerWorksetPages
+  , worksetRegions := controllerShape.worksetRegions
   , recursivePositionMapDepth := controllerShape.recursivePositionMapDepth
   , stashBound := controllerShape.stashBound
   }

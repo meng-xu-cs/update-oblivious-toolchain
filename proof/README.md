@@ -47,7 +47,9 @@ Current status:
   `View_SGX`: exact public constancy on public outcome and boundary schedule,
   plus abstract storage and micro-trace subrelations, together with a generic
   predicate expressing that a micro trace is budget-consistent with
-  `L_sgx_micro`.
+  `L_sgx_micro`. The leakage object now also carries normalized controller
+  phase order, ordered per-region page budgets, normalized exit pattern, and
+  normalized shared-resource schedule.
 - `SgxRelation.lean` also proves that the current exact TEE-storage theorem
   embeds into a degenerate SGX semantics with empty boundary, paging, exit, and
   shared-resource traces.
@@ -57,7 +59,8 @@ Current status:
   projection.
 - `SgxExactProjection.lean` now lifts the exact artifact theorem into the same
   SGX relation under an arbitrary public-safe SGX envelope, not just the
-  degenerate empty-trace case.
+  degenerate empty-trace case, and now also includes a normalized-controller
+  lifting theorem matching the richer `L_sgx_micro` observer.
 - `SgxMicroGame.lean` now introduces an explicit SGX-controller leakage object
   `L_sgx_micro` and a separate computational SGX micro-trace theorem boundary.
 - `SgxController.lean` now models a nontrivial SGX controller shape with public
@@ -70,15 +73,18 @@ Current status:
   public-controller instance, where the generated controller trace depends only
   on the public controller shape, and proves that every trace in that singleton
   distribution is consistent with the derived `L_sgx_micro`. It also defines a
-  canonical simulator that reconstructs a generic micro trace from
-  `L_sgx_micro` alone.
+  normalized simulator that reconstructs a normalized micro trace from
+  `L_sgx_micro` alone and proves the real controller trace normalizes to that
+  simulator output.
 - `SgxJointProjection.lean` now models joint SGX samples carrying both storage
-  and controller traces, and proves a joint lifting theorem into the mixed
-  `View_SGX` relation from separate storage and controller assumptions.
+  and controller traces, and proves joint lifting theorems into the mixed
+  `View_SGX` relation from separate storage and controller assumptions,
+  including the richer normalized-controller observer.
 - `SgxOramProjection.lean` now includes a concrete ORAM-to-SGX lifting theorem
   that instantiates the SGX micro trace with the public controller semantics
   rather than an arbitrary public-safe placeholder, plus a stronger theorem
-  showing those traces canonicalize to the leakage-only simulator output.
+  showing those traces normalize to the leakage-only simulator output under the
+  richer `L_sgx_micro`.
 - the SGX observer boundary in
   [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now includes explicit public output shape plus a ZeroTrace-derived split into
