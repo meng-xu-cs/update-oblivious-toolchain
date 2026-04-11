@@ -24,8 +24,12 @@ Current status:
   `Composition.lean` now contain executable definitions and proved lemmas for
   normalized trace composition, public-projection equality, exact-UO closure
   under composition, and public-gas equalization.
-- `OramGame.lean` remains the proof boundary for the computational-UO ORAM
-  theorem; that cryptographic game argument is not mechanized yet.
+- `OramGame.lean` now contains the concrete ORAM public-manifest model,
+  public schedule extraction, secret-independence lemmas for leakage
+  extraction, and manifest-budget lemmas for the current access schedule.
+- The remaining unproved boundary is the actual computational indistinguishability
+  theorem for the ORAM backend. That cryptographic game argument is still
+  axiomatized.
 
 The theorem boundary and the required runtime/compiler changes are defined in
 [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md).

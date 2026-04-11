@@ -11,6 +11,9 @@ def withPublicGas (run : Semantics) (budget : Nat) : Semantics :=
 def exactEntrypointSemantics (runs : List Semantics) (manifest : ManifestWitness) : Semantics :=
   withPublicGas (composeExactRuns runs) manifest.publicGasBudget
 
+def ArtifactSecurity (exactRun : Semantics) (oramRun : OramSemantics) : Prop :=
+  ExactUO exactRun ∧ ComputationalUO oramRun
+
 theorem exactUO_withPublicGas {run : Semantics} {budget : Nat}
   (hExact : ExactUO run) :
   ExactUO (withPublicGas run budget) := by
@@ -46,5 +49,14 @@ theorem compositionGasTheorem
     manifest
     (exactEntrypointPublicGasSafe runs manifest)
     hPublic
+
+theorem mixedArtifactComposition
+  (runs : List Semantics)
+  (manifest : ManifestWitness)
+  (hRuns : ExactUOFamily runs)
+  (oramRun : OramSemantics)
+  (hOram : ComputationalUO oramRun) :
+  ArtifactSecurity (exactEntrypointSemantics runs manifest) oramRun := by
+  exact ⟨compositionTheorem runs manifest hRuns, hOram⟩
 
 end UOToolchain
