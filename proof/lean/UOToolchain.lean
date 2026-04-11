@@ -7,5 +7,8 @@ import UOToolchain.OramGame
 import UOToolchain.TeeDeployment
 import UOToolchain.SgxBoundary
 import UOToolchain.SgxRelation
+import UOToolchain.SgxController
+import UOToolchain.SgxMicroGame
 import UOToolchain.SgxOramProjection
 import UOToolchain.SgxExactProjection
+import UOToolchain.SgxJointProjection

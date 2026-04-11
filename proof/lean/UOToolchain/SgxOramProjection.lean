@@ -1,4 +1,4 @@
-import UOToolchain.SgxRelation
+import UOToolchain.SgxController
 
 namespace UOToolchain
 
@@ -67,10 +67,7 @@ def oramToSGXSemantics
 def oramMicroLeakage
   (publicOutcome : OramConfig → SGXPublicOutcome)
   (modelTags : SGXModelTags) : OramConfig → SGXMicroLeakage :=
-  fun cfg =>
-    { publicOutcome := publicOutcome cfg
-    , modelTags := modelTags
-    }
+  oramControllerMicroLeakage publicOutcome modelTags
 
 @[simp] theorem sgxPublicOutcome_sgxViewOfOramView
   (cfg : OramConfig)
@@ -139,7 +136,7 @@ theorem oramMicroLeakage_public
   (hOutcome : OramPublicOutcomeSafe publicOutcome) :
   PublicMicroLeakage sameOramPublicProjection (oramMicroLeakage publicOutcome modelTags) := by
   intro cfg₁ cfg₂ hPublic
-  simp [oramMicroLeakage, hOutcome cfg₁ cfg₂ hPublic]
+  exact oramControllerMicroLeakage_eq_of_samePublicProjection hOutcome hPublic
 
 theorem oramStorageLeakage_public :
   PublicStorageLeakage sameOramPublicProjection executionLeakage := by

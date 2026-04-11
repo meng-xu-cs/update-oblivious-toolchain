@@ -30,6 +30,14 @@ deriving Repr, DecidableEq
 structure SGXMicroLeakage where
   publicOutcome : SGXPublicOutcome
   modelTags : SGXModelTags
+  boundaryEventBudget : Nat
+  controllerPhaseCount : Nat
+  pageTraceBudget : Nat
+  exitTraceBudget : Nat
+  sharedResourceBudget : Nat
+  controllerWorksetPages : Nat
+  recursivePositionMapDepth : Nat
+  stashBound : Nat
 deriving Repr, DecidableEq
 
 def sgxPublicOutcome (view : SGXView) : SGXPublicOutcome :=
@@ -54,6 +62,14 @@ def sgxMicroTrace (view : SGXView) : SGXMicroTrace :=
 def microLeakageOfView (tags : SGXModelTags) (view : SGXView) : SGXMicroLeakage :=
   { publicOutcome := sgxPublicOutcome view
   , modelTags := tags
+  , boundaryEventBudget := 0
+  , controllerPhaseCount := 0
+  , pageTraceBudget := 0
+  , exitTraceBudget := 0
+  , sharedResourceBudget := 0
+  , controllerWorksetPages := 0
+  , recursivePositionMapDepth := 0
+  , stashBound := 0
   }
 
 def sgxPublicOutcomeDistribution (views : Distribution SGXView) : Distribution SGXPublicOutcome :=

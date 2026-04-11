@@ -338,8 +338,54 @@ Recommended instantiations:
 - for ORAM-backed maps, `R_store` is computational indistinguishability under
   the storage leakage function
 - `R_micro` should be defined against an explicit SGX-controller leakage
-  function `L_sgx_micro` containing only public outcome data plus public model
-  tags for the page, exit, and shared-resource observers
+  function `L_sgx_micro` containing only public outcome data, public model
+  tags, and public controller-shape budgets for the admitted micro observers
+
+Recommended shape:
+
+```text
+L_sgx_micro =
+  ( public_outcome,
+    model_tags,
+    boundary_event_budget,
+    controller_phase_count,
+    page_trace_budget,
+    exit_trace_budget,
+    shared_resource_budget,
+    controller_workset_pages,
+    recursive_position_map_depth,
+    stash_bound )
+```
+
+This is intentionally a controller-side leakage function. It is separate from
+the storage leakage function inherited from the ORAM backend.
+
+The current Lean scaffold instantiates this with a public controller-shape
+object derived from ORAM manifest leakage. Its phase skeleton is:
+
+```text
+[ enclave_enter,
+  stage_request,
+  descend_position_map * recursion_depth,
+  load_metadata,
+  fetch_path,
+  scan_stash,
+  rewrite_path,
+  ascend_position_map * recursion_depth,
+  seal_persistent_state,
+  enclave_exit ]
+```
+
+repeated according to the public `accesses_per_entrypoint` counters. Page
+budgets are grouped into public regions:
+
+- `metadata`
+- `position_map`
+- `path`
+- `stash`
+
+with total page-trace budgets aggregated over the public access schedule and
+workset-page budgets taken as public maxima over the same regions.
 
 ## 4. Target Theorems
 
@@ -440,6 +486,34 @@ then the induced SGX execution satisfies the mixed `View_SGX` relation with:
 - storage relation inherited from the backend theorem
 - micro relation inherited from the SGX-controller theorem or, in degenerate
   envelope models, from exact public constancy of the admitted micro trace
+
+### Theorem J: SGX-controller local theorem
+
+For a future proof-grade SGX controller, if two controller executions start
+from states with the same public micro data and differ only in secrets, then
+the induced distribution of:
+
+```text
+micro_trace = (page_trace, exit_trace, shared_resource_trace)
+```
+
+is related by `R_micro` given only `L_sgx_micro`.
+
+This theorem is separate from ORAM storage security. Standard ORAM theorems do
+not imply it.
+
+### Theorem K: Joint SGX composition theorem
+
+If:
+
+- the storage projection satisfies the artifact-level exact or computational
+  theorem
+- the SGX-controller micro projection satisfies Theorem J
+- `public_outcome` and `boundary_schedule` are public-safe functions of the
+  public projection
+
+then the full SGX execution satisfies the mixed `View_SGX` relation from
+Section 3.5.
 
 ## 5. Recommended Mechanization Strategy
 

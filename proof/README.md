@@ -17,8 +17,11 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/TeeDeployment.lean`
 - `proof/lean/UOToolchain/SgxBoundary.lean`
 - `proof/lean/UOToolchain/SgxRelation.lean`
+- `proof/lean/UOToolchain/SgxController.lean`
+- `proof/lean/UOToolchain/SgxMicroGame.lean`
 - `proof/lean/UOToolchain/SgxOramProjection.lean`
 - `proof/lean/UOToolchain/SgxExactProjection.lean`
+- `proof/lean/UOToolchain/SgxJointProjection.lean`
 
 These files only freeze the module split and theorem boundary. They do not yet
 contain mechanized proofs of the UO claims.
@@ -53,6 +56,14 @@ Current status:
 - `SgxExactProjection.lean` now lifts the exact artifact theorem into the same
   SGX relation under an arbitrary public-safe SGX envelope, not just the
   degenerate empty-trace case.
+- `SgxMicroGame.lean` now introduces an explicit SGX-controller leakage object
+  `L_sgx_micro` and a separate computational SGX micro-trace theorem boundary.
+- `SgxController.lean` now models a nontrivial SGX controller shape with public
+  phase plans, page-budget regions, workset bounds, and a derivation of
+  `L_sgx_micro` from ORAM execution leakage.
+- `SgxJointProjection.lean` now models joint SGX samples carrying both storage
+  and controller traces, and proves a joint lifting theorem into the mixed
+  `View_SGX` relation from separate storage and controller assumptions.
 - the SGX observer boundary in
   [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now includes explicit public output shape plus a ZeroTrace-derived split into
