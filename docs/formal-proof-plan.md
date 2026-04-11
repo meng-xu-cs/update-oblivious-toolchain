@@ -322,6 +322,13 @@ For distribution-valued semantics, items 1 and 2 should be read as:
 The proof should not require positional equality of sampled lists. What matters
 is exact public constancy across both distributions.
 
+Paper-facing choice for this repository:
+
+- keep `boundary_schedule` as an exact public projection in the main theorem
+- normalize only the SGX-specific micro observer
+- treat any normalized-boundary variant as optional future work rather than the
+  headline claim
+
 This split matches the engineering intent:
 
 - public API shape, public outputs, and public gas should be literally equal
@@ -534,6 +541,9 @@ The proved relation at this stage is that the real controller trace normalizes
 exactly to that simulator output. This is stronger than the previous
 budget-only canonicalization theorem while still avoiding claims about full raw
 page identities.
+
+For the main theorem profile, `boundary_schedule` remains exact throughout.
+Only the SGX-specific micro observer is normalized.
 
 ### Theorem K: Joint SGX composition theorem
 

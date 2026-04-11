@@ -258,4 +258,29 @@ theorem exactUO_projects_to_sgxExecution_with_normalizedController
           (run := run)
           (cfg := cfg₂))
 
+/-- Paper-facing main theorem profile:
+exact public boundary schedule plus normalized SGX micro observer. -/
+theorem paperMain_exactUO_projects_to_sgxExecution
+  {run : Semantics}
+  {publicOutcome : Config → SGXPublicOutcome}
+  {boundarySchedule : Config → List BoundaryEvent}
+  {controllerShape : Config → SGXControllerShape}
+  {modelTags : SGXModelTags}
+  (hExact : ExactUO run)
+  (hOutcome : PublicOutcomeSafe publicOutcome)
+  (hBoundary : PublicBoundarySafe boundarySchedule)
+  (hController : PublicControllerShapeSafe controllerShape) :
+  SGXExecutionSecurity
+    samePublicProjection
+    exactNormalizedObservedSGXProofRelation
+    (exactToSGXSemantics
+      run
+      publicOutcome
+      boundarySchedule
+      (fun cfg => controllerMicroTraceOfShape (controllerShape cfg)))
+    emptyStorageLeakage
+    (exactMicroLeakage publicOutcome controllerShape modelTags) := by
+  exact exactUO_projects_to_sgxExecution_with_normalizedController
+    hExact hOutcome hBoundary hController
+
 end UOToolchain

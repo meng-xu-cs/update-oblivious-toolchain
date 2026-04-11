@@ -50,6 +50,9 @@ Current status:
   `L_sgx_micro`. The leakage object now also carries normalized controller
   phase order, ordered per-region page budgets, normalized exit pattern, and
   normalized shared-resource schedule.
+- The paper-facing theorem profile is now explicit: `boundary_schedule` stays
+  exact, while only the SGX micro observer is normalized and simulated from
+  `L_sgx_micro`.
 - `SgxRelation.lean` also proves that the current exact TEE-storage theorem
   embeds into a degenerate SGX semantics with empty boundary, paging, exit, and
   shared-resource traces.

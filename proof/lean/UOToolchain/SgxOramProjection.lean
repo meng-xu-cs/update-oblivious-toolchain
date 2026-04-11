@@ -484,4 +484,23 @@ theorem computationalUO_projects_to_sgxExecution_with_normalizedController
           (run := run)
           (cfg := cfg₂))
 
+/-- Paper-facing main theorem profile:
+exact public boundary schedule plus normalized SGX micro observer. -/
+theorem paperMain_computationalUO_projects_to_sgxExecution
+  {run : OramSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {modelTags : SGXModelTags}
+  (hOram : ComputationalUO run)
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    oramNormalizedObservedSGXProofRelation
+    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
+    executionLeakage
+    (oramMicroLeakage publicOutcome modelTags) := by
+  exact computationalUO_projects_to_sgxExecution_with_normalizedController
+    hOram hOutcome hBoundary
+
 end UOToolchain

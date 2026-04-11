@@ -271,4 +271,32 @@ theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
           simpa [jointToSGXSemantics, jointMicroViews, jointMicroLeakage, sgxMicroDistribution, List.map_map] using
             hMicro cfg₂)
 
+/-- Paper-facing joint theorem profile:
+exact public boundary schedule plus normalized SGX micro observer. -/
+theorem paperMain_jointSecurity_projects_to_sgxExecution
+  {run : SGXJointSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {microLeakage : OramConfig → SGXMicroLeakage}
+  (hStorage :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      oramLocalTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+  (hMicro :
+    ∀ cfg,
+      NormalizedByLeakage
+        (jointMicroViews (run cfg))
+        (microLeakage cfg))
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    { storageRel := oramSGXStorageRelation, microRel := normalizedObservedSGXMicroRelation }
+    (jointToSGXSemantics run publicOutcome boundarySchedule)
+    executionLeakage
+    (jointMicroLeakage microLeakage) := by
+  exact jointSecurity_projects_to_sgxExecution_with_normalizedMicro
+    hStorage hMicro hOutcome hBoundary hMicroLeakage
+
 end UOToolchain
