@@ -509,6 +509,12 @@ exit, and shared-resource trace lengths are proved to match the corresponding
 budgets in `L_sgx_micro`. This is a concrete witness for a public controller
 envelope, not yet the general computational theorem above.
 
+The current mechanization also contains an explicit leakage-only canonical
+simulator: from `L_sgx_micro` alone it reconstructs a generic page/exit/shared
+trace with the leaked public budgets. The proved relation at this stage is that
+the real controller trace canonicalizes to that simulator output after erasing
+event identities down to public length shape.
+
 ### Theorem K: Joint SGX composition theorem
 
 If:

@@ -69,13 +69,16 @@ Current status:
 - `SgxMicroGame.lean` now also contains an exact theorem for the deterministic
   public-controller instance, where the generated controller trace depends only
   on the public controller shape, and proves that every trace in that singleton
-  distribution is consistent with the derived `L_sgx_micro`.
+  distribution is consistent with the derived `L_sgx_micro`. It also defines a
+  canonical simulator that reconstructs a generic micro trace from
+  `L_sgx_micro` alone.
 - `SgxJointProjection.lean` now models joint SGX samples carrying both storage
   and controller traces, and proves a joint lifting theorem into the mixed
   `View_SGX` relation from separate storage and controller assumptions.
 - `SgxOramProjection.lean` now includes a concrete ORAM-to-SGX lifting theorem
   that instantiates the SGX micro trace with the public controller semantics
-  rather than an arbitrary public-safe placeholder.
+  rather than an arbitrary public-safe placeholder, plus a stronger theorem
+  showing those traces canonicalize to the leakage-only simulator output.
 - the SGX observer boundary in
   [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now includes explicit public output shape plus a ZeroTrace-derived split into
