@@ -502,6 +502,13 @@ is related by `R_micro` given only `L_sgx_micro`.
 This theorem is separate from ORAM storage security. Standard ORAM theorems do
 not imply it.
 
+The current Lean scaffold now contains one exact, proof-carrying instance of a
+public SGX controller envelope: the controller trace is generated
+deterministically from the public controller shape, and the resulting page,
+exit, and shared-resource trace lengths are proved to match the corresponding
+budgets in `L_sgx_micro`. This is a concrete witness for a public controller
+envelope, not yet the general computational theorem above.
+
 ### Theorem K: Joint SGX composition theorem
 
 If:

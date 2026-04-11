@@ -1,4 +1,4 @@
-import UOToolchain.SgxController
+import UOToolchain.SgxControllerTrace
 
 namespace UOToolchain
 
@@ -19,6 +19,11 @@ abbrev SGXMicroSemantics := SGXMicroConfig → Distribution SGXMicroTrace
 def sameSGXMicroPublicProjection (lhs rhs : SGXMicroConfig) : Prop :=
   lhs.pubData = rhs.pubData
 
+def ExactSGXMicroUO (run : SGXMicroSemantics) : Prop :=
+  ∀ cfg₁ cfg₂,
+    sameSGXMicroPublicProjection cfg₁ cfg₂ →
+    run cfg₁ = run cfg₂
+
 def sgxMicroLeakage (cfg : SGXMicroConfig) : SGXMicroLeakage :=
   sgxMicroLeakageOfController
     cfg.pubData.publicOutcome
@@ -34,6 +39,9 @@ def ComputationalSGXMicroUO (run : SGXMicroSemantics) : Prop :=
   ∀ cfg₁ cfg₂,
     sameSGXMicroPublicProjection cfg₁ cfg₂ →
     sgxMicroLocalTheorem (run cfg₁) (run cfg₂) (sgxMicroLeakage cfg₁)
+
+def publicControllerMicroSemantics : SGXMicroSemantics :=
+  fun cfg => [controllerMicroTraceOfShape cfg.pubData.controllerShape]
 
 def computationalSGXMicroRelation : SGXMicroRelation :=
   fun micro₁ micro₂ leakage => sgxMicroLocalTheorem micro₁ micro₂ leakage
@@ -72,5 +80,13 @@ theorem sgxMicroLocalTheorem_uses_public_leakage
   ComputationalSGXMicroUO run := by
   intro cfg₁ cfg₂ hPublic
   exact hLocal cfg₁ cfg₂ hPublic
+
+theorem publicControllerMicroSemantics_exact :
+  ExactSGXMicroUO publicControllerMicroSemantics := by
+  intro cfg₁ cfg₂ hPublic
+  cases cfg₁
+  cases cfg₂
+  cases hPublic
+  rfl
 
 end UOToolchain

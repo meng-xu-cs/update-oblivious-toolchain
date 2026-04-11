@@ -18,6 +18,7 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/SgxBoundary.lean`
 - `proof/lean/UOToolchain/SgxRelation.lean`
 - `proof/lean/UOToolchain/SgxController.lean`
+- `proof/lean/UOToolchain/SgxControllerTrace.lean`
 - `proof/lean/UOToolchain/SgxMicroGame.lean`
 - `proof/lean/UOToolchain/SgxOramProjection.lean`
 - `proof/lean/UOToolchain/SgxExactProjection.lean`
@@ -61,9 +62,18 @@ Current status:
 - `SgxController.lean` now models a nontrivial SGX controller shape with public
   phase plans, page-budget regions, workset bounds, and a derivation of
   `L_sgx_micro` from ORAM execution leakage.
+- `SgxControllerTrace.lean` now turns that public controller shape into
+  concrete page, exit, and shared-resource traces, and proves that the concrete
+  trace lengths match the budgets recorded in `L_sgx_micro`.
+- `SgxMicroGame.lean` now also contains an exact theorem for the deterministic
+  public-controller instance, where the generated controller trace depends only
+  on the public controller shape.
 - `SgxJointProjection.lean` now models joint SGX samples carrying both storage
   and controller traces, and proves a joint lifting theorem into the mixed
   `View_SGX` relation from separate storage and controller assumptions.
+- `SgxOramProjection.lean` now includes a concrete ORAM-to-SGX lifting theorem
+  that instantiates the SGX micro trace with the public controller semantics
+  rather than an arbitrary public-safe placeholder.
 - the SGX observer boundary in
   [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now includes explicit public output shape plus a ZeroTrace-derived split into

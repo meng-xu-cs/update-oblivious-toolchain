@@ -1,4 +1,4 @@
-import UOToolchain.SgxController
+import UOToolchain.SgxControllerTrace
 
 namespace UOToolchain
 
@@ -138,6 +138,11 @@ theorem oramMicroLeakage_public
   intro cfg₁ cfg₂ hPublic
   exact oramControllerMicroLeakage_eq_of_samePublicProjection hOutcome hPublic
 
+theorem oramControllerMicroTrace_public :
+  OramPublicMicroTraceSafe oramControllerMicroTrace := by
+  intro cfg₁ cfg₂ hPublic
+  exact oramControllerMicroTrace_eq_of_samePublicProjection hPublic
+
 theorem oramStorageLeakage_public :
   PublicStorageLeakage sameOramPublicProjection executionLeakage := by
   intro cfg₁ cfg₂ hPublic
@@ -194,5 +199,22 @@ theorem computationalUO_projects_to_sgxExecution
       rcases List.mem_map.mp hMapped with ⟨sourceView, hSource, hEq⟩
       rw [← hEq]
       simp
+
+theorem computationalUO_projects_to_sgxExecution_with_controller
+  {run : OramSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {modelTags : SGXModelTags}
+  (hOram : ComputationalUO run)
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    oramSGXProofRelation
+    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
+    executionLeakage
+    (oramMicroLeakage publicOutcome modelTags) := by
+  apply computationalUO_projects_to_sgxExecution hOram hOutcome hBoundary
+  exact oramControllerMicroTrace_public
 
 end UOToolchain
