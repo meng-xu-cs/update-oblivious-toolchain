@@ -1,7 +1,8 @@
 use crate::controller::CallRecorder;
 use crate::oram::{map_record_bytes, MapEntry, OramState};
 use anyhow::{anyhow, bail, Result};
-use rand::SeedableRng;
+use rand::rngs::OsRng;
+use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
@@ -78,8 +79,9 @@ pub(crate) enum RuntimeObject {
 
 impl RuntimeObject {
     pub fn instantiate(spec: &StateObject) -> Result<Self> {
-        let seed = 0xC0DE_u64 ^ (spec.id as u64) ^ ((spec.name.len() as u64) << 16);
-        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let mut seed = [0u8; 32];
+        OsRng.fill_bytes(&mut seed);
+        let mut rng = ChaCha20Rng::from_seed(seed);
         match (&spec.kind, &spec.backend) {
             (ContainerKind::Cell, BackendKind::Raw) => {
                 let logical = Value::zero_for_type(&spec.value_type);
@@ -391,6 +393,14 @@ impl RuntimeObject {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, &object.oram.parameters);
                 let (value, transcript) = object.oram.get(&object.spec, key, &mut object.rng)?;
+                if let Some(leaf) = transcript.path_leaf {
+                    trace.record_path_oram_leaf_access(
+                        object.spec.id,
+                        &object.spec.name,
+                        object.oram.parameters.bucket_count,
+                        leaf,
+                    );
+                }
                 for event in transcript.logical_accesses {
                     trace.logical_read(&event.kind, &event.object, event.detail);
                 }
@@ -476,6 +486,14 @@ impl RuntimeObject {
                     object
                         .oram
                         .put(&object.spec, key, value, apply, &mut object.rng)?;
+                if let Some(leaf) = transcript.path_leaf {
+                    trace.record_path_oram_leaf_access(
+                        object.spec.id,
+                        &object.spec.name,
+                        object.oram.parameters.bucket_count,
+                        leaf,
+                    );
+                }
                 for event in transcript.logical_accesses {
                     trace.logical_read(&event.kind, &event.object, event.detail);
                 }

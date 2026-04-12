@@ -177,6 +177,7 @@ impl ContractInstance {
             theorem_trace: trace_bundle.theorem_trace,
             runtime_controller_certificate: Some(trace_bundle.controller_certificate),
             runtime_oram_objects: runtime_oram_objects(&self.artifact),
+            runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
         };
         attach_theorem_metrics(&mut trace);
         trace.runtime_refinement_witness()?;

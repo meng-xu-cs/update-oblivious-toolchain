@@ -152,6 +152,7 @@ pub(crate) struct OramTranscript {
     pub logical_accesses: Vec<LogicalEvent>,
     pub physical_reads: Vec<PhysicalReadEvent>,
     pub physical_writes: Vec<OramWrite>,
+    pub path_leaf: Option<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -442,6 +443,7 @@ impl OramState {
             logical_accesses,
             physical_reads,
             physical_writes: Vec::new(),
+            path_leaf: None,
         }
     }
 
@@ -515,6 +517,7 @@ impl OramState {
             logical_accesses,
             physical_reads,
             physical_writes: Vec::new(),
+            path_leaf: Some(leaf),
         }
     }
 

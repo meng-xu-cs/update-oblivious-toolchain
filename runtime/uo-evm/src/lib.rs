@@ -395,12 +395,22 @@ mod tests {
         let second_trace = second
             .call("put(bytes32,uint256)", vec![Value::Bytes32([9u8; 32]), Value::Uint(7)])
             .unwrap();
+        let first_witness = first_trace.trace.runtime_refinement_witness().unwrap();
+        let second_witness = second_trace.trace.runtime_refinement_witness().unwrap();
 
-        assert_eq!(
-            first_trace.trace.hashes().physical_access_trace_hash,
-            second_trace.trace.hashes().physical_access_trace_hash
-        );
         assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(
+            first_witness
+                .oram_leaf_schedule
+                .iter()
+                .map(|step| (&step.object_name, step.bucket_count))
+                .collect::<Vec<_>>(),
+            second_witness
+                .oram_leaf_schedule
+                .iter()
+                .map(|step| (&step.object_name, step.bucket_count))
+                .collect::<Vec<_>>()
+        );
         assert!(first_trace
             .trace
             .physical_writes
@@ -430,12 +440,22 @@ mod tests {
         let second_trace = second
             .call("add(bytes32,uint256)", vec![Value::Bytes32([9u8; 32]), Value::Uint(7)])
             .unwrap();
+        let first_witness = first_trace.trace.runtime_refinement_witness().unwrap();
+        let second_witness = second_trace.trace.runtime_refinement_witness().unwrap();
 
-        assert_eq!(
-            first_trace.trace.hashes().physical_access_trace_hash,
-            second_trace.trace.hashes().physical_access_trace_hash
-        );
         assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(
+            first_witness
+                .oram_leaf_schedule
+                .iter()
+                .map(|step| (&step.object_name, step.bucket_count))
+                .collect::<Vec<_>>(),
+            second_witness
+                .oram_leaf_schedule
+                .iter()
+                .map(|step| (&step.object_name, step.bucket_count))
+                .collect::<Vec<_>>()
+        );
         assert_eq!(first_trace.trace.theorem_trace.boundary_schedule.len(), 6);
         assert_eq!(
             first_trace

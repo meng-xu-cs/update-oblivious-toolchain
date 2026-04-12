@@ -341,6 +341,21 @@ def ImportedRuntimeControllerCertificate.toRuntimeControllerCertificate
       ImportedRuntimeOramAccessCertificate.toRuntimeOramAccessCertificate
   }
 
+structure ImportedRuntimeOramLeafCertificate where
+  object_id : Nat
+  object_name : String
+  bucket_count : Nat
+  leaf : Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeOramLeafCertificate.toRuntimeOramLeafCertificate
+  (leaf : ImportedRuntimeOramLeafCertificate) : RuntimeOramLeafCertificate :=
+  { objectId := leaf.object_id
+  , objectName := leaf.object_name
+  , bucketCount := leaf.bucket_count
+  , leaf := leaf.leaf
+  }
+
 structure ImportedRuntimeOramObjectCertificate where
   object_id : Nat
   object_name : String
@@ -386,6 +401,7 @@ structure ImportedRuntimeRefinementWitness where
   normalized_micro_trace : ImportedNormalizedMicroTrace
   controller_certificate : ImportedRuntimeControllerCertificate
   oram_objects : List ImportedRuntimeOramObjectCertificate
+  oram_leaf_schedule : List ImportedRuntimeOramLeafCertificate
 deriving Repr, DecidableEq, FromJson, ToJson
 
 def ImportedRuntimeRefinementWitness.toRuntimeWitness
@@ -398,6 +414,8 @@ def ImportedRuntimeRefinementWitness.toRuntimeWitness
   , controllerCertificate := witness.controller_certificate.toRuntimeControllerCertificate
   , oramObjects := witness.oram_objects.map
       ImportedRuntimeOramObjectCertificate.toRuntimeOramObjectCertificate
+  , oramLeafSchedule := witness.oram_leaf_schedule.map
+      ImportedRuntimeOramLeafCertificate.toRuntimeOramLeafCertificate
   }
 
 def ImportedRuntimeRefinementWitness.Valid
@@ -533,6 +551,7 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
       , observed_oram_accesses := []
       }
   , oram_objects := []
+  , oram_leaf_schedule := []
   }
 
 def sampleImportedRuntimeRefinementWitnessRoundtrip : Bool :=

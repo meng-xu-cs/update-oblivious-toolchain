@@ -1,3 +1,4 @@
+import UOToolchain.PathOramSecurity
 import UOToolchain.SgxMicroGame
 
 namespace UOToolchain
@@ -34,6 +35,19 @@ structure RuntimeControllerCertificate where
   observedOramAccesses : List RuntimeOramAccessCertificate
 deriving Repr, DecidableEq
 
+structure RuntimeOramLeafCertificate where
+  objectId : Nat
+  objectName : String
+  bucketCount : Nat
+  leaf : Nat
+deriving Repr, DecidableEq
+
+structure RuntimePathOramLeafScaffoldStep where
+  objectId : Nat
+  objectName : String
+  bucketCount : Nat
+deriving Repr, DecidableEq
+
 def RuntimeOramObjectCertificate.accessCertificate
   (object : RuntimeOramObjectCertificate) : RuntimeOramAccessCertificate :=
   { objectId := object.objectId
@@ -57,6 +71,24 @@ def RuntimeOramObjectCertificate.bucketEventKind?
   | "surrogate_public_schedule_v1" => some "uooram_bucket_scan"
   | "path_oram_local_posmap_v1" => some "uooram_path_read"
   | _ => none
+
+def RuntimeOramObjectCertificate.isPathOram
+  (object : RuntimeOramObjectCertificate) : Bool :=
+  object.scheme = pathOramScheme
+
+def RuntimeOramLeafCertificate.toPathOramLeafScheduleStep
+  (leaf : RuntimeOramLeafCertificate) : PathOramLeafScheduleStep :=
+  { object := leaf.objectName
+  , bucketCount := leaf.bucketCount
+  , leaf := leaf.leaf
+  }
+
+def RuntimeOramLeafCertificate.scaffoldStep
+  (leaf : RuntimeOramLeafCertificate) : RuntimePathOramLeafScaffoldStep :=
+  { objectId := leaf.objectId
+  , objectName := leaf.objectName
+  , bucketCount := leaf.bucketCount
+  }
 
 def runtimeOramObjectByName?
   (oramObjects : List RuntimeOramObjectCertificate)
@@ -132,6 +164,63 @@ def reconstructObservedOramAccessesFromLogicalTrace
   (oramObjects : List RuntimeOramObjectCertificate) :
   Option (List RuntimeOramAccessCertificate) :=
   reconstructObservedOramAccessesFromLogicalTraceAux logicalAccesses.length logicalAccesses oramObjects
+
+def reconstructPathOramLeafScaffoldFromLogicalTraceAux
+  (fuel : Nat)
+  (logicalAccesses : List LogicalEvent)
+  (oramObjects : List RuntimeOramObjectCertificate) :
+  Option (List RuntimePathOramLeafScaffoldStep) :=
+  match fuel with
+  | 0 =>
+      match logicalAccesses with
+      | [] => some []
+      | _ => none
+  | fuel + 1 =>
+      match logicalAccesses with
+      | [] => some []
+      | event :: events =>
+          if !(isOramLogicalKind event.kind) then
+            reconstructPathOramLeafScaffoldFromLogicalTraceAux fuel events oramObjects
+          else if event.kind != "uooram_counter" || event.detail != "counter" then
+            none
+          else
+            do
+            let object ← runtimeOramObjectByName? oramObjects event.object
+            let metadataKind ← object.metadataEventKind?
+            let bucketKind ← object.bucketEventKind?
+            let events ←
+              consumeExpectedOramLogicalEvents
+                events
+                event.object
+                metadataKind
+                object.metadataPages
+                "page:"
+            let events ←
+              consumeExpectedOramLogicalEvents
+                events
+                event.object
+                bucketKind
+                object.bucketsPerAccess
+                "bucket:"
+            let scaffold ←
+              reconstructPathOramLeafScaffoldFromLogicalTraceAux fuel events oramObjects
+            if object.isPathOram then
+              some
+                ({ objectId := object.objectId
+                 , objectName := object.objectName
+                 , bucketCount := object.bucketCount
+                 } :: scaffold)
+            else
+              some scaffold
+
+def reconstructPathOramLeafScaffoldFromLogicalTrace
+  (logicalAccesses : List LogicalEvent)
+  (oramObjects : List RuntimeOramObjectCertificate) :
+  Option (List RuntimePathOramLeafScaffoldStep) :=
+  reconstructPathOramLeafScaffoldFromLogicalTraceAux
+    logicalAccesses.length
+    logicalAccesses
+    oramObjects
 
 def runtimeControllerAccessBoundaryEvents : List BoundaryEvent :=
   [ { direction := .exit
@@ -273,6 +362,7 @@ structure RuntimeRefinementWitness where
   normalizedMicroTrace : NormalizedMicroTrace
   controllerCertificate : RuntimeControllerCertificate
   oramObjects : List RuntimeOramObjectCertificate
+  oramLeafSchedule : List RuntimeOramLeafCertificate
 deriving Repr, DecidableEq
 
 def RuntimeRefinementWitness.storageTrace
@@ -306,6 +396,18 @@ def RuntimeRefinementWitness.sgxView
   , gasUsed := witness.publicOutcome.gasUsed
   }
 
+def RuntimeRefinementWitness.pathOramLeafScheduleTrace
+  (witness : RuntimeRefinementWitness) : PathOramLeafScheduleTrace :=
+  witness.oramLeafSchedule.map RuntimeOramLeafCertificate.toPathOramLeafScheduleStep
+
+def RuntimeRefinementWitness.pathOramLeafScaffold
+  (witness : RuntimeRefinementWitness) : List RuntimePathOramLeafScaffoldStep :=
+  witness.oramLeafSchedule.map RuntimeOramLeafCertificate.scaffoldStep
+
+def RuntimeRefinementWitness.pathOramBucketTrace
+  (witness : RuntimeRefinementWitness) : PathOramBucketTrace :=
+  pathOramBucketTraceOfView (viewMPlus witness.trace)
+
 def RuntimeRefinementWitness.Valid
   (witness : RuntimeRefinementWitness)
   (modelTags : SGXModelTags) : Prop :=
@@ -317,6 +419,12 @@ def RuntimeRefinementWitness.Valid
         witness.trace.logicalAccesses
         witness.oramObjects =
       some witness.controllerCertificate.observedOramAccesses ∧
+    reconstructPathOramLeafScaffoldFromLogicalTrace
+        witness.trace.logicalAccesses
+        witness.oramObjects =
+      some witness.pathOramLeafScaffold ∧
+    pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
+      witness.pathOramBucketTrace ∧
     witness.normalizedMicroTrace =
       simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags)
 
@@ -333,6 +441,14 @@ def RuntimeRefinementWitness.checkValid
           witness.trace.logicalAccesses
           witness.oramObjects =
         some witness.controllerCertificate.observedOramAccesses) &&
+    decide
+      (reconstructPathOramLeafScaffoldFromLogicalTrace
+          witness.trace.logicalAccesses
+          witness.oramObjects =
+        some witness.pathOramLeafScaffold) &&
+    decide
+      (pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
+        witness.pathOramBucketTrace) &&
     decide
       (witness.normalizedMicroTrace =
         simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags))
@@ -385,7 +501,8 @@ theorem sgxView_normalizedMicro_eq_witness
   (modelTags : SGXModelTags)
   (hValid : witness.Valid modelTags) :
   normalizeMicroTrace (sgxMicroTrace witness.sgxView) = witness.normalizedMicroTrace := by
-  rcases hValid with ⟨_hGas, _hBoundary, _hShape, _hAccesses, hNormalized⟩
+  rcases hValid with
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hLeafBuckets, hNormalized⟩
   rw [sgxMicroTrace_runtimeWitness]
   rw [reconstructedMicroTrace_normalizedByLeakage]
   exact hNormalized.symm
@@ -395,7 +512,8 @@ theorem runtimeWitness_boundaryBudget_exact
   (modelTags : SGXModelTags)
   (hValid : witness.Valid modelTags) :
   witness.boundarySchedule.length = witness.controllerShape.boundaryEventBudget := by
-  rcases hValid with ⟨_hGas, hBoundary, hShape, _hAccesses, _hNormalized⟩
+  rcases hValid with
+    ⟨_hGas, hBoundary, hShape, _hAccesses, _hLeafScaffold, _hLeafBuckets, _hNormalized⟩
   rw [hBoundary, hShape]
   exact runtimeControllerCertificate_boundarySchedule_budget
     witness.controllerCertificate
@@ -407,6 +525,28 @@ theorem runtimeWitness_publicOutcome_gas_exact
   (hValid : witness.Valid modelTags) :
   witness.trace.gasUsed = witness.publicOutcome.gasUsed := by
   exact hValid.1
+
+theorem runtimeWitness_pathOramLeafScaffold_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  reconstructPathOramLeafScaffoldFromLogicalTrace
+      witness.trace.logicalAccesses
+      witness.oramObjects =
+    some witness.pathOramLeafScaffold := by
+  rcases hValid with
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, hLeafScaffold, _hLeafBuckets, _hNormalized⟩
+  exact hLeafScaffold
+
+theorem runtimeWitness_pathOramBucketProjection_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
+    witness.pathOramBucketTrace := by
+  rcases hValid with
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, hLeafBuckets, _hNormalized⟩
+  exact hLeafBuckets
 
 theorem runtimeWitness_projects_to_paper_observer
   (witness : RuntimeRefinementWitness)

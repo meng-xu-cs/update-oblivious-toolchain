@@ -7,6 +7,7 @@ use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::{
     BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape,
     PublicOutcomeTrace, RuntimeControllerCertificate, RuntimeOramAccessWitness,
+    RuntimeOramLeafWitness,
     SgxControllerShapeTrace, TheoremTrace, Value,
 };
 use uo_store::StoreExecutionMetrics;
@@ -24,6 +25,7 @@ pub(crate) struct CallTraceBundle {
     pub physical_writes: Vec<PhysicalWriteEvent>,
     pub theorem_trace: TheoremTrace,
     pub controller_certificate: RuntimeControllerCertificate,
+    pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,6 +49,7 @@ pub(crate) struct CallRecorder {
     total_oram_accesses: usize,
     observed_oram_schedule: Vec<ObservedOramAccess>,
     observed_oram_accesses: BTreeMap<u32, usize>,
+    path_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
     recursive_position_map_depth: usize,
     stash_bound: usize,
 }
@@ -180,6 +183,21 @@ impl CallRecorder {
         self.stash_bound = self.stash_bound.max(parameters.stash_bound);
     }
 
+    pub(crate) fn record_path_oram_leaf_access(
+        &mut self,
+        object_id: u32,
+        object_name: &str,
+        bucket_count: usize,
+        leaf: usize,
+    ) {
+        self.path_oram_leaf_schedule.push(RuntimeOramLeafWitness {
+            object_id,
+            object_name: object_name.into(),
+            bucket_count,
+            leaf,
+        });
+    }
+
     fn bump_region(&mut self, region: &'static str, delta: usize) {
         let budget = self.page_trace_regions.entry(region).or_default();
         *budget += delta;
@@ -243,6 +261,7 @@ impl CallRecorder {
             physical_writes: self.physical_writes,
             theorem_trace: expected_theorem_trace,
             controller_certificate,
+            oram_leaf_schedule: self.path_oram_leaf_schedule,
         })
     }
 

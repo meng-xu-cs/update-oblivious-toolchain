@@ -204,6 +204,11 @@ What is implemented:
   theorem objects while reconstructing the boundary/controller observer from
   the imported controller certificate and reconstructing the ordered ORAM
   access schedule from the public logical trace
+- that runtime witness now also carries a hidden path-ORAM leaf schedule, and
+  both the Rust witness extractor and the Lean checker validate that its public
+  scaffold matches the path accesses reconstructed from the logical trace and
+  that its deterministic bucket-path projection reproduces the observed
+  path-ORAM bucket trace exactly
 - the Lean scaffold now also contains
   `proof/lean/UOToolchain/RuntimeRefinementJson.lean`, which parses the Rust
   witness JSON, converts it into the theorem-side witness, and provides a
@@ -241,6 +246,9 @@ What is still missing before this milestone is complete:
 - a theorem tying the Rust public logical-trace/controller-witness constructor
   to the Lean witness assumptions, rather than only re-checking imported
   concrete witnesses against the same predicate inside Lean
+- an explicit semantics for runtime coins or seeds that turns the hidden
+  path-ORAM leaf witness into a distribution-valued object rather than only a
+  checked per-trace certificate
 - discharge of the ORAM theorem against the chosen standard construction
   through that witness layer
 

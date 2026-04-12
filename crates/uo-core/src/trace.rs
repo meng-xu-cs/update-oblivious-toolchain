@@ -145,6 +145,14 @@ pub struct RuntimeOramAccessWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeOramLeafWitness {
+    pub object_id: u32,
+    pub object_name: String,
+    pub bucket_count: usize,
+    pub leaf: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeOramObjectWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -208,6 +216,8 @@ pub struct RuntimeRefinementWitness {
     pub normalized_micro_trace: NormalizedMicroTrace,
     pub controller_certificate: RuntimeControllerCertificate,
     pub oram_objects: Vec<RuntimeOramObjectWitness>,
+    #[serde(default)]
+    pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -229,6 +239,7 @@ pub enum RefinementWitnessError {
     BoundaryScheduleMismatch,
     ControllerShapeMismatch,
     NormalizedMicroTraceMismatch,
+    OramLeafScheduleMismatch,
 }
 
 impl fmt::Display for RefinementWitnessError {
@@ -292,6 +303,10 @@ impl fmt::Display for RefinementWitnessError {
             Self::NormalizedMicroTraceMismatch => write!(
                 f,
                 "normalized micro trace does not match the controller-shape simulation"
+            ),
+            Self::OramLeafScheduleMismatch => write!(
+                f,
+                "hidden path-ORAM leaf schedule does not match the reconstructed public scaffold or bucket trace"
             ),
         }
     }
@@ -593,6 +608,157 @@ fn reconstruct_oram_accesses_from_logical_trace(
     Ok(accesses)
 }
 
+fn path_bucket_indices(leaf_count: usize, leaf: usize) -> Vec<usize> {
+    let mut node = leaf_count.saturating_sub(1) + (leaf % leaf_count.max(1));
+    let mut path = vec![node];
+    while node != 0 {
+        node = (node - 1) / 2;
+        path.push(node);
+    }
+    path.reverse();
+    path
+}
+
+fn runtime_oram_object_by_id(
+    oram_objects: &[RuntimeOramObjectWitness],
+    object_id: u32,
+) -> Result<&RuntimeOramObjectWitness, RefinementWitnessError> {
+    oram_objects
+        .iter()
+        .find(|candidate| candidate.object_id == object_id)
+        .ok_or_else(|| RefinementWitnessError::UnknownOramLogicalObject {
+            object: object_id.to_string(),
+        })
+}
+
+fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
+    logical_accesses: &[LogicalEvent],
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<Vec<(u32, String, usize)>, RefinementWitnessError> {
+    let mut scaffold = Vec::new();
+    let mut index = 0usize;
+    while index < logical_accesses.len() {
+        let event = &logical_accesses[index];
+        if !is_oram_logical_kind(&event.kind) {
+            index += 1;
+            continue;
+        }
+        if event.kind != "uooram_counter" || event.detail != "counter" {
+            return Err(RefinementWitnessError::MalformedOramLogicalTrace {
+                object: event.object.clone(),
+                expected_kind: "uooram_counter".into(),
+                detail_prefix: "counter".into(),
+            });
+        }
+        let object = runtime_oram_object_by_name(oram_objects, &event.object)?;
+        index += 1;
+        index = consume_expected_oram_logical_events(
+            logical_accesses,
+            index,
+            &event.object,
+            object.metadata_event_kind()?,
+            object.metadata_pages,
+            "page:",
+        )?;
+        index = consume_expected_oram_logical_events(
+            logical_accesses,
+            index,
+            &event.object,
+            object.bucket_event_kind()?,
+            object.buckets_per_access,
+            "bucket:",
+        )?;
+        if object.scheme == PATH_ORAM_SCHEME {
+            scaffold.push((object.object_id, object.object_name.clone(), object.bucket_count));
+        }
+    }
+    Ok(scaffold)
+}
+
+fn runtime_path_oram_bucket_trace(
+    physical_reads: &[PhysicalReadEvent],
+    physical_writes: &[PhysicalWriteEvent],
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<(Vec<(String, String)>, Vec<(String, String)>), RefinementWitnessError> {
+    let path_objects = oram_objects
+        .iter()
+        .filter(|object| object.scheme == PATH_ORAM_SCHEME)
+        .map(|object| object.object_name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let read_buckets = physical_reads
+        .iter()
+        .filter(|event| {
+            path_objects.contains(event.object.as_str())
+                && event.location.starts_with(&format!("{}@bucket", event.object))
+        })
+        .map(|event| (event.object.clone(), event.location.clone()))
+        .collect();
+    let write_buckets = physical_writes
+        .iter()
+        .filter(|event| {
+            path_objects.contains(event.object.as_str())
+                && event.location.starts_with(&format!("{}@bucket", event.object))
+        })
+        .map(|event| (event.object.clone(), event.location.clone()))
+        .collect();
+    Ok((read_buckets, write_buckets))
+}
+
+fn runtime_path_oram_bucket_trace_of_leaf_schedule(
+    leaf_schedule: &[RuntimeOramLeafWitness],
+) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    let mut read_buckets = Vec::new();
+    let mut write_buckets = Vec::new();
+    for step in leaf_schedule {
+        let leaf_count = ((step.bucket_count + 1) / 2).max(1);
+        let path = path_bucket_indices(leaf_count, step.leaf);
+        for index in &path {
+            read_buckets.push((
+                step.object_name.clone(),
+                format!("{}@bucket{}", step.object_name, index),
+            ));
+        }
+        for index in path.iter().rev() {
+            write_buckets.push((
+                step.object_name.clone(),
+                format!("{}@bucket{}", step.object_name, index),
+            ));
+        }
+    }
+    (read_buckets, write_buckets)
+}
+
+fn validate_path_oram_leaf_schedule(
+    leaf_schedule: &[RuntimeOramLeafWitness],
+    logical_accesses: &[LogicalEvent],
+    physical_reads: &[PhysicalReadEvent],
+    physical_writes: &[PhysicalWriteEvent],
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<(), RefinementWitnessError> {
+    let scaffold = reconstruct_path_oram_leaf_scaffold_from_logical_trace(logical_accesses, oram_objects)?;
+    if scaffold.len() != leaf_schedule.len() {
+        return Err(RefinementWitnessError::OramLeafScheduleMismatch);
+    }
+    for ((object_id, object_name, bucket_count), step) in scaffold.iter().zip(leaf_schedule.iter()) {
+        let object = runtime_oram_object_by_id(oram_objects, step.object_id)?;
+        if object.scheme != PATH_ORAM_SCHEME
+            || step.object_id != *object_id
+            || step.object_name != *object_name
+            || step.bucket_count != *bucket_count
+            || object.object_name != step.object_name
+            || object.bucket_count != step.bucket_count
+        {
+            return Err(RefinementWitnessError::OramLeafScheduleMismatch);
+        }
+    }
+    let expected = runtime_path_oram_bucket_trace_of_leaf_schedule(leaf_schedule);
+    let observed = runtime_path_oram_bucket_trace(physical_reads, physical_writes, oram_objects)?;
+    if observed != expected {
+        return Err(RefinementWitnessError::OramLeafScheduleMismatch);
+    }
+    Ok(())
+}
+
 impl SgxControllerShapeTrace {
     fn with_shared_resource_budget(mut self, page_trace_budget: usize) -> Self {
         self.shared_resource_budget =
@@ -633,6 +799,8 @@ pub struct ExecutionTrace {
     pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,
     #[serde(default)]
     pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
+    #[serde(default)]
+    pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
 }
 
 impl ExecutionTrace {
@@ -736,6 +904,13 @@ impl ExecutionTrace {
         if normalized_micro_trace != controller_shape.normalized_micro_trace() {
             return Err(RefinementWitnessError::NormalizedMicroTraceMismatch);
         }
+        validate_path_oram_leaf_schedule(
+            &self.runtime_oram_leaf_schedule,
+            &self.logical_accesses,
+            &self.physical_reads,
+            &self.physical_writes,
+            &self.runtime_oram_objects,
+        )?;
         Ok(RuntimeRefinementWitness {
             trace: self.refinement_trace(),
             public_outcome,
@@ -744,6 +919,7 @@ impl ExecutionTrace {
             normalized_micro_trace,
             controller_certificate,
             oram_objects: self.runtime_oram_objects.clone(),
+            oram_leaf_schedule: self.runtime_oram_leaf_schedule.clone(),
         })
     }
 }
@@ -811,7 +987,8 @@ mod tests {
         classify_write, ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace,
         NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent,
         PublicOutcomeTrace, RefinementWitnessError, RuntimeControllerCertificate,
-        RuntimeOramAccessWitness, RuntimeOramObjectWitness, TheoremTrace, WriteClass,
+        RuntimeOramAccessWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness, TheoremTrace,
+        WriteClass,
     };
     use std::collections::BTreeMap;
 
@@ -892,19 +1069,32 @@ mod tests {
             LogicalEvent {
                 kind: "uooram_path_read".into(),
                 object: "records".into(),
-                detail: "bucket:2".into(),
-            },
-            LogicalEvent {
-                kind: "uooram_path_read".into(),
-                object: "records".into(),
                 detail: "bucket:3".into(),
             },
             LogicalEvent {
                 kind: "uooram_path_read".into(),
                 object: "records".into(),
-                detail: "bucket:4".into(),
+                detail: "bucket:7".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: "records".into(),
+                detail: "bucket:15".into(),
             },
         ]
+    }
+
+    fn sample_path_bucket_indices() -> Vec<usize> {
+        vec![0, 1, 3, 7, 15]
+    }
+
+    fn sample_oram_leaf_schedule() -> Vec<RuntimeOramLeafWitness> {
+        vec![RuntimeOramLeafWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            bucket_count: 31,
+            leaf: 0,
+        }]
     }
 
     #[test]
@@ -913,22 +1103,30 @@ mod tests {
         let public_outcome = sample_public_outcome(99);
         let controller_shape = controller_certificate.controller_shape();
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
+        let path = sample_path_bucket_indices();
         let trace = ExecutionTrace {
             opcode_trace: vec!["declare".into()],
             logical_accesses: sample_oram_logical_accesses(),
             logical_writes: vec![],
-            physical_reads: vec![PhysicalReadEvent {
-                object: "records".into(),
-                location: "records@bucket0".into(),
-                len: 64,
-            }],
-            physical_writes: vec![PhysicalWriteEvent {
-                object: "records".into(),
-                location: "records@bucket0".into(),
-                old: vec![1, 2],
-                new: vec![3, 4],
-                class: WriteClass::Update,
-            }],
+            physical_reads: path
+                .iter()
+                .map(|index| PhysicalReadEvent {
+                    object: "records".into(),
+                    location: format!("records@bucket{index}"),
+                    len: 64,
+                })
+                .collect(),
+            physical_writes: path
+                .iter()
+                .rev()
+                .map(|index| PhysicalWriteEvent {
+                    object: "records".into(),
+                    location: format!("records@bucket{index}"),
+                    old: vec![1, 2],
+                    new: vec![3, 4],
+                    class: WriteClass::Update,
+                })
+                .collect(),
             host_proxy_metrics: BTreeMap::new(),
             gas_used: 99,
             theorem_trace: TheoremTrace {
@@ -939,6 +1137,7 @@ mod tests {
             },
             runtime_controller_certificate: Some(controller_certificate.clone()),
             runtime_oram_objects: vec![sample_oram_object()],
+            runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
         };
         let witness = trace.runtime_refinement_witness().unwrap();
         assert_eq!(witness.public_outcome.gas_used, 99);
