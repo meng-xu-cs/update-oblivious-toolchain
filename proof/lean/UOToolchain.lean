@@ -14,6 +14,7 @@ import UOToolchain.SgxController
 import UOToolchain.SgxControllerTrace
 import UOToolchain.SgxMicroGame
 import UOToolchain.RuntimeRefinement
+import UOToolchain.RuntimeCoins
 import UOToolchain.RuntimeRefinementJson
 import UOToolchain.SgxOramProjection
 import UOToolchain.SgxExactProjection

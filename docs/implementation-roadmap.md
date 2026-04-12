@@ -217,6 +217,10 @@ What is implemented:
   path candidate: the exported `runtime_seed` controls object-local RNG state,
   store-cipher key generation, and ORAM leaf sampling, and the regression suite
   checks replayability of seeded path-ORAM traces
+- the Lean package now also contains `RuntimeCoins.lean`, which lifts a
+  finite seeded witness family into leaf-schedule and leaf-value distributions
+  and proves the direct canonical/scaffold lemmas needed by the newer
+  scaffold-indexed path-ORAM theorem variants
 - the Lean scaffold now also contains
   `proof/lean/UOToolchain/RuntimeRefinementJson.lean`, which parses the Rust
   witness JSON, converts it into the theorem-side witness, and provides a
@@ -258,6 +262,9 @@ What is still missing before this milestone is complete:
   deterministic replay handle into a distribution-valued runtime-coins object
   that discharges the canonical hidden-leaf theorem without adding a larger
   trusted surrogate
+- discharge of the remaining runtime-coins obligation for the actual
+  implementation: prove that the seeded family of emitted path-ORAM witnesses
+  realizes the canonical leaf-value sampler on the certified public scaffold
 - discharge of the ORAM theorem against the chosen standard construction
   through that witness layer
 
