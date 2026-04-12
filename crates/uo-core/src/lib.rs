@@ -16,6 +16,7 @@ pub use trace::{
     classify_write, BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase,
     ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
     OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace,
+    RefinementPhysicalWrite, RefinementTrace, RefinementWitnessError, RuntimeRefinementWitness,
     SgxControllerShapeTrace, TheoremTrace, TraceHashBundle, WriteClass,
 };
 pub use types::{ScalarType, StructField, Type, Value};

@@ -146,6 +146,13 @@ instance is:
 - `normalizeMicroTrace_controllerMicroTraceOfShape` in
   `proof/lean/UOToolchain/SgxMicroGame.lean`
 
+The runtime-to-Lean witness interface is now fixed in:
+
+- `ExecutionTrace::runtime_refinement_witness` in
+  `crates/uo-core/src/trace.rs`
+- `RuntimeRefinementWitness` and its projection lemmas in
+  `proof/lean/UOToolchain/RuntimeRefinement.lean`
+
 ## Non-Claim
 
 This profile does not currently claim:

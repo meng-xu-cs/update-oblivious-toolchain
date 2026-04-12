@@ -5,9 +5,8 @@ use uo_core::ir::CompiledFunction;
 use uo_core::manifest::EntrypointManifest;
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::{
-    BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase, ExitEvent,
-    NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind, PublicOutcomeTrace,
-    SgxControllerShapeTrace, TheoremTrace, Value,
+    BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape,
+    PublicOutcomeTrace, SgxControllerShapeTrace, TheoremTrace, Value,
 };
 use uo_store::StoreExecutionMetrics;
 
@@ -210,7 +209,7 @@ impl CallRecorder {
             }),
             boundary_schedule: self.boundary_schedule,
             controller_shape: Some(controller_shape.clone()),
-            normalized_micro_trace: Some(normalized_micro_trace_of(&controller_shape)),
+            normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
         };
         Ok(CallTraceBundle {
             logical_accesses: self.logical_accesses,
@@ -310,38 +309,5 @@ fn output_shape_of(return_value: &Option<Value>) -> OutputShape {
             return_length: value.canonical_bytes().len(),
         },
         None => OutputShape::default(),
-    }
-}
-
-fn normalized_micro_trace_of(shape: &SgxControllerShapeTrace) -> NormalizedMicroTrace {
-    let mut page_trace = Vec::new();
-    for region in &shape.page_trace_regions {
-        for index in 0..region.event_budget {
-            page_trace.push(NormalizedPageEvent {
-                page_kind: region.page_kind.clone(),
-                kind: if index % 2 == 0 {
-                    PageEventKind::FaultIn
-                } else {
-                    PageEventKind::EvictOut
-                },
-            });
-        }
-    }
-    let exit_pattern = (0..shape.exit_trace_budget)
-        .map(|index| {
-            if index + 1 == shape.exit_trace_budget {
-                ExitEvent::Terminate
-            } else if index % 2 == 0 {
-                ExitEvent::Resume
-            } else {
-                ExitEvent::InterruptExit
-            }
-        })
-        .collect();
-    let shared_resource_pattern = vec!["shared_resource_tick".into(); shape.shared_resource_budget];
-    NormalizedMicroTrace {
-        page_trace,
-        exit_pattern,
-        shared_resource_pattern,
     }
 }

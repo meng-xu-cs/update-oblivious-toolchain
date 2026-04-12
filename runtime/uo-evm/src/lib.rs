@@ -462,4 +462,30 @@ mod tests {
             2
         );
     }
+
+    #[test]
+    fn execution_trace_exports_refinement_witness() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let result = instance
+            .call("add(bytes32,uint256)", vec![Value::Bytes32([7u8; 32]), Value::Uint(5)])
+            .unwrap();
+        let witness = result.trace.runtime_refinement_witness().unwrap();
+        assert_eq!(witness.public_outcome.gas_used, result.trace.gas_used);
+        assert_eq!(witness.trace.gas_used, result.trace.gas_used);
+        assert_eq!(
+            witness.boundary_schedule.len(),
+            witness.controller_shape.boundary_event_budget
+        );
+        assert_eq!(
+            witness.normalized_micro_trace,
+            witness.controller_shape.normalized_micro_trace()
+        );
+    }
 }

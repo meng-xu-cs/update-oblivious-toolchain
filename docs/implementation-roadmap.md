@@ -170,10 +170,32 @@ Acceptance criteria:
 
 ### M6. Proof integration and refinement
 
-Status: not started.
+Status: partially implemented.
 
 Once M4 and M5 exist, the remaining step is to connect the Rust runtime to the
 Lean theorem by a concrete refinement layer.
+
+What is implemented:
+
+- the Rust trace layer now exposes an explicit refinement witness extraction via
+  `ExecutionTrace::runtime_refinement_witness`
+- that witness keeps only the Lean-relevant normalized trace fields together
+  with `public_outcome`, `boundary_schedule`, `controller_shape`, and
+  `normalized_micro_trace`
+- extraction is checked, not assumed: witness construction fails if gas,
+  boundary budget, or controller-derived normalized micro trace drift apart
+- the Lean scaffold now contains
+  `proof/lean/UOToolchain/RuntimeRefinement.lean`, which fixes the witness
+  record and proves how it projects into the existing `Trace`/`SGXView`
+  theorem objects
+
+What is still missing before this milestone is complete:
+
+- an end-to-end parser/import path from the serialized Rust witness into Lean
+- a theorem tying the Rust witness constructor to the Lean witness assumptions,
+  rather than only matching them structurally
+- discharge of the ORAM theorem against the chosen standard construction
+  through that witness layer
 
 Required work:
 
