@@ -2,7 +2,7 @@ use crate::oram::OramParameters;
 use anyhow::{bail, Result};
 use std::collections::BTreeMap;
 use uo_core::ir::CompiledFunction;
-use uo_core::manifest::EntrypointManifest;
+use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::{
     BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape,
@@ -194,12 +194,14 @@ impl CallRecorder {
         mut self,
         function: &CompiledFunction,
         manifest_entry: &EntrypointManifest,
+        manifest_objects: &[StateObjectManifest],
         args: &[Value],
         return_value: &Option<Value>,
         aborted: bool,
         gas_used: u64,
     ) -> Result<CallTraceBundle> {
         self.assert_manifest_exactness(manifest_entry)?;
+        self.assert_oram_parameter_exactness(manifest_objects)?;
         let entry_input_len = args.iter().map(|arg| arg.canonical_bytes().len()).sum();
         let output_shape = output_shape_of(return_value);
         self.controller_phase_order.extend([
@@ -276,6 +278,100 @@ impl CallRecorder {
         Ok(())
     }
 
+    fn assert_oram_parameter_exactness(
+        &self,
+        manifest_objects: &[StateObjectManifest],
+    ) -> Result<()> {
+        for access in &self.observed_oram_schedule {
+            let manifest_object = manifest_objects
+                .iter()
+                .find(|object| object.id == access.object_id)
+                .ok_or_else(|| anyhow::anyhow!(
+                    "manifest object missing for observed ORAM access {}",
+                    access.object_id
+                ))?;
+            let manifest_oram = manifest_object.oram.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "manifest object {} is missing ORAM parameters",
+                    access.object_id
+                )
+            })?;
+            assert_oram_field_eq(
+                access.object_id,
+                "scheme",
+                access.parameters.scheme.as_str(),
+                manifest_oram.scheme.as_str(),
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "block_size",
+                access.parameters.block_size,
+                manifest_oram.block_size,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "bucket_size",
+                access.parameters.bucket_size,
+                manifest_oram.bucket_size,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "bucket_count",
+                access.parameters.bucket_count,
+                manifest_oram.bucket_count,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "blocks_per_bucket",
+                access.parameters.blocks_per_bucket,
+                manifest_oram.blocks_per_bucket,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "tree_height",
+                access.parameters.tree_height,
+                manifest_oram.tree_height,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "stash_bound",
+                access.parameters.stash_bound,
+                manifest_oram.stash_bound,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "recursion_depth",
+                access.parameters.recursion_depth,
+                manifest_oram.recursion_depth,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "metadata_pages",
+                access.parameters.metadata_pages,
+                manifest_oram.metadata_pages,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "metadata_pages_per_access",
+                access.parameters.metadata_pages_per_access,
+                manifest_oram.metadata_pages_per_access,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "buckets_per_access",
+                access.parameters.buckets_per_access,
+                manifest_oram.buckets_per_access,
+            )?;
+            assert_oram_field_eq(
+                access.object_id,
+                "accesses_per_call",
+                access.parameters.accesses_per_call,
+                manifest_oram.accesses_per_call,
+            )?;
+        }
+        Ok(())
+    }
+
     fn controller_shape(&self) -> SgxControllerShapeTrace {
         let page_trace_regions = controller_region_budgets(&self.page_trace_regions);
         let workset_regions = controller_region_budgets(&self.workset_regions);
@@ -314,6 +410,27 @@ fn controller_certificate(
             })
             .collect(),
     }
+}
+
+fn assert_oram_field_eq<T>(
+    object_id: u32,
+    field: &str,
+    observed: T,
+    manifest: T,
+) -> Result<()>
+where
+    T: PartialEq + std::fmt::Display,
+{
+    if observed != manifest {
+        bail!(
+            "runtime ORAM parameter mismatch for object {} field {}: observed {}, manifest {}",
+            object_id,
+            field,
+            observed,
+            manifest
+        );
+    }
+    Ok(())
 }
 
 fn controller_region_budgets(regions: &BTreeMap<&'static str, usize>) -> Vec<ControllerPageBudget> {

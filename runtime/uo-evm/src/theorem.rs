@@ -1,13 +1,14 @@
 use crate::controller::CallRecorder;
 use anyhow::Result;
 use uo_core::ir::CompiledFunction;
-use uo_core::manifest::EntrypointManifest;
+use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{ExecutionTrace, Value};
 
 pub fn build_theorem_trace(
     recorder: CallRecorder,
     function: &CompiledFunction,
     manifest_entry: &EntrypointManifest,
+    manifest_objects: &[StateObjectManifest],
     args: &[Value],
     return_value: &Option<Value>,
     aborted: bool,
@@ -16,6 +17,7 @@ pub fn build_theorem_trace(
     recorder.finish(
         function,
         manifest_entry,
+        manifest_objects,
         args,
         return_value,
         aborted,

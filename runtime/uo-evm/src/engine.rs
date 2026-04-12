@@ -122,6 +122,7 @@ impl ContractInstance {
             recorder,
             &function,
             &manifest_entry,
+            &self.artifact.contract.manifest.objects,
             &call_args,
             &return_value,
             state.aborted,

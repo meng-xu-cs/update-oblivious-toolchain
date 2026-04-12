@@ -185,6 +185,9 @@ What is implemented:
 - the controller now cross-checks its incremental theorem observer against an
   independent pure reconstruction over the recorded public ORAM schedule before
   returning the trace bundle
+- the runtime also rejects observed ORAM accesses whose public parameters drift
+  from the compiled manifest objects, so the ordered controller certificate is
+  anchored to artifact metadata as well as live execution
 - the runtime CLI can now emit either the full execution trace or the checked
   refinement witness directly via `uo-evm --format refinement-witness`
 - that witness keeps only the Lean-relevant normalized trace fields together

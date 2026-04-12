@@ -556,4 +556,35 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn call_rejects_manifest_oram_parameter_drift() {
+        let mut artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        artifact
+            .contract
+            .manifest
+            .objects
+            .iter_mut()
+            .find(|object| object.name == "records")
+            .unwrap()
+            .oram
+            .as_mut()
+            .unwrap()
+            .buckets_per_access += 1;
+
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let err = instance
+            .call("put(bytes32,uint256)", vec![Value::Bytes32([1u8; 32]), Value::Uint(7)])
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("runtime ORAM parameter mismatch for object")
+        );
+    }
 }
