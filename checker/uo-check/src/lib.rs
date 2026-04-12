@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, Expr, StateObject, Statement};
+use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{CompiledArtifact, ContractMetadata, OramManifest, ProgramMode};
 
 pub fn check_source(source_path: &str, metadata: &ContractMetadata) -> Result<Vec<String>> {
@@ -96,6 +97,16 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             );
         }
         validate_oram_access_shape(&function.signature, &expected_accesses, &artifact.contract.state)?;
+        let expected_max_commit_ops =
+            expected_commit_ops(&function.body, &expected_accesses, &artifact.contract.state)?;
+        if entry.max_commit_ops != expected_max_commit_ops {
+            bail!(
+                "manifest max_commit_ops mismatch for entrypoint {}: {} != {}",
+                function.signature,
+                entry.max_commit_ops,
+                expected_max_commit_ops
+            );
+        }
     }
     report.push("manifest/object consistency: ok".into());
     report.push("forbidden control flow in confidential IR: none".into());
@@ -109,6 +120,171 @@ fn validate_oram_access_shape(
     _state: &[StateObject],
 ) -> Result<()> {
     Ok(())
+}
+
+fn expected_commit_ops(
+    statements: &[Statement],
+    oram_accesses: &BTreeMap<u32, usize>,
+    state: &[StateObject],
+) -> Result<usize> {
+    accessed_objects(statements)?
+        .into_iter()
+        .map(|object_id| {
+            let object = state_object_by_id(state, object_id)?;
+            Ok(match object.kind {
+                uo_core::ContainerKind::Cell => 1usize,
+                uo_core::ContainerKind::Array | uo_core::ContainerKind::Map
+                    if object.backend == BackendKind::Oram =>
+                {
+                    let per_access = OramManifest::for_object(object)?.total_commit_ops();
+                    if object.oram_scheme == PATH_ORAM_SCHEME {
+                        per_access * oram_accesses.get(&object_id).copied().unwrap_or(0)
+                    } else {
+                        per_access
+                    }
+                }
+                uo_core::ContainerKind::Array | uo_core::ContainerKind::Map => {
+                    object.capacity.unwrap_or(1)
+                }
+            })
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|counts| counts.into_iter().sum())
+}
+
+fn accessed_objects(statements: &[Statement]) -> Result<BTreeSet<u32>> {
+    let mut accessed = BTreeSet::new();
+    for statement in statements {
+        collect_accessed_object_ids_statement(statement, &mut accessed)?;
+    }
+    Ok(accessed)
+}
+
+fn collect_accessed_object_ids_statement(
+    statement: &Statement,
+    accessed: &mut BTreeSet<u32>,
+) -> Result<()> {
+    match statement {
+        Statement::Declare { value, .. } | Statement::Assign { value, .. } => {
+            collect_accessed_object_ids_expr(value, accessed)
+        }
+        Statement::Require { cond } | Statement::AbortIf { cond } => {
+            collect_accessed_object_ids_expr(cond, accessed)
+        }
+        Statement::If {
+            cond,
+            then_body,
+            else_body,
+        } => {
+            collect_accessed_object_ids_expr(cond, accessed)?;
+            for stmt in then_body {
+                collect_accessed_object_ids_statement(stmt, accessed)?;
+            }
+            for stmt in else_body {
+                collect_accessed_object_ids_statement(stmt, accessed)?;
+            }
+            Ok(())
+        }
+        Statement::For {
+            start, end, body, ..
+        } => {
+            collect_accessed_object_ids_expr(start, accessed)?;
+            collect_accessed_object_ids_expr(end, accessed)?;
+            for stmt in body {
+                collect_accessed_object_ids_statement(stmt, accessed)?;
+            }
+            Ok(())
+        }
+        Statement::CellSet {
+            object_id,
+            value,
+            predicate,
+        } => {
+            accessed.insert(*object_id);
+            collect_accessed_object_ids_expr(value, accessed)?;
+            if let Some(predicate) = predicate {
+                collect_accessed_object_ids_expr(predicate, accessed)?;
+            }
+            Ok(())
+        }
+        Statement::ArraySet {
+            object_id,
+            index,
+            value,
+            predicate,
+        } => {
+            accessed.insert(*object_id);
+            collect_accessed_object_ids_expr(index, accessed)?;
+            collect_accessed_object_ids_expr(value, accessed)?;
+            if let Some(predicate) = predicate {
+                collect_accessed_object_ids_expr(predicate, accessed)?;
+            }
+            Ok(())
+        }
+        Statement::MapPut {
+            object_id,
+            key,
+            value,
+            predicate,
+        } => {
+            accessed.insert(*object_id);
+            collect_accessed_object_ids_expr(key, accessed)?;
+            collect_accessed_object_ids_expr(value, accessed)?;
+            if let Some(predicate) = predicate {
+                collect_accessed_object_ids_expr(predicate, accessed)?;
+            }
+            Ok(())
+        }
+        Statement::Return { value } => {
+            if let Some(value) = value {
+                collect_accessed_object_ids_expr(value, accessed)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn collect_accessed_object_ids_expr(expr: &Expr, accessed: &mut BTreeSet<u32>) -> Result<()> {
+    match expr {
+        Expr::Literal(_) | Expr::Var(_) => Ok(()),
+        Expr::Unary { expr, .. } => collect_accessed_object_ids_expr(expr, accessed),
+        Expr::Binary { lhs, rhs, .. } => {
+            collect_accessed_object_ids_expr(lhs, accessed)?;
+            collect_accessed_object_ids_expr(rhs, accessed)
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            collect_accessed_object_ids_expr(cond, accessed)?;
+            collect_accessed_object_ids_expr(when_true, accessed)?;
+            collect_accessed_object_ids_expr(when_false, accessed)
+        }
+        Expr::CellGet { object_id } => {
+            accessed.insert(*object_id);
+            Ok(())
+        }
+        Expr::ArrayGet { object_id, index } => {
+            accessed.insert(*object_id);
+            collect_accessed_object_ids_expr(index, accessed)
+        }
+        Expr::MapGet { object_id, key } => {
+            accessed.insert(*object_id);
+            collect_accessed_object_ids_expr(key, accessed)
+        }
+        Expr::StructField { base, .. } => collect_accessed_object_ids_expr(base, accessed),
+        Expr::ArrayIndex { base, index } => {
+            collect_accessed_object_ids_expr(base, accessed)?;
+            collect_accessed_object_ids_expr(index, accessed)
+        }
+        Expr::Keccak256 { parts } => {
+            for part in parts {
+                collect_accessed_object_ids_expr(part, accessed)?;
+            }
+            Ok(())
+        }
+    }
 }
 
 fn count_oram_accesses(
