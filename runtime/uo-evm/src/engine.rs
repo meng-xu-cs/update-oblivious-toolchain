@@ -176,6 +176,7 @@ impl ContractInstance {
             theorem_trace: trace_bundle.theorem_trace,
         };
         attach_theorem_metrics(&mut trace);
+        trace.runtime_refinement_witness()?;
         Ok(CallResult {
             return_value,
             aborted: state.aborted,

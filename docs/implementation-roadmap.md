@@ -179,6 +179,9 @@ What is implemented:
 
 - the Rust trace layer now exposes an explicit refinement witness extraction via
   `ExecutionTrace::runtime_refinement_witness`
+- the runtime engine now treats witness extraction as a postcondition of trace
+  emission: a call fails instead of returning an `ExecutionTrace` whose theorem
+  fields do not admit a refinement witness
 - the runtime CLI can now emit either the full execution trace or the checked
   refinement witness directly via `uo-evm --format refinement-witness`
 - that witness keeps only the Lean-relevant normalized trace fields together
@@ -214,7 +217,8 @@ Required work:
 
 - prove that `ExecutionTrace::runtime_refinement_witness` always emits
   witnesses accepted by the Lean validity checker for each supported backend,
-  not just for the current benchmark-backed scenario family
+  not just for the current benchmark-backed scenario family and runtime
+  postcondition
 - connect the Rust-emitted theorem trace to the Lean observer by a backend-wise
   refinement argument, not just by a checked serialized witness
 - discharge the ORAM theorem against the chosen standard construction instead of
