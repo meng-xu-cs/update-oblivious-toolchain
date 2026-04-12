@@ -160,7 +160,8 @@ The runtime-to-Lean witness interface is now fixed in:
 - `RuntimeRefinementWitness` and its projection lemmas in
   `proof/lean/UOToolchain/RuntimeRefinement.lean`
 - `RuntimeRefinementJson.lean` for JSON import, Lean-side witness checking, and
-  conversion into the theorem objects, including certificate-based observer
+  conversion into the theorem objects, including logical-trace reconstruction
+  of the ordered ORAM access schedule and certificate-based observer
   reconstruction
 - `checkRuntimeWitness` in `proof/lean/CheckRuntimeWitness.lean` for
   end-to-end witness validation from the Lean side

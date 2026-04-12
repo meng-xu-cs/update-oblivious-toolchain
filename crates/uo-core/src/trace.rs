@@ -1,3 +1,4 @@
+use crate::manifest::{PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
@@ -143,6 +144,25 @@ pub struct RuntimeOramAccessWitness {
     pub stash_bound: usize,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeOramObjectWitness {
+    pub object_id: u32,
+    pub object_name: String,
+    pub scheme: String,
+    pub capacity: usize,
+    pub block_size: usize,
+    pub bucket_size: usize,
+    pub bucket_count: usize,
+    pub blocks_per_bucket: usize,
+    pub tree_height: usize,
+    pub stash_bound: usize,
+    pub recursion_depth: usize,
+    pub metadata_pages: usize,
+    pub metadata_pages_per_access: usize,
+    pub buckets_per_access: usize,
+    pub accesses_per_call: usize,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct RuntimeControllerCertificate {
     pub entry_input_len: usize,
@@ -187,6 +207,7 @@ pub struct RuntimeRefinementWitness {
     pub controller_shape: SgxControllerShapeTrace,
     pub normalized_micro_trace: NormalizedMicroTrace,
     pub controller_certificate: RuntimeControllerCertificate,
+    pub oram_objects: Vec<RuntimeOramObjectWitness>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -195,6 +216,14 @@ pub enum RefinementWitnessError {
     MissingControllerShape,
     MissingNormalizedMicroTrace,
     MissingControllerCertificate,
+    UnknownOramLogicalObject { object: String },
+    UnsupportedOramScheme { scheme: String },
+    MalformedOramLogicalTrace {
+        object: String,
+        expected_kind: String,
+        detail_prefix: String,
+    },
+    OramAccessScheduleMismatch,
     GasMismatch { trace_gas: u64, public_outcome_gas: u64 },
     BoundaryBudgetMismatch { boundary_events: usize, boundary_budget: usize },
     BoundaryScheduleMismatch,
@@ -213,6 +242,29 @@ impl fmt::Display for RefinementWitnessError {
             Self::MissingControllerCertificate => {
                 write!(f, "execution trace is missing runtime_controller_certificate")
             }
+            Self::UnknownOramLogicalObject { object } => write!(
+                f,
+                "logical ORAM trace references unknown ORAM object '{}'",
+                object
+            ),
+            Self::UnsupportedOramScheme { scheme } => write!(
+                f,
+                "runtime refinement witness does not support ORAM scheme '{}'",
+                scheme
+            ),
+            Self::MalformedOramLogicalTrace {
+                object,
+                expected_kind,
+                detail_prefix,
+            } => write!(
+                f,
+                "logical ORAM trace for object '{}' is missing expected '{}' event with '{}' detail",
+                object, expected_kind, detail_prefix
+            ),
+            Self::OramAccessScheduleMismatch => write!(
+                f,
+                "controller certificate does not match the ORAM schedule reconstructed from logical trace"
+            ),
             Self::GasMismatch {
                 trace_gas,
                 public_outcome_gas,
@@ -262,6 +314,39 @@ const METADATA_REGION: &str = "metadata";
 const POSITION_MAP_REGION: &str = "position_map";
 const PATH_REGION: &str = "path";
 const STASH_REGION: &str = "stash";
+
+impl RuntimeOramObjectWitness {
+    pub fn access_witness(&self) -> RuntimeOramAccessWitness {
+        RuntimeOramAccessWitness {
+            object_id: self.object_id,
+            scheme: self.scheme.clone(),
+            metadata_pages_per_access: self.metadata_pages_per_access,
+            buckets_per_access: self.buckets_per_access,
+            recursion_depth: self.recursion_depth,
+            stash_bound: self.stash_bound,
+        }
+    }
+
+    fn metadata_event_kind(&self) -> Result<&'static str, RefinementWitnessError> {
+        match self.scheme.as_str() {
+            SURROGATE_ORAM_SCHEME => Ok("uooram_meta_scan"),
+            PATH_ORAM_SCHEME => Ok("uooram_metadata_load"),
+            other => Err(RefinementWitnessError::UnsupportedOramScheme {
+                scheme: other.into(),
+            }),
+        }
+    }
+
+    fn bucket_event_kind(&self) -> Result<&'static str, RefinementWitnessError> {
+        match self.scheme.as_str() {
+            SURROGATE_ORAM_SCHEME => Ok("uooram_bucket_scan"),
+            PATH_ORAM_SCHEME => Ok("uooram_path_read"),
+            other => Err(RefinementWitnessError::UnsupportedOramScheme {
+                scheme: other.into(),
+            }),
+        }
+    }
+}
 
 impl RuntimeControllerCertificate {
     pub fn boundary_schedule(
@@ -412,6 +497,102 @@ impl RuntimeControllerCertificate {
     }
 }
 
+fn is_oram_logical_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "uooram_counter"
+            | "uooram_meta_scan"
+            | "uooram_bucket_scan"
+            | "uooram_metadata_load"
+            | "uooram_path_read"
+    )
+}
+
+fn runtime_oram_object_by_name<'a>(
+    oram_objects: &'a [RuntimeOramObjectWitness],
+    object: &str,
+) -> Result<&'a RuntimeOramObjectWitness, RefinementWitnessError> {
+    oram_objects
+        .iter()
+        .find(|candidate| candidate.object_name == object)
+        .ok_or_else(|| RefinementWitnessError::UnknownOramLogicalObject {
+            object: object.into(),
+        })
+}
+
+fn consume_expected_oram_logical_events(
+    logical_accesses: &[LogicalEvent],
+    mut index: usize,
+    object: &str,
+    expected_kind: &str,
+    expected_count: usize,
+    detail_prefix: &str,
+) -> Result<usize, RefinementWitnessError> {
+    for _ in 0..expected_count {
+        let Some(event) = logical_accesses.get(index) else {
+            return Err(RefinementWitnessError::MalformedOramLogicalTrace {
+                object: object.into(),
+                expected_kind: expected_kind.into(),
+                detail_prefix: detail_prefix.into(),
+            });
+        };
+        if event.object != object
+            || event.kind != expected_kind
+            || !event.detail.starts_with(detail_prefix)
+        {
+            return Err(RefinementWitnessError::MalformedOramLogicalTrace {
+                object: object.into(),
+                expected_kind: expected_kind.into(),
+                detail_prefix: detail_prefix.into(),
+            });
+        }
+        index += 1;
+    }
+    Ok(index)
+}
+
+fn reconstruct_oram_accesses_from_logical_trace(
+    logical_accesses: &[LogicalEvent],
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<Vec<RuntimeOramAccessWitness>, RefinementWitnessError> {
+    let mut accesses = Vec::new();
+    let mut index = 0usize;
+    while index < logical_accesses.len() {
+        let event = &logical_accesses[index];
+        if !is_oram_logical_kind(&event.kind) {
+            index += 1;
+            continue;
+        }
+        if event.kind != "uooram_counter" || event.detail != "counter" {
+            return Err(RefinementWitnessError::MalformedOramLogicalTrace {
+                object: event.object.clone(),
+                expected_kind: "uooram_counter".into(),
+                detail_prefix: "counter".into(),
+            });
+        }
+        let object = runtime_oram_object_by_name(oram_objects, &event.object)?;
+        index += 1;
+        index = consume_expected_oram_logical_events(
+            logical_accesses,
+            index,
+            &event.object,
+            object.metadata_event_kind()?,
+            object.metadata_pages,
+            "page:",
+        )?;
+        index = consume_expected_oram_logical_events(
+            logical_accesses,
+            index,
+            &event.object,
+            object.bucket_event_kind()?,
+            object.buckets_per_access,
+            "bucket:",
+        )?;
+        accesses.push(object.access_witness());
+    }
+    Ok(accesses)
+}
+
 impl SgxControllerShapeTrace {
     fn with_shared_resource_budget(mut self, page_trace_budget: usize) -> Self {
         self.shared_resource_budget =
@@ -450,6 +631,8 @@ pub struct ExecutionTrace {
     pub theorem_trace: TheoremTrace,
     #[serde(default)]
     pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,
+    #[serde(default)]
+    pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
 }
 
 impl ExecutionTrace {
@@ -523,6 +706,10 @@ impl ExecutionTrace {
             .runtime_controller_certificate
             .clone()
             .ok_or(RefinementWitnessError::MissingControllerCertificate)?;
+        let reconstructed_accesses = reconstruct_oram_accesses_from_logical_trace(
+            &self.logical_accesses,
+            &self.runtime_oram_objects,
+        )?;
         if self.gas_used != public_outcome.gas_used {
             return Err(RefinementWitnessError::GasMismatch {
                 trace_gas: self.gas_used,
@@ -543,6 +730,9 @@ impl ExecutionTrace {
         if controller_shape != controller_certificate.controller_shape() {
             return Err(RefinementWitnessError::ControllerShapeMismatch);
         }
+        if controller_certificate.observed_oram_accesses != reconstructed_accesses {
+            return Err(RefinementWitnessError::OramAccessScheduleMismatch);
+        }
         if normalized_micro_trace != controller_shape.normalized_micro_trace() {
             return Err(RefinementWitnessError::NormalizedMicroTraceMismatch);
         }
@@ -553,6 +743,7 @@ impl ExecutionTrace {
             controller_shape,
             normalized_micro_trace,
             controller_certificate,
+            oram_objects: self.runtime_oram_objects.clone(),
         })
     }
 }
@@ -617,10 +808,10 @@ fn hash_json<T: Serialize>(value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_write, ExecutionTrace, ExitEvent, NormalizedMicroTrace,
-        NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent,
-        PhysicalWriteEvent, PublicOutcomeTrace, RefinementWitnessError,
-        RuntimeControllerCertificate, RuntimeOramAccessWitness, TheoremTrace, WriteClass,
+        classify_write, ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace,
+        NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent,
+        PublicOutcomeTrace, RefinementWitnessError, RuntimeControllerCertificate,
+        RuntimeOramAccessWitness, RuntimeOramObjectWitness, TheoremTrace, WriteClass,
     };
     use std::collections::BTreeMap;
 
@@ -656,6 +847,66 @@ mod tests {
         }
     }
 
+    fn sample_oram_object() -> RuntimeOramObjectWitness {
+        RuntimeOramObjectWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            scheme: "path_oram_local_posmap_v1".into(),
+            capacity: 16,
+            block_size: 64,
+            bucket_size: 320,
+            bucket_count: 31,
+            blocks_per_bucket: 4,
+            tree_height: 4,
+            stash_bound: 4,
+            recursion_depth: 1,
+            metadata_pages: 1,
+            metadata_pages_per_access: 2,
+            buckets_per_access: 5,
+            accesses_per_call: 1,
+        }
+    }
+
+    fn sample_oram_logical_accesses() -> Vec<LogicalEvent> {
+        vec![
+            LogicalEvent {
+                kind: "uooram_counter".into(),
+                object: "records".into(),
+                detail: "counter".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_metadata_load".into(),
+                object: "records".into(),
+                detail: "page:0".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: "records".into(),
+                detail: "bucket:0".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: "records".into(),
+                detail: "bucket:1".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: "records".into(),
+                detail: "bucket:2".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: "records".into(),
+                detail: "bucket:3".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: "records".into(),
+                detail: "bucket:4".into(),
+            },
+        ]
+    }
+
     #[test]
     fn runtime_refinement_witness_normalizes_controller_shape() {
         let controller_certificate = sample_controller_certificate();
@@ -664,7 +915,7 @@ mod tests {
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let trace = ExecutionTrace {
             opcode_trace: vec!["declare".into()],
-            logical_accesses: vec![],
+            logical_accesses: sample_oram_logical_accesses(),
             logical_writes: vec![],
             physical_reads: vec![PhysicalReadEvent {
                 object: "records".into(),
@@ -687,6 +938,7 @@ mod tests {
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
             runtime_controller_certificate: Some(controller_certificate.clone()),
+            runtime_oram_objects: vec![sample_oram_object()],
         };
         let witness = trace.runtime_refinement_witness().unwrap();
         assert_eq!(witness.public_outcome.gas_used, 99);
@@ -695,6 +947,7 @@ mod tests {
         assert_eq!(witness.controller_shape, controller_shape);
         assert_eq!(witness.normalized_micro_trace, normalized_micro_trace);
         assert_eq!(witness.controller_certificate, controller_certificate);
+        assert_eq!(witness.oram_objects, vec![sample_oram_object()]);
     }
 
     #[test]
@@ -741,6 +994,7 @@ mod tests {
         let controller_shape = controller_certificate.controller_shape();
         let trace = ExecutionTrace {
             gas_used: 7,
+            logical_accesses: sample_oram_logical_accesses(),
             theorem_trace: TheoremTrace {
                 public_outcome: Some(public_outcome.clone()),
                 boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
@@ -752,11 +1006,42 @@ mod tests {
                 ),
             },
             runtime_controller_certificate: Some(drifted_certificate),
+            runtime_oram_objects: vec![sample_oram_object()],
             ..ExecutionTrace::default()
         };
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
             RefinementWitnessError::ControllerShapeMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_refinement_witness_rejects_logical_trace_schedule_drift() {
+        let public_outcome = sample_public_outcome(7);
+        let controller_certificate = sample_controller_certificate();
+        let controller_shape = controller_certificate.controller_shape();
+        let mut logical_accesses = sample_oram_logical_accesses();
+        logical_accesses.remove(1);
+        let trace = ExecutionTrace {
+            gas_used: 7,
+            logical_accesses,
+            theorem_trace: TheoremTrace {
+                public_outcome: Some(public_outcome.clone()),
+                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                controller_shape: Some(controller_shape.clone()),
+                normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
+            },
+            runtime_controller_certificate: Some(controller_certificate),
+            runtime_oram_objects: vec![sample_oram_object()],
+            ..ExecutionTrace::default()
+        };
+        assert_eq!(
+            trace.runtime_refinement_witness().unwrap_err(),
+            RefinementWitnessError::MalformedOramLogicalTrace {
+                object: "records".into(),
+                expected_kind: "uooram_metadata_load".into(),
+                detail_prefix: "page:".into(),
+            }
         );
     }
 }

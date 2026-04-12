@@ -341,6 +341,43 @@ def ImportedRuntimeControllerCertificate.toRuntimeControllerCertificate
       ImportedRuntimeOramAccessCertificate.toRuntimeOramAccessCertificate
   }
 
+structure ImportedRuntimeOramObjectCertificate where
+  object_id : Nat
+  object_name : String
+  scheme : String
+  capacity : Nat
+  block_size : Nat
+  bucket_size : Nat
+  bucket_count : Nat
+  blocks_per_bucket : Nat
+  tree_height : Nat
+  stash_bound : Nat
+  recursion_depth : Nat
+  metadata_pages : Nat
+  metadata_pages_per_access : Nat
+  buckets_per_access : Nat
+  accesses_per_call : Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeOramObjectCertificate.toRuntimeOramObjectCertificate
+  (object : ImportedRuntimeOramObjectCertificate) : RuntimeOramObjectCertificate :=
+  { objectId := object.object_id
+  , objectName := object.object_name
+  , scheme := object.scheme
+  , capacity := object.capacity
+  , blockSize := object.block_size
+  , bucketSize := object.bucket_size
+  , bucketCount := object.bucket_count
+  , blocksPerBucket := object.blocks_per_bucket
+  , treeHeight := object.tree_height
+  , stashBound := object.stash_bound
+  , recursionDepth := object.recursion_depth
+  , metadataPages := object.metadata_pages
+  , metadataPagesPerAccess := object.metadata_pages_per_access
+  , bucketsPerAccess := object.buckets_per_access
+  , accessesPerCall := object.accesses_per_call
+  }
+
 structure ImportedRuntimeRefinementWitness where
   trace : ImportedRefinementTrace
   public_outcome : ImportedPublicOutcomeTrace
@@ -348,6 +385,7 @@ structure ImportedRuntimeRefinementWitness where
   controller_shape : ImportedSgxControllerShapeTrace
   normalized_micro_trace : ImportedNormalizedMicroTrace
   controller_certificate : ImportedRuntimeControllerCertificate
+  oram_objects : List ImportedRuntimeOramObjectCertificate
 deriving Repr, DecidableEq, FromJson, ToJson
 
 def ImportedRuntimeRefinementWitness.toRuntimeWitness
@@ -358,6 +396,8 @@ def ImportedRuntimeRefinementWitness.toRuntimeWitness
   , controllerShape := witness.controller_shape.toControllerShape
   , normalizedMicroTrace := witness.normalized_micro_trace.toNormalizedMicroTrace
   , controllerCertificate := witness.controller_certificate.toRuntimeControllerCertificate
+  , oramObjects := witness.oram_objects.map
+      ImportedRuntimeOramObjectCertificate.toRuntimeOramObjectCertificate
   }
 
 def ImportedRuntimeRefinementWitness.Valid
@@ -492,6 +532,7 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
       { entry_input_len := 64
       , observed_oram_accesses := []
       }
+  , oram_objects := []
   }
 
 def sampleImportedRuntimeRefinementWitnessRoundtrip : Bool :=

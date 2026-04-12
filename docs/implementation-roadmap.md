@@ -192,15 +192,18 @@ What is implemented:
   refinement witness directly via `uo-evm --format refinement-witness`
 - that witness keeps only the Lean-relevant normalized trace fields together
   with `public_outcome`, `boundary_schedule`, `controller_shape`,
-  `normalized_micro_trace`, and an ordered public controller certificate
+  `normalized_micro_trace`, an ordered public controller certificate, and the
+  public ORAM object metadata needed to reconstruct that certificate from the
+  logical trace
 - extraction is checked, not assumed: witness construction fails if gas,
-  boundary/controller reconstruction, or controller-derived normalized micro
-  trace drift apart
+  boundary/controller reconstruction, logical-trace-derived ORAM access
+  reconstruction, or controller-derived normalized micro trace drift apart
 - the Lean scaffold now contains
   `proof/lean/UOToolchain/RuntimeRefinement.lean`, which fixes the witness
   record and proves how it projects into the existing `Trace`/`SGXView`
   theorem objects while reconstructing the boundary/controller observer from
-  the imported controller certificate
+  the imported controller certificate and reconstructing the ordered ORAM
+  access schedule from the public logical trace
 - the Lean scaffold now also contains
   `proof/lean/UOToolchain/RuntimeRefinementJson.lean`, which parses the Rust
   witness JSON, converts it into the theorem-side witness, and provides a
@@ -216,9 +219,9 @@ What is implemented:
 
 What is still missing before this milestone is complete:
 
-- a theorem tying the Rust controller-certificate constructor to the Lean
-  witness assumptions, rather than only re-checking imported concrete
-  certificates against the same predicate inside Lean
+- a theorem tying the Rust public logical-trace/controller-witness constructor
+  to the Lean witness assumptions, rather than only re-checking imported
+  concrete witnesses against the same predicate inside Lean
 - discharge of the ORAM theorem against the chosen standard construction
   through that witness layer
 
@@ -228,9 +231,9 @@ Required work:
   witnesses accepted by the Lean validity checker for each supported backend,
   not just for the current benchmark-backed scenario family and runtime
   postcondition
-- connect the Rust-emitted ordered controller certificate to the Lean observer
-  by a backend-wise refinement argument, not just by a checked serialized
-  witness
+- connect the Rust-emitted public logical ORAM trace and ordered controller
+  witness to the Lean observer by a backend-wise refinement argument, not just
+  by a checked serialized witness
 - discharge the ORAM theorem against the chosen standard construction instead of
   relying on the current axiom boundary
 

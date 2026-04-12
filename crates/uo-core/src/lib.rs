@@ -17,7 +17,8 @@ pub use trace::{
     ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
     OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace,
     RefinementPhysicalWrite, RefinementTrace, RefinementWitnessError,
-    RuntimeControllerCertificate, RuntimeOramAccessWitness, RuntimeRefinementWitness,
-    SgxControllerShapeTrace, TheoremTrace, TraceHashBundle, WriteClass,
+    RuntimeControllerCertificate, RuntimeOramAccessWitness, RuntimeOramObjectWitness,
+    RuntimeRefinementWitness, SgxControllerShapeTrace, TheoremTrace, TraceHashBundle,
+    WriteClass,
 };
 pub use types::{ScalarType, StructField, Type, Value};

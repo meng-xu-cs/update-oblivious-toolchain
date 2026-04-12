@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
-use uo_core::{CompiledArtifact, ExecutionTrace, Value};
+use uo_core::{CompiledArtifact, ExecutionTrace, RuntimeOramObjectWitness, Value};
 
 #[derive(Clone, Debug)]
 pub struct ContractInstance {
@@ -176,6 +176,7 @@ impl ContractInstance {
             gas_used,
             theorem_trace: trace_bundle.theorem_trace,
             runtime_controller_certificate: Some(trace_bundle.controller_certificate),
+            runtime_oram_objects: runtime_oram_objects(&self.artifact),
         };
         attach_theorem_metrics(&mut trace);
         trace.runtime_refinement_witness()?;
@@ -220,6 +221,35 @@ fn exec_block(
 
 fn bytes_read(reads: &[uo_core::PhysicalReadEvent]) -> usize {
     reads.iter().map(|event| event.len).sum()
+}
+
+fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWitness> {
+    artifact
+        .contract
+        .manifest
+        .objects
+        .iter()
+        .filter_map(|object| {
+            let oram = object.oram.as_ref()?;
+            Some(RuntimeOramObjectWitness {
+                object_id: object.id,
+                object_name: object.name.clone(),
+                scheme: oram.scheme.clone(),
+                capacity: object.capacity.unwrap_or_default(),
+                block_size: oram.block_size,
+                bucket_size: oram.bucket_size,
+                bucket_count: oram.bucket_count,
+                blocks_per_bucket: oram.blocks_per_bucket,
+                tree_height: oram.tree_height,
+                stash_bound: oram.stash_bound,
+                recursion_depth: oram.recursion_depth,
+                metadata_pages: oram.metadata_pages,
+                metadata_pages_per_access: oram.metadata_pages_per_access,
+                buckets_per_access: oram.buckets_per_access,
+                accesses_per_call: oram.accesses_per_call,
+            })
+        })
+        .collect()
 }
 
 fn exec_statement(

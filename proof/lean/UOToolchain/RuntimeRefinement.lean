@@ -11,10 +11,127 @@ structure RuntimeOramAccessCertificate where
   stashBound : Nat
 deriving Repr, DecidableEq
 
+structure RuntimeOramObjectCertificate where
+  objectId : Nat
+  objectName : String
+  scheme : String
+  capacity : Nat
+  blockSize : Nat
+  bucketSize : Nat
+  bucketCount : Nat
+  blocksPerBucket : Nat
+  treeHeight : Nat
+  stashBound : Nat
+  recursionDepth : Nat
+  metadataPages : Nat
+  metadataPagesPerAccess : Nat
+  bucketsPerAccess : Nat
+  accessesPerCall : Nat
+deriving Repr, DecidableEq
+
 structure RuntimeControllerCertificate where
   entryInputLen : Nat
   observedOramAccesses : List RuntimeOramAccessCertificate
 deriving Repr, DecidableEq
+
+def RuntimeOramObjectCertificate.accessCertificate
+  (object : RuntimeOramObjectCertificate) : RuntimeOramAccessCertificate :=
+  { objectId := object.objectId
+  , scheme := object.scheme
+  , metadataPagesPerAccess := object.metadataPagesPerAccess
+  , bucketsPerAccess := object.bucketsPerAccess
+  , recursionDepth := object.recursionDepth
+  , stashBound := object.stashBound
+  }
+
+def RuntimeOramObjectCertificate.metadataEventKind?
+  (object : RuntimeOramObjectCertificate) : Option String :=
+  match object.scheme with
+  | "surrogate_public_schedule_v1" => some "uooram_meta_scan"
+  | "path_oram_local_posmap_v1" => some "uooram_metadata_load"
+  | _ => none
+
+def RuntimeOramObjectCertificate.bucketEventKind?
+  (object : RuntimeOramObjectCertificate) : Option String :=
+  match object.scheme with
+  | "surrogate_public_schedule_v1" => some "uooram_bucket_scan"
+  | "path_oram_local_posmap_v1" => some "uooram_path_read"
+  | _ => none
+
+def runtimeOramObjectByName?
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (objectName : String) : Option RuntimeOramObjectCertificate :=
+  oramObjects.find? (fun object => object.objectName = objectName)
+
+def isOramLogicalKind (kind : String) : Bool :=
+  kind = "uooram_counter" ||
+    kind = "uooram_meta_scan" ||
+    kind = "uooram_bucket_scan" ||
+    kind = "uooram_metadata_load" ||
+    kind = "uooram_path_read"
+
+def consumeExpectedOramLogicalEvents
+  (events : List LogicalEvent)
+  (objectName : String)
+  (expectedKind : String)
+  (expectedCount : Nat)
+  (detailPrefix : String) : Option (List LogicalEvent) :=
+  match expectedCount, events with
+  | 0, _ => some events
+  | _ + 1, [] => none
+  | count + 1, event :: events =>
+      if event.object = objectName &&
+          event.kind = expectedKind &&
+          event.detail.startsWith detailPrefix then
+        consumeExpectedOramLogicalEvents events objectName expectedKind count detailPrefix
+      else
+        none
+
+def reconstructObservedOramAccessesFromLogicalTraceAux
+  (fuel : Nat)
+  (logicalAccesses : List LogicalEvent)
+  (oramObjects : List RuntimeOramObjectCertificate) :
+  Option (List RuntimeOramAccessCertificate) :=
+  match fuel with
+  | 0 =>
+      match logicalAccesses with
+      | [] => some []
+      | _ => none
+  | fuel + 1 =>
+      match logicalAccesses with
+      | [] => some []
+      | event :: events =>
+          if !(isOramLogicalKind event.kind) then
+            reconstructObservedOramAccessesFromLogicalTraceAux fuel events oramObjects
+          else if event.kind != "uooram_counter" || event.detail != "counter" then
+            none
+          else
+            do
+            let object ← runtimeOramObjectByName? oramObjects event.object
+            let metadataKind ← object.metadataEventKind?
+            let bucketKind ← object.bucketEventKind?
+            let events ←
+              consumeExpectedOramLogicalEvents
+                events
+                event.object
+                metadataKind
+                object.metadataPages
+                "page:"
+            let events ←
+              consumeExpectedOramLogicalEvents
+                events
+                event.object
+                bucketKind
+                object.bucketsPerAccess
+                "bucket:"
+            let accesses ← reconstructObservedOramAccessesFromLogicalTraceAux fuel events oramObjects
+            some (object.accessCertificate :: accesses)
+
+def reconstructObservedOramAccessesFromLogicalTrace
+  (logicalAccesses : List LogicalEvent)
+  (oramObjects : List RuntimeOramObjectCertificate) :
+  Option (List RuntimeOramAccessCertificate) :=
+  reconstructObservedOramAccessesFromLogicalTraceAux logicalAccesses.length logicalAccesses oramObjects
 
 def runtimeControllerAccessBoundaryEvents : List BoundaryEvent :=
   [ { direction := .exit
@@ -155,6 +272,7 @@ structure RuntimeRefinementWitness where
   controllerShape : SGXControllerShape
   normalizedMicroTrace : NormalizedMicroTrace
   controllerCertificate : RuntimeControllerCertificate
+  oramObjects : List RuntimeOramObjectCertificate
 deriving Repr, DecidableEq
 
 def RuntimeRefinementWitness.storageTrace
@@ -195,6 +313,10 @@ def RuntimeRefinementWitness.Valid
     witness.boundarySchedule =
       witness.controllerCertificate.boundarySchedule witness.publicOutcome ∧
     witness.controllerShape = witness.controllerCertificate.controllerShape ∧
+    reconstructObservedOramAccessesFromLogicalTrace
+        witness.trace.logicalAccesses
+        witness.oramObjects =
+      some witness.controllerCertificate.observedOramAccesses ∧
     witness.normalizedMicroTrace =
       simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags)
 
@@ -206,6 +328,11 @@ def RuntimeRefinementWitness.checkValid
       (witness.boundarySchedule =
         witness.controllerCertificate.boundarySchedule witness.publicOutcome) &&
     decide (witness.controllerShape = witness.controllerCertificate.controllerShape) &&
+    decide
+      (reconstructObservedOramAccessesFromLogicalTrace
+          witness.trace.logicalAccesses
+          witness.oramObjects =
+        some witness.controllerCertificate.observedOramAccesses) &&
     decide
       (witness.normalizedMicroTrace =
         simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags))
@@ -258,7 +385,7 @@ theorem sgxView_normalizedMicro_eq_witness
   (modelTags : SGXModelTags)
   (hValid : witness.Valid modelTags) :
   normalizeMicroTrace (sgxMicroTrace witness.sgxView) = witness.normalizedMicroTrace := by
-  rcases hValid with ⟨_hGas, _hBoundary, _hShape, hNormalized⟩
+  rcases hValid with ⟨_hGas, _hBoundary, _hShape, _hAccesses, hNormalized⟩
   rw [sgxMicroTrace_runtimeWitness]
   rw [reconstructedMicroTrace_normalizedByLeakage]
   exact hNormalized.symm
@@ -268,7 +395,7 @@ theorem runtimeWitness_boundaryBudget_exact
   (modelTags : SGXModelTags)
   (hValid : witness.Valid modelTags) :
   witness.boundarySchedule.length = witness.controllerShape.boundaryEventBudget := by
-  rcases hValid with ⟨_hGas, hBoundary, hShape, _hNormalized⟩
+  rcases hValid with ⟨_hGas, hBoundary, hShape, _hAccesses, _hNormalized⟩
   rw [hBoundary, hShape]
   exact runtimeControllerCertificate_boundarySchedule_budget
     witness.controllerCertificate
