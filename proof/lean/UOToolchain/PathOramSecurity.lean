@@ -21,6 +21,22 @@ structure PathOramProjectedAccessLeakage where
   accessesPerEntrypoint : Nat
 deriving Repr, DecidableEq
 
+structure PathOramPhysicalEventLabel where
+  object : String
+  location : String
+deriving Repr, DecidableEq
+
+structure PathOramStorageLocationTrace where
+  readLabels : List PathOramPhysicalEventLabel
+  writeLabels : List PathOramPhysicalEventLabel
+deriving Repr, DecidableEq
+
+structure PathOramStorageShape where
+  readLengths : List Nat
+  writeClasses : List String
+  writeLengths : List Nat
+deriving Repr, DecidableEq
+
 def projectPathOramAccessLeakage
   (access : OramAccessLeakage) : PathOramProjectedAccessLeakage :=
   { entrypointId := access.entrypointId
@@ -50,6 +66,29 @@ def projectPathOramLeakage
 def pathOramProjectedExecutionLeakage
   (cfg : OramConfig) : PathOramProjectedLeakage :=
   projectPathOramLeakage (executionLeakage cfg)
+
+def pathOramPhysicalReadLabel (event : PhysicalRead) : PathOramPhysicalEventLabel :=
+  { object := event.object
+  , location := event.location
+  }
+
+def pathOramPhysicalWriteLabel (event : PhysicalWrite) : PathOramPhysicalEventLabel :=
+  { object := event.object
+  , location := event.location
+  }
+
+def pathOramStorageLocationTrace
+  (view : OramStorageView) : PathOramStorageLocationTrace :=
+  { readLabels := view.physicalReads.map pathOramPhysicalReadLabel
+  , writeLabels := view.physicalWrites.map pathOramPhysicalWriteLabel
+  }
+
+def pathOramStorageShape
+  (view : OramStorageView) : PathOramStorageShape :=
+  { readLengths := view.physicalReads.map PhysicalRead.len
+  , writeClasses := view.physicalWrites.map PhysicalWrite.writeClass
+  , writeLengths := view.physicalWrites.map PhysicalWrite.len
+  }
 
 def PathOramAccessLeakage (access : OramAccessLeakage) : Prop :=
   access.scheme = pathOramScheme ∧
@@ -96,17 +135,28 @@ theorem pathOramProjectedLeakage_eq_of_samePublicProjection
   unfold pathOramProjectedExecutionLeakage
   rw [executionLeakage_eq_of_samePublicProjection hSame]
 
+abbrev PathOramLocationRelation :=
+  Distribution PathOramStorageLocationTrace →
+    Distribution PathOramStorageLocationTrace →
+    PathOramProjectedLeakage →
+    Prop
+
 structure PathOramSecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
   freshLeafResampling : Prop
   stashOverflowBounded : Prop
+  locationSecurity : PathOramLocationRelation
 
-axiom pathOramProjectedStorageTheorem
+def pathOramProjectedStorageTheorem
   (assumptions : PathOramSecurityAssumptions)
   (storage₁ storage₂ : Distribution OramStorageView)
-  (leakage : PathOramProjectedLeakage) :
-  Prop
+  (leakage : PathOramProjectedLeakage) : Prop :=
+  assumptions.locationSecurity
+      (storage₁.map pathOramStorageLocationTrace)
+      (storage₂.map pathOramStorageLocationTrace)
+      leakage ∧
+    OramExactProjectionRelation pathOramStorageShape storage₁ storage₂
 
 def pathOramStandardStorageTheorem
   (assumptions : PathOramSecurityAssumptions)
@@ -164,5 +214,50 @@ theorem pathOramProjectedStorageTheorem_projects_to_standard
     pathOramStandardStorageTheorem assumptions storage₁ storage₂ leakage := by
   intro h
   exact h
+
+theorem pathOramProjectedStorageTheorem_of_location_and_shape
+  (assumptions : PathOramSecurityAssumptions)
+  {storage₁ storage₂ : Distribution OramStorageView}
+  {leakage : PathOramProjectedLeakage}
+  (hLocation :
+    assumptions.locationSecurity
+      (storage₁.map pathOramStorageLocationTrace)
+      (storage₂.map pathOramStorageLocationTrace)
+      leakage)
+  (hShape :
+    OramExactProjectionRelation pathOramStorageShape storage₁ storage₂) :
+  pathOramProjectedStorageTheorem assumptions storage₁ storage₂ leakage := by
+  exact ⟨hLocation, hShape⟩
+
+theorem computationalPathOram_fromLocationAndShape_projects_to_computationalUOWith
+  (assumptions : PathOramSecurityAssumptions)
+  {publicPart : OramConfig → OramViewPublicPart}
+  {run : OramStorageSemantics}
+  (hCfg : ∀ cfg, PathOramConfigWellFormed cfg)
+  (hPublic : OramPublicViewSafe publicPart)
+  (hLocation :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      assumptions.locationSecurity
+        ((run cfg₁).map pathOramStorageLocationTrace)
+        ((run cfg₂).map pathOramStorageLocationTrace)
+        (pathOramProjectedExecutionLeakage cfg₁))
+  (hShape :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation pathOramStorageShape (run cfg₁) (run cfg₂)) :
+  ComputationalUOWith
+    (proofGradePathOramSecurityInterface assumptions)
+    (liftOramStorageSemantics publicPart run) := by
+  apply computationalPathOram_projects_to_computationalUOWith assumptions hCfg hPublic
+  intro cfg₁ cfg₂ hSame
+  apply pathOramProjectedStorageTheorem_projects_to_standard assumptions
+  apply pathOramProjectedStorageTheorem_of_location_and_shape assumptions
+  · have hLeakageEq :
+      pathOramProjectedExecutionLeakage cfg₁ = pathOramProjectedExecutionLeakage cfg₂ :=
+        pathOramProjectedLeakage_eq_of_samePublicProjection hSame
+    have hLoc := hLocation cfg₁ cfg₂ hSame
+    simpa [pathOramProjectedExecutionLeakage] using hLoc
+  · exact hShape cfg₁ cfg₂ hSame
 
 end UOToolchain

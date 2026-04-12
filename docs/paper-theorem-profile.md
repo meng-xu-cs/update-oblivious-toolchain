@@ -137,6 +137,10 @@ The abstract ORAM theorem boundary is now surfaced explicitly as:
 For the proof-grade path candidate, the remaining storage theorem boundary is
 already narrower than `OramAccessLeakage`: `PathOramSecurity.lean` projects
 away the legacy `schedule` field before the admitted storage theorem is used.
+It also decomposes storage security into:
+
+- a location-schedule relation on projected storage locations
+- exact public constancy of storage-shape projections
 
 The current surrogate theorem remains available as the default specialization,
 so the paper-facing aliases below are unchanged.
