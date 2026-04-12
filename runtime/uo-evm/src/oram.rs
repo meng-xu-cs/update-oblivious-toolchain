@@ -148,16 +148,10 @@ pub(crate) struct OramStorage {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct OramAccessSchedule {
-    pub metadata_pages: Vec<usize>,
-    pub bucket_indices: Vec<usize>,
-}
-
-#[derive(Clone, Debug)]
 pub(crate) struct OramTranscript {
-    pub schedule: OramAccessSchedule,
     pub logical_accesses: Vec<LogicalEvent>,
     pub physical_reads: Vec<PhysicalReadEvent>,
+    pub physical_writes: Vec<OramWrite>,
 }
 
 #[derive(Clone, Debug)]
@@ -174,17 +168,6 @@ pub(crate) struct OramCommit {
 }
 
 #[derive(Clone, Debug)]
-enum OramPendingAccess {
-    Read { key: Value, leaf: usize },
-    Write {
-        key: Value,
-        value: Value,
-        apply: bool,
-        leaf: usize,
-    },
-}
-
-#[derive(Clone, Debug)]
 pub(crate) struct OramState {
     pub parameters: OramParameters,
     pub entries: Vec<MapEntry>,
@@ -193,7 +176,6 @@ pub(crate) struct OramState {
     pub storage: OramStorage,
     pub access_counter: u64,
     pub cipher: StoreCipher,
-    pending_access: Option<OramPendingAccess>,
 }
 
 impl OramState {
@@ -231,7 +213,6 @@ impl OramState {
                 },
                 access_counter: 0,
                 cipher,
-                pending_access: None,
             })
         } else {
             let position_map = vec![None; parameters.capacity];
@@ -258,7 +239,6 @@ impl OramState {
                 },
                 access_counter: 0,
                 cipher,
-                pending_access: None,
             })
         }
     }
@@ -290,28 +270,26 @@ impl OramState {
             self.stash = stash;
             self.entries = self.reconstruct_path_entries(spec)?;
         }
-        self.pending_access = None;
         Ok(())
     }
 
-    pub(crate) fn get(&mut self, spec: &StateObject, key: &Value) -> Result<(Value, OramTranscript)> {
-        let transcript = if self.parameters.is_surrogate() {
-            self.surrogate_access_transcript(spec)
+    pub(crate) fn get(
+        &mut self,
+        spec: &StateObject,
+        key: &Value,
+        rng: &mut ChaCha20Rng,
+    ) -> Result<(Value, OramTranscript)> {
+        if self.parameters.is_surrogate() {
+            let value = self
+                .entries
+                .iter()
+                .find(|entry| entry.occupied && entry.key == *key)
+                .map(|entry| entry.value.clone())
+                .unwrap_or_else(|| Value::zero_for_type(&spec.value_type));
+            Ok((value, self.surrogate_access_transcript(spec)))
         } else {
-            let leaf = self.logical_leaf_for_key(key);
-            self.stage_pending_access(OramPendingAccess::Read {
-                key: key.clone(),
-                leaf,
-            })?;
-            self.path_access_transcript(spec, leaf)
-        };
-        let value = self
-            .entries
-            .iter()
-            .find(|entry| entry.occupied && entry.key == *key)
-            .map(|entry| entry.value.clone())
-            .unwrap_or_else(|| Value::zero_for_type(&spec.value_type));
-        Ok((value, transcript))
+            self.path_get(spec, key, rng)
+        }
     }
 
     pub(crate) fn put(
@@ -320,6 +298,7 @@ impl OramState {
         key: Value,
         value: Value,
         apply: bool,
+        rng: &mut ChaCha20Rng,
     ) -> Result<OramTranscript> {
         if self.parameters.is_surrogate() {
             let transcript = self.surrogate_access_transcript(spec);
@@ -348,14 +327,7 @@ impl OramState {
             }
             Ok(transcript)
         } else {
-            let leaf = self.logical_leaf_for_key(&key);
-            self.stage_pending_access(OramPendingAccess::Write {
-                key,
-                value,
-                apply,
-                leaf,
-            })?;
-            Ok(self.path_access_transcript(spec, leaf))
+            self.path_put(spec, key, value, apply, rng)
         }
     }
 
@@ -412,20 +384,22 @@ impl OramState {
             }
             next.entries = source_entries.clone();
             next.access_counter = next_counter;
-            next.pending_access = None;
             Ok(OramCommit { next, writes })
         } else {
-            self.commit_path_access(spec, old, aborted, rng)
+            let next = if aborted { old.clone() } else { self.clone() };
+            let _ = rng;
+            Ok(OramCommit {
+                next,
+                writes: Vec::new(),
+            })
         }
     }
 
     fn surrogate_access_transcript(&self, spec: &StateObject) -> OramTranscript {
         let mut logical_accesses = Vec::new();
         let mut physical_reads = Vec::new();
-        let schedule = OramAccessSchedule {
-            metadata_pages: (0..self.storage.directory_pages.len()).collect(),
-            bucket_indices: self.surrogate_bucket_window(),
-        };
+        let metadata_pages = (0..self.storage.directory_pages.len()).collect::<Vec<_>>();
+        let bucket_indices = self.surrogate_bucket_window();
 
         logical_accesses.push(LogicalEvent {
             kind: "uooram_counter".into(),
@@ -438,7 +412,7 @@ impl OramState {
             len: self.storage.access_counter_slot.len(),
         });
 
-        for page in &schedule.metadata_pages {
+        for page in &metadata_pages {
             logical_accesses.push(LogicalEvent {
                 kind: "uooram_meta_scan".into(),
                 object: spec.name.clone(),
@@ -451,7 +425,7 @@ impl OramState {
             });
         }
 
-        for index in &schedule.bucket_indices {
+        for index in &bucket_indices {
             logical_accesses.push(LogicalEvent {
                 kind: "uooram_bucket_scan".into(),
                 object: spec.name.clone(),
@@ -465,9 +439,9 @@ impl OramState {
         }
 
         OramTranscript {
-            schedule,
             logical_accesses,
             physical_reads,
+            physical_writes: Vec::new(),
         }
     }
 
@@ -475,17 +449,6 @@ impl OramState {
         (0..self.parameters.buckets_per_access)
             .map(|offset| ((self.access_counter as usize) + offset) % self.storage.buckets.len())
             .collect()
-    }
-
-    fn stage_pending_access(&mut self, access: OramPendingAccess) -> Result<()> {
-        if self.pending_access.is_some() {
-            bail!(
-                "map {} uses ORAM more than once in a single entrypoint; this scheme is not yet supported",
-                self.parameters.scheme
-            );
-        }
-        self.pending_access = Some(access);
-        Ok(())
     }
 
     fn logical_leaf_for_key(&self, key: &Value) -> usize {
@@ -508,10 +471,8 @@ impl OramState {
     fn path_access_transcript(&self, spec: &StateObject, leaf: usize) -> OramTranscript {
         let mut logical_accesses = Vec::new();
         let mut physical_reads = Vec::new();
-        let schedule = OramAccessSchedule {
-            metadata_pages: (0..self.storage.directory_pages.len()).collect(),
-            bucket_indices: path_bucket_indices(self.parameters.leaf_count(), leaf),
-        };
+        let metadata_pages = (0..self.storage.directory_pages.len()).collect::<Vec<_>>();
+        let bucket_indices = path_bucket_indices(self.parameters.leaf_count(), leaf);
 
         logical_accesses.push(LogicalEvent {
             kind: "uooram_counter".into(),
@@ -524,7 +485,7 @@ impl OramState {
             len: self.storage.access_counter_slot.len(),
         });
 
-        for page in &schedule.metadata_pages {
+        for page in &metadata_pages {
             logical_accesses.push(LogicalEvent {
                 kind: "uooram_metadata_load".into(),
                 object: spec.name.clone(),
@@ -537,7 +498,7 @@ impl OramState {
             });
         }
 
-        for index in &schedule.bucket_indices {
+        for index in &bucket_indices {
             logical_accesses.push(LogicalEvent {
                 kind: "uooram_path_read".into(),
                 object: spec.name.clone(),
@@ -551,9 +512,9 @@ impl OramState {
         }
 
         OramTranscript {
-            schedule,
             logical_accesses,
             physical_reads,
+            physical_writes: Vec::new(),
         }
     }
 
@@ -592,81 +553,84 @@ impl OramState {
         OramBucket::deserialize(spec, &payload)
     }
 
-    fn commit_path_access(
-        &self,
+    fn path_get(
+        &mut self,
         spec: &StateObject,
-        old: &Self,
-        aborted: bool,
+        key: &Value,
         rng: &mut ChaCha20Rng,
-    ) -> Result<OramCommit> {
-        let Some(access) = &self.pending_access else {
-            let mut next = old.clone();
-            next.pending_access = None;
-            return Ok(OramCommit { next, writes: Vec::new() });
-        };
-
-        let mut next = old.clone();
-        let mut writes = Vec::new();
-        let leaf_count = old.parameters.leaf_count();
-        let access_leaf = match access {
-            OramPendingAccess::Read { leaf, .. } | OramPendingAccess::Write { leaf, .. } => *leaf,
-        };
-        let path = path_bucket_indices(leaf_count, access_leaf);
-        let mut working_entries = old.entries.clone();
-        let mut working_position_map = old.position_map.clone();
-        let mut working_stash = old.stash.clone();
-
-        for bucket_index in &path {
-            let bucket = old.decode_bucket(spec, *bucket_index)?;
-            working_stash.extend(bucket.blocks.into_iter().filter(|block| block.occupied));
-        }
-
-        match access {
-            OramPendingAccess::Read { key, .. } => {
-                if let Some(slot) = slot_for_key(&working_entries, key) {
-                    let block = find_stash_block_mut(&mut working_stash, slot)?;
+    ) -> Result<(Value, OramTranscript)> {
+        let access_leaf = self.logical_leaf_for_key(key);
+        let leaf_count = self.parameters.leaf_count();
+        let return_value = self
+            .entries
+            .iter()
+            .find(|entry| entry.occupied && entry.key == *key)
+            .map(|entry| entry.value.clone())
+            .unwrap_or_else(|| Value::zero_for_type(&spec.value_type));
+        let writes = self.rewrite_path_for_access(
+            spec,
+            access_leaf,
+            rng,
+            |entries, position_map, stash, rng| {
+                if let Some(slot) = slot_for_key(entries, key) {
+                    let block = find_stash_block_mut(stash, slot)?;
                     let new_leaf = sample_leaf(rng, leaf_count);
                     block.leaf = new_leaf;
-                    working_position_map[slot] = Some(new_leaf);
+                    position_map[slot] = Some(new_leaf);
                 }
-            }
-            OramPendingAccess::Write {
-                key,
-                value,
-                apply,
-                ..
-            } => {
-                let effective_apply = *apply && !aborted;
-                match slot_for_key(&working_entries, key) {
+                Ok(())
+            },
+        )?;
+        let mut transcript = self.path_access_transcript(spec, access_leaf);
+        transcript.physical_writes = writes;
+        Ok((return_value, transcript))
+    }
+
+    fn path_put(
+        &mut self,
+        spec: &StateObject,
+        key: Value,
+        value: Value,
+        apply: bool,
+        rng: &mut ChaCha20Rng,
+    ) -> Result<OramTranscript> {
+        let access_leaf = self.logical_leaf_for_key(&key);
+        let leaf_count = self.parameters.leaf_count();
+        let writes = self.rewrite_path_for_access(
+            spec,
+            access_leaf,
+            rng,
+            |entries, position_map, stash, rng| {
+                if !apply {
+                    return Ok(());
+                }
+                match slot_for_key(entries, &key) {
                     Some(slot) => {
-                        if effective_apply && value.is_zero_like() {
-                            remove_stash_block(&mut working_stash, slot)?;
-                            working_entries[slot] = empty_map_entry(spec)?;
-                            working_position_map[slot] = None;
+                        if value.is_zero_like() {
+                            remove_stash_block(stash, slot)?;
+                            entries[slot] = empty_map_entry(spec)?;
+                            position_map[slot] = None;
                         } else {
-                            let block = find_stash_block_mut(&mut working_stash, slot)?;
-                            if effective_apply {
-                                block.value = value.clone();
-                                working_entries[slot].value = value.clone();
-                            }
+                            let block = find_stash_block_mut(stash, slot)?;
+                            block.value = value.clone();
                             let new_leaf = sample_leaf(rng, leaf_count);
                             block.leaf = new_leaf;
-                            working_position_map[slot] = Some(new_leaf);
+                            entries[slot].value = value.clone();
+                            position_map[slot] = Some(new_leaf);
                         }
                     }
                     None => {
-                        if effective_apply && !value.is_zero_like() {
-                            let slot = allocate_slot(&working_entries).ok_or_else(|| {
-                                anyhow!("map {} exceeded public capacity", spec.name)
-                            })?;
+                        if !value.is_zero_like() {
+                            let slot = allocate_slot(entries)
+                                .ok_or_else(|| anyhow!("map {} exceeded public capacity", spec.name))?;
                             let new_leaf = sample_leaf(rng, leaf_count);
-                            working_entries[slot] = MapEntry {
+                            entries[slot] = MapEntry {
                                 occupied: true,
                                 key: key.clone(),
                                 value: value.clone(),
                             };
-                            working_position_map[slot] = Some(new_leaf);
-                            working_stash.push(OramBlock {
+                            position_map[slot] = Some(new_leaf);
+                            stash.push(OramBlock {
                                 occupied: true,
                                 slot_index: slot,
                                 leaf: new_leaf,
@@ -676,10 +640,43 @@ impl OramState {
                         }
                     }
                 }
-            }
+                Ok(())
+            },
+        )?;
+        let mut transcript = self.path_access_transcript(spec, access_leaf);
+        transcript.physical_writes = writes;
+        Ok(transcript)
+    }
+
+    fn rewrite_path_for_access<F>(
+        &mut self,
+        spec: &StateObject,
+        access_leaf: usize,
+        rng: &mut ChaCha20Rng,
+        update: F,
+    ) -> Result<Vec<OramWrite>>
+    where
+        F: FnOnce(
+            &mut Vec<MapEntry>,
+            &mut Vec<Option<usize>>,
+            &mut Vec<OramBlock>,
+            &mut ChaCha20Rng,
+        ) -> Result<()>,
+    {
+        let mut writes = Vec::new();
+        let path = path_bucket_indices(self.parameters.leaf_count(), access_leaf);
+        let mut working_entries = self.entries.clone();
+        let mut working_position_map = self.position_map.clone();
+        let mut working_stash = self.stash.clone();
+
+        for bucket_index in &path {
+            let bucket = self.decode_bucket(spec, *bucket_index)?;
+            working_stash.extend(bucket.blocks.into_iter().filter(|block| block.occupied));
         }
 
-        if working_stash.len() > old.parameters.stash_bound + old.parameters.buckets_per_access {
+        update(&mut working_entries, &mut working_position_map, &mut working_stash, rng)?;
+
+        if working_stash.len() > self.parameters.stash_bound + self.parameters.buckets_per_access {
             bail!(
                 "stash bound exceeded for {} under path ORAM candidate",
                 spec.name
@@ -687,12 +684,12 @@ impl OramState {
         }
 
         for bucket_index in path.iter().rev() {
-            let bucket = build_path_bucket(&old.parameters, *bucket_index, &mut working_stash)?;
+            let bucket = build_path_bucket(&self.parameters, *bucket_index, &mut working_stash)?;
             let payload = bucket.serialize(spec)?;
             let aad = oram_bucket_aad(spec, *bucket_index);
-            let old_physical = old.storage.buckets[*bucket_index].clone();
-            let new_physical = old.cipher.seal(aad.as_bytes(), &payload, rng);
-            next.storage.buckets[*bucket_index] = new_physical.clone();
+            let old_physical = self.storage.buckets[*bucket_index].clone();
+            let new_physical = self.cipher.seal(aad.as_bytes(), &payload, rng);
+            self.storage.buckets[*bucket_index] = new_physical.clone();
             writes.push(OramWrite {
                 location: format!("{}@bucket{}", spec.name, bucket_index),
                 old: old_physical,
@@ -700,21 +697,21 @@ impl OramState {
             });
         }
 
-        if working_stash.len() > old.parameters.stash_bound {
+        if working_stash.len() > self.parameters.stash_bound {
             bail!("stash bound exceeded for {}", spec.name);
         }
 
         let new_directory_pages = encode_path_metadata_pages(
             spec,
-            &old.parameters,
-            &old.cipher,
+            &self.parameters,
+            &self.cipher,
             &working_position_map,
             &working_stash,
             rng,
         )?;
         for (page, new_physical) in new_directory_pages.into_iter().enumerate() {
-            let old_physical = old.storage.directory_pages[page].clone();
-            next.storage.directory_pages[page] = new_physical.clone();
+            let old_physical = self.storage.directory_pages[page].clone();
+            self.storage.directory_pages[page] = new_physical.clone();
             writes.push(OramWrite {
                 location: format!("{}@meta{page}", spec.name),
                 old: old_physical,
@@ -722,24 +719,23 @@ impl OramState {
             });
         }
 
-        let next_counter = old.access_counter + 1;
-        let old_counter_physical = old.storage.access_counter_slot.clone();
-        let new_counter_physical = old
+        let next_counter = self.access_counter + 1;
+        let old_counter_physical = self.storage.access_counter_slot.clone();
+        let new_counter_physical = self
             .cipher
             .seal(oram_counter_aad(spec).as_bytes(), &next_counter.to_be_bytes(), rng);
-        next.storage.access_counter_slot = new_counter_physical.clone();
+        self.storage.access_counter_slot = new_counter_physical.clone();
         writes.push(OramWrite {
             location: format!("{}@counter", spec.name),
             old: old_counter_physical,
             new: new_counter_physical,
         });
 
-        next.entries = working_entries;
-        next.position_map = working_position_map;
-        next.stash = working_stash;
-        next.access_counter = next_counter;
-        next.pending_access = None;
-        Ok(OramCommit { next, writes })
+        self.entries = working_entries;
+        self.position_map = working_position_map;
+        self.stash = working_stash;
+        self.access_counter = next_counter;
+        Ok(writes)
     }
 }
 

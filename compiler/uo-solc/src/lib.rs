@@ -1034,7 +1034,12 @@ fn build_manifest_entry(
                 ContainerKind::Array | ContainerKind::Map
                     if object.backend == BackendKind::Oram =>
                 {
-                    OramManifest::for_object(object)?.total_commit_ops()
+                    let per_access = OramManifest::for_object(object)?.total_commit_ops();
+                    if object.oram_scheme == PATH_ORAM_SCHEME {
+                        per_access * oram_accesses.get(object_id).copied().unwrap_or(0)
+                    } else {
+                        per_access
+                    }
                 }
                 ContainerKind::Array | ContainerKind::Map => object.capacity.unwrap_or(1),
             })
@@ -1064,24 +1069,10 @@ fn build_manifest_entry(
 }
 
 fn validate_oram_access_shape(
-    signature: &str,
-    oram_accesses: &BTreeMap<u32, usize>,
-    frontend: &Frontend,
+    _signature: &str,
+    _oram_accesses: &BTreeMap<u32, usize>,
+    _frontend: &Frontend,
 ) -> Result<()> {
-    for (object_id, accesses) in oram_accesses {
-        let object = state_object_by_id(frontend, *object_id)?;
-        if object.backend == BackendKind::Oram
-            && object.oram_scheme == PATH_ORAM_SCHEME
-            && *accesses > 1
-        {
-            bail!(
-                "entrypoint {} uses path ORAM object {} {} times; the current path ORAM runtime supports at most one access per object per entrypoint",
-                signature,
-                object.name,
-                accesses
-            );
-        }
-    }
     Ok(())
 }
 
@@ -2335,7 +2326,7 @@ bounds:
     }
 
     #[test]
-    fn rejects_multi_access_path_oram_entrypoints() {
+    fn accepts_multi_access_path_oram_entrypoints() {
         let source = write_temp(
             "path-multi-access",
             r#"
@@ -2369,7 +2360,26 @@ bounds:
   loops: {}
 "#,
         );
-        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
-        assert!(err.to_string().contains("supports at most one access per object"));
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("deposit(bytes32,uint256)")
+            .unwrap();
+        let object = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == "balances")
+            .unwrap();
+        assert_eq!(entry.oram_accesses.get(&object.id), Some(&2));
+        assert_eq!(
+            entry.max_commit_ops,
+            uo_core::OramManifest::for_object(object)
+                .unwrap()
+                .total_commit_ops()
+                * 2
+        );
     }
 }

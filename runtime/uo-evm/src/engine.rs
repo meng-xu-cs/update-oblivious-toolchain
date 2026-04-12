@@ -1,3 +1,4 @@
+use crate::controller::CallRecorder;
 use crate::objects::RuntimeObject;
 use crate::theorem::{attach_theorem_metrics, build_theorem_trace};
 use anyhow::{anyhow, bail, Result};
@@ -72,6 +73,7 @@ impl ContractInstance {
             .iter()
             .map(|(id, object)| (*id, object.clone_for_tx()))
             .collect::<BTreeMap<_, _>>();
+        let mut recorder = CallRecorder::begin(entrypoint, &call_args);
         let mut state = ExecState::default();
         for ((param_name, _), arg) in function.params.iter().zip(args.into_iter()) {
             state.env.insert(param_name.clone(), arg);
@@ -84,61 +86,27 @@ impl ContractInstance {
             &mut shadow,
             &mut state,
             &mut opcode_trace,
+            &mut recorder,
         )?;
-        let mut logical_accesses = Vec::new();
-        let mut logical_writes = Vec::new();
-        let mut physical_reads = Vec::new();
-        let mut physical_writes = Vec::new();
-        let mut host_proxy_metrics = BTreeMap::new();
-        let mut gas_used = 0u64;
         let mut next_objects = BTreeMap::new();
         for (id, object) in shadow {
             let old = committed
                 .get(&id)
                 .ok_or_else(|| anyhow!("missing committed object {id}"))?;
-            let committed_object = object.commit(old, state.aborted)?;
-            gas_used += committed_object.metrics.logical_reads as u64 * 3;
-            gas_used += committed_object.metrics.logical_writes as u64 * 5;
-            gas_used += committed_object.metrics.physical_writes as u64 * 17;
-            logical_accesses.extend(committed_object.logical_accesses);
-            logical_writes.extend(committed_object.logical_writes);
-            physical_reads.extend(committed_object.physical_reads);
-            physical_writes.extend(committed_object.physical_writes);
-            next_objects.insert(id, committed_object.next);
+            let committed_object = object.commit(old, state.aborted, &mut recorder)?;
+            next_objects.insert(id, committed_object);
         }
-        host_proxy_metrics.insert("bytes_read".into(), bytes_read(&physical_reads) as f64);
-        host_proxy_metrics.insert("backend_reads".into(), physical_reads.len() as f64);
-        host_proxy_metrics.insert(
-            "bytes_written".into(),
-            bytes_written(&physical_writes) as f64,
-        );
-        host_proxy_metrics.insert("backend_writes".into(), physical_writes.len() as f64);
-        host_proxy_metrics.insert(
-            "zero_writes".into(),
-            physical_writes
-                .iter()
-                .filter(|event| event.new.iter().all(|byte| *byte == 0))
-                .count() as f64,
-        );
-        host_proxy_metrics.insert(
-            "update_only_fraction".into(),
-            if physical_writes.is_empty() {
-                1.0
-            } else {
-                physical_writes
-                    .iter()
-                    .filter(|event| event.class == uo_core::WriteClass::Update)
-                    .count() as f64
-                    / physical_writes.len() as f64
-            },
-        );
+        let mut gas_used = 0u64;
+        gas_used += recorder.metrics().logical_reads as u64 * 3;
+        gas_used += recorder.metrics().logical_writes as u64 * 5;
+        gas_used += recorder.metrics().physical_writes as u64 * 17;
         let manifest_budget = manifest_entry.public_gas_budget;
         if function.confidential {
-            if physical_writes.len() > manifest_entry.max_commit_ops {
+            if recorder.physical_write_count() > manifest_entry.max_commit_ops {
                 bail!(
                     "entrypoint {} exceeded manifest commit budget: {} > {}",
                     entrypoint,
-                    physical_writes.len(),
+                    recorder.physical_write_count(),
                     manifest_entry.max_commit_ops
                 );
             }
@@ -150,24 +118,62 @@ impl ContractInstance {
         } else {
             state.return_value
         };
-        let theorem_trace = build_theorem_trace(
+        let trace_bundle = build_theorem_trace(
+            recorder,
             &function,
             &manifest_entry,
-            &self.artifact.contract.manifest.objects,
             &call_args,
             &return_value,
             state.aborted,
             gas_used,
+        )?;
+        let mut host_proxy_metrics = BTreeMap::new();
+        host_proxy_metrics.insert(
+            "bytes_read".into(),
+            bytes_read(&trace_bundle.physical_reads) as f64,
+        );
+        host_proxy_metrics.insert(
+            "backend_reads".into(),
+            trace_bundle.physical_reads.len() as f64,
+        );
+        host_proxy_metrics.insert(
+            "bytes_written".into(),
+            bytes_written(&trace_bundle.physical_writes) as f64,
+        );
+        host_proxy_metrics.insert(
+            "backend_writes".into(),
+            trace_bundle.physical_writes.len() as f64,
+        );
+        host_proxy_metrics.insert(
+            "zero_writes".into(),
+            trace_bundle
+                .physical_writes
+                .iter()
+                .filter(|event| event.new.iter().all(|byte| *byte == 0))
+                .count() as f64,
+        );
+        host_proxy_metrics.insert(
+            "update_only_fraction".into(),
+            if trace_bundle.physical_writes.is_empty() {
+                1.0
+            } else {
+                trace_bundle
+                    .physical_writes
+                    .iter()
+                    .filter(|event| event.class == uo_core::WriteClass::Update)
+                    .count() as f64
+                    / trace_bundle.physical_writes.len() as f64
+            },
         );
         let mut trace = ExecutionTrace {
             opcode_trace,
-            logical_accesses,
-            logical_writes,
-            physical_reads,
-            physical_writes,
+            logical_accesses: trace_bundle.logical_accesses,
+            logical_writes: trace_bundle.logical_writes,
+            physical_reads: trace_bundle.physical_reads,
+            physical_writes: trace_bundle.physical_writes,
             host_proxy_metrics,
             gas_used,
-            theorem_trace,
+            theorem_trace: trace_bundle.theorem_trace,
         };
         attach_theorem_metrics(&mut trace);
         Ok(CallResult {
@@ -190,12 +196,21 @@ fn exec_block(
     objects: &mut BTreeMap<u32, RuntimeObject>,
     state: &mut ExecState,
     opcode_trace: &mut Vec<String>,
+    recorder: &mut CallRecorder,
 ) -> Result<()> {
     for statement in statements {
         if state.returned {
             break;
         }
-        exec_statement(contract, function, statement, objects, state, opcode_trace)?;
+        exec_statement(
+            contract,
+            function,
+            statement,
+            objects,
+            state,
+            opcode_trace,
+            recorder,
+        )?;
     }
     Ok(())
 }
@@ -211,19 +226,20 @@ fn exec_statement(
     objects: &mut BTreeMap<u32, RuntimeObject>,
     state: &mut ExecState,
     opcode_trace: &mut Vec<String>,
+    recorder: &mut CallRecorder,
 ) -> Result<()> {
     opcode_trace.push(statement_name(statement).into());
     match statement {
         Statement::Declare { name, value, .. } => {
-            let value = eval_expr(contract, function, value, objects, state)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder)?;
             state.env.insert(name.clone(), value);
         }
         Statement::Assign { name, value } => {
-            let value = eval_expr(contract, function, value, objects, state)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder)?;
             state.env.insert(name.clone(), value);
         }
         Statement::Require { cond } => {
-            let cond = eval_expr(contract, function, cond, objects, state)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("require condition must be boolean"))?;
             if !cond {
@@ -232,7 +248,7 @@ fn exec_statement(
             }
         }
         Statement::AbortIf { cond } => {
-            let cond = eval_expr(contract, function, cond, objects, state)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("abort condition must be boolean"))?;
             if cond {
@@ -244,13 +260,13 @@ fn exec_statement(
             then_body,
             else_body,
         } => {
-            let cond = eval_expr(contract, function, cond, objects, state)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("if condition must be boolean"))?;
             if cond {
-                exec_block(contract, function, then_body, objects, state, opcode_trace)?;
+                exec_block(contract, function, then_body, objects, state, opcode_trace, recorder)?;
             } else {
-                exec_block(contract, function, else_body, objects, state, opcode_trace)?;
+                exec_block(contract, function, else_body, objects, state, opcode_trace, recorder)?;
             }
         }
         Statement::For {
@@ -260,10 +276,10 @@ fn exec_statement(
             body,
             ..
         } => {
-            let start = eval_expr(contract, function, start, objects, state)?
+            let start = eval_expr(contract, function, start, objects, state, recorder)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("for loop start must be uint"))?;
-            let end = eval_expr(contract, function, end, objects, state)?
+            let end = eval_expr(contract, function, end, objects, state, recorder)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("for loop end must be uint"))?;
             for index in start..end {
@@ -271,7 +287,7 @@ fn exec_statement(
                     break;
                 }
                 state.env.insert(index_var.clone(), Value::uint(index));
-                exec_block(contract, function, body, objects, state, opcode_trace)?;
+                exec_block(contract, function, body, objects, state, opcode_trace, recorder)?;
             }
         }
         Statement::CellSet {
@@ -279,10 +295,10 @@ fn exec_statement(
             value,
             predicate,
         } => {
-            let value = eval_expr(contract, function, value, objects, state)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder)?;
             let predicate = predicate
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
                 .transpose()?
                 .map(|value| {
                     value
@@ -290,7 +306,7 @@ fn exec_statement(
                         .ok_or_else(|| anyhow!("cell predicate must be boolean"))
                 })
                 .transpose()?;
-            object_mut(objects, *object_id)?.set_cell(value, predicate)?;
+            object_mut(objects, *object_id)?.set_cell(value, predicate, recorder)?;
         }
         Statement::ArraySet {
             object_id,
@@ -298,14 +314,14 @@ fn exec_statement(
             value,
             predicate,
         } => {
-            let index = eval_expr(contract, function, index, objects, state)?
+            let index = eval_expr(contract, function, index, objects, state, recorder)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
                 as usize;
-            let value = eval_expr(contract, function, value, objects, state)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder)?;
             let predicate = predicate
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
                 .transpose()?
                 .map(|value| {
                     value
@@ -313,7 +329,7 @@ fn exec_statement(
                         .ok_or_else(|| anyhow!("array predicate must be boolean"))
                 })
                 .transpose()?;
-            object_mut(objects, *object_id)?.set_array(index, value, predicate)?;
+            object_mut(objects, *object_id)?.set_array(index, value, predicate, recorder)?;
         }
         Statement::MapPut {
             object_id,
@@ -321,11 +337,11 @@ fn exec_statement(
             value,
             predicate,
         } => {
-            let key = eval_expr(contract, function, key, objects, state)?;
-            let value = eval_expr(contract, function, value, objects, state)?;
+            let key = eval_expr(contract, function, key, objects, state, recorder)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder)?;
             let predicate = predicate
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
                 .transpose()?
                 .map(|value| {
                     value
@@ -333,12 +349,12 @@ fn exec_statement(
                         .ok_or_else(|| anyhow!("map predicate must be boolean"))
                 })
                 .transpose()?;
-            object_mut(objects, *object_id)?.put_map(key, value, predicate)?;
+            object_mut(objects, *object_id)?.put_map(key, value, predicate, recorder)?;
         }
         Statement::Return { value } => {
             state.return_value = value
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
                 .transpose()?;
             state.returned = true;
         }
@@ -352,6 +368,7 @@ fn eval_expr(
     expr: &Expr,
     objects: &mut BTreeMap<u32, RuntimeObject>,
     state: &mut ExecState,
+    recorder: &mut CallRecorder,
 ) -> Result<Value> {
     match expr {
         Expr::Literal(value) => Ok(value.clone()),
@@ -361,7 +378,7 @@ fn eval_expr(
             .cloned()
             .ok_or_else(|| anyhow!("unknown variable {name}")),
         Expr::Unary { op, expr } => {
-            let value = eval_expr(contract, function, expr, objects, state)?;
+            let value = eval_expr(contract, function, expr, objects, state, recorder)?;
             match op {
                 UnaryOp::Not => Ok(Value::Bool(
                     !value
@@ -378,8 +395,8 @@ fn eval_expr(
             }
         }
         Expr::Binary { op, lhs, rhs } => {
-            let lhs = eval_expr(contract, function, lhs, objects, state)?;
-            let rhs = eval_expr(contract, function, rhs, objects, state)?;
+            let lhs = eval_expr(contract, function, lhs, objects, state, recorder)?;
+            let rhs = eval_expr(contract, function, rhs, objects, state, recorder)?;
             eval_binary(op, lhs, rhs)
         }
         Expr::Select {
@@ -387,29 +404,29 @@ fn eval_expr(
             when_true,
             when_false,
         } => {
-            let cond = eval_expr(contract, function, cond, objects, state)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("select condition must be boolean"))?;
             if cond {
-                eval_expr(contract, function, when_true, objects, state)
+                eval_expr(contract, function, when_true, objects, state, recorder)
             } else {
-                eval_expr(contract, function, when_false, objects, state)
+                eval_expr(contract, function, when_false, objects, state, recorder)
             }
         }
-        Expr::CellGet { object_id } => object_mut(objects, *object_id)?.get_cell(),
+        Expr::CellGet { object_id } => object_mut(objects, *object_id)?.get_cell(recorder),
         Expr::ArrayGet { object_id, index } => {
-            let index = eval_expr(contract, function, index, objects, state)?
+            let index = eval_expr(contract, function, index, objects, state, recorder)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
                 as usize;
-            object_mut(objects, *object_id)?.get_array(index)
+            object_mut(objects, *object_id)?.get_array(index, recorder)
         }
         Expr::MapGet { object_id, key } => {
-            let key = eval_expr(contract, function, key, objects, state)?;
-            object_mut(objects, *object_id)?.get_map(&key)
+            let key = eval_expr(contract, function, key, objects, state, recorder)?;
+            object_mut(objects, *object_id)?.get_map(&key, recorder)
         }
         Expr::StructField { base, field } => {
-            match eval_expr(contract, function, base, objects, state)? {
+            match eval_expr(contract, function, base, objects, state, recorder)? {
                 Value::Struct(fields) => fields
                     .into_iter()
                     .find_map(|(name, value)| if name == *field { Some(value) } else { None })
@@ -418,8 +435,8 @@ fn eval_expr(
             }
         }
         Expr::ArrayIndex { base, index } => {
-            let base = eval_expr(contract, function, base, objects, state)?;
-            let index = eval_expr(contract, function, index, objects, state)?
+            let base = eval_expr(contract, function, base, objects, state, recorder)?;
+            let index = eval_expr(contract, function, index, objects, state, recorder)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
                 as usize;
@@ -434,7 +451,8 @@ fn eval_expr(
         Expr::Keccak256 { parts } => {
             let mut hasher = Keccak::v256();
             for part in parts {
-                let bytes = eval_expr(contract, function, part, objects, state)?.canonical_bytes();
+                let bytes =
+                    eval_expr(contract, function, part, objects, state, recorder)?.canonical_bytes();
                 hasher.update(&bytes);
             }
             let mut out = [0u8; 32];

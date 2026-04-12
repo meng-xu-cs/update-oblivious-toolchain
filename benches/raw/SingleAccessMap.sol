@@ -11,6 +11,11 @@ contract SingleAccessMap {
         records[key] = 0;
     }
 
+    function add(bytes32 key, uint256 delta) public {
+        uint256 current = records[key];
+        records[key] = current + delta;
+    }
+
     function read(bytes32 key) public returns (uint256) {
         return records[key];
     }

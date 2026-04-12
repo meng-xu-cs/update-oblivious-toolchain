@@ -1,67 +1,14 @@
-use crate::oram::{map_record_bytes, MapEntry, OramState, OramTranscript};
+use crate::controller::CallRecorder;
+use crate::oram::{map_record_bytes, MapEntry, OramState};
 use anyhow::{anyhow, bail, Result};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
-use uo_core::trace::{classify_write, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
+use uo_core::manifest::PATH_ORAM_SCHEME;
+use uo_core::trace::{classify_write, PhysicalWriteEvent};
 use uo_core::Value;
-use uo_store::{StoreCipher, StoreExecutionMetrics};
-
-#[derive(Clone, Debug)]
-pub(crate) struct ObjectCommit {
-    pub next: RuntimeObject,
-    pub logical_accesses: Vec<LogicalEvent>,
-    pub logical_writes: Vec<LogicalEvent>,
-    pub physical_reads: Vec<PhysicalReadEvent>,
-    pub physical_writes: Vec<PhysicalWriteEvent>,
-    pub metrics: StoreExecutionMetrics,
-}
-
-#[derive(Clone, Debug, Default)]
-struct Tape {
-    logical_accesses: Vec<LogicalEvent>,
-    logical_writes: Vec<LogicalEvent>,
-    physical_reads: Vec<PhysicalReadEvent>,
-    metrics: StoreExecutionMetrics,
-}
-
-impl Tape {
-    fn read(&mut self, kind: &str, object: &str, detail: impl Into<String>) {
-        self.metrics.logical_reads += 1;
-        self.logical_accesses.push(LogicalEvent {
-            kind: kind.into(),
-            object: object.into(),
-            detail: detail.into(),
-        });
-    }
-
-    fn write(&mut self, kind: &str, object: &str, detail: impl Into<String>) {
-        self.metrics.logical_writes += 1;
-        self.logical_writes.push(LogicalEvent {
-            kind: kind.into(),
-            object: object.into(),
-            detail: detail.into(),
-        });
-    }
-
-    fn physical_read(&mut self, object: &str, location: impl Into<String>, len: usize) {
-        self.metrics.physical_reads += 1;
-        self.physical_reads.push(PhysicalReadEvent {
-            object: object.into(),
-            location: location.into(),
-            len,
-        });
-    }
-
-    fn record_oram(&mut self, transcript: OramTranscript) {
-        let _ = transcript.schedule;
-        self.metrics.logical_reads += transcript.logical_accesses.len();
-        self.metrics.physical_reads += transcript.physical_reads.len();
-        self.logical_accesses.extend(transcript.logical_accesses);
-        self.physical_reads.extend(transcript.physical_reads);
-    }
-}
+use uo_store::StoreCipher;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CellObject {
@@ -71,16 +18,7 @@ pub(crate) struct CellObject {
     cipher: StoreCipher,
     accessed: bool,
     written: bool,
-    tape: Tape,
     rng: ChaCha20Rng,
-}
-
-impl CellObject {
-    fn reset_tape(&mut self) {
-        self.accessed = false;
-        self.written = false;
-        self.tape = Tape::default();
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -91,16 +29,7 @@ pub(crate) struct ArrayObject {
     cipher: StoreCipher,
     accessed: bool,
     written_indices: BTreeSet<usize>,
-    tape: Tape,
     rng: ChaCha20Rng,
-}
-
-impl ArrayObject {
-    fn reset_tape(&mut self) {
-        self.accessed = false;
-        self.written_indices.clear();
-        self.tape = Tape::default();
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -114,14 +43,6 @@ pub(crate) struct RawMapObject {
     spec: StateObject,
     entries: BTreeMap<String, RawMapEntry>,
     staged: BTreeMap<String, (Value, Value)>,
-    tape: Tape,
-}
-
-impl RawMapObject {
-    fn reset_tape(&mut self) {
-        self.staged.clear();
-        self.tape = Tape::default();
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -132,16 +53,7 @@ pub(crate) struct SmallMapObject {
     cipher: StoreCipher,
     accessed: bool,
     dirty: bool,
-    tape: Tape,
     rng: ChaCha20Rng,
-}
-
-impl SmallMapObject {
-    fn reset_tape(&mut self) {
-        self.accessed = false;
-        self.dirty = false;
-        self.tape = Tape::default();
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -150,16 +62,7 @@ pub(crate) struct OramMapObject {
     oram: OramState,
     accessed: bool,
     dirty: bool,
-    tape: Tape,
     rng: ChaCha20Rng,
-}
-
-impl OramMapObject {
-    fn reset_tape(&mut self) {
-        self.accessed = false;
-        self.dirty = false;
-        self.tape = Tape::default();
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -187,7 +90,6 @@ impl RuntimeObject {
                     cipher: StoreCipher::random(),
                     accessed: false,
                     written: false,
-                    tape: Tape::default(),
                     rng,
                 }))
             }
@@ -203,7 +105,6 @@ impl RuntimeObject {
                     cipher,
                     accessed: false,
                     written: false,
-                    tape: Tape::default(),
                     rng,
                 }))
             }
@@ -220,7 +121,6 @@ impl RuntimeObject {
                     cipher: StoreCipher::random(),
                     accessed: false,
                     written_indices: BTreeSet::new(),
-                    tape: Tape::default(),
                     rng,
                 }))
             }
@@ -247,7 +147,6 @@ impl RuntimeObject {
                     cipher,
                     accessed: false,
                     written_indices: BTreeSet::new(),
-                    tape: Tape::default(),
                     rng,
                 }))
             }
@@ -255,7 +154,6 @@ impl RuntimeObject {
                 spec: spec.clone(),
                 entries: BTreeMap::new(),
                 staged: BTreeMap::new(),
-                tape: Tape::default(),
             })),
             (ContainerKind::Map, BackendKind::FullScan) => {
                 let capacity = spec
@@ -289,7 +187,6 @@ impl RuntimeObject {
                     cipher,
                     accessed: false,
                     dirty: false,
-                    tape: Tape::default(),
                     rng,
                 }))
             }
@@ -298,7 +195,6 @@ impl RuntimeObject {
                 oram: OramState::instantiate(spec, &mut rng)?,
                 accessed: false,
                 dirty: false,
-                tape: Tape::default(),
                 rng,
             })),
         }
@@ -326,12 +222,12 @@ impl RuntimeObject {
         }
     }
 
-    pub fn get_cell(&mut self) -> Result<Value> {
+    pub fn get_cell(&mut self, trace: &mut CallRecorder) -> Result<Value> {
         match self {
             Self::RawCell(object) | Self::UoCell(object) => {
                 object.accessed = true;
-                object.tape.read("cell_get", &object.spec.name, "");
-                object.tape.physical_read(
+                trace.logical_read("cell_get", &object.spec.name, "");
+                trace.physical_read(
                     &object.spec.name,
                     object.spec.name.clone(),
                     object.physical.len(),
@@ -342,13 +238,18 @@ impl RuntimeObject {
         }
     }
 
-    pub fn set_cell(&mut self, value: Value, predicate: Option<bool>) -> Result<()> {
+    pub fn set_cell(
+        &mut self,
+        value: Value,
+        predicate: Option<bool>,
+        trace: &mut CallRecorder,
+    ) -> Result<()> {
         let apply = predicate.unwrap_or(true);
         match self {
             Self::RawCell(object) | Self::UoCell(object) => {
                 object.accessed = true;
-                object.tape.write("cell_set", &object.spec.name, "slot");
-                object.tape.physical_read(
+                trace.logical_write("cell_set", &object.spec.name, "slot");
+                trace.physical_read(
                     &object.spec.name,
                     object.spec.name.clone(),
                     object.physical.len(),
@@ -363,7 +264,7 @@ impl RuntimeObject {
         }
     }
 
-    pub fn get_array(&mut self, index: usize) -> Result<Value> {
+    pub fn get_array(&mut self, index: usize, trace: &mut CallRecorder) -> Result<Value> {
         match self {
             Self::RawArray(object) => {
                 object.accessed = true;
@@ -374,10 +275,8 @@ impl RuntimeObject {
                         object.spec.name
                     )
                 })?;
-                object
-                    .tape
-                    .read("array_get", &object.spec.name, format!("[{index}]"));
-                object.tape.physical_read(
+                trace.logical_read("array_get", &object.spec.name, format!("[{index}]"));
+                trace.physical_read(
                     &object.spec.name,
                     format!("{}[{index}]", object.spec.name),
                     object.physical_slots[index].len(),
@@ -393,17 +292,21 @@ impl RuntimeObject {
                         object.spec.name
                     )
                 })?;
-                object
-                    .tape
-                    .read("array_get", &object.spec.name, format!("[{index}]"));
-                record_array_scan(object);
+                trace.logical_read("array_get", &object.spec.name, format!("[{index}]"));
+                record_array_scan(object, trace);
                 Ok(value)
             }
             _ => bail!("{} is not an array", self.name()),
         }
     }
 
-    pub fn set_array(&mut self, index: usize, value: Value, predicate: Option<bool>) -> Result<()> {
+    pub fn set_array(
+        &mut self,
+        index: usize,
+        value: Value,
+        predicate: Option<bool>,
+        trace: &mut CallRecorder,
+    ) -> Result<()> {
         let apply = predicate.unwrap_or(true);
         match self {
             Self::RawArray(object) => {
@@ -415,10 +318,8 @@ impl RuntimeObject {
                         object.spec.name
                     )
                 })?;
-                object
-                    .tape
-                    .write("array_set", &object.spec.name, format!("[{index}]"));
-                object.tape.physical_read(
+                trace.logical_write("array_set", &object.spec.name, format!("[{index}]"));
+                trace.physical_read(
                     &object.spec.name,
                     format!("{}[{index}]", object.spec.name),
                     object.physical_slots[index].len(),
@@ -438,10 +339,8 @@ impl RuntimeObject {
                         object.spec.name
                     )
                 })?;
-                object
-                    .tape
-                    .write("array_set", &object.spec.name, format!("[{index}]"));
-                record_array_scan(object);
+                trace.logical_write("array_set", &object.spec.name, format!("[{index}]"));
+                record_array_scan(object, trace);
                 if apply {
                     object.values[index] = value;
                     object.written_indices.insert(index);
@@ -452,14 +351,12 @@ impl RuntimeObject {
         }
     }
 
-    pub fn get_map(&mut self, key: &Value) -> Result<Value> {
+    pub fn get_map(&mut self, key: &Value, trace: &mut CallRecorder) -> Result<Value> {
         match self {
             Self::RawMap(object) => {
                 let key_name = key.canonical_key();
-                object
-                    .tape
-                    .read("raw_map_get", &object.spec.name, key_name.clone());
-                object.tape.physical_read(
+                trace.logical_read("raw_map_get", &object.spec.name, key_name.clone());
+                trace.physical_read(
                     &object.spec.name,
                     format!("{}::{key_name}", object.spec.name),
                     32,
@@ -476,10 +373,8 @@ impl RuntimeObject {
             Self::UoSmallMap(object) => {
                 object.accessed = true;
                 for index in 0..object.entries.len() {
-                    object
-                        .tape
-                        .read("uomap_scan", &object.spec.name, format!("slot:{index}"));
-                    object.tape.physical_read(
+                    trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
+                    trace.physical_read(
                         &object.spec.name,
                         format!("{}#{index}", object.spec.name),
                         object.physical_slots[index].len(),
@@ -494,22 +389,41 @@ impl RuntimeObject {
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
-                let (value, transcript) = object.oram.get(&object.spec, key)?;
-                object.tape.record_oram(transcript);
+                trace.record_oram_access(object.spec.id, &object.oram.parameters);
+                let (value, transcript) = object.oram.get(&object.spec, key, &mut object.rng)?;
+                for event in transcript.logical_accesses {
+                    trace.logical_read(&event.kind, &event.object, event.detail);
+                }
+                for event in transcript.physical_reads {
+                    trace.physical_read(&event.object, event.location, event.len);
+                }
+                for write in transcript.physical_writes {
+                    trace.physical_write(PhysicalWriteEvent {
+                        object: object.spec.name.clone(),
+                        location: write.location,
+                        class: classify_write(&write.old, &write.new),
+                        old: write.old,
+                        new: write.new,
+                    });
+                }
                 Ok(value)
             }
             _ => bail!("{} is not a map", self.name()),
         }
     }
 
-    pub fn put_map(&mut self, key: Value, value: Value, predicate: Option<bool>) -> Result<()> {
+    pub fn put_map(
+        &mut self,
+        key: Value,
+        value: Value,
+        predicate: Option<bool>,
+        trace: &mut CallRecorder,
+    ) -> Result<()> {
         let apply = predicate.unwrap_or(true);
         match self {
             Self::RawMap(object) => {
                 let key_name = key.canonical_key();
-                object
-                    .tape
-                    .write("raw_map_put", &object.spec.name, key_name.clone());
+                trace.logical_write("raw_map_put", &object.spec.name, key_name.clone());
                 if apply {
                     object.staged.insert(key_name, (key, value));
                 }
@@ -518,18 +432,14 @@ impl RuntimeObject {
             Self::UoSmallMap(object) => {
                 object.accessed = true;
                 for index in 0..object.entries.len() {
-                    object
-                        .tape
-                        .read("uomap_scan", &object.spec.name, format!("slot:{index}"));
-                    object.tape.physical_read(
+                    trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
+                    trace.physical_read(
                         &object.spec.name,
                         format!("{}#{index}", object.spec.name),
                         object.physical_slots[index].len(),
                     );
                 }
-                object
-                    .tape
-                    .write("uomap_put", &object.spec.name, "oblivious");
+                trace.logical_write("uomap_put", &object.spec.name, "oblivious");
                 if apply {
                     let value_is_zero = value.is_zero_like();
                     if let Some(entry) = object
@@ -561,11 +471,27 @@ impl RuntimeObject {
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
-                let transcript = object.oram.put(&object.spec, key, value, apply)?;
-                object.tape.record_oram(transcript);
-                object
-                    .tape
-                    .write("uooram_put", &object.spec.name, "oblivious");
+                trace.record_oram_access(object.spec.id, &object.oram.parameters);
+                let transcript =
+                    object
+                        .oram
+                        .put(&object.spec, key, value, apply, &mut object.rng)?;
+                for event in transcript.logical_accesses {
+                    trace.logical_read(&event.kind, &event.object, event.detail);
+                }
+                for event in transcript.physical_reads {
+                    trace.physical_read(&event.object, event.location, event.len);
+                }
+                for write in transcript.physical_writes {
+                    trace.physical_write(PhysicalWriteEvent {
+                        object: object.spec.name.clone(),
+                        location: write.location,
+                        class: classify_write(&write.old, &write.new),
+                        old: write.old,
+                        new: write.new,
+                    });
+                }
+                trace.logical_write("uooram_put", &object.spec.name, "oblivious");
                 if apply {
                     object.dirty = true;
                 }
@@ -575,15 +501,14 @@ impl RuntimeObject {
         }
     }
 
-    pub fn commit(self, old: &Self, aborted: bool) -> Result<ObjectCommit> {
+    pub fn commit(self, old: &Self, aborted: bool, trace: &mut CallRecorder) -> Result<Self> {
         match (self, old) {
-            (Self::RawCell(mut new), Self::RawCell(old)) => {
-                let mut physical_writes = Vec::new();
+            (Self::RawCell(new), Self::RawCell(old)) => {
                 let mut next = old.clone();
                 if !aborted && new.written {
                     let old_physical = old.physical.clone();
                     let new_physical = raw_encode(&new.value);
-                    physical_writes.push(PhysicalWriteEvent {
+                    trace.physical_write(PhysicalWriteEvent {
                         object: new.spec.name.clone(),
                         location: new.spec.name.clone(),
                         class: classify_write(&old_physical, &new_physical),
@@ -592,23 +517,12 @@ impl RuntimeObject {
                     });
                     next.value = new.value.clone();
                     next.physical = new_physical;
-                    next.tape.metrics.physical_writes += 1;
-                    if next.physical.iter().all(|byte| *byte == 0) {
-                        next.tape.metrics.zero_writes += 1;
-                    }
                 }
-                next.reset_tape();
-                Ok(ObjectCommit {
-                    next: Self::RawCell(next),
-                    logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
-                    logical_writes: std::mem::take(&mut new.tape.logical_writes),
-                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
-                    physical_writes,
-                    metrics: new.tape.metrics,
-                })
+                next.accessed = false;
+                next.written = false;
+                Ok(Self::RawCell(next))
             }
-            (Self::UoCell(mut new), Self::UoCell(old)) => {
-                let mut physical_writes = Vec::new();
+            (Self::UoCell(new), Self::UoCell(old)) => {
                 let mut next = new.clone();
                 let committed_value = if aborted {
                     old.value.clone()
@@ -621,7 +535,7 @@ impl RuntimeObject {
                     let new_physical = next
                         .cipher
                         .seal(aad.as_bytes(), &committed_value.canonical_bytes(), &mut next.rng);
-                    physical_writes.push(PhysicalWriteEvent {
+                    trace.physical_write(PhysicalWriteEvent {
                         object: next.spec.name.clone(),
                         location: next.spec.name.clone(),
                         class: classify_write(&old_physical, &new_physical),
@@ -630,29 +544,21 @@ impl RuntimeObject {
                     });
                     next.physical = new_physical;
                     next.value = committed_value;
-                    next.tape.metrics.physical_writes += 1;
                 } else {
                     next.value = old.value.clone();
                     next.physical = old.physical.clone();
                 }
-                next.reset_tape();
-                Ok(ObjectCommit {
-                    next: Self::UoCell(next),
-                    logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
-                    logical_writes: std::mem::take(&mut new.tape.logical_writes),
-                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
-                    physical_writes,
-                    metrics: new.tape.metrics,
-                })
+                next.accessed = false;
+                next.written = false;
+                Ok(Self::UoCell(next))
             }
-            (Self::RawArray(mut new), Self::RawArray(old)) => {
-                let mut physical_writes = Vec::new();
+            (Self::RawArray(new), Self::RawArray(old)) => {
                 let mut next = old.clone();
                 if !aborted {
                     for index in &new.written_indices {
                         let old_physical = old.physical_slots[*index].clone();
                         let new_physical = raw_encode(&new.values[*index]);
-                        physical_writes.push(PhysicalWriteEvent {
+                        trace.physical_write(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}[{index}]", new.spec.name),
                             class: classify_write(&old_physical, &new_physical),
@@ -661,21 +567,13 @@ impl RuntimeObject {
                         });
                         next.values[*index] = new.values[*index].clone();
                         next.physical_slots[*index] = new_physical;
-                        next.tape.metrics.physical_writes += 1;
                     }
                 }
-                next.reset_tape();
-                Ok(ObjectCommit {
-                    next: Self::RawArray(next),
-                    logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
-                    logical_writes: std::mem::take(&mut new.tape.logical_writes),
-                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
-                    physical_writes,
-                    metrics: new.tape.metrics,
-                })
+                next.accessed = false;
+                next.written_indices.clear();
+                Ok(Self::RawArray(next))
             }
-            (Self::UoArray(mut new), Self::UoArray(old)) => {
-                let mut physical_writes = Vec::new();
+            (Self::UoArray(new), Self::UoArray(old)) => {
                 let mut next = new.clone();
                 let source_values = if aborted { &old.values } else { &new.values };
                 if new.accessed {
@@ -685,7 +583,7 @@ impl RuntimeObject {
                         let new_physical = next
                             .cipher
                             .seal(aad.as_bytes(), &value.canonical_bytes(), &mut next.rng);
-                        physical_writes.push(PhysicalWriteEvent {
+                        trace.physical_write(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}[{index}]", new.spec.name),
                             class: classify_write(&old_physical, &new_physical),
@@ -694,24 +592,16 @@ impl RuntimeObject {
                         });
                         next.physical_slots[index] = new_physical;
                         next.values[index] = value.clone();
-                        next.tape.metrics.physical_writes += 1;
                     }
                 } else {
                     next.values = old.values.clone();
                     next.physical_slots = old.physical_slots.clone();
                 }
-                next.reset_tape();
-                Ok(ObjectCommit {
-                    next: Self::UoArray(next),
-                    logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
-                    logical_writes: std::mem::take(&mut new.tape.logical_writes),
-                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
-                    physical_writes,
-                    metrics: new.tape.metrics,
-                })
+                next.accessed = false;
+                next.written_indices.clear();
+                Ok(Self::UoArray(next))
             }
-            (Self::RawMap(mut new), Self::RawMap(old)) => {
-                let mut physical_writes = Vec::new();
+            (Self::RawMap(new), Self::RawMap(old)) => {
                 let mut next = old.clone();
                 if !aborted {
                     for (key_name, (_key, value)) in &new.staged {
@@ -720,7 +610,7 @@ impl RuntimeObject {
                             .map(|entry| entry.physical.clone())
                             .unwrap_or_else(|| vec![0u8; 32]);
                         let new_physical = raw_encode(value);
-                        physical_writes.push(PhysicalWriteEvent {
+                        trace.physical_write(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}::{key_name}", new.spec.name),
                             class: classify_write(&old_physical, &new_physical),
@@ -738,21 +628,12 @@ impl RuntimeObject {
                                 },
                             );
                         }
-                        next.tape.metrics.physical_writes += 1;
                     }
                 }
-                next.reset_tape();
-                Ok(ObjectCommit {
-                    next: Self::RawMap(next),
-                    logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
-                    logical_writes: std::mem::take(&mut new.tape.logical_writes),
-                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
-                    physical_writes,
-                    metrics: new.tape.metrics,
-                })
+                next.staged.clear();
+                Ok(Self::RawMap(next))
             }
-            (Self::UoSmallMap(mut new), Self::UoSmallMap(old)) => {
-                let mut physical_writes = Vec::new();
+            (Self::UoSmallMap(new), Self::UoSmallMap(old)) => {
                 let mut next = new.clone();
                 let source_entries = if aborted { &old.entries } else { &new.entries };
                 if new.accessed {
@@ -762,7 +643,7 @@ impl RuntimeObject {
                         let new_physical = next
                             .cipher
                             .seal(aad.as_bytes(), &map_record_bytes(entry), &mut next.rng);
-                        physical_writes.push(PhysicalWriteEvent {
+                        trace.physical_write(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}#{index}", new.spec.name),
                             class: classify_write(&old_physical, &new_physical),
@@ -771,52 +652,45 @@ impl RuntimeObject {
                         });
                         next.entries[index] = entry.clone();
                         next.physical_slots[index] = new_physical;
-                        next.tape.metrics.physical_writes += 1;
                     }
                 } else {
                     next.entries = old.entries.clone();
                     next.physical_slots = old.physical_slots.clone();
                 }
-                next.reset_tape();
-                Ok(ObjectCommit {
-                    next: Self::UoSmallMap(next),
-                    logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
-                    logical_writes: std::mem::take(&mut new.tape.logical_writes),
-                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
-                    physical_writes,
-                    metrics: new.tape.metrics,
-                })
+                next.accessed = false;
+                next.dirty = false;
+                Ok(Self::UoSmallMap(next))
             }
-            (Self::UoOramMap(mut new), Self::UoOramMap(old)) => {
-                let mut physical_writes = Vec::new();
+            (Self::UoOramMap(new), Self::UoOramMap(old)) => {
                 let mut next = new.clone();
                 if new.accessed {
-                    let commit = new
-                        .oram
-                        .commit(&new.spec, &old.oram, aborted, &mut next.rng)?;
-                    for write in commit.writes {
-                        physical_writes.push(PhysicalWriteEvent {
-                            object: new.spec.name.clone(),
-                            location: write.location,
-                            class: classify_write(&write.old, &write.new),
-                            old: write.old,
-                            new: write.new,
-                        });
-                        next.tape.metrics.physical_writes += 1;
+                    if new.spec.oram_scheme == PATH_ORAM_SCHEME {
+                        next.oram = if aborted {
+                            old.oram.clone()
+                        } else {
+                            new.oram.clone()
+                        };
+                    } else {
+                        let commit = new
+                            .oram
+                            .commit(&new.spec, &old.oram, aborted, &mut next.rng)?;
+                        for write in commit.writes {
+                            trace.physical_write(PhysicalWriteEvent {
+                                object: new.spec.name.clone(),
+                                location: write.location,
+                                class: classify_write(&write.old, &write.new),
+                                old: write.old,
+                                new: write.new,
+                            });
+                        }
+                        next.oram = commit.next;
                     }
-                    next.oram = commit.next;
                 } else {
                     next.oram = old.oram.clone();
                 }
-                next.reset_tape();
-                Ok(ObjectCommit {
-                    next: Self::UoOramMap(next),
-                    logical_accesses: std::mem::take(&mut new.tape.logical_accesses),
-                    logical_writes: std::mem::take(&mut new.tape.logical_writes),
-                    physical_reads: std::mem::take(&mut new.tape.physical_reads),
-                    physical_writes,
-                    metrics: new.tape.metrics,
-                })
+                next.accessed = false;
+                next.dirty = false;
+                Ok(Self::UoOramMap(next))
             }
             _ => bail!("mismatched object kinds during commit"),
         }
@@ -827,26 +701,21 @@ impl RuntimeObject {
             Self::RawCell(object) | Self::UoCell(object) => {
                 object.accessed = false;
                 object.written = false;
-                object.tape = Tape::default();
             }
             Self::RawArray(object) | Self::UoArray(object) => {
                 object.accessed = false;
                 object.written_indices.clear();
-                object.tape = Tape::default();
             }
             Self::RawMap(object) => {
                 object.staged.clear();
-                object.tape = Tape::default();
             }
             Self::UoSmallMap(object) => {
                 object.accessed = false;
                 object.dirty = false;
-                object.tape = Tape::default();
             }
             Self::UoOramMap(object) => {
                 object.accessed = false;
                 object.dirty = false;
-                object.tape = Tape::default();
             }
         }
     }
@@ -865,9 +734,9 @@ fn raw_encode(value: &Value) -> Vec<u8> {
     }
 }
 
-fn record_array_scan(object: &mut ArrayObject) {
+fn record_array_scan(object: &ArrayObject, trace: &mut CallRecorder) {
     for index in 0..object.physical_slots.len() {
-        object.tape.physical_read(
+        trace.physical_read(
             &object.spec.name,
             format!("{}[{index}]", object.spec.name),
             object.physical_slots[index].len(),

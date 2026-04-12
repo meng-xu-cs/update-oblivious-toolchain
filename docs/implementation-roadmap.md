@@ -98,13 +98,16 @@ What is implemented:
   surrogate placeholders
 - the path candidate uses a real tree, real path reads/writes, a persisted
   position map, and a persisted stash
-- the checker/compiler reject entrypoints that exceed the currently supported
-  path-runtime shape
+- the path candidate now executes immediately at each ORAM access on the
+  transaction shadow state rather than replaying a single staged access at
+  commit time
+- multiple accesses to the same path-ORAM object within one entrypoint are now
+  supported and covered by the runtime/controller trace
+- manifest commit budgets now scale with the admitted per-entrypoint path-ORAM
+  access multiplicity
 
 What is still missing before this milestone is complete:
 
-- support for multiple accesses to the same path-ORAM object within one
-  entrypoint
 - a broader benchmark suite using the stronger backend
 - the proof reduction from the implementation candidate to the ORAM theorem
 
@@ -132,24 +135,31 @@ The current runtime now has an explicit controller-envelope module that builds:
 - public controller shape
 - normalized SGX micro trace
 
-from the runtime manifest and public entrypoint data.
+from the runtime controller path itself.
+
+What is implemented:
+
+- a call-scoped runtime recorder now emits ordered logical accesses, ordered
+  physical reads/writes, exact enclave-boundary events, and controller-phase
+  observations in execution order
+- ORAM accesses route through that recorder at the moment they execute
+- the emitted theorem trace is now assembled from the recorder rather than from
+  a manifest-only reconstruction
 
 What is still missing before this milestone is complete:
 
-- controller-driven execution of the ORAM runtime itself rather than
-  controller-driven observer emission
-- phase-by-phase integration between the runtime storage backend and the
-  controller state machine
-- stronger evidence that the emitted controller trace is the direct image of the
-  runtime execution path rather than a public reconstruction
+- a stronger refinement argument connecting the Rust recorder/controller state
+  machine to the Lean `View_SGX` observer
+- broader backend coverage beyond the current standard-ORAM-style path
+  candidate and the legacy surrogate mode
 
 Required work:
 
-- implement an explicit controller state machine for ORAM accesses
-- route boundary transitions through that controller
-- derive normalized micro traces from the real controller execution, not just
-  from manifest leakage
 - preserve exact public `boundary_schedule`
+- keep extending controller-backed execution to every admitted confidential
+  backend mode
+- prove that the recorder/controller trace is the direct image of the supported
+  runtime execution path
 
 Acceptance criteria:
 

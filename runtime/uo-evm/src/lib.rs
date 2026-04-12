@@ -412,4 +412,54 @@ mod tests {
             .iter()
             .all(|event| event.class == WriteClass::Update));
     }
+
+    #[test]
+    fn path_oram_candidate_supports_multi_access_entrypoints() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
+        let first_trace = first
+            .call("add(bytes32,uint256)", vec![Value::Bytes32([1u8; 32]), Value::Uint(7)])
+            .unwrap();
+        let mut second = ContractInstance::deploy(artifact).unwrap();
+        let second_trace = second
+            .call("add(bytes32,uint256)", vec![Value::Bytes32([9u8; 32]), Value::Uint(7)])
+            .unwrap();
+
+        assert_eq!(
+            first_trace.trace.hashes().physical_access_trace_hash,
+            second_trace.trace.hashes().physical_access_trace_hash
+        );
+        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(first_trace.trace.theorem_trace.boundary_schedule.len(), 6);
+        assert_eq!(
+            first_trace
+                .trace
+                .theorem_trace
+                .controller_shape
+                .as_ref()
+                .unwrap()
+                .boundary_event_budget,
+            6
+        );
+        assert!(first_trace
+            .trace
+            .physical_writes
+            .iter()
+            .all(|event| event.class == WriteClass::Update));
+        assert_eq!(
+            first_trace
+                .trace
+                .logical_accesses
+                .iter()
+                .filter(|event| event.kind == "uooram_counter")
+                .count(),
+            2
+        );
+    }
 }

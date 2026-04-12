@@ -6,6 +6,9 @@ entrypoints:
   clear(bytes32):
     secret_args: [key]
     confidential: true
+  add(bytes32,uint256):
+    secret_args: [key, delta]
+    confidential: true
   read(bytes32):
     secret_args: [key]
     confidential: true
