@@ -131,7 +131,7 @@ The abstract ORAM theorem boundary is now surfaced explicitly as:
   `computationalStandardOram_projects_to_computationalUOWith` in
   `proof/lean/UOToolchain/StandardOramReduction.lean`
 - `PathOramSecurityAssumptions`, `proofGradePathOramSecurityInterface`, and
-  `computationalPathOram_fromPublicViewLeafScheduleBucketLocationAndShape_projects_to_computationalUOWith` in
+  `computationalPathOram_fromPublicViewLeafValuesBucketLocationAndShape_projects_to_computationalUOWith` in
   `proof/lean/UOToolchain/PathOramSecurity.lean`
 
 For the proof-grade path candidate, the remaining storage theorem boundary is
@@ -140,21 +140,25 @@ away the legacy `schedule` field before the admitted storage theorem is used.
 It also no longer treats raw path bucket indices in `logicalAccesses` as exact
 public data: the proof-grade path interface normalizes those logical events to
 a public skeleton before comparing views. On the storage side it now exposes a
-leaf-level hidden witness interface: bucket-trace secrecy is derived from a
-hidden per-access leaf schedule together with a deterministic public projection
-from leaves to root-to-leaf bucket paths. The remaining decomposition is:
+leaf-value hidden witness interface: the ordered per-access leaf scaffold is
+reconstructed from the public logical trace plus public ORAM metadata, and
+bucket-trace secrecy is derived from hidden leaf values together with a
+deterministic public projection from those values to root-to-leaf bucket
+paths. The remaining decomposition is:
 
-- a hidden relation on per-access leaf schedules
+- a hidden relation on per-access leaf values
+- exact public reconstruction of the ordered leaf scaffold
 - exact public constancy of the leaf-schedule scaffold
-- deterministic projection from leaf schedules to bucket traces
+- deterministic projection from leaf schedules and leaf values to bucket traces
 - exact public constancy of the non-bucket location scaffold
 - exact public constancy of storage-shape projections
 
-The narrower leaf-witness assumption surface is exposed through:
+The narrower leaf-value assumption surface is exposed through:
 
-- `PathOramLeafSecurityAssumptions`
-- `pathOramBucketRelationFromLeafScheduleRelation`
-- `computationalPathOram_fromPublicViewLeafScheduleBucketLocationAndShape_projects_to_computationalUOWith`
+- `PathOramLeafValueSecurityAssumptions`
+- `pathOramLeafScheduleRelationFromLeafValueRelation`
+- `pathOramLeafScheduleScaffoldOfPublicPart`
+- `computationalPathOram_fromPublicViewLeafValuesBucketLocationAndShape_projects_to_computationalUOWith`
 
 The current surrogate theorem remains available as the default specialization,
 so the paper-facing aliases below are unchanged.

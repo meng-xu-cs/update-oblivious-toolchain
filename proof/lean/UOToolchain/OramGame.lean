@@ -5,6 +5,7 @@ namespace UOToolchain
 
 structure OramObjectManifest where
   objectId : Nat
+  objectName : String
   capacity : Nat
   scheme : String
   blockSize : Nat
@@ -34,6 +35,7 @@ structure OramAccessLeakage where
   entrypointId : String
   publicGasBudget : Nat
   objectId : Nat
+  objectName : String
   capacity : Nat
   scheme : String
   blockSize : Nat
@@ -98,6 +100,7 @@ def accessLeakage (cfg : OramConfig) (object : OramObjectManifest) : OramAccessL
   { entrypointId := cfg.pubData.witness.entrypointId
   , publicGasBudget := cfg.pubData.witness.publicGasBudget
   , objectId := object.objectId
+  , objectName := object.objectName
   , capacity := object.capacity
   , scheme := object.scheme
   , blockSize := object.blockSize
