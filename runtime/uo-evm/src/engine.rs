@@ -1,4 +1,5 @@
 use crate::objects::RuntimeObject;
+use crate::theorem::{attach_theorem_metrics, build_theorem_trace};
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
@@ -53,6 +54,7 @@ impl ContractInstance {
                 args.len()
             );
         }
+        let call_args = args.clone();
         let manifest_entry = self
             .artifact
             .contract
@@ -148,18 +150,30 @@ impl ContractInstance {
         } else {
             state.return_value
         };
+        let theorem_trace = build_theorem_trace(
+            &function,
+            &manifest_entry,
+            &self.artifact.contract.manifest.objects,
+            &call_args,
+            &return_value,
+            state.aborted,
+            gas_used,
+        );
+        let mut trace = ExecutionTrace {
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            host_proxy_metrics,
+            gas_used,
+            theorem_trace,
+        };
+        attach_theorem_metrics(&mut trace);
         Ok(CallResult {
             return_value,
             aborted: state.aborted,
-            trace: ExecutionTrace {
-                opcode_trace,
-                logical_accesses,
-                logical_writes,
-                physical_reads,
-                physical_writes,
-                host_proxy_metrics,
-                gas_used,
-            },
+            trace,
         })
     }
 }

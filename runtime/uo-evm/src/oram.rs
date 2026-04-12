@@ -3,7 +3,7 @@ use rand_chacha::ChaCha20Rng;
 use uo_core::ir::StateObject;
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent};
 use uo_core::{ScalarType, Type, Value};
-use uo_store::NonZeroCodec;
+use uo_store::StoreCipher;
 
 pub(crate) const ORAM_DIRECTORY_PAGE_ENTRIES: usize = 8;
 const ORAM_BLOCKS_PER_BUCKET: usize = 2;
@@ -110,6 +110,7 @@ pub(crate) struct OramState {
     pub entries: Vec<MapEntry>,
     pub storage: OramStorage,
     pub access_counter: u64,
+    pub cipher: StoreCipher,
 }
 
 impl OramState {
@@ -117,16 +118,21 @@ impl OramState {
         let parameters = OramParameters::for_spec(spec)?;
         let empty_entry = empty_map_entry(spec)?;
         let entries = vec![empty_entry.clone(); parameters.capacity];
+        let cipher = StoreCipher::random();
         let directory_pages = (0..parameters.metadata_pages)
             .map(|page| {
                 let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
                 let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(entries.len());
                 let payload = encode_oram_directory_page(&entries[start..end], &empty_entry);
-                NonZeroCodec::encode(&payload, rng)
+                let aad = oram_meta_aad(spec, page);
+                cipher.seal(aad.as_bytes(), &payload, rng)
             })
             .collect();
         let buckets = (0..parameters.bucket_count)
-            .map(|_| NonZeroCodec::filler(parameters.bucket_size, rng))
+            .map(|index| {
+                let aad = oram_bucket_aad(spec, index);
+                cipher.filler(aad.as_bytes(), parameters.bucket_size, rng)
+            })
             .collect();
         Ok(Self {
             parameters,
@@ -134,21 +140,27 @@ impl OramState {
             storage: OramStorage {
                 directory_pages,
                 buckets,
-                access_counter_slot: NonZeroCodec::encode(&0u64.to_be_bytes(), rng),
+                access_counter_slot: cipher.seal(oram_counter_aad(spec).as_bytes(), &0u64.to_be_bytes(), rng),
             },
             access_counter: 0,
+            cipher,
         })
     }
 
     pub(crate) fn refresh_from_storage(&mut self, spec: &StateObject) -> Result<()> {
         let mut entries = Vec::new();
-        for page in &self.storage.directory_pages {
-            let payload = NonZeroCodec::decode(self.parameters.directory_page_bytes, page)
+        for (page_index, page) in self.storage.directory_pages.iter().enumerate() {
+            let aad = oram_meta_aad(spec, page_index);
+            let payload = self
+                .cipher
+                .open(aad.as_bytes(), self.parameters.directory_page_bytes, page)
                 .ok_or_else(|| anyhow!("failed to decode ORAM metadata page for {}", spec.name))?;
             entries.extend(decode_oram_directory_page(&payload, spec)?);
         }
         entries.truncate(self.parameters.capacity);
-        let counter_bytes = NonZeroCodec::decode(8, &self.storage.access_counter_slot)
+        let counter_bytes = self
+            .cipher
+            .open(oram_counter_aad(spec).as_bytes(), 8, &self.storage.access_counter_slot)
             .ok_or_else(|| anyhow!("failed to decode ORAM counter for {}", spec.name))?;
         let mut counter = [0u8; 8];
         counter.copy_from_slice(&counter_bytes);
@@ -218,7 +230,8 @@ impl OramState {
             let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(source_entries.len());
             let old_physical = old.storage.directory_pages[page].clone();
             let payload = encode_oram_directory_page(&source_entries[start..end], &empty_entry);
-            let new_physical = NonZeroCodec::encode(&payload, rng);
+            let aad = oram_meta_aad(spec, page);
+            let new_physical = self.cipher.seal(aad.as_bytes(), &payload, rng);
             writes.push(OramWrite {
                 location: format!("{}@meta{page}", spec.name),
                 old: old_physical,
@@ -228,7 +241,9 @@ impl OramState {
         }
         let next_counter = old.access_counter + 1;
         let old_counter_physical = old.storage.access_counter_slot.clone();
-        let new_counter_physical = NonZeroCodec::encode(&next_counter.to_be_bytes(), rng);
+        let new_counter_physical = self
+            .cipher
+            .seal(oram_counter_aad(spec).as_bytes(), &next_counter.to_be_bytes(), rng);
         writes.push(OramWrite {
             location: format!("{}@counter", spec.name),
             old: old_counter_physical,
@@ -240,7 +255,8 @@ impl OramState {
             let payload =
                 OramBucket::from_entries(spec, source_entries, old.access_counter, index)?
                     .serialize(spec)?;
-            let new_physical = NonZeroCodec::encode(&payload, rng);
+            let aad = oram_bucket_aad(spec, index);
+            let new_physical = self.cipher.seal(aad.as_bytes(), &payload, rng);
             writes.push(OramWrite {
                 location: format!("{}@bucket{index}", spec.name),
                 old: old_physical,
@@ -310,6 +326,18 @@ impl OramState {
             .map(|offset| ((self.access_counter as usize) + offset) % self.storage.buckets.len())
             .collect()
     }
+}
+
+fn oram_meta_aad(spec: &StateObject, page: usize) -> String {
+    format!("oram:{}:meta:{page}", spec.name)
+}
+
+fn oram_bucket_aad(spec: &StateObject, index: usize) -> String {
+    format!("oram:{}:bucket:{index}", spec.name)
+}
+
+fn oram_counter_aad(spec: &StateObject) -> String {
+    format!("oram:{}:counter", spec.name)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

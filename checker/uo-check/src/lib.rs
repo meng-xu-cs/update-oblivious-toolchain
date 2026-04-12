@@ -108,7 +108,7 @@ fn count_oram_accesses(
 ) -> Result<BTreeMap<u32, usize>> {
     let mut counts = BTreeMap::new();
     for statement in statements {
-        collect_oram_statement_accesses(statement, state, &mut counts)?;
+        collect_oram_statement_accesses(statement, state, &BTreeMap::new(), &mut counts)?;
     }
     Ok(counts)
 }
@@ -116,6 +116,7 @@ fn count_oram_accesses(
 fn collect_oram_statement_accesses(
     statement: &Statement,
     state: &[StateObject],
+    loop_env: &BTreeMap<String, u128>,
     counts: &mut BTreeMap<u32, usize>,
 ) -> Result<()> {
     match statement {
@@ -132,20 +133,41 @@ fn collect_oram_statement_accesses(
         } => {
             collect_oram_expr_accesses(cond, state, counts)?;
             for stmt in then_body {
-                collect_oram_statement_accesses(stmt, state, counts)?;
+                collect_oram_statement_accesses(stmt, state, loop_env, counts)?;
             }
             for stmt in else_body {
-                collect_oram_statement_accesses(stmt, state, counts)?;
+                collect_oram_statement_accesses(stmt, state, loop_env, counts)?;
             }
             Ok(())
         }
         Statement::For {
-            start, end, body, ..
+            loop_id,
+            index_var,
+            start,
+            end,
+            body,
         } => {
             collect_oram_expr_accesses(start, state, counts)?;
             collect_oram_expr_accesses(end, state, counts)?;
-            for stmt in body {
-                collect_oram_statement_accesses(stmt, state, counts)?;
+            let start = eval_loop_bound(start, loop_env);
+            let end = eval_loop_bound(end, loop_env);
+            match (start, end) {
+                (Some(start), Some(end)) => {
+                    for index in start..end {
+                        let mut nested_env = loop_env.clone();
+                        nested_env.insert(index_var.clone(), index);
+                        for stmt in body {
+                            collect_oram_statement_accesses(stmt, state, &nested_env, counts)?;
+                        }
+                    }
+                }
+                _ if body_contains_oram_accesses(body, state)? => {
+                    bail!(
+                        "loop {} contains ORAM accesses but its trip count is not compile-time exact",
+                        loop_id
+                    );
+                }
+                _ => {}
             }
             Ok(())
         }
@@ -191,6 +213,77 @@ fn collect_oram_statement_accesses(
             }
             Ok(())
         }
+    }
+}
+
+fn body_contains_oram_accesses(statements: &[Statement], state: &[StateObject]) -> Result<bool> {
+    let mut counts = BTreeMap::new();
+    for statement in statements {
+        collect_oram_statement_accesses(statement, state, &BTreeMap::new(), &mut counts)?;
+        if !counts.is_empty() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, u128>) -> Option<u128> {
+    match expr {
+        Expr::Literal(uo_core::Value::Uint(value)) => Some(*value),
+        Expr::Literal(uo_core::Value::Bool(value)) => Some(u128::from(*value)),
+        Expr::Var(name) => loop_env.get(name).copied(),
+        Expr::Unary {
+            op: uo_core::UnaryOp::Neg,
+            expr,
+        } => eval_loop_bound(expr, loop_env).and_then(|value| 0u128.checked_sub(value)),
+        Expr::Unary {
+            op: uo_core::UnaryOp::Not,
+            expr,
+        } => eval_loop_bound(expr, loop_env).map(|value| u128::from(value == 0)),
+        Expr::Binary { op, lhs, rhs } => {
+            let lhs = eval_loop_bound(lhs, loop_env)?;
+            let rhs = eval_loop_bound(rhs, loop_env)?;
+            match op {
+                uo_core::BinaryOp::Add => lhs.checked_add(rhs),
+                uo_core::BinaryOp::Sub => lhs.checked_sub(rhs),
+                uo_core::BinaryOp::Mul => lhs.checked_mul(rhs),
+                uo_core::BinaryOp::Div => (rhs != 0).then(|| lhs / rhs),
+                uo_core::BinaryOp::Mod => (rhs != 0).then(|| lhs % rhs),
+                uo_core::BinaryOp::BitAnd => Some(lhs & rhs),
+                uo_core::BinaryOp::BitOr => Some(lhs | rhs),
+                uo_core::BinaryOp::BitXor => Some(lhs ^ rhs),
+                uo_core::BinaryOp::Eq => Some(u128::from(lhs == rhs)),
+                uo_core::BinaryOp::Neq => Some(u128::from(lhs != rhs)),
+                uo_core::BinaryOp::Lt => Some(u128::from(lhs < rhs)),
+                uo_core::BinaryOp::Lte => Some(u128::from(lhs <= rhs)),
+                uo_core::BinaryOp::Gt => Some(u128::from(lhs > rhs)),
+                uo_core::BinaryOp::Gte => Some(u128::from(lhs >= rhs)),
+                uo_core::BinaryOp::And => Some(u128::from(lhs != 0 && rhs != 0)),
+                uo_core::BinaryOp::Or => Some(u128::from(lhs != 0 || rhs != 0)),
+            }
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            let cond = eval_loop_bound(cond, loop_env)?;
+            if cond != 0 {
+                eval_loop_bound(when_true, loop_env)
+            } else {
+                eval_loop_bound(when_false, loop_env)
+            }
+        }
+        Expr::CellGet { .. }
+        | Expr::ArrayGet { .. }
+        | Expr::MapGet { .. }
+        | Expr::StructField { .. }
+        | Expr::ArrayIndex { .. }
+        | Expr::Keccak256 { .. }
+        | Expr::Literal(uo_core::Value::Bytes32(_))
+        | Expr::Literal(uo_core::Value::Address(_))
+        | Expr::Literal(uo_core::Value::Struct(_))
+        | Expr::Literal(uo_core::Value::Array(_)) => None,
     }
 }
 

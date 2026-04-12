@@ -1,6 +1,7 @@
 mod engine;
 mod objects;
 mod oram;
+mod theorem;
 
 pub use engine::{run_artifact, CallResult, ContractInstance};
 
@@ -323,5 +324,56 @@ mod tests {
         );
         assert_eq!(first_trace.trace.gas_used, 14336);
         assert_eq!(second_trace.trace.gas_used, 14336);
+    }
+
+    #[test]
+    fn oram_theorem_trace_is_public_determined() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.oram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
+        let first_trace = first
+            .call(
+                "deposit(bytes32,uint256)",
+                vec![Value::Bytes32([1u8; 32]), Value::Uint(3)],
+            )
+            .unwrap();
+        let mut second = ContractInstance::deploy(artifact).unwrap();
+        let second_trace = second
+            .call(
+                "deposit(bytes32,uint256)",
+                vec![Value::Bytes32([9u8; 32]), Value::Uint(3)],
+            )
+            .unwrap();
+        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        let controller = first_trace
+            .trace
+            .theorem_trace
+            .controller_shape
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            first_trace.trace.theorem_trace.boundary_schedule.len(),
+            controller.boundary_event_budget
+        );
+        assert_eq!(
+            first_trace
+                .trace
+                .theorem_trace
+                .normalized_micro_trace
+                .as_ref()
+                .unwrap()
+                .page_trace
+                .len(),
+            controller
+                .page_trace_regions
+                .iter()
+                .map(|region| region.event_budget)
+                .sum::<usize>()
+        );
     }
 }

@@ -34,6 +34,105 @@ pub struct LogicalEvent {
     pub detail: String,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum BoundaryDirection {
+    Enter,
+    Exit,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct BoundaryEvent {
+    pub direction: BoundaryDirection,
+    pub api_id: String,
+    pub input_len: usize,
+    pub output_len: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+pub struct OutputShape {
+    pub return_present: bool,
+    pub return_length: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct PublicOutcomeTrace {
+    pub entrypoint_id: String,
+    pub public_args: Vec<String>,
+    pub termination_status: bool,
+    pub output_shape: OutputShape,
+    pub gas_used: u64,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ControllerPhase {
+    EnclaveEnter,
+    StageRequest,
+    DescendPositionMap,
+    LoadMetadata,
+    FetchPath,
+    ScanStash,
+    RewritePath,
+    AscendPositionMap,
+    SealPersistentState,
+    EnclaveExit,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ControllerPageBudget {
+    pub page_kind: String,
+    pub event_budget: usize,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum PageEventKind {
+    FaultIn,
+    EvictOut,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ExitEvent {
+    InterruptExit,
+    Resume,
+    Terminate,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct SgxControllerShapeTrace {
+    pub boundary_event_budget: usize,
+    pub controller_phase_order: Vec<ControllerPhase>,
+    pub page_trace_regions: Vec<ControllerPageBudget>,
+    pub workset_regions: Vec<ControllerPageBudget>,
+    pub exit_trace_budget: usize,
+    pub shared_resource_budget: usize,
+    pub recursive_position_map_depth: usize,
+    pub stash_bound: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct NormalizedPageEvent {
+    pub page_kind: String,
+    pub kind: PageEventKind,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+pub struct NormalizedMicroTrace {
+    pub page_trace: Vec<NormalizedPageEvent>,
+    pub exit_pattern: Vec<ExitEvent>,
+    pub shared_resource_pattern: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+pub struct TheoremTrace {
+    #[serde(default)]
+    pub public_outcome: Option<PublicOutcomeTrace>,
+    #[serde(default)]
+    pub boundary_schedule: Vec<BoundaryEvent>,
+    #[serde(default)]
+    pub controller_shape: Option<SgxControllerShapeTrace>,
+    #[serde(default)]
+    pub normalized_micro_trace: Option<NormalizedMicroTrace>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct TraceHashBundle {
     pub opcode_trace_hash: String,
@@ -60,6 +159,8 @@ pub struct ExecutionTrace {
     pub host_proxy_metrics: BTreeMap<String, f64>,
     #[serde(default)]
     pub gas_used: u64,
+    #[serde(default)]
+    pub theorem_trace: TheoremTrace,
 }
 
 impl ExecutionTrace {

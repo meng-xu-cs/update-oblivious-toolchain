@@ -13,7 +13,9 @@ pub use ir::{
 pub use manifest::{EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest};
 pub use metadata::{BoundsMetadata, ContractMetadata, EntrypointMetadata, StateMetadata};
 pub use trace::{
-    classify_write, ExecutionTrace, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent,
-    TraceHashBundle, WriteClass,
+    classify_write, BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase,
+    ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
+    OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace,
+    SgxControllerShapeTrace, TheoremTrace, TraceHashBundle, WriteClass,
 };
 pub use types::{ScalarType, StructField, Type, Value};

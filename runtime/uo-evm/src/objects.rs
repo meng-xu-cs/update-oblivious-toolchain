@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
 use uo_core::trace::{classify_write, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::Value;
-use uo_store::{NonZeroCodec, StoreExecutionMetrics};
+use uo_store::{StoreCipher, StoreExecutionMetrics};
 
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectCommit {
@@ -68,6 +68,7 @@ pub(crate) struct CellObject {
     spec: StateObject,
     value: Value,
     physical: Vec<u8>,
+    cipher: StoreCipher,
     accessed: bool,
     written: bool,
     tape: Tape,
@@ -87,6 +88,7 @@ pub(crate) struct ArrayObject {
     spec: StateObject,
     values: Vec<Value>,
     physical_slots: Vec<Vec<u8>>,
+    cipher: StoreCipher,
     accessed: bool,
     written_indices: BTreeSet<usize>,
     tape: Tape,
@@ -127,6 +129,7 @@ pub(crate) struct SmallMapObject {
     spec: StateObject,
     entries: Vec<MapEntry>,
     physical_slots: Vec<Vec<u8>>,
+    cipher: StoreCipher,
     accessed: bool,
     dirty: bool,
     tape: Tape,
@@ -181,6 +184,7 @@ impl RuntimeObject {
                     spec: spec.clone(),
                     physical: raw_encode(&logical),
                     value: logical,
+                    cipher: StoreCipher::random(),
                     accessed: false,
                     written: false,
                     tape: Tape::default(),
@@ -190,10 +194,13 @@ impl RuntimeObject {
             (ContainerKind::Cell, _) => {
                 let logical = Value::zero_for_type(&spec.value_type);
                 let payload = logical.canonical_bytes();
+                let cipher = StoreCipher::random();
+                let aad = cell_slot_aad(&spec.name);
                 Ok(Self::UoCell(CellObject {
                     spec: spec.clone(),
-                    physical: NonZeroCodec::filler(payload.len().max(1), &mut rng),
+                    physical: cipher.filler(aad.as_bytes(), payload.len().max(1), &mut rng),
                     value: logical,
+                    cipher,
                     accessed: false,
                     written: false,
                     tape: Tape::default(),
@@ -210,6 +217,7 @@ impl RuntimeObject {
                     spec: spec.clone(),
                     values,
                     physical_slots,
+                    cipher: StoreCipher::random(),
                     accessed: false,
                     written_indices: BTreeSet::new(),
                     tape: Tape::default(),
@@ -225,13 +233,18 @@ impl RuntimeObject {
                     .canonical_bytes()
                     .len()
                     .max(1);
+                let cipher = StoreCipher::random();
                 let physical_slots = (0..capacity)
-                    .map(|_| NonZeroCodec::filler(logical_len, &mut rng))
+                    .map(|index| {
+                        let aad = array_slot_aad(&spec.name, index);
+                        cipher.filler(aad.as_bytes(), logical_len, &mut rng)
+                    })
                     .collect();
                 Ok(Self::UoArray(ArrayObject {
                     spec: spec.clone(),
                     values,
                     physical_slots,
+                    cipher,
                     accessed: false,
                     written_indices: BTreeSet::new(),
                     tape: Tape::default(),
@@ -262,13 +275,18 @@ impl RuntimeObject {
                     })
                     .collect::<Vec<_>>();
                 let logical_len = map_record_bytes(&entries[0]).len().max(1);
+                let cipher = StoreCipher::random();
                 let physical_slots = (0..capacity)
-                    .map(|_| NonZeroCodec::filler(logical_len, &mut rng))
+                    .map(|index| {
+                        let aad = small_map_slot_aad(&spec.name, index);
+                        cipher.filler(aad.as_bytes(), logical_len, &mut rng)
+                    })
                     .collect();
                 Ok(Self::UoSmallMap(SmallMapObject {
                     spec: spec.clone(),
                     entries,
                     physical_slots,
+                    cipher,
                     accessed: false,
                     dirty: false,
                     tape: Tape::default(),
@@ -599,8 +617,10 @@ impl RuntimeObject {
                 };
                 if new.accessed {
                     let old_physical = old.physical.clone();
-                    let new_physical =
-                        NonZeroCodec::encode(&committed_value.canonical_bytes(), &mut next.rng);
+                    let aad = cell_slot_aad(&next.spec.name);
+                    let new_physical = next
+                        .cipher
+                        .seal(aad.as_bytes(), &committed_value.canonical_bytes(), &mut next.rng);
                     physical_writes.push(PhysicalWriteEvent {
                         object: next.spec.name.clone(),
                         location: next.spec.name.clone(),
@@ -661,8 +681,10 @@ impl RuntimeObject {
                 if new.accessed {
                     for (index, value) in source_values.iter().enumerate() {
                         let old_physical = old.physical_slots[index].clone();
-                        let new_physical =
-                            NonZeroCodec::encode(&value.canonical_bytes(), &mut next.rng);
+                        let aad = array_slot_aad(&new.spec.name, index);
+                        let new_physical = next
+                            .cipher
+                            .seal(aad.as_bytes(), &value.canonical_bytes(), &mut next.rng);
                         physical_writes.push(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}[{index}]", new.spec.name),
@@ -736,8 +758,10 @@ impl RuntimeObject {
                 if new.accessed {
                     for (index, entry) in source_entries.iter().enumerate() {
                         let old_physical = old.physical_slots[index].clone();
-                        let new_physical =
-                            NonZeroCodec::encode(&map_record_bytes(entry), &mut next.rng);
+                        let aad = small_map_slot_aad(&new.spec.name, index);
+                        let new_physical = next
+                            .cipher
+                            .seal(aad.as_bytes(), &map_record_bytes(entry), &mut next.rng);
                         physical_writes.push(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}#{index}", new.spec.name),
@@ -849,4 +873,16 @@ fn record_array_scan(object: &mut ArrayObject) {
             object.physical_slots[index].len(),
         );
     }
+}
+
+fn cell_slot_aad(object: &str) -> String {
+    format!("cell:{object}")
+}
+
+fn array_slot_aad(object: &str, index: usize) -> String {
+    format!("array:{object}:{index}")
+}
+
+fn small_map_slot_aad(object: &str, index: usize) -> String {
+    format!("small_map:{object}:{index}")
 }

@@ -1,37 +1,98 @@
+use chacha20poly1305::aead::{Aead, Payload};
+use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce};
+use rand::rngs::OsRng;
 use rand::RngCore;
 use rand_chacha::ChaCha20Rng;
+use std::fmt;
 
 #[derive(Clone, Debug)]
 pub struct NonZeroCodec;
 
 impl NonZeroCodec {
-    pub fn encode(payload: &[u8], rng: &mut ChaCha20Rng) -> Vec<u8> {
-        let mut nonce = [0u8; 16];
-        rng.fill_bytes(&mut nonce);
-        let mut out = Vec::with_capacity((payload.len() + nonce.len() + 2) * 2);
-        push_nonzero_encoded(&mut out, &[0xA5, 0x5A]);
-        push_nonzero_encoded(&mut out, &nonce);
+    pub fn encode_bytes(payload: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(payload.len() * 2);
         push_nonzero_encoded(&mut out, payload);
         out
     }
 
-    pub fn filler(len: usize, rng: &mut ChaCha20Rng) -> Vec<u8> {
-        Self::encode(&vec![0u8; len], rng)
-    }
-
-    pub fn decode(payload_len: usize, encoded: &[u8]) -> Option<Vec<u8>> {
-        let expected_len = (payload_len + 18) * 2;
-        if encoded.len() != expected_len {
+    pub fn decode_bytes(byte_len: usize, encoded: &[u8]) -> Option<Vec<u8>> {
+        if encoded.len() != byte_len * 2 {
             return None;
         }
         let decoded = decode_nonzero(encoded)?;
-        if decoded.len() != payload_len + 18 {
+        if decoded.len() != byte_len {
             return None;
         }
-        if decoded[0..2] != [0xA5, 0x5A] {
+        Some(decoded)
+    }
+}
+
+const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];
+const SEALED_NONCE_BYTES: usize = 12;
+const SEALED_TAG_BYTES: usize = 16;
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct StoreCipher {
+    key: [u8; 32],
+}
+
+impl fmt::Debug for StoreCipher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StoreCipher")
+            .field("key", &"<redacted>")
+            .finish()
+    }
+}
+
+impl StoreCipher {
+    pub fn random() -> Self {
+        let mut key = [0u8; 32];
+        OsRng.fill_bytes(&mut key);
+        Self { key }
+    }
+
+    pub fn seal(&self, aad: &[u8], payload: &[u8], rng: &mut ChaCha20Rng) -> Vec<u8> {
+        let mut nonce_bytes = [0u8; SEALED_NONCE_BYTES];
+        rng.fill_bytes(&mut nonce_bytes);
+        let cipher = ChaCha20Poly1305::new_from_slice(&self.key).expect("fixed-size key");
+        let ciphertext = cipher
+            .encrypt(
+                Nonce::from_slice(&nonce_bytes),
+                Payload {
+                    msg: payload,
+                    aad,
+                },
+            )
+            .expect("fixed-size nonce");
+        let mut sealed = Vec::with_capacity(SEALED_MAGIC.len() + nonce_bytes.len() + ciphertext.len());
+        sealed.extend_from_slice(&SEALED_MAGIC);
+        sealed.extend_from_slice(&nonce_bytes);
+        sealed.extend_from_slice(&ciphertext);
+        NonZeroCodec::encode_bytes(&sealed)
+    }
+
+    pub fn filler(&self, aad: &[u8], len: usize, rng: &mut ChaCha20Rng) -> Vec<u8> {
+        self.seal(aad, &vec![0u8; len], rng)
+    }
+
+    pub fn open(&self, aad: &[u8], payload_len: usize, encoded: &[u8]) -> Option<Vec<u8>> {
+        let sealed_len = SEALED_MAGIC.len() + SEALED_NONCE_BYTES + payload_len + SEALED_TAG_BYTES;
+        let sealed = NonZeroCodec::decode_bytes(sealed_len, encoded)?;
+        let (magic, rest) = sealed.split_at(SEALED_MAGIC.len());
+        if magic != SEALED_MAGIC {
             return None;
         }
-        Some(decoded[18..].to_vec())
+        let (nonce_bytes, ciphertext) = rest.split_at(SEALED_NONCE_BYTES);
+        let cipher = ChaCha20Poly1305::new_from_slice(&self.key).ok()?;
+        cipher
+            .decrypt(
+                Nonce::from_slice(nonce_bytes),
+                Payload {
+                    msg: ciphertext,
+                    aad,
+                },
+            )
+            .ok()
     }
 }
 
@@ -60,25 +121,42 @@ fn decode_nonzero(encoded: &[u8]) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use super::NonZeroCodec;
+    use super::{NonZeroCodec, StoreCipher};
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
-    fn encoded_records_are_always_nonzero() {
-        let mut rng = ChaCha20Rng::seed_from_u64(7);
-        let encoded = NonZeroCodec::encode(&[0u8, 0xFF, 0x11], &mut rng);
+    fn nonzero_transport_records_are_always_nonzero() {
+        let encoded = NonZeroCodec::encode_bytes(&[0u8, 0xFF, 0x11]);
         assert!(encoded.iter().all(|byte| *byte != 0));
     }
 
     #[test]
-    fn decode_roundtrips_payload() {
+    fn nonzero_transport_roundtrips_payload() {
+        let payload = [0u8, 0xAB, 0xCD, 0xEF];
+        let encoded = NonZeroCodec::encode_bytes(&payload);
+        assert_eq!(NonZeroCodec::decode_bytes(payload.len(), &encoded), Some(payload.to_vec()));
+    }
+
+    #[test]
+    fn sealed_codec_roundtrips_payload() {
+        let cipher = StoreCipher::random();
         let mut rng = ChaCha20Rng::seed_from_u64(11);
         let payload = [0u8, 0xAB, 0xCD, 0xEF];
-        let encoded = NonZeroCodec::encode(&payload, &mut rng);
+        let encoded = cipher.seal(b"object:slot", &payload, &mut rng);
         assert_eq!(
-            NonZeroCodec::decode(payload.len(), &encoded),
+            cipher.open(b"object:slot", payload.len(), &encoded),
             Some(payload.to_vec())
         );
+    }
+
+    #[test]
+    fn sealed_codec_rejects_tampering() {
+        let cipher = StoreCipher::random();
+        let mut rng = ChaCha20Rng::seed_from_u64(29);
+        let encoded = cipher.seal(b"object:slot", &[1u8, 2u8, 3u8], &mut rng);
+        let mut tampered = encoded.clone();
+        tampered[5] ^= 0x01;
+        assert_eq!(cipher.open(b"object:slot", 3, &tampered), None);
     }
 }

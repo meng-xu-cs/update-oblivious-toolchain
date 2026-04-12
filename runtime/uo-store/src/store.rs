@@ -1,4 +1,4 @@
-use crate::codec::NonZeroCodec;
+use crate::codec::StoreCipher;
 use anyhow::{anyhow, Result};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -115,14 +115,17 @@ pub struct UoObjectStore {
     logical_events: Vec<LogicalEvent>,
     metrics: StoreExecutionMetrics,
     rng: ChaCha20Rng,
+    cipher: StoreCipher,
 }
 
 impl UoObjectStore {
     pub fn preinitialized(objects: impl IntoIterator<Item = (String, usize)>) -> Self {
         let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);
+        let cipher = StoreCipher::random();
         let mut slots = BTreeMap::new();
         for (object, logical_len) in objects {
-            slots.insert(object, NonZeroCodec::filler(logical_len, &mut rng));
+            let aad = format!("uo_store:{object}");
+            slots.insert(object, cipher.filler(aad.as_bytes(), logical_len, &mut rng));
         }
         Self {
             slots,
@@ -130,6 +133,7 @@ impl UoObjectStore {
             logical_events: Vec::new(),
             metrics: StoreExecutionMetrics::default(),
             rng,
+            cipher,
         }
     }
 
@@ -168,7 +172,8 @@ impl ObjectStore for UoObjectStore {
             .get(object)
             .cloned()
             .ok_or_else(|| anyhow!("unknown UO object: {object}"))?;
-        let new = NonZeroCodec::encode(value, &mut self.rng);
+        let aad = format!("uo_store:{object}");
+        let new = self.cipher.seal(aad.as_bytes(), value, &mut self.rng);
         self.logical_events.push(LogicalEvent {
             kind: "uo_cell_set".into(),
             object: object.into(),
