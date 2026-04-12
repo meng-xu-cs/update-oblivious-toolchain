@@ -36,6 +36,12 @@ structure PathOramBucketTrace where
   writeBuckets : List PathOramPhysicalEventLabel
 deriving Repr, DecidableEq
 
+structure PathOramLeafScheduleStep where
+  object : String
+  bucketCount : Nat
+  leaf : Nat
+deriving Repr, DecidableEq
+
 structure PathOramStorageShape where
   readLengths : List Nat
   writeClasses : List String
@@ -111,6 +117,61 @@ def pathOramBucketTrace
   (trace : PathOramStorageLocationTrace) : PathOramBucketTrace :=
   { readBuckets := trace.readLabels.filter isPathOramBucketLabel
   , writeBuckets := trace.writeLabels.filter isPathOramBucketLabel
+  }
+
+abbrev PathOramLeafScheduleTrace := List PathOramLeafScheduleStep
+abbrev PathOramLeafScheduleScaffold := List (String × Nat)
+
+def pathOramLeafScheduleScaffold
+  (trace : PathOramLeafScheduleTrace) : PathOramLeafScheduleScaffold :=
+  trace.map fun step => (step.object, step.bucketCount)
+
+def pathOramLeafCount
+  (bucketCount : Nat) : Nat :=
+  (bucketCount + 1) / 2
+
+def pathOramBucketPathOfNodeAux : Nat → Nat → List Nat
+  | 0, _ => []
+  | _fuel + 1, 0 => [0]
+  | fuel + 1, node + 1 =>
+      pathOramBucketPathOfNodeAux fuel (node / 2) ++ [node + 1]
+
+def pathOramBucketPathOfNode
+  (node : Nat) : List Nat :=
+  pathOramBucketPathOfNodeAux (node + 1) node
+
+def pathOramBucketIndicesOfLeafStep
+  (step : PathOramLeafScheduleStep) : List Nat :=
+  let leafCount := max (pathOramLeafCount step.bucketCount) 1
+  let node := leafCount - 1 + step.leaf % leafCount
+  pathOramBucketPathOfNode node
+
+def pathOramBucketLabelOfIndex
+  (object : String)
+  (index : Nat) : PathOramPhysicalEventLabel :=
+  { object := object
+  , location := s!"{object}@bucket{index}"
+  }
+
+def concatPathOramPhysicalEventLabels :
+  List (List PathOramPhysicalEventLabel) → List PathOramPhysicalEventLabel
+  | [] => []
+  | labels :: traces => labels ++ concatPathOramPhysicalEventLabels traces
+
+def pathOramReadBucketLabelsOfLeafStep
+  (step : PathOramLeafScheduleStep) : List PathOramPhysicalEventLabel :=
+  (pathOramBucketIndicesOfLeafStep step).map fun index =>
+    pathOramBucketLabelOfIndex step.object index
+
+def pathOramWriteBucketLabelsOfLeafStep
+  (step : PathOramLeafScheduleStep) : List PathOramPhysicalEventLabel :=
+  (pathOramBucketIndicesOfLeafStep step).reverse.map fun index =>
+    pathOramBucketLabelOfIndex step.object index
+
+def pathOramBucketTraceOfLeafScheduleTrace
+  (trace : PathOramLeafScheduleTrace) : PathOramBucketTrace :=
+  { readBuckets := concatPathOramPhysicalEventLabels (trace.map pathOramReadBucketLabelsOfLeafStep)
+  , writeBuckets := concatPathOramPhysicalEventLabels (trace.map pathOramWriteBucketLabelsOfLeafStep)
   }
 
 def pathOramStorageShape
@@ -217,6 +278,21 @@ abbrev PathOramBucketRelation :=
     PathOramProjectedLeakage →
     Prop
 
+abbrev PathOramLeafScheduleRelation :=
+  Distribution PathOramLeafScheduleTrace →
+    Distribution PathOramLeafScheduleTrace →
+    PathOramProjectedLeakage →
+    Prop
+
+def pathOramBucketRelationFromLeafScheduleRelation
+  (leafRel : PathOramLeafScheduleRelation) : PathOramBucketRelation :=
+  fun buckets₁ buckets₂ leakage =>
+    ∃ leaves₁ leaves₂,
+      leafRel leaves₁ leaves₂ leakage ∧
+      OramExactProjectionRelation pathOramLeafScheduleScaffold leaves₁ leaves₂ ∧
+      buckets₁ = leaves₁.map pathOramBucketTraceOfLeafScheduleTrace ∧
+      buckets₂ = leaves₂.map pathOramBucketTraceOfLeafScheduleTrace
+
 def pathOramLocationRelationFromBucketRelation
   (bucketRel : PathOramBucketRelation) : PathOramLocationRelation :=
   fun locations₁ locations₂ leakage =>
@@ -240,6 +316,13 @@ structure PathOramBucketSecurityAssumptions where
   stashOverflowBounded : Prop
   bucketLocationSecurity : PathOramBucketRelation
 
+structure PathOramLeafSecurityAssumptions where
+  bucketEncryptionINDCPA : Prop
+  metadataEncryptionINDCPA : Prop
+  freshLeafResampling : Prop
+  stashOverflowBounded : Prop
+  leafScheduleSecurity : PathOramLeafScheduleRelation
+
 def PathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
   (assumptions : PathOramBucketSecurityAssumptions) :
   PathOramSecurityAssumptions :=
@@ -250,6 +333,21 @@ def PathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
   , locationSecurity :=
       pathOramLocationRelationFromBucketRelation assumptions.bucketLocationSecurity
   }
+
+def PathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions
+  (assumptions : PathOramLeafSecurityAssumptions) :
+  PathOramBucketSecurityAssumptions :=
+  { bucketEncryptionINDCPA := assumptions.bucketEncryptionINDCPA
+  , metadataEncryptionINDCPA := assumptions.metadataEncryptionINDCPA
+  , freshLeafResampling := assumptions.freshLeafResampling
+  , stashOverflowBounded := assumptions.stashOverflowBounded
+  , bucketLocationSecurity :=
+      pathOramBucketRelationFromLeafScheduleRelation assumptions.leafScheduleSecurity
+  }
+
+def pathOramBucketTraceOfView
+  (view : ViewMPlus) : PathOramBucketTrace :=
+  pathOramBucketTrace (pathOramStorageLocationTrace (oramStorageView view))
 
 def pathOramProjectedStorageTheorem
   (assumptions : PathOramSecurityAssumptions)
@@ -422,6 +520,45 @@ theorem pathOramProjectedStorageTheorem_of_bucketLocationPublicTrace_and_shape
   · exact ⟨hBucket, hPublicLocation⟩
   · exact hShape
 
+theorem pathOramProjectedStorageTheorem_of_leafScheduleBucketLocationPublicTrace_and_shape
+  (assumptions : PathOramLeafSecurityAssumptions)
+  {storage₁ storage₂ : Distribution OramStorageView}
+  {leafs₁ leafs₂ : Distribution PathOramLeafScheduleTrace}
+  {leakage : PathOramProjectedLeakage}
+  (hLeaf :
+    assumptions.leafScheduleSecurity
+      leafs₁
+      leafs₂
+      leakage)
+  (hLeafScaffold :
+    OramExactProjectionRelation
+      pathOramLeafScheduleScaffold
+      leafs₁
+      leafs₂)
+  (hBucket₁ :
+    (storage₁.map pathOramStorageLocationTrace).map pathOramBucketTrace =
+      leafs₁.map pathOramBucketTraceOfLeafScheduleTrace)
+  (hBucket₂ :
+    (storage₂.map pathOramStorageLocationTrace).map pathOramBucketTrace =
+      leafs₂.map pathOramBucketTraceOfLeafScheduleTrace)
+  (hPublicLocation :
+    OramExactProjectionRelation
+      pathOramPublicLocationTrace
+      (storage₁.map pathOramStorageLocationTrace)
+      (storage₂.map pathOramStorageLocationTrace))
+  (hShape :
+    OramExactProjectionRelation pathOramStorageShape storage₁ storage₂) :
+  pathOramProjectedStorageTheorem
+    assumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
+    storage₁
+    storage₂
+    leakage := by
+  apply pathOramProjectedStorageTheorem_of_bucketLocationPublicTrace_and_shape
+    assumptions.toPathOramBucketSecurityAssumptions
+  · refine ⟨leafs₁, leafs₂, hLeaf, hLeafScaffold, hBucket₁, hBucket₂⟩
+  · exact hPublicLocation
+  · exact hShape
+
 theorem computationalPathOram_fromLocationAndShape_projects_to_computationalUOWith
   (assumptions : PathOramSecurityAssumptions)
   {publicPart : OramConfig → OramViewPublicPart}
@@ -532,6 +669,59 @@ theorem computationalPathOram_fromPublicViewBucketLocationAndShape_projects_to_c
   · intro cfg₁ cfg₂ hSame
     refine ⟨?_, hPublicLocation cfg₁ cfg₂ hSame⟩
     simpa [List.map_map] using hBucket cfg₁ cfg₂ hSame
+  · exact hShape
+
+theorem computationalPathOram_fromPublicViewLeafScheduleBucketLocationAndShape_projects_to_computationalUOWith
+  (assumptions : PathOramLeafSecurityAssumptions)
+  {run : OramSemantics}
+  {leafRun : OramConfig → Distribution PathOramLeafScheduleTrace}
+  (hCfg : ∀ cfg, PathOramConfigWellFormed cfg)
+  (hPublic : PathOramPublicViewSafe run)
+  (hLeaf :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      assumptions.leafScheduleSecurity
+        (leafRun cfg₁)
+        (leafRun cfg₂)
+        (pathOramProjectedExecutionLeakage cfg₁))
+  (hLeafScaffold :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramLeafScheduleScaffold
+        (leafRun cfg₁)
+        (leafRun cfg₂))
+  (hBucketProjection :
+    ∀ cfg,
+      (run cfg).map pathOramBucketTraceOfView =
+        (leafRun cfg).map pathOramBucketTraceOfLeafScheduleTrace)
+  (hPublicLocation :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramPublicLocationTrace
+        ((run cfg₁).map (fun view => pathOramStorageLocationTrace (oramStorageView view)))
+        ((run cfg₂).map (fun view => pathOramStorageLocationTrace (oramStorageView view))))
+  (hShape :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        (fun view => pathOramStorageShape (oramStorageView view))
+        (run cfg₁)
+        (run cfg₂)) :
+  ComputationalUOWith
+    (proofGradePathOramSecurityInterface
+      assumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
+    run := by
+  apply computationalPathOram_fromPublicViewBucketLocationAndShape_projects_to_computationalUOWith
+    assumptions.toPathOramBucketSecurityAssumptions
+    hCfg
+    hPublic
+  · intro cfg₁ cfg₂ hSame
+    refine ⟨leafRun cfg₁, leafRun cfg₂, hLeaf cfg₁ cfg₂ hSame, hLeafScaffold cfg₁ cfg₂ hSame, ?_, ?_⟩
+    · exact hBucketProjection cfg₁
+    · exact hBucketProjection cfg₂
+  · exact hPublicLocation
   · exact hShape
 
 end UOToolchain

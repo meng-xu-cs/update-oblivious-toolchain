@@ -451,14 +451,14 @@ impl OramState {
             .collect()
     }
 
-    fn logical_leaf_for_key(&self, key: &Value) -> usize {
+    fn access_leaf_for_key(&self, key: &Value, rng: &mut ChaCha20Rng) -> usize {
         if let Some(slot) = self.find_slot(key) {
             self.position_map
                 .get(slot)
                 .and_then(|leaf| *leaf)
-                .unwrap_or_else(|| fallback_leaf(self.parameters.leaf_count(), self.access_counter))
+                .unwrap_or_else(|| sample_leaf(rng, self.parameters.leaf_count()))
         } else {
-            fallback_leaf(self.parameters.leaf_count(), self.access_counter)
+            sample_leaf(rng, self.parameters.leaf_count())
         }
     }
 
@@ -559,7 +559,7 @@ impl OramState {
         key: &Value,
         rng: &mut ChaCha20Rng,
     ) -> Result<(Value, OramTranscript)> {
-        let access_leaf = self.logical_leaf_for_key(key);
+        let access_leaf = self.access_leaf_for_key(key, rng);
         let leaf_count = self.parameters.leaf_count();
         let return_value = self
             .entries
@@ -594,7 +594,7 @@ impl OramState {
         apply: bool,
         rng: &mut ChaCha20Rng,
     ) -> Result<OramTranscript> {
-        let access_leaf = self.logical_leaf_for_key(&key);
+        let access_leaf = self.access_leaf_for_key(&key, rng);
         let leaf_count = self.parameters.leaf_count();
         let writes = self.rewrite_path_for_access(
             spec,
@@ -854,10 +854,6 @@ fn path_bucket_indices(leaf_count: usize, leaf: usize) -> Vec<usize> {
     }
     path.reverse();
     path
-}
-
-fn fallback_leaf(leaf_count: usize, access_counter: u64) -> usize {
-    (access_counter as usize) % leaf_count.max(1)
 }
 
 fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {

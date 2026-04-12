@@ -229,10 +229,11 @@ What is implemented:
   a public skeleton instead of treating concrete `bucket:{i}` details as exact
   public trace data
 - that path-ORAM theorem boundary is now internally decomposed into a
-  bucket-only hidden relation, exact public constancy of the non-bucket
-  location scaffold, and exact public storage-shape constancy, so the
-  remaining assumption surface is smaller than a single monolithic storage
-  theorem
+  leaf-schedule hidden relation, exact public constancy of the leaf-schedule
+  scaffold, deterministic projection from leaves to bucket traces, exact
+  public constancy of the non-bucket location scaffold, and exact public
+  storage-shape constancy, so the remaining assumption surface is smaller than
+  a single monolithic storage theorem
 
 What is still missing before this milestone is complete:
 
