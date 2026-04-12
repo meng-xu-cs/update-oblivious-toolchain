@@ -182,6 +182,9 @@ What is implemented:
 - the runtime engine now treats witness extraction as a postcondition of trace
   emission: a call fails instead of returning an `ExecutionTrace` whose theorem
   fields do not admit a refinement witness
+- the controller now cross-checks its incremental theorem observer against an
+  independent pure reconstruction over the recorded public ORAM schedule before
+  returning the trace bundle
 - the runtime CLI can now emit either the full execution trace or the checked
   refinement witness directly via `uo-evm --format refinement-witness`
 - that witness keeps only the Lean-relevant normalized trace fields together

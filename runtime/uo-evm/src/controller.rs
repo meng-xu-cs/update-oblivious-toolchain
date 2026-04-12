@@ -24,6 +24,11 @@ pub(crate) struct CallTraceBundle {
     pub theorem_trace: TheoremTrace,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ObservedOramAccess {
+    parameters: OramParameters,
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallRecorder {
     entrypoint: String,
@@ -37,6 +42,7 @@ pub(crate) struct CallRecorder {
     page_trace_regions: BTreeMap<&'static str, usize>,
     workset_regions: BTreeMap<&'static str, usize>,
     total_oram_accesses: usize,
+    observed_oram_schedule: Vec<ObservedOramAccess>,
     observed_oram_accesses: BTreeMap<u32, usize>,
     recursive_position_map_depth: usize,
     stash_bound: usize,
@@ -125,6 +131,9 @@ impl CallRecorder {
         parameters: &OramParameters,
     ) {
         self.total_oram_accesses += 1;
+        self.observed_oram_schedule.push(ObservedOramAccess {
+            parameters: parameters.clone(),
+        });
         *self.observed_oram_accesses.entry(object_id).or_default() += 1;
         self.boundary_schedule.push(BoundaryEvent {
             direction: BoundaryDirection::Exit,
@@ -211,12 +220,28 @@ impl CallRecorder {
             controller_shape: Some(controller_shape.clone()),
             normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
         };
+        let expected_theorem_trace =
+            independently_reconstructed_theorem_trace(
+                &self.entrypoint,
+                &self.observed_oram_schedule,
+                function,
+                manifest_entry,
+                args,
+                return_value,
+                aborted,
+                gas_used,
+            );
+        if theorem_trace != expected_theorem_trace {
+            bail!(
+                "runtime theorem trace drifted from independent public observer reconstruction"
+            );
+        }
         Ok(CallTraceBundle {
             logical_accesses: self.logical_accesses,
             logical_writes: self.logical_writes,
             physical_reads: self.physical_reads,
             physical_writes: self.physical_writes,
-            theorem_trace,
+            theorem_trace: expected_theorem_trace,
         })
     }
 
@@ -270,6 +295,188 @@ impl CallRecorder {
             stash_bound: self.stash_bound,
         }
     }
+}
+
+fn independently_reconstructed_theorem_trace(
+    entrypoint: &str,
+    observed_oram_schedule: &[ObservedOramAccess],
+    function: &CompiledFunction,
+    manifest_entry: &EntrypointManifest,
+    args: &[Value],
+    return_value: &Option<Value>,
+    aborted: bool,
+    gas_used: u64,
+) -> TheoremTrace {
+    let total_input_len = args.iter().map(|arg| arg.canonical_bytes().len()).sum();
+    let output_shape = output_shape_of(return_value);
+    let mut boundary_schedule = vec![BoundaryEvent {
+        direction: BoundaryDirection::Enter,
+        api_id: entrypoint.into(),
+        input_len: total_input_len,
+        output_len: 0,
+    }];
+    let mut controller_phase_order = vec![ControllerPhase::EnclaveEnter];
+    let mut page_trace_regions = default_controller_region_map();
+    let mut workset_regions = default_controller_region_map();
+    let mut total_oram_accesses = 0usize;
+    let mut recursive_position_map_depth = 0usize;
+    let mut stash_bound = 0usize;
+
+    for access in observed_oram_schedule {
+        total_oram_accesses += 1;
+        boundary_schedule.push(BoundaryEvent {
+            direction: BoundaryDirection::Exit,
+            api_id: "oram_access".into(),
+            input_len: 0,
+            output_len: 0,
+        });
+        boundary_schedule.push(BoundaryEvent {
+            direction: BoundaryDirection::Enter,
+            api_id: "oram_access".into(),
+            input_len: 0,
+            output_len: 0,
+        });
+        extend_controller_phase_order(
+            &mut controller_phase_order,
+            &access.parameters,
+        );
+        bump_region_budget(
+            &mut page_trace_regions,
+            METADATA_REGION,
+            access.parameters.metadata_pages_per_access,
+        );
+        bump_region_budget(
+            &mut page_trace_regions,
+            POSITION_MAP_REGION,
+            access.parameters.recursion_depth,
+        );
+        bump_region_budget(
+            &mut page_trace_regions,
+            PATH_REGION,
+            access.parameters.buckets_per_access,
+        );
+        bump_region_budget(
+            &mut page_trace_regions,
+            STASH_REGION,
+            access.parameters.stash_bound,
+        );
+        bump_workset_budget(
+            &mut workset_regions,
+            METADATA_REGION,
+            access.parameters.metadata_pages_per_access,
+        );
+        bump_workset_budget(
+            &mut workset_regions,
+            POSITION_MAP_REGION,
+            access.parameters.recursion_depth,
+        );
+        bump_workset_budget(
+            &mut workset_regions,
+            PATH_REGION,
+            access.parameters.buckets_per_access,
+        );
+        bump_workset_budget(
+            &mut workset_regions,
+            STASH_REGION,
+            access.parameters.stash_bound,
+        );
+        recursive_position_map_depth =
+            recursive_position_map_depth.max(access.parameters.recursion_depth);
+        stash_bound = stash_bound.max(access.parameters.stash_bound);
+    }
+
+    controller_phase_order.extend([
+        ControllerPhase::SealPersistentState,
+        ControllerPhase::EnclaveExit,
+    ]);
+    boundary_schedule.push(BoundaryEvent {
+        direction: BoundaryDirection::Exit,
+        api_id: entrypoint.into(),
+        input_len: 0,
+        output_len: output_shape.return_length,
+    });
+
+    let page_trace_regions = controller_region_budgets(&page_trace_regions);
+    let workset_regions = controller_region_budgets(&workset_regions);
+    let page_trace_budget = page_trace_regions
+        .iter()
+        .map(|region| region.event_budget)
+        .sum::<usize>();
+    let controller_shape = SgxControllerShapeTrace {
+        boundary_event_budget: boundary_schedule.len(),
+        controller_phase_order,
+        page_trace_regions,
+        workset_regions,
+        exit_trace_budget: 2 + observed_oram_schedule.len() * 6 + total_oram_accesses + 1,
+        shared_resource_budget: 0, // overwritten below
+        recursive_position_map_depth,
+        stash_bound,
+    };
+    let controller_shape = SgxControllerShapeTrace {
+        shared_resource_budget: controller_shape.controller_phase_order.len() + page_trace_budget,
+        exit_trace_budget: controller_shape.controller_phase_order.len() + total_oram_accesses + 1,
+        ..controller_shape
+    };
+    TheoremTrace {
+        public_outcome: Some(PublicOutcomeTrace {
+            entrypoint_id: function.signature.clone(),
+            public_args: public_args_of(function, manifest_entry, args),
+            termination_status: !aborted,
+            output_shape,
+            gas_used,
+        }),
+        boundary_schedule,
+        controller_shape: Some(controller_shape.clone()),
+        normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
+    }
+}
+
+fn default_controller_region_map() -> BTreeMap<&'static str, usize> {
+    let mut regions = BTreeMap::new();
+    regions.insert(METADATA_REGION, 0);
+    regions.insert(POSITION_MAP_REGION, 0);
+    regions.insert(PATH_REGION, 0);
+    regions.insert(STASH_REGION, 0);
+    regions
+}
+
+fn extend_controller_phase_order(
+    controller_phase_order: &mut Vec<ControllerPhase>,
+    parameters: &OramParameters,
+) {
+    controller_phase_order.push(ControllerPhase::StageRequest);
+    controller_phase_order.extend(std::iter::repeat_n(
+        ControllerPhase::DescendPositionMap,
+        parameters.recursion_depth,
+    ));
+    controller_phase_order.extend([
+        ControllerPhase::LoadMetadata,
+        ControllerPhase::FetchPath,
+        ControllerPhase::ScanStash,
+        ControllerPhase::RewritePath,
+    ]);
+    controller_phase_order.extend(std::iter::repeat_n(
+        ControllerPhase::AscendPositionMap,
+        parameters.recursion_depth,
+    ));
+}
+
+fn bump_region_budget(
+    page_trace_regions: &mut BTreeMap<&'static str, usize>,
+    region: &'static str,
+    delta: usize,
+) {
+    let budget = page_trace_regions.entry(region).or_default();
+    *budget += delta;
+}
+
+fn bump_workset_budget(
+    workset_regions: &mut BTreeMap<&'static str, usize>,
+    region: &'static str,
+    budget: usize,
+) {
+    let current = workset_regions.entry(region).or_default();
+    *current = (*current).max(budget);
 }
 
 fn controller_region_budgets(regions: &BTreeMap<&'static str, usize>) -> Vec<ControllerPageBudget> {

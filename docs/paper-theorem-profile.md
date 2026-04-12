@@ -152,6 +152,8 @@ The runtime-to-Lean witness interface is now fixed in:
   `crates/uo-core/src/trace.rs`
 - runtime enforcement of that witness postcondition in
   `runtime/uo-evm/src/engine.rs`
+- independent public-observer reconstruction and drift check in
+  `runtime/uo-evm/src/controller.rs`
 - `uo-evm --format refinement-witness` in `runtime/uo-evm/src/main.rs`
 - `RuntimeRefinementWitness` and its projection lemmas in
   `proof/lean/UOToolchain/RuntimeRefinement.lean`
