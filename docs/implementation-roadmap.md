@@ -214,6 +214,11 @@ What is implemented:
   transition certificate; witness validity now replays those certified
   transitions and checks that they produce the exported final hidden state,
   rather than treating the hidden leaf schedule as an opaque sidecar
+- the Lean runtime witness layer now also exposes a deterministic
+  decomposition of each path-ORAM call into hidden initial position-map state,
+  hidden transition shape, and a minimal fresh-leaf coin sequence, which
+  sharpens the remaining runtime-coins theorem to a statement about fresh
+  resampling rather than about the entire hidden access-leaf schedule
 - that same witness now also exports the certified public leaf scaffold
   explicitly, so the theorem side can consume equality of that public scaffold
   directly when instantiating the path-ORAM storage boundary instead of

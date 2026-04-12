@@ -75,6 +75,14 @@ deriving Repr, DecidableEq
 
 abbrev RuntimePathOramPositionMapState := List (Nat × List (Option Nat))
 
+structure RuntimePathOramTransitionShape where
+  objectId : Nat
+  objectName : String
+  bucketCount : Nat
+  kind : RuntimePathOramTransitionKind
+  slotIndex : Option Nat
+deriving Repr, DecidableEq
+
 def RuntimeOramObjectCertificate.accessCertificate
   (object : RuntimeOramObjectCertificate) : RuntimeOramAccessCertificate :=
   { objectId := object.objectId
@@ -310,6 +318,217 @@ def replayRuntimePathOramTransitions
   Option RuntimePathOramPositionMapState := do
   let state ← runtimePathOramPositionMapStateByObject before oramObjects
   replayRuntimePathOramTransitionsAux state oramObjects leafs transitions
+
+def RuntimePathOramTransitionCertificate.shape
+  (transition : RuntimePathOramTransitionCertificate) : RuntimePathOramTransitionShape :=
+  { objectId := transition.objectId
+  , objectName := transition.objectName
+  , bucketCount := transition.bucketCount
+  , kind := transition.kind
+  , slotIndex := transition.slotIndex
+  }
+
+def runtimePathOramFreshCoinScaffoldOfStep
+  (leaf : RuntimeOramLeafCertificate)
+  (transition : RuntimePathOramTransitionCertificate) :
+  Option (List RuntimePathOramLeafScaffoldStep) :=
+  if transition.objectId != leaf.objectId ||
+      transition.objectName != leaf.objectName ||
+      transition.bucketCount != leaf.bucketCount then
+    none
+  else
+    let scaffoldStep := leaf.scaffoldStep
+    match transition.kind with
+    | .readMiss => some [scaffoldStep]
+    | .readHit =>
+        match transition.nextLeaf with
+        | some _ => some [scaffoldStep]
+        | none => none
+    | .writeNoop =>
+        match transition.slotIndex with
+        | some _ => some []
+        | none => some [scaffoldStep]
+    | .writeInsert =>
+        match transition.nextLeaf with
+        | some _ => some [scaffoldStep, scaffoldStep]
+        | none => none
+    | .writeUpdate =>
+        match transition.nextLeaf with
+        | some _ => some [scaffoldStep]
+        | none => none
+    | .writeDelete => some []
+
+def runtimePathOramFreshCoinValuesOfStep
+  (leaf : RuntimeOramLeafCertificate)
+  (transition : RuntimePathOramTransitionCertificate) :
+  Option (List Nat) :=
+  if transition.objectId != leaf.objectId ||
+      transition.objectName != leaf.objectName ||
+      transition.bucketCount != leaf.bucketCount then
+    none
+  else
+    match transition.kind with
+    | .readMiss => some [leaf.leaf]
+    | .readHit =>
+        match transition.nextLeaf with
+        | some nextLeaf => some [nextLeaf]
+        | none => none
+    | .writeNoop =>
+        match transition.slotIndex with
+        | some _ => some []
+        | none => some [leaf.leaf]
+    | .writeInsert =>
+        match transition.nextLeaf with
+        | some nextLeaf => some [leaf.leaf, nextLeaf]
+        | none => none
+    | .writeUpdate =>
+        match transition.nextLeaf with
+        | some nextLeaf => some [nextLeaf]
+        | none => none
+    | .writeDelete => some []
+
+def extractRuntimePathOramFreshCoinScaffoldAux
+  (leafs : List RuntimeOramLeafCertificate)
+  (transitions : List RuntimePathOramTransitionCertificate) :
+  Option (List RuntimePathOramLeafScaffoldStep) :=
+  match leafs, transitions with
+  | [], [] => some []
+  | leaf :: leafs, transition :: transitions => do
+      let head ← runtimePathOramFreshCoinScaffoldOfStep leaf transition
+      let tail ← extractRuntimePathOramFreshCoinScaffoldAux leafs transitions
+      some (head ++ tail)
+  | _, _ => none
+
+def extractRuntimePathOramFreshCoinValuesAux
+  (leafs : List RuntimeOramLeafCertificate)
+  (transitions : List RuntimePathOramTransitionCertificate) :
+  Option (List Nat) :=
+  match leafs, transitions with
+  | [], [] => some []
+  | leaf :: leafs, transition :: transitions => do
+      let head ← runtimePathOramFreshCoinValuesOfStep leaf transition
+      let tail ← extractRuntimePathOramFreshCoinValuesAux leafs transitions
+      some (head ++ tail)
+  | _, _ => none
+
+def runtimePathOramTakeFreshCoin?
+  (leafCount : Nat)
+  (coins : List Nat) : Option (Nat × List Nat) :=
+  match coins with
+  | [] => none
+  | coin :: coins =>
+      if coin < leafCount then
+        some (coin, coins)
+      else
+        none
+
+def runtimePathOramApplyTransitionShapeWithCoins?
+  (state : RuntimePathOramPositionMapState)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (transition : RuntimePathOramTransitionShape)
+  (coins : List Nat) :
+  Option (RuntimeOramLeafCertificate × RuntimePathOramPositionMapState × List Nat) := do
+  let object ← runtimeOramObjectById? oramObjects transition.objectId
+  if object.scheme != pathOramScheme ||
+      object.objectName != transition.objectName ||
+      object.bucketCount != transition.bucketCount then
+    none
+  else
+    let leafCount := object.pathOramLeafChoiceCount
+    let leaves ← runtimePathOramStateLookup? state transition.objectId
+    let mkLeaf := fun leaf =>
+      { objectId := transition.objectId
+      , objectName := transition.objectName
+      , bucketCount := transition.bucketCount
+      , leaf := leaf
+      }
+    match transition.kind with
+    | .readMiss => do
+        let (accessLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
+        some (mkLeaf accessLeaf, state, coins)
+    | .readHit =>
+        match transition.slotIndex with
+        | some slotIndex =>
+            match runtimePathOramGetLeafAt? leaves slotIndex with
+            | some (some priorLeaf) => do
+                let (nextLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                let nextState ← runtimePathOramStateUpdate? state transition.objectId updated
+                some (mkLeaf priorLeaf, nextState, coins)
+            | _ => none
+        | none => none
+    | .writeNoop =>
+        match transition.slotIndex with
+        | some slotIndex =>
+            match runtimePathOramGetLeafAt? leaves slotIndex with
+            | some (some priorLeaf) => some (mkLeaf priorLeaf, state, coins)
+            | _ => none
+        | none => do
+            let (accessLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
+            some (mkLeaf accessLeaf, state, coins)
+    | .writeInsert =>
+        match transition.slotIndex with
+        | some slotIndex =>
+            if runtimePathOramGetLeafAt? leaves slotIndex = some none then
+              do
+                let (accessLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
+                let (nextLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                let nextState ← runtimePathOramStateUpdate? state transition.objectId updated
+                some (mkLeaf accessLeaf, nextState, coins)
+            else
+              none
+        | none => none
+    | .writeUpdate =>
+        match transition.slotIndex with
+        | some slotIndex =>
+            match runtimePathOramGetLeafAt? leaves slotIndex with
+            | some (some priorLeaf) => do
+                let (nextLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                let nextState ← runtimePathOramStateUpdate? state transition.objectId updated
+                some (mkLeaf priorLeaf, nextState, coins)
+            | _ => none
+        | none => none
+    | .writeDelete =>
+        match transition.slotIndex with
+        | some slotIndex =>
+            match runtimePathOramGetLeafAt? leaves slotIndex with
+            | some (some priorLeaf) => do
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex none
+                let nextState ← runtimePathOramStateUpdate? state transition.objectId updated
+                some (mkLeaf priorLeaf, nextState, coins)
+            | _ => none
+        | none => none
+
+def replayRuntimePathOramLeafScheduleFromCoinsAux
+  (state : RuntimePathOramPositionMapState)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (transitions : List RuntimePathOramTransitionShape)
+  (coins : List Nat) :
+  Option (List RuntimeOramLeafCertificate × RuntimePathOramPositionMapState × List Nat) :=
+  match transitions with
+  | [] => some ([], state, coins)
+  | transition :: transitions => do
+      let (leaf, nextState, coins) ←
+        runtimePathOramApplyTransitionShapeWithCoins? state oramObjects transition coins
+      let (tail, finalState, coins) ←
+        replayRuntimePathOramLeafScheduleFromCoinsAux nextState oramObjects transitions coins
+      some (leaf :: tail, finalState, coins)
+
+def replayRuntimePathOramLeafScheduleFromCoins
+  (before : List RuntimePathOramPositionMapCertificate)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (transitions : List RuntimePathOramTransitionShape)
+  (coins : List Nat) :
+  Option (List RuntimeOramLeafCertificate × RuntimePathOramPositionMapState) := do
+  let state ← runtimePathOramPositionMapStateByObject before oramObjects
+  let (leafs, finalState, coins) ←
+    replayRuntimePathOramLeafScheduleFromCoinsAux state oramObjects transitions coins
+  if coins = [] then
+    some (leafs, finalState)
+  else
+    none
 
 def isOramLogicalKind (kind : String) : Bool :=
   kind = "uooram_counter" ||
@@ -638,6 +857,33 @@ def RuntimeRefinementWitness.projectedPublicPathOramLeafScaffold
 def RuntimeRefinementWitness.pathOramBucketTrace
   (witness : RuntimeRefinementWitness) : PathOramBucketTrace :=
   pathOramBucketTraceOfView (viewMPlus witness.trace)
+
+def RuntimeRefinementWitness.pathOramTransitionShapes
+  (witness : RuntimeRefinementWitness) : List RuntimePathOramTransitionShape :=
+  witness.oramLeafStateTransitions.map RuntimePathOramTransitionCertificate.shape
+
+def RuntimeRefinementWitness.pathOramFreshCoinScaffold?
+  (witness : RuntimeRefinementWitness) : Option PathOramLeafScheduleScaffold := do
+  let scaffold ←
+    extractRuntimePathOramFreshCoinScaffoldAux
+      witness.oramLeafSchedule
+      witness.oramLeafStateTransitions
+  some (scaffold.map RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep)
+
+def RuntimeRefinementWitness.pathOramFreshCoinValues?
+  (witness : RuntimeRefinementWitness) : Option PathOramLeafValueTrace :=
+  extractRuntimePathOramFreshCoinValuesAux
+    witness.oramLeafSchedule
+    witness.oramLeafStateTransitions
+
+def RuntimeRefinementWitness.replayedPathOramLeafScheduleFromFreshCoins
+  (witness : RuntimeRefinementWitness) : Option (List RuntimeOramLeafCertificate × RuntimePathOramPositionMapState) := do
+  let coins ← witness.pathOramFreshCoinValues?
+  replayRuntimePathOramLeafScheduleFromCoins
+    witness.oramPositionMapBefore
+    witness.oramObjects
+    witness.pathOramTransitionShapes
+    coins
 
 def RuntimeRefinementWitness.replayedPathOramPositionMapState
   (witness : RuntimeRefinementWitness) : Option RuntimePathOramPositionMapState :=
