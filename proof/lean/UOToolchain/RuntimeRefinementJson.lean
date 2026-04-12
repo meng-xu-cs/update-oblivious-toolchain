@@ -369,6 +369,80 @@ def ImportedRuntimeOramLeafScaffoldCertificate.toRuntimePathOramLeafScaffoldStep
   , bucketCount := leaf.bucket_count
   }
 
+inductive ImportedRuntimePathOramTransitionKind where
+  | ReadMiss
+  | ReadHit
+  | WriteNoop
+  | WriteInsert
+  | WriteUpdate
+  | WriteDelete
+deriving Repr, DecidableEq
+
+instance : FromJson ImportedRuntimePathOramTransitionKind where
+  fromJson? j := do
+    match (← j.getStr?) with
+    | "ReadMiss" => pure .ReadMiss
+    | "ReadHit" => pure .ReadHit
+    | "WriteNoop" => pure .WriteNoop
+    | "WriteInsert" => pure .WriteInsert
+    | "WriteUpdate" => pure .WriteUpdate
+    | "WriteDelete" => pure .WriteDelete
+    | value => throw s!"unexpected path-ORAM transition kind '{value}'"
+
+instance : ToJson ImportedRuntimePathOramTransitionKind where
+  toJson
+    | .ReadMiss => Json.str "ReadMiss"
+    | .ReadHit => Json.str "ReadHit"
+    | .WriteNoop => Json.str "WriteNoop"
+    | .WriteInsert => Json.str "WriteInsert"
+    | .WriteUpdate => Json.str "WriteUpdate"
+    | .WriteDelete => Json.str "WriteDelete"
+
+def ImportedRuntimePathOramTransitionKind.toRuntimePathOramTransitionKind :
+  ImportedRuntimePathOramTransitionKind → RuntimePathOramTransitionKind
+  | .ReadMiss => .readMiss
+  | .ReadHit => .readHit
+  | .WriteNoop => .writeNoop
+  | .WriteInsert => .writeInsert
+  | .WriteUpdate => .writeUpdate
+  | .WriteDelete => .writeDelete
+
+structure ImportedRuntimePathOramTransitionCertificate where
+  object_id : Nat
+  object_name : String
+  bucket_count : Nat
+  kind : ImportedRuntimePathOramTransitionKind
+  slot_index : Option Nat
+  prior_leaf : Option Nat
+  next_leaf : Option Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimePathOramTransitionCertificate.toRuntimePathOramTransitionCertificate
+  (transition : ImportedRuntimePathOramTransitionCertificate) :
+  RuntimePathOramTransitionCertificate :=
+  { objectId := transition.object_id
+  , objectName := transition.object_name
+  , bucketCount := transition.bucket_count
+  , kind := transition.kind.toRuntimePathOramTransitionKind
+  , slotIndex := transition.slot_index
+  , priorLeaf := transition.prior_leaf
+  , nextLeaf := transition.next_leaf
+  }
+
+structure ImportedRuntimePathOramPositionMapCertificate where
+  object_id : Nat
+  object_name : String
+  leaves : List (Option Nat)
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimePathOramPositionMapCertificate.toRuntimePathOramPositionMapCertificate
+  (state : ImportedRuntimePathOramPositionMapCertificate) :
+  RuntimePathOramPositionMapCertificate :=
+  { objectId := state.object_id
+  , objectName := state.object_name
+  , leaves := state.leaves
+  }
+
 structure ImportedRuntimeOramObjectCertificate where
   object_id : Nat
   object_name : String
@@ -417,6 +491,9 @@ structure ImportedRuntimeRefinementWitness where
   oram_objects : List ImportedRuntimeOramObjectCertificate
   oram_leaf_public_scaffold : List ImportedRuntimeOramLeafScaffoldCertificate
   oram_leaf_schedule : List ImportedRuntimeOramLeafCertificate
+  oram_position_map_before : List ImportedRuntimePathOramPositionMapCertificate
+  oram_position_map_after : List ImportedRuntimePathOramPositionMapCertificate
+  oram_leaf_state_transitions : List ImportedRuntimePathOramTransitionCertificate
 deriving Repr, DecidableEq, FromJson, ToJson
 
 def ImportedRuntimeRefinementWitness.toRuntimeWitness
@@ -434,6 +511,12 @@ def ImportedRuntimeRefinementWitness.toRuntimeWitness
       ImportedRuntimeOramLeafScaffoldCertificate.toRuntimePathOramLeafScaffoldStep
   , oramLeafSchedule := witness.oram_leaf_schedule.map
       ImportedRuntimeOramLeafCertificate.toRuntimeOramLeafCertificate
+  , oramPositionMapBefore := witness.oram_position_map_before.map
+      ImportedRuntimePathOramPositionMapCertificate.toRuntimePathOramPositionMapCertificate
+  , oramPositionMapAfter := witness.oram_position_map_after.map
+      ImportedRuntimePathOramPositionMapCertificate.toRuntimePathOramPositionMapCertificate
+  , oramLeafStateTransitions := witness.oram_leaf_state_transitions.map
+      ImportedRuntimePathOramTransitionCertificate.toRuntimePathOramTransitionCertificate
   }
 
 def ImportedRuntimeRefinementWitness.Valid
@@ -572,6 +655,9 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
   , oram_objects := []
   , oram_leaf_public_scaffold := []
   , oram_leaf_schedule := []
+  , oram_position_map_before := []
+  , oram_position_map_after := []
+  , oram_leaf_state_transitions := []
   }
 
 def sampleImportedRuntimeRefinementWitnessRoundtrip : Bool :=

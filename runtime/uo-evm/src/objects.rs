@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
 use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::trace::{classify_write, PhysicalWriteEvent};
+use uo_core::RuntimePathOramPositionMapWitness;
 use uo_core::Value;
 use uo_store::StoreCipher;
 
@@ -224,6 +225,19 @@ impl RuntimeObject {
         cloned
     }
 
+    pub fn path_oram_position_map_witness(&self) -> Option<RuntimePathOramPositionMapWitness> {
+        match self {
+            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+                Some(RuntimePathOramPositionMapWitness {
+                    object_id: object.spec.id,
+                    object_name: object.spec.name.clone(),
+                    leaves: object.oram.position_map.clone(),
+                })
+            }
+            _ => None,
+        }
+    }
+
     pub fn name(&self) -> &str {
         match self {
             Self::RawCell(object) | Self::UoCell(object) => &object.spec.name,
@@ -411,6 +425,9 @@ impl RuntimeObject {
                         leaf,
                     );
                 }
+                if let Some(transition) = transcript.path_transition {
+                    trace.record_path_oram_leaf_state_transition(transition);
+                }
                 for event in transcript.logical_accesses {
                     trace.logical_read(&event.kind, &event.object, event.detail);
                 }
@@ -503,6 +520,9 @@ impl RuntimeObject {
                         object.oram.parameters.bucket_count,
                         leaf,
                     );
+                }
+                if let Some(transition) = transcript.path_transition {
+                    trace.record_path_oram_leaf_state_transition(transition);
                 }
                 for event in transcript.logical_accesses {
                     trace.logical_read(&event.kind, &event.object, event.detail);

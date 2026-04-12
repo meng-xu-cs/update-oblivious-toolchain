@@ -18,7 +18,8 @@ pub use trace::{
     OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace,
     RefinementPhysicalWrite, RefinementTrace, RefinementWitnessError,
     RuntimeControllerCertificate, RuntimeOramAccessWitness, RuntimeOramLeafWitness,
-    RuntimeOramObjectWitness,
+    RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness,
+    RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness,
     RuntimeRefinementWitness, SgxControllerShapeTrace, TheoremTrace, TraceHashBundle,
     WriteClass,
 };

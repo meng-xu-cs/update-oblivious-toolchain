@@ -209,6 +209,11 @@ What is implemented:
   scaffold matches the path accesses reconstructed from the logical trace and
   that its deterministic bucket-path projection reproduces the observed
   path-ORAM bucket trace exactly
+- that same witness now also carries hidden path-ORAM position-map state both
+  before and after the call, together with an exact hidden per-access
+  transition certificate; witness validity now replays those certified
+  transitions and checks that they produce the exported final hidden state,
+  rather than treating the hidden leaf schedule as an opaque sidecar
 - that same witness now also exports the certified public leaf scaffold
   explicitly, so the theorem side can consume equality of that public scaffold
   directly when instantiating the path-ORAM storage boundary instead of
@@ -218,9 +223,11 @@ What is implemented:
   store-cipher key generation, and ORAM leaf sampling, and the regression suite
   checks replayability of seeded path-ORAM traces
 - the Lean package now also contains `RuntimeCoins.lean`, which lifts a
-  finite seeded witness family into leaf-schedule and leaf-value distributions
-  and proves the direct canonical/scaffold lemmas needed by the newer
-  scaffold-indexed path-ORAM theorem variants
+  finite seeded witness family into leaf-schedule and leaf-value distributions,
+  proves the direct public scaffold lemmas needed by the newer
+  scaffold-indexed path-ORAM theorem variants, and now keeps canonical
+  leaf-value realization as an explicit theorem hypothesis at the exact lemmas
+  that need it instead of bundling that claim into the witness-family record
 - the Lean scaffold now also contains
   `proof/lean/UOToolchain/RuntimeRefinementJson.lean`, which parses the Rust
   witness JSON, converts it into the theorem-side witness, and provides a

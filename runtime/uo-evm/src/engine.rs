@@ -8,7 +8,10 @@ use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
-use uo_core::{CompiledArtifact, ExecutionTrace, RuntimeOramObjectWitness, Value};
+use uo_core::{
+    CompiledArtifact, ExecutionTrace, RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness,
+    Value,
+};
 
 #[derive(Clone, Debug)]
 pub struct ContractInstance {
@@ -83,6 +86,7 @@ impl ContractInstance {
             manifest_entry.max_stack_words,
         );
         let committed = self.objects.clone();
+        let runtime_oram_position_map_before = runtime_path_oram_position_maps(&committed);
         let mut shadow = committed
             .iter()
             .map(|(id, object)| (*id, object.clone_for_tx()))
@@ -127,6 +131,7 @@ impl ContractInstance {
             gas_used = manifest_budget;
         }
         self.objects = next_objects;
+        let runtime_oram_position_map_after = runtime_path_oram_position_maps(&self.objects);
         let return_value = if function.confidential && state.aborted {
             None
         } else {
@@ -193,6 +198,9 @@ impl ContractInstance {
             runtime_controller_certificate: Some(trace_bundle.controller_certificate),
             runtime_oram_objects: runtime_oram_objects(&self.artifact),
             runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
         };
         attach_theorem_metrics(&mut trace);
         trace.runtime_refinement_witness()?;
@@ -274,6 +282,15 @@ fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWit
                 accesses_per_call: oram.accesses_per_call,
             })
         })
+        .collect()
+}
+
+fn runtime_path_oram_position_maps(
+    objects: &BTreeMap<u32, RuntimeObject>,
+) -> Vec<RuntimePathOramPositionMapWitness> {
+    objects
+        .values()
+        .filter_map(RuntimeObject::path_oram_position_map_witness)
         .collect()
 }
 

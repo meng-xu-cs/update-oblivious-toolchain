@@ -7,7 +7,7 @@ use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::{
     BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape,
     PublicOutcomeTrace, RuntimeControllerCertificate, RuntimeOramAccessWitness,
-    RuntimeOramLeafWitness,
+    RuntimeOramLeafWitness, RuntimePathOramTransitionWitness,
     SgxControllerShapeTrace, TheoremTrace, Value,
 };
 use uo_store::StoreExecutionMetrics;
@@ -26,6 +26,7 @@ pub(crate) struct CallTraceBundle {
     pub theorem_trace: TheoremTrace,
     pub controller_certificate: RuntimeControllerCertificate,
     pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,6 +51,7 @@ pub(crate) struct CallRecorder {
     observed_oram_schedule: Vec<ObservedOramAccess>,
     observed_oram_accesses: BTreeMap<u32, usize>,
     path_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    path_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
     recursive_position_map_depth: usize,
     stash_bound: usize,
 }
@@ -198,6 +200,13 @@ impl CallRecorder {
         });
     }
 
+    pub(crate) fn record_path_oram_leaf_state_transition(
+        &mut self,
+        transition: RuntimePathOramTransitionWitness,
+    ) {
+        self.path_oram_leaf_state_transitions.push(transition);
+    }
+
     fn bump_region(&mut self, region: &'static str, delta: usize) {
         let budget = self.page_trace_regions.entry(region).or_default();
         *budget += delta;
@@ -262,6 +271,7 @@ impl CallRecorder {
             theorem_trace: expected_theorem_trace,
             controller_certificate,
             oram_leaf_schedule: self.path_oram_leaf_schedule,
+            oram_leaf_state_transitions: self.path_oram_leaf_state_transitions,
         })
     }
 

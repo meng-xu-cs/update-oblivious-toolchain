@@ -5,6 +5,7 @@ use uo_core::ir::StateObject;
 use uo_core::manifest::{PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent};
 use uo_core::{ScalarType, Type, Value};
+use uo_core::{RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness};
 use uo_store::StoreCipher;
 
 pub(crate) const ORAM_DIRECTORY_PAGE_ENTRIES: usize = 8;
@@ -153,6 +154,7 @@ pub(crate) struct OramTranscript {
     pub physical_reads: Vec<PhysicalReadEvent>,
     pub physical_writes: Vec<OramWrite>,
     pub path_leaf: Option<usize>,
+    pub path_transition: Option<RuntimePathOramTransitionWitness>,
 }
 
 #[derive(Clone, Debug)]
@@ -444,6 +446,7 @@ impl OramState {
             physical_reads,
             physical_writes: Vec::new(),
             path_leaf: None,
+            path_transition: None,
         }
     }
 
@@ -518,6 +521,7 @@ impl OramState {
             physical_reads,
             physical_writes: Vec::new(),
             path_leaf: Some(leaf),
+            path_transition: None,
         }
     }
 
@@ -564,6 +568,9 @@ impl OramState {
     ) -> Result<(Value, OramTranscript)> {
         let access_leaf = self.access_leaf_for_key(key, rng);
         let leaf_count = self.parameters.leaf_count();
+        let slot = slot_for_key(&self.entries, key);
+        let prior_leaf = slot.and_then(|slot_index| self.position_map.get(slot_index).copied().flatten());
+        let next_leaf = slot.map(|_| sample_leaf(rng, leaf_count));
         let return_value = self
             .entries
             .iter()
@@ -574,18 +581,30 @@ impl OramState {
             spec,
             access_leaf,
             rng,
-            |entries, position_map, stash, rng| {
-                if let Some(slot) = slot_for_key(entries, key) {
-                    let block = find_stash_block_mut(stash, slot)?;
-                    let new_leaf = sample_leaf(rng, leaf_count);
+            |_entries, position_map, stash, _rng| {
+                if let (Some(slot_index), Some(new_leaf)) = (slot, next_leaf) {
+                    let block = find_stash_block_mut(stash, slot_index)?;
                     block.leaf = new_leaf;
-                    position_map[slot] = Some(new_leaf);
+                    position_map[slot_index] = Some(new_leaf);
                 }
                 Ok(())
             },
         )?;
         let mut transcript = self.path_access_transcript(spec, access_leaf);
         transcript.physical_writes = writes;
+        transcript.path_transition = Some(RuntimePathOramTransitionWitness {
+            object_id: spec.id,
+            object_name: spec.name.clone(),
+            bucket_count: self.parameters.bucket_count,
+            kind: if slot.is_some() {
+                RuntimePathOramTransitionKind::ReadHit
+            } else {
+                RuntimePathOramTransitionKind::ReadMiss
+            },
+            slot_index: slot,
+            prior_leaf,
+            next_leaf,
+        });
         Ok((return_value, transcript))
     }
 
@@ -599,43 +618,109 @@ impl OramState {
     ) -> Result<OramTranscript> {
         let access_leaf = self.access_leaf_for_key(&key, rng);
         let leaf_count = self.parameters.leaf_count();
+        let slot = slot_for_key(&self.entries, &key);
+        let prior_leaf = slot.and_then(|slot_index| self.position_map.get(slot_index).copied().flatten());
+        let insert_slot = if slot.is_none() && apply && !value.is_zero_like() {
+            allocate_slot(&self.entries)
+        } else {
+            None
+        };
+        let next_leaf = match (slot, apply, value.is_zero_like(), insert_slot) {
+            (Some(_), true, false, _) => Some(sample_leaf(rng, leaf_count)),
+            (None, true, false, Some(_)) => Some(sample_leaf(rng, leaf_count)),
+            _ => None,
+        };
+        let transition = if !apply {
+            RuntimePathOramTransitionWitness {
+                object_id: spec.id,
+                object_name: spec.name.clone(),
+                bucket_count: self.parameters.bucket_count,
+                kind: RuntimePathOramTransitionKind::WriteNoop,
+                slot_index: slot,
+                prior_leaf,
+                next_leaf: prior_leaf,
+            }
+        } else if let Some(slot_index) = slot {
+            if value.is_zero_like() {
+                RuntimePathOramTransitionWitness {
+                    object_id: spec.id,
+                    object_name: spec.name.clone(),
+                    bucket_count: self.parameters.bucket_count,
+                    kind: RuntimePathOramTransitionKind::WriteDelete,
+                    slot_index: Some(slot_index),
+                    prior_leaf,
+                    next_leaf: None,
+                }
+            } else {
+                RuntimePathOramTransitionWitness {
+                    object_id: spec.id,
+                    object_name: spec.name.clone(),
+                    bucket_count: self.parameters.bucket_count,
+                    kind: RuntimePathOramTransitionKind::WriteUpdate,
+                    slot_index: Some(slot_index),
+                    prior_leaf,
+                    next_leaf,
+                }
+            }
+        } else if let Some(slot_index) = insert_slot {
+            RuntimePathOramTransitionWitness {
+                object_id: spec.id,
+                object_name: spec.name.clone(),
+                bucket_count: self.parameters.bucket_count,
+                kind: RuntimePathOramTransitionKind::WriteInsert,
+                slot_index: Some(slot_index),
+                prior_leaf: None,
+                next_leaf,
+            }
+        } else {
+            RuntimePathOramTransitionWitness {
+                object_id: spec.id,
+                object_name: spec.name.clone(),
+                bucket_count: self.parameters.bucket_count,
+                kind: RuntimePathOramTransitionKind::WriteNoop,
+                slot_index: None,
+                prior_leaf: None,
+                next_leaf: None,
+            }
+        };
         let writes = self.rewrite_path_for_access(
             spec,
             access_leaf,
             rng,
-            |entries, position_map, stash, rng| {
+            |entries, position_map, stash, _rng| {
                 if !apply {
                     return Ok(());
                 }
-                match slot_for_key(entries, &key) {
-                    Some(slot) => {
+                match slot {
+                    Some(slot_index) => {
                         if value.is_zero_like() {
-                            remove_stash_block(stash, slot)?;
-                            entries[slot] = empty_map_entry(spec)?;
-                            position_map[slot] = None;
+                            remove_stash_block(stash, slot_index)?;
+                            entries[slot_index] = empty_map_entry(spec)?;
+                            position_map[slot_index] = None;
                         } else {
-                            let block = find_stash_block_mut(stash, slot)?;
+                            let block = find_stash_block_mut(stash, slot_index)?;
                             block.value = value.clone();
-                            let new_leaf = sample_leaf(rng, leaf_count);
+                            let new_leaf = next_leaf.expect("write update precomputes next leaf");
                             block.leaf = new_leaf;
-                            entries[slot].value = value.clone();
-                            position_map[slot] = Some(new_leaf);
+                            entries[slot_index].value = value.clone();
+                            position_map[slot_index] = Some(new_leaf);
                         }
                     }
                     None => {
-                        if !value.is_zero_like() {
-                            let slot = allocate_slot(entries)
-                                .ok_or_else(|| anyhow!("map {} exceeded public capacity", spec.name))?;
-                            let new_leaf = sample_leaf(rng, leaf_count);
-                            entries[slot] = MapEntry {
+                        if let Some(slot_index) = insert_slot {
+                            let new_leaf = next_leaf.expect("write insert precomputes next leaf");
+                            if slot_index >= entries.len() {
+                                bail!("map {} exceeded public capacity", spec.name);
+                            }
+                            entries[slot_index] = MapEntry {
                                 occupied: true,
                                 key: key.clone(),
                                 value: value.clone(),
                             };
-                            position_map[slot] = Some(new_leaf);
+                            position_map[slot_index] = Some(new_leaf);
                             stash.push(OramBlock {
                                 occupied: true,
-                                slot_index: slot,
+                                slot_index,
                                 leaf: new_leaf,
                                 key: key.clone(),
                                 value: value.clone(),
@@ -648,6 +733,7 @@ impl OramState {
         )?;
         let mut transcript = self.path_access_transcript(spec, access_leaf);
         transcript.physical_writes = writes;
+        transcript.path_transition = Some(transition);
         Ok(transcript)
     }
 

@@ -48,6 +48,33 @@ structure RuntimePathOramLeafScaffoldStep where
   bucketCount : Nat
 deriving Repr, DecidableEq
 
+inductive RuntimePathOramTransitionKind where
+  | readMiss
+  | readHit
+  | writeNoop
+  | writeInsert
+  | writeUpdate
+  | writeDelete
+deriving Repr, DecidableEq
+
+structure RuntimePathOramTransitionCertificate where
+  objectId : Nat
+  objectName : String
+  bucketCount : Nat
+  kind : RuntimePathOramTransitionKind
+  slotIndex : Option Nat
+  priorLeaf : Option Nat
+  nextLeaf : Option Nat
+deriving Repr, DecidableEq
+
+structure RuntimePathOramPositionMapCertificate where
+  objectId : Nat
+  objectName : String
+  leaves : List (Option Nat)
+deriving Repr, DecidableEq
+
+abbrev RuntimePathOramPositionMapState := List (Nat × List (Option Nat))
+
 def RuntimeOramObjectCertificate.accessCertificate
   (object : RuntimeOramObjectCertificate) : RuntimeOramAccessCertificate :=
   { objectId := object.objectId
@@ -98,6 +125,191 @@ def runtimeOramObjectByName?
   (oramObjects : List RuntimeOramObjectCertificate)
   (objectName : String) : Option RuntimeOramObjectCertificate :=
   oramObjects.find? (fun object => object.objectName = objectName)
+
+def runtimeOramObjectById?
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (objectId : Nat) : Option RuntimeOramObjectCertificate :=
+  oramObjects.find? (fun object => object.objectId = objectId)
+
+def RuntimeOramObjectCertificate.pathOramLeafChoiceCount
+  (object : RuntimeOramObjectCertificate) : Nat :=
+  max ((object.bucketCount + 1) / 2) 1
+
+def runtimePathOramLeavesWithinBound
+  (leaves : List (Option Nat))
+  (leafCount : Nat) : Bool :=
+  leaves.all fun leaf =>
+    match leaf with
+    | some value => value < leafCount
+    | none => true
+
+def runtimePathOramPositionMapStateByObjectAux
+  (states : List RuntimePathOramPositionMapCertificate)
+  (oramObjects : List RuntimeOramObjectCertificate) :
+  Option RuntimePathOramPositionMapState :=
+  match states, oramObjects with
+  | [], [] => some []
+  | state :: states, object :: objects =>
+      if state.objectId = object.objectId &&
+          state.objectName = object.objectName &&
+          state.leaves.length = object.capacity &&
+          runtimePathOramLeavesWithinBound
+            state.leaves
+            object.pathOramLeafChoiceCount then
+        do
+          let tail ← runtimePathOramPositionMapStateByObjectAux states objects
+          some ((object.objectId, state.leaves) :: tail)
+      else
+        none
+  | _, _ => none
+
+def runtimePathOramPositionMapStateByObject
+  (states : List RuntimePathOramPositionMapCertificate)
+  (oramObjects : List RuntimeOramObjectCertificate) :
+  Option RuntimePathOramPositionMapState :=
+  runtimePathOramPositionMapStateByObjectAux
+    states
+    (oramObjects.filter RuntimeOramObjectCertificate.isPathOram)
+
+def runtimePathOramStateLookup?
+  (state : RuntimePathOramPositionMapState)
+  (objectId : Nat) : Option (List (Option Nat)) :=
+  match state.find? (fun entry => entry.fst = objectId) with
+  | some (_objectId, leaves) => some leaves
+  | none => none
+
+def runtimePathOramSetLeafAt? :
+  List (Option Nat) → Nat → Option Nat → Option (List (Option Nat))
+  | [], _index, _leaf => none
+  | _current :: leaves, 0, leaf => some (leaf :: leaves)
+  | current :: leaves, index + 1, leaf => do
+      let tail ← runtimePathOramSetLeafAt? leaves index leaf
+      some (current :: tail)
+
+def runtimePathOramGetLeafAt? :
+  List (Option Nat) → Nat → Option (Option Nat)
+  | [], _index => none
+  | current :: _leaves, 0 => some current
+  | _current :: leaves, index + 1 => runtimePathOramGetLeafAt? leaves index
+
+def runtimePathOramStateUpdate?
+  (state : RuntimePathOramPositionMapState)
+  (objectId : Nat)
+  (leaves : List (Option Nat)) : Option RuntimePathOramPositionMapState :=
+  match state with
+  | [] => none
+  | (entryId, entryLeaves) :: entries =>
+      if entryId = objectId then
+        some ((entryId, leaves) :: entries)
+      else
+        do
+          let tail ← runtimePathOramStateUpdate? entries objectId leaves
+          some ((entryId, entryLeaves) :: tail)
+
+def runtimePathOramApplyTransition?
+  (state : RuntimePathOramPositionMapState)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (leaf : RuntimeOramLeafCertificate)
+  (transition : RuntimePathOramTransitionCertificate) :
+  Option RuntimePathOramPositionMapState := do
+  let object ← runtimeOramObjectById? oramObjects leaf.objectId
+  if object.scheme != pathOramScheme ||
+      transition.objectId != leaf.objectId ||
+      transition.objectName != leaf.objectName ||
+      transition.bucketCount != leaf.bucketCount ||
+      object.objectName != leaf.objectName ||
+      object.bucketCount != leaf.bucketCount ||
+      object.pathOramLeafChoiceCount ≤ leaf.leaf then
+    none
+  else
+    let leaves ← runtimePathOramStateLookup? state leaf.objectId
+    match transition.kind with
+    | .readMiss =>
+        if transition.slotIndex.isNone &&
+            transition.priorLeaf.isNone &&
+            transition.nextLeaf.isNone then
+          some state
+        else
+          none
+    | .readHit =>
+        match transition.slotIndex, transition.priorLeaf, transition.nextLeaf with
+        | some slotIndex, some priorLeaf, some nextLeaf =>
+            if leaf.leaf = priorLeaf &&
+                nextLeaf < object.pathOramLeafChoiceCount &&
+                runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) then
+              do
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                runtimePathOramStateUpdate? state leaf.objectId updated
+            else
+              none
+        | _, _, _ => none
+    | .writeNoop =>
+        match transition.slotIndex, transition.priorLeaf, transition.nextLeaf with
+        | none, none, none => some state
+        | some slotIndex, some priorLeaf, some nextLeaf =>
+            if leaf.leaf = priorLeaf &&
+                nextLeaf = priorLeaf &&
+                runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) then
+              some state
+            else
+              none
+        | _, _, _ => none
+    | .writeInsert =>
+        match transition.slotIndex, transition.priorLeaf, transition.nextLeaf with
+        | some slotIndex, none, some nextLeaf =>
+            if nextLeaf < object.pathOramLeafChoiceCount &&
+                runtimePathOramGetLeafAt? leaves slotIndex = some none then
+              do
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                runtimePathOramStateUpdate? state leaf.objectId updated
+            else
+              none
+        | _, _, _ => none
+    | .writeUpdate =>
+        match transition.slotIndex, transition.priorLeaf, transition.nextLeaf with
+        | some slotIndex, some priorLeaf, some nextLeaf =>
+            if leaf.leaf = priorLeaf &&
+                nextLeaf < object.pathOramLeafChoiceCount &&
+                runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) then
+              do
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                runtimePathOramStateUpdate? state leaf.objectId updated
+            else
+              none
+        | _, _, _ => none
+    | .writeDelete =>
+        match transition.slotIndex, transition.priorLeaf, transition.nextLeaf with
+        | some slotIndex, some priorLeaf, none =>
+            if leaf.leaf = priorLeaf &&
+                runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) then
+              do
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex none
+                runtimePathOramStateUpdate? state leaf.objectId updated
+            else
+              none
+        | _, _, _ => none
+
+def replayRuntimePathOramTransitionsAux
+  (state : RuntimePathOramPositionMapState)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (leafs : List RuntimeOramLeafCertificate)
+  (transitions : List RuntimePathOramTransitionCertificate) :
+  Option RuntimePathOramPositionMapState :=
+  match leafs, transitions with
+  | [], [] => some state
+  | leaf :: leafs, transition :: transitions => do
+      let next ← runtimePathOramApplyTransition? state oramObjects leaf transition
+      replayRuntimePathOramTransitionsAux next oramObjects leafs transitions
+  | _, _ => none
+
+def replayRuntimePathOramTransitions
+  (before : List RuntimePathOramPositionMapCertificate)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (leafs : List RuntimeOramLeafCertificate)
+  (transitions : List RuntimePathOramTransitionCertificate) :
+  Option RuntimePathOramPositionMapState := do
+  let state ← runtimePathOramPositionMapStateByObject before oramObjects
+  replayRuntimePathOramTransitionsAux state oramObjects leafs transitions
 
 def isOramLogicalKind (kind : String) : Bool :=
   kind = "uooram_counter" ||
@@ -369,6 +581,9 @@ structure RuntimeRefinementWitness where
   oramObjects : List RuntimeOramObjectCertificate
   oramLeafPublicScaffold : List RuntimePathOramLeafScaffoldStep
   oramLeafSchedule : List RuntimeOramLeafCertificate
+  oramPositionMapBefore : List RuntimePathOramPositionMapCertificate
+  oramPositionMapAfter : List RuntimePathOramPositionMapCertificate
+  oramLeafStateTransitions : List RuntimePathOramTransitionCertificate
 deriving Repr, DecidableEq
 
 def RuntimeRefinementWitness.storageTrace
@@ -424,6 +639,20 @@ def RuntimeRefinementWitness.pathOramBucketTrace
   (witness : RuntimeRefinementWitness) : PathOramBucketTrace :=
   pathOramBucketTraceOfView (viewMPlus witness.trace)
 
+def RuntimeRefinementWitness.replayedPathOramPositionMapState
+  (witness : RuntimeRefinementWitness) : Option RuntimePathOramPositionMapState :=
+  replayRuntimePathOramTransitions
+    witness.oramPositionMapBefore
+    witness.oramObjects
+    witness.oramLeafSchedule
+    witness.oramLeafStateTransitions
+
+def RuntimeRefinementWitness.expectedPathOramPositionMapState
+  (witness : RuntimeRefinementWitness) : Option RuntimePathOramPositionMapState :=
+  runtimePathOramPositionMapStateByObject
+    witness.oramPositionMapAfter
+    witness.oramObjects
+
 def RuntimeRefinementWitness.Valid
   (witness : RuntimeRefinementWitness)
   (modelTags : SGXModelTags) : Prop :=
@@ -440,6 +669,9 @@ def RuntimeRefinementWitness.Valid
         witness.oramObjects =
       some witness.pathOramLeafScaffold ∧
     witness.oramLeafPublicScaffold = witness.pathOramLeafScaffold ∧
+    witness.replayedPathOramPositionMapState =
+      witness.expectedPathOramPositionMapState ∧
+    witness.replayedPathOramPositionMapState.isSome = true ∧
     pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
       witness.pathOramBucketTrace ∧
     witness.normalizedMicroTrace =
@@ -464,6 +696,10 @@ def RuntimeRefinementWitness.checkValid
           witness.oramObjects =
         some witness.pathOramLeafScaffold) &&
     decide (witness.oramLeafPublicScaffold = witness.pathOramLeafScaffold) &&
+    decide
+      (witness.replayedPathOramPositionMapState =
+        witness.expectedPathOramPositionMapState) &&
+    decide (witness.replayedPathOramPositionMapState.isSome = true) &&
     decide
       (pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
         witness.pathOramBucketTrace) &&
@@ -521,7 +757,7 @@ theorem sgxView_normalizedMicro_eq_witness
   normalizeMicroTrace (sgxMicroTrace witness.sgxView) = witness.normalizedMicroTrace := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafBuckets, hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, hNormalized⟩
   rw [sgxMicroTrace_runtimeWitness]
   rw [reconstructedMicroTrace_normalizedByLeakage]
   exact hNormalized.symm
@@ -533,7 +769,7 @@ theorem runtimeWitness_boundaryBudget_exact
   witness.boundarySchedule.length = witness.controllerShape.boundaryEventBudget := by
   rcases hValid with
     ⟨_hGas, hBoundary, hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
   rw [hBoundary, hShape]
   exact runtimeControllerCertificate_boundarySchedule_budget
     witness.controllerCertificate
@@ -556,7 +792,7 @@ theorem runtimeWitness_pathOramLeafScaffold_exact
     some witness.pathOramLeafScaffold := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
   exact hLeafScaffold
 
 theorem runtimeWitness_publicPathOramLeafScaffold_matches_hidden
@@ -566,8 +802,29 @@ theorem runtimeWitness_publicPathOramLeafScaffold_matches_hidden
   witness.oramLeafPublicScaffold = witness.pathOramLeafScaffold := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, hPublicLeafScaffold,
-      _hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
   exact hPublicLeafScaffold
+
+theorem runtimeWitness_pathOramLeafStateReplay_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.replayedPathOramPositionMapState =
+    witness.expectedPathOramPositionMapState := by
+  rcases hValid with
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
+      hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
+  exact hLeafStateEq
+
+theorem runtimeWitness_pathOramLeafStateReplay_some
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.replayedPathOramPositionMapState.isSome = true := by
+  rcases hValid with
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
+      _hLeafStateEq, hLeafStateSome, _hLeafBuckets, _hNormalized⟩
+  exact hLeafStateSome
 
 theorem runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
   (witness : RuntimeRefinementWitness)
@@ -585,7 +842,8 @@ theorem runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
     witness.projectedPathOramLeafScaffold := by
   cases witness with
   | mk trace runtimeSeed publicOutcome boundarySchedule controllerShape normalizedMicroTrace
-      controllerCertificate oramObjects oramLeafPublicScaffold oramLeafSchedule =>
+      controllerCertificate oramObjects oramLeafPublicScaffold oramLeafSchedule
+      oramPositionMapBefore oramPositionMapAfter oramLeafStateTransitions =>
       induction oramLeafSchedule with
       | nil =>
           rfl
@@ -608,7 +866,7 @@ theorem runtimeWitness_pathOramBucketProjection_exact
     witness.pathOramBucketTrace := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, hLeafBuckets, _hNormalized⟩
   exact hLeafBuckets
 
 theorem runtimeWitness_pathOramLeafScaffold_singletonExactProjection

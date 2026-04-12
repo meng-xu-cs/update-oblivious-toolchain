@@ -19,10 +19,6 @@ structure SeededRuntimePathOramWitnessFamily (modelTags : SGXModelTags)
   publicLeafScaffoldExact :
     ∀ seed, seed < seedCount →
       (witnessAt seed).projectedPublicPathOramLeafScaffold = publicLeafScaffold
-  canonicalLeafValues :
-    ((runtimeSeedIndexDistribution seedCount).map
-      (fun seed => pathOramLeafValues ((witnessAt seed).pathOramLeafScheduleTrace))).samples =
-      (pathOramLeafValueDistributionOfScaffold publicLeafScaffold).samples
 
 def SeededRuntimeWitnessFamily.witnessDistribution
   {modelTags : SGXModelTags}
@@ -75,10 +71,13 @@ theorem SeededRuntimePathOramWitnessFamily.leafScaffoldConstantProjection
 
 theorem SeededRuntimePathOramWitnessFamily.leafValueDistribution_eq_canonical
   {modelTags : SGXModelTags}
-  (family : SeededRuntimePathOramWitnessFamily modelTags) :
+  (family : SeededRuntimePathOramWitnessFamily modelTags)
+  (hCanonical :
+    family.leafValueDistribution =
+      (pathOramLeafValueDistributionOfScaffold family.publicLeafScaffold).samples) :
   family.leafValueDistribution =
     (pathOramLeafValueDistributionOfScaffold family.publicLeafScaffold).samples := by
-  exact family.canonicalLeafValues
+  exact hCanonical
 
 @[simp] theorem SeededRuntimePathOramWitnessFamily.map_leafScheduleDistribution_pathOramLeafValues
   {modelTags : SGXModelTags}
@@ -109,6 +108,9 @@ theorem SeededRuntimePathOramWitnessFamily.leafValueCanonicalOnPublicPart_of_pub
   (family : SeededRuntimePathOramWitnessFamily modelTags)
   {publicPart : OramViewPublicPart}
   {leakage : PathOramProjectedLeakage}
+  (hCanonical :
+    family.leafValueDistribution =
+      (pathOramLeafValueDistributionOfScaffold family.publicLeafScaffold).samples)
   (hScaffold :
     pathOramLeafScheduleScaffoldOfPublicPart publicPart leakage =
       some family.publicLeafScaffold) :
@@ -116,7 +118,8 @@ theorem SeededRuntimePathOramWitnessFamily.leafValueCanonicalOnPublicPart_of_pub
     family.leafValueDistribution
     publicPart
     leakage := by
-  exact ⟨family.publicLeafScaffold, hScaffold, family.leafValueDistribution_eq_canonical⟩
+  exact ⟨family.publicLeafScaffold, hScaffold,
+    family.leafValueDistribution_eq_canonical hCanonical⟩
 
 theorem seededRuntimePathOram_leafScaffoldExactProjection_of_publicScaffoldEq
   {modelTags : SGXModelTags}
@@ -134,18 +137,30 @@ theorem seededRuntimePathOram_canonicalLeafValueRelation_of_publicScaffoldEq
   {modelTags : SGXModelTags}
   {family₁ family₂ : SeededRuntimePathOramWitnessFamily modelTags}
   {leakage : PathOramProjectedLeakage}
+  (hCanonical₁ :
+    family₁.leafValueDistribution =
+      (pathOramLeafValueDistributionOfScaffold family₁.publicLeafScaffold).samples)
+  (hCanonical₂ :
+    family₂.leafValueDistribution =
+      (pathOramLeafValueDistributionOfScaffold family₂.publicLeafScaffold).samples)
   (hPublic : family₁.publicLeafScaffold = family₂.publicLeafScaffold) :
   canonicalPathOramLeafValueRelation
     family₁.leafValueDistribution
     family₂.leafValueDistribution
     leakage := by
-  refine ⟨family₁.publicLeafScaffold, family₁.leafValueDistribution_eq_canonical, ?_⟩
-  simpa [hPublic.symm] using family₂.leafValueDistribution_eq_canonical
+  refine ⟨family₁.publicLeafScaffold, family₁.leafValueDistribution_eq_canonical hCanonical₁, ?_⟩
+  simpa [hPublic.symm] using family₂.leafValueDistribution_eq_canonical hCanonical₂
 
 theorem seededRuntimePathOram_leafScheduleRelation_of_publicScaffoldEq
   {modelTags : SGXModelTags}
   {family₁ family₂ : SeededRuntimePathOramWitnessFamily modelTags}
   {leakage : PathOramProjectedLeakage}
+  (hCanonical₁ :
+    family₁.leafValueDistribution =
+      (pathOramLeafValueDistributionOfScaffold family₁.publicLeafScaffold).samples)
+  (hCanonical₂ :
+    family₂.leafValueDistribution =
+      (pathOramLeafValueDistributionOfScaffold family₂.publicLeafScaffold).samples)
   (hPublic : family₁.publicLeafScaffold = family₂.publicLeafScaffold) :
   pathOramLeafScheduleRelationFromLeafValueRelation canonicalPathOramLeafValueRelation
     family₁.leafScheduleDistribution
@@ -154,7 +169,8 @@ theorem seededRuntimePathOram_leafScheduleRelation_of_publicScaffoldEq
   refine ⟨?_, ?_⟩
   · simpa [SeededRuntimePathOramWitnessFamily.map_leafScheduleDistribution_pathOramLeafValues]
       using seededRuntimePathOram_canonicalLeafValueRelation_of_publicScaffoldEq
-        (family₁ := family₁) (family₂ := family₂) (leakage := leakage) hPublic
+        (family₁ := family₁) (family₂ := family₂) (leakage := leakage)
+        hCanonical₁ hCanonical₂ hPublic
   · exact seededRuntimePathOram_leafScaffoldExactProjection_of_publicScaffoldEq hPublic
 
 end UOToolchain

@@ -159,6 +159,34 @@ pub struct RuntimeOramLeafScaffoldWitness {
     pub bucket_count: usize,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RuntimePathOramTransitionKind {
+    ReadMiss,
+    ReadHit,
+    WriteNoop,
+    WriteInsert,
+    WriteUpdate,
+    WriteDelete,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimePathOramTransitionWitness {
+    pub object_id: u32,
+    pub object_name: String,
+    pub bucket_count: usize,
+    pub kind: RuntimePathOramTransitionKind,
+    pub slot_index: Option<usize>,
+    pub prior_leaf: Option<usize>,
+    pub next_leaf: Option<usize>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimePathOramPositionMapWitness {
+    pub object_id: u32,
+    pub object_name: String,
+    pub leaves: Vec<Option<usize>>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeOramObjectWitness {
     pub object_id: u32,
@@ -228,6 +256,12 @@ pub struct RuntimeRefinementWitness {
     pub oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
     #[serde(default)]
     pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    #[serde(default)]
+    pub oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    #[serde(default)]
+    pub oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    #[serde(default)]
+    pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -250,6 +284,7 @@ pub enum RefinementWitnessError {
     ControllerShapeMismatch,
     NormalizedMicroTraceMismatch,
     OramLeafScheduleMismatch,
+    OramLeafStateMismatch,
 }
 
 impl fmt::Display for RefinementWitnessError {
@@ -317,6 +352,10 @@ impl fmt::Display for RefinementWitnessError {
             Self::OramLeafScheduleMismatch => write!(
                 f,
                 "hidden path-ORAM leaf schedule does not match the reconstructed public scaffold or bucket trace"
+            ),
+            Self::OramLeafStateMismatch => write!(
+                f,
+                "hidden path-ORAM state witness does not match the emitted leaf schedule evolution"
             ),
         }
     }
@@ -738,6 +777,10 @@ fn runtime_path_oram_bucket_trace_of_leaf_schedule(
     (read_buckets, write_buckets)
 }
 
+fn path_oram_leaf_choice_count(bucket_count: usize) -> usize {
+    ((bucket_count + 1) / 2).max(1)
+}
+
 fn validate_path_oram_leaf_schedule(
     leaf_schedule: &[RuntimeOramLeafWitness],
     logical_accesses: &[LogicalEvent],
@@ -774,6 +817,170 @@ fn validate_path_oram_leaf_schedule(
             bucket_count,
         })
         .collect())
+}
+
+fn runtime_path_oram_state_by_object(
+    states: &[RuntimePathOramPositionMapWitness],
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<BTreeMap<u32, Vec<Option<usize>>>, RefinementWitnessError> {
+    let mut by_object = BTreeMap::new();
+    for object in oram_objects.iter().filter(|object| object.scheme == PATH_ORAM_SCHEME) {
+        let state = states
+            .iter()
+            .find(|state| state.object_id == object.object_id)
+            .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+        if state.object_name != object.object_name || state.leaves.len() != object.capacity {
+            return Err(RefinementWitnessError::OramLeafStateMismatch);
+        }
+        let leaf_count = path_oram_leaf_choice_count(object.bucket_count);
+        if state
+            .leaves
+            .iter()
+            .flatten()
+            .any(|leaf| *leaf >= leaf_count)
+        {
+            return Err(RefinementWitnessError::OramLeafStateMismatch);
+        }
+        if by_object.insert(object.object_id, state.leaves.clone()).is_some() {
+            return Err(RefinementWitnessError::OramLeafStateMismatch);
+        }
+    }
+    if by_object.len() != states.len() {
+        return Err(RefinementWitnessError::OramLeafStateMismatch);
+    }
+    Ok(by_object)
+}
+
+fn validate_path_oram_leaf_state(
+    leaf_schedule: &[RuntimeOramLeafWitness],
+    transitions: &[RuntimePathOramTransitionWitness],
+    before: &[RuntimePathOramPositionMapWitness],
+    after: &[RuntimePathOramPositionMapWitness],
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<(), RefinementWitnessError> {
+    if leaf_schedule.len() != transitions.len() {
+        return Err(RefinementWitnessError::OramLeafStateMismatch);
+    }
+    let mut current = runtime_path_oram_state_by_object(before, oram_objects)?;
+    let expected_after = runtime_path_oram_state_by_object(after, oram_objects)?;
+    for (step, transition) in leaf_schedule.iter().zip(transitions.iter()) {
+        let object = runtime_oram_object_by_id(oram_objects, step.object_id)?;
+        if object.scheme != PATH_ORAM_SCHEME
+            || transition.object_id != step.object_id
+            || transition.object_name != step.object_name
+            || transition.bucket_count != step.bucket_count
+            || object.object_name != step.object_name
+            || object.bucket_count != step.bucket_count
+            || step.leaf >= path_oram_leaf_choice_count(step.bucket_count)
+        {
+            return Err(RefinementWitnessError::OramLeafStateMismatch);
+        }
+        let state = current
+            .get_mut(&step.object_id)
+            .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+        if transition.prior_leaf.is_some() && transition.slot_index.is_none() {
+            return Err(RefinementWitnessError::OramLeafStateMismatch);
+        }
+        if let Some(slot_index) = transition.slot_index {
+            if slot_index >= state.len() {
+                return Err(RefinementWitnessError::OramLeafStateMismatch);
+            }
+            if let Some(prior_leaf) = transition.prior_leaf {
+                if state[slot_index] != Some(prior_leaf) {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+            }
+        }
+        match transition.kind {
+            RuntimePathOramTransitionKind::ReadMiss => {
+                if transition.slot_index.is_some()
+                    || transition.prior_leaf.is_some()
+                    || transition.next_leaf.is_some()
+                {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+            }
+            RuntimePathOramTransitionKind::ReadHit => {
+                let (slot_index, prior_leaf, next_leaf) = match (
+                    transition.slot_index,
+                    transition.prior_leaf,
+                    transition.next_leaf,
+                ) {
+                    (Some(slot_index), Some(prior_leaf), Some(next_leaf)) => {
+                        (slot_index, prior_leaf, next_leaf)
+                    }
+                    _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
+                };
+                if step.leaf != prior_leaf || next_leaf >= path_oram_leaf_choice_count(step.bucket_count) {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                state[slot_index] = Some(next_leaf);
+            }
+            RuntimePathOramTransitionKind::WriteNoop => match (
+                transition.slot_index,
+                transition.prior_leaf,
+                transition.next_leaf,
+            ) {
+                (None, None, None) => {}
+                (Some(_slot_index), Some(prior_leaf), Some(next_leaf)) => {
+                    if step.leaf != prior_leaf || next_leaf != prior_leaf {
+                        return Err(RefinementWitnessError::OramLeafStateMismatch);
+                    }
+                }
+                _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
+            },
+            RuntimePathOramTransitionKind::WriteInsert => {
+                let (slot_index, next_leaf) = match (
+                    transition.slot_index,
+                    transition.prior_leaf,
+                    transition.next_leaf,
+                ) {
+                    (Some(slot_index), None, Some(next_leaf)) => (slot_index, next_leaf),
+                    _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
+                };
+                if state[slot_index].is_some()
+                    || next_leaf >= path_oram_leaf_choice_count(step.bucket_count)
+                {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                state[slot_index] = Some(next_leaf);
+            }
+            RuntimePathOramTransitionKind::WriteUpdate => {
+                let (slot_index, prior_leaf, next_leaf) = match (
+                    transition.slot_index,
+                    transition.prior_leaf,
+                    transition.next_leaf,
+                ) {
+                    (Some(slot_index), Some(prior_leaf), Some(next_leaf)) => {
+                        (slot_index, prior_leaf, next_leaf)
+                    }
+                    _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
+                };
+                if step.leaf != prior_leaf || next_leaf >= path_oram_leaf_choice_count(step.bucket_count) {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                state[slot_index] = Some(next_leaf);
+            }
+            RuntimePathOramTransitionKind::WriteDelete => {
+                let (slot_index, prior_leaf) = match (
+                    transition.slot_index,
+                    transition.prior_leaf,
+                    transition.next_leaf,
+                ) {
+                    (Some(slot_index), Some(prior_leaf), None) => (slot_index, prior_leaf),
+                    _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
+                };
+                if step.leaf != prior_leaf {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                state[slot_index] = None;
+            }
+        }
+    }
+    if current != expected_after {
+        return Err(RefinementWitnessError::OramLeafStateMismatch);
+    }
+    Ok(())
 }
 
 impl SgxControllerShapeTrace {
@@ -820,6 +1027,12 @@ pub struct ExecutionTrace {
     pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
     #[serde(default)]
     pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    #[serde(default)]
+    pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    #[serde(default)]
+    pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    #[serde(default)]
+    pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
 impl ExecutionTrace {
@@ -930,6 +1143,13 @@ impl ExecutionTrace {
             &self.physical_writes,
             &self.runtime_oram_objects,
         )?;
+        validate_path_oram_leaf_state(
+            &self.runtime_oram_leaf_schedule,
+            &self.runtime_oram_leaf_state_transitions,
+            &self.runtime_oram_position_map_before,
+            &self.runtime_oram_position_map_after,
+            &self.runtime_oram_objects,
+        )?;
         Ok(RuntimeRefinementWitness {
             trace: self.refinement_trace(),
             runtime_seed: self.runtime_seed,
@@ -941,6 +1161,9 @@ impl ExecutionTrace {
             oram_objects: self.runtime_oram_objects.clone(),
             oram_leaf_public_scaffold,
             oram_leaf_schedule: self.runtime_oram_leaf_schedule.clone(),
+            oram_position_map_before: self.runtime_oram_position_map_before.clone(),
+            oram_position_map_after: self.runtime_oram_position_map_after.clone(),
+            oram_leaf_state_transitions: self.runtime_oram_leaf_state_transitions.clone(),
         })
     }
 }
@@ -1008,8 +1231,9 @@ mod tests {
         classify_write, ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace,
         NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent,
         PublicOutcomeTrace, RefinementWitnessError, RuntimeControllerCertificate,
-        RuntimeOramAccessWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness, TheoremTrace,
-        WriteClass,
+        RuntimeOramAccessWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
+        RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
+        RuntimePathOramTransitionWitness, TheoremTrace, WriteClass,
     };
     use std::collections::BTreeMap;
 
@@ -1118,6 +1342,38 @@ mod tests {
         }]
     }
 
+    fn sample_path_oram_position_map_before() -> Vec<RuntimePathOramPositionMapWitness> {
+        let mut leaves = vec![None; 16];
+        leaves[0] = Some(0);
+        vec![RuntimePathOramPositionMapWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            leaves,
+        }]
+    }
+
+    fn sample_path_oram_position_map_after() -> Vec<RuntimePathOramPositionMapWitness> {
+        let mut leaves = vec![None; 16];
+        leaves[0] = Some(3);
+        vec![RuntimePathOramPositionMapWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            leaves,
+        }]
+    }
+
+    fn sample_path_oram_leaf_state_transitions() -> Vec<RuntimePathOramTransitionWitness> {
+        vec![RuntimePathOramTransitionWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            bucket_count: 31,
+            kind: RuntimePathOramTransitionKind::ReadHit,
+            slot_index: Some(0),
+            prior_leaf: Some(0),
+            next_leaf: Some(3),
+        }]
+    }
+
     #[test]
     fn runtime_refinement_witness_normalizes_controller_shape() {
         let controller_certificate = sample_controller_certificate();
@@ -1160,6 +1416,9 @@ mod tests {
             runtime_controller_certificate: Some(controller_certificate.clone()),
             runtime_oram_objects: vec![sample_oram_object()],
             runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
+            runtime_oram_position_map_before: sample_path_oram_position_map_before(),
+            runtime_oram_position_map_after: sample_path_oram_position_map_after(),
+            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
         };
         let witness = trace.runtime_refinement_witness().unwrap();
         assert_eq!(witness.public_outcome.gas_used, 99);
@@ -1263,6 +1522,60 @@ mod tests {
                 expected_kind: "uooram_metadata_load".into(),
                 detail_prefix: "page:".into(),
             }
+        );
+    }
+
+    #[test]
+    fn runtime_refinement_witness_rejects_path_oram_state_drift() {
+        let controller_certificate = sample_controller_certificate();
+        let public_outcome = sample_public_outcome(99);
+        let controller_shape = controller_certificate.controller_shape();
+        let normalized_micro_trace = controller_shape.normalized_micro_trace();
+        let path = sample_path_bucket_indices();
+        let mut drifted_after = sample_path_oram_position_map_after();
+        drifted_after[0].leaves[0] = Some(2);
+        let trace = ExecutionTrace {
+            opcode_trace: vec!["declare".into()],
+            logical_accesses: sample_oram_logical_accesses(),
+            logical_writes: vec![],
+            physical_reads: path
+                .iter()
+                .map(|index| PhysicalReadEvent {
+                    object: "records".into(),
+                    location: format!("records@bucket{index}"),
+                    len: 64,
+                })
+                .collect(),
+            physical_writes: path
+                .iter()
+                .rev()
+                .map(|index| PhysicalWriteEvent {
+                    object: "records".into(),
+                    location: format!("records@bucket{index}"),
+                    old: vec![1, 2],
+                    new: vec![3, 4],
+                    class: WriteClass::Update,
+                })
+                .collect(),
+            host_proxy_metrics: BTreeMap::new(),
+            gas_used: 99,
+            theorem_trace: TheoremTrace {
+                public_outcome: Some(public_outcome.clone()),
+                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                controller_shape: Some(controller_shape.clone()),
+                normalized_micro_trace: Some(normalized_micro_trace.clone()),
+            },
+            runtime_seed: None,
+            runtime_controller_certificate: Some(controller_certificate),
+            runtime_oram_objects: vec![sample_oram_object()],
+            runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
+            runtime_oram_position_map_before: sample_path_oram_position_map_before(),
+            runtime_oram_position_map_after: drifted_after,
+            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
+        };
+        assert_eq!(
+            trace.runtime_refinement_witness().unwrap_err(),
+            RefinementWitnessError::OramLeafStateMismatch
         );
     }
 }
