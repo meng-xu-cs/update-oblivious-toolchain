@@ -5,7 +5,7 @@
       "equivalent": true,
       "raw": {
         "aborted": false,
-        "gas_used": 5,
+        "gas_used": 22,
         "getters": [
           1
         ],
@@ -27,7 +27,7 @@
       "equivalent": true,
       "raw": {
         "aborted": false,
-        "gas_used": 17,
+        "gas_used": 34,
         "getters": [
           1
         ],
@@ -59,7 +59,7 @@
       },
       "raw": {
         "aborted": false,
-        "gas_used": 16,
+        "gas_used": 50,
         "getters": [
           3,
           3
@@ -94,7 +94,7 @@
       },
       "raw": {
         "aborted": false,
-        "gas_used": 24,
+        "gas_used": 75,
         "getters": [
           7,
           3,
@@ -120,7 +120,7 @@
       "equivalent": true,
       "raw": {
         "aborted": false,
-        "gas_used": 8,
+        "gas_used": 25,
         "getters": [
           0
         ],

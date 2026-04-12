@@ -10,6 +10,7 @@
         "name": "TOKENS",
         "kind": "Array",
         "backend": "FullScan",
+        "oram_scheme": "surrogate_public_schedule_v1",
         "value_type": {
           "Scalar": "Bytes32"
         },
@@ -22,6 +23,7 @@
         "name": "lastAuth",
         "kind": "Cell",
         "backend": "FullScan",
+        "oram_scheme": "surrogate_public_schedule_v1",
         "value_type": {
           "Scalar": {
             "Uint": 256

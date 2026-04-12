@@ -2,7 +2,9 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value as JsonValue};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::{self, Command};
+use std::time::{SystemTime, UNIX_EPOCH};
 use uo_core::{CompiledArtifact, ContractMetadata, ProgramMode, Value, WriteClass};
 use uo_evm::{CallResult, ContractInstance};
 
@@ -28,6 +30,7 @@ pub fn run_probe() -> Result<JsonValue> {
     let leakage_auc = run_auc_reports(&suite)?;
     let mutual_information = run_mutual_information_reports(&suite)?;
     let overheads = run_overheads(&suite)?;
+    let witness_validation = run_witness_validation(&suite)?;
     let artifact_readme = artifact_readme();
     Ok(json!({
         "correctness": correctness,
@@ -36,6 +39,7 @@ pub fn run_probe() -> Result<JsonValue> {
         "leakage_auc": leakage_auc,
         "mutual_information": mutual_information,
         "overheads": overheads,
+        "witness_validation": witness_validation,
         "artifact_readme": artifact_readme,
     }))
 }
@@ -49,6 +53,7 @@ pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
         "leakage_auc",
         "mutual_information",
         "overheads",
+        "witness_validation",
     ] {
         let path = Path::new(out_dir).join(format!("{key}.json"));
         fs::write(path, serde_json::to_vec_pretty(&results[key])?)?;
@@ -195,6 +200,312 @@ fn run_correctness(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
     scenarios.push(check_erc20_correctness(&suite["ERC20Lite"])?);
     scenarios.push(check_registry_correctness(&suite["RegistryCRUD"])?);
     Ok(json!({ "scenarios": scenarios }))
+}
+
+fn run_witness_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let checker = lean_witness_checker_path()?;
+    let single_access = compile_artifact(
+        "benches/raw/SingleAccessMap.sol",
+        "benches/raw/SingleAccessMap.pathoram.yaml",
+        ProgramMode::Uo,
+    )?;
+
+    let auth_setup = vec![
+        CallSpec {
+            entrypoint: "seed(uint256,bytes32)",
+            args: vec![Value::Uint(0), b32(1)],
+        },
+        CallSpec {
+            entrypoint: "seed(uint256,bytes32)",
+            args: vec![Value::Uint(1), b32(2)],
+        },
+    ];
+    let erc20_setup = vec![CallSpec {
+        entrypoint: "mint(address,uint256)",
+        args: vec![addr(0x11), Value::Uint(10)],
+    }];
+
+    let mut scenarios = Vec::new();
+    scenarios.push(validate_witness_case(
+        "FixedSlotClassifier/uo/class0",
+        &suite["FixedSlotClassifier"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "classify(uint256)",
+            args: vec![Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "FixedSlotClassifier/uo/class1",
+        &suite["FixedSlotClassifier"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "classify(uint256)",
+            args: vec![Value::Uint(1)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "AuthScan/uo/class0",
+        &suite["AuthScan"].uo,
+        &auth_setup,
+        &CallSpec {
+            entrypoint: "auth(bytes32)",
+            args: vec![b32(9)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "AuthScan/uo/class1",
+        &suite["AuthScan"].uo,
+        &auth_setup,
+        &CallSpec {
+            entrypoint: "auth(bytes32)",
+            args: vec![b32(1)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "RegistryCRUD/uo/class0",
+        &suite["RegistryCRUD"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "upsert(bytes32,uint256)",
+            args: vec![b32(7), Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "RegistryCRUD/uo/class1",
+        &suite["RegistryCRUD"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "upsert(bytes32,uint256)",
+            args: vec![b32(7), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "ConfidentialMixer/fullscan/class0",
+        &suite["ConfidentialMixer"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(5), Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "ConfidentialMixer/fullscan/class1",
+        &suite["ConfidentialMixer"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(5), Value::Uint(1)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "ERC20Lite/fullscan/class0",
+        &suite["ERC20Lite"].uo,
+        &erc20_setup,
+        &CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![addr(0x11), addr(0x22), Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "ERC20Lite/fullscan/class1",
+        &suite["ERC20Lite"].uo,
+        &erc20_setup,
+        &CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+        },
+        &checker,
+    )?);
+
+    let mixer_oram = suite["ConfidentialMixer"]
+        .oram
+        .as_ref()
+        .ok_or_else(|| anyhow!("ConfidentialMixer ORAM artifact missing from suite"))?;
+    scenarios.push(validate_witness_case(
+        "ConfidentialMixer/oram/class0",
+        mixer_oram,
+        &[],
+        &CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(1), Value::Uint(3)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "ConfidentialMixer/oram/class1",
+        mixer_oram,
+        &[],
+        &CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(9), Value::Uint(3)],
+        },
+        &checker,
+    )?);
+
+    let erc20_oram = suite["ERC20Lite"]
+        .oram
+        .as_ref()
+        .ok_or_else(|| anyhow!("ERC20Lite ORAM artifact missing from suite"))?;
+    scenarios.push(validate_witness_case(
+        "ERC20Lite/oram/class0",
+        erc20_oram,
+        &[],
+        &CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![addr(0x11), addr(0x21), Value::Uint(3)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "ERC20Lite/oram/class1",
+        erc20_oram,
+        &[],
+        &CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![addr(0x31), addr(0x41), Value::Uint(3)],
+        },
+        &checker,
+    )?);
+
+    scenarios.push(validate_witness_case(
+        "SingleAccessMap/pathoram/put-class0",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "put(bytes32,uint256)",
+            args: vec![b32(1), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "SingleAccessMap/pathoram/put-class1",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "put(bytes32,uint256)",
+            args: vec![b32(9), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "SingleAccessMap/pathoram/add-class0",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "add(bytes32,uint256)",
+            args: vec![b32(1), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_witness_case(
+        "SingleAccessMap/pathoram/add-class1",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "add(bytes32,uint256)",
+            args: vec![b32(9), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+
+    Ok(json!({
+        "checker": checker.display().to_string(),
+        "model_tags": {
+            "page_model": "page_v1",
+            "exit_model": "exit_v1",
+            "shared_resource_model": "shared_v1"
+        },
+        "scenario_count": scenarios.len(),
+        "scenarios": scenarios,
+    }))
+}
+
+fn validate_witness_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    checker: &Path,
+) -> Result<JsonValue> {
+    let trace = run_target_call(artifact, setup, target.entrypoint, target.args.clone())?;
+    let witness = trace.runtime_refinement_witness()?;
+    let witness_json = witness.to_json_pretty();
+    let witness_path = temporary_witness_path(name);
+    fs::write(&witness_path, &witness_json)?;
+    let output = Command::new(checker)
+        .arg(&witness_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    let _ = fs::remove_file(&witness_path);
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean witness validation failed for {}: {}",
+            name,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(json!({
+        "scenario": name,
+        "entrypoint": target.entrypoint,
+        "setup_calls": setup.len(),
+        "gas_used": trace.gas_used,
+        "boundary_events": witness.boundary_schedule.len(),
+        "controller_phase_count": witness.controller_shape.controller_phase_order.len(),
+        "page_trace_events": witness.normalized_micro_trace.page_trace.len(),
+        "exit_events": witness.normalized_micro_trace.exit_pattern.len(),
+        "shared_resource_events": witness.normalized_micro_trace.shared_resource_pattern.len(),
+        "witness_json_bytes": witness_json.len(),
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "accepted": true,
+    }))
+}
+
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("workspace root should exist")
+}
+
+fn lean_witness_checker_path() -> Result<PathBuf> {
+    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeWitness");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(anyhow!(
+            "Lean witness checker not found at {}; build it with `cd proof/lean && lake build`",
+            path.display()
+        ))
+    }
+}
+
+fn temporary_witness_path(case_name: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock should be after unix epoch")
+        .as_nanos();
+    let sanitized = case_name
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect::<String>();
+    std::env::temp_dir().join(format!(
+        "uo-runtime-witness-{}-{}-{}.json",
+        process::id(),
+        sanitized,
+        nanos
+    ))
 }
 
 fn check_classifier_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
@@ -1090,6 +1401,9 @@ fn artifact_readme() -> &'static str {
     r#"# UO Toolchain Artifact Results
 
 This results bundle was generated from the local Rust workspace using the benchmark suite under `benches/raw/`.
+
+The generated reports now also include `witness_validation.json`, which checks
+representative runtime refinement witnesses against the Lean-side validator.
 
 Security tiers:
 

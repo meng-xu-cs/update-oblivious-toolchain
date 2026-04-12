@@ -197,6 +197,10 @@ What is implemented:
 - the Lean package now includes `checkRuntimeWitness`, a small executable that
   loads a serialized Rust witness and validates it against the theorem-side
   predicate from the command line
+- the validation pipeline now runs representative benchmark scenarios through
+  the real Rust runtime, extracts refinement witnesses from the resulting
+  traces, and checks those witnesses with the Lean executable; the report is
+  emitted as `results/witness_validation.json`
 
 What is still missing before this milestone is complete:
 
@@ -209,7 +213,8 @@ What is still missing before this milestone is complete:
 Required work:
 
 - prove that `ExecutionTrace::runtime_refinement_witness` always emits
-  witnesses accepted by the Lean validity checker for each supported backend
+  witnesses accepted by the Lean validity checker for each supported backend,
+  not just for the current benchmark-backed scenario family
 - connect the Rust-emitted theorem trace to the Lean observer by a backend-wise
   refinement argument, not just by a checked serialized witness
 - discharge the ORAM theorem against the chosen standard construction instead of

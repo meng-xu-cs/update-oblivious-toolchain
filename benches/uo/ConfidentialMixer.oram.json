@@ -10,6 +10,7 @@
         "name": "balances",
         "kind": "Map",
         "backend": "Oram",
+        "oram_scheme": "surrogate_public_schedule_v1",
         "value_type": {
           "Scalar": {
             "Uint": 256
@@ -26,6 +27,7 @@
         "name": "total",
         "kind": "Cell",
         "backend": "FullScan",
+        "oram_scheme": "surrogate_public_schedule_v1",
         "value_type": {
           "Scalar": {
             "Uint": 256

@@ -2,6 +2,9 @@
 
 This results bundle was generated from the local Rust workspace using the benchmark suite under `benches/raw/`.
 
+The generated reports now also include `witness_validation.json`, which checks
+representative runtime refinement witnesses against the Lean-side validator.
+
 Security tiers:
 
 - Exact-UO: `FixedSlotClassifier`, `AuthScan`, `ConfidentialMixer` full-scan, `ERC20Lite` full-scan, and `RegistryCRUD` use fixed-shape commits and normalized `M+` traces that are identical across secret variations in this instrumented abstract machine.

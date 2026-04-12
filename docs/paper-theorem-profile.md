@@ -157,6 +157,9 @@ The runtime-to-Lean witness interface is now fixed in:
   conversion into the theorem objects
 - `checkRuntimeWitness` in `proof/lean/CheckRuntimeWitness.lean` for
   end-to-end witness validation from the Lean side
+- `results/witness_validation.json` for benchmark-backed validation that the
+  emitted runtime witnesses are accepted by the Lean checker on representative
+  supported paths
 
 ## Non-Claim
 
