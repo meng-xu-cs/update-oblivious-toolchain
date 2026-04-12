@@ -114,6 +114,21 @@ theorem oramConstantProjection_map_of_const
   rcases hMem with ⟨view, hView, rfl⟩
   exact hConst view hView
 
+theorem oramExactProjectionRelation_map
+  {α β γ : Type}
+  (project : β → γ)
+  (f : α → β)
+  {views₁ views₂ : Distribution α} :
+  OramExactProjectionRelation (fun view => project (f view)) views₁ views₂ →
+    OramExactProjectionRelation project (views₁.map f) (views₂.map f) := by
+  intro hExact
+  rcases hExact with ⟨value, hViews₁, hViews₂⟩
+  refine
+    ⟨ value
+    , oramConstantProjection_map_of_const project value f views₁ hViews₁
+    , oramConstantProjection_map_of_const project value f views₂ hViews₂
+    ⟩
+
 abbrev StandardOramStorageRelation :=
   Distribution OramStorageView → Distribution OramStorageView → List OramAccessLeakage → Prop
 

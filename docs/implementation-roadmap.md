@@ -225,8 +225,12 @@ What is implemented:
   `path_oram_local_posmap_v1` backend candidate under an explicit security
   assumption bundle rather than a whole-view ORAM theorem, and projects away
   the legacy surrogate-style `schedule` field before that theorem is invoked
+- the proof-grade path interface now also normalizes raw logical path reads to
+  a public skeleton instead of treating concrete `bucket:{i}` details as exact
+  public trace data
 - that path-ORAM theorem boundary is now internally decomposed into a
-  location-schedule relation and exact public storage-shape constancy, so the
+  bucket-only hidden relation, exact public constancy of the non-bucket
+  location scaffold, and exact public storage-shape constancy, so the
   remaining assumption surface is smaller than a single monolithic storage
   theorem
 
