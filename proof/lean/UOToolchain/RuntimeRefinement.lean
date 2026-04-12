@@ -49,6 +49,21 @@ def RuntimeRefinementWitness.Valid
     witness.normalizedMicroTrace =
       simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags)
 
+def RuntimeRefinementWitness.checkValid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags) : Bool :=
+  decide (witness.trace.gasUsed = witness.publicOutcome.gasUsed) &&
+    decide (witness.boundarySchedule.length = witness.controllerShape.boundaryEventBudget) &&
+    decide
+      (witness.normalizedMicroTrace =
+        simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags))
+
+@[simp] theorem runtimeWitness_checkValid_eq_true_iff
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags) :
+  witness.checkValid modelTags = true ↔ witness.Valid modelTags := by
+  simp [RuntimeRefinementWitness.checkValid, RuntimeRefinementWitness.Valid, and_assoc]
+
 @[simp] theorem sgxPublicOutcome_runtimeWitness
   (witness : RuntimeRefinementWitness) :
   sgxPublicOutcome witness.sgxView = witness.publicOutcome := by

@@ -150,8 +150,13 @@ The runtime-to-Lean witness interface is now fixed in:
 
 - `ExecutionTrace::runtime_refinement_witness` in
   `crates/uo-core/src/trace.rs`
+- `uo-evm --format refinement-witness` in `runtime/uo-evm/src/main.rs`
 - `RuntimeRefinementWitness` and its projection lemmas in
   `proof/lean/UOToolchain/RuntimeRefinement.lean`
+- `RuntimeRefinementJson.lean` for JSON import, Lean-side witness checking, and
+  conversion into the theorem objects
+- `checkRuntimeWitness` in `proof/lean/CheckRuntimeWitness.lean` for
+  end-to-end witness validation from the Lean side
 
 ## Non-Claim
 

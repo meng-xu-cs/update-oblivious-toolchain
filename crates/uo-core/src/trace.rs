@@ -216,6 +216,17 @@ impl fmt::Display for RefinementWitnessError {
 
 impl std::error::Error for RefinementWitnessError {}
 
+impl RuntimeRefinementWitness {
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("runtime refinement witness is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("runtime refinement witness is JSON serializable")
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct TraceHashBundle {
     pub opcode_trace_hash: String,

@@ -179,6 +179,8 @@ What is implemented:
 
 - the Rust trace layer now exposes an explicit refinement witness extraction via
   `ExecutionTrace::runtime_refinement_witness`
+- the runtime CLI can now emit either the full execution trace or the checked
+  refinement witness directly via `uo-evm --format refinement-witness`
 - that witness keeps only the Lean-relevant normalized trace fields together
   with `public_outcome`, `boundary_schedule`, `controller_shape`, and
   `normalized_micro_trace`
@@ -188,21 +190,28 @@ What is implemented:
   `proof/lean/UOToolchain/RuntimeRefinement.lean`, which fixes the witness
   record and proves how it projects into the existing `Trace`/`SGXView`
   theorem objects
+- the Lean scaffold now also contains
+  `proof/lean/UOToolchain/RuntimeRefinementJson.lean`, which parses the Rust
+  witness JSON, converts it into the theorem-side witness, and provides a
+  Lean-side executable validity checker equivalent to the `Valid` proposition
+- the Lean package now includes `checkRuntimeWitness`, a small executable that
+  loads a serialized Rust witness and validates it against the theorem-side
+  predicate from the command line
 
 What is still missing before this milestone is complete:
 
-- an end-to-end parser/import path from the serialized Rust witness into Lean
 - a theorem tying the Rust witness constructor to the Lean witness assumptions,
-  rather than only matching them structurally
+  rather than only re-checking imported concrete witnesses against the same
+  predicate inside Lean
 - discharge of the ORAM theorem against the chosen standard construction
   through that witness layer
 
 Required work:
 
-- define a serialization or extraction path from manifest/runtime traces into
-  the Lean-level observer structures
-- prove that the Rust-emitted theorem trace matches the Lean observer for each
-  supported backend
+- prove that `ExecutionTrace::runtime_refinement_witness` always emits
+  witnesses accepted by the Lean validity checker for each supported backend
+- connect the Rust-emitted theorem trace to the Lean observer by a backend-wise
+  refinement argument, not just by a checked serialized witness
 - discharge the ORAM theorem against the chosen standard construction instead of
   relying on the current axiom boundary
 
