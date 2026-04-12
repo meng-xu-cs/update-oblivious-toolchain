@@ -459,6 +459,9 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   concrete `path_oram_local_posmap_v1` scheme and narrows the remaining axiom
   boundary to a path-ORAM storage theorem with an explicit security-assumption
   bundle rather than a whole-view ORAM theorem
+- that path-ORAM theorem now consumes a projected leakage type that drops the
+  legacy surrogate-style `schedule` field and keeps only the standard public
+  ORAM parameters
 
 ### Theorem E: Public gas theorem
 

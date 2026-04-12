@@ -2,6 +2,55 @@ import UOToolchain.StandardOramReduction
 
 namespace UOToolchain
 
+structure PathOramProjectedAccessLeakage where
+  entrypointId : String
+  publicGasBudget : Nat
+  objectId : Nat
+  capacity : Nat
+  blockSize : Nat
+  bucketSize : Nat
+  bucketCount : Nat
+  blocksPerBucket : Nat
+  treeHeight : Nat
+  stashBound : Nat
+  recursionDepth : Nat
+  metadataPages : Nat
+  metadataPagesPerAccess : Nat
+  bucketsPerAccess : Nat
+  accessesPerCall : Nat
+  accessesPerEntrypoint : Nat
+deriving Repr, DecidableEq
+
+def projectPathOramAccessLeakage
+  (access : OramAccessLeakage) : PathOramProjectedAccessLeakage :=
+  { entrypointId := access.entrypointId
+  , publicGasBudget := access.publicGasBudget
+  , objectId := access.objectId
+  , capacity := access.capacity
+  , blockSize := access.blockSize
+  , bucketSize := access.bucketSize
+  , bucketCount := access.bucketCount
+  , blocksPerBucket := access.blocksPerBucket
+  , treeHeight := access.treeHeight
+  , stashBound := access.stashBound
+  , recursionDepth := access.recursionDepth
+  , metadataPages := access.metadataPages
+  , metadataPagesPerAccess := access.metadataPagesPerAccess
+  , bucketsPerAccess := access.bucketsPerAccess
+  , accessesPerCall := access.accessesPerCall
+  , accessesPerEntrypoint := access.accessesPerEntrypoint
+  }
+
+abbrev PathOramProjectedLeakage := List PathOramProjectedAccessLeakage
+
+def projectPathOramLeakage
+  (leakage : List OramAccessLeakage) : PathOramProjectedLeakage :=
+  leakage.map projectPathOramAccessLeakage
+
+def pathOramProjectedExecutionLeakage
+  (cfg : OramConfig) : PathOramProjectedLeakage :=
+  projectPathOramLeakage (executionLeakage cfg)
+
 def PathOramAccessLeakage (access : OramAccessLeakage) : Prop :=
   access.scheme = pathOramScheme ∧
   access.blocksPerBucket = pathOramBlocksPerBucket ∧
@@ -39,17 +88,31 @@ theorem pathOramConfigWellFormed_executionLeakage
   rw [← hEq]
   exact pathOramAccessLeakage_of_wellFormedObject cfg (hCfg object hObjectMem)
 
+theorem pathOramProjectedLeakage_eq_of_samePublicProjection
+  {cfg₁ cfg₂ : OramConfig} :
+  sameOramPublicProjection cfg₁ cfg₂ →
+  pathOramProjectedExecutionLeakage cfg₁ = pathOramProjectedExecutionLeakage cfg₂ := by
+  intro hSame
+  unfold pathOramProjectedExecutionLeakage
+  rw [executionLeakage_eq_of_samePublicProjection hSame]
+
 structure PathOramSecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
   freshLeafResampling : Prop
   stashOverflowBounded : Prop
 
-axiom pathOramStandardStorageTheorem
+axiom pathOramProjectedStorageTheorem
   (assumptions : PathOramSecurityAssumptions)
   (storage₁ storage₂ : Distribution OramStorageView)
-  (leakage : List OramAccessLeakage) :
+  (leakage : PathOramProjectedLeakage) :
   Prop
+
+def pathOramStandardStorageTheorem
+  (assumptions : PathOramSecurityAssumptions)
+  (storage₁ storage₂ : Distribution OramStorageView)
+  (leakage : List OramAccessLeakage) : Prop :=
+  pathOramProjectedStorageTheorem assumptions storage₁ storage₂ (projectPathOramLeakage leakage)
 
 def pathOramStandardSecurityInterface
   (assumptions : PathOramSecurityAssumptions) : StandardOramSecurityInterface :=
@@ -88,5 +151,18 @@ theorem pathOramStandardSecurityInterface_uses_pathLeakage
   (hStorage : pathOramStandardStorageTheorem assumptions storage₁ storage₂ leakage) :
   (pathOramStandardSecurityInterface assumptions).storageRel storage₁ storage₂ leakage := by
   exact ⟨hLeakage, hStorage⟩
+
+theorem pathOramProjectedStorageTheorem_projects_to_standard
+  (assumptions : PathOramSecurityAssumptions)
+  {storage₁ storage₂ : Distribution OramStorageView}
+  {leakage : List OramAccessLeakage} :
+  pathOramProjectedStorageTheorem
+      assumptions
+      storage₁
+      storage₂
+      (projectPathOramLeakage leakage) →
+    pathOramStandardStorageTheorem assumptions storage₁ storage₂ leakage := by
+  intro h
+  exact h
 
 end UOToolchain

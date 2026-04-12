@@ -134,6 +134,10 @@ The abstract ORAM theorem boundary is now surfaced explicitly as:
   `computationalPathOram_projects_to_computationalUOWith` in
   `proof/lean/UOToolchain/PathOramSecurity.lean`
 
+For the proof-grade path candidate, the remaining storage theorem boundary is
+already narrower than `OramAccessLeakage`: `PathOramSecurity.lean` projects
+away the legacy `schedule` field before the admitted storage theorem is used.
+
 The current surrogate theorem remains available as the default specialization,
 so the paper-facing aliases below are unchanged.
 

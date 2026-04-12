@@ -223,7 +223,8 @@ What is implemented:
 - the Lean scaffold now also contains `PathOramSecurity.lean`, which narrows
   the remaining ORAM axiom boundary to a storage theorem for the concrete
   `path_oram_local_posmap_v1` backend candidate under an explicit security
-  assumption bundle rather than a whole-view ORAM theorem
+  assumption bundle rather than a whole-view ORAM theorem, and projects away
+  the legacy surrogate-style `schedule` field before that theorem is invoked
 
 What is still missing before this milestone is complete:
 
