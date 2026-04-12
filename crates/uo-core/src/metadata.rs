@@ -32,12 +32,18 @@ pub struct StateMetadata {
     pub capacity: Option<usize>,
     #[serde(default = "default_backend")]
     pub backend: String,
+    #[serde(default = "default_oram_scheme")]
+    pub oram_scheme: String,
     #[serde(default)]
     pub confidential: bool,
 }
 
 fn default_backend() -> String {
     "full_scan".to_string()
+}
+
+fn default_oram_scheme() -> String {
+    "surrogate_public_schedule_v1".to_string()
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

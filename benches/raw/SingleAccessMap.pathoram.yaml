@@ -1,0 +1,22 @@
+contract: SingleAccessMap
+entrypoints:
+  put(bytes32,uint256):
+    secret_args: [key, value]
+    confidential: true
+  clear(bytes32):
+    secret_args: [key]
+    confidential: true
+  read(bytes32):
+    secret_args: [key]
+    confidential: true
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 16
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}

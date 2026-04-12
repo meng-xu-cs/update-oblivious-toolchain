@@ -5,7 +5,9 @@ use uo_core::ir::{
     BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
     StateObject, Statement, UnaryOp,
 };
-use uo_core::manifest::{EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest};
+use uo_core::manifest::{
+    EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
+};
 use uo_core::{
     CompiledArtifact, ContractMetadata, ScalarType, StateMetadata, StructField, Type, Value,
 };
@@ -900,6 +902,7 @@ fn lower_state_object(
             name: name.into(),
             kind,
             backend,
+            oram_scheme: state_meta.oram_scheme.clone(),
             value_type: lower_type_expr(&def.ty, structs)?,
             key_type: None,
             capacity: None,
@@ -917,6 +920,7 @@ fn lower_state_object(
                 name: name.into(),
                 kind,
                 backend,
+                oram_scheme: state_meta.oram_scheme.clone(),
                 value_type: element_ty,
                 key_type: None,
                 capacity: Some(state_meta.capacity.unwrap_or(capacity)),
@@ -933,6 +937,7 @@ fn lower_state_object(
                     name: name.into(),
                     kind,
                     backend,
+                    oram_scheme: state_meta.oram_scheme.clone(),
                     value_type: lower_type_expr(value, structs)?,
                     key_type: Some(lower_type_expr(key, structs)?),
                     capacity: state_meta.capacity,
@@ -1019,6 +1024,7 @@ fn build_manifest_entry(
     let counts = count_body(&function.body);
     let accessed_objects = accessed_objects(&function.body);
     let oram_accesses = count_oram_accesses(&function.body, frontend)?;
+    validate_oram_access_shape(&function.signature, &oram_accesses, frontend)?;
     let max_commit_ops = accessed_objects
         .iter()
         .map(|object_id| {
@@ -1055,6 +1061,28 @@ fn build_manifest_entry(
         max_commit_ops,
         oram_accesses,
     })
+}
+
+fn validate_oram_access_shape(
+    signature: &str,
+    oram_accesses: &BTreeMap<u32, usize>,
+    frontend: &Frontend,
+) -> Result<()> {
+    for (object_id, accesses) in oram_accesses {
+        let object = state_object_by_id(frontend, *object_id)?;
+        if object.backend == BackendKind::Oram
+            && object.oram_scheme == PATH_ORAM_SCHEME
+            && *accesses > 1
+        {
+            bail!(
+                "entrypoint {} uses path ORAM object {} {} times; the current path ORAM runtime supports at most one access per object per entrypoint",
+                signature,
+                object.name,
+                accesses
+            );
+        }
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -2304,5 +2332,44 @@ bounds:
         assert!(err
             .to_string()
             .contains("loop bounds must be compile-time constants"));
+    }
+
+    #[test]
+    fn rejects_multi_access_path_oram_entrypoints() {
+        let source = write_temp(
+            "path-multi-access",
+            r#"
+            contract PathMultiAccess {
+                mapping(bytes32 => uint256) private balances;
+
+                function deposit(bytes32 key, uint256 value) public {
+                    uint256 oldBalance = balances[key];
+                    balances[key] = oldBalance + value;
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: PathMultiAccess
+entrypoints:
+  deposit(bytes32,uint256):
+    confidential: true
+    secret_args: [key, value]
+state:
+  balances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 16
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err.to_string().contains("supports at most one access per object"));
     }
 }

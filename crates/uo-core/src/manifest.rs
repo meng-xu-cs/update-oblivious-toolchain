@@ -4,6 +4,9 @@ use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+pub const SURROGATE_ORAM_SCHEME: &str = "surrogate_public_schedule_v1";
+pub const PATH_ORAM_SCHEME: &str = "path_oram_local_posmap_v1";
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeManifest {
     pub contract: String,
@@ -74,24 +77,54 @@ impl OramManifest {
             .key_type
             .as_ref()
             .ok_or_else(|| anyhow!("map {} missing key type", object.name))?;
-        let block_size =
-            1 + fixed_scalar_width(key_type)? + fixed_scalar_width(&object.value_type)?;
-        let tree_height = log2_ceil(capacity.max(2));
-        let metadata_pages = capacity.max(1).div_ceil(8);
-        Ok(Self {
-            scheme: "surrogate_public_schedule_v1".into(),
-            block_size,
-            bucket_size: 24 + 2 * block_size,
-            bucket_count: capacity.max(1).next_power_of_two().max(8) / 2,
-            blocks_per_bucket: 2,
-            tree_height,
-            stash_bound: 0,
-            recursion_depth: 0,
-            metadata_pages,
-            metadata_pages_per_access: metadata_pages + 1,
-            buckets_per_access: (tree_height + 2).max(3),
-            accesses_per_call: 1,
-        })
+        let key_bytes = fixed_scalar_width(key_type)?;
+        let value_bytes = fixed_scalar_width(&object.value_type)?;
+        match object.oram_scheme.as_str() {
+            SURROGATE_ORAM_SCHEME => {
+                let block_size = 1 + key_bytes + value_bytes;
+                let tree_height = log2_ceil(capacity.max(2));
+                let metadata_pages = capacity.max(1).div_ceil(8);
+                Ok(Self {
+                    scheme: SURROGATE_ORAM_SCHEME.into(),
+                    block_size,
+                    bucket_size: 24 + 2 * block_size,
+                    bucket_count: capacity.max(1).next_power_of_two().max(8) / 2,
+                    blocks_per_bucket: 2,
+                    tree_height,
+                    stash_bound: 0,
+                    recursion_depth: 0,
+                    metadata_pages,
+                    metadata_pages_per_access: metadata_pages + 1,
+                    buckets_per_access: (tree_height + 2).max(3),
+                    accesses_per_call: 1,
+                })
+            }
+            PATH_ORAM_SCHEME => {
+                let leaf_count = capacity.max(2).next_power_of_two();
+                let tree_height = log2_ceil(leaf_count);
+                let block_size = 1 + 8 + 8 + key_bytes + value_bytes;
+                let blocks_per_bucket = 4usize;
+                let stash_bound = capacity.max(1);
+                let position_map_pages = capacity.max(1).div_ceil(8);
+                let stash_pages = stash_bound.div_ceil(8);
+                let metadata_pages = position_map_pages + stash_pages;
+                Ok(Self {
+                    scheme: PATH_ORAM_SCHEME.into(),
+                    block_size,
+                    bucket_size: 24 + blocks_per_bucket * block_size,
+                    bucket_count: 2 * leaf_count - 1,
+                    blocks_per_bucket,
+                    tree_height,
+                    stash_bound,
+                    recursion_depth: 0,
+                    metadata_pages,
+                    metadata_pages_per_access: metadata_pages + 1,
+                    buckets_per_access: tree_height + 1,
+                    accesses_per_call: 1,
+                })
+            }
+            other => bail!("unsupported ORAM scheme {}", other),
+        }
     }
 
     pub fn total_commit_ops(&self) -> usize {

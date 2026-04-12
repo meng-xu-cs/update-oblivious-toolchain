@@ -86,11 +86,27 @@ Still remaining:
 
 ### M4. Replace the surrogate ORAM with a proof-grade ORAM
 
-Status: not started.
+Status: partially implemented in this repo.
 
-The current backend still uses `surrogate_public_schedule_v1`. To reach the
-proof-grade SGX/TEE theorem boundary, the implementation needs a standard ORAM
-construction with real stash and recursion behavior.
+The repo now contains a second ORAM scheme candidate,
+`path_oram_local_posmap_v1`, alongside the legacy surrogate backend.
+
+What is implemented:
+
+- scheme selection is explicit in metadata and the compiled artifact
+- the manifest/runtime parameters for the path candidate are no longer the
+  surrogate placeholders
+- the path candidate uses a real tree, real path reads/writes, a persisted
+  position map, and a persisted stash
+- the checker/compiler reject entrypoints that exceed the currently supported
+  path-runtime shape
+
+What is still missing before this milestone is complete:
+
+- support for multiple accesses to the same path-ORAM object within one
+  entrypoint
+- a broader benchmark suite using the stronger backend
+- the proof reduction from the implementation candidate to the ORAM theorem
 
 Required work:
 
@@ -108,10 +124,24 @@ Acceptance criteria:
 
 ### M5. Make the SGX controller explicit in the runtime
 
-Status: not started.
+Status: partially implemented in this repo.
 
-The current runtime emits a public controller envelope, but the controller
-itself is not yet a first-class implementation component.
+The current runtime now has an explicit controller-envelope module that builds:
+
+- exact `boundary_schedule`
+- public controller shape
+- normalized SGX micro trace
+
+from the runtime manifest and public entrypoint data.
+
+What is still missing before this milestone is complete:
+
+- controller-driven execution of the ORAM runtime itself rather than
+  controller-driven observer emission
+- phase-by-phase integration between the runtime storage backend and the
+  controller state machine
+- stronger evidence that the emitted controller trace is the direct image of the
+  runtime execution path rather than a public reconstruction
 
 Required work:
 

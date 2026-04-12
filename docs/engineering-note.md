@@ -10,6 +10,11 @@ Computational-UO in this artifact:
 - The ORAM backend uses a public-schedule, fixed-size bucket rewrite discipline plus fixed-shape committed control-metadata rewrites.
 - It is reported as computational-UO only; the implementation is an instrumented prototype rather than a full production ORAM proof.
 
+Stronger ORAM candidate in this artifact:
+
+- A second ORAM scheme, `path_oram_local_posmap_v1`, now exists as a standard-ORAM-style candidate with a persisted position map, persisted stash, and real path rewrites.
+- The current implementation of that candidate is intentionally narrower than the surrogate path: it supports at most one access per ORAM object per entrypoint, and unsupported artifacts are rejected by the compiler/checker.
+
 Remaining assumptions:
 
 - arithmetic is executed in a bounded `u128` domain even when the accepted Solidity syntax spells `uint256`

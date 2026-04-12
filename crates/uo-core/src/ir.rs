@@ -28,6 +28,8 @@ pub struct StateObject {
     pub name: String,
     pub kind: ContainerKind,
     pub backend: BackendKind,
+    #[serde(default = "default_oram_scheme")]
+    pub oram_scheme: String,
     pub value_type: Type,
     #[serde(default)]
     pub key_type: Option<Type>,
@@ -35,6 +37,10 @@ pub struct StateObject {
     pub capacity: Option<usize>,
     #[serde(default)]
     pub confidential: bool,
+}
+
+fn default_oram_scheme() -> String {
+    "surrogate_public_schedule_v1".to_string()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

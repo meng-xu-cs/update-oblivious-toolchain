@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, Expr, StateObject, Statement};
+use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{CompiledArtifact, ContractMetadata, OramManifest, ProgramMode};
 
 pub fn check_source(source_path: &str, metadata: &ContractMetadata) -> Result<Vec<String>> {
@@ -95,11 +96,34 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 function.signature
             );
         }
+        validate_oram_access_shape(&function.signature, &expected_accesses, &artifact.contract.state)?;
     }
     report.push("manifest/object consistency: ok".into());
     report.push("forbidden control flow in confidential IR: none".into());
     report.push("raw storage backend for confidential objects: none".into());
     Ok(report)
+}
+
+fn validate_oram_access_shape(
+    signature: &str,
+    oram_accesses: &BTreeMap<u32, usize>,
+    state: &[StateObject],
+) -> Result<()> {
+    for (object_id, accesses) in oram_accesses {
+        let object = state_object_by_id(state, *object_id)?;
+        if object.backend == BackendKind::Oram
+            && object.oram_scheme == PATH_ORAM_SCHEME
+            && *accesses > 1
+        {
+            bail!(
+                "entrypoint {} uses path ORAM object {} {} times; the current path ORAM runtime supports at most one access per object per entrypoint",
+                signature,
+                object.name,
+                accesses
+            );
+        }
+    }
+    Ok(())
 }
 
 fn count_oram_accesses(

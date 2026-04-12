@@ -1,14 +1,18 @@
 use anyhow::{anyhow, bail, Result};
+use rand::RngCore;
 use rand_chacha::ChaCha20Rng;
 use uo_core::ir::StateObject;
+use uo_core::manifest::{PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent};
 use uo_core::{ScalarType, Type, Value};
 use uo_store::StoreCipher;
 
 pub(crate) const ORAM_DIRECTORY_PAGE_ENTRIES: usize = 8;
-const ORAM_BLOCKS_PER_BUCKET: usize = 2;
 const ORAM_BUCKET_HEADER_BYTES: usize = 24;
-const ORAM_SCHEME: &str = "surrogate_public_schedule_v1";
+const SURROGATE_BLOCKS_PER_BUCKET: usize = 2;
+const PATH_BLOCKS_PER_BUCKET: usize = 4;
+const ORAM_SLOT_INDEX_BYTES: usize = 8;
+const ORAM_LEAF_LABEL_BYTES: usize = 8;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct MapEntry {
@@ -47,27 +51,92 @@ impl OramParameters {
             .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
         let key_len = fixed_scalar_width(key_type)?;
         let value_len = fixed_scalar_width(&spec.value_type)?;
-        let block_size = 1 + key_len + value_len;
-        let bucket_size = ORAM_BUCKET_HEADER_BYTES + ORAM_BLOCKS_PER_BUCKET * block_size;
-        let tree_height = log2_ceil(capacity.max(2));
-        let metadata_pages = oram_directory_page_count(capacity);
-        Ok(Self {
-            scheme: ORAM_SCHEME.into(),
-            capacity,
-            block_size,
-            bucket_size,
-            bucket_count: capacity.max(1).next_power_of_two().max(8) / 2,
-            blocks_per_bucket: ORAM_BLOCKS_PER_BUCKET,
-            tree_height,
-            stash_bound: 0,
-            recursion_depth: 0,
-            metadata_pages,
-            metadata_pages_per_access: metadata_pages + 1,
-            accesses_per_call: 1,
-            buckets_per_access: (tree_height + 2).max(3),
-            directory_page_entries: ORAM_DIRECTORY_PAGE_ENTRIES,
-            directory_page_bytes: ORAM_DIRECTORY_PAGE_ENTRIES * block_size,
-        })
+        match spec.oram_scheme.as_str() {
+            SURROGATE_ORAM_SCHEME => {
+                let block_size = 1 + key_len + value_len;
+                let bucket_size = ORAM_BUCKET_HEADER_BYTES + SURROGATE_BLOCKS_PER_BUCKET * block_size;
+                let tree_height = log2_ceil(capacity.max(2));
+                let metadata_pages = oram_directory_page_count(capacity);
+                Ok(Self {
+                    scheme: SURROGATE_ORAM_SCHEME.into(),
+                    capacity,
+                    block_size,
+                    bucket_size,
+                    bucket_count: capacity.max(1).next_power_of_two().max(8) / 2,
+                    blocks_per_bucket: SURROGATE_BLOCKS_PER_BUCKET,
+                    tree_height,
+                    stash_bound: 0,
+                    recursion_depth: 0,
+                    metadata_pages,
+                    metadata_pages_per_access: metadata_pages + 1,
+                    accesses_per_call: 1,
+                    buckets_per_access: (tree_height + 2).max(3),
+                    directory_page_entries: ORAM_DIRECTORY_PAGE_ENTRIES,
+                    directory_page_bytes: ORAM_DIRECTORY_PAGE_ENTRIES * block_size,
+                })
+            }
+            PATH_ORAM_SCHEME => {
+                let leaf_count = capacity.max(2).next_power_of_two();
+                let tree_height = log2_ceil(leaf_count);
+                let block_size = 1 + ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES + key_len + value_len;
+                let bucket_size = ORAM_BUCKET_HEADER_BYTES + PATH_BLOCKS_PER_BUCKET * block_size;
+                let stash_bound = capacity.max(1);
+                let metadata_pages =
+                    oram_directory_page_count(capacity) + oram_directory_page_count(stash_bound);
+                Ok(Self {
+                    scheme: PATH_ORAM_SCHEME.into(),
+                    capacity,
+                    block_size,
+                    bucket_size,
+                    bucket_count: 2 * leaf_count - 1,
+                    blocks_per_bucket: PATH_BLOCKS_PER_BUCKET,
+                    tree_height,
+                    stash_bound,
+                    recursion_depth: 0,
+                    metadata_pages,
+                    metadata_pages_per_access: metadata_pages + 1,
+                    accesses_per_call: 1,
+                    buckets_per_access: tree_height + 1,
+                    directory_page_entries: ORAM_DIRECTORY_PAGE_ENTRIES,
+                    directory_page_bytes: ORAM_DIRECTORY_PAGE_ENTRIES * block_size,
+                })
+            }
+            other => bail!("unsupported ORAM scheme {} for {}", other, spec.name),
+        }
+    }
+}
+
+impl OramParameters {
+    fn is_surrogate(&self) -> bool {
+        self.scheme == SURROGATE_ORAM_SCHEME
+    }
+
+    fn is_path_oram(&self) -> bool {
+        self.scheme == PATH_ORAM_SCHEME
+    }
+
+    fn leaf_count(&self) -> usize {
+        if self.is_path_oram() {
+            (self.bucket_count + 1) / 2
+        } else {
+            self.bucket_count
+        }
+    }
+
+    fn position_map_pages(&self) -> usize {
+        if self.is_path_oram() {
+            oram_directory_page_count(self.capacity)
+        } else {
+            self.metadata_pages
+        }
+    }
+
+    fn stash_pages(&self) -> usize {
+        if self.is_path_oram() {
+            self.metadata_pages.saturating_sub(self.position_map_pages())
+        } else {
+            0
+        }
     }
 }
 
@@ -105,72 +174,137 @@ pub(crate) struct OramCommit {
 }
 
 #[derive(Clone, Debug)]
+enum OramPendingAccess {
+    Read { key: Value, leaf: usize },
+    Write {
+        key: Value,
+        value: Value,
+        apply: bool,
+        leaf: usize,
+    },
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct OramState {
     pub parameters: OramParameters,
     pub entries: Vec<MapEntry>,
+    pub position_map: Vec<Option<usize>>,
+    pub stash: Vec<OramBlock>,
     pub storage: OramStorage,
     pub access_counter: u64,
     pub cipher: StoreCipher,
+    pending_access: Option<OramPendingAccess>,
 }
 
 impl OramState {
     pub(crate) fn instantiate(spec: &StateObject, rng: &mut ChaCha20Rng) -> Result<Self> {
         let parameters = OramParameters::for_spec(spec)?;
+        let cipher = StoreCipher::random();
         let empty_entry = empty_map_entry(spec)?;
         let entries = vec![empty_entry.clone(); parameters.capacity];
-        let cipher = StoreCipher::random();
-        let directory_pages = (0..parameters.metadata_pages)
-            .map(|page| {
-                let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
-                let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(entries.len());
-                let payload = encode_oram_directory_page(&entries[start..end], &empty_entry);
-                let aad = oram_meta_aad(spec, page);
-                cipher.seal(aad.as_bytes(), &payload, rng)
+        if parameters.is_surrogate() {
+            let directory_pages = (0..parameters.metadata_pages)
+                .map(|page| {
+                    let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
+                    let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(entries.len());
+                    let payload = encode_oram_directory_page(&entries[start..end], &empty_entry);
+                    let aad = oram_meta_aad(spec, page);
+                    cipher.seal(aad.as_bytes(), &payload, rng)
+                })
+                .collect();
+            let buckets = (0..parameters.bucket_count)
+                .map(|index| {
+                    let aad = oram_bucket_aad(spec, index);
+                    cipher.filler(aad.as_bytes(), parameters.bucket_size, rng)
+                })
+                .collect();
+            Ok(Self {
+                parameters,
+                entries,
+                position_map: Vec::new(),
+                stash: Vec::new(),
+                storage: OramStorage {
+                    directory_pages,
+                    buckets,
+                    access_counter_slot: cipher
+                        .seal(oram_counter_aad(spec).as_bytes(), &0u64.to_be_bytes(), rng),
+                },
+                access_counter: 0,
+                cipher,
+                pending_access: None,
             })
-            .collect();
-        let buckets = (0..parameters.bucket_count)
-            .map(|index| {
-                let aad = oram_bucket_aad(spec, index);
-                cipher.filler(aad.as_bytes(), parameters.bucket_size, rng)
+        } else {
+            let position_map = vec![None; parameters.capacity];
+            let stash = Vec::new();
+            let directory_pages =
+                encode_path_metadata_pages(spec, &parameters, &cipher, &position_map, &stash, rng)?;
+            let buckets = (0..parameters.bucket_count)
+                .map(|index| {
+                    let aad = oram_bucket_aad(spec, index);
+                    let empty_bucket = OramBucket::empty(spec, index)?;
+                    Ok(cipher.seal(aad.as_bytes(), &empty_bucket.serialize(spec)?, rng))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok(Self {
+                parameters,
+                entries,
+                position_map,
+                stash,
+                storage: OramStorage {
+                    directory_pages,
+                    buckets,
+                    access_counter_slot: cipher
+                        .seal(oram_counter_aad(spec).as_bytes(), &0u64.to_be_bytes(), rng),
+                },
+                access_counter: 0,
+                cipher,
+                pending_access: None,
             })
-            .collect();
-        Ok(Self {
-            parameters,
-            entries,
-            storage: OramStorage {
-                directory_pages,
-                buckets,
-                access_counter_slot: cipher.seal(oram_counter_aad(spec).as_bytes(), &0u64.to_be_bytes(), rng),
-            },
-            access_counter: 0,
-            cipher,
-        })
+        }
     }
 
     pub(crate) fn refresh_from_storage(&mut self, spec: &StateObject) -> Result<()> {
-        let mut entries = Vec::new();
-        for (page_index, page) in self.storage.directory_pages.iter().enumerate() {
-            let aad = oram_meta_aad(spec, page_index);
-            let payload = self
-                .cipher
-                .open(aad.as_bytes(), self.parameters.directory_page_bytes, page)
-                .ok_or_else(|| anyhow!("failed to decode ORAM metadata page for {}", spec.name))?;
-            entries.extend(decode_oram_directory_page(&payload, spec)?);
-        }
-        entries.truncate(self.parameters.capacity);
         let counter_bytes = self
             .cipher
             .open(oram_counter_aad(spec).as_bytes(), 8, &self.storage.access_counter_slot)
             .ok_or_else(|| anyhow!("failed to decode ORAM counter for {}", spec.name))?;
         let mut counter = [0u8; 8];
         counter.copy_from_slice(&counter_bytes);
-        self.entries = entries;
         self.access_counter = u64::from_be_bytes(counter);
+        if self.parameters.is_surrogate() {
+            let mut entries = Vec::new();
+            for (page_index, page) in self.storage.directory_pages.iter().enumerate() {
+                let aad = oram_meta_aad(spec, page_index);
+                let payload = self
+                    .cipher
+                    .open(aad.as_bytes(), self.parameters.directory_page_bytes, page)
+                    .ok_or_else(|| anyhow!("failed to decode ORAM metadata page for {}", spec.name))?;
+                entries.extend(decode_oram_directory_page(&payload, spec)?);
+            }
+            entries.truncate(self.parameters.capacity);
+            self.entries = entries;
+        } else {
+            let (position_map, stash) =
+                decode_path_metadata_pages(spec, &self.parameters, &self.cipher, &self.storage.directory_pages)?;
+            self.position_map = position_map;
+            self.stash = stash;
+            self.entries = self.reconstruct_path_entries(spec)?;
+        }
+        self.pending_access = None;
         Ok(())
     }
 
-    pub(crate) fn get(&self, spec: &StateObject, key: &Value) -> Result<(Value, OramTranscript)> {
-        let transcript = self.access_transcript(spec);
+    pub(crate) fn get(&mut self, spec: &StateObject, key: &Value) -> Result<(Value, OramTranscript)> {
+        let transcript = if self.parameters.is_surrogate() {
+            self.surrogate_access_transcript(spec)
+        } else {
+            let leaf = self.logical_leaf_for_key(key);
+            self.stage_pending_access(OramPendingAccess::Read {
+                key: key.clone(),
+                leaf,
+            })?;
+            self.path_access_transcript(spec, leaf)
+        };
         let value = self
             .entries
             .iter()
@@ -187,31 +321,42 @@ impl OramState {
         value: Value,
         apply: bool,
     ) -> Result<OramTranscript> {
-        let transcript = self.access_transcript(spec);
-        if apply {
-            let value_is_zero = value.is_zero_like();
-            if let Some(entry) = self
-                .entries
-                .iter_mut()
-                .find(|entry| entry.occupied && entry.key == key)
-            {
-                if value_is_zero {
-                    *entry = empty_map_entry(spec)?;
-                } else {
-                    entry.value = value;
-                }
-            } else if !value_is_zero {
-                let entry = self
+        if self.parameters.is_surrogate() {
+            let transcript = self.surrogate_access_transcript(spec);
+            if apply {
+                let value_is_zero = value.is_zero_like();
+                if let Some(entry) = self
                     .entries
                     .iter_mut()
-                    .find(|entry| !entry.occupied)
-                    .ok_or_else(|| anyhow!("map {} exceeded public capacity", spec.name))?;
-                entry.occupied = true;
-                entry.key = key;
-                entry.value = value;
+                    .find(|entry| entry.occupied && entry.key == key)
+                {
+                    if value_is_zero {
+                        *entry = empty_map_entry(spec)?;
+                    } else {
+                        entry.value = value;
+                    }
+                } else if !value_is_zero {
+                    let entry = self
+                        .entries
+                        .iter_mut()
+                        .find(|entry| !entry.occupied)
+                        .ok_or_else(|| anyhow!("map {} exceeded public capacity", spec.name))?;
+                    entry.occupied = true;
+                    entry.key = key;
+                    entry.value = value;
+                }
             }
+            Ok(transcript)
+        } else {
+            let leaf = self.logical_leaf_for_key(&key);
+            self.stage_pending_access(OramPendingAccess::Write {
+                key,
+                value,
+                apply,
+                leaf,
+            })?;
+            Ok(self.path_access_transcript(spec, leaf))
         }
-        Ok(transcript)
     }
 
     pub(crate) fn commit(
@@ -221,60 +366,65 @@ impl OramState {
         aborted: bool,
         rng: &mut ChaCha20Rng,
     ) -> Result<OramCommit> {
-        let source_entries = if aborted { &old.entries } else { &self.entries };
-        let empty_entry = empty_map_entry(spec)?;
-        let mut next = self.clone();
-        let mut writes = Vec::new();
-        for page in 0..old.storage.directory_pages.len() {
-            let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
-            let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(source_entries.len());
-            let old_physical = old.storage.directory_pages[page].clone();
-            let payload = encode_oram_directory_page(&source_entries[start..end], &empty_entry);
-            let aad = oram_meta_aad(spec, page);
-            let new_physical = self.cipher.seal(aad.as_bytes(), &payload, rng);
+        if self.parameters.is_surrogate() {
+            let source_entries = if aborted { &old.entries } else { &self.entries };
+            let empty_entry = empty_map_entry(spec)?;
+            let mut next = self.clone();
+            let mut writes = Vec::new();
+            for page in 0..old.storage.directory_pages.len() {
+                let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
+                let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(source_entries.len());
+                let old_physical = old.storage.directory_pages[page].clone();
+                let payload = encode_oram_directory_page(&source_entries[start..end], &empty_entry);
+                let aad = oram_meta_aad(spec, page);
+                let new_physical = self.cipher.seal(aad.as_bytes(), &payload, rng);
+                writes.push(OramWrite {
+                    location: format!("{}@meta{page}", spec.name),
+                    old: old_physical,
+                    new: new_physical.clone(),
+                });
+                next.storage.directory_pages[page] = new_physical;
+            }
+            let next_counter = old.access_counter + 1;
+            let old_counter_physical = old.storage.access_counter_slot.clone();
+            let new_counter_physical = self
+                .cipher
+                .seal(oram_counter_aad(spec).as_bytes(), &next_counter.to_be_bytes(), rng);
             writes.push(OramWrite {
-                location: format!("{}@meta{page}", spec.name),
-                old: old_physical,
-                new: new_physical.clone(),
+                location: format!("{}@counter", spec.name),
+                old: old_counter_physical,
+                new: new_counter_physical.clone(),
             });
-            next.storage.directory_pages[page] = new_physical;
+            next.storage.access_counter_slot = new_counter_physical;
+            for index in self.surrogate_bucket_window() {
+                let old_physical = old.storage.buckets[index].clone();
+                let payload =
+                    OramBucket::from_entries(spec, source_entries, old.access_counter, index)?
+                        .serialize(spec)?;
+                let aad = oram_bucket_aad(spec, index);
+                let new_physical = self.cipher.seal(aad.as_bytes(), &payload, rng);
+                writes.push(OramWrite {
+                    location: format!("{}@bucket{index}", spec.name),
+                    old: old_physical,
+                    new: new_physical.clone(),
+                });
+                next.storage.buckets[index] = new_physical;
+            }
+            next.entries = source_entries.clone();
+            next.access_counter = next_counter;
+            next.pending_access = None;
+            Ok(OramCommit { next, writes })
+        } else {
+            self.commit_path_access(spec, old, aborted, rng)
         }
-        let next_counter = old.access_counter + 1;
-        let old_counter_physical = old.storage.access_counter_slot.clone();
-        let new_counter_physical = self
-            .cipher
-            .seal(oram_counter_aad(spec).as_bytes(), &next_counter.to_be_bytes(), rng);
-        writes.push(OramWrite {
-            location: format!("{}@counter", spec.name),
-            old: old_counter_physical,
-            new: new_counter_physical.clone(),
-        });
-        next.storage.access_counter_slot = new_counter_physical;
-        for index in self.bucket_window() {
-            let old_physical = old.storage.buckets[index].clone();
-            let payload =
-                OramBucket::from_entries(spec, source_entries, old.access_counter, index)?
-                    .serialize(spec)?;
-            let aad = oram_bucket_aad(spec, index);
-            let new_physical = self.cipher.seal(aad.as_bytes(), &payload, rng);
-            writes.push(OramWrite {
-                location: format!("{}@bucket{index}", spec.name),
-                old: old_physical,
-                new: new_physical.clone(),
-            });
-            next.storage.buckets[index] = new_physical;
-        }
-        next.entries = source_entries.clone();
-        next.access_counter = next_counter;
-        Ok(OramCommit { next, writes })
     }
 
-    fn access_transcript(&self, spec: &StateObject) -> OramTranscript {
+    fn surrogate_access_transcript(&self, spec: &StateObject) -> OramTranscript {
         let mut logical_accesses = Vec::new();
         let mut physical_reads = Vec::new();
         let schedule = OramAccessSchedule {
             metadata_pages: (0..self.storage.directory_pages.len()).collect(),
-            bucket_indices: self.bucket_window(),
+            bucket_indices: self.surrogate_bucket_window(),
         };
 
         logical_accesses.push(LogicalEvent {
@@ -321,10 +471,275 @@ impl OramState {
         }
     }
 
-    fn bucket_window(&self) -> Vec<usize> {
+    fn surrogate_bucket_window(&self) -> Vec<usize> {
         (0..self.parameters.buckets_per_access)
             .map(|offset| ((self.access_counter as usize) + offset) % self.storage.buckets.len())
             .collect()
+    }
+
+    fn stage_pending_access(&mut self, access: OramPendingAccess) -> Result<()> {
+        if self.pending_access.is_some() {
+            bail!(
+                "map {} uses ORAM more than once in a single entrypoint; this scheme is not yet supported",
+                self.parameters.scheme
+            );
+        }
+        self.pending_access = Some(access);
+        Ok(())
+    }
+
+    fn logical_leaf_for_key(&self, key: &Value) -> usize {
+        if let Some(slot) = self.find_slot(key) {
+            self.position_map
+                .get(slot)
+                .and_then(|leaf| *leaf)
+                .unwrap_or_else(|| fallback_leaf(self.parameters.leaf_count(), self.access_counter))
+        } else {
+            fallback_leaf(self.parameters.leaf_count(), self.access_counter)
+        }
+    }
+
+    fn find_slot(&self, key: &Value) -> Option<usize> {
+        self.entries
+            .iter()
+            .position(|entry| entry.occupied && entry.key == *key)
+    }
+
+    fn path_access_transcript(&self, spec: &StateObject, leaf: usize) -> OramTranscript {
+        let mut logical_accesses = Vec::new();
+        let mut physical_reads = Vec::new();
+        let schedule = OramAccessSchedule {
+            metadata_pages: (0..self.storage.directory_pages.len()).collect(),
+            bucket_indices: path_bucket_indices(self.parameters.leaf_count(), leaf),
+        };
+
+        logical_accesses.push(LogicalEvent {
+            kind: "uooram_counter".into(),
+            object: spec.name.clone(),
+            detail: "counter".into(),
+        });
+        physical_reads.push(PhysicalReadEvent {
+            object: spec.name.clone(),
+            location: format!("{}@counter", spec.name),
+            len: self.storage.access_counter_slot.len(),
+        });
+
+        for page in &schedule.metadata_pages {
+            logical_accesses.push(LogicalEvent {
+                kind: "uooram_metadata_load".into(),
+                object: spec.name.clone(),
+                detail: format!("page:{page}"),
+            });
+            physical_reads.push(PhysicalReadEvent {
+                object: spec.name.clone(),
+                location: format!("{}@meta{page}", spec.name),
+                len: self.storage.directory_pages[*page].len(),
+            });
+        }
+
+        for index in &schedule.bucket_indices {
+            logical_accesses.push(LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: spec.name.clone(),
+                detail: format!("bucket:{index}"),
+            });
+            physical_reads.push(PhysicalReadEvent {
+                object: spec.name.clone(),
+                location: format!("{}@bucket{index}", spec.name),
+                len: self.storage.buckets[*index].len(),
+            });
+        }
+
+        OramTranscript {
+            schedule,
+            logical_accesses,
+            physical_reads,
+        }
+    }
+
+    fn reconstruct_path_entries(&self, spec: &StateObject) -> Result<Vec<MapEntry>> {
+        let mut entries = vec![empty_map_entry(spec)?; self.parameters.capacity];
+        for block in &self.stash {
+            if block.occupied {
+                entries[block.slot_index] = MapEntry {
+                    occupied: true,
+                    key: block.key.clone(),
+                    value: block.value.clone(),
+                };
+            }
+        }
+        for index in 0..self.parameters.bucket_count {
+            let bucket = self.decode_bucket(spec, index)?;
+            for block in bucket.blocks {
+                if block.occupied {
+                    entries[block.slot_index] = MapEntry {
+                        occupied: true,
+                        key: block.key,
+                        value: block.value,
+                    };
+                }
+            }
+        }
+        Ok(entries)
+    }
+
+    fn decode_bucket(&self, spec: &StateObject, index: usize) -> Result<OramBucket> {
+        let aad = oram_bucket_aad(spec, index);
+        let payload = self
+            .cipher
+            .open(aad.as_bytes(), self.parameters.bucket_size, &self.storage.buckets[index])
+            .ok_or_else(|| anyhow!("failed to decode ORAM bucket {} for {}", index, spec.name))?;
+        OramBucket::deserialize(spec, &payload)
+    }
+
+    fn commit_path_access(
+        &self,
+        spec: &StateObject,
+        old: &Self,
+        aborted: bool,
+        rng: &mut ChaCha20Rng,
+    ) -> Result<OramCommit> {
+        let Some(access) = &self.pending_access else {
+            let mut next = old.clone();
+            next.pending_access = None;
+            return Ok(OramCommit { next, writes: Vec::new() });
+        };
+
+        let mut next = old.clone();
+        let mut writes = Vec::new();
+        let leaf_count = old.parameters.leaf_count();
+        let access_leaf = match access {
+            OramPendingAccess::Read { leaf, .. } | OramPendingAccess::Write { leaf, .. } => *leaf,
+        };
+        let path = path_bucket_indices(leaf_count, access_leaf);
+        let mut working_entries = old.entries.clone();
+        let mut working_position_map = old.position_map.clone();
+        let mut working_stash = old.stash.clone();
+
+        for bucket_index in &path {
+            let bucket = old.decode_bucket(spec, *bucket_index)?;
+            working_stash.extend(bucket.blocks.into_iter().filter(|block| block.occupied));
+        }
+
+        match access {
+            OramPendingAccess::Read { key, .. } => {
+                if let Some(slot) = slot_for_key(&working_entries, key) {
+                    let block = find_stash_block_mut(&mut working_stash, slot)?;
+                    let new_leaf = sample_leaf(rng, leaf_count);
+                    block.leaf = new_leaf;
+                    working_position_map[slot] = Some(new_leaf);
+                }
+            }
+            OramPendingAccess::Write {
+                key,
+                value,
+                apply,
+                ..
+            } => {
+                let effective_apply = *apply && !aborted;
+                match slot_for_key(&working_entries, key) {
+                    Some(slot) => {
+                        if effective_apply && value.is_zero_like() {
+                            remove_stash_block(&mut working_stash, slot)?;
+                            working_entries[slot] = empty_map_entry(spec)?;
+                            working_position_map[slot] = None;
+                        } else {
+                            let block = find_stash_block_mut(&mut working_stash, slot)?;
+                            if effective_apply {
+                                block.value = value.clone();
+                                working_entries[slot].value = value.clone();
+                            }
+                            let new_leaf = sample_leaf(rng, leaf_count);
+                            block.leaf = new_leaf;
+                            working_position_map[slot] = Some(new_leaf);
+                        }
+                    }
+                    None => {
+                        if effective_apply && !value.is_zero_like() {
+                            let slot = allocate_slot(&working_entries).ok_or_else(|| {
+                                anyhow!("map {} exceeded public capacity", spec.name)
+                            })?;
+                            let new_leaf = sample_leaf(rng, leaf_count);
+                            working_entries[slot] = MapEntry {
+                                occupied: true,
+                                key: key.clone(),
+                                value: value.clone(),
+                            };
+                            working_position_map[slot] = Some(new_leaf);
+                            working_stash.push(OramBlock {
+                                occupied: true,
+                                slot_index: slot,
+                                leaf: new_leaf,
+                                key: key.clone(),
+                                value: value.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if working_stash.len() > old.parameters.stash_bound + old.parameters.buckets_per_access {
+            bail!(
+                "stash bound exceeded for {} under path ORAM candidate",
+                spec.name
+            );
+        }
+
+        for bucket_index in path.iter().rev() {
+            let bucket = build_path_bucket(&old.parameters, *bucket_index, &mut working_stash)?;
+            let payload = bucket.serialize(spec)?;
+            let aad = oram_bucket_aad(spec, *bucket_index);
+            let old_physical = old.storage.buckets[*bucket_index].clone();
+            let new_physical = old.cipher.seal(aad.as_bytes(), &payload, rng);
+            next.storage.buckets[*bucket_index] = new_physical.clone();
+            writes.push(OramWrite {
+                location: format!("{}@bucket{}", spec.name, bucket_index),
+                old: old_physical,
+                new: new_physical,
+            });
+        }
+
+        if working_stash.len() > old.parameters.stash_bound {
+            bail!("stash bound exceeded for {}", spec.name);
+        }
+
+        let new_directory_pages = encode_path_metadata_pages(
+            spec,
+            &old.parameters,
+            &old.cipher,
+            &working_position_map,
+            &working_stash,
+            rng,
+        )?;
+        for (page, new_physical) in new_directory_pages.into_iter().enumerate() {
+            let old_physical = old.storage.directory_pages[page].clone();
+            next.storage.directory_pages[page] = new_physical.clone();
+            writes.push(OramWrite {
+                location: format!("{}@meta{page}", spec.name),
+                old: old_physical,
+                new: new_physical,
+            });
+        }
+
+        let next_counter = old.access_counter + 1;
+        let old_counter_physical = old.storage.access_counter_slot.clone();
+        let new_counter_physical = old
+            .cipher
+            .seal(oram_counter_aad(spec).as_bytes(), &next_counter.to_be_bytes(), rng);
+        next.storage.access_counter_slot = new_counter_physical.clone();
+        writes.push(OramWrite {
+            location: format!("{}@counter", spec.name),
+            old: old_counter_physical,
+            new: new_counter_physical,
+        });
+
+        next.entries = working_entries;
+        next.position_map = working_position_map;
+        next.stash = working_stash;
+        next.access_counter = next_counter;
+        next.pending_access = None;
+        Ok(OramCommit { next, writes })
     }
 }
 
@@ -340,9 +755,173 @@ fn oram_counter_aad(spec: &StateObject) -> String {
     format!("oram:{}:counter", spec.name)
 }
 
+fn encode_path_metadata_pages(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    position_map: &[Option<usize>],
+    stash: &[OramBlock],
+    rng: &mut ChaCha20Rng,
+) -> Result<Vec<Vec<u8>>> {
+    let mut pages = Vec::with_capacity(parameters.metadata_pages);
+    for page in 0..parameters.position_map_pages() {
+        let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
+        let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(position_map.len());
+        let mut payload = Vec::with_capacity(parameters.directory_page_bytes);
+        for entry in &position_map[start..end] {
+            let encoded = match entry {
+                Some(leaf) => u64::try_from(*leaf)
+                    .map_err(|_| anyhow!("leaf label overflow for {}", spec.name))?,
+                None => u64::MAX,
+            };
+            payload.extend_from_slice(&encoded.to_be_bytes());
+        }
+        while payload.len() < parameters.directory_page_bytes {
+            payload.push(0);
+        }
+        let aad = oram_meta_aad(spec, page);
+        pages.push(cipher.seal(aad.as_bytes(), &payload, rng));
+    }
+    for page in 0..parameters.stash_pages() {
+        let start = page * ORAM_DIRECTORY_PAGE_ENTRIES;
+        let end = (start + ORAM_DIRECTORY_PAGE_ENTRIES).min(stash.len());
+        let mut payload = Vec::with_capacity(parameters.directory_page_bytes);
+        if start < stash.len() {
+            for block in &stash[start..end] {
+                payload.extend_from_slice(&block.serialize(spec)?);
+            }
+        }
+        while payload.len() < parameters.directory_page_bytes {
+            payload.extend_from_slice(&OramBlock::empty(spec)?.serialize(spec)?);
+        }
+        let aad = oram_meta_aad(spec, parameters.position_map_pages() + page);
+        pages.push(cipher.seal(aad.as_bytes(), &payload, rng));
+    }
+    Ok(pages)
+}
+
+fn decode_path_metadata_pages(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    pages: &[Vec<u8>],
+) -> Result<(Vec<Option<usize>>, Vec<OramBlock>)> {
+    let mut position_map = Vec::with_capacity(parameters.capacity);
+    for page in 0..parameters.position_map_pages() {
+        let aad = oram_meta_aad(spec, page);
+        let payload = cipher
+            .open(aad.as_bytes(), parameters.directory_page_bytes, &pages[page])
+            .ok_or_else(|| anyhow!("failed to decode ORAM position map page {}", page))?;
+        for slot in payload.chunks_exact(8).take(ORAM_DIRECTORY_PAGE_ENTRIES) {
+            if position_map.len() == parameters.capacity {
+                break;
+            }
+            let mut encoded = [0u8; 8];
+            encoded.copy_from_slice(slot);
+            let value = u64::from_be_bytes(encoded);
+            if value == u64::MAX {
+                position_map.push(None);
+            } else {
+                position_map.push(Some(
+                    usize::try_from(value)
+                        .map_err(|_| anyhow!("leaf label overflow for {}", spec.name))?,
+                ));
+            }
+        }
+    }
+    let mut stash = Vec::new();
+    for page in 0..parameters.stash_pages() {
+        let page_index = parameters.position_map_pages() + page;
+        let aad = oram_meta_aad(spec, page_index);
+        let payload = cipher
+            .open(aad.as_bytes(), parameters.directory_page_bytes, &pages[page_index])
+            .ok_or_else(|| anyhow!("failed to decode ORAM stash page {}", page_index))?;
+        for block_bytes in payload.chunks_exact(parameters.block_size) {
+            let block = OramBlock::deserialize(spec, block_bytes)?;
+            if block.occupied {
+                stash.push(block);
+            }
+        }
+    }
+    Ok((position_map, stash))
+}
+
+fn path_bucket_indices(leaf_count: usize, leaf: usize) -> Vec<usize> {
+    let mut node = leaf_count - 1 + (leaf % leaf_count.max(1));
+    let mut path = Vec::new();
+    loop {
+        path.push(node);
+        if node == 0 {
+            break;
+        }
+        node = (node - 1) / 2;
+    }
+    path.reverse();
+    path
+}
+
+fn fallback_leaf(leaf_count: usize, access_counter: u64) -> usize {
+    (access_counter as usize) % leaf_count.max(1)
+}
+
+fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {
+    (rng.next_u64() as usize) % leaf_count.max(1)
+}
+
+fn slot_for_key(entries: &[MapEntry], key: &Value) -> Option<usize> {
+    entries
+        .iter()
+        .position(|entry| entry.occupied && entry.key == *key)
+}
+
+fn allocate_slot(entries: &[MapEntry]) -> Option<usize> {
+    entries.iter().position(|entry| !entry.occupied)
+}
+
+fn find_stash_block_mut(stash: &mut [OramBlock], slot: usize) -> Result<&mut OramBlock> {
+    stash
+        .iter_mut()
+        .find(|block| block.occupied && block.slot_index == slot)
+        .ok_or_else(|| anyhow!("missing ORAM block for slot {}", slot))
+}
+
+fn remove_stash_block(stash: &mut Vec<OramBlock>, slot: usize) -> Result<()> {
+    let index = stash
+        .iter()
+        .position(|block| block.occupied && block.slot_index == slot)
+        .ok_or_else(|| anyhow!("missing ORAM block for slot {}", slot))?;
+    stash.remove(index);
+    Ok(())
+}
+
+fn build_path_bucket(
+    parameters: &OramParameters,
+    bucket_index: usize,
+    stash: &mut Vec<OramBlock>,
+) -> Result<OramBucket> {
+    let mut blocks = Vec::with_capacity(parameters.blocks_per_bucket);
+    while blocks.len() < parameters.blocks_per_bucket {
+        let Some(candidate_index) = stash.iter().position(|block| {
+            block.occupied
+                && path_bucket_indices(parameters.leaf_count(), block.leaf).contains(&bucket_index)
+        }) else {
+            break;
+        };
+        blocks.push(stash.remove(candidate_index));
+    }
+    Ok(OramBucket {
+        access_counter: 0,
+        bucket_index,
+        live_entry_count: blocks.len(),
+        blocks,
+    })
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct OramBlock {
     pub occupied: bool,
+    pub slot_index: usize,
+    pub leaf: usize,
     pub key: Value,
     pub value: Value,
 }
@@ -351,6 +930,8 @@ impl OramBlock {
     fn empty(spec: &StateObject) -> Result<Self> {
         Ok(Self {
             occupied: false,
+            slot_index: 0,
+            leaf: 0,
             key: Value::zero_for_type(
                 spec.key_type
                     .as_ref()
@@ -363,6 +944,8 @@ impl OramBlock {
     fn from_entry(entry: &MapEntry) -> Self {
         Self {
             occupied: entry.occupied,
+            slot_index: 0,
+            leaf: 0,
             key: entry.key.clone(),
             value: entry.value.clone(),
         }
@@ -375,6 +958,18 @@ impl OramBlock {
             .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
         let mut out = Vec::with_capacity(OramParameters::for_spec(spec)?.block_size);
         out.push(u8::from(self.occupied));
+        if spec.oram_scheme == PATH_ORAM_SCHEME {
+            out.extend_from_slice(
+                &u64::try_from(self.slot_index)
+                    .map_err(|_| anyhow!("slot index overflow for {}", spec.name))?
+                    .to_be_bytes(),
+            );
+            out.extend_from_slice(
+                &u64::try_from(self.leaf)
+                    .map_err(|_| anyhow!("leaf label overflow for {}", spec.name))?
+                    .to_be_bytes(),
+            );
+        }
         out.extend_from_slice(&encode_scalar_value(key_type, &self.key)?);
         out.extend_from_slice(&encode_scalar_value(&spec.value_type, &self.value)?);
         Ok(out)
@@ -388,7 +983,12 @@ impl OramBlock {
             .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
         let key_len = fixed_scalar_width(key_type)?;
         let value_len = fixed_scalar_width(&spec.value_type)?;
-        let expected_len = 1 + key_len + value_len;
+        let path_bytes = if spec.oram_scheme == PATH_ORAM_SCHEME {
+            ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES
+        } else {
+            0
+        };
+        let expected_len = 1 + path_bytes + key_len + value_len;
         if bytes.len() != expected_len {
             bail!(
                 "unexpected ORAM block length for {}: {} != {}",
@@ -402,12 +1002,29 @@ impl OramBlock {
             1 => true,
             other => bail!("invalid ORAM block tag {other:#x} for {}", spec.name),
         };
+        let (slot_index, leaf, key_start) = if spec.oram_scheme == PATH_ORAM_SCHEME {
+            let mut slot_bytes = [0u8; 8];
+            slot_bytes.copy_from_slice(&bytes[1..9]);
+            let mut leaf_bytes = [0u8; 8];
+            leaf_bytes.copy_from_slice(&bytes[9..17]);
+            (
+                usize::try_from(u64::from_be_bytes(slot_bytes))
+                    .map_err(|_| anyhow!("slot index overflow for {}", spec.name))?,
+                usize::try_from(u64::from_be_bytes(leaf_bytes))
+                    .map_err(|_| anyhow!("leaf label overflow for {}", spec.name))?,
+                17,
+            )
+        } else {
+            (0, 0, 1)
+        };
         Ok(Self {
             occupied,
-            key: decode_scalar_value(key_type, &bytes[1..1 + key_len])?,
+            slot_index,
+            leaf,
+            key: decode_scalar_value(key_type, &bytes[key_start..key_start + key_len])?,
             value: decode_scalar_value(
                 &spec.value_type,
-                &bytes[1 + key_len..1 + key_len + value_len],
+                &bytes[key_start + key_len..key_start + key_len + value_len],
             )?,
         })
     }
@@ -422,6 +1039,15 @@ pub(crate) struct OramBucket {
 }
 
 impl OramBucket {
+    pub(crate) fn empty(_spec: &StateObject, bucket_index: usize) -> Result<Self> {
+        Ok(Self {
+            access_counter: 0,
+            bucket_index,
+            live_entry_count: 0,
+            blocks: Vec::new(),
+        })
+    }
+
     pub(crate) fn from_entries(
         spec: &StateObject,
         entries: &[MapEntry],
@@ -642,7 +1268,7 @@ fn log2_ceil(value: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{MapEntry, OramBucket, OramParameters};
+    use super::{MapEntry, OramBucket, OramParameters, SURROGATE_ORAM_SCHEME};
     use uo_core::ir::{BackendKind, ContainerKind, StateObject};
     use uo_core::{ScalarType, Type, Value};
 
@@ -652,6 +1278,7 @@ mod tests {
             name: "balances".into(),
             kind: ContainerKind::Map,
             backend: BackendKind::Oram,
+            oram_scheme: SURROGATE_ORAM_SCHEME.into(),
             value_type: Type::Scalar(ScalarType::Uint(256)),
             key_type: Some(Type::Scalar(ScalarType::Address)),
             capacity: Some(8),
@@ -669,11 +1296,15 @@ mod tests {
             blocks: vec![
                 super::OramBlock {
                     occupied: true,
+                    slot_index: 0,
+                    leaf: 0,
                     key: Value::Address([0x11; 20]),
                     value: Value::Uint(5),
                 },
                 super::OramBlock {
                     occupied: true,
+                    slot_index: 0,
+                    leaf: 0,
                     key: Value::Address([0x22; 20]),
                     value: Value::Uint(7),
                 },
