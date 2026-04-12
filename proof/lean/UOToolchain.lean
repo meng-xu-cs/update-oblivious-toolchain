@@ -4,6 +4,8 @@ import UOToolchain.ExactObjects
 import UOToolchain.CompilerInvariant
 import UOToolchain.Composition
 import UOToolchain.OramGame
+import UOToolchain.StandardOramReduction
+import UOToolchain.PathOramSecurity
 import UOToolchain.TeeDeployment
 import UOToolchain.SgxBoundary
 import UOToolchain.SgxRelation

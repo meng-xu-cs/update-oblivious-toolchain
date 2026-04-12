@@ -450,6 +450,16 @@ given only `L_oram`.
 This theorem must be reduced to the underlying ORAM construction plus the
 chosen cryptographic assumptions.
 
+The current Lean scaffold now contains an explicit reduction layer for this:
+
+- `StandardOramReduction.lean` factors `View_M+` into an exact public part plus
+  a backend storage trace and proves that any standard-ORAM-style storage
+  theorem lifts to `ComputationalUOWith`
+- `PathOramSecurity.lean` fixes the current proof-grade backend target to the
+  concrete `path_oram_local_posmap_v1` scheme and narrows the remaining axiom
+  boundary to a path-ORAM storage theorem with an explicit security-assumption
+  bundle rather than a whole-view ORAM theorem
+
 ### Theorem E: Public gas theorem
 
 For accepted confidential entrypoints, `gas_used` equals the manifest-declared

@@ -127,6 +127,12 @@ The abstract ORAM theorem boundary is now surfaced explicitly as:
 
 - `OramSecurityInterface` and `ComputationalUOWith` in
   `proof/lean/UOToolchain/OramGame.lean`
+- `StandardOramSecurityInterface` and
+  `computationalStandardOram_projects_to_computationalUOWith` in
+  `proof/lean/UOToolchain/StandardOramReduction.lean`
+- `PathOramSecurityAssumptions`, `proofGradePathOramSecurityInterface`, and
+  `computationalPathOram_projects_to_computationalUOWith` in
+  `proof/lean/UOToolchain/PathOramSecurity.lean`
 
 The current surrogate theorem remains available as the default specialization,
 so the paper-facing aliases below are unchanged.

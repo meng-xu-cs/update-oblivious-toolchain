@@ -216,6 +216,14 @@ What is implemented:
   traces, and checks those witnesses with the Lean executable; the report is
   emitted as `results/witness_validation.json`, now including a multi-object
   ORAM `transferFrom` path
+- the Lean scaffold now contains an explicit standard-ORAM reduction layer in
+  `StandardOramReduction.lean`, which factors `View_M+` into an exact public
+  part plus a backend storage trace and lifts storage theorems into
+  `ComputationalUOWith`
+- the Lean scaffold now also contains `PathOramSecurity.lean`, which narrows
+  the remaining ORAM axiom boundary to a storage theorem for the concrete
+  `path_oram_local_posmap_v1` backend candidate under an explicit security
+  assumption bundle rather than a whole-view ORAM theorem
 
 What is still missing before this milestone is complete:
 
