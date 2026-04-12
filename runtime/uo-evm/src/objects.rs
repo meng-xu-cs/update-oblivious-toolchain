@@ -78,10 +78,8 @@ pub(crate) enum RuntimeObject {
 }
 
 impl RuntimeObject {
-    pub fn instantiate(spec: &StateObject) -> Result<Self> {
-        let mut seed = [0u8; 32];
-        OsRng.fill_bytes(&mut seed);
-        let mut rng = ChaCha20Rng::from_seed(seed);
+    fn instantiate_from_rng(spec: &StateObject, master_rng: &mut ChaCha20Rng) -> Result<Self> {
+        let mut rng = ChaCha20Rng::seed_from_u64(master_rng.next_u64());
         match (&spec.kind, &spec.backend) {
             (ContainerKind::Cell, BackendKind::Raw) => {
                 let logical = Value::zero_for_type(&spec.value_type);
@@ -89,7 +87,7 @@ impl RuntimeObject {
                     spec: spec.clone(),
                     physical: raw_encode(&logical),
                     value: logical,
-                    cipher: StoreCipher::random(),
+                    cipher: StoreCipher::from_rng(&mut rng),
                     accessed: false,
                     written: false,
                     rng,
@@ -98,7 +96,7 @@ impl RuntimeObject {
             (ContainerKind::Cell, _) => {
                 let logical = Value::zero_for_type(&spec.value_type);
                 let payload = logical.canonical_bytes();
-                let cipher = StoreCipher::random();
+                let cipher = StoreCipher::from_rng(&mut rng);
                 let aad = cell_slot_aad(&spec.name);
                 Ok(Self::UoCell(CellObject {
                     spec: spec.clone(),
@@ -120,7 +118,7 @@ impl RuntimeObject {
                     spec: spec.clone(),
                     values,
                     physical_slots,
-                    cipher: StoreCipher::random(),
+                    cipher: StoreCipher::from_rng(&mut rng),
                     accessed: false,
                     written_indices: BTreeSet::new(),
                     rng,
@@ -135,7 +133,7 @@ impl RuntimeObject {
                     .canonical_bytes()
                     .len()
                     .max(1);
-                let cipher = StoreCipher::random();
+                let cipher = StoreCipher::from_rng(&mut rng);
                 let physical_slots = (0..capacity)
                     .map(|index| {
                         let aad = array_slot_aad(&spec.name, index);
@@ -175,7 +173,7 @@ impl RuntimeObject {
                     })
                     .collect::<Vec<_>>();
                 let logical_len = map_record_bytes(&entries[0]).len().max(1);
-                let cipher = StoreCipher::random();
+                let cipher = StoreCipher::from_rng(&mut rng);
                 let physical_slots = (0..capacity)
                     .map(|index| {
                         let aad = small_map_slot_aad(&spec.name, index);
@@ -200,6 +198,18 @@ impl RuntimeObject {
                 rng,
             })),
         }
+    }
+
+    pub fn instantiate(spec: &StateObject) -> Result<Self> {
+        let mut seed = [0u8; 32];
+        OsRng.fill_bytes(&mut seed);
+        let mut master_rng = ChaCha20Rng::from_seed(seed);
+        Self::instantiate_from_rng(spec, &mut master_rng)
+    }
+
+    pub fn instantiate_with_seed(spec: &StateObject, seed: u64) -> Result<Self> {
+        let mut master_rng = ChaCha20Rng::seed_from_u64(seed);
+        Self::instantiate_from_rng(spec, &mut master_rng)
     }
 
     pub fn clone_for_tx(&self) -> Self {

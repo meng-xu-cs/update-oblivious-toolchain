@@ -182,7 +182,7 @@ pub(crate) struct OramState {
 impl OramState {
     pub(crate) fn instantiate(spec: &StateObject, rng: &mut ChaCha20Rng) -> Result<Self> {
         let parameters = OramParameters::for_spec(spec)?;
-        let cipher = StoreCipher::random();
+        let cipher = StoreCipher::from_rng(rng);
         let empty_entry = empty_map_entry(spec)?;
         let entries = vec![empty_entry.clone(); parameters.capacity];
         if parameters.is_surrogate() {

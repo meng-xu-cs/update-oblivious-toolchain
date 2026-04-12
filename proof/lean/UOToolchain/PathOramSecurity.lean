@@ -868,6 +868,66 @@ theorem computationalPathOram_fromPublicViewBucketLocationAndShape_projects_to_c
     simpa [List.map_map] using hBucket cfg₁ cfg₂ hSame
   · exact hShape
 
+theorem computationalPathOram_fromPublicViewLeafScheduleScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+  (assumptions : PathOramLeafSecurityAssumptions)
+  {run : OramSemantics}
+  {leafRun : OramConfig → Distribution PathOramLeafScheduleTrace}
+  (hCfg : ∀ cfg, PathOramConfigWellFormed cfg)
+  (hPublic : PathOramPublicViewSafe run)
+  (hLeaf :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      assumptions.leafScheduleSecurity
+        (leafRun cfg₁)
+        (leafRun cfg₂)
+        (pathOramProjectedExecutionLeakage cfg₁))
+  (hLeafScaffold :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramLeafScheduleScaffold
+        (leafRun cfg₁)
+        (leafRun cfg₂))
+  (hBucketProjection :
+    ∀ cfg,
+      (run cfg).map pathOramBucketTraceOfView =
+        (leafRun cfg).map pathOramBucketTraceOfLeafScheduleTrace)
+  (hPublicLocation :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramPublicLocationTrace
+        ((run cfg₁).map (fun view => pathOramStorageLocationTrace (oramStorageView view)))
+        ((run cfg₂).map (fun view => pathOramStorageLocationTrace (oramStorageView view))))
+  (hShape :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        (fun view => pathOramStorageShape (oramStorageView view))
+        (run cfg₁)
+        (run cfg₂)) :
+  ComputationalUOWith
+    (proofGradePathOramSecurityInterface
+      assumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
+    run := by
+  apply computationalPathOram_fromPublicViewBucketLocationAndShape_projects_to_computationalUOWith
+    assumptions.toPathOramBucketSecurityAssumptions
+    hCfg
+    hPublic
+  · intro cfg₁ cfg₂ hSame
+    refine
+      ⟨ leafRun cfg₁
+      , leafRun cfg₂
+      , hLeaf cfg₁ cfg₂ hSame
+      , hLeafScaffold cfg₁ cfg₂ hSame
+      , ?_
+      , ?_
+      ⟩
+    · exact hBucketProjection cfg₁
+    · exact hBucketProjection cfg₂
+  · exact hPublicLocation
+  · exact hShape
+
 theorem computationalPathOram_fromPublicViewLeafScheduleBucketLocationAndShape_projects_to_computationalUOWith
   (assumptions : PathOramLeafSecurityAssumptions)
   {run : OramSemantics}
@@ -910,21 +970,68 @@ theorem computationalPathOram_fromPublicViewLeafScheduleBucketLocationAndShape_p
     (proofGradePathOramSecurityInterface
       assumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
     run := by
-  apply computationalPathOram_fromPublicViewBucketLocationAndShape_projects_to_computationalUOWith
-    assumptions.toPathOramBucketSecurityAssumptions
+  apply computationalPathOram_fromPublicViewLeafScheduleScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+    assumptions
     hCfg
     hPublic
   · intro cfg₁ cfg₂ hSame
-    refine
-      ⟨ leafRun cfg₁
-      , leafRun cfg₂
-      , hLeaf cfg₁ cfg₂ hSame
-      , pathOramLeafSchedulePublicAlignment_exact_of_samePublicProjection hPublic hLeafPublic hSame
-      , ?_
-      , ?_
-      ⟩
-    · exact hBucketProjection cfg₁
-    · exact hBucketProjection cfg₂
+    exact hLeaf cfg₁ cfg₂ hSame
+  · intro cfg₁ cfg₂ hSame
+    exact pathOramLeafSchedulePublicAlignment_exact_of_samePublicProjection hPublic hLeafPublic hSame
+  · exact hBucketProjection
+  · exact hPublicLocation
+  · exact hShape
+
+theorem computationalPathOram_fromPublicViewLeafValuesScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+  (assumptions : PathOramLeafValueSecurityAssumptions)
+  {run : OramSemantics}
+  {leafRun : OramConfig → Distribution PathOramLeafScheduleTrace}
+  (hCfg : ∀ cfg, PathOramConfigWellFormed cfg)
+  (hPublic : PathOramPublicViewSafe run)
+  (hLeafValues :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      assumptions.leafValueSecurity
+        ((leafRun cfg₁).map pathOramLeafValues)
+        ((leafRun cfg₂).map pathOramLeafValues)
+        (pathOramProjectedExecutionLeakage cfg₁))
+  (hLeafScaffold :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramLeafScheduleScaffold
+        (leafRun cfg₁)
+        (leafRun cfg₂))
+  (hBucketProjection :
+    ∀ cfg,
+      (run cfg).map pathOramBucketTraceOfView =
+        (leafRun cfg).map pathOramBucketTraceOfLeafScheduleTrace)
+  (hPublicLocation :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramPublicLocationTrace
+        ((run cfg₁).map (fun view => pathOramStorageLocationTrace (oramStorageView view)))
+        ((run cfg₂).map (fun view => pathOramStorageLocationTrace (oramStorageView view))))
+  (hShape :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        (fun view => pathOramStorageShape (oramStorageView view))
+        (run cfg₁)
+        (run cfg₂)) :
+  ComputationalUOWith
+    (proofGradePathOramSecurityInterface
+      assumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
+    run := by
+  apply computationalPathOram_fromPublicViewLeafScheduleScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+    assumptions.toPathOramLeafSecurityAssumptions
+    hCfg
+    hPublic
+  · intro cfg₁ cfg₂ hSame
+    exact ⟨hLeafValues cfg₁ cfg₂ hSame, hLeafScaffold cfg₁ cfg₂ hSame⟩
+  · exact hLeafScaffold
+  · exact hBucketProjection
   · exact hPublicLocation
   · exact hShape
 
@@ -970,16 +1077,67 @@ theorem computationalPathOram_fromPublicViewLeafValuesBucketLocationAndShape_pro
     (proofGradePathOramSecurityInterface
       assumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
     run := by
-  apply computationalPathOram_fromPublicViewLeafScheduleBucketLocationAndShape_projects_to_computationalUOWith
-    assumptions.toPathOramLeafSecurityAssumptions
+  apply computationalPathOram_fromPublicViewLeafValuesScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+    assumptions
     hCfg
     hPublic
   · intro cfg₁ cfg₂ hSame
-    refine
-      ⟨ hLeafValues cfg₁ cfg₂ hSame
-      , pathOramLeafSchedulePublicAlignment_exact_of_samePublicProjection hPublic hLeafPublic hSame
-      ⟩
-  · exact hLeafPublic
+    exact hLeafValues cfg₁ cfg₂ hSame
+  · intro cfg₁ cfg₂ hSame
+    exact pathOramLeafSchedulePublicAlignment_exact_of_samePublicProjection hPublic hLeafPublic hSame
+  · exact hBucketProjection
+  · exact hPublicLocation
+  · exact hShape
+
+theorem computationalPathOram_fromPublicViewCanonicalLeafValuesScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+  (assumptions : PathOramCanonicalLeafValueSecurityAssumptions)
+  {run : OramSemantics}
+  {leafRun : OramConfig → Distribution PathOramLeafScheduleTrace}
+  (hCfg : ∀ cfg, PathOramConfigWellFormed cfg)
+  (hPublic : PathOramPublicViewSafe run)
+  (hLeafCanonical :
+    ∀ cfg publicPart,
+      OramConstantProjection pathOramViewPublicPart (run cfg) publicPart →
+      PathOramLeafValueCanonicalOnPublicPart
+        ((leafRun cfg).map pathOramLeafValues)
+        publicPart
+        (pathOramProjectedExecutionLeakage cfg))
+  (hLeafScaffold :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramLeafScheduleScaffold
+        (leafRun cfg₁)
+        (leafRun cfg₂))
+  (hBucketProjection :
+    ∀ cfg,
+      (run cfg).map pathOramBucketTraceOfView =
+        (leafRun cfg).map pathOramBucketTraceOfLeafScheduleTrace)
+  (hPublicLocation :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramPublicLocationTrace
+        ((run cfg₁).map (fun view => pathOramStorageLocationTrace (oramStorageView view)))
+        ((run cfg₂).map (fun view => pathOramStorageLocationTrace (oramStorageView view))))
+  (hShape :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        (fun view => pathOramStorageShape (oramStorageView view))
+        (run cfg₁)
+        (run cfg₂)) :
+  ComputationalUOWith
+    (proofGradePathOramSecurityInterface
+      assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
+    run := by
+  apply computationalPathOram_fromPublicViewLeafValuesScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+    assumptions.toPathOramLeafValueSecurityAssumptions
+    hCfg
+    hPublic
+  · intro cfg₁ cfg₂ hSame
+    exact canonicalPathOramLeafValueRelation_of_samePublicProjection hPublic hLeafCanonical hSame
+  · exact hLeafScaffold
   · exact hBucketProjection
   · exact hPublicLocation
   · exact hShape
@@ -1026,13 +1184,13 @@ theorem computationalPathOram_fromPublicViewCanonicalLeafValuesBucketLocationAnd
     (proofGradePathOramSecurityInterface
       assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
     run := by
-  apply computationalPathOram_fromPublicViewLeafValuesBucketLocationAndShape_projects_to_computationalUOWith
-    assumptions.toPathOramLeafValueSecurityAssumptions
+  apply computationalPathOram_fromPublicViewCanonicalLeafValuesScaffoldBucketLocationAndShape_projects_to_computationalUOWith
+    assumptions
     hCfg
     hPublic
+  · exact hLeafCanonical
   · intro cfg₁ cfg₂ hSame
-    exact canonicalPathOramLeafValueRelation_of_samePublicProjection hPublic hLeafCanonical hSame
-  · exact hLeafPublic
+    exact pathOramLeafSchedulePublicAlignment_exact_of_samePublicProjection hPublic hLeafPublic hSame
   · exact hBucketProjection
   · exact hPublicLocation
   · exact hShape

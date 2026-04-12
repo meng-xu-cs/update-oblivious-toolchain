@@ -209,6 +209,14 @@ What is implemented:
   scaffold matches the path accesses reconstructed from the logical trace and
   that its deterministic bucket-path projection reproduces the observed
   path-ORAM bucket trace exactly
+- that same witness now also exports the certified public leaf scaffold
+  explicitly, so the theorem side can consume equality of that public scaffold
+  directly when instantiating the path-ORAM storage boundary instead of
+  rebuilding the same relation only through the older public-alignment lemma
+- seeded runtime execution is now deterministic end to end for the proof-grade
+  path candidate: the exported `runtime_seed` controls object-local RNG state,
+  store-cipher key generation, and ORAM leaf sampling, and the regression suite
+  checks replayability of seeded path-ORAM traces
 - the Lean scaffold now also contains
   `proof/lean/UOToolchain/RuntimeRefinementJson.lean`, which parses the Rust
   witness JSON, converts it into the theorem-side witness, and provides a
@@ -246,9 +254,10 @@ What is still missing before this milestone is complete:
 - a theorem tying the Rust public logical-trace/controller-witness constructor
   to the Lean witness assumptions, rather than only re-checking imported
   concrete witnesses against the same predicate inside Lean
-- an explicit semantics for runtime coins or seeds that turns the hidden
-  path-ORAM leaf witness into a distribution-valued object rather than only a
-  checked per-trace certificate
+- a theorem that lifts the now-explicit `runtime_seed` interface from a
+  deterministic replay handle into a distribution-valued runtime-coins object
+  that discharges the canonical hidden-leaf theorem without adding a larger
+  trusted surrogate
 - discharge of the ORAM theorem against the chosen standard construction
   through that witness layer
 

@@ -356,6 +356,19 @@ def ImportedRuntimeOramLeafCertificate.toRuntimeOramLeafCertificate
   , leaf := leaf.leaf
   }
 
+structure ImportedRuntimeOramLeafScaffoldCertificate where
+  object_id : Nat
+  object_name : String
+  bucket_count : Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeOramLeafScaffoldCertificate.toRuntimePathOramLeafScaffoldStep
+  (leaf : ImportedRuntimeOramLeafScaffoldCertificate) : RuntimePathOramLeafScaffoldStep :=
+  { objectId := leaf.object_id
+  , objectName := leaf.object_name
+  , bucketCount := leaf.bucket_count
+  }
+
 structure ImportedRuntimeOramObjectCertificate where
   object_id : Nat
   object_name : String
@@ -395,18 +408,21 @@ def ImportedRuntimeOramObjectCertificate.toRuntimeOramObjectCertificate
 
 structure ImportedRuntimeRefinementWitness where
   trace : ImportedRefinementTrace
+  runtime_seed : Option Nat
   public_outcome : ImportedPublicOutcomeTrace
   boundary_schedule : List ImportedBoundaryEvent
   controller_shape : ImportedSgxControllerShapeTrace
   normalized_micro_trace : ImportedNormalizedMicroTrace
   controller_certificate : ImportedRuntimeControllerCertificate
   oram_objects : List ImportedRuntimeOramObjectCertificate
+  oram_leaf_public_scaffold : List ImportedRuntimeOramLeafScaffoldCertificate
   oram_leaf_schedule : List ImportedRuntimeOramLeafCertificate
 deriving Repr, DecidableEq, FromJson, ToJson
 
 def ImportedRuntimeRefinementWitness.toRuntimeWitness
   (witness : ImportedRuntimeRefinementWitness) : RuntimeRefinementWitness :=
   { trace := witness.trace.toTrace
+  , runtimeSeed := witness.runtime_seed
   , publicOutcome := witness.public_outcome.toPublicOutcome
   , boundarySchedule := witness.boundary_schedule.map ImportedBoundaryEvent.toBoundaryEvent
   , controllerShape := witness.controller_shape.toControllerShape
@@ -414,6 +430,8 @@ def ImportedRuntimeRefinementWitness.toRuntimeWitness
   , controllerCertificate := witness.controller_certificate.toRuntimeControllerCertificate
   , oramObjects := witness.oram_objects.map
       ImportedRuntimeOramObjectCertificate.toRuntimeOramObjectCertificate
+  , oramLeafPublicScaffold := witness.oram_leaf_public_scaffold.map
+      ImportedRuntimeOramLeafScaffoldCertificate.toRuntimePathOramLeafScaffoldStep
   , oramLeafSchedule := witness.oram_leaf_schedule.map
       ImportedRuntimeOramLeafCertificate.toRuntimeOramLeafCertificate
   }
@@ -498,6 +516,7 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
            }]
       , gas_used := 7
       }
+  , runtime_seed := none
   , public_outcome :=
       { entrypoint_id := "put(bytes32,uint256)"
       , public_args := []
@@ -551,6 +570,7 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
       , observed_oram_accesses := []
       }
   , oram_objects := []
+  , oram_leaf_public_scaffold := []
   , oram_leaf_schedule := []
   }
 

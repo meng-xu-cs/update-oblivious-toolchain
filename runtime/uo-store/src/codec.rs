@@ -45,10 +45,15 @@ impl fmt::Debug for StoreCipher {
 }
 
 impl StoreCipher {
-    pub fn random() -> Self {
+    pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {
         let mut key = [0u8; 32];
-        OsRng.fill_bytes(&mut key);
+        rng.fill_bytes(&mut key);
         Self { key }
+    }
+
+    pub fn random() -> Self {
+        let mut rng = OsRng;
+        Self::from_rng(&mut rng)
     }
 
     pub fn seal(&self, aad: &[u8], payload: &[u8], rng: &mut ChaCha20Rng) -> Vec<u8> {
@@ -158,5 +163,21 @@ mod tests {
         let mut tampered = encoded.clone();
         tampered[5] ^= 0x01;
         assert_eq!(cipher.open(b"object:slot", 3, &tampered), None);
+    }
+
+    #[test]
+    fn cipher_from_rng_is_seed_deterministic() {
+        let mut lhs = ChaCha20Rng::seed_from_u64(41);
+        let mut rhs = ChaCha20Rng::seed_from_u64(41);
+        let cipher_lhs = StoreCipher::from_rng(&mut lhs);
+        let cipher_rhs = StoreCipher::from_rng(&mut rhs);
+        let payload = [7u8, 8u8, 9u8];
+        let encoded_lhs = cipher_lhs.seal(b"object:slot", &payload, &mut lhs);
+        let encoded_rhs = cipher_rhs.seal(b"object:slot", &payload, &mut rhs);
+        assert_eq!(encoded_lhs, encoded_rhs);
+        assert_eq!(
+            cipher_lhs.open(b"object:slot", payload.len(), &encoded_lhs),
+            Some(payload.to_vec())
+        );
     }
 }

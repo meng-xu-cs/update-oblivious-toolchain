@@ -4,7 +4,7 @@ mod objects;
 mod oram;
 mod theorem;
 
-pub use engine::{run_artifact, CallResult, ContractInstance};
+pub use engine::{run_artifact, run_artifact_with_seed, CallResult, ContractInstance};
 
 #[cfg(test)]
 mod tests {
@@ -506,6 +506,39 @@ mod tests {
         assert_eq!(
             witness.normalized_micro_trace,
             witness.controller_shape.normalized_micro_trace()
+        );
+    }
+
+    #[test]
+    fn deploy_with_seed_makes_path_oram_trace_replayable() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut first = ContractInstance::deploy_with_seed(artifact.clone(), 17).unwrap();
+        let first_result = first
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+        let mut second = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
+        let second_result = second
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+
+        assert_eq!(first_result.trace.runtime_seed, Some(17));
+        assert_eq!(second_result.trace.runtime_seed, Some(17));
+        assert_eq!(first_result.trace.hashes(), second_result.trace.hashes());
+        assert_eq!(
+            first_result.trace.runtime_refinement_witness().unwrap(),
+            second_result.trace.runtime_refinement_witness().unwrap()
         );
     }
 

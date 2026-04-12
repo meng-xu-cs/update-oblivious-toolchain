@@ -90,6 +90,10 @@ def RuntimeOramLeafCertificate.scaffoldStep
   , bucketCount := leaf.bucketCount
   }
 
+def RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+  (step : RuntimePathOramLeafScaffoldStep) : String × Nat :=
+  (step.objectName, step.bucketCount)
+
 def runtimeOramObjectByName?
   (oramObjects : List RuntimeOramObjectCertificate)
   (objectName : String) : Option RuntimeOramObjectCertificate :=
@@ -356,12 +360,14 @@ def RuntimeControllerCertificate.controllerShape
 
 structure RuntimeRefinementWitness where
   trace : Trace
+  runtimeSeed : Option Nat
   publicOutcome : SGXPublicOutcome
   boundarySchedule : List BoundaryEvent
   controllerShape : SGXControllerShape
   normalizedMicroTrace : NormalizedMicroTrace
   controllerCertificate : RuntimeControllerCertificate
   oramObjects : List RuntimeOramObjectCertificate
+  oramLeafPublicScaffold : List RuntimePathOramLeafScaffoldStep
   oramLeafSchedule : List RuntimeOramLeafCertificate
 deriving Repr, DecidableEq
 
@@ -404,6 +410,16 @@ def RuntimeRefinementWitness.pathOramLeafScaffold
   (witness : RuntimeRefinementWitness) : List RuntimePathOramLeafScaffoldStep :=
   witness.oramLeafSchedule.map RuntimeOramLeafCertificate.scaffoldStep
 
+def RuntimeRefinementWitness.projectedPathOramLeafScaffold
+  (witness : RuntimeRefinementWitness) : PathOramLeafScheduleScaffold :=
+  witness.pathOramLeafScaffold.map
+    RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+
+def RuntimeRefinementWitness.projectedPublicPathOramLeafScaffold
+  (witness : RuntimeRefinementWitness) : PathOramLeafScheduleScaffold :=
+  witness.oramLeafPublicScaffold.map
+    RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+
 def RuntimeRefinementWitness.pathOramBucketTrace
   (witness : RuntimeRefinementWitness) : PathOramBucketTrace :=
   pathOramBucketTraceOfView (viewMPlus witness.trace)
@@ -423,6 +439,7 @@ def RuntimeRefinementWitness.Valid
         witness.trace.logicalAccesses
         witness.oramObjects =
       some witness.pathOramLeafScaffold ∧
+    witness.oramLeafPublicScaffold = witness.pathOramLeafScaffold ∧
     pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
       witness.pathOramBucketTrace ∧
     witness.normalizedMicroTrace =
@@ -446,6 +463,7 @@ def RuntimeRefinementWitness.checkValid
           witness.trace.logicalAccesses
           witness.oramObjects =
         some witness.pathOramLeafScaffold) &&
+    decide (witness.oramLeafPublicScaffold = witness.pathOramLeafScaffold) &&
     decide
       (pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
         witness.pathOramBucketTrace) &&
@@ -502,7 +520,8 @@ theorem sgxView_normalizedMicro_eq_witness
   (hValid : witness.Valid modelTags) :
   normalizeMicroTrace (sgxMicroTrace witness.sgxView) = witness.normalizedMicroTrace := by
   rcases hValid with
-    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hLeafBuckets, hNormalized⟩
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
+      _hLeafBuckets, hNormalized⟩
   rw [sgxMicroTrace_runtimeWitness]
   rw [reconstructedMicroTrace_normalizedByLeakage]
   exact hNormalized.symm
@@ -513,7 +532,8 @@ theorem runtimeWitness_boundaryBudget_exact
   (hValid : witness.Valid modelTags) :
   witness.boundarySchedule.length = witness.controllerShape.boundaryEventBudget := by
   rcases hValid with
-    ⟨_hGas, hBoundary, hShape, _hAccesses, _hLeafScaffold, _hLeafBuckets, _hNormalized⟩
+    ⟨_hGas, hBoundary, hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
+      _hLeafBuckets, _hNormalized⟩
   rw [hBoundary, hShape]
   exact runtimeControllerCertificate_boundarySchedule_budget
     witness.controllerCertificate
@@ -535,8 +555,50 @@ theorem runtimeWitness_pathOramLeafScaffold_exact
       witness.oramObjects =
     some witness.pathOramLeafScaffold := by
   rcases hValid with
-    ⟨_hGas, _hBoundary, _hShape, _hAccesses, hLeafScaffold, _hLeafBuckets, _hNormalized⟩
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, hLeafScaffold, _hPublicLeafScaffold,
+      _hLeafBuckets, _hNormalized⟩
   exact hLeafScaffold
+
+theorem runtimeWitness_publicPathOramLeafScaffold_matches_hidden
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.oramLeafPublicScaffold = witness.pathOramLeafScaffold := by
+  rcases hValid with
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, hPublicLeafScaffold,
+      _hLeafBuckets, _hNormalized⟩
+  exact hPublicLeafScaffold
+
+theorem runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.projectedPublicPathOramLeafScaffold =
+    witness.projectedPathOramLeafScaffold := by
+  rw [RuntimeRefinementWitness.projectedPublicPathOramLeafScaffold,
+    RuntimeRefinementWitness.projectedPathOramLeafScaffold,
+    runtimeWitness_publicPathOramLeafScaffold_matches_hidden witness modelTags hValid]
+
+@[simp] theorem runtimeWitness_projectedPathOramLeafScaffold_exact
+  (witness : RuntimeRefinementWitness) :
+  pathOramLeafScheduleScaffold witness.pathOramLeafScheduleTrace =
+    witness.projectedPathOramLeafScaffold := by
+  cases witness with
+  | mk trace runtimeSeed publicOutcome boundarySchedule controllerShape normalizedMicroTrace
+      controllerCertificate oramObjects oramLeafPublicScaffold oramLeafSchedule =>
+      induction oramLeafSchedule with
+      | nil =>
+          rfl
+      | cons head tail ih =>
+          cases head
+          simp [ RuntimeRefinementWitness.pathOramLeafScheduleTrace
+            , RuntimeRefinementWitness.pathOramLeafScaffold
+            , RuntimeRefinementWitness.projectedPathOramLeafScaffold
+            , pathOramLeafScheduleScaffold
+            , RuntimeOramLeafCertificate.toPathOramLeafScheduleStep
+            , RuntimeOramLeafCertificate.scaffoldStep
+            , RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+            ]
 
 theorem runtimeWitness_pathOramBucketProjection_exact
   (witness : RuntimeRefinementWitness)
@@ -545,8 +607,52 @@ theorem runtimeWitness_pathOramBucketProjection_exact
   pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
     witness.pathOramBucketTrace := by
   rcases hValid with
-    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, hLeafBuckets, _hNormalized⟩
+    ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
+      hLeafBuckets, _hNormalized⟩
   exact hLeafBuckets
+
+theorem runtimeWitness_pathOramLeafScaffold_singletonExactProjection
+  (witness : RuntimeRefinementWitness) :
+  OramExactProjectionRelation
+    pathOramLeafScheduleScaffold
+    [witness.pathOramLeafScheduleTrace]
+    [witness.pathOramLeafScheduleTrace] := by
+  refine ⟨witness.projectedPathOramLeafScaffold, ?_, ?_⟩
+  · intro trace hMem
+    simp at hMem
+    rcases hMem with rfl
+    exact runtimeWitness_projectedPathOramLeafScaffold_exact witness
+  · intro trace hMem
+    simp at hMem
+    rcases hMem with rfl
+    exact runtimeWitness_projectedPathOramLeafScaffold_exact witness
+
+theorem runtimeWitness_pathOramLeafScaffold_exactProjection_of_publicScaffold
+  (witness₁ witness₂ : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid₁ : witness₁.Valid modelTags)
+  (hValid₂ : witness₂.Valid modelTags)
+  (hPublic :
+    witness₁.projectedPublicPathOramLeafScaffold =
+      witness₂.projectedPublicPathOramLeafScaffold) :
+  OramExactProjectionRelation
+    pathOramLeafScheduleScaffold
+    [witness₁.pathOramLeafScheduleTrace]
+    [witness₂.pathOramLeafScheduleTrace] := by
+  refine ⟨witness₁.projectedPublicPathOramLeafScaffold, ?_, ?_⟩
+  · intro trace hMem
+    simp at hMem
+    rcases hMem with rfl
+    rw [runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
+      witness₁ modelTags hValid₁]
+    exact runtimeWitness_projectedPathOramLeafScaffold_exact witness₁
+  · intro trace hMem
+    simp at hMem
+    rcases hMem with rfl
+    rw [hPublic]
+    rw [runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
+      witness₂ modelTags hValid₂]
+    exact runtimeWitness_projectedPathOramLeafScaffold_exact witness₂
 
 theorem runtimeWitness_projects_to_paper_observer
   (witness : RuntimeRefinementWitness)

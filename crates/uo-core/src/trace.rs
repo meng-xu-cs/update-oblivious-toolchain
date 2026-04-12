@@ -153,6 +153,13 @@ pub struct RuntimeOramLeafWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeOramLeafScaffoldWitness {
+    pub object_id: u32,
+    pub object_name: String,
+    pub bucket_count: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeOramObjectWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -210,12 +217,15 @@ pub struct RefinementTrace {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeRefinementWitness {
     pub trace: RefinementTrace,
+    pub runtime_seed: Option<u64>,
     pub public_outcome: PublicOutcomeTrace,
     pub boundary_schedule: Vec<BoundaryEvent>,
     pub controller_shape: SgxControllerShapeTrace,
     pub normalized_micro_trace: NormalizedMicroTrace,
     pub controller_certificate: RuntimeControllerCertificate,
     pub oram_objects: Vec<RuntimeOramObjectWitness>,
+    #[serde(default)]
+    pub oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
     #[serde(default)]
     pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
 }
@@ -734,7 +744,7 @@ fn validate_path_oram_leaf_schedule(
     physical_reads: &[PhysicalReadEvent],
     physical_writes: &[PhysicalWriteEvent],
     oram_objects: &[RuntimeOramObjectWitness],
-) -> Result<(), RefinementWitnessError> {
+) -> Result<Vec<RuntimeOramLeafScaffoldWitness>, RefinementWitnessError> {
     let scaffold = reconstruct_path_oram_leaf_scaffold_from_logical_trace(logical_accesses, oram_objects)?;
     if scaffold.len() != leaf_schedule.len() {
         return Err(RefinementWitnessError::OramLeafScheduleMismatch);
@@ -756,7 +766,14 @@ fn validate_path_oram_leaf_schedule(
     if observed != expected {
         return Err(RefinementWitnessError::OramLeafScheduleMismatch);
     }
-    Ok(())
+    Ok(scaffold
+        .into_iter()
+        .map(|(object_id, object_name, bucket_count)| RuntimeOramLeafScaffoldWitness {
+            object_id,
+            object_name,
+            bucket_count,
+        })
+        .collect())
 }
 
 impl SgxControllerShapeTrace {
@@ -795,6 +812,8 @@ pub struct ExecutionTrace {
     pub gas_used: u64,
     #[serde(default)]
     pub theorem_trace: TheoremTrace,
+    #[serde(default)]
+    pub runtime_seed: Option<u64>,
     #[serde(default)]
     pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,
     #[serde(default)]
@@ -904,7 +923,7 @@ impl ExecutionTrace {
         if normalized_micro_trace != controller_shape.normalized_micro_trace() {
             return Err(RefinementWitnessError::NormalizedMicroTraceMismatch);
         }
-        validate_path_oram_leaf_schedule(
+        let oram_leaf_public_scaffold = validate_path_oram_leaf_schedule(
             &self.runtime_oram_leaf_schedule,
             &self.logical_accesses,
             &self.physical_reads,
@@ -913,12 +932,14 @@ impl ExecutionTrace {
         )?;
         Ok(RuntimeRefinementWitness {
             trace: self.refinement_trace(),
+            runtime_seed: self.runtime_seed,
             public_outcome,
             boundary_schedule: self.theorem_trace.boundary_schedule.clone(),
             controller_shape,
             normalized_micro_trace,
             controller_certificate,
             oram_objects: self.runtime_oram_objects.clone(),
+            oram_leaf_public_scaffold,
             oram_leaf_schedule: self.runtime_oram_leaf_schedule.clone(),
         })
     }
@@ -1135,6 +1156,7 @@ mod tests {
                 controller_shape: Some(controller_shape.clone()),
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
+            runtime_seed: None,
             runtime_controller_certificate: Some(controller_certificate.clone()),
             runtime_oram_objects: vec![sample_oram_object()],
             runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),

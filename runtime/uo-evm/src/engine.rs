@@ -2,6 +2,8 @@ use crate::controller::CallRecorder;
 use crate::objects::RuntimeObject;
 use crate::theorem::{attach_theorem_metrics, build_theorem_trace};
 use anyhow::{anyhow, bail, Result};
+use rand::rngs::OsRng;
+use rand::RngCore;
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
@@ -12,6 +14,7 @@ use uo_core::{CompiledArtifact, ExecutionTrace, RuntimeOramObjectWitness, Value}
 pub struct ContractInstance {
     artifact: CompiledArtifact,
     objects: BTreeMap<u32, RuntimeObject>,
+    deploy_seed: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -31,11 +34,22 @@ struct ExecState {
 
 impl ContractInstance {
     pub fn deploy(artifact: CompiledArtifact) -> Result<Self> {
+        let deploy_seed = OsRng.next_u64();
+        Self::deploy_with_seed(artifact, deploy_seed)
+    }
+
+    pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
         let mut objects = BTreeMap::new();
+        let mut master_seed = deploy_seed;
         for spec in &artifact.contract.state {
-            objects.insert(spec.id, RuntimeObject::instantiate(spec)?);
+            objects.insert(spec.id, RuntimeObject::instantiate_with_seed(spec, master_seed)?);
+            master_seed = master_seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xA5A5_A5A5_A5A5_A5A5);
         }
-        Ok(Self { artifact, objects })
+        Ok(Self {
+            artifact,
+            objects,
+            deploy_seed,
+        })
     }
 
     pub fn call(&mut self, entrypoint: &str, args: Vec<Value>) -> Result<CallResult> {
@@ -175,6 +189,7 @@ impl ContractInstance {
             host_proxy_metrics,
             gas_used,
             theorem_trace: trace_bundle.theorem_trace,
+            runtime_seed: Some(self.deploy_seed),
             runtime_controller_certificate: Some(trace_bundle.controller_certificate),
             runtime_oram_objects: runtime_oram_objects(&self.artifact),
             runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
@@ -191,6 +206,15 @@ impl ContractInstance {
 
 pub fn run_artifact(artifact: &CompiledArtifact, entrypoint: &str) -> Result<ExecutionTrace> {
     let mut instance = ContractInstance::deploy(artifact.clone())?;
+    Ok(instance.call(entrypoint, Vec::new())?.trace)
+}
+
+pub fn run_artifact_with_seed(
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    deploy_seed: u64,
+) -> Result<ExecutionTrace> {
+    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), deploy_seed)?;
     Ok(instance.call(entrypoint, Vec::new())?.trace)
 }
 
