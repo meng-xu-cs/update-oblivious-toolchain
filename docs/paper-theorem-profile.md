@@ -144,21 +144,24 @@ leaf-value hidden witness interface: the ordered per-access leaf scaffold is
 reconstructed from the public logical trace plus public ORAM metadata, and
 bucket-trace secrecy is derived from hidden leaf values together with a
 deterministic public projection from those values to root-to-leaf bucket
-paths. The remaining decomposition is:
+paths. The clean-path proof stack now goes one step further and instantiates
+that hidden leaf-value layer with a canonical finite-distribution sampler
+indexed by the public scaffold. The decomposition is now:
 
-- a hidden relation on per-access leaf values
 - exact public reconstruction of the ordered leaf scaffold
+- a canonical finite-distribution sampler for per-access leaf values
+- exact public canonicalization of sampled leaf values from the public part
 - exact public constancy of the leaf-schedule scaffold
 - deterministic projection from leaf schedules and leaf values to bucket traces
 - exact public constancy of the non-bucket location scaffold
 - exact public constancy of storage-shape projections
 
-The narrower leaf-value assumption surface is exposed through:
+The canonical leaf-value layer is exposed through:
 
-- `PathOramLeafValueSecurityAssumptions`
-- `pathOramLeafScheduleRelationFromLeafValueRelation`
-- `pathOramLeafScheduleScaffoldOfPublicPart`
-- `computationalPathOram_fromPublicViewLeafValuesBucketLocationAndShape_projects_to_computationalUOWith`
+- `FiniteDistribution.lean`
+- `PathOramLeafValueCanonicalOnPublicPart`
+- `PathOramCanonicalLeafValueSecurityAssumptions`
+- `computationalPathOram_fromPublicViewCanonicalLeafValuesBucketLocationAndShape_projects_to_computationalUOWith`
 
 The current surrogate theorem remains available as the default specialization,
 so the paper-facing aliases below are unchanged.

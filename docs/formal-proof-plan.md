@@ -463,9 +463,11 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   legacy surrogate-style `schedule` field and keeps only the standard public
   ORAM parameters
 - the path-ORAM storage theorem is now decomposed inside Lean into:
-  a location-schedule security relation on projected storage locations plus
-  exact public constancy of storage-shape data such as read lengths and write
-  classes
+  a canonical finite-distribution sampler for hidden leaf values indexed by
+  the public leaf scaffold, deterministic projection from leaf values to bucket
+  traces, a location-schedule security relation on projected storage
+  locations, and exact public constancy of storage-shape data such as read
+  lengths and write classes
 
 ### Theorem E: Public gas theorem
 
