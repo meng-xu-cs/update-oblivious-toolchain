@@ -310,12 +310,44 @@ def ImportedNormalizedMicroTrace.toNormalizedMicroTrace
   , sharedResourcePattern := trace.shared_resource_pattern
   }
 
+structure ImportedRuntimeOramAccessCertificate where
+  object_id : Nat
+  scheme : String
+  metadata_pages_per_access : Nat
+  buckets_per_access : Nat
+  recursion_depth : Nat
+  stash_bound : Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeOramAccessCertificate.toRuntimeOramAccessCertificate
+  (access : ImportedRuntimeOramAccessCertificate) : RuntimeOramAccessCertificate :=
+  { objectId := access.object_id
+  , scheme := access.scheme
+  , metadataPagesPerAccess := access.metadata_pages_per_access
+  , bucketsPerAccess := access.buckets_per_access
+  , recursionDepth := access.recursion_depth
+  , stashBound := access.stash_bound
+  }
+
+structure ImportedRuntimeControllerCertificate where
+  entry_input_len : Nat
+  observed_oram_accesses : List ImportedRuntimeOramAccessCertificate
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeControllerCertificate.toRuntimeControllerCertificate
+  (certificate : ImportedRuntimeControllerCertificate) : RuntimeControllerCertificate :=
+  { entryInputLen := certificate.entry_input_len
+  , observedOramAccesses := certificate.observed_oram_accesses.map
+      ImportedRuntimeOramAccessCertificate.toRuntimeOramAccessCertificate
+  }
+
 structure ImportedRuntimeRefinementWitness where
   trace : ImportedRefinementTrace
   public_outcome : ImportedPublicOutcomeTrace
   boundary_schedule : List ImportedBoundaryEvent
   controller_shape : ImportedSgxControllerShapeTrace
   normalized_micro_trace : ImportedNormalizedMicroTrace
+  controller_certificate : ImportedRuntimeControllerCertificate
 deriving Repr, DecidableEq, FromJson, ToJson
 
 def ImportedRuntimeRefinementWitness.toRuntimeWitness
@@ -325,6 +357,7 @@ def ImportedRuntimeRefinementWitness.toRuntimeWitness
   , boundarySchedule := witness.boundary_schedule.map ImportedBoundaryEvent.toBoundaryEvent
   , controllerShape := witness.controller_shape.toControllerShape
   , normalizedMicroTrace := witness.normalized_micro_trace.toNormalizedMicroTrace
+  , controllerCertificate := witness.controller_certificate.toRuntimeControllerCertificate
   }
 
 def ImportedRuntimeRefinementWitness.Valid
@@ -428,20 +461,36 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
       ]
   , controller_shape :=
       { boundary_event_budget := 2
-      , controller_phase_order := [.EnclaveEnter, .EnclaveExit]
+      , controller_phase_order := [.EnclaveEnter, .SealPersistentState, .EnclaveExit]
       , page_trace_regions :=
-          [{ page_kind := "metadata", event_budget := 0 }]
+          [ { page_kind := "metadata", event_budget := 0 }
+          , { page_kind := "position_map", event_budget := 0 }
+          , { page_kind := "path", event_budget := 0 }
+          , { page_kind := "stash", event_budget := 0 }
+          ]
       , workset_regions :=
-          [{ page_kind := "metadata", event_budget := 0 }]
-      , exit_trace_budget := 2
-      , shared_resource_budget := 2
+          [ { page_kind := "metadata", event_budget := 0 }
+          , { page_kind := "position_map", event_budget := 0 }
+          , { page_kind := "path", event_budget := 0 }
+          , { page_kind := "stash", event_budget := 0 }
+          ]
+      , exit_trace_budget := 4
+      , shared_resource_budget := 3
       , recursive_position_map_depth := 0
       , stash_bound := 0
       }
   , normalized_micro_trace :=
       { page_trace := []
-      , exit_pattern := [.Resume, .Terminate]
-      , shared_resource_pattern := ["shared_resource_tick", "shared_resource_tick"]
+      , exit_pattern := [.Resume, .InterruptExit, .Resume, .Terminate]
+      , shared_resource_pattern :=
+          [ "shared_resource_tick"
+          , "shared_resource_tick"
+          , "shared_resource_tick"
+          ]
+      }
+  , controller_certificate :=
+      { entry_input_len := 64
+      , observed_oram_accesses := []
       }
   }
 

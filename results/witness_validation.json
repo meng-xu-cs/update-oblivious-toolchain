@@ -5,11 +5,12 @@
     "page_model": "page_v1",
     "shared_resource_model": "shared_v1"
   },
-  "scenario_count": 18,
+  "scenario_count": 19,
   "scenarios": [
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
@@ -19,11 +20,12 @@
       "scenario": "FixedSlotClassifier/uo/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 2281
+      "witness_json_bytes": 2376
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
@@ -33,11 +35,12 @@
       "scenario": "FixedSlotClassifier/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 2281
+      "witness_json_bytes": 2376
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
@@ -47,11 +50,12 @@
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4838
+      "witness_json_bytes": 4933
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
@@ -61,11 +65,12 @@
       "scenario": "AuthScan/uo/class1",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4838
+      "witness_json_bytes": 4933
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
@@ -75,11 +80,12 @@
       "scenario": "RegistryCRUD/uo/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4739
+      "witness_json_bytes": 4834
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
@@ -89,11 +95,12 @@
       "scenario": "RegistryCRUD/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4739
+      "witness_json_bytes": 4834
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
@@ -103,11 +110,12 @@
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 6949
+      "witness_json_bytes": 7044
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
@@ -117,11 +125,12 @@
       "scenario": "ConfidentialMixer/fullscan/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 6949
+      "witness_json_bytes": 7044
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
@@ -131,11 +140,12 @@
       "scenario": "ERC20Lite/fullscan/class0",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7700
+      "witness_json_bytes": 7795
     },
     {
       "accepted": true,
       "boundary_events": 2,
+      "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
@@ -145,11 +155,12 @@
       "scenario": "ERC20Lite/fullscan/class1",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7700
+      "witness_json_bytes": 7795
     },
     {
       "accepted": true,
       "boundary_events": 6,
+      "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
@@ -159,11 +170,12 @@
       "scenario": "ConfidentialMixer/oram/class0",
       "setup_calls": 0,
       "shared_resource_events": 47,
-      "witness_json_bytes": 17131
+      "witness_json_bytes": 17668
     },
     {
       "accepted": true,
       "boundary_events": 6,
+      "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
@@ -173,11 +185,12 @@
       "scenario": "ConfidentialMixer/oram/class1",
       "setup_calls": 0,
       "shared_resource_events": 47,
-      "witness_json_bytes": 17131
+      "witness_json_bytes": 17668
     },
     {
       "accepted": true,
       "boundary_events": 4,
+      "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 10,
@@ -187,11 +200,12 @@
       "scenario": "ERC20Lite/oram/class0",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 14981
+      "witness_json_bytes": 15300
     },
     {
       "accepted": true,
       "boundary_events": 4,
+      "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 10,
@@ -201,11 +215,27 @@
       "scenario": "ERC20Lite/oram/class1",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 14981
+      "witness_json_bytes": 15300
+    },
+    {
+      "accepted": true,
+      "boundary_events": 14,
+      "controller_accesses": 6,
+      "controller_phase_count": 33,
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "exit_events": 40,
+      "gas_used": 16384,
+      "lean_stdout": "validated runtime refinement witness for transferFrom(address,address,address,uint256)",
+      "page_trace_events": 120,
+      "scenario": "ERC20Lite/oram/transferFrom-multi-object",
+      "setup_calls": 2,
+      "shared_resource_events": 153,
+      "witness_json_bytes": 52518
     },
     {
       "accepted": true,
       "boundary_events": 4,
+      "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
@@ -215,11 +245,12 @@
       "scenario": "SingleAccessMap/pathoram/put-class0",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 8901
+      "witness_json_bytes": 9217
     },
     {
       "accepted": true,
       "boundary_events": 4,
+      "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
@@ -229,11 +260,12 @@
       "scenario": "SingleAccessMap/pathoram/put-class1",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 8901
+      "witness_json_bytes": 9217
     },
     {
       "accepted": true,
       "boundary_events": 6,
+      "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
@@ -243,11 +275,12 @@
       "scenario": "SingleAccessMap/pathoram/add-class0",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 15741
+      "witness_json_bytes": 16274
     },
     {
       "accepted": true,
       "boundary_events": 6,
+      "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
@@ -257,7 +290,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class1",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 15741
+      "witness_json_bytes": 16274
     }
   ]
 }

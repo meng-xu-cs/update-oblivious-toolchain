@@ -174,6 +174,7 @@ impl ContractInstance {
             host_proxy_metrics,
             gas_used,
             theorem_trace: trace_bundle.theorem_trace,
+            runtime_controller_certificate: Some(trace_bundle.controller_certificate),
         };
         attach_theorem_metrics(&mut trace);
         trace.runtime_refinement_witness()?;

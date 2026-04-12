@@ -376,6 +376,25 @@ fn run_witness_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Res
         },
         &checker,
     )?);
+    scenarios.push(validate_witness_case(
+        "ERC20Lite/oram/transferFrom-multi-object",
+        erc20_oram,
+        &[
+            CallSpec {
+                entrypoint: "mint(address,uint256)",
+                args: vec![addr(0x11), Value::Uint(10)],
+            },
+            CallSpec {
+                entrypoint: "approve(address,address,uint256)",
+                args: vec![addr(0x11), addr(0x21), Value::Uint(6)],
+            },
+        ],
+        &CallSpec {
+            entrypoint: "transferFrom(address,address,address,uint256)",
+            args: vec![addr(0x11), addr(0x21), addr(0x31), Value::Uint(3)],
+        },
+        &checker,
+    )?);
 
     scenarios.push(validate_witness_case(
         "SingleAccessMap/pathoram/put-class0",
@@ -463,6 +482,7 @@ fn validate_witness_case(
         "gas_used": trace.gas_used,
         "boundary_events": witness.boundary_schedule.len(),
         "controller_phase_count": witness.controller_shape.controller_phase_order.len(),
+        "controller_accesses": witness.controller_certificate.observed_oram_accesses.len(),
         "page_trace_events": witness.normalized_micro_trace.page_trace.len(),
         "exit_events": witness.normalized_micro_trace.exit_pattern.len(),
         "shared_resource_events": witness.normalized_micro_trace.shared_resource_pattern.len(),

@@ -488,4 +488,72 @@ mod tests {
             witness.controller_shape.normalized_micro_trace()
         );
     }
+
+    #[test]
+    fn transfer_from_witness_records_multi_object_oram_order() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.oram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let balances_id = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == "balances")
+            .unwrap()
+            .id;
+        let allowances_id = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == "allowances")
+            .unwrap()
+            .id;
+        let owner = Value::Address([0x11; 20]);
+        let spender = Value::Address([0x22; 20]);
+        let recipient = Value::Address([0x33; 20]);
+
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        instance
+            .call("mint(address,uint256)", vec![owner.clone(), Value::Uint(10)])
+            .unwrap();
+        instance
+            .call(
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::Uint(6)],
+            )
+            .unwrap();
+        let result = instance
+            .call(
+                "transferFrom(address,address,address,uint256)",
+                vec![
+                    owner.clone(),
+                    spender.clone(),
+                    recipient,
+                    Value::Uint(3),
+                ],
+            )
+            .unwrap();
+        let witness = result.trace.runtime_refinement_witness().unwrap();
+        let observed_ids = witness
+            .controller_certificate
+            .observed_oram_accesses
+            .iter()
+            .map(|access| access.object_id)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            observed_ids,
+            vec![
+                allowances_id,
+                balances_id,
+                allowances_id,
+                balances_id,
+                balances_id,
+                balances_id,
+            ]
+        );
+    }
 }

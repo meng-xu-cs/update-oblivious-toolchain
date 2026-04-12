@@ -154,16 +154,19 @@ The runtime-to-Lean witness interface is now fixed in:
   `runtime/uo-evm/src/engine.rs`
 - independent public-observer reconstruction and drift check in
   `runtime/uo-evm/src/controller.rs`
+- ordered controller-certificate reconstruction in
+  `crates/uo-core/src/trace.rs`
 - `uo-evm --format refinement-witness` in `runtime/uo-evm/src/main.rs`
 - `RuntimeRefinementWitness` and its projection lemmas in
   `proof/lean/UOToolchain/RuntimeRefinement.lean`
 - `RuntimeRefinementJson.lean` for JSON import, Lean-side witness checking, and
-  conversion into the theorem objects
+  conversion into the theorem objects, including certificate-based observer
+  reconstruction
 - `checkRuntimeWitness` in `proof/lean/CheckRuntimeWitness.lean` for
   end-to-end witness validation from the Lean side
 - `results/witness_validation.json` for benchmark-backed validation that the
   emitted runtime witnesses are accepted by the Lean checker on representative
-  supported paths
+  supported paths, including a multi-object ORAM `transferFrom` witness
 
 ## Non-Claim
 
