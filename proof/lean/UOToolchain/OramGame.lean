@@ -136,10 +136,22 @@ axiom oramLocalTheorem
   (leakage : List OramAccessLeakage) :
   Prop
 
-def ComputationalUO (run : OramSemantics) : Prop :=
+abbrev OramLocalTheorem :=
+  Distribution ViewMPlus → Distribution ViewMPlus → List OramAccessLeakage → Prop
+
+structure OramSecurityInterface where
+  localTheorem : OramLocalTheorem
+
+def surrogateOramSecurityInterface : OramSecurityInterface :=
+  { localTheorem := oramLocalTheorem }
+
+def ComputationalUOWith (security : OramSecurityInterface) (run : OramSemantics) : Prop :=
   ∀ cfg₁ cfg₂,
     sameOramPublicProjection cfg₁ cfg₂ →
-    oramLocalTheorem (run cfg₁) (run cfg₂) (executionLeakage cfg₁)
+    security.localTheorem (run cfg₁) (run cfg₂) (executionLeakage cfg₁)
+
+abbrev ComputationalUO (run : OramSemantics) : Prop :=
+  ComputationalUOWith surrogateOramSecurityInterface run
 
 theorem sameOramPublicProjection_refl (cfg : OramConfig) : sameOramPublicProjection cfg cfg := rfl
 
@@ -228,6 +240,17 @@ theorem executionLeakage_eq_of_samePublicProjection
   cases hPublic
   rfl
 
+theorem computationalUOWith_uses_public_leakage
+  (security : OramSecurityInterface)
+  (run : OramSemantics)
+  (hLocal :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      security.localTheorem (run cfg₁) (run cfg₂) (executionLeakage cfg₁)) :
+  ComputationalUOWith security run := by
+  intro cfg₁ cfg₂ hPublic
+  exact hLocal cfg₁ cfg₂ hPublic
+
 theorem oramLocalTheorem_uses_public_leakage
   (run : OramSemantics)
   (hLocal :
@@ -235,7 +258,6 @@ theorem oramLocalTheorem_uses_public_leakage
       sameOramPublicProjection cfg₁ cfg₂ →
       oramLocalTheorem (run cfg₁) (run cfg₂) (executionLeakage cfg₁)) :
   ComputationalUO run := by
-  intro cfg₁ cfg₂ hPublic
-  exact hLocal cfg₁ cfg₂ hPublic
+  exact computationalUOWith_uses_public_leakage surrogateOramSecurityInterface run hLocal
 
 end UOToolchain

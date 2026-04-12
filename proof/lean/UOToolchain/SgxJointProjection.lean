@@ -97,6 +97,19 @@ theorem jointMicroLeakage_public
   intro cfg₁ cfg₂ hSame
   exact hPublic cfg₁ cfg₂ hSame
 
+theorem jointStorageTheoremWith_projects_to_sgxStorage
+  (security : OramSecurityInterface)
+  (cfg₁ cfg₂ : OramConfig)
+  (samples₁ samples₂ : Distribution SGXJointSample) :
+  sameOramPublicProjection cfg₁ cfg₂ →
+  security.localTheorem (jointStorageViews samples₁) (jointStorageViews samples₂) (executionLeakage cfg₁) →
+  oramSGXStorageRelationWith security
+    ((jointStorageViews samples₁).map sgxStorageOfOramView)
+    ((jointStorageViews samples₂).map sgxStorageOfOramView)
+    (executionLeakage cfg₁) := by
+  intro hPublic hLocal
+  exact ⟨cfg₁, cfg₂, jointStorageViews samples₁, jointStorageViews samples₂, hPublic, rfl, hLocal, rfl, rfl⟩
+
 theorem jointStorageTheorem_projects_to_sgxStorage
   (cfg₁ cfg₂ : OramConfig)
   (samples₁ samples₂ : Distribution SGXJointSample) :
@@ -106,8 +119,13 @@ theorem jointStorageTheorem_projects_to_sgxStorage
     ((jointStorageViews samples₁).map sgxStorageOfOramView)
     ((jointStorageViews samples₂).map sgxStorageOfOramView)
     (executionLeakage cfg₁) := by
-  intro hPublic hLocal
-  exact ⟨cfg₁, cfg₂, jointStorageViews samples₁, jointStorageViews samples₂, hPublic, rfl, hLocal, rfl, rfl⟩
+  exact
+    jointStorageTheoremWith_projects_to_sgxStorage
+      surrogateOramSecurityInterface
+      cfg₁
+      cfg₂
+      samples₁
+      samples₂
 
 theorem jointMicroTheorem_projects_to_sgxMicro
   (samples₁ samples₂ : Distribution SGXJointSample)
@@ -120,7 +138,8 @@ theorem jointMicroTheorem_projects_to_sgxMicro
   intro h
   exact h
 
-theorem jointSecurity_projects_to_sgxExecution
+theorem jointSecurityWith_projects_to_sgxExecution
+  (security : OramSecurityInterface)
   {run : SGXJointSemantics}
   {publicOutcome : OramConfig → SGXPublicOutcome}
   {boundarySchedule : OramConfig → List BoundaryEvent}
@@ -128,7 +147,7 @@ theorem jointSecurity_projects_to_sgxExecution
   (hStorage :
     ∀ cfg₁ cfg₂,
       sameOramPublicProjection cfg₁ cfg₂ →
-      oramLocalTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+      security.localTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
   (hMicro :
     ∀ cfg₁ cfg₂,
       sameOramPublicProjection cfg₁ cfg₂ →
@@ -138,7 +157,7 @@ theorem jointSecurity_projects_to_sgxExecution
   (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
   SGXExecutionSecurity
     sameOramPublicProjection
-    { storageRel := oramSGXStorageRelation, microRel := computationalSGXMicroRelation }
+    { storageRel := oramSGXStorageRelationWith security, microRel := computationalSGXMicroRelation }
     (jointToSGXSemantics run publicOutcome boundarySchedule)
     executionLeakage
     (jointMicroLeakage microLeakage) := by
@@ -162,7 +181,8 @@ theorem jointSecurity_projects_to_sgxExecution
       simp
   constructor
   · simpa [jointToSGXSemantics, sgxStorageDistribution, jointStorageViews, List.map_map] using
-      (jointStorageTheorem_projects_to_sgxStorage
+      (jointStorageTheoremWith_projects_to_sgxStorage
+        security
         cfg₁
         cfg₂
         (run cfg₁)
@@ -175,6 +195,65 @@ theorem jointSecurity_projects_to_sgxExecution
         (run cfg₂)
         (microLeakage cfg₁)
         (hMicro cfg₁ cfg₂ hPublic))
+
+theorem jointSecurity_projects_to_sgxExecution
+  {run : SGXJointSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {microLeakage : OramConfig → SGXMicroLeakage}
+  (hStorage :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      oramLocalTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+  (hMicro :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      sgxMicroLocalTheorem (jointMicroViews (run cfg₁)) (jointMicroViews (run cfg₂)) (microLeakage cfg₁))
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    { storageRel := oramSGXStorageRelation, microRel := computationalSGXMicroRelation }
+    (jointToSGXSemantics run publicOutcome boundarySchedule)
+    executionLeakage
+    (jointMicroLeakage microLeakage) := by
+  exact
+    jointSecurityWith_projects_to_sgxExecution
+      surrogateOramSecurityInterface
+      hStorage
+      hMicro
+      hOutcome
+      hBoundary
+      hMicroLeakage
+
+theorem jointSecurityWith_projects_to_sgxExecution_with_oramController
+  (security : OramSecurityInterface)
+  {run : SGXJointSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {modelTags : SGXModelTags}
+  (hStorage :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      security.localTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+  (hMicro :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      sgxMicroLocalTheorem
+        (jointMicroViews (run cfg₁))
+        (jointMicroViews (run cfg₂))
+        (oramMicroLeakage publicOutcome modelTags cfg₁))
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    { storageRel := oramSGXStorageRelationWith security, microRel := computationalSGXMicroRelation }
+    (jointToSGXSemantics run publicOutcome boundarySchedule)
+    executionLeakage
+    (jointMicroLeakage (oramMicroLeakage publicOutcome modelTags)) := by
+  apply jointSecurityWith_projects_to_sgxExecution security hStorage hMicro hOutcome hBoundary
+  exact oramMicroLeakage_public hOutcome
 
 theorem jointSecurity_projects_to_sgxExecution_with_oramController
   {run : SGXJointSemantics}
@@ -200,10 +279,16 @@ theorem jointSecurity_projects_to_sgxExecution_with_oramController
     (jointToSGXSemantics run publicOutcome boundarySchedule)
     executionLeakage
     (jointMicroLeakage (oramMicroLeakage publicOutcome modelTags)) := by
-  apply jointSecurity_projects_to_sgxExecution hStorage hMicro hOutcome hBoundary
-  exact oramMicroLeakage_public hOutcome
+  exact
+    jointSecurityWith_projects_to_sgxExecution_with_oramController
+      surrogateOramSecurityInterface
+      hStorage
+      hMicro
+      hOutcome
+      hBoundary
 
-theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
+theorem jointSecurityWith_projects_to_sgxExecution_with_normalizedMicro
+  (security : OramSecurityInterface)
   {run : SGXJointSemantics}
   {publicOutcome : OramConfig → SGXPublicOutcome}
   {boundarySchedule : OramConfig → List BoundaryEvent}
@@ -211,7 +296,7 @@ theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
   (hStorage :
     ∀ cfg₁ cfg₂,
       sameOramPublicProjection cfg₁ cfg₂ →
-      oramLocalTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+      security.localTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
   (hMicro :
     ∀ cfg,
       NormalizedByLeakage
@@ -222,7 +307,7 @@ theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
   (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
   SGXExecutionSecurity
     sameOramPublicProjection
-    { storageRel := oramSGXStorageRelation, microRel := normalizedObservedSGXMicroRelation }
+    { storageRel := oramSGXStorageRelationWith security, microRel := normalizedObservedSGXMicroRelation }
     (jointToSGXSemantics run publicOutcome boundarySchedule)
     executionLeakage
     (jointMicroLeakage microLeakage) := by
@@ -246,7 +331,8 @@ theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
       simp
   constructor
   · simpa [jointToSGXSemantics, sgxStorageDistribution, jointStorageViews, List.map_map] using
-      (jointStorageTheorem_projects_to_sgxStorage
+      (jointStorageTheoremWith_projects_to_sgxStorage
+        security
         cfg₁
         cfg₂
         (run cfg₁)
@@ -271,8 +357,73 @@ theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
           simpa [jointToSGXSemantics, jointMicroViews, jointMicroLeakage, sgxMicroDistribution, List.map_map] using
             hMicro cfg₂)
 
+theorem jointSecurity_projects_to_sgxExecution_with_normalizedMicro
+  {run : SGXJointSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {microLeakage : OramConfig → SGXMicroLeakage}
+  (hStorage :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      oramLocalTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+  (hMicro :
+    ∀ cfg,
+      NormalizedByLeakage
+        (jointMicroViews (run cfg))
+        (microLeakage cfg))
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    { storageRel := oramSGXStorageRelation, microRel := normalizedObservedSGXMicroRelation }
+    (jointToSGXSemantics run publicOutcome boundarySchedule)
+    executionLeakage
+    (jointMicroLeakage microLeakage) := by
+  exact
+    jointSecurityWith_projects_to_sgxExecution_with_normalizedMicro
+      surrogateOramSecurityInterface
+      hStorage
+      hMicro
+      hOutcome
+      hBoundary
+      hMicroLeakage
+
 /-- Paper-facing joint theorem profile:
 exact public boundary schedule plus normalized SGX micro observer. -/
+theorem paperMain_jointSecurityWith_projects_to_sgxExecution
+  (security : OramSecurityInterface)
+  {run : SGXJointSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {microLeakage : OramConfig → SGXMicroLeakage}
+  (hStorage :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      security.localTheorem (jointStorageViews (run cfg₁)) (jointStorageViews (run cfg₂)) (executionLeakage cfg₁))
+  (hMicro :
+    ∀ cfg,
+      NormalizedByLeakage
+        (jointMicroViews (run cfg))
+        (microLeakage cfg))
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    { storageRel := oramSGXStorageRelationWith security, microRel := normalizedObservedSGXMicroRelation }
+    (jointToSGXSemantics run publicOutcome boundarySchedule)
+    executionLeakage
+    (jointMicroLeakage microLeakage) := by
+  exact
+    jointSecurityWith_projects_to_sgxExecution_with_normalizedMicro
+      security
+      hStorage
+      hMicro
+      hOutcome
+      hBoundary
+      hMicroLeakage
+
 theorem paperMain_jointSecurity_projects_to_sgxExecution
   {run : SGXJointSemantics}
   {publicOutcome : OramConfig → SGXPublicOutcome}
@@ -296,7 +447,13 @@ theorem paperMain_jointSecurity_projects_to_sgxExecution
     (jointToSGXSemantics run publicOutcome boundarySchedule)
     executionLeakage
     (jointMicroLeakage microLeakage) := by
-  exact jointSecurity_projects_to_sgxExecution_with_normalizedMicro
-    hStorage hMicro hOutcome hBoundary hMicroLeakage
+  exact
+    paperMain_jointSecurityWith_projects_to_sgxExecution
+      surrogateOramSecurityInterface
+      hStorage
+      hMicro
+      hOutcome
+      hBoundary
+      hMicroLeakage
 
 end UOToolchain

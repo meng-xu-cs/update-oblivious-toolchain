@@ -623,6 +623,9 @@ Required change:
 - implement a standard construction such as Path ORAM or Ring ORAM
 - define bucket capacity `Z`, block size `B`, tree height `H`, stash bound `S`
 - store the position map recursively or prove a bounded public-resident layer
+- keep the Lean theorem boundary parameterized by an abstract ORAM security
+  interface so the current surrogate theorem can be replaced only by
+  instantiation, not by weakening downstream SGX or TEE theorems
 
 ### 6.4 Make randomness explicit in the runtime interface
 
@@ -707,14 +710,17 @@ Without these changes, the repository may target Section 1.3 but not Section
 The most efficient implementation path is:
 
 1. Freeze the artifact theorem boundary in this document.
-2. Extract ORAM logic from
+2. Keep the ORAM-facing Lean theorems parameterized by an explicit ORAM
+   security interface and preserve the current surrogate theorem only as the
+   default instance.
+3. Extract ORAM logic from
    [objects.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/objects.rs)
    into a dedicated module with explicit transcript outputs.
-3. Introduce typed bucket/block/state structs and explicit serialization.
-4. Split marker-hiding encoding from cryptographic encryption.
-5. Upgrade the surrogate to a standard ORAM construction.
-6. Add manifest fields for ORAM security parameters.
-7. Only then start mechanized proofs.
+4. Introduce typed bucket/block/state structs and explicit serialization.
+5. Split marker-hiding encoding from cryptographic encryption.
+6. Upgrade the surrogate to a standard ORAM construction.
+7. Add manifest fields for ORAM security parameters.
+8. Only then start mechanized proofs for the concrete backend instance.
 
 ## 8. Immediate Next Engineering Tasks
 

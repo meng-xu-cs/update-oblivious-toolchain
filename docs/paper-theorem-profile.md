@@ -123,6 +123,14 @@ boundary behavior and normalized SGX micro simulation.
 
 ## Lean Mapping
 
+The abstract ORAM theorem boundary is now surfaced explicitly as:
+
+- `OramSecurityInterface` and `ComputationalUOWith` in
+  `proof/lean/UOToolchain/OramGame.lean`
+
+The current surrogate theorem remains available as the default specialization,
+so the paper-facing aliases below are unchanged.
+
 The current paper-facing aliases are:
 
 - Exact backend main theorem:

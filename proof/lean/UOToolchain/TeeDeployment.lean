@@ -115,14 +115,32 @@ def OramPublicOutputShapeSafe (outputShape : OramConfig → OutputShape) : Prop 
 
 abbrev TEEStorageLocalTheorem := Distribution TEEView → Distribution TEEView → List OramAccessLeakage → Prop
 
-def teeStorageLocalTheorem : TEEStorageLocalTheorem :=
+def teeStorageLocalTheoremWith (security : OramSecurityInterface) : TEEStorageLocalTheorem :=
   fun teeView₁ teeView₂ leakage =>
     ∃ cfg₁ cfg₂ termination outputShape view₁ view₂,
       sameOramPublicProjection cfg₁ cfg₂ ∧
       leakage = executionLeakage cfg₁ ∧
-      oramLocalTheorem view₁ view₂ leakage ∧
+      security.localTheorem view₁ view₂ leakage ∧
       teeView₁ = view₁.map (viewTEEStoreFromOramView cfg₁ termination outputShape) ∧
       teeView₂ = view₂.map (viewTEEStoreFromOramView cfg₂ termination outputShape)
+
+abbrev teeStorageLocalTheorem : TEEStorageLocalTheorem :=
+  teeStorageLocalTheoremWith surrogateOramSecurityInterface
+
+theorem oramSecurity_projects_to_teeStorage
+  (security : OramSecurityInterface)
+  (cfg₁ cfg₂ : OramConfig)
+  (termination : Bool)
+  (outputShape : OutputShape)
+  (view₁ view₂ : Distribution ViewMPlus) :
+  sameOramPublicProjection cfg₁ cfg₂ →
+  security.localTheorem view₁ view₂ (executionLeakage cfg₁) →
+  teeStorageLocalTheoremWith security
+    (view₁.map (viewTEEStoreFromOramView cfg₁ termination outputShape))
+    (view₂.map (viewTEEStoreFromOramView cfg₂ termination outputShape))
+    (executionLeakage cfg₁) := by
+  intro hPublic hLocal
+  refine ⟨cfg₁, cfg₂, termination, outputShape, view₁, view₂, hPublic, rfl, hLocal, rfl, rfl⟩
 
 theorem oramLocalTheorem_projects_to_teeStorage
   (cfg₁ cfg₂ : OramConfig)
@@ -135,35 +153,43 @@ theorem oramLocalTheorem_projects_to_teeStorage
     (view₁.map (viewTEEStoreFromOramView cfg₁ termination outputShape))
     (view₂.map (viewTEEStoreFromOramView cfg₂ termination outputShape))
     (executionLeakage cfg₁) := by
-  intro hPublic hLocal
-  refine ⟨cfg₁, cfg₂, termination, outputShape, view₁, view₂, hPublic, rfl, hLocal, rfl, rfl⟩
+  exact oramSecurity_projects_to_teeStorage surrogateOramSecurityInterface cfg₁ cfg₂ termination outputShape view₁ view₂
 
-def ComputationalTEEStorageOblivious
+def ComputationalTEEStorageObliviousWith
+  (security : OramSecurityInterface)
   (run : OramSemantics)
   (termination : OramConfig → Bool)
   (outputShape : OramConfig → OutputShape) : Prop :=
   ∀ cfg₁ cfg₂,
     sameOramPublicProjection cfg₁ cfg₂ →
-    teeStorageLocalTheorem
+    teeStorageLocalTheoremWith security
       (teeStoreDistribution run termination outputShape cfg₁)
       (teeStoreDistribution run termination outputShape cfg₂)
       (executionLeakage cfg₁)
 
-theorem computationalUO_projects_to_teeStorage
+abbrev ComputationalTEEStorageOblivious
+  (run : OramSemantics)
+  (termination : OramConfig → Bool)
+  (outputShape : OramConfig → OutputShape) : Prop :=
+  ComputationalTEEStorageObliviousWith surrogateOramSecurityInterface run termination outputShape
+
+theorem computationalUOWith_projects_to_teeStorage
+  (security : OramSecurityInterface)
   {run : OramSemantics}
   {termination : OramConfig → Bool}
   {outputShape : OramConfig → OutputShape}
-  (hOram : ComputationalUO run)
+  (hOram : ComputationalUOWith security run)
   (hTermination : OramPublicTerminationSafe termination)
   (hOutputShape : OramPublicOutputShapeSafe outputShape) :
-  ComputationalTEEStorageOblivious run termination outputShape := by
+  ComputationalTEEStorageObliviousWith security run termination outputShape := by
   intro cfg₁ cfg₂ hPublic
   have hTerm : termination cfg₁ = termination cfg₂ :=
     hTermination cfg₁ cfg₂ hPublic
   have hOutput : outputShape cfg₁ = outputShape cfg₂ :=
     hOutputShape cfg₁ cfg₂ hPublic
   simpa [teeStoreDistribution, hTerm, hOutput] using
-    (oramLocalTheorem_projects_to_teeStorage
+    (oramSecurity_projects_to_teeStorage
+      security
       cfg₁
       cfg₂
       (termination cfg₁)
@@ -173,7 +199,23 @@ theorem computationalUO_projects_to_teeStorage
       hPublic
       (hOram cfg₁ cfg₂ hPublic))
 
-def TEEStorageSecurity
+theorem computationalUO_projects_to_teeStorage
+  {run : OramSemantics}
+  {termination : OramConfig → Bool}
+  {outputShape : OramConfig → OutputShape}
+  (hOram : ComputationalUO run)
+  (hTermination : OramPublicTerminationSafe termination)
+  (hOutputShape : OramPublicOutputShapeSafe outputShape) :
+  ComputationalTEEStorageOblivious run termination outputShape := by
+  exact
+    computationalUOWith_projects_to_teeStorage
+      surrogateOramSecurityInterface
+      hOram
+      hTermination
+      hOutputShape
+
+def TEEStorageSecurityWith
+  (security : OramSecurityInterface)
   (exactRun : Semantics)
   (exactTermination : Config → Bool)
   (exactOutputShape : Config → OutputShape)
@@ -181,7 +223,50 @@ def TEEStorageSecurity
   (oramTermination : OramConfig → Bool)
   (oramOutputShape : OramConfig → OutputShape) : Prop :=
   ExactTEEStorageOblivious (withPublicBoundary exactRun exactTermination exactOutputShape) ∧
-    ComputationalTEEStorageOblivious oramRun oramTermination oramOutputShape
+    ComputationalTEEStorageObliviousWith security oramRun oramTermination oramOutputShape
+
+abbrev TEEStorageSecurity
+  (exactRun : Semantics)
+  (exactTermination : Config → Bool)
+  (exactOutputShape : Config → OutputShape)
+  (oramRun : OramSemantics)
+  (oramTermination : OramConfig → Bool)
+  (oramOutputShape : OramConfig → OutputShape) : Prop :=
+  TEEStorageSecurityWith
+    surrogateOramSecurityInterface
+    exactRun
+    exactTermination
+    exactOutputShape
+    oramRun
+    oramTermination
+    oramOutputShape
+
+theorem artifactSecurityWith_projects_to_teeStorage
+  (security : OramSecurityInterface)
+  {exactRun : Semantics}
+  {exactTermination : Config → Bool}
+  {exactOutputShape : Config → OutputShape}
+  {oramRun : OramSemantics}
+  {oramTermination : OramConfig → Bool}
+  {oramOutputShape : OramConfig → OutputShape}
+  (hArtifact : ArtifactSecurityWith security exactRun oramRun)
+  (hExactTermination : PublicTerminationSafe exactTermination)
+  (hExactOutputShape : PublicOutputShapeSafe exactOutputShape)
+  (hOramTermination : OramPublicTerminationSafe oramTermination)
+  (hOramOutputShape : OramPublicOutputShapeSafe oramOutputShape) :
+  TEEStorageSecurityWith
+    security
+    exactRun
+    exactTermination
+    exactOutputShape
+    oramRun
+    oramTermination
+    oramOutputShape := by
+  rcases hArtifact with ⟨hExact, hOram⟩
+  exact
+    ⟨ exactUO_projects_to_teeStorage hExact hExactTermination hExactOutputShape
+    , computationalUOWith_projects_to_teeStorage security hOram hOramTermination hOramOutputShape
+    ⟩
 
 theorem artifactSecurity_projects_to_teeStorage
   {exactRun : Semantics}
@@ -202,10 +287,13 @@ theorem artifactSecurity_projects_to_teeStorage
     oramRun
     oramTermination
     oramOutputShape := by
-  rcases hArtifact with ⟨hExact, hOram⟩
   exact
-    ⟨ exactUO_projects_to_teeStorage hExact hExactTermination hExactOutputShape
-    , computationalUO_projects_to_teeStorage hOram hOramTermination hOramOutputShape
-    ⟩
+    artifactSecurityWith_projects_to_teeStorage
+      surrogateOramSecurityInterface
+      hArtifact
+      hExactTermination
+      hExactOutputShape
+      hOramTermination
+      hOramOutputShape
 
 end UOToolchain
