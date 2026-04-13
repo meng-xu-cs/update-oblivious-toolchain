@@ -154,7 +154,9 @@ def totalPhysicalWritesPerAccess (object : OramObjectManifest) (accessCounter : 
   1 + (accessSchedule object accessCounter).metadataPages.length +
     (accessSchedule object accessCounter).bucketIndices.length
 
-axiom oramLocalTheorem
+/-- Legacy placeholder local theorem interface.
+The proof-grade Path ORAM development does not depend on this axiom. -/
+axiom legacyOramLocalTheorem
   (view₁ view₂ : Distribution ViewMPlus)
   (leakage : List OramAccessLeakage) :
   Prop
@@ -165,16 +167,16 @@ abbrev OramLocalTheorem :=
 structure OramSecurityInterface where
   localTheorem : OramLocalTheorem
 
-def surrogateOramSecurityInterface : OramSecurityInterface :=
-  { localTheorem := oramLocalTheorem }
+def legacyOramSecurityInterface : OramSecurityInterface :=
+  { localTheorem := legacyOramLocalTheorem }
 
 def ComputationalUOWith (security : OramSecurityInterface) (run : OramSemantics) : Prop :=
   ∀ cfg₁ cfg₂,
     sameOramPublicProjection cfg₁ cfg₂ →
     security.localTheorem (run cfg₁) (run cfg₂) (executionLeakage cfg₁)
 
-abbrev ComputationalUO (run : OramSemantics) : Prop :=
-  ComputationalUOWith surrogateOramSecurityInterface run
+abbrev legacyComputationalUO (run : OramSemantics) : Prop :=
+  ComputationalUOWith legacyOramSecurityInterface run
 
 theorem sameOramPublicProjection_refl (cfg : OramConfig) : sameOramPublicProjection cfg cfg := rfl
 
@@ -284,13 +286,13 @@ theorem computationalUOWith_uses_public_leakage
   intro cfg₁ cfg₂ hPublic
   exact hLocal cfg₁ cfg₂ hPublic
 
-theorem oramLocalTheorem_uses_public_leakage
+theorem legacyOramLocalTheorem_uses_public_leakage
   (run : OramSemantics)
   (hLocal :
     ∀ cfg₁ cfg₂,
       sameOramPublicProjection cfg₁ cfg₂ →
-      oramLocalTheorem (run cfg₁) (run cfg₂) (executionLeakage cfg₁)) :
-  ComputationalUO run := by
-  exact computationalUOWith_uses_public_leakage surrogateOramSecurityInterface run hLocal
+      legacyOramLocalTheorem (run cfg₁) (run cfg₂) (executionLeakage cfg₁)) :
+  legacyComputationalUO run := by
+  exact computationalUOWith_uses_public_leakage legacyOramSecurityInterface run hLocal
 
 end UOToolchain

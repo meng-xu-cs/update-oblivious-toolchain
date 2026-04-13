@@ -468,6 +468,10 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   traces, a location-schedule security relation on projected storage
   locations, and exact public constancy of storage-shape data such as read
   lengths and write classes
+- the old placeholder whole-view ORAM and SGX-micro local-theorem interfaces
+  are now quarantined under `legacy*` names in the Lean development; they are
+  compatibility shims only and are not on the dependency path of the
+  proof-grade paper theorem
 
 ### Theorem E: Public gas theorem
 

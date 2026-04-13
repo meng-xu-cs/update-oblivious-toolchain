@@ -17,8 +17,8 @@ def ArtifactSecurityWith
   (oramRun : OramSemantics) : Prop :=
   ExactUO exactRun ∧ ComputationalUOWith security oramRun
 
-abbrev ArtifactSecurity (exactRun : Semantics) (oramRun : OramSemantics) : Prop :=
-  ArtifactSecurityWith surrogateOramSecurityInterface exactRun oramRun
+abbrev legacyArtifactSecurity (exactRun : Semantics) (oramRun : OramSemantics) : Prop :=
+  ArtifactSecurityWith legacyOramSecurityInterface exactRun oramRun
 
 theorem exactUO_withPublicGas {run : Semantics} {budget : Nat}
   (hExact : ExactUO run) :
@@ -56,13 +56,13 @@ theorem compositionGasTheorem
     (exactEntrypointPublicGasSafe runs manifest)
     hPublic
 
-theorem mixedArtifactComposition
+theorem legacyMixedArtifactComposition
   (runs : List Semantics)
   (manifest : ManifestWitness)
   (hRuns : ExactUOFamily runs)
   (oramRun : OramSemantics)
-  (hOram : ComputationalUO oramRun) :
-  ArtifactSecurity (exactEntrypointSemantics runs manifest) oramRun := by
+  (hOram : legacyComputationalUO oramRun) :
+  legacyArtifactSecurity (exactEntrypointSemantics runs manifest) oramRun := by
   exact ⟨compositionTheorem runs manifest hRuns, hOram⟩
 
 theorem mixedArtifactCompositionWith

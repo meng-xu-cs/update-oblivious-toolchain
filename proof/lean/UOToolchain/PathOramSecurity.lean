@@ -183,6 +183,157 @@ def pathOramLeafValueDistributionOfScaffold :
         (pathOramLeafValueDistributionOfScaffold scaffold)
         List.cons
 
+def pathOramLeafValueSeedSpaceSize : PathOramLeafScheduleScaffold → Nat
+  | [] => 1
+  | (_object, bucketCount) :: scaffold =>
+      pathOramLeafChoiceCount bucketCount * pathOramLeafValueSeedSpaceSize scaffold
+
+def pathOramLeafValueTraceOfSeed :
+  PathOramLeafScheduleScaffold → Nat → PathOramLeafValueTrace
+  | [], _seed => []
+  | (_object, _bucketCount) :: scaffold, seed =>
+      let tailSize := pathOramLeafValueSeedSpaceSize scaffold
+      (seed / tailSize) :: pathOramLeafValueTraceOfSeed scaffold (seed % tailSize)
+
+@[simp] theorem pathOramLeafValueSeedSpaceSize_pos
+  (scaffold : PathOramLeafScheduleScaffold) :
+  0 < pathOramLeafValueSeedSpaceSize scaffold := by
+  induction scaffold with
+  | nil =>
+      simp [pathOramLeafValueSeedSpaceSize]
+  | cons step scaffold ih =>
+      cases step with
+      | mk object bucketCount =>
+          have hChoice : 0 < pathOramLeafChoiceCount bucketCount := by
+            unfold pathOramLeafChoiceCount
+            exact Nat.lt_of_lt_of_le (by decide : 0 < (1 : Nat)) (Nat.le_max_right _ _)
+          exact Nat.mul_pos hChoice ih
+
+@[simp] theorem list_map_finiteDistribution_concat
+  (f : α → β)
+  (xss : List (List α)) :
+  (FiniteDistribution.concat xss).map f =
+    FiniteDistribution.concat (xss.map (List.map f)) := by
+  induction xss with
+  | nil =>
+      rfl
+  | cons xs xss ih =>
+      simp [FiniteDistribution.concat, ih, List.map_append]
+
+@[simp] theorem finiteDistribution_concat_append
+  (xss yss : List (List α)) :
+  FiniteDistribution.concat (xss ++ yss) =
+    FiniteDistribution.concat xss ++ FiniteDistribution.concat yss := by
+  induction xss with
+  | nil =>
+      simp [FiniteDistribution.concat]
+  | cons xs xss ih =>
+      simp [FiniteDistribution.concat, ih, List.append_assoc]
+
+theorem pathOramLeafValueSeedRange_eq_concat
+  (bound tailSize : Nat) :
+  List.range (bound * tailSize) =
+    FiniteDistribution.concat
+      ((List.range bound).map fun left =>
+        (List.range tailSize).map fun tailSeed =>
+          tailSeed + left * tailSize) := by
+  induction bound with
+  | zero =>
+      simp [FiniteDistribution.concat]
+  | succ bound ih =>
+      rw [Nat.succ_mul, List.range_add, ih, List.range_succ, List.map_append,
+        finiteDistribution_concat_append]
+      simp [FiniteDistribution.concat, Nat.add_comm]
+
+theorem pathOramLeafValueTraceOfSeed_block
+  {scaffold : PathOramLeafScheduleScaffold}
+  {object : String}
+  {bucketCount left tailSeed : Nat}
+  (hTailSeed : tailSeed < pathOramLeafValueSeedSpaceSize scaffold) :
+  pathOramLeafValueTraceOfSeed
+      ((object, bucketCount) :: scaffold)
+      (tailSeed + left * pathOramLeafValueSeedSpaceSize scaffold) =
+    left :: pathOramLeafValueTraceOfSeed scaffold tailSeed := by
+  have hTailPos : 0 < pathOramLeafValueSeedSpaceSize scaffold :=
+    pathOramLeafValueSeedSpaceSize_pos scaffold
+  simp [pathOramLeafValueTraceOfSeed,
+    Nat.add_mul_div_right _ _ hTailPos, Nat.div_eq_of_lt hTailSeed,
+    Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt hTailSeed]
+
+theorem pathOramLeafValueDistributionOfScaffold_samples_eq_seedRange
+  (scaffold : PathOramLeafScheduleScaffold) :
+  (pathOramLeafValueDistributionOfScaffold scaffold).samples =
+    (List.range (pathOramLeafValueSeedSpaceSize scaffold)).map
+      (pathOramLeafValueTraceOfSeed scaffold) := by
+  induction scaffold with
+  | nil =>
+      simp [pathOramLeafValueDistributionOfScaffold, pathOramLeafValueSeedSpaceSize,
+        pathOramLeafValueTraceOfSeed]
+  | cons step scaffold ih =>
+      cases step with
+      | mk object bucketCount =>
+          let bound := pathOramLeafChoiceCount bucketCount
+          let tailSize := pathOramLeafValueSeedSpaceSize scaffold
+          have hBlocks :
+              (List.range bound).map
+                  (fun left =>
+                    (List.range tailSize).map
+                      (List.cons left ∘ pathOramLeafValueTraceOfSeed scaffold)) =
+                (List.range bound).map
+                  (fun left =>
+                    (List.range tailSize).map
+                      (fun tailSeed =>
+                        pathOramLeafValueTraceOfSeed
+                          ((object, bucketCount) :: scaffold)
+                          (tailSeed + left * tailSize))) := by
+            apply List.map_congr_left
+            intro left hLeftMem
+            apply List.map_congr_left
+            intro tailSeed hTailMem
+            have hTailSeed : tailSeed < tailSize := by
+              simpa [tailSize] using List.mem_range.mp hTailMem
+            symm
+            simpa [tailSize] using
+              pathOramLeafValueTraceOfSeed_block
+                (object := object)
+                (bucketCount := bucketCount)
+                (left := left)
+                (tailSeed := tailSeed)
+                hTailSeed
+          rw [pathOramLeafValueDistributionOfScaffold, FiniteDistribution.samples_productWith, ih]
+          simp [pathOramUniformLeafValueDistribution]
+          rw [hBlocks]
+          have hSeeds :=
+            congrArg
+              (fun seeds =>
+                seeds.map
+                  (pathOramLeafValueTraceOfSeed ((object, bucketCount) :: scaffold)))
+              (pathOramLeafValueSeedRange_eq_concat bound tailSize)
+          have hSeedBlocks :
+              (List.range bound).map
+                  (fun left =>
+                    (List.range tailSize).map
+                      (fun tailSeed =>
+                        pathOramLeafValueTraceOfSeed
+                          ((object, bucketCount) :: scaffold)
+                          (tailSeed + left * tailSize))) =
+                (List.range bound).map
+                  ((List.map
+                      (pathOramLeafValueTraceOfSeed ((object, bucketCount) :: scaffold))) ∘
+                    fun left =>
+                      (List.range tailSize).map fun tailSeed =>
+                        tailSeed + left * tailSize) := by
+            apply List.map_congr_left
+            intro left hLeftMem
+            simp [Function.comp, List.map_map]
+          rw [hSeedBlocks]
+          simpa
+            [ tailSize
+            , bound
+            , pathOramLeafValueSeedSpaceSize
+            , list_map_finiteDistribution_concat
+            ] using hSeeds.symm
+
 def pathOramBucketPathOfNodeAux : Nat → Nat → List Nat
   | 0, _ => []
   | _fuel + 1, 0 => [0]

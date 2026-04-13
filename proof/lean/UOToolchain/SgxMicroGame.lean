@@ -30,21 +30,23 @@ def sgxMicroLeakage (cfg : SGXMicroConfig) : SGXMicroLeakage :=
     cfg.pubData.modelTags
     cfg.pubData.controllerShape
 
-axiom sgxMicroLocalTheorem
+/-- Legacy placeholder SGX micro local theorem interface.
+The proof-grade normalized-controller path does not depend on this axiom. -/
+axiom legacySgxMicroLocalTheorem
   (micro₁ micro₂ : Distribution SGXMicroTrace)
   (leakage : SGXMicroLeakage) :
   Prop
 
-def ComputationalSGXMicroUO (run : SGXMicroSemantics) : Prop :=
+def legacyComputationalSGXMicroUO (run : SGXMicroSemantics) : Prop :=
   ∀ cfg₁ cfg₂,
     sameSGXMicroPublicProjection cfg₁ cfg₂ →
-    sgxMicroLocalTheorem (run cfg₁) (run cfg₂) (sgxMicroLeakage cfg₁)
+    legacySgxMicroLocalTheorem (run cfg₁) (run cfg₂) (sgxMicroLeakage cfg₁)
 
 def publicControllerMicroSemantics : SGXMicroSemantics :=
   fun cfg => [controllerMicroTraceOfShape cfg.pubData.controllerShape]
 
-def computationalSGXMicroRelation : SGXMicroRelation :=
-  fun micro₁ micro₂ leakage => sgxMicroLocalTheorem micro₁ micro₂ leakage
+def legacyComputationalSGXMicroRelation : SGXMicroRelation :=
+  fun micro₁ micro₂ leakage => legacySgxMicroLocalTheorem micro₁ micro₂ leakage
 
 def budgetConsistentSGXMicroRelation : SGXMicroRelation :=
   fun micro₁ micro₂ leakage =>
@@ -221,13 +223,13 @@ theorem sgxMicroLeakage_eq_of_samePublicProjection
   cases hPublic
   rfl
 
-theorem sgxMicroLocalTheorem_uses_public_leakage
+theorem legacySgxMicroLocalTheorem_uses_public_leakage
   (run : SGXMicroSemantics)
   (hLocal :
     ∀ cfg₁ cfg₂,
       sameSGXMicroPublicProjection cfg₁ cfg₂ →
-      sgxMicroLocalTheorem (run cfg₁) (run cfg₂) (sgxMicroLeakage cfg₁)) :
-  ComputationalSGXMicroUO run := by
+      legacySgxMicroLocalTheorem (run cfg₁) (run cfg₂) (sgxMicroLeakage cfg₁)) :
+  legacyComputationalSGXMicroUO run := by
   intro cfg₁ cfg₂ hPublic
   exact hLocal cfg₁ cfg₂ hPublic
 

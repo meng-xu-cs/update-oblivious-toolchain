@@ -129,6 +129,25 @@ def RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
   (step : RuntimePathOramLeafScaffoldStep) : String × Nat :=
   (step.objectName, step.bucketCount)
 
+def RuntimeOramObjectCertificate.toOramObjectManifest
+  (object : RuntimeOramObjectCertificate) : OramObjectManifest :=
+  { objectId := object.objectId
+  , objectName := object.objectName
+  , capacity := object.capacity
+  , scheme := object.scheme
+  , blockSize := object.blockSize
+  , bucketSize := object.bucketSize
+  , bucketCount := object.bucketCount
+  , blocksPerBucket := object.blocksPerBucket
+  , treeHeight := object.treeHeight
+  , stashBound := object.stashBound
+  , recursionDepth := object.recursionDepth
+  , metadataPages := object.metadataPages
+  , metadataPagesPerAccess := object.metadataPagesPerAccess
+  , bucketsPerAccess := object.bucketsPerAccess
+  , accessesPerCall := object.accessesPerCall
+  }
+
 def runtimeOramObjectByName?
   (oramObjects : List RuntimeOramObjectCertificate)
   (objectName : String) : Option RuntimeOramObjectCertificate :=
@@ -138,6 +157,90 @@ def runtimeOramObjectById?
   (oramObjects : List RuntimeOramObjectCertificate)
   (objectId : Nat) : Option RuntimeOramObjectCertificate :=
   oramObjects.find? (fun object => object.objectId = objectId)
+
+theorem runtimeOramObjectByName?_mem
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {objectName : String}
+  {object : RuntimeOramObjectCertificate}
+  (hLookup : runtimeOramObjectByName? oramObjects objectName = some object) :
+  object ∈ oramObjects := by
+  unfold runtimeOramObjectByName? at hLookup
+  induction oramObjects with
+  | nil =>
+      simp at hLookup
+  | cons head tail ih =>
+      by_cases hHead : head.objectName = objectName
+      · simp [List.find?, hHead] at hLookup
+        cases hLookup
+        simp
+      · simp [List.find?, hHead] at hLookup
+        simp [ih hLookup]
+
+theorem runtimeOramObjectByName?_objectName
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {objectName : String}
+  {object : RuntimeOramObjectCertificate}
+  (hLookup : runtimeOramObjectByName? oramObjects objectName = some object) :
+  object.objectName = objectName := by
+  unfold runtimeOramObjectByName? at hLookup
+  induction oramObjects with
+  | nil =>
+      simp at hLookup
+  | cons head tail ih =>
+      by_cases hHead : head.objectName = objectName
+      · simp [List.find?, hHead] at hLookup
+        cases hLookup
+        exact hHead
+      · simp [List.find?, hHead] at hLookup
+        exact ih hLookup
+
+def RuntimeOramObjectsMatchPublicConfig
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (cfg : OramConfig) : Prop :=
+  cfg.pubData.witness.oramObjects =
+    oramObjects.map RuntimeOramObjectCertificate.toOramObjectManifest
+
+theorem runtimeOramObject_toManifest_mem_of_matchPublicConfig
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {cfg : OramConfig}
+  (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
+  {object : RuntimeOramObjectCertificate}
+  (hMem : object ∈ oramObjects) :
+  object.toOramObjectManifest ∈ cfg.pubData.witness.oramObjects := by
+  rw [hMatch]
+  exact List.mem_map.mpr ⟨object, hMem, rfl⟩
+
+theorem runtimeOramObject_isPathOram_of_matchPublicConfig
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {cfg : OramConfig}
+  (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
+  (hCfg : PathOramConfigWellFormed cfg)
+  {object : RuntimeOramObjectCertificate}
+  (hMem : object ∈ oramObjects) :
+  object.isPathOram = true := by
+  have hManifestMem :
+      object.toOramObjectManifest ∈ cfg.pubData.witness.oramObjects :=
+    runtimeOramObject_toManifest_mem_of_matchPublicConfig hMatch hMem
+  rcases hCfg object.toOramObjectManifest hManifestMem with
+    ⟨hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion,
+      _hMetadata, _hBuckets, _hAccesses⟩
+  have hObjectScheme : object.scheme = pathOramScheme := by
+    simpa [RuntimeOramObjectCertificate.toOramObjectManifest] using hScheme
+  simp [RuntimeOramObjectCertificate.isPathOram, hObjectScheme]
+
+theorem runtimeOramObjectByName?_isPathOram_of_matchPublicConfig
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {cfg : OramConfig}
+  (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
+  (hCfg : PathOramConfigWellFormed cfg)
+  {objectName : String}
+  {object : RuntimeOramObjectCertificate}
+  (hLookup : runtimeOramObjectByName? oramObjects objectName = some object) :
+  object.isPathOram = true := by
+  exact runtimeOramObject_isPathOram_of_matchPublicConfig
+    hMatch
+    hCfg
+    (runtimeOramObjectByName?_mem hLookup)
 
 def RuntimeOramObjectCertificate.pathOramLeafChoiceCount
   (object : RuntimeOramObjectCertificate) : Nat :=
@@ -530,12 +633,1000 @@ def replayRuntimePathOramLeafScheduleFromCoins
   else
     none
 
+theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
+  {state : RuntimePathOramPositionMapState}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {leaf : RuntimeOramLeafCertificate}
+  {transition : RuntimePathOramTransitionCertificate}
+  {nextState : RuntimePathOramPositionMapState}
+  (hExplicit :
+    runtimePathOramApplyTransition? state oramObjects leaf transition =
+      some nextState) :
+  ∃ coins,
+    runtimePathOramFreshCoinValuesOfStep leaf transition = some coins ∧
+    runtimePathOramApplyTransitionShapeWithCoins?
+      state
+      oramObjects
+      transition.shape
+      coins =
+      some (leaf, nextState, []) := by
+  cases leaf with
+  | mk leafObjectId leafObjectName leafBucketCount leafValue =>
+      cases transition with
+      | mk transitionObjectId transitionObjectName transitionBucketCount transitionKind
+          transitionSlotIndex transitionPriorLeaf transitionNextLeaf =>
+          cases transitionKind <;>
+            cases transitionSlotIndex <;>
+            cases transitionPriorLeaf <;>
+            cases transitionNextLeaf <;>
+            simp [ runtimePathOramApplyTransition?
+              , runtimePathOramFreshCoinValuesOfStep
+              , runtimePathOramApplyTransitionShapeWithCoins?
+              , RuntimePathOramTransitionCertificate.shape
+              ] at hExplicit ⊢
+          case mk.mk.readMiss.none.none.none =>
+            cases hObj : runtimeOramObjectById? oramObjects leafObjectId with
+            | none =>
+                simp [hObj] at hExplicit
+            | some object =>
+                have hScheme : object.scheme = pathOramScheme := by
+                  by_cases hEq : object.scheme = pathOramScheme
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hId : transitionObjectId = leafObjectId := by
+                  by_cases hEq : transitionObjectId = leafObjectId
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hName : transitionObjectName = leafObjectName := by
+                  by_cases hEq : transitionObjectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hBucket : transitionBucketCount = leafBucketCount := by
+                  by_cases hEq : transitionBucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjName : object.objectName = leafObjectName := by
+                  by_cases hEq : object.objectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjBucket : object.bucketCount = leafBucketCount := by
+                  by_cases hEq : object.bucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hObjName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hLeafLt : leafValue < object.pathOramLeafChoiceCount := by
+                  by_cases hLt : leafValue < object.pathOramLeafChoiceCount
+                  · exact hLt
+                  · have hLe : object.pathOramLeafChoiceCount ≤ leafValue :=
+                      Nat.le_of_not_gt hLt
+                    have hFalse : False := by
+                      simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hLe] at hExplicit
+                    exact False.elim hFalse
+                cases hState : runtimePathOramStateLookup? state leafObjectId with
+                | none =>
+                    simp
+                      [hObj, hId, hName, hBucket, hState] at hExplicit
+                | some leaves =>
+                    simp
+                      [hObj, hScheme, hObjName, hObjBucket, hLeafLt, hState] at hExplicit
+                    rcases hExplicit with ⟨_, hNextStateEq⟩
+                    cases hNextStateEq
+                    subst transitionObjectId
+                    subst transitionObjectName
+                    subst transitionBucketCount
+                    refine ⟨[leafValue], ?_, ?_⟩
+                    · simp
+                    · simp
+                        [ hObj, hScheme, hObjName, hObjBucket, hState
+                        , runtimePathOramTakeFreshCoin?, hLeafLt
+                        ]
+          case mk.mk.readHit.some.some.some =>
+            rename_i slotIndex priorLeaf nextLeaf
+            cases hObj : runtimeOramObjectById? oramObjects leafObjectId with
+            | none =>
+                simp [hObj] at hExplicit
+            | some object =>
+                have hScheme : object.scheme = pathOramScheme := by
+                  by_cases hEq : object.scheme = pathOramScheme
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hId : transitionObjectId = leafObjectId := by
+                  by_cases hEq : transitionObjectId = leafObjectId
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hName : transitionObjectName = leafObjectName := by
+                  by_cases hEq : transitionObjectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hBucket : transitionBucketCount = leafBucketCount := by
+                  by_cases hEq : transitionBucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjName : object.objectName = leafObjectName := by
+                  by_cases hEq : object.objectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjBucket : object.bucketCount = leafBucketCount := by
+                  by_cases hEq : object.bucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hObjName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hAccessLeafLt : leafValue < object.pathOramLeafChoiceCount := by
+                  by_cases hLt : leafValue < object.pathOramLeafChoiceCount
+                  · exact hLt
+                  · have hLe : object.pathOramLeafChoiceCount ≤ leafValue :=
+                      Nat.le_of_not_gt hLt
+                    have hFalse : False := by
+                      simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hLe] at hExplicit
+                    exact False.elim hFalse
+                cases hState : runtimePathOramStateLookup? state leafObjectId with
+                | none =>
+                    simp [hObj, hId, hName, hBucket, hState] at hExplicit
+                | some leaves =>
+                    have hLeafEq : leafValue = priorLeaf := by
+                      by_cases hEq : leafValue = priorLeaf
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hEq] at hExplicit
+                        exact False.elim hFalse
+                    have hNextLt : nextLeaf < object.pathOramLeafChoiceCount := by
+                      by_cases hLt : nextLeaf < object.pathOramLeafChoiceCount
+                      · exact hLt
+                      · have hNotLt : ¬ nextLeaf < object.pathOramLeafChoiceCount :=
+                          hLt
+                        have hFalse : False := by
+                          simp
+                            [ hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket
+                            , hState, hLeafEq, hNotLt
+                            ] at hExplicit
+                        exact False.elim hFalse
+                    have hGetEq :
+                        runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) := by
+                      by_cases hEq : runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf)
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hEq] at hExplicit
+                        exact False.elim hFalse
+                    cases hSet : runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf) with
+                    | none =>
+                        simp
+                          [ hObj, hId, hName, hBucket, hState, hLeafEq
+                          , hGetEq, hSet
+                          ] at hExplicit
+                    | some updated =>
+                        cases hUpdate : runtimePathOramStateUpdate? state leafObjectId updated with
+                        | none =>
+                            simp
+                              [ hObj, hId, hName, hBucket, hState, hLeafEq
+                              , hGetEq, hSet, hUpdate
+                              ] at hExplicit
+                        | some updatedState =>
+                            simp
+                              [ hObj, hId, hName, hBucket, hState, hLeafEq
+                              , hGetEq, hSet, hUpdate
+                              ] at hExplicit
+                            rcases hExplicit with ⟨_, _, hNextStateEq⟩
+                            cases hNextStateEq
+                            subst transitionObjectId
+                            subst transitionObjectName
+                            subst transitionBucketCount
+                            subst leafValue
+                            refine ⟨[nextLeaf], ?_, ?_⟩
+                            · simp
+                            · simp
+                                [ hObj, hScheme, hObjName, hObjBucket, hState
+                                , hGetEq, hSet, hUpdate
+                                , runtimePathOramTakeFreshCoin?, hNextLt
+                                ]
+          case mk.mk.writeNoop.none.none.none =>
+            cases hObj : runtimeOramObjectById? oramObjects leafObjectId with
+            | none =>
+                simp [hObj] at hExplicit
+            | some object =>
+                have hScheme : object.scheme = pathOramScheme := by
+                  by_cases hEq : object.scheme = pathOramScheme
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hId : transitionObjectId = leafObjectId := by
+                  by_cases hEq : transitionObjectId = leafObjectId
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hName : transitionObjectName = leafObjectName := by
+                  by_cases hEq : transitionObjectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hBucket : transitionBucketCount = leafBucketCount := by
+                  by_cases hEq : transitionBucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjName : object.objectName = leafObjectName := by
+                  by_cases hEq : object.objectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjBucket : object.bucketCount = leafBucketCount := by
+                  by_cases hEq : object.bucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hObjName, hEq] at hExplicit
+                    exact False.elim hFalse
+                cases hState : runtimePathOramStateLookup? state leafObjectId with
+                | none =>
+                    simp [hObj, hId, hName, hBucket, hState] at hExplicit
+                | some leaves =>
+                    simp [hObj, hId, hName, hBucket, hState] at hExplicit
+                    rcases hExplicit with ⟨hLeafLt, hStateEq⟩
+                    cases hStateEq
+                    subst transitionObjectId
+                    subst transitionObjectName
+                    subst transitionBucketCount
+                    refine ⟨[leafValue], ?_, ?_⟩
+                    · simp
+                    · simp
+                        [ hObj, hScheme, hObjName, hObjBucket, hState
+                        , runtimePathOramTakeFreshCoin?, hLeafLt
+                        ]
+          case mk.mk.writeNoop.some.some.some =>
+            rename_i slotIndex priorLeaf nextLeaf
+            cases hObj : runtimeOramObjectById? oramObjects leafObjectId with
+            | none =>
+                simp [hObj] at hExplicit
+            | some object =>
+                have hScheme : object.scheme = pathOramScheme := by
+                  by_cases hEq : object.scheme = pathOramScheme
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hId : transitionObjectId = leafObjectId := by
+                  by_cases hEq : transitionObjectId = leafObjectId
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hName : transitionObjectName = leafObjectName := by
+                  by_cases hEq : transitionObjectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hBucket : transitionBucketCount = leafBucketCount := by
+                  by_cases hEq : transitionBucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjName : object.objectName = leafObjectName := by
+                  by_cases hEq : object.objectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjBucket : object.bucketCount = leafBucketCount := by
+                  by_cases hEq : object.bucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hObjName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hAccessLeafLt : leafValue < object.pathOramLeafChoiceCount := by
+                  by_cases hLt : leafValue < object.pathOramLeafChoiceCount
+                  · exact hLt
+                  · have hLe : object.pathOramLeafChoiceCount ≤ leafValue :=
+                      Nat.le_of_not_gt hLt
+                    have hFalse : False := by
+                      simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hLe] at hExplicit
+                    exact False.elim hFalse
+                cases hState : runtimePathOramStateLookup? state leafObjectId with
+                | none =>
+                    simp [hObj, hId, hName, hBucket, hState] at hExplicit
+                | some leaves =>
+                    have hLeafEq : leafValue = priorLeaf := by
+                      by_cases hEq : leafValue = priorLeaf
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hEq] at hExplicit
+                        exact False.elim hFalse
+                    have hNextEq : nextLeaf = priorLeaf := by
+                      by_cases hEq : nextLeaf = priorLeaf
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hEq] at hExplicit
+                        exact False.elim hFalse
+                    have hGetEq :
+                        runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) := by
+                      by_cases hEq : runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf)
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hNextEq, hEq] at hExplicit
+                        exact False.elim hFalse
+                    simp
+                      [hObj, hId, hName, hBucket, hState, hLeafEq, hNextEq, hGetEq] at hExplicit
+                    rcases hExplicit with ⟨_, hStateEq⟩
+                    cases hStateEq
+                    subst transitionObjectId
+                    subst transitionObjectName
+                    subst transitionBucketCount
+                    subst leafValue
+                    subst nextLeaf
+                    refine ⟨[], ?_, ?_⟩
+                    · simp
+                    · simp [hObj, hScheme, hObjName, hObjBucket, hState, hGetEq]
+          case mk.mk.writeInsert.some.none.some =>
+            rename_i slotIndex nextLeaf
+            cases hObj : runtimeOramObjectById? oramObjects leafObjectId with
+            | none =>
+                simp [hObj] at hExplicit
+            | some object =>
+                have hScheme : object.scheme = pathOramScheme := by
+                  by_cases hEq : object.scheme = pathOramScheme
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hId : transitionObjectId = leafObjectId := by
+                  by_cases hEq : transitionObjectId = leafObjectId
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hName : transitionObjectName = leafObjectName := by
+                  by_cases hEq : transitionObjectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hBucket : transitionBucketCount = leafBucketCount := by
+                  by_cases hEq : transitionBucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjName : object.objectName = leafObjectName := by
+                  by_cases hEq : object.objectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjBucket : object.bucketCount = leafBucketCount := by
+                  by_cases hEq : object.bucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hObjName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hAccessLeafLt : leafValue < object.pathOramLeafChoiceCount := by
+                  by_cases hLt : leafValue < object.pathOramLeafChoiceCount
+                  · exact hLt
+                  · have hLe : object.pathOramLeafChoiceCount ≤ leafValue :=
+                      Nat.le_of_not_gt hLt
+                    have hFalse : False := by
+                      simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hLe] at hExplicit
+                    exact False.elim hFalse
+                cases hState : runtimePathOramStateLookup? state leafObjectId with
+                | none =>
+                    simp [hObj, hId, hName, hBucket, hState] at hExplicit
+                | some leaves =>
+                    have hNextLt : nextLeaf < object.pathOramLeafChoiceCount := by
+                      by_cases hLt : nextLeaf < object.pathOramLeafChoiceCount
+                      · exact hLt
+                      · have hNotLt : ¬ nextLeaf < object.pathOramLeafChoiceCount := hLt
+                        have hFalse : False := by
+                          simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hState, hNotLt] at hExplicit
+                        exact False.elim hFalse
+                    have hGetEq :
+                        runtimePathOramGetLeafAt? leaves slotIndex = some none := by
+                      by_cases hEq : runtimePathOramGetLeafAt? leaves slotIndex = some none
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hEq] at hExplicit
+                        exact False.elim hFalse
+                    cases hSet : runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf) with
+                    | none =>
+                        simp [hObj, hId, hName, hBucket, hState, hGetEq, hSet] at hExplicit
+                    | some updated =>
+                        cases hUpdate : runtimePathOramStateUpdate? state leafObjectId updated with
+                        | none =>
+                            simp [hObj, hId, hName, hBucket, hState, hGetEq, hSet, hUpdate] at hExplicit
+                        | some updatedState =>
+                            simp [hObj, hId, hName, hBucket, hState, hGetEq, hSet, hUpdate] at hExplicit
+                            rcases hExplicit with ⟨_, _, hNextStateEq⟩
+                            cases hNextStateEq
+                            subst transitionObjectId
+                            subst transitionObjectName
+                            subst transitionBucketCount
+                            refine ⟨[leafValue, nextLeaf], ?_, ?_⟩
+                            · simp
+                            · simp
+                                [ hObj, hScheme, hObjName, hObjBucket, hState
+                                , hGetEq, hSet, hUpdate
+                                , runtimePathOramTakeFreshCoin?, hAccessLeafLt, hNextLt
+                                ]
+          case mk.mk.writeUpdate.some.some.some =>
+            rename_i slotIndex priorLeaf nextLeaf
+            cases hObj : runtimeOramObjectById? oramObjects leafObjectId with
+            | none =>
+                simp [hObj] at hExplicit
+            | some object =>
+                have hScheme : object.scheme = pathOramScheme := by
+                  by_cases hEq : object.scheme = pathOramScheme
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hId : transitionObjectId = leafObjectId := by
+                  by_cases hEq : transitionObjectId = leafObjectId
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hName : transitionObjectName = leafObjectName := by
+                  by_cases hEq : transitionObjectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hBucket : transitionBucketCount = leafBucketCount := by
+                  by_cases hEq : transitionBucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjName : object.objectName = leafObjectName := by
+                  by_cases hEq : object.objectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjBucket : object.bucketCount = leafBucketCount := by
+                  by_cases hEq : object.bucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hObjName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hAccessLeafLt : leafValue < object.pathOramLeafChoiceCount := by
+                  by_cases hLt : leafValue < object.pathOramLeafChoiceCount
+                  · exact hLt
+                  · have hLe : object.pathOramLeafChoiceCount ≤ leafValue :=
+                      Nat.le_of_not_gt hLt
+                    have hFalse : False := by
+                      simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hLe] at hExplicit
+                    exact False.elim hFalse
+                cases hState : runtimePathOramStateLookup? state leafObjectId with
+                | none =>
+                    simp [hObj, hId, hName, hBucket, hState] at hExplicit
+                | some leaves =>
+                    have hLeafEq : leafValue = priorLeaf := by
+                      by_cases hEq : leafValue = priorLeaf
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hEq] at hExplicit
+                        exact False.elim hFalse
+                    have hNextLt : nextLeaf < object.pathOramLeafChoiceCount := by
+                      by_cases hLt : nextLeaf < object.pathOramLeafChoiceCount
+                      · exact hLt
+                      · have hNotLt : ¬ nextLeaf < object.pathOramLeafChoiceCount := hLt
+                        have hFalse : False := by
+                          simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hState, hLeafEq, hNotLt] at hExplicit
+                        exact False.elim hFalse
+                    have hGetEq :
+                        runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) := by
+                      by_cases hEq : runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf)
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hEq] at hExplicit
+                        exact False.elim hFalse
+                    cases hSet : runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf) with
+                    | none =>
+                        simp [hObj, hId, hName, hBucket, hState, hLeafEq, hGetEq, hSet] at hExplicit
+                    | some updated =>
+                        cases hUpdate : runtimePathOramStateUpdate? state leafObjectId updated with
+                        | none =>
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hGetEq, hSet, hUpdate] at hExplicit
+                        | some updatedState =>
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hGetEq, hSet, hUpdate] at hExplicit
+                            rcases hExplicit with ⟨_, _, hNextStateEq⟩
+                            cases hNextStateEq
+                            subst transitionObjectId
+                            subst transitionObjectName
+                            subst transitionBucketCount
+                            subst leafValue
+                            refine ⟨[nextLeaf], ?_, ?_⟩
+                            · simp
+                            · simp
+                                [ hObj, hScheme, hObjName, hObjBucket, hState
+                                , hGetEq, hSet, hUpdate
+                                , runtimePathOramTakeFreshCoin?, hNextLt
+                                ]
+          case mk.mk.writeDelete.some.some.none =>
+            rename_i slotIndex priorLeaf
+            cases hObj : runtimeOramObjectById? oramObjects leafObjectId with
+            | none =>
+                simp [hObj] at hExplicit
+            | some object =>
+                have hScheme : object.scheme = pathOramScheme := by
+                  by_cases hEq : object.scheme = pathOramScheme
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hId : transitionObjectId = leafObjectId := by
+                  by_cases hEq : transitionObjectId = leafObjectId
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hName : transitionObjectName = leafObjectName := by
+                  by_cases hEq : transitionObjectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hBucket : transitionBucketCount = leafBucketCount := by
+                  by_cases hEq : transitionBucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hId, hName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjName : object.objectName = leafObjectName := by
+                  by_cases hEq : object.objectName = leafObjectName
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hObjBucket : object.bucketCount = leafBucketCount := by
+                  by_cases hEq : object.bucketCount = leafBucketCount
+                  · exact hEq
+                  · have hFalse : False := by
+                        simp [hObj, hScheme, hId, hName, hBucket, hObjName, hEq] at hExplicit
+                    exact False.elim hFalse
+                have hAccessLeafLt : leafValue < object.pathOramLeafChoiceCount := by
+                  by_cases hLt : leafValue < object.pathOramLeafChoiceCount
+                  · exact hLt
+                  · have hLe : object.pathOramLeafChoiceCount ≤ leafValue :=
+                      Nat.le_of_not_gt hLt
+                    have hFalse : False := by
+                      simp [hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket, hLe] at hExplicit
+                    exact False.elim hFalse
+                cases hState : runtimePathOramStateLookup? state leafObjectId with
+                | none =>
+                    simp [hObj, hId, hName, hBucket, hState] at hExplicit
+                | some leaves =>
+                    have hLeafEq : leafValue = priorLeaf := by
+                      by_cases hEq : leafValue = priorLeaf
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hEq] at hExplicit
+                        exact False.elim hFalse
+                    have hGetEq :
+                        runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) := by
+                      by_cases hEq : runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf)
+                      · exact hEq
+                      · have hFalse : False := by
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hEq] at hExplicit
+                        exact False.elim hFalse
+                    cases hSet : runtimePathOramSetLeafAt? leaves slotIndex none with
+                    | none =>
+                        simp [hObj, hId, hName, hBucket, hState, hLeafEq, hGetEq, hSet] at hExplicit
+                    | some updated =>
+                        cases hUpdate : runtimePathOramStateUpdate? state leafObjectId updated with
+                        | none =>
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hGetEq, hSet, hUpdate] at hExplicit
+                        | some updatedState =>
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hGetEq, hSet, hUpdate] at hExplicit
+                            rcases hExplicit with ⟨_, hNextStateEq⟩
+                            cases hNextStateEq
+                            subst transitionObjectId
+                            subst transitionObjectName
+                            subst transitionBucketCount
+                            subst leafValue
+                            refine ⟨[], ?_, ?_⟩
+                            · simp
+                            · simp [hObj, hScheme, hObjName, hObjBucket, hState, hGetEq, hSet, hUpdate]
+
+def extractRuntimePathOramFreshCoinBlocksAux
+  (leafs : List RuntimeOramLeafCertificate)
+  (transitions : List RuntimePathOramTransitionCertificate) :
+  Option (List (List Nat)) :=
+  match leafs, transitions with
+  | [], [] => some []
+  | leaf :: leafs, transition :: transitions => do
+      let head ← runtimePathOramFreshCoinValuesOfStep leaf transition
+      let tail ← extractRuntimePathOramFreshCoinBlocksAux leafs transitions
+      some (head :: tail)
+  | _, _ => none
+
+def replayRuntimePathOramLeafScheduleFromCoinBlocksAux
+  (state : RuntimePathOramPositionMapState)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (transitions : List RuntimePathOramTransitionShape)
+  (coinBlocks : List (List Nat)) :
+  Option (List RuntimeOramLeafCertificate × RuntimePathOramPositionMapState) :=
+  match transitions, coinBlocks with
+  | [], [] => some ([], state)
+  | transition :: transitions, coins :: coinBlocks => do
+      let (leaf, nextState, remaining) ←
+        runtimePathOramApplyTransitionShapeWithCoins? state oramObjects transition coins
+      if remaining = [] then
+        let (tail, finalState) ←
+          replayRuntimePathOramLeafScheduleFromCoinBlocksAux
+            nextState
+            oramObjects
+            transitions
+            coinBlocks
+        some (leaf :: tail, finalState)
+      else
+        none
+  | _, _ => none
+
+def replayRuntimePathOramLeafScheduleFromCoinBlocks
+  (before : List RuntimePathOramPositionMapCertificate)
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (transitions : List RuntimePathOramTransitionShape)
+  (coinBlocks : List (List Nat)) :
+  Option (List RuntimeOramLeafCertificate × RuntimePathOramPositionMapState) := do
+  let state ← runtimePathOramPositionMapStateByObject before oramObjects
+  replayRuntimePathOramLeafScheduleFromCoinBlocksAux
+    state
+    oramObjects
+    transitions
+    coinBlocks
+
+theorem replayRuntimePathOramLeafScheduleFromCoinBlocksAux_of_explicit
+  {state : RuntimePathOramPositionMapState}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {leafs : List RuntimeOramLeafCertificate}
+  {transitions : List RuntimePathOramTransitionCertificate}
+  {finalState : RuntimePathOramPositionMapState}
+  (hExplicit :
+    replayRuntimePathOramTransitionsAux state oramObjects leafs transitions =
+      some finalState) :
+  ∃ coinBlocks,
+    extractRuntimePathOramFreshCoinBlocksAux leafs transitions = some coinBlocks ∧
+    replayRuntimePathOramLeafScheduleFromCoinBlocksAux
+      state
+      oramObjects
+      (transitions.map RuntimePathOramTransitionCertificate.shape)
+      coinBlocks =
+      some (leafs, finalState) := by
+  induction leafs generalizing state transitions finalState with
+  | nil =>
+      cases transitions with
+      | nil =>
+          have hStateEq : state = finalState := by
+            simpa [replayRuntimePathOramTransitionsAux] using hExplicit
+          subst finalState
+          refine ⟨[], rfl, rfl⟩
+      | cons transition transitions =>
+          simp [replayRuntimePathOramTransitionsAux] at hExplicit
+  | cons leaf leafs ih =>
+      cases transitions with
+      | nil =>
+          simp [replayRuntimePathOramTransitionsAux] at hExplicit
+      | cons transition transitions =>
+          simp [replayRuntimePathOramTransitionsAux] at hExplicit
+          cases hStep : runtimePathOramApplyTransition? state oramObjects leaf transition with
+          | none =>
+              simp [hStep] at hExplicit
+          | some nextState =>
+              have hTailExplicit :
+                  replayRuntimePathOramTransitionsAux
+                    nextState
+                    oramObjects
+                    leafs
+                    transitions =
+                    some finalState := by
+                simpa [hStep] using hExplicit
+              rcases
+                runtimePathOramApplyTransitionShapeWithCoins_of_explicit hStep
+                with ⟨headCoins, hHeadCoins, hHeadReplay⟩
+              rcases ih hTailExplicit with ⟨tailBlocks, hTailBlocks, hTailReplay⟩
+              refine ⟨headCoins :: tailBlocks, ?_, ?_⟩
+              · simp [extractRuntimePathOramFreshCoinBlocksAux, hHeadCoins, hTailBlocks]
+              · simp
+                  [ replayRuntimePathOramLeafScheduleFromCoinBlocksAux
+                  , hHeadReplay
+                  , hTailReplay
+                  ]
+
+theorem replayRuntimePathOramLeafScheduleFromCoinBlocks_of_explicit
+  {before : List RuntimePathOramPositionMapCertificate}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {leafs : List RuntimeOramLeafCertificate}
+  {transitions : List RuntimePathOramTransitionCertificate}
+  {finalState : RuntimePathOramPositionMapState}
+  (hExplicit :
+    replayRuntimePathOramTransitions before oramObjects leafs transitions =
+      some finalState) :
+  ∃ coinBlocks,
+    extractRuntimePathOramFreshCoinBlocksAux leafs transitions = some coinBlocks ∧
+    replayRuntimePathOramLeafScheduleFromCoinBlocks
+      before
+      oramObjects
+      (transitions.map RuntimePathOramTransitionCertificate.shape)
+      coinBlocks =
+      some (leafs, finalState) := by
+  cases hState : runtimePathOramPositionMapStateByObject before oramObjects with
+  | none =>
+      simp [replayRuntimePathOramTransitions, hState] at hExplicit
+  | some state =>
+      have hAux :
+          replayRuntimePathOramTransitionsAux state oramObjects leafs transitions =
+            some finalState := by
+        simpa [replayRuntimePathOramTransitions, hState] using hExplicit
+      rcases replayRuntimePathOramLeafScheduleFromCoinBlocksAux_of_explicit hAux with
+        ⟨coinBlocks, hCoinBlocks, hReplay⟩
+      refine ⟨coinBlocks, hCoinBlocks, ?_⟩
+      simp [replayRuntimePathOramLeafScheduleFromCoinBlocks, hState, hReplay]
+
+theorem extractRuntimePathOramFreshCoinValuesAux_of_blocks
+  {leafs : List RuntimeOramLeafCertificate}
+  {transitions : List RuntimePathOramTransitionCertificate}
+  {coinBlocks : List (List Nat)}
+  (hBlocks :
+    extractRuntimePathOramFreshCoinBlocksAux leafs transitions =
+      some coinBlocks) :
+  extractRuntimePathOramFreshCoinValuesAux leafs transitions =
+    some (concatLists coinBlocks) := by
+  induction leafs generalizing transitions coinBlocks with
+  | nil =>
+      cases transitions with
+      | nil =>
+          simp [extractRuntimePathOramFreshCoinBlocksAux] at hBlocks
+          cases hBlocks
+          simp [extractRuntimePathOramFreshCoinValuesAux, concatLists]
+      | cons transition transitions =>
+          simp [extractRuntimePathOramFreshCoinBlocksAux] at hBlocks
+  | cons leaf leafs ih =>
+      cases transitions with
+      | nil =>
+          simp
+            [extractRuntimePathOramFreshCoinBlocksAux] at hBlocks
+      | cons transition transitions =>
+          cases hHead : runtimePathOramFreshCoinValuesOfStep leaf transition with
+          | none =>
+              simp
+                [extractRuntimePathOramFreshCoinBlocksAux, hHead] at hBlocks
+          | some head =>
+              cases hTail : extractRuntimePathOramFreshCoinBlocksAux leafs transitions with
+              | none =>
+                  simp
+                    [extractRuntimePathOramFreshCoinBlocksAux, hHead, hTail] at hBlocks
+              | some tailBlocks =>
+                  simp [extractRuntimePathOramFreshCoinBlocksAux, hHead, hTail] at hBlocks
+                  cases hBlocks
+                  simp [extractRuntimePathOramFreshCoinValuesAux, hHead, ih hTail, concatLists]
+
 def isOramLogicalKind (kind : String) : Bool :=
   kind = "uooram_counter" ||
     kind = "uooram_meta_scan" ||
     kind = "uooram_bucket_scan" ||
     kind = "uooram_metadata_load" ||
     kind = "uooram_path_read"
+
+def isOramCounterLogicalEvent
+  (event : LogicalEvent) : Bool :=
+  event.kind = "uooram_counter" && event.detail = "counter"
+
+def runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+  (logicalAccesses : List LogicalEvent)
+  (oramObjects : List RuntimeOramObjectCertificate) :
+  Option PathOramLeafScheduleScaffold :=
+  match logicalAccesses with
+  | [] => some []
+  | event :: events =>
+      if !(isOramLogicalKind event.kind) then
+        runtimePathOramLeafScheduleScaffoldOfLogicalAccesses events oramObjects
+      else if !isOramCounterLogicalEvent event then
+        runtimePathOramLeafScheduleScaffoldOfLogicalAccesses events oramObjects
+      else
+        do
+          let object ← runtimeOramObjectByName? oramObjects event.object
+          let tail ← runtimePathOramLeafScheduleScaffoldOfLogicalAccesses events oramObjects
+          if object.isPathOram then
+            some ((object.objectName, object.bucketCount) :: tail)
+          else
+            some tail
+
+def projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+  (logicalAccesses : List LogicalEvent)
+  (leakage : PathOramProjectedLeakage) :
+  Option PathOramLeafScheduleScaffold :=
+  match logicalAccesses with
+  | [] => some []
+  | event :: events =>
+      if isOramCounterLogicalEvent event then
+        do
+          let bucketCount ← pathOramBucketCountByObjectName? leakage event.object
+          let tail ← projectedPathOramLeafScheduleScaffoldOfLogicalAccesses events leakage
+          some ((event.object, bucketCount) :: tail)
+      else
+        projectedPathOramLeafScheduleScaffoldOfLogicalAccesses events leakage
+
+theorem projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_eq
+  (logicalAccesses : List LogicalEvent)
+  (leakage : PathOramProjectedLeakage) :
+  projectedPathOramLeafScheduleScaffoldOfLogicalAccesses logicalAccesses leakage =
+    pathOramLeafScheduleScaffoldOfLogicalAccesses logicalAccesses leakage := by
+  induction logicalAccesses with
+  | nil =>
+      simp
+        [ projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+        , pathOramLeafScheduleScaffoldOfLogicalAccesses
+        ]
+  | cons event events ih =>
+      by_cases hCounter : isOramCounterLogicalEvent event = true
+      · have hKind : event.kind = "uooram_counter" := by
+          unfold isOramCounterLogicalEvent at hCounter
+          simp at hCounter
+          exact hCounter.1
+        have hDetail : event.detail = "counter" := by
+          unfold isOramCounterLogicalEvent at hCounter
+          simp at hCounter
+          exact hCounter.2
+        cases hBucket : pathOramBucketCountByObjectName? leakage event.object with
+        | none =>
+            simp
+              [ projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+              , pathOramLeafScheduleScaffoldOfLogicalAccesses
+              , isOramCounterLogicalEvent
+              , hKind
+              , hDetail
+              , hBucket
+              ]
+        | some bucketCount =>
+            let P : Prop :=
+              ∀ (x : LogicalEvent),
+                x ∈ events →
+                  (¬x.kind = "uooram_counter" ∨ ¬x.detail = "counter") ∨
+                    (pathOramBucketCountByObjectName? leakage x.object).isSome = true
+            have hStep :
+                (pathOramLeafScheduleScaffoldOfLogicalAccesses events leakage).bind
+                    (fun tail => some ((event.object, bucketCount) :: tail)) =
+                  pathOramLeafScheduleScaffoldOfLogicalAccesses
+                    (event :: events)
+                    leakage := by
+              by_cases hP : P
+              · simp
+                  [ pathOramLeafScheduleScaffoldOfLogicalAccesses
+                  , hKind
+                  , hDetail
+                  , hBucket
+                  ]
+                rw [if_pos hP, if_pos hP]
+                simp
+              · simp
+                  [ pathOramLeafScheduleScaffoldOfLogicalAccesses
+                  , hKind
+                  , hDetail
+                  , hBucket
+                  ]
+                rw [if_neg hP, if_neg hP]
+                rfl
+            calc
+              projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                  (event :: events)
+                  leakage =
+                (projectedPathOramLeafScheduleScaffoldOfLogicalAccesses events leakage).bind
+                  (fun tail => some ((event.object, bucketCount) :: tail)) := by
+                    rw [projectedPathOramLeafScheduleScaffoldOfLogicalAccesses, if_pos hCounter, hBucket]
+                    simp
+              _ =
+                (pathOramLeafScheduleScaffoldOfLogicalAccesses events leakage).bind
+                  (fun tail => some ((event.object, bucketCount) :: tail)) := by
+                    rw [ih]
+              _ =
+                pathOramLeafScheduleScaffoldOfLogicalAccesses
+                  (event :: events)
+                  leakage := hStep
+      · have hCounterFalse : isOramCounterLogicalEvent event = false := by
+          cases hEq : isOramCounterLogicalEvent event <;> simp [hEq] at hCounter ⊢
+        by_cases hKind : event.kind = "uooram_counter"
+        · have hDetailNe : event.detail ≠ "counter" := by
+            intro hDetail
+            have hEq : isOramCounterLogicalEvent event = true := by
+              unfold isOramCounterLogicalEvent
+              simp [hKind, hDetail]
+            rw [hCounterFalse] at hEq
+            contradiction
+          simp
+            [ projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+            , pathOramLeafScheduleScaffoldOfLogicalAccesses
+            , isOramCounterLogicalEvent
+            , hKind
+            , hDetailNe
+            , ih
+            ]
+        · simp
+            [ projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+            , pathOramLeafScheduleScaffoldOfLogicalAccesses
+            , isOramCounterLogicalEvent
+            , hKind
+            , ih
+            ]
+
+@[simp] theorem pathOramNormalizeLogicalEvent_kind
+  (event : LogicalEvent) :
+  (pathOramNormalizeLogicalEvent event).kind = event.kind := by
+  cases event with
+  | mk kind object detail =>
+      unfold pathOramNormalizeLogicalEvent
+      split <;> rfl
+
+@[simp] theorem pathOramNormalizeLogicalEvent_object
+  (event : LogicalEvent) :
+  (pathOramNormalizeLogicalEvent event).object = event.object := by
+  cases event with
+  | mk kind object detail =>
+      unfold pathOramNormalizeLogicalEvent
+      split <;> rfl
+
+theorem pathOramNormalizeLogicalEvent_eq_self_of_not_oram
+  {event : LogicalEvent}
+  (hOram : isOramLogicalKind event.kind = false) :
+  pathOramNormalizeLogicalEvent event = event := by
+  cases event with
+  | mk kind object detail =>
+      unfold pathOramNormalizeLogicalEvent
+      split
+      · rename_i hEq
+        exfalso
+        have hCounter : kind ≠ "uooram_counter" := by
+          intro hk
+          simp [isOramLogicalKind, hk] at hOram
+        exact hCounter (by simpa using hEq)
+      · rename_i hEq
+        exfalso
+        have hMetadata : kind ≠ "uooram_metadata_load" := by
+          intro hk
+          simp [isOramLogicalKind, hk] at hOram
+        exact hMetadata (by simpa using hEq)
+      · rename_i hEq
+        exfalso
+        have hPathRead : kind ≠ "uooram_path_read" := by
+          intro hk
+          simp [isOramLogicalKind, hk] at hOram
+        exact hPathRead (by simpa using hEq)
+      · rfl
+
+theorem pathOramNormalizeLogicalEvent_eq_self_of_counter
+  {event : LogicalEvent}
+  (hKind : event.kind = "uooram_counter")
+  (hDetail : event.detail = "counter") :
+  pathOramNormalizeLogicalEvent event = event := by
+  cases event with
+  | mk kind object detail =>
+      simp at hKind hDetail
+      simp [pathOramNormalizeLogicalEvent, hKind, hDetail]
 
 def consumeExpectedOramLogicalEvents
   (events : List LogicalEvent)
@@ -553,6 +1644,374 @@ def consumeExpectedOramLogicalEvents
         consumeExpectedOramLogicalEvents events objectName expectedKind count detailPrefix
       else
         none
+
+theorem consumeExpectedOramLogicalEvents_runtimePathOramLeafScheduleScaffold
+  {events remaining : List LogicalEvent}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {objectName expectedKind detailPrefix : String}
+  {expectedCount : Nat}
+  (hNotCounter : expectedKind ≠ "uooram_counter")
+  (hConsume :
+    consumeExpectedOramLogicalEvents
+      events
+      objectName
+      expectedKind
+      expectedCount
+      detailPrefix =
+    some remaining) :
+  runtimePathOramLeafScheduleScaffoldOfLogicalAccesses events oramObjects =
+    runtimePathOramLeafScheduleScaffoldOfLogicalAccesses remaining oramObjects := by
+  induction expectedCount generalizing events remaining with
+  | zero =>
+      simp [consumeExpectedOramLogicalEvents] at hConsume
+      cases hConsume
+      rfl
+  | succ expectedCount ih =>
+      cases events with
+      | nil =>
+          simp [consumeExpectedOramLogicalEvents] at hConsume
+      | cons event events =>
+          simp [consumeExpectedOramLogicalEvents] at hConsume
+          rcases hConsume with ⟨hMatch, hConsume⟩
+          rcases hMatch with ⟨⟨_hObj, hKind⟩, _hPrefix⟩
+          have hNotCounterEvent : isOramCounterLogicalEvent event = false := by
+            unfold isOramCounterLogicalEvent
+            have hKindNe : event.kind ≠ "uooram_counter" := by
+              intro hEq
+              apply hNotCounter
+              exact hKind.symm.trans hEq
+            by_cases hCounter : event.kind = "uooram_counter"
+            · exact False.elim (hKindNe hCounter)
+            · simp [hCounter]
+          have hSkip :
+              runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                  (event :: events)
+                  oramObjects =
+                runtimePathOramLeafScheduleScaffoldOfLogicalAccesses events oramObjects := by
+            by_cases hOram : isOramLogicalKind event.kind
+            · simp [runtimePathOramLeafScheduleScaffoldOfLogicalAccesses, hOram, hNotCounterEvent]
+            · simp [runtimePathOramLeafScheduleScaffoldOfLogicalAccesses, hOram]
+          rw [hSkip]
+          exact ih hConsume
+
+theorem consumeExpectedOramLogicalEvents_projectedPathOramLeafScheduleScaffold
+  {events remaining : List LogicalEvent}
+  {leakage : PathOramProjectedLeakage}
+  {objectName expectedKind detailPrefix : String}
+  {expectedCount : Nat}
+  (hNotCounter : expectedKind ≠ "uooram_counter")
+  (hConsume :
+    consumeExpectedOramLogicalEvents
+      events
+      objectName
+      expectedKind
+      expectedCount
+      detailPrefix =
+    some remaining) :
+  projectedPathOramLeafScheduleScaffoldOfLogicalAccesses events leakage =
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses remaining leakage := by
+  induction expectedCount generalizing events remaining with
+  | zero =>
+      simp [consumeExpectedOramLogicalEvents] at hConsume
+      cases hConsume
+      rfl
+  | succ expectedCount ih =>
+      cases events with
+      | nil =>
+          simp [consumeExpectedOramLogicalEvents] at hConsume
+      | cons event events =>
+          simp [consumeExpectedOramLogicalEvents] at hConsume
+          rcases hConsume with ⟨hMatch, hConsume⟩
+          rcases hMatch with ⟨⟨_hObj, hKind⟩, _hPrefix⟩
+          have hNotCounterEvent : isOramCounterLogicalEvent event = false := by
+            unfold isOramCounterLogicalEvent
+            have hKindNe : event.kind ≠ "uooram_counter" := by
+              intro hEq
+              apply hNotCounter
+              exact hKind.symm.trans hEq
+            by_cases hCounter : event.kind = "uooram_counter"
+            · exact False.elim (hKindNe hCounter)
+            · simp [hCounter]
+          have hSkip :
+              projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                  (event :: events)
+                  leakage =
+                projectedPathOramLeafScheduleScaffoldOfLogicalAccesses events leakage := by
+            simp [projectedPathOramLeafScheduleScaffoldOfLogicalAccesses, hNotCounterEvent]
+          rw [hSkip]
+          exact ih hConsume
+
+theorem consumeExpectedOramLogicalEvents_normalized_projectedPathOramLeafScheduleScaffold
+  {events remaining : List LogicalEvent}
+  {leakage : PathOramProjectedLeakage}
+  {objectName expectedKind detailPrefix : String}
+  {expectedCount : Nat}
+  (hNotCounter : expectedKind ≠ "uooram_counter")
+  (hConsume :
+    consumeExpectedOramLogicalEvents
+      events
+      objectName
+      expectedKind
+      expectedCount
+      detailPrefix =
+    some remaining) :
+  projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      (pathOramNormalizeLogicalAccesses events)
+      leakage =
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      (pathOramNormalizeLogicalAccesses remaining)
+      leakage := by
+  induction expectedCount generalizing events remaining with
+  | zero =>
+      simp [consumeExpectedOramLogicalEvents] at hConsume
+      cases hConsume
+      rfl
+  | succ expectedCount ih =>
+      cases events with
+      | nil =>
+          simp [consumeExpectedOramLogicalEvents] at hConsume
+      | cons event events =>
+          simp [consumeExpectedOramLogicalEvents] at hConsume
+          rcases hConsume with ⟨hMatch, hConsume⟩
+          rcases hMatch with ⟨⟨_hObj, hKind⟩, _hPrefix⟩
+          have hNormKind :
+              (pathOramNormalizeLogicalEvent event).kind = event.kind :=
+            pathOramNormalizeLogicalEvent_kind event
+          have hNotCounterEvent :
+              isOramCounterLogicalEvent (pathOramNormalizeLogicalEvent event) = false := by
+            by_cases hEq :
+                isOramCounterLogicalEvent (pathOramNormalizeLogicalEvent event) = true
+            · unfold isOramCounterLogicalEvent at hEq
+              simp at hEq
+              have hFalse : False := by
+                apply hNotCounter
+                calc
+                  expectedKind = event.kind := hKind.symm
+                  _ = "uooram_counter" := hEq.1
+              exact False.elim hFalse
+            · cases hVal : isOramCounterLogicalEvent (pathOramNormalizeLogicalEvent event) <;>
+                simp [hVal] at hEq ⊢
+          have hSkip :
+              projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                  (pathOramNormalizeLogicalAccesses (event :: events))
+                  leakage =
+                projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                  (pathOramNormalizeLogicalAccesses events)
+                  leakage := by
+            simp
+              [ pathOramNormalizeLogicalAccesses
+              , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+              , hNotCounterEvent
+              ]
+          rw [hSkip]
+          exact ih hConsume
+
+theorem runtimeOramObjectByName?_map_toManifest
+  (oramObjects : List RuntimeOramObjectCertificate)
+  (objectName : String) :
+  (oramObjects.map RuntimeOramObjectCertificate.toOramObjectManifest).find?
+      (fun object => object.objectName = objectName) =
+    (runtimeOramObjectByName? oramObjects objectName).map
+      RuntimeOramObjectCertificate.toOramObjectManifest := by
+  induction oramObjects with
+  | nil =>
+      simp [runtimeOramObjectByName?]
+  | cons head tail ih =>
+      by_cases hHead : head.objectName = objectName
+      · simp
+          [ runtimeOramObjectByName?
+          , List.find?
+          , hHead
+          , RuntimeOramObjectCertificate.toOramObjectManifest
+          ]
+      · simp
+          [ runtimeOramObjectByName?
+          , List.find?
+          , hHead
+          , RuntimeOramObjectCertificate.toOramObjectManifest
+          , ih
+          ]
+
+theorem pathOramProjectedLeakage_find_byObjectName_of_manifests
+  (cfg : OramConfig)
+  (objects : List OramObjectManifest)
+  (objectName : String) :
+  (projectPathOramLeakage (objects.map (accessLeakage cfg))).find?
+      (fun access => access.objectName = objectName) =
+    (objects.find? (fun object => object.objectName = objectName)).map
+      (fun object => projectPathOramAccessLeakage (accessLeakage cfg object)) := by
+  induction objects with
+  | nil =>
+      simp [projectPathOramLeakage]
+  | cons head tail ih =>
+      by_cases hHead : head.objectName = objectName
+      · simp
+          [ projectPathOramLeakage
+          , List.find?
+          , hHead
+          , accessLeakage
+          , projectPathOramAccessLeakage
+          ]
+      · simp
+          [ projectPathOramLeakage
+          , List.find?
+          , hHead
+          , accessLeakage
+          , projectPathOramAccessLeakage
+          ]
+        simpa [projectPathOramLeakage] using ih
+
+theorem pathOramBucketCountByObjectName?_of_manifests
+  (cfg : OramConfig)
+  (objects : List OramObjectManifest)
+  (objectName : String) :
+  pathOramBucketCountByObjectName?
+      (projectPathOramLeakage (objects.map (accessLeakage cfg)))
+      objectName =
+    (objects.find? (fun object => object.objectName = objectName)).map
+      OramObjectManifest.bucketCount := by
+  unfold pathOramBucketCountByObjectName?
+  rw [pathOramProjectedLeakage_find_byObjectName_of_manifests]
+  cases hFind : List.find? (fun object => object.objectName = objectName) objects with
+  | none =>
+      rfl
+  | some object =>
+      simp [accessLeakage, projectPathOramAccessLeakage]
+
+theorem pathOramBucketCountByObjectName?_of_matchPublicConfig
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {cfg : OramConfig}
+  (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
+  (objectName : String) :
+  pathOramBucketCountByObjectName?
+      (pathOramProjectedExecutionLeakage cfg)
+      objectName =
+    (runtimeOramObjectByName? oramObjects objectName).map
+      RuntimeOramObjectCertificate.bucketCount := by
+  unfold pathOramProjectedExecutionLeakage executionLeakage projectPathOramLeakage
+  rw [hMatch]
+  have hManifest :
+      pathOramBucketCountByObjectName?
+          (List.map projectPathOramAccessLeakage
+            (List.map (accessLeakage cfg)
+              (List.map RuntimeOramObjectCertificate.toOramObjectManifest oramObjects)))
+          objectName =
+        ((oramObjects.map RuntimeOramObjectCertificate.toOramObjectManifest).find?
+          (fun object => object.objectName = objectName)).map
+          OramObjectManifest.bucketCount := by
+    simpa [projectPathOramLeakage, List.map_map] using
+      (pathOramBucketCountByObjectName?_of_manifests cfg
+        (oramObjects.map RuntimeOramObjectCertificate.toOramObjectManifest)
+        objectName)
+  rw [hManifest]
+  rw [runtimeOramObjectByName?_map_toManifest]
+  cases hLookup : runtimeOramObjectByName? oramObjects objectName <;>
+    simp [RuntimeOramObjectCertificate.toOramObjectManifest]
+
+theorem runtimePathOramLeafScheduleScaffold_eq_projected_of_matchPublicConfig
+  {logicalAccesses : List LogicalEvent}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {cfg : OramConfig}
+  (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
+  (hCfg : PathOramConfigWellFormed cfg) :
+  runtimePathOramLeafScheduleScaffoldOfLogicalAccesses logicalAccesses oramObjects =
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      logicalAccesses
+      (pathOramProjectedExecutionLeakage cfg) := by
+  induction logicalAccesses with
+  | nil =>
+      simp
+        [ runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+        , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+        ]
+  | cons event events ih =>
+      by_cases hOram : isOramLogicalKind event.kind
+      · by_cases hCounter : isOramCounterLogicalEvent event
+        · have hBucketLookup :
+            pathOramBucketCountByObjectName?
+                (pathOramProjectedExecutionLeakage cfg)
+                event.object =
+              (runtimeOramObjectByName? oramObjects event.object).map
+                RuntimeOramObjectCertificate.bucketCount :=
+            pathOramBucketCountByObjectName?_of_matchPublicConfig hMatch event.object
+          cases hLookup : runtimeOramObjectByName? oramObjects event.object with
+          | none =>
+              have hProjectedLookup :
+                  pathOramBucketCountByObjectName?
+                      (pathOramProjectedExecutionLeakage cfg)
+                      event.object =
+                    none := by
+                simpa [hLookup] using hBucketLookup
+              simp
+                [ runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                , hOram
+                , hCounter
+                , hLookup
+                , hProjectedLookup
+                ]
+          | some object =>
+              have hProjectedLookup :
+                  pathOramBucketCountByObjectName?
+                      (pathOramProjectedExecutionLeakage cfg)
+                      event.object =
+                    some object.bucketCount := by
+                simpa [hLookup] using hBucketLookup
+              have hObjectName : object.objectName = event.object :=
+                runtimeOramObjectByName?_objectName hLookup
+              have hIsPath : object.isPathOram = true :=
+                runtimeOramObjectByName?_isPathOram_of_matchPublicConfig
+                  hMatch hCfg hLookup
+              simp
+                [ runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                , hOram
+                , hCounter
+                , hLookup
+                , hProjectedLookup
+                , hObjectName
+                , hIsPath
+                , ih
+                ]
+        · simp
+            [ runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+            , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+            , hOram
+            , hCounter
+            , ih
+            ]
+      · have hNotCounter : isOramCounterLogicalEvent event = false := by
+          unfold isOramCounterLogicalEvent
+          by_cases hKind : event.kind = "uooram_counter"
+          · have hFalse : False := by
+              simp [isOramLogicalKind, hKind] at hOram
+            exact False.elim hFalse
+          · simp [hKind]
+        simp
+          [ runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+          , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+          , hOram
+          , hNotCounter
+          , ih
+          ]
+
+theorem runtimeOramObject_metadataEventKind_ne_counter
+  {object : RuntimeOramObjectCertificate}
+  {metadataKind : String}
+  (hKind : object.metadataEventKind? = some metadataKind) :
+  metadataKind ≠ "uooram_counter" := by
+  unfold RuntimeOramObjectCertificate.metadataEventKind? at hKind
+  split at hKind <;> simp at hKind
+  all_goals subst metadataKind <;> decide
+
+theorem runtimeOramObject_bucketEventKind_ne_counter
+  {object : RuntimeOramObjectCertificate}
+  {bucketKind : String}
+  (hKind : object.bucketEventKind? = some bucketKind) :
+  bucketKind ≠ "uooram_counter" := by
+  unfold RuntimeOramObjectCertificate.bucketEventKind? at hKind
+  split at hKind <;> simp at hKind
+  all_goals subst bucketKind <;> decide
 
 def reconstructObservedOramAccessesFromLogicalTraceAux
   (fuel : Nat)
@@ -656,6 +2115,590 @@ def reconstructPathOramLeafScaffoldFromLogicalTrace
     logicalAccesses.length
     logicalAccesses
     oramObjects
+
+theorem reconstructPathOramLeafScaffoldFromLogicalTraceAux_runtime
+  {fuel : Nat}
+  {logicalAccesses : List LogicalEvent}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {scaffold : List RuntimePathOramLeafScaffoldStep}
+  (hRecon :
+    reconstructPathOramLeafScaffoldFromLogicalTraceAux
+      fuel
+      logicalAccesses
+      oramObjects =
+    some scaffold) :
+  runtimePathOramLeafScheduleScaffoldOfLogicalAccesses logicalAccesses oramObjects =
+    some (scaffold.map RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep) := by
+  induction fuel generalizing logicalAccesses scaffold with
+  | zero =>
+      cases logicalAccesses with
+      | nil =>
+          simp [reconstructPathOramLeafScaffoldFromLogicalTraceAux, runtimePathOramLeafScheduleScaffoldOfLogicalAccesses] at hRecon ⊢
+          cases hRecon
+          rfl
+      | cons event events =>
+          simp [reconstructPathOramLeafScaffoldFromLogicalTraceAux] at hRecon
+  | succ fuel ih =>
+      cases logicalAccesses with
+      | nil =>
+          simp [reconstructPathOramLeafScaffoldFromLogicalTraceAux, runtimePathOramLeafScheduleScaffoldOfLogicalAccesses] at hRecon ⊢
+          cases hRecon
+          rfl
+      | cons event events =>
+          by_cases hOram : isOramLogicalKind event.kind
+          · by_cases hCounter : isOramCounterLogicalEvent event
+            · have hCounterEq : event.kind = "uooram_counter" ∧ event.detail = "counter" := by
+                unfold isOramCounterLogicalEvent at hCounter
+                simp at hCounter
+                exact hCounter
+              rcases hCounterEq with ⟨hKindCounter, hDetailCounter⟩
+              cases hLookup : runtimeOramObjectByName? oramObjects event.object with
+              | none =>
+                  simp
+                    [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                    , hKindCounter
+                    , hDetailCounter
+                    , hLookup
+                    ] at hRecon
+                  have hFalse : False := by
+                    simpa [isOramLogicalKind] using hRecon.1
+                  exact False.elim hFalse
+              | some object =>
+                  cases hMeta : object.metadataEventKind? with
+                  | none =>
+                      simp
+                        [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                        , hKindCounter
+                        , hDetailCounter
+                        , hLookup
+                        , hMeta
+                        ] at hRecon
+                      have hFalse : False := by
+                        simpa [isOramLogicalKind] using hRecon.1
+                      exact False.elim hFalse
+                  | some metadataKind =>
+                      cases hBucket : object.bucketEventKind? with
+                      | none =>
+                          simp
+                            [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                            , hKindCounter
+                            , hDetailCounter
+                            , hLookup
+                            , hMeta
+                            , hBucket
+                            ] at hRecon
+                          have hFalse : False := by
+                            simpa [isOramLogicalKind] using hRecon.1
+                          exact False.elim hFalse
+                      | some bucketKind =>
+                          cases hConsumeMeta :
+                              consumeExpectedOramLogicalEvents
+                                events
+                                event.object
+                                metadataKind
+                                object.metadataPages
+                                "page:" with
+                          | none =>
+                              simp
+                                [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                , hKindCounter
+                                , hDetailCounter
+                                , hLookup
+                                , hMeta
+                                , hBucket
+                                , hConsumeMeta
+                                ] at hRecon
+                              have hFalse : False := by
+                                simpa [isOramLogicalKind] using hRecon.1
+                              exact False.elim hFalse
+                          | some afterMeta =>
+                              cases hConsumeBucket :
+                                  consumeExpectedOramLogicalEvents
+                                    afterMeta
+                                    event.object
+                                    bucketKind
+                                    object.bucketsPerAccess
+                                    "bucket:" with
+                              | none =>
+                                  simp
+                                    [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                    , hKindCounter
+                                    , hDetailCounter
+                                    , hLookup
+                                    , hMeta
+                                    , hBucket
+                                    , hConsumeMeta
+                                    , hConsumeBucket
+                                    ] at hRecon
+                                  have hFalse : False := by
+                                    simpa [isOramLogicalKind] using hRecon.1
+                                  exact False.elim hFalse
+                              | some remaining =>
+                                  cases hTail :
+                                      reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                        fuel
+                                        remaining
+                                        oramObjects with
+                                  | none =>
+                                      simp
+                                        [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                        , hKindCounter
+                                        , hDetailCounter
+                                        , hLookup
+                                        , hMeta
+                                        , hBucket
+                                        , hConsumeMeta
+                                        , hConsumeBucket
+                                        , hTail
+                                        ] at hRecon
+                                      have hFalse : False := by
+                                        simpa [isOramLogicalKind] using hRecon.1
+                                      exact False.elim hFalse
+                                  | some tailScaffold =>
+                                      have hSkipMeta :
+                                          runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              events
+                                              oramObjects =
+                                            runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              afterMeta
+                                              oramObjects :=
+                                        consumeExpectedOramLogicalEvents_runtimePathOramLeafScheduleScaffold
+                                          (runtimeOramObject_metadataEventKind_ne_counter hMeta)
+                                          hConsumeMeta
+                                      have hSkipBucket :
+                                          runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              afterMeta
+                                              oramObjects =
+                                            runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              remaining
+                                              oramObjects :=
+                                        consumeExpectedOramLogicalEvents_runtimePathOramLeafScheduleScaffold
+                                          (runtimeOramObject_bucketEventKind_ne_counter hBucket)
+                                          hConsumeBucket
+                                      have hTailRuntime :
+                                          runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              remaining
+                                              oramObjects =
+                                            some
+                                              (tailScaffold.map
+                                                RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep) :=
+                                        ih hTail
+                                      have hEventsRuntime :
+                                          runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              events
+                                              oramObjects =
+                                            some
+                                              (tailScaffold.map
+                                                RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep) := by
+                                        rw [hSkipMeta, hSkipBucket]
+                                        exact hTailRuntime
+                                      by_cases hPath : object.isPathOram
+                                      · simp
+                                          [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                          , hKindCounter
+                                          , hDetailCounter
+                                          , hLookup
+                                          , hMeta
+                                          , hBucket
+                                          , hConsumeMeta
+                                          , hConsumeBucket
+                                          , hTail
+                                          , hPath
+                                          ] at hRecon
+                                        cases hRecon
+                                        simp
+                                          [ runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                          , hOram
+                                          , hCounter
+                                          , hLookup
+                                          , hPath
+                                          , hEventsRuntime
+                                          , RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+                                          ]
+                                      · simp
+                                          [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                          , hKindCounter
+                                          , hDetailCounter
+                                          , hLookup
+                                          , hMeta
+                                          , hBucket
+                                          , hConsumeMeta
+                                          , hConsumeBucket
+                                          , hTail
+                                          , hPath
+                                          ] at hRecon
+                                        cases hRecon
+                                        simp
+                                          [ runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+                                          , hOram
+                                          , hCounter
+                                          , hLookup
+                                          , hPath
+                                          , hEventsRuntime
+                                          ]
+            · have hBadCounter :
+                (event.kind != "uooram_counter" || event.detail != "counter") = true := by
+                unfold isOramCounterLogicalEvent at hCounter
+                by_cases hKind : event.kind = "uooram_counter"
+                · by_cases hDetail : event.detail = "counter"
+                  · simp [hKind, hDetail] at hCounter
+                  · simp [hKind, hDetail]
+                · simp [hKind]
+              simp
+                [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                , hOram
+                , hBadCounter
+                ] at hRecon
+          · have hTail :
+                reconstructPathOramLeafScaffoldFromLogicalTraceAux fuel events oramObjects =
+                  some scaffold := by
+              simpa [reconstructPathOramLeafScaffoldFromLogicalTraceAux, hOram] using hRecon
+            have hTailRuntime := ih hTail
+            simpa [runtimePathOramLeafScheduleScaffoldOfLogicalAccesses, hOram] using hTailRuntime
+
+theorem reconstructPathOramLeafScaffoldFromLogicalTrace_runtime
+  {logicalAccesses : List LogicalEvent}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {scaffold : List RuntimePathOramLeafScaffoldStep}
+  (hRecon :
+    reconstructPathOramLeafScaffoldFromLogicalTrace
+      logicalAccesses
+      oramObjects =
+    some scaffold) :
+  runtimePathOramLeafScheduleScaffoldOfLogicalAccesses logicalAccesses oramObjects =
+    some (scaffold.map RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep) := by
+  simpa [reconstructPathOramLeafScaffoldFromLogicalTrace] using
+    (reconstructPathOramLeafScaffoldFromLogicalTraceAux_runtime hRecon)
+
+theorem projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_normalize_of_reconstructAux
+  {fuel : Nat}
+  {logicalAccesses : List LogicalEvent}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {scaffold : List RuntimePathOramLeafScaffoldStep}
+  {leakage : PathOramProjectedLeakage}
+  (hRecon :
+    reconstructPathOramLeafScaffoldFromLogicalTraceAux
+      fuel
+      logicalAccesses
+      oramObjects =
+    some scaffold) :
+  projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      (pathOramNormalizeLogicalAccesses logicalAccesses)
+      leakage =
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      logicalAccesses
+      leakage := by
+  induction fuel generalizing logicalAccesses scaffold with
+  | zero =>
+      cases logicalAccesses with
+      | nil =>
+          simp
+            [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+            , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+            , pathOramNormalizeLogicalAccesses
+            ] at hRecon ⊢
+      | cons event events =>
+          simp [reconstructPathOramLeafScaffoldFromLogicalTraceAux] at hRecon
+  | succ fuel ih =>
+      cases logicalAccesses with
+      | nil =>
+          simp
+            [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+            , projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+            , pathOramNormalizeLogicalAccesses
+            ] at hRecon ⊢
+      | cons event events =>
+          by_cases hOram : isOramLogicalKind event.kind
+          · by_cases hCounter : isOramCounterLogicalEvent event
+            · unfold isOramCounterLogicalEvent at hCounter
+              simp at hCounter
+              rcases hCounter with ⟨hKindCounter, hDetailCounter⟩
+              cases hLookup : runtimeOramObjectByName? oramObjects event.object with
+              | none =>
+                  simp
+                    [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                    , hKindCounter
+                    , hDetailCounter
+                    , hLookup
+                    ] at hRecon
+                  have hFalse : False := by
+                    simpa [isOramLogicalKind] using hRecon.1
+                  exact False.elim hFalse
+              | some object =>
+                  cases hMeta : object.metadataEventKind? with
+                  | none =>
+                      simp
+                        [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                        , hKindCounter
+                        , hDetailCounter
+                        , hLookup
+                        , hMeta
+                        ] at hRecon
+                      have hFalse : False := by
+                        simpa [isOramLogicalKind] using hRecon.1
+                      exact False.elim hFalse
+                  | some metadataKind =>
+                      cases hBucket : object.bucketEventKind? with
+                      | none =>
+                          simp
+                            [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                            , hKindCounter
+                            , hDetailCounter
+                            , hLookup
+                            , hMeta
+                            , hBucket
+                            ] at hRecon
+                          have hFalse : False := by
+                            simpa [isOramLogicalKind] using hRecon.1
+                          exact False.elim hFalse
+                      | some bucketKind =>
+                          cases hConsumeMeta :
+                              consumeExpectedOramLogicalEvents
+                                events
+                                event.object
+                                metadataKind
+                                object.metadataPages
+                                "page:" with
+                          | none =>
+                              simp
+                                [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                , hKindCounter
+                                , hDetailCounter
+                                , hLookup
+                                , hMeta
+                                , hBucket
+                                , hConsumeMeta
+                                ] at hRecon
+                              have hFalse : False := by
+                                simpa [isOramLogicalKind] using hRecon.1
+                              exact False.elim hFalse
+                          | some afterMeta =>
+                              cases hConsumeBucket :
+                                  consumeExpectedOramLogicalEvents
+                                    afterMeta
+                                    event.object
+                                    bucketKind
+                                    object.bucketsPerAccess
+                                    "bucket:" with
+                              | none =>
+                                  simp
+                                    [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                    , hKindCounter
+                                    , hDetailCounter
+                                    , hLookup
+                                    , hMeta
+                                    , hBucket
+                                    , hConsumeMeta
+                                    , hConsumeBucket
+                                    ] at hRecon
+                                  have hFalse : False := by
+                                    simpa [isOramLogicalKind] using hRecon.1
+                                  exact False.elim hFalse
+                              | some remaining =>
+                                  cases hTail :
+                                      reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                        fuel
+                                        remaining
+                                        oramObjects with
+                                  | none =>
+                                      simp
+                                        [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                                        , hKindCounter
+                                        , hDetailCounter
+                                        , hLookup
+                                        , hMeta
+                                        , hBucket
+                                        , hConsumeMeta
+                                        , hConsumeBucket
+                                        , hTail
+                                        ] at hRecon
+                                      have hFalse : False := by
+                                        simpa [isOramLogicalKind] using hRecon.1
+                                      exact False.elim hFalse
+                                  | some tailScaffold =>
+                                      have hSkipMeta :
+                                          projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              events
+                                              leakage =
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              afterMeta
+                                              leakage :=
+                                        consumeExpectedOramLogicalEvents_projectedPathOramLeafScheduleScaffold
+                                          (runtimeOramObject_metadataEventKind_ne_counter hMeta)
+                                          hConsumeMeta
+                                      have hSkipBucket :
+                                          projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              afterMeta
+                                              leakage =
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              remaining
+                                              leakage :=
+                                        consumeExpectedOramLogicalEvents_projectedPathOramLeafScheduleScaffold
+                                          (runtimeOramObject_bucketEventKind_ne_counter hBucket)
+                                          hConsumeBucket
+                                      have hSkipMetaNorm :
+                                          projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              (pathOramNormalizeLogicalAccesses events)
+                                              leakage =
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              (pathOramNormalizeLogicalAccesses afterMeta)
+                                              leakage :=
+                                        consumeExpectedOramLogicalEvents_normalized_projectedPathOramLeafScheduleScaffold
+                                          (runtimeOramObject_metadataEventKind_ne_counter hMeta)
+                                          hConsumeMeta
+                                      have hSkipBucketNorm :
+                                          projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              (pathOramNormalizeLogicalAccesses afterMeta)
+                                              leakage =
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              (pathOramNormalizeLogicalAccesses remaining)
+                                              leakage :=
+                                        consumeExpectedOramLogicalEvents_normalized_projectedPathOramLeafScheduleScaffold
+                                          (runtimeOramObject_bucketEventKind_ne_counter hBucket)
+                                          hConsumeBucket
+                                      have hTailNorm :
+                                          projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              (pathOramNormalizeLogicalAccesses remaining)
+                                              leakage =
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              remaining
+                                              leakage :=
+                                        ih hTail
+                                      have hEventsNorm :
+                                          projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              (pathOramNormalizeLogicalAccesses events)
+                                              leakage =
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              remaining
+                                              leakage := by
+                                        rw [hSkipMetaNorm, hSkipBucketNorm]
+                                        exact hTailNorm
+                                      have hEvents :
+                                          projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              events
+                                              leakage =
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                              remaining
+                                              leakage := by
+                                        rw [hSkipMeta, hSkipBucket]
+                                      cases hProjectedBucket :
+                                          pathOramBucketCountByObjectName? leakage event.object with
+                                      | none =>
+                                          have hCounterTrue :
+                                              isOramCounterLogicalEvent event = true := by
+                                            unfold isOramCounterLogicalEvent
+                                            simp [hKindCounter, hDetailCounter]
+                                          have hNormEvent :
+                                              pathOramNormalizeLogicalEvent event = event :=
+                                            pathOramNormalizeLogicalEvent_eq_self_of_counter
+                                              hKindCounter
+                                              hDetailCounter
+                                          simp
+                                            [ projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                            , pathOramNormalizeLogicalAccesses
+                                            , hNormEvent
+                                            , hCounterTrue
+                                            , hProjectedBucket
+                                            ]
+                                      | some bucketCount =>
+                                          have hCounterTrue :
+                                              isOramCounterLogicalEvent event = true := by
+                                            unfold isOramCounterLogicalEvent
+                                            simp [hKindCounter, hDetailCounter]
+                                          have hNormEvent :
+                                              pathOramNormalizeLogicalEvent event = event :=
+                                            pathOramNormalizeLogicalEvent_eq_self_of_counter
+                                              hKindCounter
+                                              hDetailCounter
+                                          calc
+                                            projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                                (pathOramNormalizeLogicalAccesses (event :: events))
+                                                leakage =
+                                              (projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                                  (pathOramNormalizeLogicalAccesses events)
+                                                  leakage).bind
+                                                (fun tail =>
+                                                  some ((event.object, bucketCount) :: tail)) := by
+                                                    simp
+                                                      [ projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                                      , pathOramNormalizeLogicalAccesses
+                                                      , hNormEvent
+                                                      , hCounterTrue
+                                                      , hProjectedBucket
+                                                      ]
+                                            _ =
+                                              (projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                                  remaining
+                                                  leakage).bind
+                                                (fun tail =>
+                                                  some ((event.object, bucketCount) :: tail)) := by
+                                                    rw [hEventsNorm]
+                                            _ =
+                                              projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+                                                (event :: events)
+                                                leakage := by
+                                                  rw [projectedPathOramLeafScheduleScaffoldOfLogicalAccesses]
+                                                  simp [hCounterTrue, hProjectedBucket]
+                                                  rw [hEvents]
+            · have hBadCounter :
+                (event.kind != "uooram_counter" || event.detail != "counter") = true := by
+                unfold isOramCounterLogicalEvent at hCounter
+                by_cases hKind : event.kind = "uooram_counter"
+                · by_cases hDetail : event.detail = "counter"
+                  · simp [hKind, hDetail] at hCounter
+                  · simp [hKind, hDetail]
+                · simp [hKind]
+              simp
+                [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
+                , hOram
+                , hBadCounter
+                ] at hRecon
+          · have hTail :
+              reconstructPathOramLeafScaffoldFromLogicalTraceAux fuel events oramObjects =
+                some scaffold := by
+              simpa [reconstructPathOramLeafScaffoldFromLogicalTraceAux, hOram] using hRecon
+            have hOramFalse : isOramLogicalKind event.kind = false := by
+              cases hKind : isOramLogicalKind event.kind <;> simp [hKind] at hOram ⊢
+            have hKindNe : event.kind ≠ "uooram_counter" := by
+              intro hKind
+              have hFalse : False := by
+                simp [isOramLogicalKind, hKind] at hOram
+              exact False.elim hFalse
+            have hNotCounter :
+                isOramCounterLogicalEvent event = false := by
+              unfold isOramCounterLogicalEvent
+              simp [hKindNe]
+            have hNormEvent :
+                pathOramNormalizeLogicalEvent event = event :=
+              pathOramNormalizeLogicalEvent_eq_self_of_not_oram hOramFalse
+            have hTailNorm := ih hTail
+            simpa
+              [ projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+              , pathOramNormalizeLogicalAccesses
+              , hNormEvent
+              , hNotCounter
+              ] using hTailNorm
+
+theorem projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_normalize_of_reconstruct
+  {logicalAccesses : List LogicalEvent}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {scaffold : List RuntimePathOramLeafScaffoldStep}
+  {leakage : PathOramProjectedLeakage}
+  (hRecon :
+    reconstructPathOramLeafScaffoldFromLogicalTrace
+      logicalAccesses
+      oramObjects =
+    some scaffold) :
+  projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      (pathOramNormalizeLogicalAccesses logicalAccesses)
+      leakage =
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      logicalAccesses
+      leakage := by
+  simpa [reconstructPathOramLeafScaffoldFromLogicalTrace] using
+    (projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_normalize_of_reconstructAux
+      (leakage := leakage)
+      hRecon)
 
 def runtimeControllerAccessBoundaryEvents : List BoundaryEvent :=
   [ { direction := .exit
@@ -876,6 +2919,12 @@ def RuntimeRefinementWitness.pathOramFreshCoinValues?
     witness.oramLeafSchedule
     witness.oramLeafStateTransitions
 
+def RuntimeRefinementWitness.pathOramFreshCoinBlocks?
+  (witness : RuntimeRefinementWitness) : Option (List (List Nat)) :=
+  extractRuntimePathOramFreshCoinBlocksAux
+    witness.oramLeafSchedule
+    witness.oramLeafStateTransitions
+
 def RuntimeRefinementWitness.replayedPathOramLeafScheduleFromFreshCoins
   (witness : RuntimeRefinementWitness) : Option (List RuntimeOramLeafCertificate × RuntimePathOramPositionMapState) := do
   let coins ← witness.pathOramFreshCoinValues?
@@ -884,6 +2933,15 @@ def RuntimeRefinementWitness.replayedPathOramLeafScheduleFromFreshCoins
     witness.oramObjects
     witness.pathOramTransitionShapes
     coins
+
+def RuntimeRefinementWitness.replayedPathOramLeafScheduleFromFreshCoinBlocks
+  (witness : RuntimeRefinementWitness) : Option (List RuntimeOramLeafCertificate × RuntimePathOramPositionMapState) := do
+  let coinBlocks ← witness.pathOramFreshCoinBlocks?
+  replayRuntimePathOramLeafScheduleFromCoinBlocks
+    witness.oramPositionMapBefore
+    witness.oramObjects
+    witness.pathOramTransitionShapes
+    coinBlocks
 
 def RuntimeRefinementWitness.replayedPathOramPositionMapState
   (witness : RuntimeRefinementWitness) : Option RuntimePathOramPositionMapState :=
@@ -898,6 +2956,11 @@ def RuntimeRefinementWitness.expectedPathOramPositionMapState
   runtimePathOramPositionMapStateByObject
     witness.oramPositionMapAfter
     witness.oramObjects
+
+def RuntimeRefinementWitness.ObjectsMatchPublicConfig
+  (witness : RuntimeRefinementWitness)
+  (cfg : OramConfig) : Prop :=
+  RuntimeOramObjectsMatchPublicConfig witness.oramObjects cfg
 
 def RuntimeRefinementWitness.Valid
   (witness : RuntimeRefinementWitness)
@@ -1041,6 +3104,27 @@ theorem runtimeWitness_pathOramLeafScaffold_exact
       _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
   exact hLeafScaffold
 
+theorem runtimeWitness_object_isPathOram_of_matchPublicConfig
+  (witness : RuntimeRefinementWitness)
+  {cfg : OramConfig}
+  (hMatch : witness.ObjectsMatchPublicConfig cfg)
+  (hCfg : PathOramConfigWellFormed cfg)
+  {object : RuntimeOramObjectCertificate}
+  (hMem : object ∈ witness.oramObjects) :
+  object.isPathOram = true := by
+  exact runtimeOramObject_isPathOram_of_matchPublicConfig hMatch hCfg hMem
+
+theorem runtimeWitness_objectByName_isPathOram_of_matchPublicConfig
+  (witness : RuntimeRefinementWitness)
+  {cfg : OramConfig}
+  (hMatch : witness.ObjectsMatchPublicConfig cfg)
+  (hCfg : PathOramConfigWellFormed cfg)
+  {objectName : String}
+  {object : RuntimeOramObjectCertificate}
+  (hLookup : runtimeOramObjectByName? witness.oramObjects objectName = some object) :
+  object.isPathOram = true := by
+  exact runtimeOramObjectByName?_isPathOram_of_matchPublicConfig hMatch hCfg hLookup
+
 theorem runtimeWitness_publicPathOramLeafScaffold_matches_hidden
   (witness : RuntimeRefinementWitness)
   (modelTags : SGXModelTags)
@@ -1072,6 +3156,55 @@ theorem runtimeWitness_pathOramLeafStateReplay_some
       _hLeafStateEq, hLeafStateSome, _hLeafBuckets, _hNormalized⟩
   exact hLeafStateSome
 
+theorem runtimeWitness_pathOramFreshCoinValues_of_blocks
+  (witness : RuntimeRefinementWitness)
+  {coinBlocks : List (List Nat)}
+  (hBlocks : witness.pathOramFreshCoinBlocks? = some coinBlocks) :
+  witness.pathOramFreshCoinValues? = some (concatLists coinBlocks) := by
+  exact extractRuntimePathOramFreshCoinValuesAux_of_blocks (by
+    simpa [RuntimeRefinementWitness.pathOramFreshCoinBlocks?] using hBlocks)
+
+theorem runtimeWitness_replayedPathOramLeafScheduleFromFreshCoinBlocks_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  ∃ finalState,
+    witness.expectedPathOramPositionMapState = some finalState ∧
+    witness.replayedPathOramLeafScheduleFromFreshCoinBlocks =
+      some (witness.oramLeafSchedule, finalState) := by
+  have hReplayEq :=
+    runtimeWitness_pathOramLeafStateReplay_exact witness modelTags hValid
+  have hReplaySome :=
+    runtimeWitness_pathOramLeafStateReplay_some witness modelTags hValid
+  cases hExpected : witness.expectedPathOramPositionMapState with
+  | none =>
+      have hReplayNone : witness.replayedPathOramPositionMapState = none := by
+        simpa [hExpected] using hReplayEq
+      have hFalse : False := by
+        simp [hReplayNone] at hReplaySome
+      exact False.elim hFalse
+  | some finalState =>
+      refine ⟨finalState, rfl, ?_⟩
+      have hExplicitReplay :
+          replayRuntimePathOramTransitions
+            witness.oramPositionMapBefore
+            witness.oramObjects
+            witness.oramLeafSchedule
+            witness.oramLeafStateTransitions =
+            some finalState := by
+        simpa
+          [ RuntimeRefinementWitness.replayedPathOramPositionMapState
+          , hExpected
+          ] using hReplayEq
+      rcases replayRuntimePathOramLeafScheduleFromCoinBlocks_of_explicit hExplicitReplay with
+        ⟨coinBlocks, hCoinBlocks, hReplayBlocks⟩
+      simp
+        [ RuntimeRefinementWitness.replayedPathOramLeafScheduleFromFreshCoinBlocks
+        , RuntimeRefinementWitness.pathOramFreshCoinBlocks?
+        , hCoinBlocks
+        ]
+      simpa [RuntimeRefinementWitness.pathOramTransitionShapes] using hReplayBlocks
+
 theorem runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
   (witness : RuntimeRefinementWitness)
   (modelTags : SGXModelTags)
@@ -1081,6 +3214,67 @@ theorem runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
   rw [RuntimeRefinementWitness.projectedPublicPathOramLeafScaffold,
     RuntimeRefinementWitness.projectedPathOramLeafScaffold,
     runtimeWitness_publicPathOramLeafScaffold_matches_hidden witness modelTags hValid]
+
+theorem runtimeWitness_publicPathOramLeafScaffold_of_matchPublicConfig
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  {cfg : OramConfig}
+  (hValid : witness.Valid modelTags)
+  (hMatch : witness.ObjectsMatchPublicConfig cfg)
+  (hCfg : PathOramConfigWellFormed cfg) :
+  pathOramLeafScheduleScaffoldOfPublicPart
+      (pathOramViewPublicPart (viewMPlus witness.trace))
+      (pathOramProjectedExecutionLeakage cfg) =
+    some witness.projectedPublicPathOramLeafScaffold := by
+  have hRecon :=
+    runtimeWitness_pathOramLeafScaffold_exact witness modelTags hValid
+  have hNormalize :=
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_normalize_of_reconstruct
+      (leakage := pathOramProjectedExecutionLeakage cfg)
+      hRecon
+  have hRuntime :
+      runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
+          witness.trace.logicalAccesses
+          witness.oramObjects =
+        some witness.projectedPathOramLeafScaffold := by
+    exact reconstructPathOramLeafScaffoldFromLogicalTrace_runtime hRecon
+  have hProjected :
+      projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+          witness.trace.logicalAccesses
+          (pathOramProjectedExecutionLeakage cfg) =
+        some witness.projectedPathOramLeafScaffold := by
+    have hEq :=
+      runtimePathOramLeafScheduleScaffold_eq_projected_of_matchPublicConfig
+        (logicalAccesses := witness.trace.logicalAccesses)
+        (oramObjects := witness.oramObjects)
+        (cfg := cfg)
+        hMatch
+        hCfg
+    rw [← hEq]
+    exact hRuntime
+  calc
+    pathOramLeafScheduleScaffoldOfPublicPart
+        (pathOramViewPublicPart (viewMPlus witness.trace))
+        (pathOramProjectedExecutionLeakage cfg) =
+      projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+        (pathOramNormalizeLogicalAccesses witness.trace.logicalAccesses)
+        (pathOramProjectedExecutionLeakage cfg) := by
+          simpa
+            [ pathOramLeafScheduleScaffoldOfPublicPart
+            , pathOramViewPublicPart
+            , pathOramNormalizePublicPart
+            ] using
+            (projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_eq
+              (pathOramNormalizeLogicalAccesses witness.trace.logicalAccesses)
+              (pathOramProjectedExecutionLeakage cfg)).symm
+    _ =
+      projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+        witness.trace.logicalAccesses
+        (pathOramProjectedExecutionLeakage cfg) := hNormalize
+    _ = some witness.projectedPathOramLeafScaffold := hProjected
+    _ = some witness.projectedPublicPathOramLeafScaffold := by
+          simp [runtimeWitness_projectedPublicPathOramLeafScaffold_matches_hidden
+            witness modelTags hValid]
 
 @[simp] theorem runtimeWitness_projectedPathOramLeafScaffold_exact
   (witness : RuntimeRefinementWitness) :
