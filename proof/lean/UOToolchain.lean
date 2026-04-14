@@ -15,7 +15,11 @@ import UOToolchain.SgxControllerTrace
 import UOToolchain.SgxMicroGame
 import UOToolchain.RuntimeRefinement
 import UOToolchain.RuntimeCoins
+import UOToolchain.PathOramLocalPosmapV1
 import UOToolchain.RuntimeRefinementJson
+import UOToolchain.RuntimeCoinsJson
+import UOToolchain.RuntimePathOramPairJson
+import UOToolchain.RuntimeCanonicalPathOramPairJson
 import UOToolchain.SgxOramProjection
 import UOToolchain.SgxExactProjection
 import UOToolchain.SgxJointProjection

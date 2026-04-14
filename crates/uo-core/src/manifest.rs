@@ -130,6 +130,109 @@ impl OramManifest {
     pub fn total_commit_ops(&self) -> usize {
         self.metadata_pages_per_access + self.buckets_per_access
     }
+
+    pub fn supports_multi_access_per_entrypoint(&self) -> bool {
+        self.scheme == PATH_ORAM_SCHEME
+    }
+
+    pub fn validate_theorem_shape_for_object(&self, object: &StateObject) -> Result<()> {
+        let capacity = object
+            .capacity
+            .ok_or_else(|| anyhow!("map {} is missing capacity", object.name))?;
+        match self.scheme.as_str() {
+            SURROGATE_ORAM_SCHEME => {
+                if self.blocks_per_bucket != 2 {
+                    bail!("surrogate ORAM requires 2 blocks per bucket");
+                }
+                if self.bucket_size != 24 + self.blocks_per_bucket * self.block_size {
+                    bail!("surrogate ORAM bucket size does not match theorem shape");
+                }
+                if self.bucket_count == 0 {
+                    bail!("surrogate ORAM bucket count must be positive");
+                }
+                if self.metadata_pages_per_access != self.metadata_pages + 1 {
+                    bail!("surrogate ORAM metadata_pages_per_access must equal metadata_pages + 1");
+                }
+                if self.buckets_per_access != (self.tree_height + 2).max(3) {
+                    bail!("surrogate ORAM buckets_per_access does not match theorem shape");
+                }
+                if self.stash_bound != 0 {
+                    bail!("surrogate ORAM stash_bound must be 0");
+                }
+                if self.recursion_depth != 0 {
+                    bail!("surrogate ORAM recursion_depth must be 0");
+                }
+                if self.accesses_per_call != 1 {
+                    bail!("surrogate ORAM accesses_per_call must be 1");
+                }
+            }
+            PATH_ORAM_SCHEME => {
+                if self.blocks_per_bucket != 4 {
+                    bail!("path ORAM requires 4 blocks per bucket");
+                }
+                if self.bucket_size != 24 + self.blocks_per_bucket * self.block_size {
+                    bail!("path ORAM bucket size does not match theorem shape");
+                }
+                if self.bucket_count == 0 {
+                    bail!("path ORAM bucket count must be positive");
+                }
+                if self.stash_bound != capacity.max(1) {
+                    bail!("path ORAM stash_bound must equal max(capacity, 1)");
+                }
+                if self.recursion_depth != 0 {
+                    bail!("path ORAM recursion_depth must be 0");
+                }
+                if self.metadata_pages_per_access != self.metadata_pages + 1 {
+                    bail!("path ORAM metadata_pages_per_access must equal metadata_pages + 1");
+                }
+                if self.buckets_per_access != self.tree_height + 1 {
+                    bail!("path ORAM buckets_per_access must equal tree_height + 1");
+                }
+                if self.accesses_per_call != 1 {
+                    bail!("path ORAM accesses_per_call must be 1");
+                }
+            }
+            other => bail!("unsupported ORAM scheme {}", other),
+        }
+        Ok(())
+    }
+}
+
+pub fn validate_oram_access_shape(
+    signature: &str,
+    oram_accesses: &BTreeMap<u32, usize>,
+    state: &[StateObject],
+) -> Result<()> {
+    for (object_id, accesses) in oram_accesses {
+        let object = state_object_by_id(state, *object_id)?;
+        if object.backend != BackendKind::Oram {
+            bail!(
+                "entrypoint {} records ORAM accesses for non-ORAM object {}",
+                signature,
+                object.name
+            );
+        }
+        let manifest = OramManifest::for_object(object)?;
+        manifest.validate_theorem_shape_for_object(object).map_err(|err| {
+            anyhow!(
+                "entrypoint {} object {} violates theorem-facing ORAM shape: {}",
+                signature,
+                object.name,
+                err
+            )
+        })?;
+        if *accesses > 1 && !manifest.supports_multi_access_per_entrypoint() {
+            bail!(
+                "entrypoint {} performs {} ORAM accesses to {} but scheme {} only supports one access per entrypoint; use {} for multi-access workloads",
+                signature,
+                accesses,
+                object.name,
+                manifest.scheme,
+                PATH_ORAM_SCHEME
+            );
+        }
+    }
+    Ok(())
 }
 
 fn fixed_scalar_width(ty: &Type) -> Result<usize> {
@@ -144,4 +247,11 @@ fn fixed_scalar_width(ty: &Type) -> Result<usize> {
 
 fn log2_ceil(value: usize) -> usize {
     value.max(1).next_power_of_two().ilog2() as usize
+}
+
+fn state_object_by_id(state: &[StateObject], object_id: u32) -> Result<&StateObject> {
+    state
+        .iter()
+        .find(|object| object.id == object_id)
+        .ok_or_else(|| anyhow!("unknown object id {}", object_id))
 }

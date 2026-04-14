@@ -1,0 +1,30 @@
+contract: ConfidentialMixer
+entrypoints:
+  deposit(bytes32,uint256):
+    secret_args: [commitment, amount]
+    confidential: true
+    public_gas_budget: 12288
+  withdraw(bytes32,uint256):
+    secret_args: [commitment, amount]
+    confidential: true
+    public_gas_budget: 12288
+  balanceOf(bytes32):
+    confidential: false
+  totalValue():
+    confidential: false
+state:
+  balances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 64
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+  total:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}

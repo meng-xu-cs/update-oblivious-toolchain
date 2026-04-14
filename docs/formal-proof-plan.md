@@ -459,6 +459,18 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   concrete `path_oram_local_posmap_v1` scheme and narrows the remaining axiom
   boundary to a path-ORAM storage theorem with an explicit security-assumption
   bundle rather than a whole-view ORAM theorem
+- `PathOramLocalPosmapV1.lean` now packages that concrete backend target into
+  an explicit repo-facing assumption bundle and theorem boundary, so the
+  remaining discharge obligation is stated directly against the
+  `path_oram_local_posmap_v1` candidate instead of being left only as a
+  generic path-ORAM reduction
+- `PathOramLocalPosmapV1.lean` now also exposes an explicit standard-theorem
+  import boundary,
+  `PathOramLocalPosmapV1StandardStorageBoundary`, together with named
+  projection lemmas into the concrete computational-UO, paper-main SGX, and
+  TEE-storage theorem endpoints, so the remaining gap is the backend theorem
+  itself rather than any ambiguity about how it composes with the rest of the
+  repository proof stack
 - that path-ORAM theorem now consumes a projected leakage type that drops the
   legacy surrogate-style `schedule` field and keeps only the standard public
   ORAM parameters

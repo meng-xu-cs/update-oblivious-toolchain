@@ -341,6 +341,34 @@ def ImportedRuntimeControllerCertificate.toRuntimeControllerCertificate
       ImportedRuntimeOramAccessCertificate.toRuntimeOramAccessCertificate
   }
 
+structure ImportedRuntimeControllerObserverCertificate where
+  public_outcome : ImportedPublicOutcomeTrace
+  boundary_schedule : List ImportedBoundaryEvent
+  controller_shape : ImportedSgxControllerShapeTrace
+  normalized_micro_trace : ImportedNormalizedMicroTrace
+  controller_certificate : ImportedRuntimeControllerCertificate
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeControllerObserverCertificate.toRuntimeControllerObserverCertificate
+  (certificate : ImportedRuntimeControllerObserverCertificate) :
+  RuntimeControllerObserverCertificate :=
+  { publicOutcome := certificate.public_outcome.toPublicOutcome
+  , boundarySchedule := certificate.boundary_schedule.map ImportedBoundaryEvent.toBoundaryEvent
+  , controllerShape := certificate.controller_shape.toControllerShape
+  , normalizedMicroTrace := certificate.normalized_micro_trace.toNormalizedMicroTrace
+  , controllerCertificate := certificate.controller_certificate.toRuntimeControllerCertificate
+  }
+
+def ImportedRuntimeControllerObserverCertificate.Valid
+  (certificate : ImportedRuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) : Prop :=
+  certificate.toRuntimeControllerObserverCertificate.Valid modelTags
+
+def ImportedRuntimeControllerObserverCertificate.checkValid
+  (certificate : ImportedRuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) : Bool :=
+  certificate.toRuntimeControllerObserverCertificate.checkValid modelTags
+
 structure ImportedRuntimeOramLeafCertificate where
   object_id : Nat
   object_name : String
@@ -480,6 +508,42 @@ def ImportedRuntimeOramObjectCertificate.toRuntimeOramObjectCertificate
   , accessesPerCall := object.accesses_per_call
   }
 
+structure ImportedRuntimePathOramHiddenCertificate where
+  trace : ImportedRefinementTrace
+  oram_objects : List ImportedRuntimeOramObjectCertificate
+  oram_leaf_public_scaffold : List ImportedRuntimeOramLeafScaffoldCertificate
+  oram_leaf_schedule : List ImportedRuntimeOramLeafCertificate
+  oram_position_map_before : List ImportedRuntimePathOramPositionMapCertificate
+  oram_position_map_after : List ImportedRuntimePathOramPositionMapCertificate
+  oram_leaf_state_transitions : List ImportedRuntimePathOramTransitionCertificate
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimePathOramHiddenCertificate.toRuntimePathOramHiddenCertificate
+  (certificate : ImportedRuntimePathOramHiddenCertificate) :
+  RuntimePathOramHiddenCertificate :=
+  { trace := certificate.trace.toTrace
+  , oramObjects := certificate.oram_objects.map
+      ImportedRuntimeOramObjectCertificate.toRuntimeOramObjectCertificate
+  , oramLeafPublicScaffold := certificate.oram_leaf_public_scaffold.map
+      ImportedRuntimeOramLeafScaffoldCertificate.toRuntimePathOramLeafScaffoldStep
+  , oramLeafSchedule := certificate.oram_leaf_schedule.map
+      ImportedRuntimeOramLeafCertificate.toRuntimeOramLeafCertificate
+  , oramPositionMapBefore := certificate.oram_position_map_before.map
+      ImportedRuntimePathOramPositionMapCertificate.toRuntimePathOramPositionMapCertificate
+  , oramPositionMapAfter := certificate.oram_position_map_after.map
+      ImportedRuntimePathOramPositionMapCertificate.toRuntimePathOramPositionMapCertificate
+  , oramLeafStateTransitions := certificate.oram_leaf_state_transitions.map
+      ImportedRuntimePathOramTransitionCertificate.toRuntimePathOramTransitionCertificate
+  }
+
+def ImportedRuntimePathOramHiddenCertificate.Valid
+  (certificate : ImportedRuntimePathOramHiddenCertificate) : Prop :=
+  certificate.toRuntimePathOramHiddenCertificate.Valid
+
+def ImportedRuntimePathOramHiddenCertificate.checkValid
+  (certificate : ImportedRuntimePathOramHiddenCertificate) : Bool :=
+  certificate.toRuntimePathOramHiddenCertificate.checkValid
+
 structure ImportedRuntimeRefinementWitness where
   trace : ImportedRefinementTrace
   runtime_seed : Option Nat
@@ -584,6 +648,98 @@ theorem importedWitness_projects_to_paper_observer
       witness.toRuntimeWitness.normalizedMicroTrace := by
   exact runtimeWitness_projects_to_paper_observer witness.toRuntimeWitness modelTags hValid
 
+def parseImportedRuntimePathOramHiddenCertificate
+  (input : String) : Except String ImportedRuntimePathOramHiddenCertificate := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedRuntimePathOramHiddenCertificate
+  (input : String) : Except String ImportedRuntimePathOramHiddenCertificate := do
+  let certificate ← parseImportedRuntimePathOramHiddenCertificate input
+  if certificate.checkValid then
+    pure certificate
+  else
+    throw "imported runtime path-ORAM hidden certificate does not satisfy Lean validity checks"
+
+def loadImportedRuntimePathOramHiddenCertificate
+  (path : System.FilePath) : IO ImportedRuntimePathOramHiddenCertificate := do
+  let input ← IO.FS.readFile path
+  match parseImportedRuntimePathOramHiddenCertificate input with
+  | .ok certificate => pure certificate
+  | .error err =>
+      throw <| IO.userError s!"failed to parse runtime path-ORAM hidden certificate: {err}"
+
+def loadAndCheckImportedRuntimePathOramHiddenCertificate
+  (path : System.FilePath) : IO ImportedRuntimePathOramHiddenCertificate := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedRuntimePathOramHiddenCertificate input with
+  | .ok certificate => pure certificate
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate runtime path-ORAM hidden certificate: {err}"
+
+def parseImportedRuntimeControllerObserverCertificate
+  (input : String) : Except String ImportedRuntimeControllerObserverCertificate := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedRuntimeControllerObserverCertificate
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedRuntimeControllerObserverCertificate := do
+  let certificate ← parseImportedRuntimeControllerObserverCertificate input
+  if certificate.checkValid modelTags then
+    pure certificate
+  else
+    throw "imported runtime controller observer certificate does not satisfy Lean validity checks"
+
+def loadImportedRuntimeControllerObserverCertificate
+  (path : System.FilePath) : IO ImportedRuntimeControllerObserverCertificate := do
+  let input ← IO.FS.readFile path
+  match parseImportedRuntimeControllerObserverCertificate input with
+  | .ok certificate => pure certificate
+  | .error err =>
+      throw <| IO.userError s!"failed to parse runtime controller observer certificate: {err}"
+
+def loadAndCheckImportedRuntimeControllerObserverCertificate
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedRuntimeControllerObserverCertificate := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedRuntimeControllerObserverCertificate input modelTags with
+  | .ok certificate => pure certificate
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate runtime controller observer certificate: {err}"
+
+@[simp] theorem importedRuntimeControllerObserverCertificate_valid_iff
+  (certificate : ImportedRuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) :
+  certificate.Valid modelTags ↔
+    certificate.toRuntimeControllerObserverCertificate.Valid modelTags := by
+  rfl
+
+@[simp] theorem importedRuntimeControllerObserverCertificate_checkValid_eq_true_iff
+  (certificate : ImportedRuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) :
+  certificate.checkValid modelTags = true ↔ certificate.Valid modelTags := by
+  unfold ImportedRuntimeControllerObserverCertificate.checkValid
+    ImportedRuntimeControllerObserverCertificate.Valid
+  exact runtimeControllerObserverCertificate_checkValid_eq_true_iff
+    certificate.toRuntimeControllerObserverCertificate
+    modelTags
+
+@[simp] theorem importedRuntimePathOramHiddenCertificate_valid_iff
+  (certificate : ImportedRuntimePathOramHiddenCertificate) :
+  certificate.Valid ↔ certificate.toRuntimePathOramHiddenCertificate.Valid := by
+  rfl
+
+@[simp] theorem importedRuntimePathOramHiddenCertificate_checkValid_eq_true_iff
+  (certificate : ImportedRuntimePathOramHiddenCertificate) :
+  certificate.checkValid = true ↔ certificate.Valid := by
+  unfold ImportedRuntimePathOramHiddenCertificate.checkValid
+    ImportedRuntimePathOramHiddenCertificate.Valid
+  exact runtimePathOramHiddenCertificate_checkValid_eq_true_iff
+    certificate.toRuntimePathOramHiddenCertificate
+
 def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
   { trace :=
       { opcode_trace := ["declare"]
@@ -660,6 +816,26 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
   , oram_leaf_state_transitions := []
   }
 
+def sampleImportedRuntimeControllerObserverCertificate :
+  ImportedRuntimeControllerObserverCertificate :=
+  { public_outcome := sampleImportedRuntimeRefinementWitness.public_outcome
+  , boundary_schedule := sampleImportedRuntimeRefinementWitness.boundary_schedule
+  , controller_shape := sampleImportedRuntimeRefinementWitness.controller_shape
+  , normalized_micro_trace := sampleImportedRuntimeRefinementWitness.normalized_micro_trace
+  , controller_certificate := sampleImportedRuntimeRefinementWitness.controller_certificate
+  }
+
+def sampleImportedRuntimePathOramHiddenCertificate :
+  ImportedRuntimePathOramHiddenCertificate :=
+  { trace := sampleImportedRuntimeRefinementWitness.trace
+  , oram_objects := sampleImportedRuntimeRefinementWitness.oram_objects
+  , oram_leaf_public_scaffold := sampleImportedRuntimeRefinementWitness.oram_leaf_public_scaffold
+  , oram_leaf_schedule := sampleImportedRuntimeRefinementWitness.oram_leaf_schedule
+  , oram_position_map_before := sampleImportedRuntimeRefinementWitness.oram_position_map_before
+  , oram_position_map_after := sampleImportedRuntimeRefinementWitness.oram_position_map_after
+  , oram_leaf_state_transitions := sampleImportedRuntimeRefinementWitness.oram_leaf_state_transitions
+  }
+
 def sampleImportedRuntimeRefinementWitnessRoundtrip : Bool :=
   match
       parseImportedRuntimeRefinementWitness
@@ -669,6 +845,28 @@ def sampleImportedRuntimeRefinementWitnessRoundtrip : Bool :=
     | .error _ => false
 
 example : sampleImportedRuntimeRefinementWitnessRoundtrip = true := by
+  native_decide
+
+def sampleImportedRuntimeControllerObserverCertificateRoundtrip : Bool :=
+  match
+      parseImportedRuntimeControllerObserverCertificate
+        (Json.compress (toJson sampleImportedRuntimeControllerObserverCertificate))
+    with
+    | .ok certificate => decide (certificate = sampleImportedRuntimeControllerObserverCertificate)
+    | .error _ => false
+
+example : sampleImportedRuntimeControllerObserverCertificateRoundtrip = true := by
+  native_decide
+
+def sampleImportedRuntimePathOramHiddenCertificateRoundtrip : Bool :=
+  match
+      parseImportedRuntimePathOramHiddenCertificate
+        (Json.compress (toJson sampleImportedRuntimePathOramHiddenCertificate))
+    with
+    | .ok certificate => decide (certificate = sampleImportedRuntimePathOramHiddenCertificate)
+    | .error _ => false
+
+example : sampleImportedRuntimePathOramHiddenCertificateRoundtrip = true := by
   native_decide
 
 end UOToolchain

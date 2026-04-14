@@ -7,8 +7,8 @@ use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::{
     BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape,
     PublicOutcomeTrace, RuntimeControllerCertificate, RuntimeOramAccessWitness,
-    RuntimeOramLeafWitness, RuntimePathOramTransitionWitness,
-    SgxControllerShapeTrace, TheoremTrace, Value,
+    RuntimeOramLeafWitness, RuntimePathOramTransitionWitness, SgxControllerShapeTrace,
+    TheoremTrace, Value,
 };
 use uo_store::StoreExecutionMetrics;
 
@@ -83,12 +83,7 @@ impl CallRecorder {
         recorder
     }
 
-    pub(crate) fn logical_read(
-        &mut self,
-        kind: &str,
-        object: &str,
-        detail: impl Into<String>,
-    ) {
+    pub(crate) fn logical_read(&mut self, kind: &str, object: &str, detail: impl Into<String>) {
         self.metrics.logical_reads += 1;
         self.logical_accesses.push(LogicalEvent {
             kind: kind.into(),
@@ -97,12 +92,7 @@ impl CallRecorder {
         });
     }
 
-    pub(crate) fn logical_write(
-        &mut self,
-        kind: &str,
-        object: &str,
-        detail: impl Into<String>,
-    ) {
+    pub(crate) fn logical_write(&mut self, kind: &str, object: &str, detail: impl Into<String>) {
         self.metrics.logical_writes += 1;
         self.logical_writes.push(LogicalEvent {
             kind: kind.into(),
@@ -111,12 +101,7 @@ impl CallRecorder {
         });
     }
 
-    pub(crate) fn physical_read(
-        &mut self,
-        object: &str,
-        location: impl Into<String>,
-        len: usize,
-    ) {
+    pub(crate) fn physical_read(&mut self, object: &str, location: impl Into<String>, len: usize) {
         self.metrics.physical_reads += 1;
         self.physical_reads.push(PhysicalReadEvent {
             object: object.into(),
@@ -133,11 +118,7 @@ impl CallRecorder {
         self.physical_writes.push(event);
     }
 
-    pub(crate) fn record_oram_access(
-        &mut self,
-        object_id: u32,
-        parameters: &OramParameters,
-    ) {
+    pub(crate) fn record_oram_access(&mut self, object_id: u32, parameters: &OramParameters) {
         self.total_oram_accesses += 1;
         self.observed_oram_schedule.push(ObservedOramAccess {
             object_id,
@@ -156,7 +137,8 @@ impl CallRecorder {
             input_len: 0,
             output_len: 0,
         });
-        self.controller_phase_order.push(ControllerPhase::StageRequest);
+        self.controller_phase_order
+            .push(ControllerPhase::StageRequest);
         self.controller_phase_order.extend(std::iter::repeat_n(
             ControllerPhase::DescendPositionMap,
             parameters.recursion_depth,
@@ -259,9 +241,7 @@ impl CallRecorder {
         };
         let expected_theorem_trace = controller_certificate.theorem_trace(public_outcome);
         if theorem_trace != expected_theorem_trace {
-            bail!(
-                "runtime theorem trace drifted from independent public observer reconstruction"
-            );
+            bail!("runtime theorem trace drifted from independent public observer reconstruction");
         }
         Ok(CallTraceBundle {
             logical_accesses: self.logical_accesses,
@@ -285,7 +265,11 @@ impl CallRecorder {
 
     fn assert_manifest_exactness(&self, manifest_entry: &EntrypointManifest) -> Result<()> {
         for (object_id, expected) in &manifest_entry.oram_accesses {
-            let observed = self.observed_oram_accesses.get(object_id).copied().unwrap_or(0);
+            let observed = self
+                .observed_oram_accesses
+                .get(object_id)
+                .copied()
+                .unwrap_or(0);
             if observed != *expected {
                 bail!(
                     "runtime ORAM access count mismatch for object {}: observed {}, manifest {}",
@@ -315,10 +299,12 @@ impl CallRecorder {
             let manifest_object = manifest_objects
                 .iter()
                 .find(|object| object.id == access.object_id)
-                .ok_or_else(|| anyhow::anyhow!(
-                    "manifest object missing for observed ORAM access {}",
-                    access.object_id
-                ))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "manifest object missing for observed ORAM access {}",
+                        access.object_id
+                    )
+                })?;
             let manifest_oram = manifest_object.oram.as_ref().ok_or_else(|| {
                 anyhow::anyhow!(
                     "manifest object {} is missing ORAM parameters",
@@ -441,12 +427,7 @@ fn controller_certificate(
     }
 }
 
-fn assert_oram_field_eq<T>(
-    object_id: u32,
-    field: &str,
-    observed: T,
-    manifest: T,
-) -> Result<()>
+fn assert_oram_field_eq<T>(object_id: u32, field: &str, observed: T, manifest: T) -> Result<()>
 where
     T: PartialEq + std::fmt::Display,
 {

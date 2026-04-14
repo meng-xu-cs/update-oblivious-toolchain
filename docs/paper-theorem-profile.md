@@ -163,8 +163,40 @@ The canonical leaf-value layer is exposed through:
 - `PathOramCanonicalLeafValueSecurityAssumptions`
 - `computationalPathOram_fromPublicViewCanonicalLeafValuesBucketLocationAndShape_projects_to_computationalUOWith`
 
-The current surrogate theorem remains available as the default specialization,
-so the paper-facing aliases below are unchanged.
+The concrete backend specialization is now surfaced explicitly in:
+
+- `proof/lean/UOToolchain/PathOramLocalPosmapV1.lean`
+- `PathOramLocalPosmapV1SecurityAssumptions`
+- `pathOramLocalPosmapV1SecurityInterface`
+- `PathOramLocalPosmapV1StandardStorageBoundary`
+- `PathOramLocalPosmapV1StandardPaperMainBoundary`
+- `pathOramLocalPosmapV1_standardStorageBoundary_projects_to_computationalUOWith`
+- `pathOramLocalPosmapV1_standardStorageBoundary_projects_to_paperMainSgxExecution`
+- `pathOramLocalPosmapV1_standardStorageBoundary_projects_to_teeStorage`
+- `pathOramLocalPosmapV1_standardStorageBoundary_paperTheoremBoundary`
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardStorageBoundary`
+- `SeededRuntimePaperMainBundle.pathOramLocalPosmapV1_standardPaperMainBoundary`
+- `PathOramLocalPosmapV1PaperTheoremBoundary`
+- `SeededRuntimePaperMainBundle.pathOramLocalPosmapV1_paperTheoremBoundary`
+- `pathOramLocalPosmapV1_paperMain_jointSecurity_projects_to_sgxExecution`
+- `PathOramLocalPosmapV1ArtifactPaperMainBoundary`
+- `pathOramLocalPosmapV1_artifactPaperMainBoundary`
+
+That module does not discharge the remaining ORAM assumptions by itself. What
+it does is fix the exact theorem-facing boundary for the repo’s concrete
+`path_oram_local_posmap_v1` candidate and package the current computational-UO,
+paper-main SGX, joint-SGX, artifact-composition, and TEE-storage projections
+into named endpoints. It now also exposes the explicit import point for an
+external or separately mechanized standard Path ORAM theorem: once that theorem
+is proved at `PathOramLocalPosmapV1StandardStorageBoundary`, the repo’s
+concrete computational-UO, paper-main SGX, and TEE-storage claims follow by
+named projection lemmas without changing the theorem boundary. The legacy
+surrogate theorem remains available as a compatibility specialization, so the
+generic paper-facing aliases below are unchanged. The current seeded runtime
+proof bundle now also instantiates that standard-theorem import boundary
+directly, which means the remaining open issue is the backend theorem itself
+rather than any mismatch between the runtime witness bundle and the theorem
+interface.
 
 The current paper-facing aliases are:
 

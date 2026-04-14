@@ -1069,11 +1069,12 @@ fn build_manifest_entry(
 }
 
 fn validate_oram_access_shape(
-    _signature: &str,
-    _oram_accesses: &BTreeMap<u32, usize>,
-    _frontend: &Frontend,
+    signature: &str,
+    oram_accesses: &BTreeMap<u32, usize>,
+    frontend: &Frontend,
 ) -> Result<()> {
-    Ok(())
+    let state = frontend.state_by_name.values().cloned().collect::<Vec<_>>();
+    uo_core::validate_oram_access_shape(signature, oram_accesses, &state)
 }
 
 #[derive(Default)]
@@ -1356,11 +1357,14 @@ fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, u128>) -> Option<u12
         Expr::Literal(Value::Uint(value)) => Some(*value),
         Expr::Literal(Value::Bool(value)) => Some(u128::from(*value)),
         Expr::Var(name) => loop_env.get(name).copied(),
-        Expr::Unary { op: UnaryOp::Neg, expr } => eval_loop_bound(expr, loop_env)
-            .and_then(|value| 0u128.checked_sub(value)),
-        Expr::Unary { op: UnaryOp::Not, expr } => {
-            eval_loop_bound(expr, loop_env).map(|value| u128::from(value == 0))
-        }
+        Expr::Unary {
+            op: UnaryOp::Neg,
+            expr,
+        } => eval_loop_bound(expr, loop_env).and_then(|value| 0u128.checked_sub(value)),
+        Expr::Unary {
+            op: UnaryOp::Not,
+            expr,
+        } => eval_loop_bound(expr, loop_env).map(|value| u128::from(value == 0)),
         Expr::Binary { op, lhs, rhs } => {
             let lhs = eval_loop_bound(lhs, loop_env)?;
             let rhs = eval_loop_bound(rhs, loop_env)?;
@@ -2381,5 +2385,43 @@ bounds:
                 .total_commit_ops()
                 * 2
         );
+    }
+
+    #[test]
+    fn rejects_multi_access_surrogate_oram_entrypoints() {
+        let source = write_temp(
+            "surrogate-multi-access",
+            r#"
+            contract SurrogateMultiAccess {
+                mapping(bytes32 => uint256) private balances;
+
+                function deposit(bytes32 key, uint256 value) public {
+                    uint256 oldBalance = balances[key];
+                    balances[key] = oldBalance + value;
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: SurrogateMultiAccess
+entrypoints:
+  deposit(bytes32,uint256):
+    confidential: true
+    secret_args: [key, value]
+state:
+  balances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 16
+    backend: oram
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err.to_string().contains("only supports one access per entrypoint"));
     }
 }

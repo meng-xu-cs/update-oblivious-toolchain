@@ -1,15 +1,14 @@
 use crate::controller::CallRecorder;
-use crate::oram::{map_record_bytes, MapEntry, OramState};
+use crate::oram::{map_record_bytes, MapEntry, OramState, PathOramLeafCoinSource};
 use anyhow::{anyhow, bail, Result};
-use rand::rngs::OsRng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
 use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::trace::{classify_write, PhysicalWriteEvent};
-use uo_core::RuntimePathOramPositionMapWitness;
 use uo_core::Value;
+use uo_core::{RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness};
 use uo_store::StoreCipher;
 
 #[derive(Clone, Debug)]
@@ -64,6 +63,7 @@ pub(crate) struct OramMapObject {
     oram: OramState,
     accessed: bool,
     dirty: bool,
+    leaf_coin_source: PathOramLeafCoinSource,
     rng: ChaCha20Rng,
 }
 
@@ -196,16 +196,10 @@ impl RuntimeObject {
                 oram: OramState::instantiate(spec, &mut rng)?,
                 accessed: false,
                 dirty: false,
+                leaf_coin_source: PathOramLeafCoinSource::random(),
                 rng,
             })),
         }
-    }
-
-    pub fn instantiate(spec: &StateObject) -> Result<Self> {
-        let mut seed = [0u8; 32];
-        OsRng.fill_bytes(&mut seed);
-        let mut master_rng = ChaCha20Rng::from_seed(seed);
-        Self::instantiate_from_rng(spec, &mut master_rng)
     }
 
     pub fn instantiate_with_seed(spec: &StateObject, seed: u64) -> Result<Self> {
@@ -232,6 +226,19 @@ impl RuntimeObject {
                     object_id: object.spec.id,
                     object_name: object.spec.name.clone(),
                     leaves: object.oram.position_map.clone(),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub fn path_oram_access_counter_witness(&self) -> Option<RuntimeOramAccessCounterWitness> {
+        match self {
+            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+                Some(RuntimeOramAccessCounterWitness {
+                    object_id: object.spec.id,
+                    object_name: object.spec.name.clone(),
+                    access_counter: object.oram.access_counter,
                 })
             }
             _ => None,
@@ -416,7 +423,12 @@ impl RuntimeObject {
             Self::UoOramMap(object) => {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, &object.oram.parameters);
-                let (value, transcript) = object.oram.get(&object.spec, key, &mut object.rng)?;
+                let (value, transcript) = object.oram.get(
+                    &object.spec,
+                    key,
+                    &mut object.leaf_coin_source,
+                    &mut object.rng,
+                )?;
                 if let Some(leaf) = transcript.path_leaf {
                     trace.record_path_oram_leaf_access(
                         object.spec.id,
@@ -509,10 +521,14 @@ impl RuntimeObject {
             Self::UoOramMap(object) => {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, &object.oram.parameters);
-                let transcript =
-                    object
-                        .oram
-                        .put(&object.spec, key, value, apply, &mut object.rng)?;
+                let transcript = object.oram.put(
+                    &object.spec,
+                    key,
+                    value,
+                    apply,
+                    &mut object.leaf_coin_source,
+                    &mut object.rng,
+                )?;
                 if let Some(leaf) = transcript.path_leaf {
                     trace.record_path_oram_leaf_access(
                         object.spec.id,
@@ -580,9 +596,11 @@ impl RuntimeObject {
                 if new.accessed {
                     let old_physical = old.physical.clone();
                     let aad = cell_slot_aad(&next.spec.name);
-                    let new_physical = next
-                        .cipher
-                        .seal(aad.as_bytes(), &committed_value.canonical_bytes(), &mut next.rng);
+                    let new_physical = next.cipher.seal(
+                        aad.as_bytes(),
+                        &committed_value.canonical_bytes(),
+                        &mut next.rng,
+                    );
                     trace.physical_write(PhysicalWriteEvent {
                         object: next.spec.name.clone(),
                         location: next.spec.name.clone(),
@@ -628,9 +646,11 @@ impl RuntimeObject {
                     for (index, value) in source_values.iter().enumerate() {
                         let old_physical = old.physical_slots[index].clone();
                         let aad = array_slot_aad(&new.spec.name, index);
-                        let new_physical = next
-                            .cipher
-                            .seal(aad.as_bytes(), &value.canonical_bytes(), &mut next.rng);
+                        let new_physical = next.cipher.seal(
+                            aad.as_bytes(),
+                            &value.canonical_bytes(),
+                            &mut next.rng,
+                        );
                         trace.physical_write(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}[{index}]", new.spec.name),
@@ -688,9 +708,11 @@ impl RuntimeObject {
                     for (index, entry) in source_entries.iter().enumerate() {
                         let old_physical = old.physical_slots[index].clone();
                         let aad = small_map_slot_aad(&new.spec.name, index);
-                        let new_physical = next
-                            .cipher
-                            .seal(aad.as_bytes(), &map_record_bytes(entry), &mut next.rng);
+                        let new_physical = next.cipher.seal(
+                            aad.as_bytes(),
+                            &map_record_bytes(entry),
+                            &mut next.rng,
+                        );
                         trace.physical_write(PhysicalWriteEvent {
                             object: new.spec.name.clone(),
                             location: format!("{}#{index}", new.spec.name),
@@ -718,10 +740,11 @@ impl RuntimeObject {
                         } else {
                             new.oram.clone()
                         };
+                        next.leaf_coin_source = PathOramLeafCoinSource::random();
                     } else {
-                        let commit = new
-                            .oram
-                            .commit(&new.spec, &old.oram, aborted, &mut next.rng)?;
+                        let commit =
+                            new.oram
+                                .commit(&new.spec, &old.oram, aborted, &mut next.rng)?;
                         for write in commit.writes {
                             trace.physical_write(PhysicalWriteEvent {
                                 object: new.spec.name.clone(),
@@ -735,6 +758,7 @@ impl RuntimeObject {
                     }
                 } else {
                     next.oram = old.oram.clone();
+                    next.leaf_coin_source = PathOramLeafCoinSource::random();
                 }
                 next.accessed = false;
                 next.dirty = false;
@@ -764,7 +788,36 @@ impl RuntimeObject {
             Self::UoOramMap(object) => {
                 object.accessed = false;
                 object.dirty = false;
+                object.leaf_coin_source = PathOramLeafCoinSource::random();
             }
+        }
+    }
+
+    pub fn enable_injected_path_oram_leaf_coins(&mut self) {
+        if let Self::UoOramMap(object) = self {
+            if object.spec.oram_scheme == PATH_ORAM_SCHEME {
+                object.leaf_coin_source = PathOramLeafCoinSource::require_injected();
+            }
+        }
+    }
+
+    pub fn install_path_oram_leaf_coins(&mut self, coins: Vec<usize>) -> Result<()> {
+        match self {
+            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+                object.leaf_coin_source.install(coins);
+                Ok(())
+            }
+            _ if coins.is_empty() => Ok(()),
+            _ => bail!("{} is not a path-ORAM map", self.name()),
+        }
+    }
+
+    pub fn ensure_path_oram_leaf_coins_consumed(&self) -> Result<()> {
+        match self {
+            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+                object.leaf_coin_source.ensure_exhausted(&object.spec.name)
+            }
+            _ => Ok(()),
         }
     }
 }

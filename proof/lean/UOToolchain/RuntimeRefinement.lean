@@ -254,33 +254,29 @@ def runtimePathOramLeavesWithinBound
     | some value => value < leafCount
     | none => true
 
-def runtimePathOramPositionMapStateByObjectAux
+def runtimePathOramPositionMapCertificateById?
   (states : List RuntimePathOramPositionMapCertificate)
-  (oramObjects : List RuntimeOramObjectCertificate) :
-  Option RuntimePathOramPositionMapState :=
-  match states, oramObjects with
-  | [], [] => some []
-  | state :: states, object :: objects =>
-      if state.objectId = object.objectId &&
-          state.objectName = object.objectName &&
-          state.leaves.length = object.capacity &&
-          runtimePathOramLeavesWithinBound
-            state.leaves
-            object.pathOramLeafChoiceCount then
-        do
-          let tail ← runtimePathOramPositionMapStateByObjectAux states objects
-          some ((object.objectId, state.leaves) :: tail)
-      else
-        none
-  | _, _ => none
+  (objectId : Nat) : Option RuntimePathOramPositionMapCertificate :=
+  states.find? (fun state => state.objectId = objectId)
 
 def runtimePathOramPositionMapStateByObject
   (states : List RuntimePathOramPositionMapCertificate)
   (oramObjects : List RuntimeOramObjectCertificate) :
-  Option RuntimePathOramPositionMapState :=
-  runtimePathOramPositionMapStateByObjectAux
-    states
-    (oramObjects.filter RuntimeOramObjectCertificate.isPathOram)
+  Option RuntimePathOramPositionMapState := do
+  let pathObjects := oramObjects.filter RuntimeOramObjectCertificate.isPathOram
+  if states.length != pathObjects.length then
+    none
+  else
+    pathObjects.mapM fun object => do
+      let state ← runtimePathOramPositionMapCertificateById? states object.objectId
+      if state.objectName = object.objectName &&
+          state.leaves.length = object.capacity &&
+          runtimePathOramLeavesWithinBound
+            state.leaves
+            object.pathOramLeafChoiceCount then
+        some (object.objectId, state.leaves)
+      else
+        none
 
 def runtimePathOramStateLookup?
   (state : RuntimePathOramPositionMapState)
@@ -2832,6 +2828,189 @@ def RuntimeControllerCertificate.controllerShape
   simp [RuntimeControllerCertificate.controllerShape,
     runtimeControllerCertificate_boundarySchedule_length]
 
+structure RuntimeControllerObserverCertificate where
+  publicOutcome : SGXPublicOutcome
+  boundarySchedule : List BoundaryEvent
+  controllerShape : SGXControllerShape
+  normalizedMicroTrace : NormalizedMicroTrace
+  controllerCertificate : RuntimeControllerCertificate
+deriving Repr, DecidableEq
+
+def RuntimeControllerObserverCertificate.microLeakage
+  (certificate : RuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) : SGXMicroLeakage :=
+  sgxMicroLeakageOfController
+    certificate.publicOutcome
+    modelTags
+    certificate.controllerShape
+
+def RuntimeControllerObserverCertificate.Valid
+  (certificate : RuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) : Prop :=
+  certificate.boundarySchedule =
+      certificate.controllerCertificate.boundarySchedule certificate.publicOutcome ∧
+    certificate.controllerShape = certificate.controllerCertificate.controllerShape ∧
+    certificate.normalizedMicroTrace =
+      simulateNormalizedMicroTraceFromLeakage (certificate.microLeakage modelTags)
+
+def RuntimeControllerObserverCertificate.checkValid
+  (certificate : RuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) : Bool :=
+  decide
+      (certificate.boundarySchedule =
+        certificate.controllerCertificate.boundarySchedule certificate.publicOutcome) &&
+    decide
+      (certificate.controllerShape = certificate.controllerCertificate.controllerShape) &&
+    decide
+      (certificate.normalizedMicroTrace =
+        simulateNormalizedMicroTraceFromLeakage (certificate.microLeakage modelTags))
+
+@[simp] theorem runtimeControllerObserverCertificate_checkValid_eq_true_iff
+  (certificate : RuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags) :
+  certificate.checkValid modelTags = true ↔ certificate.Valid modelTags := by
+  simp [RuntimeControllerObserverCertificate.checkValid,
+    RuntimeControllerObserverCertificate.Valid, and_assoc]
+
+theorem runtimeControllerObserverCertificate_boundaryBudget_exact
+  (certificate : RuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags)
+  (hValid : certificate.Valid modelTags) :
+  certificate.boundarySchedule.length = certificate.controllerShape.boundaryEventBudget := by
+  rcases hValid with ⟨hBoundary, hShape, _hNormalized⟩
+  rw [hBoundary, hShape]
+  exact runtimeControllerCertificate_boundarySchedule_budget
+    certificate.controllerCertificate
+    certificate.publicOutcome
+
+theorem runtimeControllerObserverCertificate_normalizedMicro_exact
+  (certificate : RuntimeControllerObserverCertificate)
+  (modelTags : SGXModelTags)
+  (hValid : certificate.Valid modelTags) :
+  certificate.normalizedMicroTrace =
+    simulateNormalizedMicroTraceFromLeakage (certificate.microLeakage modelTags) := by
+  exact hValid.2.2
+
+structure RuntimePathOramHiddenCertificate where
+  trace : Trace
+  oramObjects : List RuntimeOramObjectCertificate
+  oramLeafPublicScaffold : List RuntimePathOramLeafScaffoldStep
+  oramLeafSchedule : List RuntimeOramLeafCertificate
+  oramPositionMapBefore : List RuntimePathOramPositionMapCertificate
+  oramPositionMapAfter : List RuntimePathOramPositionMapCertificate
+  oramLeafStateTransitions : List RuntimePathOramTransitionCertificate
+deriving Repr, DecidableEq
+
+def RuntimePathOramHiddenCertificate.pathOramLeafScheduleTrace
+  (certificate : RuntimePathOramHiddenCertificate) : PathOramLeafScheduleTrace :=
+  certificate.oramLeafSchedule.map RuntimeOramLeafCertificate.toPathOramLeafScheduleStep
+
+def RuntimePathOramHiddenCertificate.pathOramLeafScaffold
+  (certificate : RuntimePathOramHiddenCertificate) : List RuntimePathOramLeafScaffoldStep :=
+  certificate.oramLeafSchedule.map RuntimeOramLeafCertificate.scaffoldStep
+
+def RuntimePathOramHiddenCertificate.projectedPathOramLeafScaffold
+  (certificate : RuntimePathOramHiddenCertificate) : PathOramLeafScheduleScaffold :=
+  certificate.pathOramLeafScaffold.map
+    RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+
+def RuntimePathOramHiddenCertificate.projectedPublicPathOramLeafScaffold
+  (certificate : RuntimePathOramHiddenCertificate) : PathOramLeafScheduleScaffold :=
+  certificate.oramLeafPublicScaffold.map
+    RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+
+def RuntimePathOramHiddenCertificate.pathOramBucketTrace
+  (certificate : RuntimePathOramHiddenCertificate) : PathOramBucketTrace :=
+  pathOramBucketTraceOfView (viewMPlus certificate.trace)
+
+def RuntimePathOramHiddenCertificate.pathOramTransitionShapes
+  (certificate : RuntimePathOramHiddenCertificate) : List RuntimePathOramTransitionShape :=
+  certificate.oramLeafStateTransitions.map RuntimePathOramTransitionCertificate.shape
+
+def RuntimePathOramHiddenCertificate.replayedPathOramPositionMapState
+  (certificate : RuntimePathOramHiddenCertificate) : Option RuntimePathOramPositionMapState :=
+  replayRuntimePathOramTransitions
+    certificate.oramPositionMapBefore
+    certificate.oramObjects
+    certificate.oramLeafSchedule
+    certificate.oramLeafStateTransitions
+
+def RuntimePathOramHiddenCertificate.expectedPathOramPositionMapState
+  (certificate : RuntimePathOramHiddenCertificate) : Option RuntimePathOramPositionMapState :=
+  runtimePathOramPositionMapStateByObject
+    certificate.oramPositionMapAfter
+    certificate.oramObjects
+
+def RuntimePathOramHiddenCertificate.Valid
+  (certificate : RuntimePathOramHiddenCertificate) : Prop :=
+  reconstructPathOramLeafScaffoldFromLogicalTrace
+      certificate.trace.logicalAccesses
+      certificate.oramObjects =
+    some certificate.pathOramLeafScaffold ∧
+    certificate.oramLeafPublicScaffold = certificate.pathOramLeafScaffold ∧
+    certificate.replayedPathOramPositionMapState =
+      certificate.expectedPathOramPositionMapState ∧
+    certificate.replayedPathOramPositionMapState.isSome = true ∧
+    pathOramBucketTraceOfLeafScheduleTrace certificate.pathOramLeafScheduleTrace =
+      certificate.pathOramBucketTrace
+
+def RuntimePathOramHiddenCertificate.checkValid
+  (certificate : RuntimePathOramHiddenCertificate) : Bool :=
+  decide
+      (reconstructPathOramLeafScaffoldFromLogicalTrace
+          certificate.trace.logicalAccesses
+          certificate.oramObjects =
+        some certificate.pathOramLeafScaffold) &&
+    decide (certificate.oramLeafPublicScaffold = certificate.pathOramLeafScaffold) &&
+    decide
+      (certificate.replayedPathOramPositionMapState =
+        certificate.expectedPathOramPositionMapState) &&
+    decide (certificate.replayedPathOramPositionMapState.isSome = true) &&
+    decide
+      (pathOramBucketTraceOfLeafScheduleTrace certificate.pathOramLeafScheduleTrace =
+        certificate.pathOramBucketTrace)
+
+@[simp] theorem runtimePathOramHiddenCertificate_checkValid_eq_true_iff
+  (certificate : RuntimePathOramHiddenCertificate) :
+  certificate.checkValid = true ↔ certificate.Valid := by
+  simp [RuntimePathOramHiddenCertificate.checkValid,
+    RuntimePathOramHiddenCertificate.Valid, and_assoc]
+
+theorem runtimePathOramHiddenCertificate_publicPathOramLeafScaffold_matches_hidden
+  (certificate : RuntimePathOramHiddenCertificate)
+  (hValid : certificate.Valid) :
+  certificate.oramLeafPublicScaffold = certificate.pathOramLeafScaffold := by
+  exact hValid.2.1
+
+theorem runtimePathOramHiddenCertificate_pathOramLeafScaffold_exact
+  (certificate : RuntimePathOramHiddenCertificate)
+  (hValid : certificate.Valid) :
+  reconstructPathOramLeafScaffoldFromLogicalTrace
+      certificate.trace.logicalAccesses
+      certificate.oramObjects =
+    some certificate.pathOramLeafScaffold := by
+  exact hValid.1
+
+theorem runtimePathOramHiddenCertificate_pathOramLeafStateReplay_exact
+  (certificate : RuntimePathOramHiddenCertificate)
+  (hValid : certificate.Valid) :
+  certificate.replayedPathOramPositionMapState =
+    certificate.expectedPathOramPositionMapState := by
+  exact hValid.2.2.1
+
+theorem runtimePathOramHiddenCertificate_pathOramLeafStateReplay_some
+  (certificate : RuntimePathOramHiddenCertificate)
+  (hValid : certificate.Valid) :
+  certificate.replayedPathOramPositionMapState.isSome = true := by
+  exact hValid.2.2.2.1
+
+theorem runtimePathOramHiddenCertificate_pathOramBucketProjection_exact
+  (certificate : RuntimePathOramHiddenCertificate)
+  (hValid : certificate.Valid) :
+  pathOramBucketTraceOfLeafScheduleTrace certificate.pathOramLeafScheduleTrace =
+    certificate.pathOramBucketTrace := by
+  exact hValid.2.2.2.2
+
 structure RuntimeRefinementWitness where
   trace : Trace
   runtimeSeed : Option Nat
@@ -2957,6 +3136,26 @@ def RuntimeRefinementWitness.expectedPathOramPositionMapState
     witness.oramPositionMapAfter
     witness.oramObjects
 
+def RuntimeRefinementWitness.controllerObserverCertificate
+  (witness : RuntimeRefinementWitness) : RuntimeControllerObserverCertificate :=
+  { publicOutcome := witness.publicOutcome
+  , boundarySchedule := witness.boundarySchedule
+  , controllerShape := witness.controllerShape
+  , normalizedMicroTrace := witness.normalizedMicroTrace
+  , controllerCertificate := witness.controllerCertificate
+  }
+
+def RuntimeRefinementWitness.pathOramHiddenCertificate
+  (witness : RuntimeRefinementWitness) : RuntimePathOramHiddenCertificate :=
+  { trace := witness.trace
+  , oramObjects := witness.oramObjects
+  , oramLeafPublicScaffold := witness.oramLeafPublicScaffold
+  , oramLeafSchedule := witness.oramLeafSchedule
+  , oramPositionMapBefore := witness.oramPositionMapBefore
+  , oramPositionMapAfter := witness.oramPositionMapAfter
+  , oramLeafStateTransitions := witness.oramLeafStateTransitions
+  }
+
 def RuntimeRefinementWitness.ObjectsMatchPublicConfig
   (witness : RuntimeRefinementWitness)
   (cfg : OramConfig) : Prop :=
@@ -3021,6 +3220,48 @@ def RuntimeRefinementWitness.checkValid
   (modelTags : SGXModelTags) :
   witness.checkValid modelTags = true ↔ witness.Valid modelTags := by
   simp [RuntimeRefinementWitness.checkValid, RuntimeRefinementWitness.Valid, and_assoc]
+
+theorem runtimeWitness_valid_iff_subcertificates
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags) :
+  witness.Valid modelTags ↔
+    witness.trace.gasUsed = witness.publicOutcome.gasUsed ∧
+      reconstructObservedOramAccessesFromLogicalTrace
+          witness.trace.logicalAccesses
+          witness.oramObjects =
+        some witness.controllerCertificate.observedOramAccesses ∧
+      witness.controllerObserverCertificate.Valid modelTags ∧
+      witness.pathOramHiddenCertificate.Valid := by
+  constructor
+  · intro hValid
+    rcases hValid with
+      ⟨hGas, hBoundary, hShape, hAccess, hLeafScaffold, hPublicLeafScaffold,
+        hLeafStateEq, hLeafStateSome, hLeafBuckets, hNormalized⟩
+    refine ⟨hGas, hAccess, ?_, ?_⟩
+    · exact ⟨hBoundary, hShape, hNormalized⟩
+    · exact ⟨hLeafScaffold, hPublicLeafScaffold, hLeafStateEq, hLeafStateSome, hLeafBuckets⟩
+  · intro hValid
+    rcases hValid with ⟨hGas, hAccess, hController, hHidden⟩
+    rcases hController with ⟨hBoundary, hShape, hNormalized⟩
+    rcases hHidden with
+      ⟨hLeafScaffold, hPublicLeafScaffold, hLeafStateEq, hLeafStateSome, hLeafBuckets⟩
+    exact
+      ⟨hGas, hBoundary, hShape, hAccess, hLeafScaffold, hPublicLeafScaffold,
+        hLeafStateEq, hLeafStateSome, hLeafBuckets, hNormalized⟩
+
+theorem runtimeWitness_controllerObserverCertificate_valid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.controllerObserverCertificate.Valid modelTags := by
+  exact (runtimeWitness_valid_iff_subcertificates witness modelTags).mp hValid |>.2.2.1
+
+theorem runtimeWitness_pathOramHiddenCertificate_valid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.pathOramHiddenCertificate.Valid := by
+  exact (runtimeWitness_valid_iff_subcertificates witness modelTags).mp hValid |>.2.2.2
 
 @[simp] theorem sgxPublicOutcome_runtimeWitness
   (witness : RuntimeRefinementWitness) :

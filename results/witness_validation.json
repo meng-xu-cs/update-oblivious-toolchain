@@ -1,11 +1,21 @@
 {
   "checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkRuntimeWitness",
+  "excluded_scenarios": [
+    {
+      "reason": "legacy surrogate ORAM backend is outside the current Lean runtime witness boundary",
+      "scenario": "ConfidentialMixer/oram/*"
+    },
+    {
+      "reason": "legacy surrogate ORAM backend is outside the current Lean runtime witness boundary",
+      "scenario": "ERC20Lite/oram/*"
+    }
+  ],
   "model_tags": {
     "exit_model": "exit_v1",
     "page_model": "page_v1",
     "shared_resource_model": "shared_v1"
   },
-  "scenario_count": 19,
+  "scenario_count": 16,
   "scenarios": [
     {
       "accepted": true,
@@ -20,7 +30,7 @@
       "scenario": "FixedSlotClassifier/uo/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 2398
+      "witness_json_bytes": 2604
     },
     {
       "accepted": true,
@@ -35,7 +45,7 @@
       "scenario": "FixedSlotClassifier/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 2398
+      "witness_json_bytes": 2605
     },
     {
       "accepted": true,
@@ -50,7 +60,7 @@
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4955
+      "witness_json_bytes": 5161
     },
     {
       "accepted": true,
@@ -65,7 +75,7 @@
       "scenario": "AuthScan/uo/class1",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4955
+      "witness_json_bytes": 5162
     },
     {
       "accepted": true,
@@ -80,7 +90,7 @@
       "scenario": "RegistryCRUD/uo/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4856
+      "witness_json_bytes": 5062
     },
     {
       "accepted": true,
@@ -95,7 +105,7 @@
       "scenario": "RegistryCRUD/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 4856
+      "witness_json_bytes": 5061
     },
     {
       "accepted": true,
@@ -110,7 +120,7 @@
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7066
+      "witness_json_bytes": 7273
     },
     {
       "accepted": true,
@@ -125,7 +135,7 @@
       "scenario": "ConfidentialMixer/fullscan/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7066
+      "witness_json_bytes": 7272
     },
     {
       "accepted": true,
@@ -140,7 +150,7 @@
       "scenario": "ERC20Lite/fullscan/class0",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7817
+      "witness_json_bytes": 8023
     },
     {
       "accepted": true,
@@ -155,82 +165,7 @@
       "scenario": "ERC20Lite/fullscan/class1",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7817
-    },
-    {
-      "accepted": true,
-      "boundary_events": 6,
-      "controller_accesses": 2,
-      "controller_phase_count": 13,
-      "entrypoint": "deposit(bytes32,uint256)",
-      "exit_events": 16,
-      "gas_used": 12288,
-      "lean_stdout": "validated runtime refinement witness for deposit(bytes32,uint256)",
-      "page_trace_events": 34,
-      "scenario": "ConfidentialMixer/oram/class0",
-      "setup_calls": 0,
-      "shared_resource_events": 47,
-      "witness_json_bytes": 18137
-    },
-    {
-      "accepted": true,
-      "boundary_events": 6,
-      "controller_accesses": 2,
-      "controller_phase_count": 13,
-      "entrypoint": "deposit(bytes32,uint256)",
-      "exit_events": 16,
-      "gas_used": 12288,
-      "lean_stdout": "validated runtime refinement witness for deposit(bytes32,uint256)",
-      "page_trace_events": 34,
-      "scenario": "ConfidentialMixer/oram/class1",
-      "setup_calls": 0,
-      "shared_resource_events": 47,
-      "witness_json_bytes": 18137
-    },
-    {
-      "accepted": true,
-      "boundary_events": 4,
-      "controller_accesses": 1,
-      "controller_phase_count": 8,
-      "entrypoint": "approve(address,address,uint256)",
-      "exit_events": 10,
-      "gas_used": 14336,
-      "lean_stdout": "validated runtime refinement witness for approve(address,address,uint256)",
-      "page_trace_events": 26,
-      "scenario": "ERC20Lite/oram/class0",
-      "setup_calls": 0,
-      "shared_resource_events": 34,
-      "witness_json_bytes": 16219
-    },
-    {
-      "accepted": true,
-      "boundary_events": 4,
-      "controller_accesses": 1,
-      "controller_phase_count": 8,
-      "entrypoint": "approve(address,address,uint256)",
-      "exit_events": 10,
-      "gas_used": 14336,
-      "lean_stdout": "validated runtime refinement witness for approve(address,address,uint256)",
-      "page_trace_events": 26,
-      "scenario": "ERC20Lite/oram/class1",
-      "setup_calls": 0,
-      "shared_resource_events": 34,
-      "witness_json_bytes": 16219
-    },
-    {
-      "accepted": true,
-      "boundary_events": 14,
-      "controller_accesses": 6,
-      "controller_phase_count": 33,
-      "entrypoint": "transferFrom(address,address,address,uint256)",
-      "exit_events": 40,
-      "gas_used": 16384,
-      "lean_stdout": "validated runtime refinement witness for transferFrom(address,address,address,uint256)",
-      "page_trace_events": 120,
-      "scenario": "ERC20Lite/oram/transferFrom-multi-object",
-      "setup_calls": 2,
-      "shared_resource_events": 153,
-      "witness_json_bytes": 53437
+      "witness_json_bytes": 8023
     },
     {
       "accepted": true,
@@ -245,7 +180,7 @@
       "scenario": "SingleAccessMap/pathoram/put-class0",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 9683
+      "witness_json_bytes": 10922
     },
     {
       "accepted": true,
@@ -260,7 +195,7 @@
       "scenario": "SingleAccessMap/pathoram/put-class1",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 9683
+      "witness_json_bytes": 10923
     },
     {
       "accepted": true,
@@ -275,7 +210,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class0",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 16740
+      "witness_json_bytes": 18382
     },
     {
       "accepted": true,
@@ -290,7 +225,37 @@
       "scenario": "SingleAccessMap/pathoram/add-class1",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 16740
+      "witness_json_bytes": 18376
+    },
+    {
+      "accepted": true,
+      "boundary_events": 6,
+      "controller_accesses": 2,
+      "controller_phase_count": 13,
+      "entrypoint": "deposit(bytes32,uint256)",
+      "exit_events": 16,
+      "gas_used": 12288,
+      "lean_stdout": "validated runtime refinement witness for deposit(bytes32,uint256)",
+      "page_trace_events": 176,
+      "scenario": "ConfidentialMixer/pathoram/deposit",
+      "setup_calls": 0,
+      "shared_resource_events": 189,
+      "witness_json_bytes": 43325
+    },
+    {
+      "accepted": true,
+      "boundary_events": 14,
+      "controller_accesses": 6,
+      "controller_phase_count": 33,
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "exit_events": 40,
+      "gas_used": 16384,
+      "lean_stdout": "validated runtime refinement witness for transferFrom(address,address,address,uint256)",
+      "page_trace_events": 690,
+      "scenario": "ERC20Lite/pathoram/transferFrom",
+      "setup_calls": 2,
+      "shared_resource_events": 723,
+      "witness_json_bytes": 153209
     }
   ]
 }

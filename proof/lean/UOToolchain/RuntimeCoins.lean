@@ -54,6 +54,73 @@ def SeededRuntimePathOramWitnessFamily.RealizesCanonicalLeafValueSeedSpace
       pathOramLeafValues ((family.witnessAt seed).pathOramLeafScheduleTrace) =
         pathOramLeafValueTraceOfSeed family.publicLeafScaffold seed
 
+structure CanonicalFreshCoinRuntimePathOramWitnessFamily (modelTags : SGXModelTags) where
+  seedCount : Nat
+  witnessAt : Nat → RuntimeRefinementWitness
+  valid :
+    ∀ seed, seed < seedCount → (witnessAt seed).Valid modelTags
+  publicLeafScaffold : PathOramLeafScheduleScaffold
+  publicLeafScaffoldExact :
+    ∀ seed, seed < seedCount →
+      (witnessAt seed).projectedPublicPathOramLeafScaffold = publicLeafScaffold
+  publicFreshCoinScaffold : PathOramLeafScheduleScaffold
+  freshCoinScaffoldExact :
+    ∀ seed, seed < seedCount →
+      (witnessAt seed).pathOramFreshCoinScaffold? = some publicFreshCoinScaffold
+  freshCoinSeedSpaceExact :
+    seedCount = pathOramLeafValueSeedSpaceSize publicFreshCoinScaffold
+  freshCoinValuesExact :
+    ∀ seed, seed < seedCount →
+      (witnessAt seed).pathOramFreshCoinValues? =
+        some (pathOramLeafValueTraceOfSeed publicFreshCoinScaffold seed)
+
+def CanonicalFreshCoinRuntimePathOramWitnessFamily.witnessDistribution
+  {modelTags : SGXModelTags}
+  (family : CanonicalFreshCoinRuntimePathOramWitnessFamily modelTags) :
+  Distribution RuntimeRefinementWitness :=
+  (runtimeSeedIndexDistribution family.seedCount).samples.map family.witnessAt
+
+def CanonicalFreshCoinRuntimePathOramWitnessFamily.viewDistribution
+  {modelTags : SGXModelTags}
+  (family : CanonicalFreshCoinRuntimePathOramWitnessFamily modelTags) :
+  Distribution ViewMPlus :=
+  (runtimeSeedIndexDistribution family.seedCount).samples.map
+    (fun seed => viewMPlus ((family.witnessAt seed).trace))
+
+def CanonicalFreshCoinRuntimePathOramWitnessFamily.freshCoinValueDistribution
+  {modelTags : SGXModelTags}
+  (family : CanonicalFreshCoinRuntimePathOramWitnessFamily modelTags) :
+  Distribution PathOramLeafValueTrace :=
+  (runtimeSeedIndexDistribution family.seedCount).samples.map
+    (fun seed =>
+      match (family.witnessAt seed).pathOramFreshCoinValues? with
+      | some coins => coins
+      | none => [])
+
+theorem CanonicalFreshCoinRuntimePathOramWitnessFamily.seedCount_pos
+  {modelTags : SGXModelTags}
+  (family : CanonicalFreshCoinRuntimePathOramWitnessFamily modelTags) :
+  0 < family.seedCount := by
+  rw [family.freshCoinSeedSpaceExact]
+  exact pathOramLeafValueSeedSpaceSize_pos family.publicFreshCoinScaffold
+
+theorem CanonicalFreshCoinRuntimePathOramWitnessFamily.freshCoinValueDistribution_eq_canonical
+  {modelTags : SGXModelTags}
+  (family : CanonicalFreshCoinRuntimePathOramWitnessFamily modelTags) :
+  family.freshCoinValueDistribution =
+    (pathOramLeafValueDistributionOfScaffold family.publicFreshCoinScaffold).samples := by
+  rw [CanonicalFreshCoinRuntimePathOramWitnessFamily.freshCoinValueDistribution]
+  rw [runtimeSeedIndexDistribution, family.freshCoinSeedSpaceExact]
+  rw [pathOramLeafValueDistributionOfScaffold_samples_eq_seedRange]
+  apply List.map_congr_left
+  intro seed hSeedMem
+  have hSeedLt : seed < family.seedCount := by
+    simpa [family.freshCoinSeedSpaceExact] using
+      (List.mem_range.mp hSeedMem :
+        seed < pathOramLeafValueSeedSpaceSize family.publicFreshCoinScaffold)
+  have hValues := family.freshCoinValuesExact seed hSeedLt
+  simp [hValues]
+
 theorem SeededRuntimeWitnessFamily.viewConstantProjection_of_exact
   {modelTags : SGXModelTags}
   (family : SeededRuntimeWitnessFamily modelTags)

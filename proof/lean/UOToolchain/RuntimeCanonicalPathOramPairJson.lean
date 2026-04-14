@@ -1,0 +1,385 @@
+import Lean.Data.Json
+import UOToolchain.RuntimePathOramPairJson
+
+open Lean
+
+namespace UOToolchain
+
+structure ImportedCanonicalFreshCoinRuntimePathOramPairCertificate where
+  cfg : ImportedOramConfig
+  lhs_family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily
+  rhs_family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily
+  public_view : ImportedOramViewPublicPart
+  public_location : ImportedPathOramStorageLocationTrace
+  storage_shape : ImportedPathOramStorageShape
+  public_outcome : ImportedPublicOutcomeTrace
+  boundary_schedule : List ImportedBoundaryEvent
+  controller_shape : ImportedSgxControllerShapeTrace
+  normalized_micro_trace : ImportedNormalizedMicroTrace
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimeCfg
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) : OramConfig :=
+  certificate.cfg.toOramConfig
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimePublicView
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) : OramViewPublicPart :=
+  certificate.public_view.toOramViewPublicPart
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimePublicLocation
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) :
+  PathOramStorageLocationTrace :=
+  certificate.public_location.toPathOramStorageLocationTrace
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimeStorageShape
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) :
+  PathOramStorageShape :=
+  certificate.storage_shape.toPathOramStorageShape
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimePublicOutcome
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) : SGXPublicOutcome :=
+  certificate.public_outcome.toPublicOutcome
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimeBoundarySchedule
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) : List BoundaryEvent :=
+  certificate.boundary_schedule.map ImportedBoundaryEvent.toBoundaryEvent
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimeControllerShape
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) : SGXControllerShape :=
+  certificate.controller_shape.toControllerShape
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.runtimeNormalizedMicroTrace
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate) : NormalizedMicroTrace :=
+  certificate.normalized_micro_trace.toNormalizedMicroTrace
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.familyMatches
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Prop :=
+  family.Valid modelTags ∧
+    ∀ seed, seed < family.seed_count →
+      ∃ witness,
+        family.witnessAt? seed = some witness ∧
+        witness.toRuntimeWitness.ObjectsMatchPublicConfig certificate.runtimeCfg ∧
+        pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+          certificate.runtimePublicView ∧
+        pathOramPublicLocationTrace
+            (pathOramStorageLocationTrace
+              (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+          certificate.runtimePublicLocation ∧
+        pathOramStorageShape (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+          certificate.runtimeStorageShape ∧
+        witness.toRuntimeWitness.publicOutcome = certificate.runtimePublicOutcome ∧
+        witness.toRuntimeWitness.boundarySchedule = certificate.runtimeBoundarySchedule ∧
+        witness.toRuntimeWitness.controllerShape = certificate.runtimeControllerShape ∧
+        witness.toRuntimeWitness.normalizedMicroTrace = certificate.runtimeNormalizedMicroTrace
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.Valid
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags) : Prop :=
+  PathOramConfigWellFormed certificate.runtimeCfg ∧
+    certificate.familyMatches certificate.lhs_family modelTags ∧
+    certificate.familyMatches certificate.rhs_family modelTags
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.familyMatchesCheck
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Bool :=
+  family.checkValid modelTags &&
+    (List.range family.seed_count).all fun seed =>
+      match family.witnessAt? seed with
+      | some witness =>
+          runtimeWitnessObjectsMatchPublicConfigCheck
+              witness.toRuntimeWitness
+              certificate.runtimeCfg &&
+            decide
+              (pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+                certificate.runtimePublicView) &&
+            decide
+              (pathOramPublicLocationTrace
+                  (pathOramStorageLocationTrace
+                    (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+                certificate.runtimePublicLocation) &&
+            decide
+              (pathOramStorageShape (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+                certificate.runtimeStorageShape) &&
+            decide (witness.toRuntimeWitness.publicOutcome = certificate.runtimePublicOutcome) &&
+            decide
+              (witness.toRuntimeWitness.boundarySchedule =
+                certificate.runtimeBoundarySchedule) &&
+            decide (witness.toRuntimeWitness.controllerShape = certificate.runtimeControllerShape) &&
+            decide
+              (witness.toRuntimeWitness.normalizedMicroTrace =
+                certificate.runtimeNormalizedMicroTrace)
+      | none => false
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.checkValid
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags) : Bool :=
+  pathOramConfigWellFormedCheck certificate.runtimeCfg &&
+    certificate.familyMatchesCheck certificate.lhs_family modelTags &&
+    certificate.familyMatchesCheck certificate.rhs_family modelTags
+
+def parseImportedCanonicalFreshCoinRuntimePathOramPairCertificate
+  (input : String) : Except String ImportedCanonicalFreshCoinRuntimePathOramPairCertificate := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedCanonicalFreshCoinRuntimePathOramPairCertificate
+  (input : String)
+  (modelTags : SGXModelTags) :
+  Except String ImportedCanonicalFreshCoinRuntimePathOramPairCertificate := do
+  let certificate ← parseImportedCanonicalFreshCoinRuntimePathOramPairCertificate input
+  if certificate.checkValid modelTags then
+    pure certificate
+  else
+    throw
+      "imported canonical fresh-coin path-ORAM pair certificate does not satisfy Lean validity checks"
+
+def loadAndCheckImportedCanonicalFreshCoinRuntimePathOramPairCertificate
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedCanonicalFreshCoinRuntimePathOramPairCertificate := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedCanonicalFreshCoinRuntimePathOramPairCertificate input modelTags with
+  | .ok certificate => pure certificate
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate canonical fresh-coin path-ORAM pair certificate: {err}"
+
+@[simp] theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatchesCheck_eq_true_iff
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) :
+  certificate.familyMatchesCheck family modelTags = true ↔
+    certificate.familyMatches family modelTags := by
+  constructor
+  · intro hCheck
+    rw [ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.familyMatchesCheck,
+      Bool.and_eq_true] at hCheck
+    refine ⟨?_, ?_⟩
+    · exact
+        (importedCanonicalFreshCoinRuntimePathOramWitnessFamily_checkValid_eq_true_iff
+          family modelTags).mp hCheck.1
+    · intro seed hSeed
+      have hSeedCheck :
+          (match family.witnessAt? seed with
+            | some witness =>
+                runtimeWitnessObjectsMatchPublicConfigCheck
+                    witness.toRuntimeWitness
+                    certificate.runtimeCfg &&
+                  decide
+                    (pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+                      certificate.runtimePublicView) &&
+                  decide
+                    (pathOramPublicLocationTrace
+                        (pathOramStorageLocationTrace
+                          (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+                      certificate.runtimePublicLocation) &&
+                  decide
+                    (pathOramStorageShape
+                        (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+                      certificate.runtimeStorageShape) &&
+                  decide
+                    (witness.toRuntimeWitness.publicOutcome =
+                      certificate.runtimePublicOutcome) &&
+                  decide
+                    (witness.toRuntimeWitness.boundarySchedule =
+                      certificate.runtimeBoundarySchedule) &&
+                  decide
+                    (witness.toRuntimeWitness.controllerShape =
+                      certificate.runtimeControllerShape) &&
+                  decide
+                    (witness.toRuntimeWitness.normalizedMicroTrace =
+                      certificate.runtimeNormalizedMicroTrace)
+            | none => false) = true := by
+        exact (List.all_eq_true.mp hCheck.2) seed (List.mem_range.mpr hSeed)
+      cases hGet : family.witnessAt? seed with
+      | none =>
+          simp [hGet] at hSeedCheck
+      | some witness =>
+          have hWitness :
+              runtimeWitnessObjectsMatchPublicConfigCheck
+                  witness.toRuntimeWitness
+                  certificate.runtimeCfg = true ∧
+                pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+                  certificate.runtimePublicView ∧
+                pathOramPublicLocationTrace
+                    (pathOramStorageLocationTrace
+                      (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+                  certificate.runtimePublicLocation ∧
+                pathOramStorageShape (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+                  certificate.runtimeStorageShape ∧
+                witness.toRuntimeWitness.publicOutcome = certificate.runtimePublicOutcome ∧
+                witness.toRuntimeWitness.boundarySchedule =
+                  certificate.runtimeBoundarySchedule ∧
+                witness.toRuntimeWitness.controllerShape =
+                  certificate.runtimeControllerShape ∧
+                witness.toRuntimeWitness.normalizedMicroTrace =
+                  certificate.runtimeNormalizedMicroTrace := by
+            simpa [hGet, Bool.and_eq_true, and_assoc] using hSeedCheck
+          rcases hWitness with
+            ⟨hMatchCheck, hView, hLocation, hShape, hOutcome, hBoundary, hController, hMicro⟩
+          exact
+            ⟨witness, rfl,
+              (runtimeWitnessObjectsMatchPublicConfigCheck_eq_true_iff
+                witness.toRuntimeWitness certificate.runtimeCfg).mp hMatchCheck,
+              hView, hLocation, hShape, hOutcome, hBoundary, hController, hMicro⟩
+  · intro hValid
+    rw [ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.familyMatchesCheck, Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · exact
+        (importedCanonicalFreshCoinRuntimePathOramWitnessFamily_checkValid_eq_true_iff
+          family modelTags).2 hValid.1
+    · refine List.all_eq_true.mpr ?_
+      intro seed hSeedMem
+      have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
+      rcases hValid.2 seed hSeed with
+        ⟨witness, hGet, hMatch, hView, hLocation, hShape, hOutcome, hBoundary, hController, hMicro⟩
+      have hViewNormalized :
+          pathOramNormalizePublicPart
+              (oramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace)) =
+            certificate.runtimePublicView := by
+        simpa [pathOramViewPublicPart] using hView
+      have hMatchCheck :
+          runtimeWitnessObjectsMatchPublicConfigCheck
+              witness.toRuntimeWitness
+              certificate.runtimeCfg = true :=
+        (runtimeWitnessObjectsMatchPublicConfigCheck_eq_true_iff
+          witness.toRuntimeWitness certificate.runtimeCfg).2 hMatch
+      simp [hGet, hMatchCheck, hViewNormalized, hLocation, hShape, hOutcome, hBoundary,
+        hController, hMicro]
+
+@[simp] theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_checkValid_eq_true_iff
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags) :
+  certificate.checkValid modelTags = true ↔ certificate.Valid modelTags := by
+  constructor
+  · intro hCheck
+    rw [ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.checkValid, Bool.and_eq_true] at hCheck
+    have hHead := hCheck.1
+    rw [Bool.and_eq_true] at hHead
+    refine ⟨?_, ?_, ?_⟩
+    · exact (pathOramConfigWellFormedCheck_eq_true_iff certificate.runtimeCfg).mp hHead.1
+    · exact
+        (importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatchesCheck_eq_true_iff
+          certificate certificate.lhs_family modelTags).mp hHead.2
+    · exact
+        (importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatchesCheck_eq_true_iff
+          certificate certificate.rhs_family modelTags).mp hCheck.2
+  · intro hValid
+    rw [ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.checkValid, Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · rw [Bool.and_eq_true]
+      refine ⟨?_, ?_⟩
+      · exact (pathOramConfigWellFormedCheck_eq_true_iff certificate.runtimeCfg).2 hValid.1
+      · exact
+          (importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatchesCheck_eq_true_iff
+            certificate certificate.lhs_family modelTags).2 hValid.2.1
+    · exact
+        (importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatchesCheck_eq_true_iff
+          certificate certificate.rhs_family modelTags).2 hValid.2.2
+
+theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatches_witnessValid
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags)
+  (hMatch : certificate.familyMatches family modelTags)
+  {seed : Nat}
+  (hSeed : seed < family.seed_count)
+  {witness : ImportedRuntimeRefinementWitness}
+  (hGet : family.witnessAt? seed = some witness) :
+  witness.Valid modelTags := by
+  rcases hMatch.1.2.2 seed hSeed with
+    ⟨witness', hGet', hValid, _hLeafScaffold, _hFreshScaffold, _hFreshValues⟩
+  rw [hGet] at hGet'
+  cases hGet'
+  exact hValid
+
+theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatches_projects_to_certificate_observer
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags)
+  (hMatch : certificate.familyMatches family modelTags)
+  {seed : Nat}
+  (hSeed : seed < family.seed_count) :
+  ∃ witness,
+    family.witnessAt? seed = some witness ∧
+      sgxPublicOutcome witness.toRuntimeWitness.sgxView = certificate.runtimePublicOutcome ∧
+      witness.toRuntimeWitness.sgxView.boundarySchedule =
+        certificate.runtimeBoundarySchedule ∧
+      normalizeMicroTrace (sgxMicroTrace witness.toRuntimeWitness.sgxView) =
+        certificate.runtimeNormalizedMicroTrace ∧
+      witness.toRuntimeWitness.controllerShape = certificate.runtimeControllerShape ∧
+      pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+        certificate.runtimePublicView ∧
+      pathOramPublicLocationTrace
+          (pathOramStorageLocationTrace
+            (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+        certificate.runtimePublicLocation ∧
+      pathOramStorageShape (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+        certificate.runtimeStorageShape := by
+  rcases hMatch.2 seed hSeed with
+    ⟨witness, hGet, _hCfgMatch, hView, hLocation, hShape, hOutcome, hBoundary, hController, hMicro⟩
+  have hWitnessValid :
+      witness.Valid modelTags :=
+    importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatches_witnessValid
+      certificate family modelTags hMatch hSeed hGet
+  have hObserver :=
+    importedWitness_projects_to_paper_observer witness modelTags hWitnessValid
+  rcases hObserver with ⟨hPublicOutcome, hBoundaryView, _hStorageView, hNormalizedMicro⟩
+  exact
+    ⟨witness, hGet,
+      hPublicOutcome.trans hOutcome,
+      hBoundaryView.trans hBoundary,
+      hNormalizedMicro.trans hMicro,
+      hController,
+      hView,
+      hLocation,
+      hShape⟩
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.WitnessProjectsToCertificateObserver
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (witness : ImportedRuntimeRefinementWitness) : Prop :=
+  sgxPublicOutcome witness.toRuntimeWitness.sgxView = certificate.runtimePublicOutcome ∧
+    witness.toRuntimeWitness.sgxView.boundarySchedule =
+      certificate.runtimeBoundarySchedule ∧
+    normalizeMicroTrace (sgxMicroTrace witness.toRuntimeWitness.sgxView) =
+      certificate.runtimeNormalizedMicroTrace ∧
+    witness.toRuntimeWitness.controllerShape = certificate.runtimeControllerShape ∧
+    pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+      certificate.runtimePublicView ∧
+    pathOramPublicLocationTrace
+        (pathOramStorageLocationTrace
+          (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+      certificate.runtimePublicLocation ∧
+    pathOramStorageShape (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+      certificate.runtimeStorageShape
+
+theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_valid_projects_lhs_rhs_to_common_observer
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags)
+  (hValid : certificate.Valid modelTags)
+  {lhsSeed rhsSeed : Nat}
+  (hLhsSeed : lhsSeed < certificate.lhs_family.seed_count)
+  (hRhsSeed : rhsSeed < certificate.rhs_family.seed_count) :
+  ∃ lhsWitness rhsWitness,
+    certificate.lhs_family.witnessAt? lhsSeed = some lhsWitness ∧
+      certificate.rhs_family.witnessAt? rhsSeed = some rhsWitness ∧
+      certificate.WitnessProjectsToCertificateObserver lhsWitness ∧
+      certificate.WitnessProjectsToCertificateObserver rhsWitness := by
+  rcases
+      importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatches_projects_to_certificate_observer
+        certificate certificate.lhs_family modelTags hValid.2.1 hLhsSeed
+    with ⟨lhsWitness, hLhsGet, hLhsOutcome, hLhsBoundary, hLhsMicro, hLhsController, hLhsView,
+      hLhsLocation, hLhsShape⟩
+  rcases
+      importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatches_projects_to_certificate_observer
+        certificate certificate.rhs_family modelTags hValid.2.2 hRhsSeed
+    with ⟨rhsWitness, hRhsGet, hRhsOutcome, hRhsBoundary, hRhsMicro, hRhsController, hRhsView,
+      hRhsLocation, hRhsShape⟩
+  exact
+    ⟨lhsWitness, rhsWitness, hLhsGet, hRhsGet,
+      ⟨hLhsOutcome, hLhsBoundary, hLhsMicro, hLhsController, hLhsView, hLhsLocation, hLhsShape⟩,
+      ⟨hRhsOutcome, hRhsBoundary, hRhsMicro, hRhsController, hRhsView, hRhsLocation, hRhsShape⟩⟩
+
+end UOToolchain

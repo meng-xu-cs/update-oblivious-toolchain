@@ -1,0 +1,67 @@
+{
+  "checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkPathOramPairCertificate",
+  "model_tags": {
+    "exit_model": "exit_v1",
+    "page_model": "page_v1",
+    "shared_resource_model": "shared_v1"
+  },
+  "scenario_count": 4,
+  "scenarios": [
+    {
+      "accepted": true,
+      "access_counters_equal": true,
+      "boundary_schedule_equal": true,
+      "certificate_json_bytes": 235837,
+      "controller_shape_equal": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "lean_stdout": "validated seeded path-ORAM pair certificate for put(bytes32,uint256)",
+      "lhs_seed_count": 8,
+      "normalized_micro_trace_equal": true,
+      "public_outcome_equal": true,
+      "rhs_seed_count": 8,
+      "scenario": "SingleAccessMap/pathoram/put-pair"
+    },
+    {
+      "accepted": true,
+      "access_counters_equal": true,
+      "boundary_schedule_equal": true,
+      "certificate_json_bytes": 395102,
+      "controller_shape_equal": true,
+      "entrypoint": "add(bytes32,uint256)",
+      "lean_stdout": "validated seeded path-ORAM pair certificate for add(bytes32,uint256)",
+      "lhs_seed_count": 8,
+      "normalized_micro_trace_equal": true,
+      "public_outcome_equal": true,
+      "rhs_seed_count": 8,
+      "scenario": "SingleAccessMap/pathoram/add-pair"
+    },
+    {
+      "accepted": true,
+      "access_counters_equal": true,
+      "boundary_schedule_equal": true,
+      "certificate_json_bytes": 485282,
+      "controller_shape_equal": true,
+      "entrypoint": "deposit(bytes32,uint256)",
+      "lean_stdout": "validated seeded path-ORAM pair certificate for deposit(bytes32,uint256)",
+      "lhs_seed_count": 4,
+      "normalized_micro_trace_equal": true,
+      "public_outcome_equal": true,
+      "rhs_seed_count": 4,
+      "scenario": "ConfidentialMixer/pathoram/deposit-pair"
+    },
+    {
+      "accepted": true,
+      "access_counters_equal": true,
+      "boundary_schedule_equal": true,
+      "certificate_json_bytes": 1711711,
+      "controller_shape_equal": true,
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "lean_stdout": "validated seeded path-ORAM pair certificate for transferFrom(address,address,address,uint256)",
+      "lhs_seed_count": 4,
+      "normalized_micro_trace_equal": true,
+      "public_outcome_equal": true,
+      "rhs_seed_count": 4,
+      "scenario": "ERC20Lite/pathoram/transferFrom-pair"
+    }
+  ]
+}

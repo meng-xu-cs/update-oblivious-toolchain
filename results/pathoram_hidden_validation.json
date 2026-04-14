@@ -1,0 +1,72 @@
+{
+  "checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkRuntimePathOramHiddenCertificate",
+  "scenario_count": 6,
+  "scenarios": [
+    {
+      "accepted": true,
+      "certificate_json_bytes": 5502,
+      "entrypoint": "put(bytes32,uint256)",
+      "leaf_steps": 1,
+      "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
+      "position_map_objects": 1,
+      "public_leaf_scaffold_steps": 1,
+      "scenario": "SingleAccessMap/pathoram/put-class0",
+      "setup_calls": 0
+    },
+    {
+      "accepted": true,
+      "certificate_json_bytes": 5502,
+      "entrypoint": "put(bytes32,uint256)",
+      "leaf_steps": 1,
+      "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
+      "position_map_objects": 1,
+      "public_leaf_scaffold_steps": 1,
+      "scenario": "SingleAccessMap/pathoram/put-class1",
+      "setup_calls": 0
+    },
+    {
+      "accepted": true,
+      "certificate_json_bytes": 9434,
+      "entrypoint": "add(bytes32,uint256)",
+      "leaf_steps": 2,
+      "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
+      "position_map_objects": 1,
+      "public_leaf_scaffold_steps": 2,
+      "scenario": "SingleAccessMap/pathoram/add-class0",
+      "setup_calls": 0
+    },
+    {
+      "accepted": true,
+      "certificate_json_bytes": 9432,
+      "entrypoint": "add(bytes32,uint256)",
+      "leaf_steps": 2,
+      "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
+      "position_map_objects": 1,
+      "public_leaf_scaffold_steps": 2,
+      "scenario": "SingleAccessMap/pathoram/add-class1",
+      "setup_calls": 0
+    },
+    {
+      "accepted": true,
+      "certificate_json_bytes": 21467,
+      "entrypoint": "deposit(bytes32,uint256)",
+      "leaf_steps": 2,
+      "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
+      "position_map_objects": 1,
+      "public_leaf_scaffold_steps": 2,
+      "scenario": "ConfidentialMixer/pathoram/deposit",
+      "setup_calls": 0
+    },
+    {
+      "accepted": true,
+      "certificate_json_bytes": 74537,
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "leaf_steps": 6,
+      "lean_stdout": "validated runtime path-ORAM hidden certificate with 6 leaf steps",
+      "position_map_objects": 2,
+      "public_leaf_scaffold_steps": 6,
+      "scenario": "ERC20Lite/pathoram/transferFrom",
+      "setup_calls": 2
+    }
+  ]
+}

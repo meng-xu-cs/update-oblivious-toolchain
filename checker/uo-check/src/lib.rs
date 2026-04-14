@@ -96,7 +96,11 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 function.signature
             );
         }
-        validate_oram_access_shape(&function.signature, &expected_accesses, &artifact.contract.state)?;
+        validate_oram_access_shape(
+            &function.signature,
+            &expected_accesses,
+            &artifact.contract.state,
+        )?;
         let expected_max_commit_ops =
             expected_commit_ops(&function.body, &expected_accesses, &artifact.contract.state)?;
         if entry.max_commit_ops != expected_max_commit_ops {
@@ -115,11 +119,11 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
 }
 
 fn validate_oram_access_shape(
-    _signature: &str,
-    _oram_accesses: &BTreeMap<u32, usize>,
-    _state: &[StateObject],
+    signature: &str,
+    oram_accesses: &BTreeMap<u32, usize>,
+    state: &[StateObject],
 ) -> Result<()> {
-    Ok(())
+    uo_core::validate_oram_access_shape(signature, oram_accesses, state)
 }
 
 fn expected_commit_ops(

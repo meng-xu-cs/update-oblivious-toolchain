@@ -105,6 +105,10 @@ What is implemented:
   supported and covered by the runtime/controller trace
 - manifest commit budgets now scale with the admitted per-entrypoint path-ORAM
   access multiplicity
+- the proof/evaluation path now includes theorem-tight seeded family artifacts
+  and class0/class1 paired certificates for concrete `SingleAccessMap`
+  path-ORAM workloads, including the public access-counter state required by
+  the theorem boundary
 
 What is still missing before this milestone is complete:
 
@@ -254,6 +258,11 @@ What is implemented:
   `path_oram_local_posmap_v1` backend candidate under an explicit security
   assumption bundle rather than a whole-view ORAM theorem, and projects away
   the legacy surrogate-style `schedule` field before that theorem is invoked
+- the Lean scaffold now also contains `PathOramLocalPosmapV1.lean`, which
+  specializes that generic path-ORAM theorem boundary to the repo’s concrete
+  backend-facing assumption bundle and packages the resulting
+  computational-UO, paper-main SGX, and TEE-storage statements into one named
+  theorem boundary for seeded runtime proof bundles
 - the proof-grade path interface now also normalizes raw logical path reads to
   a public skeleton instead of treating concrete `bucket:{i}` details as exact
   public trace data
@@ -264,6 +273,10 @@ What is implemented:
   bucket traces, exact public constancy of the non-bucket location scaffold,
   and exact public storage-shape constancy, so the remaining assumption
   surface is smaller than a single monolithic storage theorem
+- the Lean import layer now also proves `checkValid = true ↔ Valid` for both
+  the seeded runtime witness family checker and the paired path-ORAM
+  certificate checker, so the proof-facing SGX/path-ORAM validation boundary
+  is theorem-tight rather than executable-only
 
 What is still missing before this milestone is complete:
 
@@ -278,6 +291,7 @@ What is still missing before this milestone is complete:
   implementation: prove that the seeded family of emitted path-ORAM witnesses
   realizes the canonical leaf-value sampler on the certified public scaffold
 - discharge of the ORAM theorem against the chosen standard construction
+  under the now-explicit `PathOramLocalPosmapV1SecurityAssumptions` boundary
   through that witness layer
 
 Required work:

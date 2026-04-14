@@ -4,12 +4,16 @@ mod objects;
 mod oram;
 mod theorem;
 
-pub use engine::{run_artifact, run_artifact_with_seed, CallResult, ContractInstance};
+pub use engine::{
+    run_artifact, run_artifact_with_seed, CallResult, ContractInstance, PathOramFreshCoinPlan,
+};
 
 #[cfg(test)]
 mod tests {
-    use super::ContractInstance;
-    use uo_core::{ContractMetadata, ProgramMode, Value, WriteClass};
+    use super::{ContractInstance, PathOramFreshCoinPlan};
+    use uo_core::{
+        canonical_path_oram_leaf_values_of_seed, ContractMetadata, ProgramMode, Value, WriteClass,
+    };
 
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
         let metadata: ContractMetadata = serde_yaml::from_str(metadata).unwrap();
@@ -238,7 +242,7 @@ mod tests {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
             include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.oram.yaml"
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.pathoram.yaml"
             ),
             ProgramMode::Uo,
         );
@@ -256,18 +260,7 @@ mod tests {
                 vec![Value::Bytes32([9u8; 32]), Value::Uint(3)],
             )
             .unwrap();
-        assert_eq!(
-            first_trace.trace.hashes().logical_access_trace_hash,
-            second_trace.trace.hashes().logical_access_trace_hash
-        );
-        assert_eq!(
-            first_trace.trace.hashes().logical_write_trace_hash,
-            second_trace.trace.hashes().logical_write_trace_hash
-        );
-        assert_eq!(
-            first_trace.trace.hashes().physical_access_trace_hash,
-            second_trace.trace.hashes().physical_access_trace_hash
-        );
+        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
         assert!(first_trace
             .trace
             .physical_writes
@@ -286,7 +279,9 @@ mod tests {
     fn erc20_oram_hides_secret_allowance_keys() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.oram.yaml"),
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.pathoram.yaml"
+            ),
             ProgramMode::Uo,
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -311,18 +306,7 @@ mod tests {
                 ],
             )
             .unwrap();
-        assert_eq!(
-            first_trace.trace.hashes().logical_access_trace_hash,
-            second_trace.trace.hashes().logical_access_trace_hash
-        );
-        assert_eq!(
-            first_trace.trace.hashes().logical_write_trace_hash,
-            second_trace.trace.hashes().logical_write_trace_hash
-        );
-        assert_eq!(
-            first_trace.trace.hashes().physical_access_trace_hash,
-            second_trace.trace.hashes().physical_access_trace_hash
-        );
+        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
         assert_eq!(first_trace.trace.gas_used, 14336);
         assert_eq!(second_trace.trace.gas_used, 14336);
     }
@@ -332,7 +316,7 @@ mod tests {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
             include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.oram.yaml"
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.pathoram.yaml"
             ),
             ProgramMode::Uo,
         );
@@ -350,7 +334,10 @@ mod tests {
                 vec![Value::Bytes32([9u8; 32]), Value::Uint(3)],
             )
             .unwrap();
-        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(
+            first_trace.trace.theorem_trace,
+            second_trace.trace.theorem_trace
+        );
         let controller = first_trace
             .trace
             .theorem_trace
@@ -389,16 +376,25 @@ mod tests {
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
         let first_trace = first
-            .call("put(bytes32,uint256)", vec![Value::Bytes32([1u8; 32]), Value::Uint(7)])
+            .call(
+                "put(bytes32,uint256)",
+                vec![Value::Bytes32([1u8; 32]), Value::Uint(7)],
+            )
             .unwrap();
         let mut second = ContractInstance::deploy(artifact).unwrap();
         let second_trace = second
-            .call("put(bytes32,uint256)", vec![Value::Bytes32([9u8; 32]), Value::Uint(7)])
+            .call(
+                "put(bytes32,uint256)",
+                vec![Value::Bytes32([9u8; 32]), Value::Uint(7)],
+            )
             .unwrap();
         let first_witness = first_trace.trace.runtime_refinement_witness().unwrap();
         let second_witness = second_trace.trace.runtime_refinement_witness().unwrap();
 
-        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(
+            first_trace.trace.theorem_trace,
+            second_trace.trace.theorem_trace
+        );
         assert_eq!(
             first_witness
                 .oram_leaf_schedule
@@ -434,16 +430,25 @@ mod tests {
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
         let first_trace = first
-            .call("add(bytes32,uint256)", vec![Value::Bytes32([1u8; 32]), Value::Uint(7)])
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([1u8; 32]), Value::Uint(7)],
+            )
             .unwrap();
         let mut second = ContractInstance::deploy(artifact).unwrap();
         let second_trace = second
-            .call("add(bytes32,uint256)", vec![Value::Bytes32([9u8; 32]), Value::Uint(7)])
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([9u8; 32]), Value::Uint(7)],
+            )
             .unwrap();
         let first_witness = first_trace.trace.runtime_refinement_witness().unwrap();
         let second_witness = second_trace.trace.runtime_refinement_witness().unwrap();
 
-        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(
+            first_trace.trace.theorem_trace,
+            second_trace.trace.theorem_trace
+        );
         assert_eq!(
             first_witness
                 .oram_leaf_schedule
@@ -494,7 +499,10 @@ mod tests {
         );
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         let result = instance
-            .call("add(bytes32,uint256)", vec![Value::Bytes32([7u8; 32]), Value::Uint(5)])
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
             .unwrap();
         let witness = result.trace.runtime_refinement_witness().unwrap();
         assert_eq!(witness.public_outcome.gas_used, result.trace.gas_used);
@@ -543,11 +551,90 @@ mod tests {
     }
 
     #[test]
+    fn injected_path_oram_fresh_coin_tape_realizes_canonical_values() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut baseline = ContractInstance::deploy_with_seed(artifact.clone(), 17).unwrap();
+        let baseline_result = baseline
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+        let baseline_witness = baseline_result.trace.runtime_refinement_witness().unwrap();
+        let fresh_coin_scaffold = baseline_witness.path_oram_fresh_coin_scaffold().unwrap();
+        let canonical_values = canonical_path_oram_leaf_values_of_seed(&fresh_coin_scaffold, 1234);
+        let fresh_coin_plan = PathOramFreshCoinPlan::from_scaffold_and_values(
+            &fresh_coin_scaffold,
+            &canonical_values,
+        )
+        .unwrap();
+
+        let mut injected = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
+        let injected_result = injected
+            .call_with_path_oram_fresh_coins(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                &fresh_coin_plan,
+            )
+            .unwrap();
+        let injected_witness = injected_result.trace.runtime_refinement_witness().unwrap();
+
+        assert_eq!(
+            injected_witness.path_oram_fresh_coin_scaffold().unwrap(),
+            fresh_coin_scaffold
+        );
+        assert_eq!(
+            injected_witness.path_oram_fresh_coin_values().unwrap(),
+            canonical_values
+        );
+    }
+
+    #[test]
+    fn injected_path_oram_fresh_coin_tape_rejects_short_tape() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut baseline = ContractInstance::deploy_with_seed(artifact.clone(), 17).unwrap();
+        let baseline_result = baseline
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+        let baseline_witness = baseline_result.trace.runtime_refinement_witness().unwrap();
+        let fresh_coin_scaffold = baseline_witness.path_oram_fresh_coin_scaffold().unwrap();
+        let mut short_plan = PathOramFreshCoinPlan::new();
+        short_plan.insert_object_coins(fresh_coin_scaffold[0].object_id, vec![0, 1]);
+
+        let mut injected = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
+        let err = injected
+            .call_with_path_oram_fresh_coins(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                &short_plan,
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires injected fresh-leaf coins, but the tape is exhausted"));
+    }
+
+    #[test]
     fn transfer_from_witness_records_multi_object_oram_order() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
             include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.oram.yaml"
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.pathoram.yaml"
             ),
             ProgramMode::Uo,
         );
@@ -571,7 +658,10 @@ mod tests {
 
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         instance
-            .call("mint(address,uint256)", vec![owner.clone(), Value::Uint(10)])
+            .call(
+                "mint(address,uint256)",
+                vec![owner.clone(), Value::Uint(10)],
+            )
             .unwrap();
         instance
             .call(
@@ -582,12 +672,7 @@ mod tests {
         let result = instance
             .call(
                 "transferFrom(address,address,address,uint256)",
-                vec![
-                    owner.clone(),
-                    spender.clone(),
-                    recipient,
-                    Value::Uint(3),
-                ],
+                vec![owner.clone(), spender.clone(), recipient, Value::Uint(3)],
             )
             .unwrap();
         let witness = result.trace.runtime_refinement_witness().unwrap();
@@ -633,11 +718,13 @@ mod tests {
 
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         let err = instance
-            .call("put(bytes32,uint256)", vec![Value::Bytes32([1u8; 32]), Value::Uint(7)])
+            .call(
+                "put(bytes32,uint256)",
+                vec![Value::Bytes32([1u8; 32]), Value::Uint(7)],
+            )
             .unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("runtime ORAM parameter mismatch for object")
-        );
+        assert!(err
+            .to_string()
+            .contains("runtime ORAM parameter mismatch for object"));
     }
 }

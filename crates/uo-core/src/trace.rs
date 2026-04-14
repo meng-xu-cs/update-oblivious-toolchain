@@ -188,6 +188,13 @@ pub struct RuntimePathOramPositionMapWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeOramAccessCounterWitness {
+    pub object_id: u32,
+    pub object_name: String,
+    pub access_counter: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeOramObjectWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -210,6 +217,31 @@ pub struct RuntimeOramObjectWitness {
 pub struct RuntimeControllerCertificate {
     pub entry_input_len: usize,
     pub observed_oram_accesses: Vec<RuntimeOramAccessWitness>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeControllerObserverCertificate {
+    pub public_outcome: PublicOutcomeTrace,
+    pub boundary_schedule: Vec<BoundaryEvent>,
+    pub controller_shape: SgxControllerShapeTrace,
+    pub normalized_micro_trace: NormalizedMicroTrace,
+    pub controller_certificate: RuntimeControllerCertificate,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimePathOramHiddenCertificate {
+    pub trace: RefinementTrace,
+    pub oram_objects: Vec<RuntimeOramObjectWitness>,
+    #[serde(default)]
+    pub oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    #[serde(default)]
+    pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    #[serde(default)]
+    pub oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    #[serde(default)]
+    pub oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    #[serde(default)]
+    pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
@@ -264,27 +296,116 @@ pub struct RuntimeRefinementWitness {
     pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SeededRuntimeWitnessFamily {
+    pub seed_count: usize,
+    pub witnesses: Vec<RuntimeRefinementWitness>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SeededRuntimePathOramWitnessFamily {
+    pub seed_count: usize,
+    pub witnesses: Vec<RuntimeRefinementWitness>,
+    #[serde(default)]
+    pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
+    pub seed_count: usize,
+    pub witnesses: Vec<RuntimeRefinementWitness>,
+    #[serde(default)]
+    pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    #[serde(default)]
+    pub public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RefinementWitnessError {
     MissingPublicOutcome,
     MissingControllerShape,
     MissingNormalizedMicroTrace,
     MissingControllerCertificate,
-    UnknownOramLogicalObject { object: String },
-    UnsupportedOramScheme { scheme: String },
+    UnknownOramLogicalObject {
+        object: String,
+    },
+    UnsupportedOramScheme {
+        scheme: String,
+    },
     MalformedOramLogicalTrace {
         object: String,
         expected_kind: String,
         detail_prefix: String,
     },
     OramAccessScheduleMismatch,
-    GasMismatch { trace_gas: u64, public_outcome_gas: u64 },
-    BoundaryBudgetMismatch { boundary_events: usize, boundary_budget: usize },
+    GasMismatch {
+        trace_gas: u64,
+        public_outcome_gas: u64,
+    },
+    BoundaryBudgetMismatch {
+        boundary_events: usize,
+        boundary_budget: usize,
+    },
     BoundaryScheduleMismatch,
     ControllerShapeMismatch,
     NormalizedMicroTraceMismatch,
     OramLeafScheduleMismatch,
     OramLeafStateMismatch,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SeededRuntimeWitnessFamilyError {
+    SeedCountMismatch {
+        seed_count: usize,
+        witness_count: usize,
+    },
+    SeedIndexTooLarge {
+        index: usize,
+    },
+    MissingSeedTag {
+        index: usize,
+    },
+    SeedTagMismatch {
+        index: usize,
+        tagged_seed: u64,
+    },
+    PublicLeafScaffoldMismatch {
+        index: usize,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CanonicalFreshCoinWitnessFamilyError {
+    SeedCountMismatch {
+        seed_count: usize,
+        witness_count: usize,
+    },
+    CanonicalSeedSpaceOverflow,
+    CanonicalSeedCountMismatch {
+        seed_count: usize,
+        canonical_seed_count: usize,
+    },
+    PublicLeafScaffoldMismatch {
+        index: usize,
+    },
+    FreshCoinScaffoldExtractionMismatch {
+        index: usize,
+    },
+    FreshCoinScaffoldMismatch {
+        index: usize,
+    },
+    FreshCoinValuesExtractionMismatch {
+        index: usize,
+    },
+    CanonicalFreshCoinValuesMismatch {
+        index: usize,
+    },
+    DuplicateCanonicalSeed {
+        seed: usize,
+    },
+    MissingCanonicalSeed {
+        seed: usize,
+    },
 }
 
 impl fmt::Display for RefinementWitnessError {
@@ -363,14 +484,414 @@ impl fmt::Display for RefinementWitnessError {
 
 impl std::error::Error for RefinementWitnessError {}
 
+impl fmt::Display for SeededRuntimeWitnessFamilyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SeedCountMismatch {
+                seed_count,
+                witness_count,
+            } => write!(
+                f,
+                "seed count {} does not match witness count {}",
+                seed_count, witness_count
+            ),
+            Self::SeedIndexTooLarge { index } => {
+                write!(f, "seeded witness index {} does not fit in u64", index)
+            }
+            Self::MissingSeedTag { index } => write!(
+                f,
+                "seeded witness at index {} is missing a runtime_seed tag",
+                index
+            ),
+            Self::SeedTagMismatch { index, tagged_seed } => write!(
+                f,
+                "seeded witness at index {} is tagged with runtime_seed {}",
+                index, tagged_seed
+            ),
+            Self::PublicLeafScaffoldMismatch { index } => write!(
+                f,
+                "seeded path-ORAM witness at index {} does not match the shared public leaf scaffold",
+                index
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SeededRuntimeWitnessFamilyError {}
+
+impl fmt::Display for CanonicalFreshCoinWitnessFamilyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SeedCountMismatch {
+                seed_count,
+                witness_count,
+            } => write!(
+                f,
+                "seed count {} does not match witness count {}",
+                seed_count, witness_count
+            ),
+            Self::CanonicalSeedSpaceOverflow => write!(
+                f,
+                "canonical fresh-coin seed space does not fit in usize"
+            ),
+            Self::CanonicalSeedCountMismatch {
+                seed_count,
+                canonical_seed_count,
+            } => write!(
+                f,
+                "seed count {} does not match canonical fresh-coin seed space {}",
+                seed_count, canonical_seed_count
+            ),
+            Self::PublicLeafScaffoldMismatch { index } => write!(
+                f,
+                "canonical fresh-coin witness at index {} does not match the shared public leaf scaffold",
+                index
+            ),
+            Self::FreshCoinScaffoldExtractionMismatch { index } => write!(
+                f,
+                "canonical fresh-coin witness at index {} does not admit fresh-coin scaffold extraction",
+                index
+            ),
+            Self::FreshCoinScaffoldMismatch { index } => write!(
+                f,
+                "canonical fresh-coin witness at index {} does not match the shared fresh-coin scaffold",
+                index
+            ),
+            Self::FreshCoinValuesExtractionMismatch { index } => write!(
+                f,
+                "canonical fresh-coin witness at index {} does not admit fresh-coin value extraction",
+                index
+            ),
+            Self::CanonicalFreshCoinValuesMismatch { index } => write!(
+                f,
+                "canonical fresh-coin witness at index {} does not match the canonical fresh-coin seed trace",
+                index
+            ),
+            Self::DuplicateCanonicalSeed { seed } => write!(
+                f,
+                "canonical fresh-coin family contains multiple witnesses for canonical seed {}",
+                seed
+            ),
+            Self::MissingCanonicalSeed { seed } => write!(
+                f,
+                "canonical fresh-coin family is missing a witness for canonical seed {}",
+                seed
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CanonicalFreshCoinWitnessFamilyError {}
+
 impl RuntimeRefinementWitness {
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("runtime refinement witness is JSON serializable")
     }
 
     pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self).expect("runtime refinement witness is JSON serializable")
+    }
+
+    pub fn path_oram_fresh_coin_scaffold(&self) -> Option<Vec<RuntimeOramLeafScaffoldWitness>> {
+        extract_runtime_path_oram_fresh_coin_scaffold(
+            &self.oram_leaf_schedule,
+            &self.oram_leaf_state_transitions,
+        )
+    }
+
+    pub fn path_oram_fresh_coin_values(&self) -> Option<Vec<usize>> {
+        extract_runtime_path_oram_fresh_coin_values(
+            &self.oram_leaf_schedule,
+            &self.oram_leaf_state_transitions,
+        )
+    }
+}
+
+impl RuntimePathOramHiddenCertificate {
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self)
+            .expect("runtime path-ORAM hidden certificate is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
         serde_json::to_string_pretty(self)
-            .expect("runtime refinement witness is JSON serializable")
+            .expect("runtime path-ORAM hidden certificate is JSON serializable")
+    }
+
+    pub fn validate(&self) -> Result<(), RefinementWitnessError> {
+        let physical_writes = self
+            .trace
+            .physical_writes
+            .iter()
+            .map(|event| {
+                let class = match event.write_class.as_str() {
+                    "Set" => WriteClass::Set,
+                    "Clear" => WriteClass::Clear,
+                    "Same" => WriteClass::Same,
+                    "Update" => WriteClass::Update,
+                    _ => return Err(RefinementWitnessError::OramLeafScheduleMismatch),
+                };
+                Ok(PhysicalWriteEvent {
+                    object: event.object.clone(),
+                    location: event.location.clone(),
+                    old: vec![1; event.len],
+                    new: vec![2; event.len],
+                    class,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let scaffold = validate_path_oram_leaf_schedule(
+            &self.oram_leaf_schedule,
+            &self.trace.logical_accesses,
+            &self.trace.physical_reads,
+            &physical_writes,
+            &self.oram_objects,
+        )?;
+        if scaffold != self.oram_leaf_public_scaffold {
+            return Err(RefinementWitnessError::OramLeafScheduleMismatch);
+        }
+        validate_path_oram_leaf_state(
+            &self.oram_leaf_schedule,
+            &self.oram_leaf_state_transitions,
+            &self.oram_position_map_before,
+            &self.oram_position_map_after,
+            &self.oram_objects,
+        )?;
+        Ok(())
+    }
+}
+
+fn validate_seeded_runtime_witnesses(
+    seed_count: usize,
+    witnesses: &[RuntimeRefinementWitness],
+) -> Result<(), SeededRuntimeWitnessFamilyError> {
+    if seed_count != witnesses.len() {
+        return Err(SeededRuntimeWitnessFamilyError::SeedCountMismatch {
+            seed_count,
+            witness_count: witnesses.len(),
+        });
+    }
+    for (index, witness) in witnesses.iter().enumerate() {
+        let expected_seed = u64::try_from(index)
+            .map_err(|_| SeededRuntimeWitnessFamilyError::SeedIndexTooLarge { index })?;
+        match witness.runtime_seed {
+            Some(seed) if seed == expected_seed => {}
+            Some(tagged_seed) => {
+                return Err(SeededRuntimeWitnessFamilyError::SeedTagMismatch { index, tagged_seed })
+            }
+            None => return Err(SeededRuntimeWitnessFamilyError::MissingSeedTag { index }),
+        }
+    }
+    Ok(())
+}
+
+impl SeededRuntimeWitnessFamily {
+    pub fn new(
+        witnesses: Vec<RuntimeRefinementWitness>,
+    ) -> Result<Self, SeededRuntimeWitnessFamilyError> {
+        let family = Self {
+            seed_count: witnesses.len(),
+            witnesses,
+        };
+        family.validate()?;
+        Ok(family)
+    }
+
+    pub fn validate(&self) -> Result<(), SeededRuntimeWitnessFamilyError> {
+        validate_seeded_runtime_witnesses(self.seed_count, &self.witnesses)
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("seeded runtime witness family is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("seeded runtime witness family is JSON serializable")
+    }
+}
+
+impl SeededRuntimePathOramWitnessFamily {
+    pub fn new(
+        witnesses: Vec<RuntimeRefinementWitness>,
+    ) -> Result<Self, SeededRuntimeWitnessFamilyError> {
+        let public_leaf_scaffold = witnesses
+            .first()
+            .map(|witness| witness.oram_leaf_public_scaffold.clone())
+            .unwrap_or_default();
+        let family = Self {
+            seed_count: witnesses.len(),
+            witnesses,
+            public_leaf_scaffold,
+        };
+        family.validate()?;
+        Ok(family)
+    }
+
+    pub fn validate(&self) -> Result<(), SeededRuntimeWitnessFamilyError> {
+        validate_seeded_runtime_witnesses(self.seed_count, &self.witnesses)?;
+        for (index, witness) in self.witnesses.iter().enumerate() {
+            if witness.oram_leaf_public_scaffold != self.public_leaf_scaffold {
+                return Err(SeededRuntimeWitnessFamilyError::PublicLeafScaffoldMismatch { index });
+            }
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self)
+            .expect("seeded path-ORAM runtime witness family is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("seeded path-ORAM runtime witness family is JSON serializable")
+    }
+}
+
+impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
+    pub fn new(
+        witnesses: Vec<RuntimeRefinementWitness>,
+    ) -> Result<Self, CanonicalFreshCoinWitnessFamilyError> {
+        let public_leaf_scaffold = witnesses
+            .first()
+            .map(|witness| witness.oram_leaf_public_scaffold.clone())
+            .unwrap_or_default();
+        let public_fresh_coin_scaffold = witnesses
+            .first()
+            .and_then(RuntimeRefinementWitness::path_oram_fresh_coin_scaffold)
+            .unwrap_or_default();
+        let family = Self {
+            seed_count: witnesses.len(),
+            witnesses,
+            public_leaf_scaffold,
+            public_fresh_coin_scaffold,
+        };
+        family.validate()?;
+        Ok(family)
+    }
+
+    pub fn from_unordered_witnesses(
+        witnesses: Vec<RuntimeRefinementWitness>,
+    ) -> Result<Self, CanonicalFreshCoinWitnessFamilyError> {
+        let public_leaf_scaffold = witnesses
+            .first()
+            .map(|witness| witness.oram_leaf_public_scaffold.clone())
+            .unwrap_or_default();
+        let public_fresh_coin_scaffold = witnesses
+            .first()
+            .and_then(RuntimeRefinementWitness::path_oram_fresh_coin_scaffold)
+            .unwrap_or_default();
+        let canonical_seed_count =
+            canonical_path_oram_leaf_seed_space_size(&public_fresh_coin_scaffold)
+                .ok_or(CanonicalFreshCoinWitnessFamilyError::CanonicalSeedSpaceOverflow)?;
+        let mut by_seed = vec![None; canonical_seed_count];
+
+        for (index, witness) in witnesses.into_iter().enumerate() {
+            if witness.oram_leaf_public_scaffold != public_leaf_scaffold {
+                return Err(
+                    CanonicalFreshCoinWitnessFamilyError::PublicLeafScaffoldMismatch { index },
+                );
+            }
+            let extracted_scaffold = witness.path_oram_fresh_coin_scaffold().ok_or(
+                CanonicalFreshCoinWitnessFamilyError::FreshCoinScaffoldExtractionMismatch { index },
+            )?;
+            if extracted_scaffold != public_fresh_coin_scaffold {
+                return Err(
+                    CanonicalFreshCoinWitnessFamilyError::FreshCoinScaffoldMismatch { index },
+                );
+            }
+            let extracted_values = witness.path_oram_fresh_coin_values().ok_or(
+                CanonicalFreshCoinWitnessFamilyError::FreshCoinValuesExtractionMismatch { index },
+            )?;
+            let seed = canonical_path_oram_seed_of_leaf_values(
+                &public_fresh_coin_scaffold,
+                &extracted_values,
+            )
+            .ok_or(
+                CanonicalFreshCoinWitnessFamilyError::CanonicalFreshCoinValuesMismatch { index },
+            )?;
+            if seed >= canonical_seed_count {
+                return Err(
+                    CanonicalFreshCoinWitnessFamilyError::CanonicalFreshCoinValuesMismatch {
+                        index,
+                    },
+                );
+            }
+            if by_seed[seed].is_some() {
+                return Err(CanonicalFreshCoinWitnessFamilyError::DuplicateCanonicalSeed { seed });
+            }
+            by_seed[seed] = Some(witness);
+        }
+
+        let mut ordered = Vec::with_capacity(canonical_seed_count);
+        for (seed, witness) in by_seed.into_iter().enumerate() {
+            match witness {
+                Some(witness) => ordered.push(witness),
+                None => {
+                    return Err(CanonicalFreshCoinWitnessFamilyError::MissingCanonicalSeed { seed })
+                }
+            }
+        }
+        Self::new(ordered)
+    }
+
+    pub fn validate(&self) -> Result<(), CanonicalFreshCoinWitnessFamilyError> {
+        if self.seed_count != self.witnesses.len() {
+            return Err(CanonicalFreshCoinWitnessFamilyError::SeedCountMismatch {
+                seed_count: self.seed_count,
+                witness_count: self.witnesses.len(),
+            });
+        }
+        let canonical_seed_count =
+            canonical_path_oram_leaf_seed_space_size(&self.public_fresh_coin_scaffold)
+                .ok_or(CanonicalFreshCoinWitnessFamilyError::CanonicalSeedSpaceOverflow)?;
+        if self.seed_count != canonical_seed_count {
+            return Err(
+                CanonicalFreshCoinWitnessFamilyError::CanonicalSeedCountMismatch {
+                    seed_count: self.seed_count,
+                    canonical_seed_count,
+                },
+            );
+        }
+        for (index, witness) in self.witnesses.iter().enumerate() {
+            if witness.oram_leaf_public_scaffold != self.public_leaf_scaffold {
+                return Err(
+                    CanonicalFreshCoinWitnessFamilyError::PublicLeafScaffoldMismatch { index },
+                );
+            }
+            let extracted_scaffold = witness.path_oram_fresh_coin_scaffold().ok_or(
+                CanonicalFreshCoinWitnessFamilyError::FreshCoinScaffoldExtractionMismatch { index },
+            )?;
+            if extracted_scaffold != self.public_fresh_coin_scaffold {
+                return Err(
+                    CanonicalFreshCoinWitnessFamilyError::FreshCoinScaffoldMismatch { index },
+                );
+            }
+            let extracted_values = witness.path_oram_fresh_coin_values().ok_or(
+                CanonicalFreshCoinWitnessFamilyError::FreshCoinValuesExtractionMismatch { index },
+            )?;
+            if extracted_values
+                != canonical_path_oram_leaf_values_of_seed(&self.public_fresh_coin_scaffold, index)
+            {
+                return Err(
+                    CanonicalFreshCoinWitnessFamilyError::CanonicalFreshCoinValuesMismatch {
+                        index,
+                    },
+                );
+            }
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self)
+            .expect("canonical fresh-coin path-ORAM runtime witness family is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("canonical fresh-coin path-ORAM runtime witness family is JSON serializable")
     }
 }
 
@@ -413,10 +934,7 @@ impl RuntimeOramObjectWitness {
 }
 
 impl RuntimeControllerCertificate {
-    pub fn boundary_schedule(
-        &self,
-        public_outcome: &PublicOutcomeTrace,
-    ) -> Vec<BoundaryEvent> {
+    pub fn boundary_schedule(&self, public_outcome: &PublicOutcomeTrace) -> Vec<BoundaryEvent> {
         let mut schedule = Vec::with_capacity(2 * self.observed_oram_accesses.len() + 2);
         schedule.push(BoundaryEvent {
             direction: BoundaryDirection::Enter,
@@ -486,8 +1004,7 @@ impl RuntimeControllerCertificate {
             position_map_workset = position_map_workset.max(access.recursion_depth);
             path_workset = path_workset.max(access.buckets_per_access);
             stash_workset = stash_workset.max(access.stash_bound);
-            recursive_position_map_depth =
-                recursive_position_map_depth.max(access.recursion_depth);
+            recursive_position_map_depth = recursive_position_map_depth.max(access.recursion_depth);
             stash_bound = stash_bound.max(access.stash_bound);
         }
 
@@ -558,6 +1075,31 @@ impl RuntimeControllerCertificate {
             normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
             controller_shape: Some(controller_shape),
         }
+    }
+}
+
+impl RuntimeControllerObserverCertificate {
+    pub fn validate(&self) -> Result<(), RefinementWitnessError> {
+        if self.boundary_schedule.len() != self.controller_shape.boundary_event_budget {
+            return Err(RefinementWitnessError::BoundaryBudgetMismatch {
+                boundary_events: self.boundary_schedule.len(),
+                boundary_budget: self.controller_shape.boundary_event_budget,
+            });
+        }
+        if self.boundary_schedule
+            != self
+                .controller_certificate
+                .boundary_schedule(&self.public_outcome)
+        {
+            return Err(RefinementWitnessError::BoundaryScheduleMismatch);
+        }
+        if self.controller_shape != self.controller_certificate.controller_shape() {
+            return Err(RefinementWitnessError::ControllerShapeMismatch);
+        }
+        if self.normalized_micro_trace != self.controller_shape.normalized_micro_trace() {
+            return Err(RefinementWitnessError::NormalizedMicroTraceMismatch);
+        }
+        Ok(())
     }
 }
 
@@ -718,7 +1260,11 @@ fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
             "bucket:",
         )?;
         if object.scheme == PATH_ORAM_SCHEME {
-            scaffold.push((object.object_id, object.object_name.clone(), object.bucket_count));
+            scaffold.push((
+                object.object_id,
+                object.object_name.clone(),
+                object.bucket_count,
+            ));
         }
     }
     Ok(scaffold)
@@ -738,7 +1284,9 @@ fn runtime_path_oram_bucket_trace(
         .iter()
         .filter(|event| {
             path_objects.contains(event.object.as_str())
-                && event.location.starts_with(&format!("{}@bucket", event.object))
+                && event
+                    .location
+                    .starts_with(&format!("{}@bucket", event.object))
         })
         .map(|event| (event.object.clone(), event.location.clone()))
         .collect();
@@ -746,7 +1294,9 @@ fn runtime_path_oram_bucket_trace(
         .iter()
         .filter(|event| {
             path_objects.contains(event.object.as_str())
-                && event.location.starts_with(&format!("{}@bucket", event.object))
+                && event
+                    .location
+                    .starts_with(&format!("{}@bucket", event.object))
         })
         .map(|event| (event.object.clone(), event.location.clone()))
         .collect();
@@ -781,6 +1331,147 @@ fn path_oram_leaf_choice_count(bucket_count: usize) -> usize {
     ((bucket_count + 1) / 2).max(1)
 }
 
+fn runtime_path_oram_fresh_coin_scaffold_of_step(
+    leaf: &RuntimeOramLeafWitness,
+    transition: &RuntimePathOramTransitionWitness,
+) -> Option<Vec<RuntimeOramLeafScaffoldWitness>> {
+    if transition.object_id != leaf.object_id
+        || transition.object_name != leaf.object_name
+        || transition.bucket_count != leaf.bucket_count
+    {
+        return None;
+    }
+    let scaffold_step = RuntimeOramLeafScaffoldWitness {
+        object_id: leaf.object_id,
+        object_name: leaf.object_name.clone(),
+        bucket_count: leaf.bucket_count,
+    };
+    match transition.kind {
+        RuntimePathOramTransitionKind::ReadMiss => Some(vec![scaffold_step]),
+        RuntimePathOramTransitionKind::ReadHit => transition.next_leaf.map(|_| vec![scaffold_step]),
+        RuntimePathOramTransitionKind::WriteNoop => Some(if transition.slot_index.is_some() {
+            vec![]
+        } else {
+            vec![scaffold_step]
+        }),
+        RuntimePathOramTransitionKind::WriteInsert => transition
+            .next_leaf
+            .map(|_| vec![scaffold_step.clone(), scaffold_step]),
+        RuntimePathOramTransitionKind::WriteUpdate => {
+            transition.next_leaf.map(|_| vec![scaffold_step])
+        }
+        RuntimePathOramTransitionKind::WriteDelete => Some(vec![]),
+    }
+}
+
+fn runtime_path_oram_fresh_coin_values_of_step(
+    leaf: &RuntimeOramLeafWitness,
+    transition: &RuntimePathOramTransitionWitness,
+) -> Option<Vec<usize>> {
+    if transition.object_id != leaf.object_id
+        || transition.object_name != leaf.object_name
+        || transition.bucket_count != leaf.bucket_count
+    {
+        return None;
+    }
+    match transition.kind {
+        RuntimePathOramTransitionKind::ReadMiss => Some(vec![leaf.leaf]),
+        RuntimePathOramTransitionKind::ReadHit => {
+            transition.next_leaf.map(|next_leaf| vec![next_leaf])
+        }
+        RuntimePathOramTransitionKind::WriteNoop => Some(if transition.slot_index.is_some() {
+            vec![]
+        } else {
+            vec![leaf.leaf]
+        }),
+        RuntimePathOramTransitionKind::WriteInsert => transition
+            .next_leaf
+            .map(|next_leaf| vec![leaf.leaf, next_leaf]),
+        RuntimePathOramTransitionKind::WriteUpdate => {
+            transition.next_leaf.map(|next_leaf| vec![next_leaf])
+        }
+        RuntimePathOramTransitionKind::WriteDelete => Some(vec![]),
+    }
+}
+
+pub fn extract_runtime_path_oram_fresh_coin_scaffold(
+    leaf_schedule: &[RuntimeOramLeafWitness],
+    transitions: &[RuntimePathOramTransitionWitness],
+) -> Option<Vec<RuntimeOramLeafScaffoldWitness>> {
+    if leaf_schedule.len() != transitions.len() {
+        return None;
+    }
+    let mut scaffold = Vec::new();
+    for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
+        scaffold.extend(runtime_path_oram_fresh_coin_scaffold_of_step(
+            leaf, transition,
+        )?);
+    }
+    Some(scaffold)
+}
+
+pub fn extract_runtime_path_oram_fresh_coin_values(
+    leaf_schedule: &[RuntimeOramLeafWitness],
+    transitions: &[RuntimePathOramTransitionWitness],
+) -> Option<Vec<usize>> {
+    if leaf_schedule.len() != transitions.len() {
+        return None;
+    }
+    let mut values = Vec::new();
+    for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
+        values.extend(runtime_path_oram_fresh_coin_values_of_step(
+            leaf, transition,
+        )?);
+    }
+    Some(values)
+}
+
+pub fn canonical_path_oram_leaf_seed_space_size(
+    scaffold: &[RuntimeOramLeafScaffoldWitness],
+) -> Option<usize> {
+    scaffold.iter().try_fold(1usize, |acc, step| {
+        acc.checked_mul(path_oram_leaf_choice_count(step.bucket_count))
+    })
+}
+
+pub fn canonical_path_oram_leaf_values_of_seed(
+    scaffold: &[RuntimeOramLeafScaffoldWitness],
+    seed: usize,
+) -> Vec<usize> {
+    fn go(scaffold: &[RuntimeOramLeafScaffoldWitness], seed: usize, output: &mut Vec<usize>) {
+        if let Some((head, tail)) = scaffold.split_first() {
+            let tail_size = canonical_path_oram_leaf_seed_space_size(tail)
+                .expect("tail seed space should fit in usize")
+                .max(1);
+            output.push(seed / tail_size);
+            debug_assert!(path_oram_leaf_choice_count(head.bucket_count) > 0);
+            go(tail, seed % tail_size, output);
+        }
+    }
+
+    let mut values = Vec::with_capacity(scaffold.len());
+    go(scaffold, seed, &mut values);
+    values
+}
+
+pub fn canonical_path_oram_seed_of_leaf_values(
+    scaffold: &[RuntimeOramLeafScaffoldWitness],
+    values: &[usize],
+) -> Option<usize> {
+    match (scaffold.split_first(), values.split_first()) {
+        (None, None) => Some(0),
+        (Some(_), None) | (None, Some(_)) => None,
+        (Some((head, tail)), Some((value, tail_values))) => {
+            if *value >= path_oram_leaf_choice_count(head.bucket_count) {
+                return None;
+            }
+            let tail_size = canonical_path_oram_leaf_seed_space_size(tail)?;
+            let tail_seed = canonical_path_oram_seed_of_leaf_values(tail, tail_values)?;
+            value.checked_mul(tail_size)?.checked_add(tail_seed)
+        }
+    }
+}
+
 fn validate_path_oram_leaf_schedule(
     leaf_schedule: &[RuntimeOramLeafWitness],
     logical_accesses: &[LogicalEvent],
@@ -788,11 +1479,13 @@ fn validate_path_oram_leaf_schedule(
     physical_writes: &[PhysicalWriteEvent],
     oram_objects: &[RuntimeOramObjectWitness],
 ) -> Result<Vec<RuntimeOramLeafScaffoldWitness>, RefinementWitnessError> {
-    let scaffold = reconstruct_path_oram_leaf_scaffold_from_logical_trace(logical_accesses, oram_objects)?;
+    let scaffold =
+        reconstruct_path_oram_leaf_scaffold_from_logical_trace(logical_accesses, oram_objects)?;
     if scaffold.len() != leaf_schedule.len() {
         return Err(RefinementWitnessError::OramLeafScheduleMismatch);
     }
-    for ((object_id, object_name, bucket_count), step) in scaffold.iter().zip(leaf_schedule.iter()) {
+    for ((object_id, object_name, bucket_count), step) in scaffold.iter().zip(leaf_schedule.iter())
+    {
         let object = runtime_oram_object_by_id(oram_objects, step.object_id)?;
         if object.scheme != PATH_ORAM_SCHEME
             || step.object_id != *object_id
@@ -811,11 +1504,13 @@ fn validate_path_oram_leaf_schedule(
     }
     Ok(scaffold
         .into_iter()
-        .map(|(object_id, object_name, bucket_count)| RuntimeOramLeafScaffoldWitness {
-            object_id,
-            object_name,
-            bucket_count,
-        })
+        .map(
+            |(object_id, object_name, bucket_count)| RuntimeOramLeafScaffoldWitness {
+                object_id,
+                object_name,
+                bucket_count,
+            },
+        )
         .collect())
 }
 
@@ -824,7 +1519,10 @@ fn runtime_path_oram_state_by_object(
     oram_objects: &[RuntimeOramObjectWitness],
 ) -> Result<BTreeMap<u32, Vec<Option<usize>>>, RefinementWitnessError> {
     let mut by_object = BTreeMap::new();
-    for object in oram_objects.iter().filter(|object| object.scheme == PATH_ORAM_SCHEME) {
+    for object in oram_objects
+        .iter()
+        .filter(|object| object.scheme == PATH_ORAM_SCHEME)
+    {
         let state = states
             .iter()
             .find(|state| state.object_id == object.object_id)
@@ -841,7 +1539,10 @@ fn runtime_path_oram_state_by_object(
         {
             return Err(RefinementWitnessError::OramLeafStateMismatch);
         }
-        if by_object.insert(object.object_id, state.leaves.clone()).is_some() {
+        if by_object
+            .insert(object.object_id, state.leaves.clone())
+            .is_some()
+        {
             return Err(RefinementWitnessError::OramLeafStateMismatch);
         }
     }
@@ -911,7 +1612,9 @@ fn validate_path_oram_leaf_state(
                     }
                     _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
                 };
-                if step.leaf != prior_leaf || next_leaf >= path_oram_leaf_choice_count(step.bucket_count) {
+                if step.leaf != prior_leaf
+                    || next_leaf >= path_oram_leaf_choice_count(step.bucket_count)
+                {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
                 state[slot_index] = Some(next_leaf);
@@ -956,7 +1659,9 @@ fn validate_path_oram_leaf_state(
                     }
                     _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
                 };
-                if step.leaf != prior_leaf || next_leaf >= path_oram_leaf_choice_count(step.bucket_count) {
+                if step.leaf != prior_leaf
+                    || next_leaf >= path_oram_leaf_choice_count(step.bucket_count)
+                {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
                 state[slot_index] = Some(next_leaf);
@@ -985,8 +1690,7 @@ fn validate_path_oram_leaf_state(
 
 impl SgxControllerShapeTrace {
     fn with_shared_resource_budget(mut self, page_trace_budget: usize) -> Self {
-        self.shared_resource_budget =
-            self.controller_phase_order.len() + page_trace_budget;
+        self.shared_resource_budget = self.controller_phase_order.len() + page_trace_budget;
         self
     }
 }
@@ -1027,6 +1731,10 @@ pub struct ExecutionTrace {
     pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
     #[serde(default)]
     pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    #[serde(default)]
+    pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    #[serde(default)]
+    pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
     #[serde(default)]
     pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
     #[serde(default)]
@@ -1084,58 +1792,38 @@ impl ExecutionTrace {
         }
     }
 
-    pub fn runtime_refinement_witness(
+    pub fn runtime_controller_observer_certificate(
         &self,
-    ) -> Result<RuntimeRefinementWitness, RefinementWitnessError> {
-        let public_outcome = self
-            .theorem_trace
-            .public_outcome
-            .clone()
-            .ok_or(RefinementWitnessError::MissingPublicOutcome)?;
-        let controller_shape = self
-            .theorem_trace
-            .controller_shape
-            .clone()
-            .ok_or(RefinementWitnessError::MissingControllerShape)?;
-        let normalized_micro_trace = self
-            .theorem_trace
-            .normalized_micro_trace
-            .clone()
-            .ok_or(RefinementWitnessError::MissingNormalizedMicroTrace)?;
-        let controller_certificate = self
-            .runtime_controller_certificate
-            .clone()
-            .ok_or(RefinementWitnessError::MissingControllerCertificate)?;
-        let reconstructed_accesses = reconstruct_oram_accesses_from_logical_trace(
-            &self.logical_accesses,
-            &self.runtime_oram_objects,
-        )?;
-        if self.gas_used != public_outcome.gas_used {
-            return Err(RefinementWitnessError::GasMismatch {
-                trace_gas: self.gas_used,
-                public_outcome_gas: public_outcome.gas_used,
-            });
-        }
-        if self.theorem_trace.boundary_schedule.len() != controller_shape.boundary_event_budget {
-            return Err(RefinementWitnessError::BoundaryBudgetMismatch {
-                boundary_events: self.theorem_trace.boundary_schedule.len(),
-                boundary_budget: controller_shape.boundary_event_budget,
-            });
-        }
-        if self.theorem_trace.boundary_schedule
-            != controller_certificate.boundary_schedule(&public_outcome)
-        {
-            return Err(RefinementWitnessError::BoundaryScheduleMismatch);
-        }
-        if controller_shape != controller_certificate.controller_shape() {
-            return Err(RefinementWitnessError::ControllerShapeMismatch);
-        }
-        if controller_certificate.observed_oram_accesses != reconstructed_accesses {
-            return Err(RefinementWitnessError::OramAccessScheduleMismatch);
-        }
-        if normalized_micro_trace != controller_shape.normalized_micro_trace() {
-            return Err(RefinementWitnessError::NormalizedMicroTraceMismatch);
-        }
+    ) -> Result<RuntimeControllerObserverCertificate, RefinementWitnessError> {
+        let certificate = RuntimeControllerObserverCertificate {
+            public_outcome: self
+                .theorem_trace
+                .public_outcome
+                .clone()
+                .ok_or(RefinementWitnessError::MissingPublicOutcome)?,
+            boundary_schedule: self.theorem_trace.boundary_schedule.clone(),
+            controller_shape: self
+                .theorem_trace
+                .controller_shape
+                .clone()
+                .ok_or(RefinementWitnessError::MissingControllerShape)?,
+            normalized_micro_trace: self
+                .theorem_trace
+                .normalized_micro_trace
+                .clone()
+                .ok_or(RefinementWitnessError::MissingNormalizedMicroTrace)?,
+            controller_certificate: self
+                .runtime_controller_certificate
+                .clone()
+                .ok_or(RefinementWitnessError::MissingControllerCertificate)?,
+        };
+        certificate.validate()?;
+        Ok(certificate)
+    }
+
+    pub fn runtime_path_oram_hidden_certificate(
+        &self,
+    ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
         let oram_leaf_public_scaffold = validate_path_oram_leaf_schedule(
             &self.runtime_oram_leaf_schedule,
             &self.logical_accesses,
@@ -1150,20 +1838,53 @@ impl ExecutionTrace {
             &self.runtime_oram_position_map_after,
             &self.runtime_oram_objects,
         )?;
-        Ok(RuntimeRefinementWitness {
+        Ok(RuntimePathOramHiddenCertificate {
             trace: self.refinement_trace(),
-            runtime_seed: self.runtime_seed,
-            public_outcome,
-            boundary_schedule: self.theorem_trace.boundary_schedule.clone(),
-            controller_shape,
-            normalized_micro_trace,
-            controller_certificate,
             oram_objects: self.runtime_oram_objects.clone(),
             oram_leaf_public_scaffold,
             oram_leaf_schedule: self.runtime_oram_leaf_schedule.clone(),
             oram_position_map_before: self.runtime_oram_position_map_before.clone(),
             oram_position_map_after: self.runtime_oram_position_map_after.clone(),
             oram_leaf_state_transitions: self.runtime_oram_leaf_state_transitions.clone(),
+        })
+    }
+
+    pub fn runtime_refinement_witness(
+        &self,
+    ) -> Result<RuntimeRefinementWitness, RefinementWitnessError> {
+        let controller_observer = self.runtime_controller_observer_certificate()?;
+        let hidden_certificate = self.runtime_path_oram_hidden_certificate()?;
+        let public_outcome = controller_observer.public_outcome;
+        let controller_shape = controller_observer.controller_shape;
+        let normalized_micro_trace = controller_observer.normalized_micro_trace;
+        let controller_certificate = controller_observer.controller_certificate;
+        let reconstructed_accesses = reconstruct_oram_accesses_from_logical_trace(
+            &self.logical_accesses,
+            &self.runtime_oram_objects,
+        )?;
+        if self.gas_used != public_outcome.gas_used {
+            return Err(RefinementWitnessError::GasMismatch {
+                trace_gas: self.gas_used,
+                public_outcome_gas: public_outcome.gas_used,
+            });
+        }
+        if controller_certificate.observed_oram_accesses != reconstructed_accesses {
+            return Err(RefinementWitnessError::OramAccessScheduleMismatch);
+        }
+        Ok(RuntimeRefinementWitness {
+            trace: hidden_certificate.trace,
+            runtime_seed: self.runtime_seed,
+            public_outcome,
+            boundary_schedule: self.theorem_trace.boundary_schedule.clone(),
+            controller_shape,
+            normalized_micro_trace,
+            controller_certificate,
+            oram_objects: hidden_certificate.oram_objects,
+            oram_leaf_public_scaffold: hidden_certificate.oram_leaf_public_scaffold,
+            oram_leaf_schedule: hidden_certificate.oram_leaf_schedule,
+            oram_position_map_before: hidden_certificate.oram_position_map_before,
+            oram_position_map_after: hidden_certificate.oram_position_map_after,
+            oram_leaf_state_transitions: hidden_certificate.oram_leaf_state_transitions,
         })
     }
 }
@@ -1228,12 +1949,17 @@ fn hash_json<T: Serialize>(value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_write, ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace,
-        NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent,
-        PublicOutcomeTrace, RefinementWitnessError, RuntimeControllerCertificate,
-        RuntimeOramAccessWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
+        canonical_path_oram_leaf_seed_space_size, canonical_path_oram_seed_of_leaf_values,
+        classify_write, extract_runtime_path_oram_fresh_coin_scaffold,
+        extract_runtime_path_oram_fresh_coin_values,
+        CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinWitnessFamilyError,
+        ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
+        OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace,
+        RefinementWitnessError, RuntimeControllerCertificate, RuntimeOramAccessWitness,
+        RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
         RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
-        RuntimePathOramTransitionWitness, TheoremTrace, WriteClass,
+        RuntimePathOramTransitionWitness, SeededRuntimePathOramWitnessFamily,
+        SeededRuntimeWitnessFamilyError, TheoremTrace, WriteClass,
     };
     use std::collections::BTreeMap;
 
@@ -1374,14 +2100,13 @@ mod tests {
         }]
     }
 
-    #[test]
-    fn runtime_refinement_witness_normalizes_controller_shape() {
+    fn sample_runtime_execution_trace_with_seed(seed: u64) -> ExecutionTrace {
         let controller_certificate = sample_controller_certificate();
         let public_outcome = sample_public_outcome(99);
         let controller_shape = controller_certificate.controller_shape();
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let path = sample_path_bucket_indices();
-        let trace = ExecutionTrace {
+        ExecutionTrace {
             opcode_trace: vec!["declare".into()],
             logical_accesses: sample_oram_logical_accesses(),
             logical_writes: vec![],
@@ -1412,14 +2137,143 @@ mod tests {
                 controller_shape: Some(controller_shape.clone()),
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
-            runtime_seed: None,
-            runtime_controller_certificate: Some(controller_certificate.clone()),
+            runtime_seed: Some(seed),
+            runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()],
             runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
+            runtime_oram_access_counters_before: vec![],
+            runtime_oram_access_counters_after: vec![],
             runtime_oram_position_map_before: sample_path_oram_position_map_before(),
             runtime_oram_position_map_after: sample_path_oram_position_map_after(),
             runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
+        }
+    }
+
+    fn sample_runtime_refinement_witness_with_seed(seed: u64) -> super::RuntimeRefinementWitness {
+        sample_runtime_execution_trace_with_seed(seed)
+            .runtime_refinement_witness()
+            .unwrap()
+    }
+
+    fn sample_read_miss_oram_object() -> RuntimeOramObjectWitness {
+        RuntimeOramObjectWitness {
+            object_id: 9,
+            object_name: "tiny_records".into(),
+            scheme: "path_oram_local_posmap_v1".into(),
+            capacity: 4,
+            block_size: 64,
+            bucket_size: 64,
+            bucket_count: 1,
+            blocks_per_bucket: 1,
+            tree_height: 0,
+            stash_bound: 4,
+            recursion_depth: 1,
+            metadata_pages: 1,
+            metadata_pages_per_access: 1,
+            buckets_per_access: 1,
+            accesses_per_call: 1,
+        }
+    }
+
+    fn sample_read_miss_logical_accesses() -> Vec<LogicalEvent> {
+        vec![
+            LogicalEvent {
+                kind: "uooram_counter".into(),
+                object: "tiny_records".into(),
+                detail: "counter".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_metadata_load".into(),
+                object: "tiny_records".into(),
+                detail: "page:0".into(),
+            },
+            LogicalEvent {
+                kind: "uooram_path_read".into(),
+                object: "tiny_records".into(),
+                detail: "bucket:0".into(),
+            },
+        ]
+    }
+
+    fn sample_read_miss_runtime_refinement_witness() -> super::RuntimeRefinementWitness {
+        let controller_certificate = RuntimeControllerCertificate {
+            entry_input_len: 64,
+            observed_oram_accesses: vec![RuntimeOramAccessWitness {
+                object_id: 9,
+                scheme: "path_oram_local_posmap_v1".into(),
+                metadata_pages_per_access: 1,
+                buckets_per_access: 1,
+                recursion_depth: 1,
+                stash_bound: 4,
+            }],
         };
+        let public_outcome = sample_public_outcome(7);
+        let controller_shape = controller_certificate.controller_shape();
+        let normalized_micro_trace = controller_shape.normalized_micro_trace();
+        let trace = ExecutionTrace {
+            opcode_trace: vec!["declare".into()],
+            logical_accesses: sample_read_miss_logical_accesses(),
+            logical_writes: vec![],
+            physical_reads: vec![PhysicalReadEvent {
+                object: "tiny_records".into(),
+                location: "tiny_records@bucket0".into(),
+                len: 64,
+            }],
+            physical_writes: vec![PhysicalWriteEvent {
+                object: "tiny_records".into(),
+                location: "tiny_records@bucket0".into(),
+                old: vec![1],
+                new: vec![2],
+                class: WriteClass::Update,
+            }],
+            host_proxy_metrics: BTreeMap::new(),
+            gas_used: 7,
+            theorem_trace: TheoremTrace {
+                public_outcome: Some(public_outcome.clone()),
+                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                controller_shape: Some(controller_shape.clone()),
+                normalized_micro_trace: Some(normalized_micro_trace),
+            },
+            runtime_controller_certificate: Some(controller_certificate),
+            runtime_oram_objects: vec![sample_read_miss_oram_object()],
+            runtime_oram_leaf_schedule: vec![RuntimeOramLeafWitness {
+                object_id: 9,
+                object_name: "tiny_records".into(),
+                bucket_count: 1,
+                leaf: 0,
+            }],
+            runtime_oram_access_counters_before: vec![],
+            runtime_oram_access_counters_after: vec![],
+            runtime_oram_position_map_before: vec![RuntimePathOramPositionMapWitness {
+                object_id: 9,
+                object_name: "tiny_records".into(),
+                leaves: vec![None; 4],
+            }],
+            runtime_oram_position_map_after: vec![RuntimePathOramPositionMapWitness {
+                object_id: 9,
+                object_name: "tiny_records".into(),
+                leaves: vec![None; 4],
+            }],
+            runtime_oram_leaf_state_transitions: vec![RuntimePathOramTransitionWitness {
+                object_id: 9,
+                object_name: "tiny_records".into(),
+                bucket_count: 1,
+                kind: RuntimePathOramTransitionKind::ReadMiss,
+                slot_index: None,
+                prior_leaf: None,
+                next_leaf: None,
+            }],
+            ..ExecutionTrace::default()
+        };
+        trace.runtime_refinement_witness().unwrap()
+    }
+
+    #[test]
+    fn runtime_refinement_witness_normalizes_controller_shape() {
+        let controller_certificate = sample_controller_certificate();
+        let controller_shape = controller_certificate.controller_shape();
+        let normalized_micro_trace = controller_shape.normalized_micro_trace();
+        let trace = sample_runtime_execution_trace_with_seed(0);
         let witness = trace.runtime_refinement_witness().unwrap();
         assert_eq!(witness.public_outcome.gas_used, 99);
         assert_eq!(witness.trace.physical_writes[0].write_class, "Update");
@@ -1428,6 +2282,44 @@ mod tests {
         assert_eq!(witness.normalized_micro_trace, normalized_micro_trace);
         assert_eq!(witness.controller_certificate, controller_certificate);
         assert_eq!(witness.oram_objects, vec![sample_oram_object()]);
+    }
+
+    #[test]
+    fn execution_trace_exports_controller_observer_certificate() {
+        let trace = sample_runtime_execution_trace_with_seed(0);
+        let certificate = trace.runtime_controller_observer_certificate().unwrap();
+        assert_eq!(certificate.public_outcome.gas_used, 99);
+        assert_eq!(
+            certificate.boundary_schedule,
+            certificate
+                .controller_certificate
+                .boundary_schedule(&certificate.public_outcome)
+        );
+        assert_eq!(
+            certificate.controller_shape,
+            certificate.controller_certificate.controller_shape()
+        );
+        assert_eq!(
+            certificate.normalized_micro_trace,
+            certificate.controller_shape.normalized_micro_trace()
+        );
+    }
+
+    #[test]
+    fn execution_trace_exports_path_oram_hidden_certificate() {
+        let trace = sample_runtime_execution_trace_with_seed(0);
+        let certificate = trace.runtime_path_oram_hidden_certificate().unwrap();
+        assert_eq!(certificate.oram_objects, vec![sample_oram_object()]);
+        assert_eq!(certificate.oram_leaf_schedule, sample_oram_leaf_schedule());
+        assert_eq!(
+            certificate.oram_leaf_public_scaffold,
+            vec![RuntimeOramLeafScaffoldWitness {
+                object_id: 7,
+                object_name: "records".into(),
+                bucket_count: 31,
+            }]
+        );
+        certificate.validate().unwrap();
     }
 
     #[test]
@@ -1569,6 +2461,8 @@ mod tests {
             runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()],
             runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
+            runtime_oram_access_counters_before: vec![],
+            runtime_oram_access_counters_after: vec![],
             runtime_oram_position_map_before: sample_path_oram_position_map_before(),
             runtime_oram_position_map_after: drifted_after,
             runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
@@ -1576,6 +2470,155 @@ mod tests {
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
             RefinementWitnessError::OramLeafStateMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_path_oram_hidden_certificate_rejects_path_oram_state_drift() {
+        let controller_certificate = sample_controller_certificate();
+        let public_outcome = sample_public_outcome(99);
+        let controller_shape = controller_certificate.controller_shape();
+        let normalized_micro_trace = controller_shape.normalized_micro_trace();
+        let path = sample_path_bucket_indices();
+        let mut drifted_after = sample_path_oram_position_map_after();
+        drifted_after[0].leaves[0] = Some(2);
+        let trace = ExecutionTrace {
+            opcode_trace: vec!["declare".into()],
+            logical_accesses: sample_oram_logical_accesses(),
+            logical_writes: vec![],
+            physical_reads: path
+                .iter()
+                .map(|index| PhysicalReadEvent {
+                    object: "records".into(),
+                    location: format!("records@bucket{index}"),
+                    len: 64,
+                })
+                .collect(),
+            physical_writes: path
+                .iter()
+                .rev()
+                .map(|index| PhysicalWriteEvent {
+                    object: "records".into(),
+                    location: format!("records@bucket{index}"),
+                    old: vec![1, 2],
+                    new: vec![3, 4],
+                    class: WriteClass::Update,
+                })
+                .collect(),
+            host_proxy_metrics: BTreeMap::new(),
+            gas_used: 99,
+            theorem_trace: TheoremTrace {
+                public_outcome: Some(public_outcome.clone()),
+                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                controller_shape: Some(controller_shape.clone()),
+                normalized_micro_trace: Some(normalized_micro_trace.clone()),
+            },
+            runtime_seed: None,
+            runtime_controller_certificate: Some(controller_certificate),
+            runtime_oram_objects: vec![sample_oram_object()],
+            runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
+            runtime_oram_access_counters_before: vec![],
+            runtime_oram_access_counters_after: vec![],
+            runtime_oram_position_map_before: sample_path_oram_position_map_before(),
+            runtime_oram_position_map_after: drifted_after,
+            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
+        };
+        assert_eq!(
+            trace.runtime_path_oram_hidden_certificate().unwrap_err(),
+            RefinementWitnessError::OramLeafStateMismatch
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_path_oram_witness_family_accepts_public_scaffold_consistency() {
+        let family = SeededRuntimePathOramWitnessFamily::new(vec![
+            sample_runtime_refinement_witness_with_seed(0),
+            sample_runtime_refinement_witness_with_seed(1),
+        ])
+        .unwrap();
+        assert_eq!(family.seed_count, 2);
+        assert_eq!(
+            family.public_leaf_scaffold,
+            family.witnesses[0].oram_leaf_public_scaffold
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_path_oram_witness_family_rejects_seed_tag_drift() {
+        let mut second = sample_runtime_refinement_witness_with_seed(1);
+        second.runtime_seed = Some(7);
+        assert_eq!(
+            SeededRuntimePathOramWitnessFamily::new(vec![
+                sample_runtime_refinement_witness_with_seed(0),
+                second,
+            ])
+            .unwrap_err(),
+            SeededRuntimeWitnessFamilyError::SeedTagMismatch {
+                index: 1,
+                tagged_seed: 7,
+            }
+        );
+    }
+
+    #[test]
+    fn extract_runtime_path_oram_fresh_coins_matches_read_hit_transition() {
+        let witness = sample_runtime_refinement_witness_with_seed(0);
+        let scaffold = extract_runtime_path_oram_fresh_coin_scaffold(
+            &witness.oram_leaf_schedule,
+            &witness.oram_leaf_state_transitions,
+        )
+        .unwrap();
+        let values = extract_runtime_path_oram_fresh_coin_values(
+            &witness.oram_leaf_schedule,
+            &witness.oram_leaf_state_transitions,
+        )
+        .unwrap();
+        assert_eq!(
+            scaffold,
+            vec![RuntimeOramLeafScaffoldWitness {
+                object_id: 7,
+                object_name: "records".into(),
+                bucket_count: 31,
+            }]
+        );
+        assert_eq!(values, vec![3]);
+    }
+
+    #[test]
+    fn canonical_fresh_coin_runtime_family_accepts_single_read_miss_seed_space() {
+        let witness = sample_read_miss_runtime_refinement_witness();
+        let family = CanonicalFreshCoinRuntimePathOramWitnessFamily::new(vec![witness]).unwrap();
+        assert_eq!(family.seed_count, 1);
+        assert_eq!(
+            canonical_path_oram_leaf_seed_space_size(&family.public_fresh_coin_scaffold),
+            Some(1)
+        );
+        assert_eq!(family.public_leaf_scaffold.len(), 1);
+        assert_eq!(family.public_fresh_coin_scaffold.len(), 1);
+    }
+
+    #[test]
+    fn canonical_fresh_coin_seed_inverse_matches_forward_enumeration() {
+        let witness = sample_runtime_refinement_witness_with_seed(0);
+        let scaffold = witness.path_oram_fresh_coin_scaffold().unwrap();
+        assert_eq!(
+            canonical_path_oram_seed_of_leaf_values(&scaffold, &[3]),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn canonical_fresh_coin_runtime_family_rejects_noncanonical_fresh_coin_indexing() {
+        let family = CanonicalFreshCoinRuntimePathOramWitnessFamily::new(vec![
+            sample_runtime_refinement_witness_with_seed(0),
+            sample_runtime_refinement_witness_with_seed(1),
+        ]);
+        assert_eq!(
+            family.unwrap_err(),
+            CanonicalFreshCoinWitnessFamilyError::CanonicalSeedCountMismatch {
+                seed_count: 2,
+                canonical_seed_count: 16,
+            }
         );
     }
 }

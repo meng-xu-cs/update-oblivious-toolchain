@@ -37,7 +37,8 @@ pub fn attach_theorem_metrics(trace: &mut ExecutionTrace) {
         );
         trace.host_proxy_metrics.insert(
             "normalized_page_events".into(),
-            shape.page_trace_regions
+            shape
+                .page_trace_regions
                 .iter()
                 .map(|region| region.event_budget)
                 .sum::<usize>() as f64,

@@ -9,7 +9,8 @@ use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::{
-    CompiledArtifact, ExecutionTrace, RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness,
+    CompiledArtifact, ExecutionTrace, RuntimeOramAccessCounterWitness,
+    RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness,
     Value,
 };
 
@@ -25,6 +26,42 @@ pub struct CallResult {
     pub return_value: Option<Value>,
     pub aborted: bool,
     pub trace: ExecutionTrace,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct PathOramFreshCoinPlan {
+    by_object: BTreeMap<u32, Vec<usize>>,
+}
+
+impl PathOramFreshCoinPlan {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert_object_coins(&mut self, object_id: u32, coins: Vec<usize>) -> Option<Vec<usize>> {
+        self.by_object.insert(object_id, coins)
+    }
+
+    pub fn from_scaffold_and_values(
+        scaffold: &[RuntimeOramLeafScaffoldWitness],
+        values: &[usize],
+    ) -> Result<Self> {
+        if scaffold.len() != values.len() {
+            bail!(
+                "path-ORAM fresh-coin scaffold length {} does not match value length {}",
+                scaffold.len(),
+                values.len()
+            );
+        }
+        let mut plan = Self::new();
+        for (step, value) in scaffold.iter().zip(values.iter()) {
+            plan.by_object
+                .entry(step.object_id)
+                .or_default()
+                .push(*value);
+        }
+        Ok(plan)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -45,8 +82,13 @@ impl ContractInstance {
         let mut objects = BTreeMap::new();
         let mut master_seed = deploy_seed;
         for spec in &artifact.contract.state {
-            objects.insert(spec.id, RuntimeObject::instantiate_with_seed(spec, master_seed)?);
-            master_seed = master_seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xA5A5_A5A5_A5A5_A5A5);
+            objects.insert(
+                spec.id,
+                RuntimeObject::instantiate_with_seed(spec, master_seed)?,
+            );
+            master_seed = master_seed
+                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                .wrapping_add(0xA5A5_A5A5_A5A5_A5A5);
         }
         Ok(Self {
             artifact,
@@ -56,6 +98,24 @@ impl ContractInstance {
     }
 
     pub fn call(&mut self, entrypoint: &str, args: Vec<Value>) -> Result<CallResult> {
+        self.call_impl(entrypoint, args, None)
+    }
+
+    pub fn call_with_path_oram_fresh_coins(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        fresh_coins: &PathOramFreshCoinPlan,
+    ) -> Result<CallResult> {
+        self.call_impl(entrypoint, args, Some(fresh_coins))
+    }
+
+    fn call_impl(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        fresh_coins: Option<&PathOramFreshCoinPlan>,
+    ) -> Result<CallResult> {
         let function = self
             .artifact
             .contract
@@ -86,11 +146,26 @@ impl ContractInstance {
             manifest_entry.max_stack_words,
         );
         let committed = self.objects.clone();
+        let runtime_oram_access_counters_before = runtime_path_oram_access_counters(&committed);
         let runtime_oram_position_map_before = runtime_path_oram_position_maps(&committed);
         let mut shadow = committed
             .iter()
             .map(|(id, object)| (*id, object.clone_for_tx()))
             .collect::<BTreeMap<_, _>>();
+        if let Some(fresh_coins) = fresh_coins {
+            for object in shadow.values_mut() {
+                object.enable_injected_path_oram_leaf_coins();
+            }
+            for (object_id, coins) in &fresh_coins.by_object {
+                let object = shadow.get_mut(object_id).ok_or_else(|| {
+                    anyhow!(
+                        "path-ORAM fresh-coin plan references unknown object {}",
+                        object_id
+                    )
+                })?;
+                object.install_path_oram_leaf_coins(coins.clone())?;
+            }
+        }
         let mut recorder = CallRecorder::begin(entrypoint, &call_args);
         let mut state = ExecState::default();
         for ((param_name, _), arg) in function.params.iter().zip(args.into_iter()) {
@@ -106,6 +181,11 @@ impl ContractInstance {
             &mut opcode_trace,
             &mut recorder,
         )?;
+        if fresh_coins.is_some() {
+            for object in shadow.values() {
+                object.ensure_path_oram_leaf_coins_consumed()?;
+            }
+        }
         let mut next_objects = BTreeMap::new();
         for (id, object) in shadow {
             let old = committed
@@ -131,6 +211,7 @@ impl ContractInstance {
             gas_used = manifest_budget;
         }
         self.objects = next_objects;
+        let runtime_oram_access_counters_after = runtime_path_oram_access_counters(&self.objects);
         let runtime_oram_position_map_after = runtime_path_oram_position_maps(&self.objects);
         let return_value = if function.confidential && state.aborted {
             None
@@ -198,6 +279,8 @@ impl ContractInstance {
             runtime_controller_certificate: Some(trace_bundle.controller_certificate),
             runtime_oram_objects: runtime_oram_objects(&self.artifact),
             runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
             runtime_oram_position_map_before,
             runtime_oram_position_map_after,
             runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
@@ -294,6 +377,15 @@ fn runtime_path_oram_position_maps(
         .collect()
 }
 
+fn runtime_path_oram_access_counters(
+    objects: &BTreeMap<u32, RuntimeObject>,
+) -> Vec<RuntimeOramAccessCounterWitness> {
+    objects
+        .values()
+        .filter_map(RuntimeObject::path_oram_access_counter_witness)
+        .collect()
+}
+
 fn exec_statement(
     contract: &CompiledContract,
     function: &CompiledFunction,
@@ -339,9 +431,25 @@ fn exec_statement(
                 .as_bool()
                 .ok_or_else(|| anyhow!("if condition must be boolean"))?;
             if cond {
-                exec_block(contract, function, then_body, objects, state, opcode_trace, recorder)?;
+                exec_block(
+                    contract,
+                    function,
+                    then_body,
+                    objects,
+                    state,
+                    opcode_trace,
+                    recorder,
+                )?;
             } else {
-                exec_block(contract, function, else_body, objects, state, opcode_trace, recorder)?;
+                exec_block(
+                    contract,
+                    function,
+                    else_body,
+                    objects,
+                    state,
+                    opcode_trace,
+                    recorder,
+                )?;
             }
         }
         Statement::For {
@@ -362,7 +470,15 @@ fn exec_statement(
                     break;
                 }
                 state.env.insert(index_var.clone(), Value::uint(index));
-                exec_block(contract, function, body, objects, state, opcode_trace, recorder)?;
+                exec_block(
+                    contract,
+                    function,
+                    body,
+                    objects,
+                    state,
+                    opcode_trace,
+                    recorder,
+                )?;
             }
         }
         Statement::CellSet {
@@ -526,8 +642,8 @@ fn eval_expr(
         Expr::Keccak256 { parts } => {
             let mut hasher = Keccak::v256();
             for part in parts {
-                let bytes =
-                    eval_expr(contract, function, part, objects, state, recorder)?.canonical_bytes();
+                let bytes = eval_expr(contract, function, part, objects, state, recorder)?
+                    .canonical_bytes();
                 hasher.update(&bytes);
             }
             let mut out = [0u8; 32];

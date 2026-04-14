@@ -63,13 +63,11 @@ impl StoreCipher {
         let ciphertext = cipher
             .encrypt(
                 Nonce::from_slice(&nonce_bytes),
-                Payload {
-                    msg: payload,
-                    aad,
-                },
+                Payload { msg: payload, aad },
             )
             .expect("fixed-size nonce");
-        let mut sealed = Vec::with_capacity(SEALED_MAGIC.len() + nonce_bytes.len() + ciphertext.len());
+        let mut sealed =
+            Vec::with_capacity(SEALED_MAGIC.len() + nonce_bytes.len() + ciphertext.len());
         sealed.extend_from_slice(&SEALED_MAGIC);
         sealed.extend_from_slice(&nonce_bytes);
         sealed.extend_from_slice(&ciphertext);
@@ -140,7 +138,10 @@ mod tests {
     fn nonzero_transport_roundtrips_payload() {
         let payload = [0u8, 0xAB, 0xCD, 0xEF];
         let encoded = NonZeroCodec::encode_bytes(&payload);
-        assert_eq!(NonZeroCodec::decode_bytes(payload.len(), &encoded), Some(payload.to_vec()));
+        assert_eq!(
+            NonZeroCodec::decode_bytes(payload.len(), &encoded),
+            Some(payload.to_vec())
+        );
     }
 
     #[test]
