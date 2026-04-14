@@ -108,15 +108,160 @@ theorem runtimeWitness_toImportedPathOramHiddenWitness_valid
       ImportedPathOramHiddenWitness.replayedPositionMapState
     simpa using runtimeWitness_pathOramLeafStateReplay_some witness modelTags hValid
 
-/-- Imported standard Path ORAM theorem object. This is the external theorem
-we intend to cite or mechanize separately, at the exact storage-semantics
-boundary already used by the repo's concrete backend theorem. -/
+/-- Bucket-trace projection on raw storage samples. -/
+def pathOramBucketTraceOfStorageView
+  (storage : OramStorageView) : PathOramBucketTrace :=
+  pathOramBucketTrace (pathOramStorageLocationTrace storage)
+
+/-- Theorem-facing standard Path ORAM implementation interface. This packages
+the exact internal hypotheses consumed by the standard Path ORAM theorem at the
+storage boundary used by `path_oram_local_posmap_v1`. -/
+structure ImportedStandardPathOramImplementation
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+  (publicPart : OramConfig → OramViewPublicPart)
+  (storageRun : OramStorageSemantics) where
+  leafRun : OramConfig → Distribution PathOramLeafScheduleTrace
+  cfgWellFormed : ∀ cfg, PathOramConfigWellFormed cfg
+  publicViewSafe : OramPublicViewSafe publicPart
+  leafValueCanonicalOnPublicPart :
+    ∀ cfg,
+      PathOramLeafValueCanonicalOnPublicPart
+        ((leafRun cfg).map pathOramLeafValues)
+        (publicPart cfg)
+        (pathOramProjectedExecutionLeakage cfg)
+  leafSchedulePublicAlignment :
+    ∀ cfg,
+      PathOramLeafSchedulePublicAlignment
+        (leafRun cfg)
+        (publicPart cfg)
+        (pathOramProjectedExecutionLeakage cfg)
+  bucketProjection :
+    ∀ cfg,
+      (storageRun cfg).map pathOramBucketTraceOfStorageView =
+        (leafRun cfg).map pathOramBucketTraceOfLeafScheduleTrace
+  publicLocationRelation :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramPublicLocationTrace
+        ((storageRun cfg₁).map pathOramStorageLocationTrace)
+        ((storageRun cfg₂).map pathOramStorageLocationTrace)
+  storageShapeRelation :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      OramExactProjectionRelation
+        pathOramStorageShape
+        (storageRun cfg₁)
+        (storageRun cfg₂)
+
+theorem ImportedStandardPathOramImplementation.leafScaffoldRelation
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {publicPart : OramConfig → OramViewPublicPart}
+  {storageRun : OramStorageSemantics}
+  (impl : ImportedStandardPathOramImplementation assumptions publicPart storageRun)
+  {cfg₁ cfg₂ : OramConfig}
+  (hSame : sameOramPublicProjection cfg₁ cfg₂) :
+  OramExactProjectionRelation
+    pathOramLeafScheduleScaffold
+    (impl.leafRun cfg₁)
+    (impl.leafRun cfg₂) := by
+  have hPublicEq : publicPart cfg₁ = publicPart cfg₂ :=
+    impl.publicViewSafe cfg₁ cfg₂ hSame
+  have hLeakageEq :
+      pathOramProjectedExecutionLeakage cfg₁ =
+        pathOramProjectedExecutionLeakage cfg₂ :=
+    pathOramProjectedLeakage_eq_of_samePublicProjection hSame
+  apply pathOramLeafSchedulePublicAlignment_exact
+  · exact impl.leafSchedulePublicAlignment cfg₁
+  · simpa [hPublicEq, hLeakageEq] using impl.leafSchedulePublicAlignment cfg₂
+
+theorem ImportedStandardPathOramImplementation.canonicalLeafValueRelation
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {publicPart : OramConfig → OramViewPublicPart}
+  {storageRun : OramStorageSemantics}
+  (impl : ImportedStandardPathOramImplementation assumptions publicPart storageRun)
+  {cfg₁ cfg₂ : OramConfig}
+  (hSame : sameOramPublicProjection cfg₁ cfg₂) :
+  canonicalPathOramLeafValueRelation
+    ((impl.leafRun cfg₁).map pathOramLeafValues)
+    ((impl.leafRun cfg₂).map pathOramLeafValues)
+    (pathOramProjectedExecutionLeakage cfg₁) := by
+  rcases impl.leafValueCanonicalOnPublicPart cfg₁ with
+    ⟨scaffold₁, hScaffold₁, hLeafs₁⟩
+  rcases impl.leafValueCanonicalOnPublicPart cfg₂ with
+    ⟨scaffold₂, hScaffold₂, hLeafs₂⟩
+  have hPublicEq : publicPart cfg₁ = publicPart cfg₂ :=
+    impl.publicViewSafe cfg₁ cfg₂ hSame
+  have hLeakageEq :
+      pathOramProjectedExecutionLeakage cfg₁ =
+        pathOramProjectedExecutionLeakage cfg₂ :=
+    pathOramProjectedLeakage_eq_of_samePublicProjection hSame
+  have hScaffold₂' :
+      pathOramLeafScheduleScaffoldOfPublicPart
+        (publicPart cfg₁)
+        (pathOramProjectedExecutionLeakage cfg₁) = some scaffold₂ := by
+    simpa [hPublicEq, hLeakageEq] using hScaffold₂
+  have hScaffoldEq : scaffold₁ = scaffold₂ := by
+    exact Option.some.inj (hScaffold₁.symm.trans hScaffold₂')
+  refine ⟨scaffold₁, hLeafs₁, ?_⟩
+  simpa [hScaffoldEq] using hLeafs₂
+
+theorem ImportedStandardPathOramImplementation.standardStorageSecurity
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {publicPart : OramConfig → OramViewPublicPart}
+  {storageRun : OramStorageSemantics}
+  (impl : ImportedStandardPathOramImplementation assumptions publicPart storageRun) :
+  ComputationalStandardOramWith
+    (pathOramStandardSecurityInterface assumptions.toPathOramSecurityAssumptions)
+    storageRun := by
+  intro cfg₁ cfg₂ hSame
+  apply pathOramStandardSecurityInterface_uses_pathLeakage
+    assumptions.toPathOramSecurityAssumptions
+  · exact pathOramConfigWellFormed_executionLeakage (impl.cfgWellFormed cfg₁)
+  · apply pathOramProjectedStorageTheorem_projects_to_standard
+      assumptions.toPathOramSecurityAssumptions
+    apply pathOramProjectedStorageTheorem_of_leafScheduleBucketLocationPublicTrace_and_shape
+      assumptions.toCanonicalLeafValueSecurityAssumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions
+    · exact
+        ⟨ impl.canonicalLeafValueRelation hSame
+        , impl.leafScaffoldRelation hSame
+        ⟩
+    · exact impl.leafScaffoldRelation hSame
+    · simpa [pathOramBucketTraceOfStorageView] using impl.bucketProjection cfg₁
+    · simpa [pathOramBucketTraceOfStorageView] using impl.bucketProjection cfg₂
+    · exact impl.publicLocationRelation cfg₁ cfg₂ hSame
+    · exact impl.storageShapeRelation cfg₁ cfg₂ hSame
+
+theorem ImportedStandardPathOramImplementation.standardStorageBoundary
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {publicPart : OramConfig → OramViewPublicPart}
+  {storageRun : OramStorageSemantics}
+  (impl : ImportedStandardPathOramImplementation assumptions publicPart storageRun) :
+  PathOramLocalPosmapV1StandardStorageBoundary assumptions publicPart storageRun := by
+  exact
+    ⟨ impl.cfgWellFormed
+    , impl.publicViewSafe
+    , impl.standardStorageSecurity
+    ⟩
+
+/-- Imported standard Path ORAM theorem object. This fixes both the public and
+storage semantics and exposes the theorem-facing implementation witness that
+discharges the standard storage boundary. -/
 structure ImportedStandardPathOramTheorem
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions) where
   publicPart : OramConfig → OramViewPublicPart
   storageRun : OramStorageSemantics
-  standardBoundary :
-    PathOramLocalPosmapV1StandardStorageBoundary assumptions publicPart storageRun
+  implementation :
+    ImportedStandardPathOramImplementation assumptions publicPart storageRun
+
+theorem ImportedStandardPathOramTheorem.standardBoundary
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  (theoremObj : ImportedStandardPathOramTheorem assumptions) :
+  PathOramLocalPosmapV1StandardStorageBoundary
+    assumptions
+    theoremObj.publicPart
+    theoremObj.storageRun := by
+  exact theoremObj.implementation.standardStorageBoundary
 
 /-- Concrete implementation conformance boundary for
 `path_oram_local_posmap_v1`: the imported standard theorem is fixed at some
@@ -127,15 +272,28 @@ structure PathOramLocalPosmapV1ImportedImplementationConformance
   {modelTags : SGXModelTags}
   (bundle : SeededRuntimePathOramProofBundle modelTags)
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions) where
-  imported : ImportedStandardPathOramTheorem assumptions
-  publicPartEq : imported.publicPart = bundle.publicView
-  storageRunEq : imported.storageRun = bundle.storageRun
+  implementation :
+    ImportedStandardPathOramImplementation
+      assumptions
+      bundle.publicView
+      bundle.storageRun
   sampleConformance :
     ∀ cfg seed, seed < (bundle.family cfg).seedCount →
       let witness := (bundle.family cfg).witnessAt seed
-      witness.toImportedStandardPathOramSample.publicPart = imported.publicPart cfg ∧
-        witness.toImportedStandardPathOramSample.storageView ∈ imported.storageRun cfg ∧
+      witness.toImportedStandardPathOramSample.publicPart = bundle.publicView cfg ∧
+        witness.toImportedStandardPathOramSample.storageView ∈ bundle.storageRun cfg ∧
         witness.toImportedStandardPathOramSample.hidden.Valid
+
+def PathOramLocalPosmapV1ImportedImplementationConformance.imported
+  {modelTags : SGXModelTags}
+  {bundle : SeededRuntimePathOramProofBundle modelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  (conformance : PathOramLocalPosmapV1ImportedImplementationConformance bundle assumptions) :
+  ImportedStandardPathOramTheorem assumptions :=
+  { publicPart := bundle.publicView
+  , storageRun := bundle.storageRun
+  , implementation := conformance.implementation
+  }
 
 def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementationConformance
   {modelTags : SGXModelTags}
@@ -143,15 +301,36 @@ def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementatio
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
   PathOramLocalPosmapV1ImportedImplementationConformance bundle assumptions := by
   refine
-    { imported :=
-        { publicPart := bundle.publicView
-        , storageRun := bundle.storageRun
-        , standardBoundary := bundle.pathOramLocalPosmapV1_standardStorageBoundary assumptions
+    { implementation :=
+        { leafRun := bundle.leafRun
+        , cfgWellFormed := bundle.cfgWellFormed
+        , publicViewSafe := bundle.publicViewSafe
+        , leafValueCanonicalOnPublicPart := ?_
+        , leafSchedulePublicAlignment := ?_
+        , bucketProjection := ?_
+        , publicLocationRelation := ?_
+        , storageShapeRelation := ?_
         }
-    , publicPartEq := rfl
-    , storageRunEq := rfl
     , sampleConformance := ?_
     }
+  · intro cfg
+    exact bundle.leafValueCanonicalOnPublicPart cfg (bundle.publicViewConstantProjection cfg)
+  · intro cfg
+    exact bundle.leafSchedulePublicAlignment cfg (bundle.publicViewConstantProjection cfg)
+  · intro cfg
+    unfold SeededRuntimePathOramProofBundle.storageRun
+    rw [List.map_map]
+    simpa [pathOramBucketTraceOfStorageView, pathOramBucketTraceOfView] using
+      bundle.bucketProjection cfg
+  · intro cfg₁ cfg₂ hSame
+    simpa [SeededRuntimePathOramProofBundle.storageRun] using
+      bundle.publicLocationRelation hSame
+  · intro cfg₁ cfg₂ hSame
+    simpa [SeededRuntimePathOramProofBundle.storageRun] using
+      (oramExactProjectionRelation_map
+        pathOramStorageShape
+        oramStorageView
+        (bundle.storageShapeRelation hSame))
   intro cfg seed hSeed
   constructor
   · exact bundle.publicViewExact cfg seed hSeed
@@ -177,6 +356,23 @@ def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementatio
         modelTags
         ((bundle.family cfg).valid seed hSeed)
 
+def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementation
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePathOramProofBundle modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+  ImportedStandardPathOramImplementation
+    assumptions
+    bundle.publicView
+    bundle.storageRun :=
+  (bundle.pathOramLocalPosmapV1_importedImplementationConformance assumptions).implementation
+
+def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedTheorem
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePathOramProofBundle modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+  ImportedStandardPathOramTheorem assumptions :=
+  (bundle.pathOramLocalPosmapV1_importedImplementationConformance assumptions).imported
+
 theorem PathOramLocalPosmapV1ImportedImplementationConformance.projects_to_standardStorageBoundary
   {modelTags : SGXModelTags}
   {bundle : SeededRuntimePathOramProofBundle modelTags}
@@ -186,8 +382,7 @@ theorem PathOramLocalPosmapV1ImportedImplementationConformance.projects_to_stand
     assumptions
     bundle.publicView
     bundle.storageRun := by
-  simpa [conformance.publicPartEq, conformance.storageRunEq] using
-    conformance.imported.standardBoundary
+  exact conformance.implementation.standardStorageBoundary
 
 theorem PathOramLocalPosmapV1ImportedImplementationConformance.projects_to_standardPaperMainBoundary
   {modelTags : SGXModelTags}
@@ -209,9 +404,9 @@ theorem PathOramLocalPosmapV1ImportedImplementationConformance.projects_to_stand
     pathOramLocalPosmapV1_standardStorageBoundary_paperTheoremBoundary
       (modelTags := modelTags)
       assumptions
-      conformance.imported.standardBoundary
+      conformance.implementation.standardStorageBoundary
       hOutcome
       hBoundary
-  simpa [conformance.publicPartEq, conformance.storageRunEq] using hImported
+  simpa using hImported
 
 end UOToolchain

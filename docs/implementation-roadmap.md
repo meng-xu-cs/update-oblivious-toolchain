@@ -314,7 +314,7 @@ Acceptance criteria:
 
 ### M7. Imported standard Path ORAM route
 
-Status: active.
+Status: theorem-facing boundary implemented.
 
 This is now the preferred route for closing the remaining ORAM gap without
 weakening the theorem:
@@ -331,23 +331,27 @@ What is now implemented:
 - `PathOramLocalPosmapV1.lean` exposes the exact standard-theorem import
   boundary via `PathOramLocalPosmapV1StandardStorageBoundary`
 - `PathOramLocalPosmapV1Refinement.lean` now defines:
+  `ImportedStandardPathOramImplementation`,
   `ImportedStandardPathOramTheorem`,
   `ImportedPathOramHiddenWitness`,
   `ImportedStandardPathOramSample`, and
   `PathOramLocalPosmapV1ImportedImplementationConformance`
+- the imported theorem object is no longer just a named boundary wrapper: it now
+  carries a theorem-facing implementation witness whose fields match the actual
+  internal Path ORAM theorem hypotheses consumed by `PathOramSecurity.lean`
 - the current seeded runtime proof bundle now factors through that interface by
   a named theorem:
   `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementationConformance`
+- that conformance now holds directly at
+  `bundle.publicView` / `bundle.storageRun`, with the equality plumbing removed
 
 Remaining work:
 
-- define the final abstract imported Path ORAM theorem statement in the exact
-  form we want to cite or mechanize
-- strengthen the current conformance witness from exact public/storage sample
-  agreement plus hidden-witness validity into a full simulation/refinement
-  proof against that abstract machine
-- discharge the imported theorem itself, either by mechanizing it or by
-  treating it as an explicit external theorem assumption
+- if we want to cite a literature theorem verbatim, map that external theorem’s
+  hypotheses onto `ImportedStandardPathOramImplementation`
+- if we want a paper appendix with a clean abstract simulator, layer that
+  simulator on top of the already-instantiated implementation package rather
+  than reopening the runtime/theorem interface
 
 Acceptance criteria:
 
@@ -355,8 +359,8 @@ Acceptance criteria:
   placeholder
 - the concrete runtime witness bundle is connected to that imported theorem by
   a named conformance theorem
-- the only remaining open step is the standard Path ORAM theorem/simulation
-  proof, not theorem plumbing or runtime/theorem interface mismatch
+- the theorem-facing implementation package matches the actual standard Path
+  ORAM proof ingredients and is instantiated by the concrete runtime bundle
 
 ## Immediate next steps
 

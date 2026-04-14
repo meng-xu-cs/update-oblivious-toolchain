@@ -472,11 +472,11 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   itself rather than any ambiguity about how it composes with the rest of the
   repository proof stack
 - `PathOramLocalPosmapV1Refinement.lean` now fixes the imported-theorem route
-  one level further by defining the imported standard theorem object and the
-  concrete implementation-conformance witness expected from the seeded runtime
-  bundle, so the remaining proof obligation is stated as a genuine
-  refinement/simulation problem rather than as an informal “the runtime should
-  match the theorem” claim
+  one level further by defining a theorem-facing standard Path ORAM
+  implementation package, proving that package yields the repo’s standard
+  storage boundary, and instantiating it from the seeded runtime bundle, so the
+  runtime/theorem interface gap is closed inside Lean rather than left as an
+  informal “the runtime should match the theorem” claim
 - that path-ORAM theorem now consumes a projected leakage type that drops the
   legacy surrogate-style `schedule` field and keeps only the standard public
   ORAM parameters
