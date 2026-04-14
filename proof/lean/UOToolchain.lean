@@ -16,6 +16,7 @@ import UOToolchain.SgxMicroGame
 import UOToolchain.RuntimeRefinement
 import UOToolchain.RuntimeCoins
 import UOToolchain.PathOramLocalPosmapV1
+import UOToolchain.PathOramLocalPosmapV1Refinement
 import UOToolchain.RuntimeRefinementJson
 import UOToolchain.RuntimeCoinsJson
 import UOToolchain.RuntimePathOramPairJson

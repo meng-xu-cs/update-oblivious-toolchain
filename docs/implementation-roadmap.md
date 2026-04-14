@@ -312,6 +312,52 @@ Acceptance criteria:
 - no gap remains where the theorem only describes a modeled controller/backend
   that the Rust runtime does not actually instantiate
 
+### M7. Imported standard Path ORAM route
+
+Status: active.
+
+This is now the preferred route for closing the remaining ORAM gap without
+weakening the theorem:
+
+1. fix an imported standard Path ORAM theorem at the storage-semantics
+   boundary already used by the repo
+2. prove that the concrete `path_oram_local_posmap_v1` runtime witness bundle
+   conforms to that imported theorem interface
+3. reuse the existing projection lemmas to obtain the repo’s computational-UO,
+   SGX, and TEE consequences
+
+What is now implemented:
+
+- `PathOramLocalPosmapV1.lean` exposes the exact standard-theorem import
+  boundary via `PathOramLocalPosmapV1StandardStorageBoundary`
+- `PathOramLocalPosmapV1Refinement.lean` now defines:
+  `ImportedStandardPathOramTheorem`,
+  `ImportedPathOramHiddenWitness`,
+  `ImportedStandardPathOramSample`, and
+  `PathOramLocalPosmapV1ImportedImplementationConformance`
+- the current seeded runtime proof bundle now factors through that interface by
+  a named theorem:
+  `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementationConformance`
+
+Remaining work:
+
+- define the final abstract imported Path ORAM theorem statement in the exact
+  form we want to cite or mechanize
+- strengthen the current conformance witness from exact public/storage sample
+  agreement plus hidden-witness validity into a full simulation/refinement
+  proof against that abstract machine
+- discharge the imported theorem itself, either by mechanizing it or by
+  treating it as an explicit external theorem assumption
+
+Acceptance criteria:
+
+- the imported theorem is a named Lean object rather than an informal paper-only
+  placeholder
+- the concrete runtime witness bundle is connected to that imported theorem by
+  a named conformance theorem
+- the only remaining open step is the standard Path ORAM theorem/simulation
+  proof, not theorem plumbing or runtime/theorem interface mismatch
+
 ## Immediate next steps
 
 The next practical path is:
