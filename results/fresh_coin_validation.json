@@ -1,5 +1,5 @@
 {
-  "checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkRuntimeFreshCoinFamily",
+  "checker": "proof/lean/.lake/build/bin/checkRuntimeFreshCoinFamily",
   "model_tags": {
     "exit_model": "exit_v1",
     "page_model": "page_v1",
@@ -118,5 +118,5 @@
       "validation_status": "accepted_compact_theorem_input"
     }
   ],
-  "theorem_input_checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkRuntimeFreshCoinTheoremInput"
+  "theorem_input_checker": "proof/lean/.lake/build/bin/checkRuntimeFreshCoinTheoremInput"
 }

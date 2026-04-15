@@ -207,7 +207,7 @@ impl ProbeRunOptions {
             "heavy_budget_bytes": self.heavy_budget_bytes,
             "heavy_artifact_dir": self
                 .heavy_artifact_dir()
-                .map(|path| path.display().to_string()),
+                .map(|path| display_report_path(&path)),
         })
     }
 
@@ -714,7 +714,7 @@ fn run_controller_observer_validation(
     )?);
 
     Ok(json!({
-        "checker": checker.display().to_string(),
+        "checker": display_report_path(&checker),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -817,7 +817,7 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
     ];
 
     Ok(json!({
-        "checker": checker.display().to_string(),
+        "checker": display_report_path(&checker),
         "scenario_count": scenarios.len(),
         "scenarios": scenarios,
     }))
@@ -1039,7 +1039,7 @@ fn run_witness_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Res
     )?);
 
     Ok(json!({
-        "checker": checker.display().to_string(),
+        "checker": display_report_path(&checker),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -1126,7 +1126,7 @@ fn run_seeded_witness_validation() -> Result<JsonValue> {
     ];
 
     Ok(json!({
-        "checker": checker.display().to_string(),
+        "checker": display_report_path(&checker),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -1218,8 +1218,8 @@ fn run_fresh_coin_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
     ];
 
     Ok(json!({
-        "checker": family_checker.display().to_string(),
-        "theorem_input_checker": theorem_input_checker.display().to_string(),
+        "checker": display_report_path(&family_checker),
+        "theorem_input_checker": display_report_path(&theorem_input_checker),
         "artifact_configuration": options.artifact_configuration_json(),
         "model_tags": {
             "page_model": "page_v1",
@@ -1322,7 +1322,7 @@ fn run_pathoram_pair_validation() -> Result<JsonValue> {
     ];
 
     Ok(json!({
-        "checker": checker.display().to_string(),
+        "checker": display_report_path(&checker),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -1435,9 +1435,9 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
     ];
 
     Ok(json!({
-        "checker": checker.display().to_string(),
-        "paper_instantiation_checker": paper_instantiation_checker.display().to_string(),
-        "theorem_input_checker": theorem_input_checker.display().to_string(),
+        "checker": display_report_path(&checker),
+        "paper_instantiation_checker": display_report_path(&paper_instantiation_checker),
+        "theorem_input_checker": display_report_path(&theorem_input_checker),
         "artifact_configuration": options.artifact_configuration_json(),
         "model_tags": {
             "page_model": "page_v1",
@@ -2280,7 +2280,7 @@ fn persist_heavy_artifact_json<T: Serialize>(
     serde_json::to_writer(&mut writer, value)?;
     writer.flush()?;
     let bytes = fs::metadata(&path)?.len();
-    Ok(Some((path.display().to_string(), bytes)))
+    Ok(Some((display_report_path(&path), bytes)))
 }
 
 fn validate_fresh_coin_heavy_case(
@@ -2347,7 +2347,7 @@ fn validate_fresh_coin_heavy_case(
         "canonical_fresh_coin_seed_space_size": Some(summary.seed_count),
         "canonical_fresh_coin_values_match_index": true,
         "witness_family_json_bytes": artifact_json_bytes,
-        "heavy_artifact_path": preserve_path.then(|| artifact_path.display().to_string()),
+        "heavy_artifact_path": preserve_path.then(|| display_report_path(&artifact_path)),
         "heavy_artifact_json_bytes": preserve_path.then_some(artifact_json_bytes),
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "lean_validated": true,
@@ -2499,7 +2499,7 @@ fn validate_canonical_pathoram_pair_heavy_case(
         "controller_shape_equal": controller_shape_equal,
         "normalized_micro_trace_equal": normalized_micro_trace_equal,
         "certificate_json_bytes": artifact_json_bytes,
-        "heavy_artifact_path": preserve_path.then(|| artifact_path.display().to_string()),
+        "heavy_artifact_path": preserve_path.then(|| display_report_path(&artifact_path)),
         "heavy_artifact_json_bytes": preserve_path.then_some(artifact_json_bytes),
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "paper_instantiation_status": "validated",
@@ -2874,6 +2874,14 @@ fn repo_root() -> PathBuf {
         .join("../..")
         .canonicalize()
         .expect("workspace root should exist")
+}
+
+fn display_report_path(path: &Path) -> String {
+    let root = repo_root();
+    match path.strip_prefix(&root) {
+        Ok(relative) => relative.display().to_string(),
+        Err(_) => path.display().to_string(),
+    }
 }
 
 fn lean_witness_checker_path() -> Result<PathBuf> {

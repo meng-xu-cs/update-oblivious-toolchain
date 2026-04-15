@@ -31,4 +31,14 @@ Artifact modes:
 - `./scripts/run_validation.sh` keeps the default compact artifact profile. Oversized canonical Path-ORAM families and pair certificates stay validated through compact theorem-input certificates.
 - `./scripts/run_heavy_artifact.sh` switches the probe into explicit heavy-artifact mode and writes a separate `results-heavy/` bundle with `heavy_artifacts/` materializations for the large feasible canonical families/pairs that exceed the default compact budget.
 
-The current prototype is intentionally narrow. The exact supported subset, rejected features, remaining assumptions, and the formal proof roadmap are documented in [docs/supported-subset.md](/home/m285xu/update-oblivious-toolchain/docs/supported-subset.md), [docs/engineering-note.md](/home/m285xu/update-oblivious-toolchain/docs/engineering-note.md), and [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md).
+If you want to keep heavy-mode runs bounded on a smaller machine, set
+`UO_CANONICAL_CERT_BUDGET_BYTES` and `UO_HEAVY_ARTIFACT_BUDGET_BYTES`
+explicitly before invoking the scripts. That lets you materialize only the
+small feasible canonical cases while still leaving the larger ones on the
+compact theorem-input path.
+
+The current prototype is intentionally narrow. The exact supported subset,
+rejected features, remaining assumptions, and the formal proof roadmap are
+documented in [docs/supported-subset.md](docs/supported-subset.md),
+[docs/engineering-note.md](docs/engineering-note.md), and
+[docs/formal-proof-plan.md](docs/formal-proof-plan.md).

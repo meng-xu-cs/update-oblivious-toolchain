@@ -32,19 +32,28 @@ enum ReportKind {
 }
 
 #[derive(Debug, Parser)]
+#[command(
+    name = "mplus-probe",
+    about = "Run the UO toolchain leakage/correctness validation reports"
+)]
 struct Cli {
+    /// Output directory for generated reports and optional heavy artifacts.
     #[arg(long, default_value = "results")]
     out_dir: String,
 
+    /// Restrict execution to a single report kind instead of generating the full bundle.
     #[arg(long)]
     only: Option<ReportKind>,
 
+    /// Artifact materialization mode for canonical fresh-coin families and pairs.
     #[arg(long, value_enum, default_value = "compact")]
     artifact_mode: ArtifactModeArg,
 
+    /// Compact artifact budget in bytes before theorem-input fallback is used.
     #[arg(long)]
     compact_budget_bytes: Option<u64>,
 
+    /// Heavy artifact budget in bytes for explicit materialization in heavy mode.
     #[arg(long)]
     heavy_budget_bytes: Option<u64>,
 }

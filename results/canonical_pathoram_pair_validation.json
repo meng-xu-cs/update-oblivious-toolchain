@@ -1,10 +1,17 @@
 {
-  "checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkCanonicalPathOramPairCertificate",
+  "artifact_configuration": {
+    "compact_budget_bytes": 10737418240,
+    "heavy_artifact_dir": "results/heavy_artifacts",
+    "heavy_budget_bytes": 21474836480,
+    "materialization_mode": "compact"
+  },
+  "checker": "proof/lean/.lake/build/bin/checkCanonicalPathOramPairCertificate",
   "model_tags": {
     "exit_model": "exit_v1",
     "page_model": "page_v1",
     "shared_resource_model": "shared_v1"
   },
+  "paper_instantiation_checker": "proof/lean/.lake/build/bin/checkCanonicalPathOramPaperInstantiation",
   "scenario_count": 4,
   "scenarios": [
     {
@@ -14,9 +21,13 @@
       "certificate_json_bytes": 3446042,
       "controller_shape_equal": true,
       "entrypoint": "put(bytes32,uint256)",
+      "heavy_artifact_json_bytes": null,
+      "heavy_artifact_path": null,
       "lean_stdout": "validated canonical fresh-coin path-ORAM pair certificate for put(bytes32,uint256)",
       "lhs_seed_count": 256,
       "normalized_micro_trace_equal": true,
+      "paper_instantiation_status": "validated",
+      "paper_instantiation_stdout": "validated concrete local paper-main instantiation for put(bytes32,uint256)",
       "public_outcome_equal": true,
       "rhs_seed_count": 256,
       "scenario": "SingleAccessMap/pathoram/put-canonical-pair",
@@ -29,9 +40,13 @@
       "certificate_json_bytes": 92320052,
       "controller_shape_equal": true,
       "entrypoint": "add(bytes32,uint256)",
+      "heavy_artifact_json_bytes": null,
+      "heavy_artifact_path": null,
       "lean_stdout": "validated canonical fresh-coin path-ORAM pair certificate for add(bytes32,uint256)",
       "lhs_seed_count": 4096,
       "normalized_micro_trace_equal": true,
+      "paper_instantiation_status": "validated",
+      "paper_instantiation_stdout": "validated concrete local paper-main instantiation for add(bytes32,uint256)",
       "public_outcome_equal": true,
       "rhs_seed_count": 4096,
       "scenario": "SingleAccessMap/pathoram/add-canonical-pair",
@@ -58,6 +73,7 @@
       "lhs_representative_seed": 0,
       "lhs_seed_count": 262144,
       "normalized_micro_trace_equal": true,
+      "paper_instantiation_status": "not_materialized",
       "public_outcome_equal": true,
       "reason": "estimated explicit canonical pair certificate exceeds safe budget 10737418240; compact theorem input used instead",
       "rhs_estimate": {
@@ -96,6 +112,7 @@
       "lhs_representative_seed": 0,
       "lhs_seed_count": 17592186044416,
       "normalized_micro_trace_equal": true,
+      "paper_instantiation_status": "not_materialized",
       "public_outcome_equal": true,
       "reason": "estimated explicit canonical pair certificate exceeds safe budget 10737418240; compact theorem input used instead",
       "rhs_estimate": {
@@ -114,5 +131,5 @@
       "validation_status": "accepted_compact_theorem_input"
     }
   ],
-  "theorem_input_checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkCanonicalPathOramPairTheoremInput"
+  "theorem_input_checker": "proof/lean/.lake/build/bin/checkCanonicalPathOramPairTheoremInput"
 }

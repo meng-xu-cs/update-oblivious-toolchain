@@ -56,7 +56,13 @@ default `10 GiB` budget, the current report accepts the two `SingleAccessMap`
 canonical pairs directly, and validates both
 `ConfidentialMixer/pathoram/deposit-canonical-pair` and
 `ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
-theorem-input path with their concrete explicit-size estimates attached.
+theorem-input path with their concrete explicit-size estimates attached. The
+same report now also records a theorem-facing
+`paper_instantiation_status`: the explicit `SingleAccessMap` canonical pairs
+validate a concrete local paper-main instantiation end to end, while oversized
+compact theorem-input cases are marked `not_materialized` explicitly so the
+artifact does not overstate full explicit closure where no full family was
+materialized.
 
 Security tiers:
 

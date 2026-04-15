@@ -96,8 +96,8 @@ current repository structure.
 
 A program is a compiled artifact:
 
-- contract state objects from [ir.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/ir.rs)
-- runtime manifest entries from [manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs)
+- contract state objects from [ir.rs](../crates/uo-core/src/ir.rs)
+- runtime manifest entries from [manifest.rs](../crates/uo-core/src/manifest.rs)
 - lowered function bodies over the UO IR
 
 ### 2.2 Inputs
@@ -115,7 +115,7 @@ The initial contract state is similarly split into:
 ### 2.3 Runtime traces
 
 The proof should use the normalized trace model in
-[trace.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/trace.rs):
+[trace.rs](../crates/uo-core/src/trace.rs):
 
 - opcode trace
 - logical access trace
@@ -330,7 +330,7 @@ Paper-facing choice for this repository:
   headline claim
 
 The polished paper-facing statement for this profile is collected in
-[paper-theorem-profile.md](/home/m285xu/update-oblivious-toolchain/docs/paper-theorem-profile.md).
+[paper-theorem-profile.md](paper-theorem-profile.md).
 
 This split matches the engineering intent:
 
@@ -662,7 +662,7 @@ not in a proof-grade state. The following changes are required.
 
 Current issue:
 
-- `oram_bucket_bytes` in [objects.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/objects.rs) is an artifact-specific fixed-size serialization.
+- `oram_bucket_bytes` in [objects.rs](../runtime/uo-evm/src/objects.rs) is an artifact-specific fixed-size serialization.
 
 Required change:
 
@@ -674,7 +674,7 @@ Required change:
 
 Current issue:
 
-- [codec.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-store/src/codec.rs) provides marker-free encoding and rerandomization, but not a cryptographic confidentiality notion.
+- [codec.rs](../runtime/uo-store/src/codec.rs) provides marker-free encoding and rerandomization, but not a cryptographic confidentiality notion.
 
 Required change:
 
@@ -702,7 +702,7 @@ Required change:
 Current issue:
 
 - randomness is consumed internally through local RNG state in
-  [objects.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/objects.rs).
+  [objects.rs](../runtime/uo-evm/src/objects.rs).
 
 Required change:
 
@@ -749,9 +749,9 @@ Required change:
   `stash_bound`, `recursion_depth`, `metadata_pages`, `accesses_per_call`
 
 This should live near
-[manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs)
+[manifest.rs](../crates/uo-core/src/manifest.rs)
 and the manifest builder in
-[lib.rs](/home/m285xu/update-oblivious-toolchain/compiler/uo-solc/src/lib.rs).
+[lib.rs](../compiler/uo-solc/src/lib.rs).
 
 ### 6.8 Remove secret-dependent enclave-controller behavior before any SGX claim
 
@@ -784,7 +784,7 @@ The most efficient implementation path is:
    security interface and preserve the current surrogate theorem only as the
    default instance.
 3. Extract ORAM logic from
-   [objects.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/objects.rs)
+   [objects.rs](../runtime/uo-evm/src/objects.rs)
    into a dedicated module with explicit transcript outputs.
 4. Introduce typed bucket/block/state structs and explicit serialization.
 5. Split marker-hiding encoding from cryptographic encryption.

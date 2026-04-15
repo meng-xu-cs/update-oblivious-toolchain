@@ -1,5 +1,5 @@
 {
-  "checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkPathOramPairCertificate",
+  "checker": "proof/lean/.lake/build/bin/checkPathOramPairCertificate",
   "model_tags": {
     "exit_model": "exit_v1",
     "page_model": "page_v1",
