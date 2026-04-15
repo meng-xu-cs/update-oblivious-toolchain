@@ -25,7 +25,7 @@
       "scenario": "SingleAccessMap/pathoram/put-seeded",
       "seed_count": 8,
       "setup_calls": 0,
-      "witness_family_json_bytes": 104490
+      "witness_family_json_bytes": 53861
     },
     {
       "accepted": true,
@@ -45,7 +45,7 @@
       "scenario": "SingleAccessMap/pathoram/add-seeded",
       "seed_count": 8,
       "setup_calls": 0,
-      "witness_family_json_bytes": 175317
+      "witness_family_json_bytes": 90310
     },
     {
       "accepted": true,
@@ -65,7 +65,7 @@
       "scenario": "ConfidentialMixer/pathoram/deposit-seeded",
       "seed_count": 4,
       "setup_calls": 0,
-      "witness_family_json_bytes": 206648
+      "witness_family_json_bytes": 104401
     },
     {
       "accepted": true,
@@ -85,7 +85,7 @@
       "scenario": "ERC20Lite/pathoram/transferFrom-seeded",
       "seed_count": 4,
       "setup_calls": 2,
-      "witness_family_json_bytes": 728993
+      "witness_family_json_bytes": 369834
     }
   ]
 }

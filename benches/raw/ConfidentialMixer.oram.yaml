@@ -19,6 +19,7 @@ state:
     value: uint256
     capacity: 64
     backend: oram
+    oram_scheme: path_oram_local_posmap_v1
     confidential: true
   total:
     kind: cell

@@ -54,7 +54,7 @@
           3,
           3
         ],
-        "physical_writes": 18,
+        "physical_writes": 49,
         "return": 2
       },
       "raw": {
@@ -89,7 +89,7 @@
           3,
           1
         ],
-        "physical_writes": 43,
+        "physical_writes": 178,
         "return": 1
       },
       "raw": {

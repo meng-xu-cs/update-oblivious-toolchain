@@ -86,12 +86,24 @@
       "witness_family_json_bytes": 6830596487
     },
     {
-      "accepted": false,
+      "accepted": true,
       "budget_bytes": 10737418240,
+      "canonical_fresh_coin_seed_space_size": 17592186044416,
+      "canonical_fresh_coin_values_match_representative_seed": true,
+      "coverage_complete": false,
+      "deploy_seed": 0,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "lean_validated": false,
-      "reason": "estimated compact canonical fresh-coin family exceeds safe budget 10737418240; set UO_CANONICAL_CERT_BUDGET_BYTES to override",
+      "lean_stdout": "validated canonical fresh-coin path-ORAM theorem input for transferFrom(address,address,address,uint256) with 17592186044416 canonical seeds",
+      "lean_validated": true,
+      "mode": "compact_canonical_seed_space",
+      "public_fresh_coin_scaffold_steps": 7,
+      "public_leaf_scaffold_steps": 6,
+      "reason": "estimated explicit canonical fresh-coin family exceeds safe budget 10737418240; compact theorem input used instead",
+      "representative_seed": 0,
+      "representative_witness_count": 1,
       "scenario": "ERC20Lite/pathoram/transferFrom-fresh-coins",
+      "seed_count": 17592186044416,
+      "setup_calls": 2,
       "size_estimate": {
         "avg_witness_json_bytes": 92323,
         "estimated_family_json_bytes": 1624163392179666944,
@@ -101,7 +113,10 @@
         "sampled_seed_count": 8,
         "seed_count": 17592186044416
       },
-      "validation_status": "skipped_by_budget"
+      "symbolic_seed_space_instantiated": true,
+      "theorem_input_json_bytes": 93246,
+      "validation_status": "accepted_compact_theorem_input"
     }
-  ]
+  ],
+  "theorem_input_checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkRuntimeFreshCoinTheoremInput"
 }

@@ -477,6 +477,29 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   storage boundary, and instantiating it from the seeded runtime bundle, so the
   runtime/theorem interface gap is closed inside Lean rather than left as an
   informal “the runtime should match the theorem” claim
+- `PathOramLocalPosmapV1StandardTheorem.lean` now freezes the exact imported
+  theorem target into one named object,
+  `PathOramLocalPosmapV1StandardTheoremTarget`, exposes the exact abstract
+  theorem proposition `StandardPathOramStorageTheoremAt` that an imported Path
+  ORAM proof must discharge, and packages the remaining concrete-implementation
+  bridge as
+  `PathOramLocalPosmapV1StandardTheoremRealization`, so the remaining work is
+  phrased as one explicit discharge object rather than a loose set of
+  cross-file obligations
+- that same module now splits the imported-theorem path into a theorem-side
+  `StandardPathOramCoreTheorem` and a runtime-side `PathOramStorageEnvelope`,
+  making explicit that public metadata-page behavior, bucket projection, and
+  storage-shape exactness are concrete implementation facts layered on top of
+  the imported ORAM theorem rather than hidden inside it
+- `PathOramJACMTheorem.lean` now exposes a literature-facing theorem object,
+  `PathOramJACMLiteratureTheorem`, and a named mapping into
+  `StandardPathOramCoreTheorem`, so the import route can be presented in the
+  paper as “JACM theorem plus formal interface mapping” rather than only as a
+  repo-native restatement
+- that module also now provides the strengthened
+  `PathOramJACMLiteratureTheoremAt` formulation, which fixes the literature
+  theorem directly at the runtime’s theorem-facing `leafRun` and removes the
+  separate alignment obligation on the preferred mainline import route
 - that path-ORAM theorem now consumes a projected leakage type that drops the
   legacy surrogate-style `schedule` field and keeps only the standard public
   ORAM parameters

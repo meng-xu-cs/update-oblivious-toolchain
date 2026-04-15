@@ -525,6 +525,126 @@ def loadAndCheckImportedCanonicalFreshCoinRuntimePathOramWitnessFamily
         (importedWitness_checkValid_eq_true_iff witness modelTags).2 hWitnessValid
       simp [hGet, hWitnessCheck, hLeafScaffold, hFreshScaffold, hFreshValues]
 
+structure ImportedCanonicalFreshCoinRuntimePathOramTheoremInput where
+  seed_count : Nat
+  representative_seed : Nat
+  representative_witness : ImportedRuntimeRefinementWitness
+  public_leaf_scaffold : List ImportedRuntimeOramLeafScaffoldCertificate
+  public_fresh_coin_scaffold : List ImportedRuntimeOramLeafScaffoldCertificate
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.runtimeRepresentativeWitness
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput) : RuntimeRefinementWitness :=
+  input.representative_witness.toRuntimeWitness
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.runtimePublicLeafScaffold
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput) :
+  List RuntimePathOramLeafScaffoldStep :=
+  input.public_leaf_scaffold.map
+    ImportedRuntimeOramLeafScaffoldCertificate.toRuntimePathOramLeafScaffoldStep
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.projectedPublicLeafScaffold
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput) :
+  PathOramLeafScheduleScaffold :=
+  input.runtimePublicLeafScaffold.map
+    RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.runtimePublicFreshCoinScaffold
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput) :
+  List RuntimePathOramLeafScaffoldStep :=
+  input.public_fresh_coin_scaffold.map
+    ImportedRuntimeOramLeafScaffoldCertificate.toRuntimePathOramLeafScaffoldStep
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.projectedPublicFreshCoinScaffold
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput) :
+  PathOramLeafScheduleScaffold :=
+  input.runtimePublicFreshCoinScaffold.map
+    RuntimePathOramLeafScaffoldStep.toPathOramLeafScheduleScaffoldStep
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.Valid
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) : Prop :=
+  input.representative_witness.Valid modelTags ∧
+    input.seed_count =
+      pathOramLeafValueSeedSpaceSize input.projectedPublicFreshCoinScaffold ∧
+    input.representative_seed < input.seed_count ∧
+    input.runtimeRepresentativeWitness.oramLeafPublicScaffold =
+      input.runtimePublicLeafScaffold ∧
+    input.runtimeRepresentativeWitness.pathOramFreshCoinScaffold? =
+      some input.projectedPublicFreshCoinScaffold ∧
+    input.runtimeRepresentativeWitness.pathOramFreshCoinValues? =
+      some
+        (pathOramLeafValueTraceOfSeed
+          input.projectedPublicFreshCoinScaffold
+          input.representative_seed)
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.checkValid
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) : Bool :=
+  input.representative_witness.checkValid modelTags &&
+    decide
+      (input.seed_count =
+        pathOramLeafValueSeedSpaceSize input.projectedPublicFreshCoinScaffold) &&
+    decide (input.representative_seed < input.seed_count) &&
+    decide
+      (input.runtimeRepresentativeWitness.oramLeafPublicScaffold =
+        input.runtimePublicLeafScaffold) &&
+    decide
+      (input.runtimeRepresentativeWitness.pathOramFreshCoinScaffold? =
+        some input.projectedPublicFreshCoinScaffold) &&
+    decide
+      (input.runtimeRepresentativeWitness.pathOramFreshCoinValues? =
+        some
+          (pathOramLeafValueTraceOfSeed
+            input.projectedPublicFreshCoinScaffold
+            input.representative_seed))
+
+def parseImportedCanonicalFreshCoinRuntimePathOramTheoremInput
+  (input : String) : Except String ImportedCanonicalFreshCoinRuntimePathOramTheoremInput := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedCanonicalFreshCoinRuntimePathOramTheoremInput
+  (input : String)
+  (modelTags : SGXModelTags) :
+  Except String ImportedCanonicalFreshCoinRuntimePathOramTheoremInput := do
+  let theoremInput ← parseImportedCanonicalFreshCoinRuntimePathOramTheoremInput input
+  if theoremInput.checkValid modelTags then
+    pure theoremInput
+  else
+    throw "imported canonical fresh-coin path-ORAM theorem input does not satisfy Lean validity checks"
+
+def loadImportedCanonicalFreshCoinRuntimePathOramTheoremInput
+  (path : System.FilePath) : IO ImportedCanonicalFreshCoinRuntimePathOramTheoremInput := do
+  let input ← IO.FS.readFile path
+  match parseImportedCanonicalFreshCoinRuntimePathOramTheoremInput input with
+  | .ok theoremInput => pure theoremInput
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to parse canonical fresh-coin path-ORAM theorem input: {err}"
+
+def loadAndCheckImportedCanonicalFreshCoinRuntimePathOramTheoremInput
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedCanonicalFreshCoinRuntimePathOramTheoremInput := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedCanonicalFreshCoinRuntimePathOramTheoremInput input modelTags with
+  | .ok theoremInput => pure theoremInput
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate canonical fresh-coin path-ORAM theorem input: {err}"
+
+@[simp] theorem importedCanonicalFreshCoinRuntimePathOramTheoremInput_checkValid_eq_true_iff
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) :
+  input.checkValid modelTags = true ↔ input.Valid modelTags := by
+  simp
+    [ ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.checkValid
+    , ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.Valid
+    , Bool.and_eq_true
+    , and_assoc
+    , decide_eq_true_eq
+    ]
+
 def sampleImportedCanonicalFreshCoinRuntimePathOramWitnessFamily :
   ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily :=
   { seed_count := 1
@@ -543,6 +663,27 @@ def sampleImportedCanonicalFreshCoinRuntimePathOramWitnessFamilyRoundtrip : Bool
     | .error _ => false
 
 example : sampleImportedCanonicalFreshCoinRuntimePathOramWitnessFamilyRoundtrip = true := by
+  native_decide
+
+def sampleImportedCanonicalFreshCoinRuntimePathOramTheoremInput :
+  ImportedCanonicalFreshCoinRuntimePathOramTheoremInput :=
+  { seed_count := 1
+  , representative_seed := 0
+  , representative_witness := sampleImportedRuntimeRefinementWitness
+  , public_leaf_scaffold := []
+  , public_fresh_coin_scaffold := []
+  }
+
+def sampleImportedCanonicalFreshCoinRuntimePathOramTheoremInputRoundtrip : Bool :=
+  match
+      parseImportedCanonicalFreshCoinRuntimePathOramTheoremInput
+        (Json.compress (toJson sampleImportedCanonicalFreshCoinRuntimePathOramTheoremInput))
+    with
+    | .ok theoremInput =>
+        decide (theoremInput = sampleImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+    | .error _ => false
+
+example : sampleImportedCanonicalFreshCoinRuntimePathOramTheoremInputRoundtrip = true := by
   native_decide
 
 def sampleImportedSeededRuntimeWitnessFamily : ImportedSeededRuntimeWitnessFamily :=

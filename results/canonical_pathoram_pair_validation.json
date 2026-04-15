@@ -38,11 +38,14 @@
       "validation_status": "accepted"
     },
     {
-      "accepted": false,
+      "accepted": true,
+      "boundary_schedule_equal": true,
       "budget_bytes": 10737418240,
+      "controller_shape_equal": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "estimated_certificate_json_bytes": 13658750976,
-      "lean_validated": false,
+      "lean_stdout": "validated canonical fresh-coin path-ORAM pair theorem input for deposit(bytes32,uint256)",
+      "lean_validated": true,
       "lhs_estimate": {
         "avg_witness_json_bytes": 26046,
         "estimated_family_json_bytes": 6828851200,
@@ -52,7 +55,11 @@
         "sampled_seed_count": 8,
         "seed_count": 262144
       },
-      "reason": "estimated compact canonical pair certificate exceeds safe budget 10737418240; set UO_CANONICAL_CERT_BUDGET_BYTES to override",
+      "lhs_representative_seed": 0,
+      "lhs_seed_count": 262144,
+      "normalized_micro_trace_equal": true,
+      "public_outcome_equal": true,
+      "reason": "estimated explicit canonical pair certificate exceeds safe budget 10737418240; compact theorem input used instead",
       "rhs_estimate": {
         "avg_witness_json_bytes": 26046,
         "estimated_family_json_bytes": 6828851200,
@@ -62,15 +69,21 @@
         "sampled_seed_count": 8,
         "seed_count": 262144
       },
+      "rhs_representative_seed": 0,
+      "rhs_seed_count": 262144,
       "scenario": "ConfidentialMixer/pathoram/deposit-canonical-pair",
-      "validation_status": "skipped_by_budget"
+      "theorem_input_json_bytes": 76243,
+      "validation_status": "accepted_compact_theorem_input"
     },
     {
-      "accepted": false,
+      "accepted": true,
+      "boundary_schedule_equal": true,
       "budget_bytes": 10737418240,
+      "controller_shape_equal": true,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "estimated_certificate_json_bytes": 3248326784360382464,
-      "lean_validated": false,
+      "lean_stdout": "validated canonical fresh-coin path-ORAM pair theorem input for transferFrom(address,address,address,uint256)",
+      "lean_validated": true,
       "lhs_estimate": {
         "avg_witness_json_bytes": 92323,
         "estimated_family_json_bytes": 1624163392179666944,
@@ -80,7 +93,11 @@
         "sampled_seed_count": 8,
         "seed_count": 17592186044416
       },
-      "reason": "estimated compact canonical pair certificate exceeds safe budget 10737418240; set UO_CANONICAL_CERT_BUDGET_BYTES to override",
+      "lhs_representative_seed": 0,
+      "lhs_seed_count": 17592186044416,
+      "normalized_micro_trace_equal": true,
+      "public_outcome_equal": true,
+      "reason": "estimated explicit canonical pair certificate exceeds safe budget 10737418240; compact theorem input used instead",
       "rhs_estimate": {
         "avg_witness_json_bytes": 92323,
         "estimated_family_json_bytes": 1624163392179666944,
@@ -90,8 +107,12 @@
         "sampled_seed_count": 8,
         "seed_count": 17592186044416
       },
+      "rhs_representative_seed": 0,
+      "rhs_seed_count": 17592186044416,
       "scenario": "ERC20Lite/pathoram/transferFrom-canonical-pair",
-      "validation_status": "skipped_by_budget"
+      "theorem_input_json_bytes": 269662,
+      "validation_status": "accepted_compact_theorem_input"
     }
-  ]
+  ],
+  "theorem_input_checker": "/home/m285xu/update-oblivious-toolchain/proof/lean/.lake/build/bin/checkCanonicalPathOramPairTheoremInput"
 }

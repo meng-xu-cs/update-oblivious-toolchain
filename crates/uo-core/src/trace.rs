@@ -320,6 +320,17 @@ pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
     pub public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CanonicalFreshCoinRuntimePathOramTheoremInput {
+    pub seed_count: usize,
+    pub representative_seed: usize,
+    pub representative_witness: RuntimeRefinementWitness,
+    #[serde(default)]
+    pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    #[serde(default)]
+    pub public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RefinementWitnessError {
     MissingPublicOutcome,
@@ -405,6 +416,26 @@ pub enum CanonicalFreshCoinWitnessFamilyError {
     },
     MissingCanonicalSeed {
         seed: usize,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CanonicalFreshCoinTheoremInputError {
+    CanonicalSeedSpaceOverflow,
+    CanonicalSeedCountMismatch {
+        seed_count: usize,
+        canonical_seed_count: usize,
+    },
+    RepresentativeSeedOutOfRange {
+        representative_seed: usize,
+        seed_count: usize,
+    },
+    PublicLeafScaffoldMismatch,
+    FreshCoinScaffoldExtractionMismatch,
+    FreshCoinScaffoldMismatch,
+    FreshCoinValuesExtractionMismatch,
+    CanonicalFreshCoinValuesMismatch {
+        representative_seed: usize,
     },
 }
 
@@ -582,6 +613,56 @@ impl fmt::Display for CanonicalFreshCoinWitnessFamilyError {
 }
 
 impl std::error::Error for CanonicalFreshCoinWitnessFamilyError {}
+
+impl fmt::Display for CanonicalFreshCoinTheoremInputError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CanonicalSeedSpaceOverflow => write!(
+                f,
+                "canonical fresh-coin seed space does not fit in usize"
+            ),
+            Self::CanonicalSeedCountMismatch {
+                seed_count,
+                canonical_seed_count,
+            } => write!(
+                f,
+                "seed count {} does not match canonical fresh-coin seed space {}",
+                seed_count, canonical_seed_count
+            ),
+            Self::RepresentativeSeedOutOfRange {
+                representative_seed,
+                seed_count,
+            } => write!(
+                f,
+                "representative canonical seed {} is outside seed space {}",
+                representative_seed, seed_count
+            ),
+            Self::PublicLeafScaffoldMismatch => write!(
+                f,
+                "representative canonical fresh-coin witness does not match the shared public leaf scaffold"
+            ),
+            Self::FreshCoinScaffoldExtractionMismatch => write!(
+                f,
+                "representative canonical fresh-coin witness does not admit fresh-coin scaffold extraction"
+            ),
+            Self::FreshCoinScaffoldMismatch => write!(
+                f,
+                "representative canonical fresh-coin witness does not match the shared fresh-coin scaffold"
+            ),
+            Self::FreshCoinValuesExtractionMismatch => write!(
+                f,
+                "representative canonical fresh-coin witness does not admit fresh-coin value extraction"
+            ),
+            Self::CanonicalFreshCoinValuesMismatch { representative_seed } => write!(
+                f,
+                "representative canonical fresh-coin witness does not match canonical seed {}",
+                representative_seed
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CanonicalFreshCoinTheoremInputError {}
 
 impl RuntimeRefinementWitness {
     pub fn to_json(&self) -> String {
@@ -892,6 +973,88 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
     pub fn to_json_pretty(&self) -> String {
         serde_json::to_string_pretty(self)
             .expect("canonical fresh-coin path-ORAM runtime witness family is JSON serializable")
+    }
+}
+
+impl CanonicalFreshCoinRuntimePathOramTheoremInput {
+    pub fn new(
+        representative_seed: usize,
+        representative_witness: RuntimeRefinementWitness,
+    ) -> Result<Self, CanonicalFreshCoinTheoremInputError> {
+        let public_leaf_scaffold = representative_witness.oram_leaf_public_scaffold.clone();
+        let public_fresh_coin_scaffold = representative_witness
+            .path_oram_fresh_coin_scaffold()
+            .ok_or(CanonicalFreshCoinTheoremInputError::FreshCoinScaffoldExtractionMismatch)?;
+        let seed_count = canonical_path_oram_leaf_seed_space_size(&public_fresh_coin_scaffold)
+            .ok_or(CanonicalFreshCoinTheoremInputError::CanonicalSeedSpaceOverflow)?;
+        let theorem_input = Self {
+            seed_count,
+            representative_seed,
+            representative_witness,
+            public_leaf_scaffold,
+            public_fresh_coin_scaffold,
+        };
+        theorem_input.validate()?;
+        Ok(theorem_input)
+    }
+
+    pub fn validate(&self) -> Result<(), CanonicalFreshCoinTheoremInputError> {
+        let canonical_seed_count =
+            canonical_path_oram_leaf_seed_space_size(&self.public_fresh_coin_scaffold)
+                .ok_or(CanonicalFreshCoinTheoremInputError::CanonicalSeedSpaceOverflow)?;
+        if self.seed_count != canonical_seed_count {
+            return Err(
+                CanonicalFreshCoinTheoremInputError::CanonicalSeedCountMismatch {
+                    seed_count: self.seed_count,
+                    canonical_seed_count,
+                },
+            );
+        }
+        if self.representative_seed >= self.seed_count {
+            return Err(
+                CanonicalFreshCoinTheoremInputError::RepresentativeSeedOutOfRange {
+                    representative_seed: self.representative_seed,
+                    seed_count: self.seed_count,
+                },
+            );
+        }
+        if self.representative_witness.oram_leaf_public_scaffold != self.public_leaf_scaffold {
+            return Err(CanonicalFreshCoinTheoremInputError::PublicLeafScaffoldMismatch);
+        }
+        let extracted_scaffold = self
+            .representative_witness
+            .path_oram_fresh_coin_scaffold()
+            .ok_or(CanonicalFreshCoinTheoremInputError::FreshCoinScaffoldExtractionMismatch)?;
+        if extracted_scaffold != self.public_fresh_coin_scaffold {
+            return Err(CanonicalFreshCoinTheoremInputError::FreshCoinScaffoldMismatch);
+        }
+        let extracted_values = self
+            .representative_witness
+            .path_oram_fresh_coin_values()
+            .ok_or(CanonicalFreshCoinTheoremInputError::FreshCoinValuesExtractionMismatch)?;
+        if extracted_values
+            != canonical_path_oram_leaf_values_of_seed(
+                &self.public_fresh_coin_scaffold,
+                self.representative_seed,
+            )
+        {
+            return Err(
+                CanonicalFreshCoinTheoremInputError::CanonicalFreshCoinValuesMismatch {
+                    representative_seed: self.representative_seed,
+                },
+            );
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self)
+            .expect("canonical fresh-coin path-ORAM theorem input is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("canonical fresh-coin path-ORAM theorem input is JSON serializable")
     }
 }
 
@@ -1951,15 +2114,16 @@ mod tests {
     use super::{
         canonical_path_oram_leaf_seed_space_size, canonical_path_oram_seed_of_leaf_values,
         classify_write, extract_runtime_path_oram_fresh_coin_scaffold,
-        extract_runtime_path_oram_fresh_coin_values,
-        CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinWitnessFamilyError,
-        ExecutionTrace, ExitEvent, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
-        OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace,
-        RefinementWitnessError, RuntimeControllerCertificate, RuntimeOramAccessWitness,
-        RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
-        RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
-        RuntimePathOramTransitionWitness, SeededRuntimePathOramWitnessFamily,
-        SeededRuntimeWitnessFamilyError, TheoremTrace, WriteClass,
+        extract_runtime_path_oram_fresh_coin_values, CanonicalFreshCoinRuntimePathOramTheoremInput,
+        CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
+        CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, LogicalEvent,
+        NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent,
+        PhysicalWriteEvent, PublicOutcomeTrace, RefinementWitnessError,
+        RuntimeControllerCertificate, RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness,
+        RuntimeOramLeafWitness, RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness,
+        RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness,
+        SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
+        WriteClass,
     };
     use std::collections::BTreeMap;
 
@@ -2002,9 +2166,9 @@ mod tests {
             scheme: "path_oram_local_posmap_v1".into(),
             capacity: 16,
             block_size: 64,
-            bucket_size: 320,
+            bucket_size: 384,
             bucket_count: 31,
-            blocks_per_bucket: 4,
+            blocks_per_bucket: 5,
             tree_height: 4,
             stash_bound: 4,
             recursion_depth: 1,
@@ -2618,6 +2782,33 @@ mod tests {
             CanonicalFreshCoinWitnessFamilyError::CanonicalSeedCountMismatch {
                 seed_count: 2,
                 canonical_seed_count: 16,
+            }
+        );
+    }
+
+    #[test]
+    fn canonical_fresh_coin_theorem_input_accepts_representative_seed() {
+        let theorem_input = CanonicalFreshCoinRuntimePathOramTheoremInput::new(
+            3,
+            sample_runtime_refinement_witness_with_seed(0),
+        )
+        .unwrap();
+        assert_eq!(theorem_input.seed_count, 16);
+        assert_eq!(theorem_input.representative_seed, 3);
+        assert_eq!(theorem_input.public_leaf_scaffold.len(), 1);
+        assert_eq!(theorem_input.public_fresh_coin_scaffold.len(), 1);
+    }
+
+    #[test]
+    fn canonical_fresh_coin_theorem_input_rejects_wrong_representative_seed() {
+        let theorem_input = CanonicalFreshCoinRuntimePathOramTheoremInput::new(
+            0,
+            sample_runtime_refinement_witness_with_seed(0),
+        );
+        assert_eq!(
+            theorem_input.unwrap_err(),
+            CanonicalFreshCoinTheoremInputError::CanonicalFreshCoinValuesMismatch {
+                representative_seed: 0,
             }
         );
     }

@@ -2,21 +2,21 @@
   "computational_uo": [
     {
       "benchmark": "ConfidentialMixer",
-      "logical_access_equal": true,
+      "logical_access_equal": false,
       "logical_write_equal": true,
       "mode": "oram",
       "opcode_equal": true,
-      "physical_read_equal": true,
-      "physical_trace_equal": true
+      "physical_read_equal": false,
+      "physical_trace_equal": false
     },
     {
       "benchmark": "ERC20Lite",
-      "logical_access_equal": true,
+      "logical_access_equal": false,
       "logical_write_equal": true,
       "mode": "oram",
       "opcode_equal": true,
-      "physical_read_equal": true,
-      "physical_trace_equal": true
+      "physical_read_equal": false,
+      "physical_trace_equal": false
     }
   ],
   "exact_uo": [

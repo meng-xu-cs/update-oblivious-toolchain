@@ -103,7 +103,7 @@ impl OramManifest {
                 let leaf_count = capacity.max(2).next_power_of_two();
                 let tree_height = log2_ceil(leaf_count);
                 let block_size = 1 + 8 + 8 + key_bytes + value_bytes;
-                let blocks_per_bucket = 4usize;
+                let blocks_per_bucket = 5usize;
                 let stash_bound = capacity.max(1);
                 let position_map_pages = capacity.max(1).div_ceil(8);
                 let stash_pages = stash_bound.div_ceil(8);
@@ -167,8 +167,8 @@ impl OramManifest {
                 }
             }
             PATH_ORAM_SCHEME => {
-                if self.blocks_per_bucket != 4 {
-                    bail!("path ORAM requires 4 blocks per bucket");
+                if self.blocks_per_bucket != 5 {
+                    bail!("path ORAM requires 5 blocks per bucket");
                 }
                 if self.bucket_size != 24 + self.blocks_per_bucket * self.block_size {
                     bail!("path ORAM bucket size does not match theorem shape");

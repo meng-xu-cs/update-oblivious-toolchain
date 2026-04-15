@@ -59,7 +59,7 @@ def oramBucketHeaderBytes : Nat := 24
 def surrogateOramScheme : String := "surrogate_public_schedule_v1"
 def pathOramScheme : String := "path_oram_local_posmap_v1"
 def surrogateOramBlocksPerBucket : Nat := 2
-def pathOramBlocksPerBucket : Nat := 4
+def pathOramBlocksPerBucket : Nat := 5
 
 structure OramPublicData where
   witness : OramEntrypointWitness

@@ -10,7 +10,7 @@
         "name": "allowances",
         "kind": "Map",
         "backend": "Oram",
-        "oram_scheme": "surrogate_public_schedule_v1",
+        "oram_scheme": "path_oram_local_posmap_v1",
         "value_type": {
           "Scalar": {
             "Uint": 256
@@ -27,7 +27,7 @@
         "name": "balances",
         "kind": "Map",
         "backend": "Oram",
-        "oram_scheme": "surrogate_public_schedule_v1",
+        "oram_scheme": "path_oram_local_posmap_v1",
         "value_type": {
           "Scalar": {
             "Uint": 256
@@ -629,17 +629,17 @@
           "value_type": "uint256",
           "key_type": "bytes32",
           "oram": {
-            "scheme": "surrogate_public_schedule_v1",
-            "block_size": 65,
-            "bucket_size": 154,
-            "bucket_count": 64,
-            "blocks_per_bucket": 2,
+            "scheme": "path_oram_local_posmap_v1",
+            "block_size": 81,
+            "bucket_size": 429,
+            "bucket_count": 255,
+            "blocks_per_bucket": 5,
             "tree_height": 7,
-            "stash_bound": 0,
+            "stash_bound": 128,
             "recursion_depth": 0,
-            "metadata_pages": 16,
-            "metadata_pages_per_access": 17,
-            "buckets_per_access": 9,
+            "metadata_pages": 32,
+            "metadata_pages_per_access": 33,
+            "buckets_per_access": 8,
             "accesses_per_call": 1
           }
         },
@@ -652,17 +652,17 @@
           "value_type": "uint256",
           "key_type": "address",
           "oram": {
-            "scheme": "surrogate_public_schedule_v1",
-            "block_size": 53,
-            "bucket_size": 130,
-            "bucket_count": 32,
-            "blocks_per_bucket": 2,
+            "scheme": "path_oram_local_posmap_v1",
+            "block_size": 69,
+            "bucket_size": 369,
+            "bucket_count": 127,
+            "blocks_per_bucket": 5,
             "tree_height": 6,
-            "stash_bound": 0,
+            "stash_bound": 64,
             "recursion_depth": 0,
-            "metadata_pages": 8,
-            "metadata_pages_per_access": 9,
-            "buckets_per_access": 8,
+            "metadata_pages": 16,
+            "metadata_pages_per_access": 17,
+            "buckets_per_access": 7,
             "accesses_per_call": 1
           }
         }
@@ -670,7 +670,7 @@
       "entrypoints": {
         "allowanceOf(address,address)": {
           "secret_args": [],
-          "public_gas_budget": 2811,
+          "public_gas_budget": 3246,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "uocell_reads": 0,
@@ -679,7 +679,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 26,
+          "max_commit_ops": 41,
           "oram_accesses": {
             "2": 1
           }
@@ -699,14 +699,14 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 1,
-          "max_commit_ops": 26,
+          "max_commit_ops": 41,
           "oram_accesses": {
             "2": 1
           }
         },
         "balanceOf(address)": {
           "secret_args": [],
-          "public_gas_budget": 2518,
+          "public_gas_budget": 2721,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "uocell_reads": 0,
@@ -715,14 +715,14 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 17,
+          "max_commit_ops": 24,
           "oram_accesses": {
             "1": 1
           }
         },
         "mint(address,uint256)": {
           "secret_args": [],
-          "public_gas_budget": 2539,
+          "public_gas_budget": 3438,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "uocell_reads": 0,
@@ -731,7 +731,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 17,
+          "max_commit_ops": 48,
           "oram_accesses": {
             "1": 2
           }
@@ -751,7 +751,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 2,
           "uomap_writes": 2,
-          "max_commit_ops": 17,
+          "max_commit_ops": 96,
           "oram_accesses": {
             "1": 4
           }
@@ -772,7 +772,7 @@
           "uoarray_writes": 0,
           "uomap_reads": 3,
           "uomap_writes": 3,
-          "max_commit_ops": 43,
+          "max_commit_ops": 178,
           "oram_accesses": {
             "1": 4,
             "2": 2

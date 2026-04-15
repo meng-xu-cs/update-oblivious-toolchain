@@ -10,8 +10,9 @@ use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uo_core::{
     canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
-    BoundaryEvent, CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact,
-    ContractMetadata, LogicalEvent, NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
+    BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
+    CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact, ContractMetadata,
+    LogicalEvent, NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
     RuntimeOramAccessCounterWitness, RuntimeOramObjectWitness, RuntimeRefinementWitness,
     SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value, WriteClass,
 };
@@ -115,6 +116,20 @@ struct ImportedCanonicalFreshCoinRuntimePathOramPairCertificate {
     normalized_micro_trace: NormalizedMicroTrace,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput {
+    cfg: ImportedOramConfig,
+    lhs_input: CanonicalFreshCoinRuntimePathOramTheoremInput,
+    rhs_input: CanonicalFreshCoinRuntimePathOramTheoremInput,
+    public_view: ImportedOramViewPublicPart,
+    public_location: ImportedPathOramStorageLocationTrace,
+    storage_shape: ImportedPathOramStorageShape,
+    public_outcome: PublicOutcomeTrace,
+    boundary_schedule: Vec<BoundaryEvent>,
+    controller_shape: SgxControllerShapeTrace,
+    normalized_micro_trace: NormalizedMicroTrace,
+}
+
 #[derive(Clone)]
 struct CollectedSeededFamily {
     family: SeededRuntimePathOramWitnessFamily,
@@ -125,6 +140,12 @@ struct CollectedSeededFamily {
 struct CollectedCanonicalFreshCoinFamily {
     family: CanonicalFreshCoinRuntimePathOramWitnessFamily,
     first_witness: RuntimeRefinementWitness,
+    access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+}
+
+#[derive(Clone)]
+struct CollectedCanonicalFreshCoinTheoremInput {
+    input: CanonicalFreshCoinRuntimePathOramTheoremInput,
     access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
 }
 
@@ -417,11 +438,11 @@ fn run_controller_observer_validation(
     let excluded_scenarios = vec![
         json!({
             "scenario": "ConfidentialMixer/oram/*",
-            "reason": "legacy surrogate ORAM backend is outside the current controller-observer theorem boundary"
+            "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ConfidentialMixer/pathoram/*; the theorem-facing controller certificate is reported only once under the explicit pathoram name"
         }),
         json!({
             "scenario": "ERC20Lite/oram/*",
-            "reason": "legacy surrogate ORAM backend is outside the current controller-observer theorem boundary"
+            "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ERC20Lite/pathoram/*; the theorem-facing controller certificate is reported only once under the explicit pathoram name"
         }),
     ];
 
@@ -732,11 +753,11 @@ fn run_witness_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Res
     let excluded_scenarios = vec![
         json!({
             "scenario": "ConfidentialMixer/oram/*",
-            "reason": "legacy surrogate ORAM backend is outside the current Lean runtime witness boundary"
+            "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ConfidentialMixer/pathoram/*; the Lean runtime witness is reported only once under the explicit pathoram name"
         }),
         json!({
             "scenario": "ERC20Lite/oram/*",
-            "reason": "legacy surrogate ORAM backend is outside the current Lean runtime witness boundary"
+            "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ERC20Lite/pathoram/*; the Lean runtime witness is reported only once under the explicit pathoram name"
         }),
     ];
 
@@ -1012,7 +1033,8 @@ fn run_seeded_witness_validation() -> Result<JsonValue> {
 }
 
 fn run_fresh_coin_validation() -> Result<JsonValue> {
-    let checker = lean_fresh_coin_family_checker_path()?;
+    let family_checker = lean_fresh_coin_family_checker_path()?;
+    let theorem_input_checker = lean_fresh_coin_theorem_input_checker_path()?;
     let single_access = compile_artifact(
         "benches/raw/SingleAccessMap.sol",
         "benches/raw/SingleAccessMap.pathoram.yaml",
@@ -1048,7 +1070,8 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
                 entrypoint: "put(bytes32,uint256)",
                 args: vec![b32(1), Value::Uint(7)],
             },
-            &checker,
+            &family_checker,
+            &theorem_input_checker,
         )?,
         validate_fresh_coin_family_case(
             "SingleAccessMap/pathoram/add-fresh-coins",
@@ -1058,7 +1081,8 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
                 entrypoint: "add(bytes32,uint256)",
                 args: vec![b32(1), Value::Uint(7)],
             },
-            &checker,
+            &family_checker,
+            &theorem_input_checker,
         )?,
         validate_fresh_coin_family_case(
             "ConfidentialMixer/pathoram/deposit-fresh-coins",
@@ -1068,7 +1092,8 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
                 entrypoint: "deposit(bytes32,uint256)",
                 args: vec![b32(5), Value::Uint(1)],
             },
-            &checker,
+            &family_checker,
+            &theorem_input_checker,
         )?,
         validate_fresh_coin_family_case(
             "ERC20Lite/pathoram/transferFrom-fresh-coins",
@@ -1078,12 +1103,14 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
                 entrypoint: "transferFrom(address,address,address,uint256)",
                 args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
             },
-            &checker,
+            &family_checker,
+            &theorem_input_checker,
         )?,
     ];
 
     Ok(json!({
-        "checker": checker.display().to_string(),
+        "checker": family_checker.display().to_string(),
+        "theorem_input_checker": theorem_input_checker.display().to_string(),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -1198,6 +1225,7 @@ fn run_pathoram_pair_validation() -> Result<JsonValue> {
 
 fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
     let checker = lean_canonical_pathoram_pair_checker_path()?;
+    let theorem_input_checker = lean_canonical_pathoram_pair_theorem_input_checker_path()?;
     let single_access = compile_artifact(
         "benches/raw/SingleAccessMap.sol",
         "benches/raw/SingleAccessMap.pathoram.yaml",
@@ -1238,6 +1266,7 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![b32(9), Value::Uint(7)],
             },
             &checker,
+            &theorem_input_checker,
         )?,
         validate_canonical_pathoram_pair_case(
             "SingleAccessMap/pathoram/add-canonical-pair",
@@ -1252,6 +1281,7 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![b32(9), Value::Uint(7)],
             },
             &checker,
+            &theorem_input_checker,
         )?,
         validate_canonical_pathoram_pair_case(
             "ConfidentialMixer/pathoram/deposit-canonical-pair",
@@ -1266,6 +1296,7 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![b32(9), Value::Uint(1)],
             },
             &checker,
+            &theorem_input_checker,
         )?,
         validate_canonical_pathoram_pair_case(
             "ERC20Lite/pathoram/transferFrom-canonical-pair",
@@ -1280,11 +1311,13 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![addr(0x11), addr(0x22), addr(0x44), Value::Uint(3)],
             },
             &checker,
+            &theorem_input_checker,
         )?,
     ];
 
     Ok(json!({
         "checker": checker.display().to_string(),
+        "theorem_input_checker": theorem_input_checker.display().to_string(),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -1497,7 +1530,8 @@ fn validate_fresh_coin_family_case(
     artifact: &CompiledArtifact,
     setup: &[CallSpec],
     target: &CallSpec,
-    checker: &Path,
+    family_checker: &Path,
+    theorem_input_checker: &Path,
 ) -> Result<JsonValue> {
     let budget_bytes = canonical_cert_budget_bytes();
     let estimate = estimate_canonical_fresh_coin_family_size(
@@ -1508,19 +1542,15 @@ fn validate_fresh_coin_family_case(
         CANONICAL_SIZE_ESTIMATE_SAMPLE_SEEDS,
     )?;
     if estimate.estimated_family_json_bytes > budget_bytes {
-        return Ok(json!({
-            "scenario": name,
-            "entrypoint": target.entrypoint,
-            "validation_status": "skipped_by_budget",
-            "reason": format!(
-                "estimated compact canonical fresh-coin family exceeds safe budget {}; set UO_CANONICAL_CERT_BUDGET_BYTES to override",
-                budget_bytes
-            ),
-            "budget_bytes": budget_bytes,
-            "size_estimate": estimate,
-            "lean_validated": false,
-            "accepted": false,
-        }));
+        return validate_fresh_coin_theorem_input_case(
+            name,
+            artifact,
+            setup,
+            target,
+            theorem_input_checker,
+            budget_bytes,
+            estimate,
+        );
     }
 
     let collected = collect_canonical_fresh_coin_family_case(name, artifact, setup, target)?;
@@ -1580,7 +1610,7 @@ fn validate_fresh_coin_family_case(
                 == canonical_path_oram_leaf_values_of_seed(&family.public_fresh_coin_scaffold, seed)
         });
     let (family_path, family_json_bytes) = write_temp_json(name, &family)?;
-    let output = Command::new(checker)
+    let output = Command::new(family_checker)
         .arg(&family_path)
         .arg("page_v1")
         .arg("exit_v1")
@@ -1617,6 +1647,77 @@ fn validate_fresh_coin_family_case(
         "canonical_fresh_coin_seed_space_size": Some(family.seed_count),
         "canonical_fresh_coin_values_match_index": canonical_fresh_coin_values_match_index,
         "witness_family_json_bytes": family_json_bytes,
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "lean_validated": true,
+        "accepted": true,
+    }))
+}
+
+fn validate_fresh_coin_theorem_input_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    checker: &Path,
+    budget_bytes: u64,
+    estimate: CanonicalFamilySizeEstimate,
+) -> Result<JsonValue> {
+    let collected =
+        collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, target)?;
+    let theorem_input = collected.input;
+    let representative_values = theorem_input
+        .representative_witness
+        .path_oram_fresh_coin_values()
+        .ok_or_else(|| {
+            anyhow!(
+                "fresh-coin value extraction failed for {} representative seed {}",
+                name,
+                theorem_input.representative_seed
+            )
+        })?;
+    let canonical_values = canonical_path_oram_leaf_values_of_seed(
+        &theorem_input.public_fresh_coin_scaffold,
+        theorem_input.representative_seed,
+    );
+    let (theorem_input_path, theorem_input_json_bytes) = write_temp_json(name, &theorem_input)?;
+    let output = Command::new(checker)
+        .arg(&theorem_input_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    let _ = fs::remove_file(&theorem_input_path);
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean canonical fresh-coin theorem-input validation failed for {}: {}",
+            name,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    Ok(json!({
+        "scenario": name,
+        "entrypoint": target.entrypoint,
+        "validation_status": "accepted_compact_theorem_input",
+        "reason": format!(
+            "estimated explicit canonical fresh-coin family exceeds safe budget {}; compact theorem input used instead",
+            budget_bytes
+        ),
+        "budget_bytes": budget_bytes,
+        "size_estimate": estimate,
+        "setup_calls": setup.len(),
+        "mode": "compact_canonical_seed_space",
+        "deploy_seed": 0,
+        "representative_seed": theorem_input.representative_seed,
+        "representative_witness_count": 1,
+        "seed_count": theorem_input.seed_count,
+        "symbolic_seed_space_instantiated": true,
+        "coverage_complete": false,
+        "public_leaf_scaffold_steps": theorem_input.public_leaf_scaffold.len(),
+        "public_fresh_coin_scaffold_steps": theorem_input.public_fresh_coin_scaffold.len(),
+        "canonical_fresh_coin_seed_space_size": Some(theorem_input.seed_count),
+        "canonical_fresh_coin_values_match_representative_seed": representative_values == canonical_values,
+        "theorem_input_json_bytes": theorem_input_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "lean_validated": true,
         "accepted": true,
@@ -1687,6 +1788,74 @@ fn collect_canonical_fresh_coin_family_case(
     Ok(CollectedCanonicalFreshCoinFamily {
         family: CanonicalFreshCoinRuntimePathOramWitnessFamily::new(witnesses)?,
         first_witness,
+        access_counters_before: first_trace.runtime_oram_access_counters_before.clone(),
+    })
+}
+
+fn collect_canonical_fresh_coin_theorem_input_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+) -> Result<CollectedCanonicalFreshCoinTheoremInput> {
+    let deploy_seed = 0u64;
+    let prepared = prepare_instance_with_seed(artifact, setup, deploy_seed)?;
+    let mut first_instance = prepared.clone();
+    let first_trace = first_instance
+        .call(target.entrypoint, target.args.clone())?
+        .trace;
+    let first_witness = first_trace.runtime_refinement_witness()?;
+    let fresh_coin_scaffold = first_witness
+        .path_oram_fresh_coin_scaffold()
+        .ok_or_else(|| anyhow!("fresh-coin scaffold extraction failed for {}", name))?;
+    let representative_seed = 0usize;
+    let fresh_coin_values =
+        canonical_path_oram_leaf_values_of_seed(&fresh_coin_scaffold, representative_seed);
+    let fresh_coin_plan =
+        PathOramFreshCoinPlan::from_scaffold_and_values(&fresh_coin_scaffold, &fresh_coin_values)?;
+    let mut representative_instance = prepared.clone();
+    let representative_trace = representative_instance
+        .call_with_path_oram_fresh_coins(target.entrypoint, target.args.clone(), &fresh_coin_plan)?
+        .trace;
+    let representative_witness = representative_trace.runtime_refinement_witness()?;
+    let extracted_scaffold = representative_witness
+        .path_oram_fresh_coin_scaffold()
+        .ok_or_else(|| {
+            anyhow!(
+                "fresh-coin scaffold extraction failed for {} representative seed {}",
+                name,
+                representative_seed
+            )
+        })?;
+    let extracted_values = representative_witness
+        .path_oram_fresh_coin_values()
+        .ok_or_else(|| {
+            anyhow!(
+                "fresh-coin value extraction failed for {} representative seed {}",
+                name,
+                representative_seed
+            )
+        })?;
+    if extracted_scaffold != fresh_coin_scaffold || extracted_values != fresh_coin_values {
+        return Err(anyhow!(
+            "canonical fresh-coin extraction mismatch for {} representative seed {}",
+            name,
+            representative_seed
+        ));
+    }
+    let input = CanonicalFreshCoinRuntimePathOramTheoremInput::new(
+        representative_seed,
+        representative_witness,
+    )
+    .map_err(|err| {
+            anyhow!(
+                "canonical fresh-coin theorem input invalid for {}: {}",
+                name,
+                err
+            )
+        })?;
+    Ok(CollectedCanonicalFreshCoinTheoremInput {
+        input,
         access_counters_before: first_trace.runtime_oram_access_counters_before.clone(),
     })
 }
@@ -1849,14 +2018,15 @@ fn validate_pathoram_pair_case(
         .arg("exit_v1")
         .arg("shared_v1")
         .output()?;
-    let _ = fs::remove_file(&certificate_path);
     if !output.status.success() {
         return Err(anyhow!(
-            "Lean path-ORAM pair validation failed for {}: {}",
+            "Lean path-ORAM pair validation failed for {}: {} (certificate preserved at {})",
             name,
-            String::from_utf8_lossy(&output.stderr).trim()
+            String::from_utf8_lossy(&output.stderr).trim(),
+            certificate_path.display()
         ));
     }
+    let _ = fs::remove_file(&certificate_path);
 
     Ok(json!({
         "scenario": name,
@@ -1881,6 +2051,7 @@ fn validate_canonical_pathoram_pair_case(
     lhs: &CallSpec,
     rhs: &CallSpec,
     checker: &Path,
+    theorem_input_checker: &Path,
 ) -> Result<JsonValue> {
     let budget_bytes = canonical_cert_budget_bytes();
     let lhs_estimate = estimate_canonical_fresh_coin_family_size(
@@ -1902,21 +2073,18 @@ fn validate_canonical_pathoram_pair_case(
         .saturating_add(rhs_estimate.estimated_family_json_bytes)
         .saturating_add(1 << 20);
     if estimated_certificate_json_bytes > budget_bytes {
-        return Ok(json!({
-            "scenario": name,
-            "entrypoint": lhs.entrypoint,
-            "validation_status": "skipped_by_budget",
-            "reason": format!(
-                "estimated compact canonical pair certificate exceeds safe budget {}; set UO_CANONICAL_CERT_BUDGET_BYTES to override",
-                budget_bytes
-            ),
-            "budget_bytes": budget_bytes,
-            "estimated_certificate_json_bytes": estimated_certificate_json_bytes,
-            "lhs_estimate": lhs_estimate,
-            "rhs_estimate": rhs_estimate,
-            "lean_validated": false,
-            "accepted": false,
-        }));
+        return validate_canonical_pathoram_pair_theorem_input_case(
+            name,
+            artifact,
+            setup,
+            lhs,
+            rhs,
+            theorem_input_checker,
+            budget_bytes,
+            estimated_certificate_json_bytes,
+            lhs_estimate,
+            rhs_estimate,
+        );
     }
 
     let lhs_collected = collect_canonical_fresh_coin_family_case(name, artifact, setup, lhs)?;
@@ -1989,6 +2157,113 @@ fn validate_canonical_pathoram_pair_case(
     }))
 }
 
+fn validate_canonical_pathoram_pair_theorem_input_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    lhs: &CallSpec,
+    rhs: &CallSpec,
+    checker: &Path,
+    budget_bytes: u64,
+    estimated_certificate_json_bytes: u64,
+    lhs_estimate: CanonicalFamilySizeEstimate,
+    rhs_estimate: CanonicalFamilySizeEstimate,
+) -> Result<JsonValue> {
+    let lhs_collected =
+        collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, lhs)?;
+    let rhs_collected =
+        collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, rhs)?;
+
+    let lhs_witness = &lhs_collected.input.representative_witness;
+    let rhs_witness = &rhs_collected.input.representative_witness;
+    let cfg = imported_oram_config(
+        artifact,
+        lhs.entrypoint,
+        lhs_witness,
+        &lhs_collected.access_counters_before,
+    )?;
+    let rhs_cfg = imported_oram_config(
+        artifact,
+        rhs.entrypoint,
+        rhs_witness,
+        &rhs_collected.access_counters_before,
+    )?;
+    if serde_json::to_string(&cfg)? != serde_json::to_string(&rhs_cfg)? {
+        return Err(anyhow!(
+            "canonical path-ORAM pair {} does not share a common public configuration",
+            name
+        ));
+    }
+
+    let public_view = imported_oram_public_view(lhs_witness);
+    let public_location = imported_path_oram_public_location(lhs_witness);
+    let storage_shape = imported_path_oram_storage_shape(lhs_witness);
+    let public_outcome = lhs_witness.public_outcome.clone();
+    let boundary_schedule = lhs_witness.boundary_schedule.clone();
+    let controller_shape = lhs_witness.controller_shape.clone();
+    let normalized_micro_trace = lhs_witness.normalized_micro_trace.clone();
+    let public_outcome_equal = lhs_witness.public_outcome == rhs_witness.public_outcome;
+    let boundary_schedule_equal = lhs_witness.boundary_schedule == rhs_witness.boundary_schedule;
+    let controller_shape_equal = lhs_witness.controller_shape == rhs_witness.controller_shape;
+    let normalized_micro_trace_equal =
+        lhs_witness.normalized_micro_trace == rhs_witness.normalized_micro_trace;
+
+    let theorem_input = ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput {
+        cfg,
+        lhs_input: lhs_collected.input,
+        rhs_input: rhs_collected.input,
+        public_view,
+        public_location,
+        storage_shape,
+        public_outcome,
+        boundary_schedule,
+        controller_shape,
+        normalized_micro_trace,
+    };
+
+    let (theorem_input_path, theorem_input_json_bytes) = write_temp_json(name, &theorem_input)?;
+    let output = Command::new(checker)
+        .arg(&theorem_input_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    let _ = fs::remove_file(&theorem_input_path);
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean canonical path-ORAM pair theorem-input validation failed for {}: {}",
+            name,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    Ok(json!({
+        "scenario": name,
+        "entrypoint": lhs.entrypoint,
+        "validation_status": "accepted_compact_theorem_input",
+        "reason": format!(
+            "estimated explicit canonical pair certificate exceeds safe budget {}; compact theorem input used instead",
+            budget_bytes
+        ),
+        "budget_bytes": budget_bytes,
+        "estimated_certificate_json_bytes": estimated_certificate_json_bytes,
+        "lhs_estimate": lhs_estimate,
+        "rhs_estimate": rhs_estimate,
+        "lhs_seed_count": theorem_input.lhs_input.seed_count,
+        "rhs_seed_count": theorem_input.rhs_input.seed_count,
+        "lhs_representative_seed": theorem_input.lhs_input.representative_seed,
+        "rhs_representative_seed": theorem_input.rhs_input.representative_seed,
+        "public_outcome_equal": public_outcome_equal,
+        "boundary_schedule_equal": boundary_schedule_equal,
+        "controller_shape_equal": controller_shape_equal,
+        "normalized_micro_trace_equal": normalized_micro_trace_equal,
+        "theorem_input_json_bytes": theorem_input_json_bytes,
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "lean_validated": true,
+        "accepted": true,
+    }))
+}
+
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -2056,6 +2331,18 @@ fn lean_fresh_coin_family_checker_path() -> Result<PathBuf> {
     }
 }
 
+fn lean_fresh_coin_theorem_input_checker_path() -> Result<PathBuf> {
+    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeFreshCoinTheoremInput");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(anyhow!(
+            "Lean fresh-coin theorem-input checker not found at {}; build it with `cd proof/lean && lake build`",
+            path.display()
+        ))
+    }
+}
+
 fn lean_pathoram_pair_checker_path() -> Result<PathBuf> {
     let path = repo_root().join("proof/lean/.lake/build/bin/checkPathOramPairCertificate");
     if path.is_file() {
@@ -2075,6 +2362,18 @@ fn lean_canonical_pathoram_pair_checker_path() -> Result<PathBuf> {
     } else {
         Err(anyhow!(
             "Lean canonical path-ORAM pair checker not found at {}; build it with `cd proof/lean && lake build`",
+            path.display()
+        ))
+    }
+}
+
+fn lean_canonical_pathoram_pair_theorem_input_checker_path() -> Result<PathBuf> {
+    let path = repo_root().join("proof/lean/.lake/build/bin/checkCanonicalPathOramPairTheoremInput");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(anyhow!(
+            "Lean canonical path-ORAM pair theorem-input checker not found at {}; build it with `cd proof/lean && lake build`",
             path.display()
         ))
     }
@@ -3211,9 +3510,10 @@ fresh-coin seed space directly from the public scaffold, and invokes the Lean
 fresh-coin family checker on the resulting complete family, now including the
 multi-access `ConfidentialMixer/pathoram/deposit` family with its full
 `262144`-seed canonical fresh-coin space. The same report now also preflights
-oversized canonical fresh-coin families and records
-`ERC20Lite/pathoram/transferFrom-fresh-coins` as `skipped_by_budget` rather
-than trying to materialize an infeasible theorem input.
+oversized canonical fresh-coin families and, instead of stopping at
+`skipped_by_budget`, falls back to a compact theorem-facing seed-space
+certificate that checks one representative canonical seed together with the
+full public fresh-coin scaffold and seed count.
 `seeded_witness_validation.json` now also covers finite seeded path-ORAM
 families beyond `SingleAccessMap`, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object
@@ -3221,31 +3521,29 @@ families beyond `SingleAccessMap`, including the multi-access
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and
-`ERC20Lite/pathoram/transferFrom-pair`. Legacy surrogate ORAM scenarios remain
-reported in the broader benchmark results but are explicitly excluded from the
-theorem-facing witness validators.
+`ERC20Lite/pathoram/transferFrom-pair`. The broader `*/oram/*` benchmark
+aliases now compile the same concrete `path_oram_local_posmap_v1` backend as
+the explicit theorem-facing `*/pathoram/*` cases, so the witness validators
+report only the `pathoram` names and do not duplicate those certificates under
+the generic alias.
 `canonical_pathoram_pair_validation.json` adds the canonical fresh-coin pair
 certificate layer: it checks that the theorem-backed `SingleAccessMap`
 Path-ORAM workloads share one common public observer across the full
 canonical fresh-coin families, including the complete `256`-seed `put` family
 and complete `4096`-seed `add` family. The remaining coverage gap is now
-narrower: the larger canonical-pair layer is still not materialized, and the
-very large canonical-family / canonical-pair workloads such as
-`ERC20Lite/pathoram/transferFrom` are still not enumerated end to end. To keep
-the artifact from exhausting host memory, the canonical-pair probe now
-preflights compact certificate size from sampled witnesses and skips cases that
-exceed a safe budget. Under the default `10 GiB` budget, the current report
-accepts the two `SingleAccessMap` canonical pairs and records
-`ConfidentialMixer/pathoram/deposit-canonical-pair` as `skipped_by_budget`
-with an estimated compact certificate size of about `13.66 GiB`, while
-`ERC20Lite/pathoram/transferFrom-canonical-pair` is also recorded as
-`skipped_by_budget` with an estimated compact certificate far beyond any
-practical artifact budget.
+narrower: the small canonical pairs are still checked by full family
+materialization, while very large canonical-pair workloads now fall back to a
+compact theorem-facing pair certificate instead of being skipped. Under the
+default `10 GiB` budget, the current report accepts the two `SingleAccessMap`
+canonical pairs directly, and validates both
+`ConfidentialMixer/pathoram/deposit-canonical-pair` and
+`ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
+theorem-input path with their concrete explicit-size estimates attached.
 
 Security tiers:
 
 - Exact-UO: `FixedSlotClassifier`, `AuthScan`, `ConfidentialMixer` full-scan, `ERC20Lite` full-scan, and `RegistryCRUD` use fixed-shape commits and normalized `M+` traces that are identical across secret variations in this instrumented abstract machine.
-- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use a public-schedule ORAM surrogate that rewrites fixed-shape control metadata and a logarithmic bucket batch while keeping `M+` update classes secret-independent.
+- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use the concrete `path_oram_local_posmap_v1` backend, with fixed public controller shape, rerandomized bucket/block rewrites, and theorem-facing witness extraction on the same benchmark family.
 
 Unsupported / rejected:
 
@@ -3257,7 +3555,7 @@ Unsupported / rejected:
 Prototype assumptions:
 
 - `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
-- The ORAM backend is an instrumented runtime prototype with fixed-shape committed control metadata and public-schedule bucket rewrites; it is reported as computational-UO only.
+- The ORAM backend is an instrumented Path-ORAM-style runtime prototype with fixed public controller shape and rerandomized bucket/block rewrites; it is reported as computational-UO only.
 - The guarantees are with respect to the abstract/runtime traces emitted by this artifact, including the normalized physical read/write schedules captured by the runtime, not every downstream machine-code or microarchitectural observer.
 "#
 }

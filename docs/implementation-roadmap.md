@@ -344,19 +344,68 @@ What is now implemented:
   `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementationConformance`
 - that conformance now holds directly at
   `bundle.publicView` / `bundle.storageRun`, with the equality plumbing removed
+- `PathOramLocalPosmapV1StandardTheorem.lean` now freezes the exact discharge
+  target into one named theorem-facing object,
+  `PathOramLocalPosmapV1StandardTheoremTarget`; it also exposes the abstract
+  proposition `StandardPathOramStorageTheoremAt` that an imported Path ORAM
+  theorem must discharge, plus the concrete bridge object
+  `PathOramLocalPosmapV1StandardTheoremRealization` that says what still has to
+  be connected from the seeded runtime witness family to that target
+- that module now also separates the imported theorem route into:
+  `StandardPathOramCoreTheorem` for the theorem-side ORAM claim,
+  `PathOramStorageEnvelope` for the concrete runtime’s public metadata /
+  bucket-projection / shape facts, and a one-step composition from the former
+  into the full storage theorem once a `leafRun` alignment proof is available
+- `PathOramJACMTheorem.lean` now adds the literature-faithful import surface
+  `PathOramJACMLiteratureTheorem` together with an explicit formal mapping into
+  `StandardPathOramCoreTheorem`, so the paper-facing theorem source is no
+  longer just described informally in docs
 
 Remaining work:
 
-- if we want to cite a literature theorem verbatim, map that external theorem’s
-  hypotheses onto `ImportedStandardPathOramImplementation`
-- if we want a paper appendix with a clean abstract simulator, layer that
-  simulator on top of the already-instantiated implementation package rather
-  than reopening the runtime/theorem interface
+1. freeze the imported standard theorem precisely at
+   `PathOramLocalPosmapV1StandardTheoremTarget`
+2. map the chosen literature theorem or self-contained abstract theorem onto
+   `StandardPathOramStorageTheoremAt` and then into
+   `ImportedStandardPathOramImplementation`
+3. construct
+   `PathOramLocalPosmapV1StandardTheoremRealization` for the concrete seeded
+   runtime witness bundle
+4. reuse the existing projection lemmas from that realization to recover the
+   repo’s computational-UO, SGX, and TEE theorem endpoints
+5. if we want a paper appendix with a cleaner abstract simulator, layer it on
+   top of this frozen target instead of reopening the runtime/theorem interface
+
+With the new split, the concrete remaining imported-theorem obligation is even
+sharper:
+
+- provide a `StandardPathOramCoreTheorem` for the concrete public observer
+- prove that the imported theorem’s `leafRun` matches the runtime’s
+  theorem-facing `bundle.leafRun`
+- then use the already-mechanized `PathOramStorageEnvelope` to obtain the full
+  `ImportedPathOramStorageTheorem` and `PathOramLocalPosmapV1StandardTheoremRealization`
+
+See `docs/path-oram-core-theorem-import.md` for the exact paper-to-repo mapping
+used by this split.
+
+The preferred route is now even tighter:
+
+- import a `PathOramJACMLiteratureTheoremAt` directly at
+  `bundle.publicView` and `bundle.leafRun`
+- use the existing runtime `PathOramStorageEnvelope` to lift it immediately to
+  `ImportedPathOramStorageTheorem`
+
+This removes the extra `leafRun` alignment obligation on the mainline route.
+The concrete backend shape is now aligned with the JACM bucket-size parameter
+`Z = 5`, so the remaining gap is the imported core theorem itself rather than a
+parameter mismatch.
 
 Acceptance criteria:
 
 - the imported theorem is a named Lean object rather than an informal paper-only
   placeholder
+- the exact discharge target is fixed in one Lean module instead of being
+  spread implicitly across the refinement and projection files
 - the concrete runtime witness bundle is connected to that imported theorem by
   a named conformance theorem
 - the theorem-facing implementation package matches the actual standard Path

@@ -54,9 +54,11 @@ Status labels:
   Evidence:
   `probe/mplus-probe/src/lib.rs`,
   `results/witness_validation.json`.
-  Legacy surrogate ORAM scenarios remain in the broader benchmark and leakage
-  reports, but they are now explicitly excluded from the Lean witness validators
-  instead of being ambiguously mixed into the proof-facing checks.
+  The broader `*/oram/*` benchmark aliases now compile the same concrete
+  `path_oram_local_posmap_v1` backend as the explicit theorem-facing
+  `*/pathoram/*` cases. The Lean witness validators therefore report only the
+  `pathoram` names and exclude the generic aliases purely to avoid duplicate
+  theorem certificates.
 
 - `cleared` The public SGX/controller observer now has a standalone theorem-facing
   certificate exported directly from `ExecutionTrace`.
@@ -184,17 +186,20 @@ Status labels:
   `ConfidentialMixer/pathoram/deposit` workload with its complete `262144`-seed
   family. The canonical fresh-coin and canonical-pair probes now also have an
   explicit memory-safety guard: they preflight compact artifact size from
-  sampled witnesses and skip oversized cases before materialization, rather
-  than risking host OOM.
-  The current report now records both
+  sampled witnesses before materialization, rather than risking host OOM.
+  Oversized canonical fresh-coin cases no longer need to stop at
+  `skipped_by_budget`: the artifact layer now falls back to a compact
+  theorem-facing seed-space certificate that validates a representative
+  canonical seed together with the full public fresh-coin scaffold and seed
+  count. Oversized canonical-pair cases now likewise fall back to a compact
+  theorem-facing pair certificate that validates representative canonical
+  seeds on both sides against one shared public observer summary, instead of
+  stopping at `skipped_by_budget`. The current report accepts both
   `ConfidentialMixer/pathoram/deposit-canonical-pair` and
   `ERC20Lite/pathoram/transferFrom-canonical-pair` as explicit
-  `skipped_by_budget` cases with concrete size estimates. The fresh-coin family
-  report now likewise records `ERC20Lite/pathoram/transferFrom-fresh-coins` as
-  an explicit `skipped_by_budget` case. What remains missing is the larger
-  canonical-pair layer and the full canonical-family /
-  canonical-pair coverage for workloads such as
-  `ERC20Lite/pathoram/transferFrom`.
+  compact theorem-input cases with concrete size estimates. What remains
+  missing is only the full explicit large-family materialization, not the
+  theorem-facing large-case input coverage.
 
 - `active` The concrete `path_oram_local_posmap_v1` theorem boundary is now
   explicit at the Lean surface, but the standard-ORAM discharge is still open.
@@ -208,11 +213,29 @@ Status labels:
   and TEE-storage consequences into explicit theorem-boundary propositions. It
   now also exposes the explicit standard-theorem import boundary for the
   concrete backend, and the current seeded runtime proof bundle now matches
-  that import boundary directly, so the remaining gap is no longer theorem
+  that import boundary directly. In addition, the exact imported-theorem target
+  is now frozen in `PathOramLocalPosmapV1StandardTheorem.lean`, and the
+  abstract theorem proposition to be discharged is explicit as
+  `StandardPathOramStorageTheoremAt`. The theorem path is now further split
+  into a theorem-side `StandardPathOramCoreTheorem` and a runtime-side
+  `PathOramStorageEnvelope`, so the remaining gap is no longer theorem
   plumbing or runtime/theorem interface alignment.
+  The literature-faithful route is now also explicit in
+  `PathOramJACMTheorem.lean` via `PathOramJACMLiteratureTheorem` and its formal
+  mapping into `StandardPathOramCoreTheorem`. The strengthened
+  `PathOramJACMLiteratureTheoremAt` route is now available as the preferred
+  lowest-assumption import path because it fixes the theorem directly at the
+  runtime’s theorem-facing `leafRun`.
+  The concrete backend shape is now also aligned with the JACM bucket-size
+  parameter `Z = 5`, so the earlier theorem/implementation parameter mismatch
+  is removed.
   What remains missing is the actual reduction from the implementation
-  candidate to a proved standard Path ORAM theorem under those explicit
-  assumptions.
+  candidate to a proved standard Path ORAM core theorem under those explicit
+  assumptions. The old extra `leafRun` alignment gap now remains only on the
+  more general fallback route where the imported theorem brings its own
+  theorem-side schedule.
+  The exact remaining import target is now documented in
+  `docs/path-oram-core-theorem-import.md`.
 
 ## Open
 
@@ -231,12 +254,14 @@ Status labels:
   additional admitted path-ORAM workloads, including a multi-access
   `ConfidentialMixer/pathoram/deposit` run and a multi-object
   `ERC20Lite/pathoram/transferFrom` run. The full canonical fresh-coin family
-  layer now also covers `ConfidentialMixer/pathoram/deposit`, but the larger
-  canonical-pair layer is still not materialized and the canonical-family /
-  canonical-pair theorem inputs are still not instantiated for very large
-  workloads such as `ERC20Lite/pathoram/transferFrom`. The evaluation harness
-  now skips oversized canonical-pair instances by an explicit preflight size
-  budget instead of trying to materialize them and risking memory exhaustion.
+  layer now also covers `ConfidentialMixer/pathoram/deposit`, and oversized
+  fresh-coin instances now have a compact theorem-facing seed-space
+  certificate in place of full family materialization. Oversized
+  canonical-pair instances now also have a compact theorem-facing pair
+  certificate in place of full pair-family materialization. What remains open
+  here is only whether we still want to materialize the enormous explicit
+  large-case families/pairs themselves for artifact completeness, even though
+  the theorem-facing large-case inputs are now instantiated.
 
 - `active` The end-to-end SGX theorem packaging gap is now narrowed to
   instantiation, not theorem-surface design.

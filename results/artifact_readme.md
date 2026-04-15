@@ -28,9 +28,10 @@ fresh-coin seed space directly from the public scaffold, and invokes the Lean
 fresh-coin family checker on the resulting complete family, now including the
 multi-access `ConfidentialMixer/pathoram/deposit` family with its full
 `262144`-seed canonical fresh-coin space. The same report now also preflights
-oversized canonical fresh-coin families and records
-`ERC20Lite/pathoram/transferFrom-fresh-coins` as `skipped_by_budget` rather
-than trying to materialize an infeasible theorem input.
+oversized canonical fresh-coin families and, instead of stopping at
+`skipped_by_budget`, falls back to a compact theorem-facing seed-space
+certificate that checks one representative canonical seed together with the
+full public fresh-coin scaffold and seed count.
 `seeded_witness_validation.json` now also covers finite seeded path-ORAM
 families beyond `SingleAccessMap`, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object
@@ -38,31 +39,29 @@ families beyond `SingleAccessMap`, including the multi-access
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and
-`ERC20Lite/pathoram/transferFrom-pair`. Legacy surrogate ORAM scenarios remain
-reported in the broader benchmark results but are explicitly excluded from the
-theorem-facing witness validators.
+`ERC20Lite/pathoram/transferFrom-pair`. The broader `*/oram/*` benchmark
+aliases now compile the same concrete `path_oram_local_posmap_v1` backend as
+the explicit theorem-facing `*/pathoram/*` cases, so the witness validators
+report only the `pathoram` names and do not duplicate those certificates under
+the generic alias.
 `canonical_pathoram_pair_validation.json` adds the canonical fresh-coin pair
 certificate layer: it checks that the theorem-backed `SingleAccessMap`
 Path-ORAM workloads share one common public observer across the full
 canonical fresh-coin families, including the complete `256`-seed `put` family
 and complete `4096`-seed `add` family. The remaining coverage gap is now
-narrower: the larger canonical-pair layer is still not materialized, and the
-very large canonical-family / canonical-pair workloads such as
-`ERC20Lite/pathoram/transferFrom` are still not enumerated end to end. To keep
-the artifact from exhausting host memory, the canonical-pair probe now
-preflights compact certificate size from sampled witnesses and skips cases that
-exceed a safe budget. Under the default `10 GiB` budget, the current report
-accepts the two `SingleAccessMap` canonical pairs and records
-`ConfidentialMixer/pathoram/deposit-canonical-pair` as `skipped_by_budget`
-with an estimated compact certificate size of about `13.66 GiB`, while
-`ERC20Lite/pathoram/transferFrom-canonical-pair` is also recorded as
-`skipped_by_budget` with an estimated compact certificate far beyond any
-practical artifact budget.
+narrower: the small canonical pairs are still checked by full family
+materialization, while very large canonical-pair workloads now fall back to a
+compact theorem-facing pair certificate instead of being skipped. Under the
+default `10 GiB` budget, the current report accepts the two `SingleAccessMap`
+canonical pairs directly, and validates both
+`ConfidentialMixer/pathoram/deposit-canonical-pair` and
+`ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
+theorem-input path with their concrete explicit-size estimates attached.
 
 Security tiers:
 
 - Exact-UO: `FixedSlotClassifier`, `AuthScan`, `ConfidentialMixer` full-scan, `ERC20Lite` full-scan, and `RegistryCRUD` use fixed-shape commits and normalized `M+` traces that are identical across secret variations in this instrumented abstract machine.
-- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use a public-schedule ORAM surrogate that rewrites fixed-shape control metadata and a logarithmic bucket batch while keeping `M+` update classes secret-independent.
+- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use the concrete `path_oram_local_posmap_v1` backend, with fixed public controller shape, rerandomized bucket/block rewrites, and theorem-facing witness extraction on the same benchmark family.
 
 Unsupported / rejected:
 
@@ -74,5 +73,5 @@ Unsupported / rejected:
 Prototype assumptions:
 
 - `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
-- The ORAM backend is an instrumented runtime prototype with fixed-shape committed control metadata and public-schedule bucket rewrites; it is reported as computational-UO only.
+- The ORAM backend is an instrumented Path-ORAM-style runtime prototype with fixed public controller shape and rerandomized bucket/block rewrites; it is reported as computational-UO only.
 - The guarantees are with respect to the abstract/runtime traces emitted by this artifact, including the normalized physical read/write schedules captured by the runtime, not every downstream machine-code or microarchitectural observer.

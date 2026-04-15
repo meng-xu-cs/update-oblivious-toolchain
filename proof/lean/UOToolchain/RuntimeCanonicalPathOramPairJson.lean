@@ -382,4 +382,164 @@ theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_valid_projects_
       ⟨hLhsOutcome, hLhsBoundary, hLhsMicro, hLhsController, hLhsView, hLhsLocation, hLhsShape⟩,
       ⟨hRhsOutcome, hRhsBoundary, hRhsMicro, hRhsController, hRhsView, hRhsLocation, hRhsShape⟩⟩
 
+structure ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput where
+  cfg : ImportedOramConfig
+  lhs_input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput
+  rhs_input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput
+  public_view : ImportedOramViewPublicPart
+  public_location : ImportedPathOramStorageLocationTrace
+  storage_shape : ImportedPathOramStorageShape
+  public_outcome : ImportedPublicOutcomeTrace
+  boundary_schedule : List ImportedBoundaryEvent
+  controller_shape : ImportedSgxControllerShapeTrace
+  normalized_micro_trace : ImportedNormalizedMicroTrace
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimeCfg
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) : OramConfig :=
+  input.cfg.toOramConfig
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimePublicView
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) : OramViewPublicPart :=
+  input.public_view.toOramViewPublicPart
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimePublicLocation
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) :
+  PathOramStorageLocationTrace :=
+  input.public_location.toPathOramStorageLocationTrace
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimeStorageShape
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) :
+  PathOramStorageShape :=
+  input.storage_shape.toPathOramStorageShape
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimePublicOutcome
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) : SGXPublicOutcome :=
+  input.public_outcome.toPublicOutcome
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimeBoundarySchedule
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) : List BoundaryEvent :=
+  input.boundary_schedule.map ImportedBoundaryEvent.toBoundaryEvent
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimeControllerShape
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) : SGXControllerShape :=
+  input.controller_shape.toControllerShape
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.runtimeNormalizedMicroTrace
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput) : NormalizedMicroTrace :=
+  input.normalized_micro_trace.toNormalizedMicroTrace
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.inputMatches
+  (pairInput : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) : Prop :=
+  input.Valid modelTags ∧
+    input.runtimeRepresentativeWitness.ObjectsMatchPublicConfig pairInput.runtimeCfg ∧
+    pathOramViewPublicPart (viewMPlus input.runtimeRepresentativeWitness.trace) =
+      pairInput.runtimePublicView ∧
+    pathOramPublicLocationTrace
+        (pathOramStorageLocationTrace
+          (oramStorageView (viewMPlus input.runtimeRepresentativeWitness.trace))) =
+      pairInput.runtimePublicLocation ∧
+    pathOramStorageShape (oramStorageView (viewMPlus input.runtimeRepresentativeWitness.trace)) =
+      pairInput.runtimeStorageShape ∧
+    input.runtimeRepresentativeWitness.publicOutcome = pairInput.runtimePublicOutcome ∧
+    input.runtimeRepresentativeWitness.boundarySchedule = pairInput.runtimeBoundarySchedule ∧
+    input.runtimeRepresentativeWitness.controllerShape = pairInput.runtimeControllerShape ∧
+    input.runtimeRepresentativeWitness.normalizedMicroTrace =
+      pairInput.runtimeNormalizedMicroTrace
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.Valid
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+  (modelTags : SGXModelTags) : Prop :=
+  PathOramConfigWellFormed input.runtimeCfg ∧
+    input.inputMatches input.lhs_input modelTags ∧
+    input.inputMatches input.rhs_input modelTags
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.inputMatchesCheck
+  (pairInput : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) : Bool :=
+  input.checkValid modelTags &&
+    runtimeWitnessObjectsMatchPublicConfigCheck input.runtimeRepresentativeWitness pairInput.runtimeCfg &&
+    decide
+      (pathOramViewPublicPart (viewMPlus input.runtimeRepresentativeWitness.trace) =
+        pairInput.runtimePublicView) &&
+    decide
+      (pathOramPublicLocationTrace
+          (pathOramStorageLocationTrace
+            (oramStorageView (viewMPlus input.runtimeRepresentativeWitness.trace))) =
+        pairInput.runtimePublicLocation) &&
+    decide
+      (pathOramStorageShape (oramStorageView (viewMPlus input.runtimeRepresentativeWitness.trace)) =
+        pairInput.runtimeStorageShape) &&
+    decide (input.runtimeRepresentativeWitness.publicOutcome = pairInput.runtimePublicOutcome) &&
+    decide
+      (input.runtimeRepresentativeWitness.boundarySchedule = pairInput.runtimeBoundarySchedule) &&
+    decide (input.runtimeRepresentativeWitness.controllerShape = pairInput.runtimeControllerShape) &&
+    decide
+      (input.runtimeRepresentativeWitness.normalizedMicroTrace =
+        pairInput.runtimeNormalizedMicroTrace)
+
+def ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.checkValid
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+  (modelTags : SGXModelTags) : Bool :=
+  pathOramConfigWellFormedCheck input.runtimeCfg &&
+    input.inputMatchesCheck input.lhs_input modelTags &&
+    input.inputMatchesCheck input.rhs_input modelTags
+
+def parseImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput
+  (input : String) : Except String ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput
+  (input : String)
+  (modelTags : SGXModelTags) :
+  Except String ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput := do
+  let theoremInput ← parseImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput input
+  if theoremInput.checkValid modelTags then
+    pure theoremInput
+  else
+    throw "imported canonical fresh-coin path-ORAM pair theorem input does not satisfy Lean validity checks"
+
+def loadAndCheckImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput input modelTags with
+  | .ok theoremInput => pure theoremInput
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate canonical fresh-coin path-ORAM pair theorem input: {err}"
+
+@[simp] theorem importedCanonicalFreshCoinRuntimePathOramPairTheoremInput_inputMatchesCheck_eq_true_iff
+  (pairInput : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) :
+  pairInput.inputMatchesCheck input modelTags = true ↔
+    pairInput.inputMatches input modelTags := by
+  simp
+    [ ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.inputMatchesCheck
+    , ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.inputMatches
+    , importedCanonicalFreshCoinRuntimePathOramTheoremInput_checkValid_eq_true_iff
+    , runtimeWitnessObjectsMatchPublicConfigCheck_eq_true_iff
+    , Bool.and_eq_true
+    , decide_eq_true_eq
+    , and_assoc
+    ]
+
+@[simp] theorem importedCanonicalFreshCoinRuntimePathOramPairTheoremInput_checkValid_eq_true_iff
+  (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+  (modelTags : SGXModelTags) :
+  input.checkValid modelTags = true ↔ input.Valid modelTags := by
+  simp
+    [ ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.checkValid
+    , ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput.Valid
+    , importedCanonicalFreshCoinRuntimePathOramPairTheoremInput_inputMatchesCheck_eq_true_iff
+    , pathOramConfigWellFormedCheck_eq_true_iff
+    , Bool.and_eq_true
+    , and_assoc
+    ]
+
 end UOToolchain
