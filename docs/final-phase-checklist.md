@@ -121,6 +121,27 @@ Status labels:
   projection directly for the full `256`-seed `put(bytes32,uint256)` family
   pair and full `4096`-seed `add(bytes32,uint256)` family pair.
 
+- `cleared` Closed the end-to-end paper-main instantiation/refinement gap for
+  explicit canonical Path-ORAM pair artifacts.
+  Evidence:
+  `proof/lean/UOToolchain/RuntimePaperInstantiation.lean`,
+  `proof/lean/CheckCanonicalPathOramPaperInstantiation.lean`,
+  `probe/mplus-probe/src/lib.rs`.
+  The theorem-facing refinement no longer incorrectly requires the full
+  canonical fresh-coin family to equal the hidden accessed-leaf seed space.
+  Instead, Lean now checks that the explicit fresh-coin family covers the
+  hidden accessed-leaf seed space induced by the public leaf scaffold and then
+  quotients that family by selecting one representative witness per hidden
+  leaf-value seed. The probe now runs this paper-instantiation checker on each
+  explicitly materialized canonical pair certificate and records
+  `paper_instantiation_status` in the canonical pair validation report. Small
+  explicit cases such as `SingleAccessMap/pathoram/put-canonical-pair` and
+  `SingleAccessMap/pathoram/add-canonical-pair` now validate end to end in
+  both normal explicit mode and bounded heavy-artifact mode. Oversized cases
+  that stay on the compact theorem-input path are now marked
+  `paper_instantiation_status = not_materialized` explicitly rather than
+  silently pretending to have a full explicit instantiation.
+
 - `cleared` Removed the hidden Path-ORAM position-map ordering assumption from
   the Lean theorem-facing checker.
   Evidence:
@@ -201,10 +222,12 @@ Status labels:
   missing is only the full explicit large-family materialization, not the
   theorem-facing large-case input coverage.
 
-- `active` The concrete `path_oram_local_posmap_v1` theorem boundary is now
-  explicit at the Lean surface, but the standard-ORAM discharge is still open.
+- `cleared` The concrete `path_oram_local_posmap_v1` standard-ORAM theorem is
+  now discharged end to end under the explicit backend assumption bundle.
   Evidence:
   `proof/lean/UOToolchain/PathOramLocalPosmapV1.lean`,
+  `proof/lean/UOToolchain/PathOramLocalPosmapV1StandardTheorem.lean`,
+  `proof/lean/UOToolchain/PathOramJACMTheorem.lean`,
   `docs/paper-theorem-profile.md`,
   `docs/formal-proof-plan.md`.
   The repo now names the remaining backend-specific assumption bundle,
@@ -229,51 +252,53 @@ Status labels:
   The concrete backend shape is now also aligned with the JACM bucket-size
   parameter `Z = 5`, so the earlier theorem/implementation parameter mismatch
   is removed.
-  What remains missing is the actual reduction from the implementation
-  candidate to a proved standard Path ORAM core theorem under those explicit
-  assumptions. The old extra `leafRun` alignment gap now remains only on the
-  more general fallback route where the imported theorem brings its own
-  theorem-side schedule.
+  The concrete seeded runtime bundle now discharges
+  `StandardPathOramStorageTheoremAt` directly via
+  `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardPathOramStorageTheoremAt`,
+  packages the resulting bridge as
+  `PathOramLocalPosmapV1StandardTheoremRealization`, and also exposes the
+  preferred literature-faithful closure route through
+  `pathOramLocalPosmapV1_jacmLiteratureTheoremAt`,
+  `pathOramLocalPosmapV1_standardPathOramStorageTheoremAtOfSelfJACMAt`, and
+  `pathOramLocalPosmapV1_standardTheoremRealizationOfSelfJACMAt`.
+  The old extra `leafRun` alignment gap now survives only as an optional
+  general fallback route when importing an external theorem whose schedule is
+  not already fixed at `bundle.leafRun`.
   The exact remaining import target is now documented in
   `docs/path-oram-core-theorem-import.md`.
 
 ## Open
 
-- `open` Discharge the ORAM theorem for the concrete
-  `path_oram_local_posmap_v1` implementation.
-  The runtime candidate, hidden witness interface, theorem-tight seeded-family
-  checker, theorem-tight paired-certificate checker, and a concrete
-  backend-specific Lean theorem boundary now all exist, but the reduction from
-  the implementation candidate to the standard Path ORAM theorem itself is
-  still not finished.
+- `cleared` Added a separate heavy-artifact mode for large feasible canonical
+  Path-ORAM families and pair certificates.
+  The default `results/` bundle stays on the compact theorem-input path once a
+  canonical family or pair certificate exceeds the configured compact budget,
+  so the default artifact remains memory-safe and reproducible. In addition,
+  `scripts/run_heavy_artifact.sh` now switches the probe into a distinct heavy
+  materialization mode backed by a larger explicit-size budget and a separate
+  `results-heavy/heavy_artifacts/` directory. In that mode, cases that are too
+  large for the default compact artifact but still physically feasible can now
+  be materialized explicitly without changing the theorem boundary. Only
+  astronomically large seed spaces, such as the current
+  `ERC20Lite/pathoram/transferFrom` canonical family and canonical pair, still
+  remain on the compact theorem-input path even in heavy mode because their
+  full explicit witness space is not a practical artifact target.
 
-- `open` Extend the full canonical-family and canonical-pair path-ORAM coverage
-  beyond the current small benchmark vehicles.
-  The witness/controller/hidden-certificate pipeline, the finite seeded-family
-  pipeline, and the finite seeded-pair certificate pipeline now all cover
-  additional admitted path-ORAM workloads, including a multi-access
-  `ConfidentialMixer/pathoram/deposit` run and a multi-object
-  `ERC20Lite/pathoram/transferFrom` run. The full canonical fresh-coin family
-  layer now also covers `ConfidentialMixer/pathoram/deposit`, and oversized
-  fresh-coin instances now have a compact theorem-facing seed-space
-  certificate in place of full family materialization. Oversized
-  canonical-pair instances now also have a compact theorem-facing pair
-  certificate in place of full pair-family materialization. What remains open
-  here is only whether we still want to materialize the enormous explicit
-  large-case families/pairs themselves for artifact completeness, even though
-  the theorem-facing large-case inputs are now instantiated.
-
-- `active` The end-to-end SGX theorem packaging gap is now narrowed to
-  instantiation, not theorem-surface design.
+- `cleared` The end-to-end SGX theorem packaging gap is closed for the current
+  explicit canonical Path-ORAM artifact path.
   Evidence:
   `proof/lean/UOToolchain/PathOramLocalPosmapV1.lean`,
+  `proof/lean/UOToolchain/RuntimePaperInstantiation.lean`,
+  `proof/lean/CheckCanonicalPathOramPaperInstantiation.lean`,
+  `probe/mplus-probe/src/lib.rs`,
   `docs/paper-theorem-profile.md`.
   The repository now has an explicit artifact-level paper-main bundle for the
-  concrete backend that combines exact artifact composition, exact SGX
-  execution security, concrete ORAM SGX execution security, and mixed
-  exact/ORAM TEE storage security into one Lean proposition. What remains is
-  to instantiate that bundle all the way through runtime refinement and the
-  still-open concrete ORAM theorem discharge for the supported backend set.
+  concrete backend and a concrete runtime-refinement bridge that instantiates
+  that bundle from explicit canonical pair certificates. The remaining scope
+  distinction is now artifact shape, not theorem packaging: explicitly
+  materialized canonical pairs validate the paper-main boundary end to end,
+  while oversized cases intentionally remain on the compact theorem-input path
+  until a full explicit artifact is physically materialized.
 
 ## Current Exit Condition
 

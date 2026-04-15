@@ -207,6 +207,40 @@ noncomputable def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importe
   ImportedPathOramStorageTheorem assumptions :=
   paper.toImportedStorageTheorem bundle.pathOramLocalPosmapV1_storageEnvelope
 
+theorem SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardPathOramStorageTheoremAtOfJACMAt
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePathOramProofBundle modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+  (paper : PathOramJACMLiteratureTheoremAt assumptions bundle.publicView bundle.leafRun) :
+  StandardPathOramStorageTheoremAt
+    assumptions
+    bundle.publicView
+    bundle.storageRun := by
+  exact paper.standardPathOramStorageTheoremAt bundle.pathOramLocalPosmapV1_storageEnvelope
+
+noncomputable def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedStorageTheoremOfSelfJACMAt
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePathOramProofBundle modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+  (hStash : assumptions.stashOverflowBounded) :
+  ImportedPathOramStorageTheorem assumptions :=
+  bundle.pathOramLocalPosmapV1_importedStorageTheoremOfJACMAt
+    assumptions
+    (bundle.pathOramLocalPosmapV1_jacmLiteratureTheoremAt assumptions hStash)
+
+theorem SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardPathOramStorageTheoremAtOfSelfJACMAt
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePathOramProofBundle modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+  (hStash : assumptions.stashOverflowBounded) :
+  StandardPathOramStorageTheoremAt
+    assumptions
+    bundle.publicView
+    bundle.storageRun := by
+  exact bundle.pathOramLocalPosmapV1_standardPathOramStorageTheoremAtOfJACMAt
+    assumptions
+    (bundle.pathOramLocalPosmapV1_jacmLiteratureTheoremAt assumptions hStash)
+
 noncomputable def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealizationOfJACM
   {modelTags : SGXModelTags}
   (bundle : SeededRuntimePathOramProofBundle modelTags)
@@ -231,5 +265,15 @@ noncomputable def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standar
     (bundle.pathOramLocalPosmapV1_importedStorageTheoremOfJACMAt assumptions paper)
     rfl
     rfl
+
+noncomputable def SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealizationOfSelfJACMAt
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePathOramProofBundle modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+  (hStash : assumptions.stashOverflowBounded) :
+  PathOramLocalPosmapV1StandardTheoremRealization bundle assumptions :=
+  bundle.pathOramLocalPosmapV1_standardTheoremRealizationOfJACMAt
+    assumptions
+    (bundle.pathOramLocalPosmapV1_jacmLiteratureTheoremAt assumptions hStash)
 
 end UOToolchain

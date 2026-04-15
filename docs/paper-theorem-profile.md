@@ -163,6 +163,23 @@ The canonical leaf-value layer is exposed through:
 - `PathOramCanonicalLeafValueSecurityAssumptions`
 - `computationalPathOram_fromPublicViewCanonicalLeafValuesBucketLocationAndShape_projects_to_computationalUOWith`
 
+At the runtime-artifact boundary, the explicit canonical fresh-coin family is
+now related to that hidden accessed-leaf theorem interface by coverage, not by
+literal equality of seed spaces. Concretely:
+
+- the public leaf scaffold determines the hidden accessed-leaf seed space
+- the explicit runtime artifact enumerates the larger canonical fresh-coin seed
+  space, which may also include non-leaf coins such as leaf-resampling coins
+- `RuntimePaperInstantiation.lean` proves that if the explicit fresh-coin
+  family covers every hidden accessed-leaf seed, Lean can select one
+  representative explicit witness per hidden seed and quotient the runtime
+  family into the theorem-facing hidden leaf-value family
+
+This is the exact bridge used by
+`CheckCanonicalPathOramPaperInstantiation.lean` and the probe’s explicit
+canonical-pair validation path. It closes the runtime/theorem instantiation gap
+without weakening the theorem boundary or adding new backend assumptions.
+
 The concrete backend specialization is now surfaced explicitly in:
 
 - `proof/lean/UOToolchain/PathOramLocalPosmapV1.lean`
@@ -194,9 +211,11 @@ named projection lemmas without changing the theorem boundary. The legacy
 surrogate theorem remains available as a compatibility specialization, so the
 generic paper-facing aliases below are unchanged. The current seeded runtime
 proof bundle now also instantiates that standard-theorem import boundary
-directly, which means the remaining open issue is the backend theorem itself
-rather than any mismatch between the runtime witness bundle and the theorem
-interface.
+directly, including the preferred `PathOramJACMLiteratureTheoremAt` route at
+the runtime-facing `leafRun`, so there is no longer an open backend-theorem
+gap at the concrete repo boundary. What remains optional is only whether the
+paper wants to replace that self-instantiated closure with an external imported
+theorem presentation.
 
 The current paper-facing aliases are:
 

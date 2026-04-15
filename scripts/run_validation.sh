@@ -21,6 +21,18 @@ resolve_lake() {
 }
 
 LAKE_BIN="$(resolve_lake)"
+RESULTS_DIR="${UO_RESULTS_DIR:-results}"
+PROBE_ARGS=(--out-dir "$RESULTS_DIR")
+
+if [[ "${UO_ARTIFACT_MODE:-compact}" == "heavy" ]]; then
+  PROBE_ARGS+=(--artifact-mode heavy)
+fi
+if [[ -n "${UO_CANONICAL_CERT_BUDGET_BYTES:-}" ]]; then
+  PROBE_ARGS+=(--compact-budget-bytes "$UO_CANONICAL_CERT_BUDGET_BYTES")
+fi
+if [[ -n "${UO_HEAVY_ARTIFACT_BUDGET_BYTES:-}" ]]; then
+  PROBE_ARGS+=(--heavy-budget-bytes "$UO_HEAVY_ARTIFACT_BUDGET_BYTES")
+fi
 
 cd "$ROOT"
 ./scripts/compile_benches.sh
@@ -29,4 +41,4 @@ cd "$ROOT"
   "$LAKE_BIN" build
 )
 cargo test
-cargo run -q -p mplus-probe -- --out-dir results
+cargo run -q -p mplus-probe -- "${PROBE_ARGS[@]}"

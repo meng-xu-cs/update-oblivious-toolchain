@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::{json, Value as JsonValue};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -13,8 +13,9 @@ use uo_core::{
     BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
     CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact, ContractMetadata,
     LogicalEvent, NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
-    RuntimeOramAccessCounterWitness, RuntimeOramObjectWitness, RuntimeRefinementWitness,
-    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value, WriteClass,
+    RuntimeOramAccessCounterWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness,
+    RuntimeRefinementWitness, SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value,
+    WriteClass,
 };
 use uo_evm::{CallResult, ContractInstance, PathOramFreshCoinPlan};
 
@@ -161,9 +162,95 @@ struct CanonicalFamilySizeEstimate {
 }
 
 const DEFAULT_CANONICAL_CERT_BUDGET_BYTES: u64 = 10 * 1024 * 1024 * 1024;
+const DEFAULT_HEAVY_ARTIFACT_BUDGET_BYTES: u64 = 20 * 1024 * 1024 * 1024;
 const CANONICAL_SIZE_ESTIMATE_SAMPLE_SEEDS: usize = 8;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum ArtifactMaterializationMode {
+    Compact,
+    Heavy,
+}
+
+impl ArtifactMaterializationMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Compact => "compact",
+            Self::Heavy => "heavy",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ProbeRunOptions {
+    pub materialization_mode: ArtifactMaterializationMode,
+    pub out_dir: Option<PathBuf>,
+    pub compact_budget_bytes: u64,
+    pub heavy_budget_bytes: u64,
+}
+
+impl Default for ProbeRunOptions {
+    fn default() -> Self {
+        Self {
+            materialization_mode: ArtifactMaterializationMode::Compact,
+            out_dir: None,
+            compact_budget_bytes: DEFAULT_CANONICAL_CERT_BUDGET_BYTES,
+            heavy_budget_bytes: DEFAULT_HEAVY_ARTIFACT_BUDGET_BYTES,
+        }
+    }
+}
+
+impl ProbeRunOptions {
+    fn artifact_configuration_json(&self) -> JsonValue {
+        json!({
+            "materialization_mode": self.materialization_mode.as_str(),
+            "compact_budget_bytes": self.compact_budget_bytes,
+            "heavy_budget_bytes": self.heavy_budget_bytes,
+            "heavy_artifact_dir": self
+                .heavy_artifact_dir()
+                .map(|path| path.display().to_string()),
+        })
+    }
+
+    fn heavy_artifact_dir(&self) -> Option<PathBuf> {
+        self.out_dir
+            .as_ref()
+            .map(|out_dir| out_dir.join("heavy_artifacts"))
+    }
+
+    fn should_try_heavy_materialization(&self, estimated_bytes: u64) -> bool {
+        self.materialization_mode == ArtifactMaterializationMode::Heavy
+            && estimated_bytes > self.compact_budget_bytes
+            && estimated_bytes <= self.heavy_budget_bytes
+    }
+}
+
+#[derive(Clone)]
+struct PreparedCanonicalFreshCoinFamily {
+    prepared: ContractInstance,
+    first_witness: RuntimeRefinementWitness,
+    access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    seed_count: usize,
+}
+
+#[derive(Clone)]
+struct MaterializedCanonicalFreshCoinFamily {
+    access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    seed_count: usize,
+    gas_uniform: bool,
+    boundary_uniform: bool,
+    controller_phase_uniform: bool,
+    oram_object_config_uniform: bool,
+    public_leaf_scaffold_steps: usize,
+    public_fresh_coin_scaffold_steps: usize,
+}
+
 pub fn run_probe() -> Result<JsonValue> {
+    run_probe_with_options(&ProbeRunOptions::default())
+}
+
+pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
     let suite = compile_suite()?;
     let correctness = run_correctness(&suite)?;
     let static_checks = run_static_checks(&suite)?;
@@ -175,11 +262,12 @@ pub fn run_probe() -> Result<JsonValue> {
     let pathoram_hidden_validation = run_pathoram_hidden_validation()?;
     let witness_validation = run_witness_validation(&suite)?;
     let seeded_witness_validation = run_seeded_witness_validation()?;
-    let fresh_coin_validation = run_fresh_coin_validation()?;
+    let fresh_coin_validation = run_fresh_coin_validation(options)?;
     let pathoram_pair_validation = run_pathoram_pair_validation()?;
-    let canonical_pathoram_pair_validation = run_canonical_pathoram_pair_validation()?;
-    let artifact_readme = artifact_readme();
+    let canonical_pathoram_pair_validation = run_canonical_pathoram_pair_validation(options)?;
+    let artifact_readme = artifact_readme(options);
     Ok(json!({
+        "artifact_configuration": options.artifact_configuration_json(),
         "correctness": correctness,
         "static_checks": static_checks,
         "trace_equivalence": trace_equivalence,
@@ -198,7 +286,11 @@ pub fn run_probe() -> Result<JsonValue> {
 }
 
 pub fn run_fresh_coin_validation_report() -> Result<JsonValue> {
-    run_fresh_coin_validation()
+    run_fresh_coin_validation_with_options(&ProbeRunOptions::default())
+}
+
+pub fn run_fresh_coin_validation_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
+    run_fresh_coin_validation(options)
 }
 
 pub fn run_witness_validation_report() -> Result<JsonValue> {
@@ -224,11 +316,24 @@ pub fn run_pathoram_hidden_validation_report() -> Result<JsonValue> {
 }
 
 pub fn run_canonical_pathoram_pair_validation_report() -> Result<JsonValue> {
-    run_canonical_pathoram_pair_validation()
+    run_canonical_pathoram_pair_validation_with_options(&ProbeRunOptions::default())
+}
+
+pub fn run_canonical_pathoram_pair_validation_with_options(
+    options: &ProbeRunOptions,
+) -> Result<JsonValue> {
+    run_canonical_pathoram_pair_validation(options)
 }
 
 pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
     fs::create_dir_all(out_dir)?;
+    if !results["artifact_configuration"].is_null() {
+        let path = Path::new(out_dir).join("artifact_configuration.json");
+        fs::write(
+            path,
+            serde_json::to_vec_pretty(&results["artifact_configuration"])?,
+        )?;
+    }
     for key in [
         "correctness",
         "static_checks",
@@ -1032,7 +1137,7 @@ fn run_seeded_witness_validation() -> Result<JsonValue> {
     }))
 }
 
-fn run_fresh_coin_validation() -> Result<JsonValue> {
+fn run_fresh_coin_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
     let family_checker = lean_fresh_coin_family_checker_path()?;
     let theorem_input_checker = lean_fresh_coin_theorem_input_checker_path()?;
     let single_access = compile_artifact(
@@ -1072,6 +1177,7 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
             },
             &family_checker,
             &theorem_input_checker,
+            options,
         )?,
         validate_fresh_coin_family_case(
             "SingleAccessMap/pathoram/add-fresh-coins",
@@ -1083,6 +1189,7 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
             },
             &family_checker,
             &theorem_input_checker,
+            options,
         )?,
         validate_fresh_coin_family_case(
             "ConfidentialMixer/pathoram/deposit-fresh-coins",
@@ -1094,6 +1201,7 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
             },
             &family_checker,
             &theorem_input_checker,
+            options,
         )?,
         validate_fresh_coin_family_case(
             "ERC20Lite/pathoram/transferFrom-fresh-coins",
@@ -1105,12 +1213,14 @@ fn run_fresh_coin_validation() -> Result<JsonValue> {
             },
             &family_checker,
             &theorem_input_checker,
+            options,
         )?,
     ];
 
     Ok(json!({
         "checker": family_checker.display().to_string(),
         "theorem_input_checker": theorem_input_checker.display().to_string(),
+        "artifact_configuration": options.artifact_configuration_json(),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -1223,8 +1333,9 @@ fn run_pathoram_pair_validation() -> Result<JsonValue> {
     }))
 }
 
-fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
+fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
     let checker = lean_canonical_pathoram_pair_checker_path()?;
+    let paper_instantiation_checker = lean_canonical_pathoram_paper_instantiation_checker_path()?;
     let theorem_input_checker = lean_canonical_pathoram_pair_theorem_input_checker_path()?;
     let single_access = compile_artifact(
         "benches/raw/SingleAccessMap.sol",
@@ -1266,7 +1377,9 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![b32(9), Value::Uint(7)],
             },
             &checker,
+            &paper_instantiation_checker,
             &theorem_input_checker,
+            options,
         )?,
         validate_canonical_pathoram_pair_case(
             "SingleAccessMap/pathoram/add-canonical-pair",
@@ -1281,7 +1394,9 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![b32(9), Value::Uint(7)],
             },
             &checker,
+            &paper_instantiation_checker,
             &theorem_input_checker,
+            options,
         )?,
         validate_canonical_pathoram_pair_case(
             "ConfidentialMixer/pathoram/deposit-canonical-pair",
@@ -1296,7 +1411,9 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![b32(9), Value::Uint(1)],
             },
             &checker,
+            &paper_instantiation_checker,
             &theorem_input_checker,
+            options,
         )?,
         validate_canonical_pathoram_pair_case(
             "ERC20Lite/pathoram/transferFrom-canonical-pair",
@@ -1311,13 +1428,17 @@ fn run_canonical_pathoram_pair_validation() -> Result<JsonValue> {
                 args: vec![addr(0x11), addr(0x22), addr(0x44), Value::Uint(3)],
             },
             &checker,
+            &paper_instantiation_checker,
             &theorem_input_checker,
+            options,
         )?,
     ];
 
     Ok(json!({
         "checker": checker.display().to_string(),
+        "paper_instantiation_checker": paper_instantiation_checker.display().to_string(),
         "theorem_input_checker": theorem_input_checker.display().to_string(),
+        "artifact_configuration": options.artifact_configuration_json(),
         "model_tags": {
             "page_model": "page_v1",
             "exit_model": "exit_v1",
@@ -1532,8 +1653,8 @@ fn validate_fresh_coin_family_case(
     target: &CallSpec,
     family_checker: &Path,
     theorem_input_checker: &Path,
+    options: &ProbeRunOptions,
 ) -> Result<JsonValue> {
-    let budget_bytes = canonical_cert_budget_bytes();
     let estimate = estimate_canonical_fresh_coin_family_size(
         name,
         artifact,
@@ -1541,14 +1662,25 @@ fn validate_fresh_coin_family_case(
         target,
         CANONICAL_SIZE_ESTIMATE_SAMPLE_SEEDS,
     )?;
-    if estimate.estimated_family_json_bytes > budget_bytes {
+    if options.should_try_heavy_materialization(estimate.estimated_family_json_bytes) {
+        return validate_fresh_coin_heavy_case(
+            name,
+            artifact,
+            setup,
+            target,
+            family_checker,
+            options,
+            estimate,
+        );
+    }
+    if estimate.estimated_family_json_bytes > options.compact_budget_bytes {
         return validate_fresh_coin_theorem_input_case(
             name,
             artifact,
             setup,
             target,
             theorem_input_checker,
-            budget_bytes,
+            options.compact_budget_bytes,
             estimate,
         );
     }
@@ -1624,6 +1756,8 @@ fn validate_fresh_coin_family_case(
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
+    let persisted_artifact =
+        persist_heavy_artifact_json(options, name, "canonical_fresh_coin_family.json", &family)?;
 
     Ok(json!({
         "scenario": name,
@@ -1647,6 +1781,8 @@ fn validate_fresh_coin_family_case(
         "canonical_fresh_coin_seed_space_size": Some(family.seed_count),
         "canonical_fresh_coin_values_match_index": canonical_fresh_coin_values_match_index,
         "witness_family_json_bytes": family_json_bytes,
+        "heavy_artifact_path": persisted_artifact.as_ref().map(|(path, _)| path.clone()),
+        "heavy_artifact_json_bytes": persisted_artifact.as_ref().map(|(_, bytes)| *bytes),
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "lean_validated": true,
         "accepted": true,
@@ -1662,8 +1798,7 @@ fn validate_fresh_coin_theorem_input_case(
     budget_bytes: u64,
     estimate: CanonicalFamilySizeEstimate,
 ) -> Result<JsonValue> {
-    let collected =
-        collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, target)?;
+    let collected = collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, target)?;
     let theorem_input = collected.input;
     let representative_values = theorem_input
         .representative_witness
@@ -1848,12 +1983,12 @@ fn collect_canonical_fresh_coin_theorem_input_case(
         representative_witness,
     )
     .map_err(|err| {
-            anyhow!(
-                "canonical fresh-coin theorem input invalid for {}: {}",
-                name,
-                err
-            )
-        })?;
+        anyhow!(
+            "canonical fresh-coin theorem input invalid for {}: {}",
+            name,
+            err
+        )
+    })?;
     Ok(CollectedCanonicalFreshCoinTheoremInput {
         input,
         access_counters_before: first_trace.runtime_oram_access_counters_before.clone(),
@@ -1942,6 +2077,435 @@ fn estimate_canonical_fresh_coin_family_size(
         public_leaf_scaffold_steps: first_witness.oram_leaf_public_scaffold.len(),
         public_fresh_coin_scaffold_steps: fresh_coin_scaffold.len(),
     })
+}
+
+fn prepare_canonical_fresh_coin_family(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+) -> Result<PreparedCanonicalFreshCoinFamily> {
+    let deploy_seed = 0u64;
+    let prepared = prepare_instance_with_seed(artifact, setup, deploy_seed)?;
+    let mut first_instance = prepared.clone();
+    let first_trace = first_instance
+        .call(target.entrypoint, target.args.clone())?
+        .trace;
+    let first_witness = first_trace.runtime_refinement_witness()?;
+    let public_leaf_scaffold = first_witness.oram_leaf_public_scaffold.clone();
+    let public_fresh_coin_scaffold = first_witness
+        .path_oram_fresh_coin_scaffold()
+        .ok_or_else(|| anyhow!("fresh-coin scaffold extraction failed for {}", name))?;
+    let seed_count = canonical_path_oram_leaf_seed_space_size(&public_fresh_coin_scaffold)
+        .ok_or_else(|| anyhow!("fresh-coin seed space overflow for {}", name))?;
+    Ok(PreparedCanonicalFreshCoinFamily {
+        prepared,
+        first_witness,
+        access_counters_before: first_trace.runtime_oram_access_counters_before.clone(),
+        public_leaf_scaffold,
+        public_fresh_coin_scaffold,
+        seed_count,
+    })
+}
+
+fn update_uniform<T: Eq>(slot: &mut Option<T>, uniform: &mut bool, value: T) {
+    match slot {
+        Some(expected) => {
+            if expected != &value {
+                *uniform = false;
+            }
+        }
+        None => *slot = Some(value),
+    }
+}
+
+fn write_json_key<W: Write>(writer: &mut W, key: &str) -> Result<()> {
+    serde_json::to_writer(&mut *writer, key)?;
+    writer.write_all(b":")?;
+    Ok(())
+}
+
+fn materialize_canonical_fresh_coin_family_object<W: Write>(
+    writer: &mut W,
+    name: &'static str,
+    target: &CallSpec,
+    context: &PreparedCanonicalFreshCoinFamily,
+) -> Result<MaterializedCanonicalFreshCoinFamily> {
+    writer.write_all(b"{")?;
+    write_json_key(writer, "seed_count")?;
+    serde_json::to_writer(&mut *writer, &context.seed_count)?;
+    writer.write_all(b",")?;
+    write_json_key(writer, "witnesses")?;
+    writer.write_all(b"[")?;
+
+    let mut gas_seen: Option<u64> = None;
+    let mut boundary_seen: Option<usize> = None;
+    let mut controller_phase_seen: Option<usize> = None;
+    let mut oram_object_cfg_seen: Option<String> = None;
+    let mut gas_uniform = true;
+    let mut boundary_uniform = true;
+    let mut controller_phase_uniform = true;
+    let mut oram_object_config_uniform = true;
+
+    for seed in 0..context.seed_count {
+        let fresh_coin_values =
+            canonical_path_oram_leaf_values_of_seed(&context.public_fresh_coin_scaffold, seed);
+        let fresh_coin_plan = PathOramFreshCoinPlan::from_scaffold_and_values(
+            &context.public_fresh_coin_scaffold,
+            &fresh_coin_values,
+        )?;
+        let mut instance = context.prepared.clone();
+        let trace = instance
+            .call_with_path_oram_fresh_coins(
+                target.entrypoint,
+                target.args.clone(),
+                &fresh_coin_plan,
+            )?
+            .trace;
+        let witness = trace.runtime_refinement_witness()?;
+        let extracted_scaffold = witness.path_oram_fresh_coin_scaffold().ok_or_else(|| {
+            anyhow!(
+                "fresh-coin scaffold extraction failed for {} seed {}",
+                name,
+                seed
+            )
+        })?;
+        let extracted_values = witness.path_oram_fresh_coin_values().ok_or_else(|| {
+            anyhow!(
+                "fresh-coin value extraction failed for {} seed {}",
+                name,
+                seed
+            )
+        })?;
+        if witness.oram_leaf_public_scaffold != context.public_leaf_scaffold
+            || extracted_scaffold != context.public_fresh_coin_scaffold
+            || extracted_values != fresh_coin_values
+        {
+            return Err(anyhow!(
+                "canonical fresh-coin extraction mismatch for {} seed {}",
+                name,
+                seed
+            ));
+        }
+        update_uniform(&mut gas_seen, &mut gas_uniform, witness.trace.gas_used);
+        update_uniform(
+            &mut boundary_seen,
+            &mut boundary_uniform,
+            witness.boundary_schedule.len(),
+        );
+        update_uniform(
+            &mut controller_phase_seen,
+            &mut controller_phase_uniform,
+            witness.controller_shape.controller_phase_order.len(),
+        );
+        update_uniform(
+            &mut oram_object_cfg_seen,
+            &mut oram_object_config_uniform,
+            serde_json::to_string(&witness.oram_objects)?,
+        );
+        if seed > 0 {
+            writer.write_all(b",")?;
+        }
+        serde_json::to_writer(&mut *writer, &witness)?;
+    }
+
+    writer.write_all(b"],")?;
+    write_json_key(writer, "public_leaf_scaffold")?;
+    serde_json::to_writer(&mut *writer, &context.public_leaf_scaffold)?;
+    writer.write_all(b",")?;
+    write_json_key(writer, "public_fresh_coin_scaffold")?;
+    serde_json::to_writer(&mut *writer, &context.public_fresh_coin_scaffold)?;
+    writer.write_all(b"}")?;
+
+    Ok(MaterializedCanonicalFreshCoinFamily {
+        access_counters_before: context.access_counters_before.clone(),
+        seed_count: context.seed_count,
+        gas_uniform,
+        boundary_uniform,
+        controller_phase_uniform,
+        oram_object_config_uniform,
+        public_leaf_scaffold_steps: context.public_leaf_scaffold.len(),
+        public_fresh_coin_scaffold_steps: context.public_fresh_coin_scaffold.len(),
+    })
+}
+
+fn sanitize_case_name(case_name: &str) -> String {
+    case_name
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect::<String>()
+}
+
+fn heavy_artifact_materialization_path(
+    options: &ProbeRunOptions,
+    scenario: &str,
+    suffix: &str,
+) -> Result<(PathBuf, bool)> {
+    if let Some(dir) = options.heavy_artifact_dir() {
+        fs::create_dir_all(&dir)?;
+        Ok((
+            dir.join(format!("{}.{}", sanitize_case_name(scenario), suffix)),
+            true,
+        ))
+    } else {
+        Ok((
+            temporary_witness_path(&format!("{scenario}-{suffix}")),
+            false,
+        ))
+    }
+}
+
+fn cleanup_materialized_file(path: &Path, preserve: bool) {
+    if !preserve {
+        let _ = fs::remove_file(path);
+    }
+}
+
+fn persist_heavy_artifact_json<T: Serialize>(
+    options: &ProbeRunOptions,
+    scenario: &str,
+    suffix: &str,
+    value: &T,
+) -> Result<Option<(String, u64)>> {
+    if options.materialization_mode != ArtifactMaterializationMode::Heavy {
+        return Ok(None);
+    }
+    let Some(dir) = options.heavy_artifact_dir() else {
+        return Ok(None);
+    };
+    fs::create_dir_all(&dir)?;
+    let path = dir.join(format!("{}.{}", sanitize_case_name(scenario), suffix));
+    let file = fs::File::create(&path)?;
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer(&mut writer, value)?;
+    writer.flush()?;
+    let bytes = fs::metadata(&path)?.len();
+    Ok(Some((path.display().to_string(), bytes)))
+}
+
+fn validate_fresh_coin_heavy_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    checker: &Path,
+    options: &ProbeRunOptions,
+    estimate: CanonicalFamilySizeEstimate,
+) -> Result<JsonValue> {
+    let context = prepare_canonical_fresh_coin_family(name, artifact, setup, target)?;
+    let (artifact_path, preserve_path) =
+        heavy_artifact_materialization_path(options, name, "canonical_fresh_coin_family.json")?;
+    let file = fs::File::create(&artifact_path)?;
+    let mut writer = BufWriter::new(file);
+    let summary =
+        materialize_canonical_fresh_coin_family_object(&mut writer, name, target, &context)?;
+    writer.flush()?;
+    let artifact_json_bytes = fs::metadata(&artifact_path)?.len();
+    let output = Command::new(checker)
+        .arg(&artifact_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean heavy canonical fresh-coin family validation failed for {}: {} (artifact preserved at {})",
+            name,
+            String::from_utf8_lossy(&output.stderr).trim(),
+            artifact_path.display()
+        ));
+    }
+    cleanup_materialized_file(&artifact_path, preserve_path);
+
+    Ok(json!({
+        "scenario": name,
+        "entrypoint": target.entrypoint,
+        "validation_status": "accepted_heavy_artifact",
+        "reason": format!(
+            "estimated explicit canonical fresh-coin family exceeded compact budget {} but fit within heavy-artifact budget {}",
+            options.compact_budget_bytes,
+            options.heavy_budget_bytes
+        ),
+        "compact_budget_bytes": options.compact_budget_bytes,
+        "heavy_budget_bytes": options.heavy_budget_bytes,
+        "size_estimate": estimate,
+        "setup_calls": setup.len(),
+        "mode": "heavy_explicit_canonical_seed_space",
+        "deploy_seed": 0,
+        "seed_count": summary.seed_count,
+        "distinct_canonical_seeds_found": summary.seed_count,
+        "coverage_fraction": 1.0,
+        "coverage_complete": true,
+        "gas_uniform": summary.gas_uniform,
+        "boundary_uniform": summary.boundary_uniform,
+        "controller_phase_uniform": summary.controller_phase_uniform,
+        "public_leaf_scaffold_uniform": true,
+        "public_fresh_coin_scaffold_uniform": true,
+        "oram_object_config_uniform": summary.oram_object_config_uniform,
+        "public_leaf_scaffold_steps": summary.public_leaf_scaffold_steps,
+        "public_fresh_coin_scaffold_steps": summary.public_fresh_coin_scaffold_steps,
+        "canonical_fresh_coin_seed_space_size": Some(summary.seed_count),
+        "canonical_fresh_coin_values_match_index": true,
+        "witness_family_json_bytes": artifact_json_bytes,
+        "heavy_artifact_path": preserve_path.then(|| artifact_path.display().to_string()),
+        "heavy_artifact_json_bytes": preserve_path.then_some(artifact_json_bytes),
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "lean_validated": true,
+        "accepted": true,
+    }))
+}
+
+fn validate_canonical_pathoram_pair_heavy_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    lhs: &CallSpec,
+    rhs: &CallSpec,
+    checker: &Path,
+    paper_instantiation_checker: &Path,
+    options: &ProbeRunOptions,
+    estimated_certificate_json_bytes: u64,
+    lhs_estimate: CanonicalFamilySizeEstimate,
+    rhs_estimate: CanonicalFamilySizeEstimate,
+) -> Result<JsonValue> {
+    let lhs_context = prepare_canonical_fresh_coin_family(name, artifact, setup, lhs)?;
+    let rhs_context = prepare_canonical_fresh_coin_family(name, artifact, setup, rhs)?;
+    let cfg = imported_oram_config(
+        artifact,
+        lhs.entrypoint,
+        &lhs_context.first_witness,
+        &lhs_context.access_counters_before,
+    )?;
+    let rhs_cfg = imported_oram_config(
+        artifact,
+        rhs.entrypoint,
+        &rhs_context.first_witness,
+        &rhs_context.access_counters_before,
+    )?;
+    if serde_json::to_string(&cfg)? != serde_json::to_string(&rhs_cfg)? {
+        return Err(anyhow!(
+            "canonical path-ORAM pair {} does not share a common public configuration",
+            name
+        ));
+    }
+
+    let public_view = imported_oram_public_view(&lhs_context.first_witness);
+    let public_location = imported_path_oram_public_location(&lhs_context.first_witness);
+    let storage_shape = imported_path_oram_storage_shape(&lhs_context.first_witness);
+    let public_outcome = lhs_context.first_witness.public_outcome.clone();
+    let boundary_schedule = lhs_context.first_witness.boundary_schedule.clone();
+    let controller_shape = lhs_context.first_witness.controller_shape.clone();
+    let normalized_micro_trace = lhs_context.first_witness.normalized_micro_trace.clone();
+    let public_outcome_equal =
+        lhs_context.first_witness.public_outcome == rhs_context.first_witness.public_outcome;
+    let boundary_schedule_equal =
+        lhs_context.first_witness.boundary_schedule == rhs_context.first_witness.boundary_schedule;
+    let controller_shape_equal =
+        lhs_context.first_witness.controller_shape == rhs_context.first_witness.controller_shape;
+    let normalized_micro_trace_equal = lhs_context.first_witness.normalized_micro_trace
+        == rhs_context.first_witness.normalized_micro_trace;
+
+    let (artifact_path, preserve_path) = heavy_artifact_materialization_path(
+        options,
+        name,
+        "canonical_pathoram_pair_certificate.json",
+    )?;
+    let file = fs::File::create(&artifact_path)?;
+    let mut writer = BufWriter::new(file);
+    writer.write_all(b"{")?;
+    write_json_key(&mut writer, "cfg")?;
+    serde_json::to_writer(&mut writer, &cfg)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "lhs_family")?;
+    let lhs_summary =
+        materialize_canonical_fresh_coin_family_object(&mut writer, name, lhs, &lhs_context)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "rhs_family")?;
+    let rhs_summary =
+        materialize_canonical_fresh_coin_family_object(&mut writer, name, rhs, &rhs_context)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "public_view")?;
+    serde_json::to_writer(&mut writer, &public_view)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "public_location")?;
+    serde_json::to_writer(&mut writer, &public_location)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "storage_shape")?;
+    serde_json::to_writer(&mut writer, &storage_shape)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "public_outcome")?;
+    serde_json::to_writer(&mut writer, &public_outcome)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "boundary_schedule")?;
+    serde_json::to_writer(&mut writer, &boundary_schedule)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "controller_shape")?;
+    serde_json::to_writer(&mut writer, &controller_shape)?;
+    writer.write_all(b",")?;
+    write_json_key(&mut writer, "normalized_micro_trace")?;
+    serde_json::to_writer(&mut writer, &normalized_micro_trace)?;
+    writer.write_all(b"}")?;
+    writer.flush()?;
+    let artifact_json_bytes = fs::metadata(&artifact_path)?.len();
+    let output = Command::new(checker)
+        .arg(&artifact_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean heavy canonical path-ORAM pair validation failed for {}: {} (artifact preserved at {})",
+            name,
+            String::from_utf8_lossy(&output.stderr).trim(),
+            artifact_path.display()
+        ));
+    }
+    let paper_instantiation_output = Command::new(paper_instantiation_checker)
+        .arg(&artifact_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    if !paper_instantiation_output.status.success() {
+        return Err(anyhow!(
+            "Lean heavy canonical path-ORAM paper instantiation failed for {}: {} (artifact preserved at {})",
+            name,
+            String::from_utf8_lossy(&paper_instantiation_output.stderr).trim(),
+            artifact_path.display()
+        ));
+    }
+    cleanup_materialized_file(&artifact_path, preserve_path);
+
+    Ok(json!({
+        "scenario": name,
+        "entrypoint": lhs.entrypoint,
+        "validation_status": "accepted_heavy_artifact",
+        "reason": format!(
+            "estimated explicit canonical pair certificate exceeded compact budget {} but fit within heavy-artifact budget {}",
+            options.compact_budget_bytes,
+            options.heavy_budget_bytes
+        ),
+        "compact_budget_bytes": options.compact_budget_bytes,
+        "heavy_budget_bytes": options.heavy_budget_bytes,
+        "estimated_certificate_json_bytes": estimated_certificate_json_bytes,
+        "lhs_estimate": lhs_estimate,
+        "rhs_estimate": rhs_estimate,
+        "lhs_seed_count": lhs_summary.seed_count,
+        "rhs_seed_count": rhs_summary.seed_count,
+        "access_counters_equal": lhs_summary.access_counters_before == rhs_summary.access_counters_before,
+        "public_outcome_equal": public_outcome_equal,
+        "boundary_schedule_equal": boundary_schedule_equal,
+        "controller_shape_equal": controller_shape_equal,
+        "normalized_micro_trace_equal": normalized_micro_trace_equal,
+        "certificate_json_bytes": artifact_json_bytes,
+        "heavy_artifact_path": preserve_path.then(|| artifact_path.display().to_string()),
+        "heavy_artifact_json_bytes": preserve_path.then_some(artifact_json_bytes),
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "paper_instantiation_status": "validated",
+        "paper_instantiation_stdout": String::from_utf8_lossy(&paper_instantiation_output.stdout).trim(),
+        "accepted": true,
+    }))
 }
 
 fn validate_pathoram_pair_case(
@@ -2051,9 +2615,10 @@ fn validate_canonical_pathoram_pair_case(
     lhs: &CallSpec,
     rhs: &CallSpec,
     checker: &Path,
+    paper_instantiation_checker: &Path,
     theorem_input_checker: &Path,
+    options: &ProbeRunOptions,
 ) -> Result<JsonValue> {
-    let budget_bytes = canonical_cert_budget_bytes();
     let lhs_estimate = estimate_canonical_fresh_coin_family_size(
         name,
         artifact,
@@ -2072,7 +2637,22 @@ fn validate_canonical_pathoram_pair_case(
         .estimated_family_json_bytes
         .saturating_add(rhs_estimate.estimated_family_json_bytes)
         .saturating_add(1 << 20);
-    if estimated_certificate_json_bytes > budget_bytes {
+    if options.should_try_heavy_materialization(estimated_certificate_json_bytes) {
+        return validate_canonical_pathoram_pair_heavy_case(
+            name,
+            artifact,
+            setup,
+            lhs,
+            rhs,
+            checker,
+            paper_instantiation_checker,
+            options,
+            estimated_certificate_json_bytes,
+            lhs_estimate,
+            rhs_estimate,
+        );
+    }
+    if estimated_certificate_json_bytes > options.compact_budget_bytes {
         return validate_canonical_pathoram_pair_theorem_input_case(
             name,
             artifact,
@@ -2080,7 +2660,7 @@ fn validate_canonical_pathoram_pair_case(
             lhs,
             rhs,
             theorem_input_checker,
-            budget_bytes,
+            options.compact_budget_bytes,
             estimated_certificate_json_bytes,
             lhs_estimate,
             rhs_estimate,
@@ -2131,14 +2711,34 @@ fn validate_canonical_pathoram_pair_case(
         .arg("exit_v1")
         .arg("shared_v1")
         .output()?;
-    let _ = fs::remove_file(&certificate_path);
     if !output.status.success() {
+        let _ = fs::remove_file(&certificate_path);
         return Err(anyhow!(
             "Lean canonical path-ORAM pair validation failed for {}: {}",
             name,
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
+    let paper_instantiation_output = Command::new(paper_instantiation_checker)
+        .arg(&certificate_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    let _ = fs::remove_file(&certificate_path);
+    if !paper_instantiation_output.status.success() {
+        return Err(anyhow!(
+            "Lean canonical path-ORAM paper instantiation failed for {}: {}",
+            name,
+            String::from_utf8_lossy(&paper_instantiation_output.stderr).trim()
+        ));
+    }
+    let persisted_artifact = persist_heavy_artifact_json(
+        options,
+        name,
+        "canonical_pathoram_pair_certificate.json",
+        &certificate,
+    )?;
 
     Ok(json!({
         "scenario": name,
@@ -2152,7 +2752,11 @@ fn validate_canonical_pathoram_pair_case(
         "controller_shape_equal": lhs_first.controller_shape == rhs_first.controller_shape,
         "normalized_micro_trace_equal": lhs_first.normalized_micro_trace == rhs_first.normalized_micro_trace,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "paper_instantiation_status": "validated",
+        "paper_instantiation_stdout": String::from_utf8_lossy(&paper_instantiation_output.stdout).trim(),
         "certificate_json_bytes": certificate_json_bytes,
+        "heavy_artifact_path": persisted_artifact.as_ref().map(|(path, _)| path.clone()),
+        "heavy_artifact_json_bytes": persisted_artifact.as_ref().map(|(_, bytes)| *bytes),
         "accepted": true,
     }))
 }
@@ -2259,6 +2863,7 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
         "normalized_micro_trace_equal": normalized_micro_trace_equal,
         "theorem_input_json_bytes": theorem_input_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "paper_instantiation_status": "not_materialized",
         "lean_validated": true,
         "accepted": true,
     }))
@@ -2367,8 +2972,22 @@ fn lean_canonical_pathoram_pair_checker_path() -> Result<PathBuf> {
     }
 }
 
+fn lean_canonical_pathoram_paper_instantiation_checker_path() -> Result<PathBuf> {
+    let path =
+        repo_root().join("proof/lean/.lake/build/bin/checkCanonicalPathOramPaperInstantiation");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(anyhow!(
+            "Lean canonical path-ORAM paper instantiation checker not found at {}; build it with `cd proof/lean && lake build`",
+            path.display()
+        ))
+    }
+}
+
 fn lean_canonical_pathoram_pair_theorem_input_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkCanonicalPathOramPairTheoremInput");
+    let path =
+        repo_root().join("proof/lean/.lake/build/bin/checkCanonicalPathOramPairTheoremInput");
     if path.is_file() {
         Ok(path)
     } else {
@@ -2384,10 +3003,7 @@ fn temporary_witness_path(case_name: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock should be after unix epoch")
         .as_nanos();
-    let sanitized = case_name
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
-        .collect::<String>();
+    let sanitized = sanitize_case_name(case_name);
     std::env::temp_dir().join(format!(
         "uo-runtime-witness-{}-{}-{}.json",
         process::id(),
@@ -2396,17 +3012,10 @@ fn temporary_witness_path(case_name: &str) -> PathBuf {
     ))
 }
 
-fn canonical_cert_budget_bytes() -> u64 {
-    std::env::var("UO_CANONICAL_CERT_BUDGET_BYTES")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(DEFAULT_CANONICAL_CERT_BUDGET_BYTES)
-}
-
 fn write_temp_json<T: Serialize>(case_name: &str, value: &T) -> Result<(PathBuf, u64)> {
     let path = temporary_witness_path(case_name);
     let file = fs::File::create(&path)?;
-    let mut writer = std::io::BufWriter::new(file);
+    let mut writer = BufWriter::new(file);
     serde_json::to_writer(&mut writer, value)?;
     writer.flush()?;
     let bytes = fs::metadata(&path)?.len();
@@ -3479,8 +4088,9 @@ fn addr(byte: u8) -> Value {
     Value::Address([byte; 20])
 }
 
-fn artifact_readme() -> &'static str {
-    r#"# UO Toolchain Artifact Results
+fn artifact_readme(options: &ProbeRunOptions) -> String {
+    let mut readme = String::from(
+        r#"# UO Toolchain Artifact Results
 
 This results bundle was generated from the local Rust workspace using the benchmark suite under `benches/raw/`.
 
@@ -3557,5 +4167,31 @@ Prototype assumptions:
 - `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
 - The ORAM backend is an instrumented Path-ORAM-style runtime prototype with fixed public controller shape and rerandomized bucket/block rewrites; it is reported as computational-UO only.
 - The guarantees are with respect to the abstract/runtime traces emitted by this artifact, including the normalized physical read/write schedules captured by the runtime, not every downstream machine-code or microarchitectural observer.
-"#
+"#,
+    );
+
+    readme.push_str("\n\nArtifact packaging mode:\n\n");
+    match options.materialization_mode {
+        ArtifactMaterializationMode::Compact => {
+            readme.push_str(
+                "- This bundle uses compact artifact mode. Canonical Path-ORAM families and pair certificates larger than the configured compact budget remain validated through theorem-input certificates instead of full explicit materialization.\n",
+            );
+        }
+        ArtifactMaterializationMode::Heavy => {
+            readme.push_str(
+                "- This bundle uses heavy artifact mode. Feasible canonical Path-ORAM families and pair certificates above the compact budget are materialized explicitly under `heavy_artifacts/`; only astronomically large seed spaces still fall back to compact theorem-input certificates.\n",
+            );
+        }
+    }
+    readme.push_str(&format!(
+        "- Compact budget: `{}` bytes. Heavy-artifact budget: `{}` bytes.\n",
+        options.compact_budget_bytes, options.heavy_budget_bytes
+    ));
+    if let Some(dir) = options.heavy_artifact_dir() {
+        readme.push_str(&format!(
+            "- Heavy artifacts are written under `{}` when heavy mode is selected.\n",
+            dir.display()
+        ));
+    }
+    readme
 }

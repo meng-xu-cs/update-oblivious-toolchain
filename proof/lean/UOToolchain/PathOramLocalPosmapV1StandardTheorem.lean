@@ -608,6 +608,18 @@ theorem PathOramLocalPosmapV1StandardTheoremRealization.standardStorageBoundary
   simpa [realization.publicPart_eq, realization.storageRun_eq] using
     realization.target.standardBoundary
 
+theorem PathOramLocalPosmapV1StandardTheoremRealization.standardPathOramStorageTheoremAt
+  {modelTags : SGXModelTags}
+  {bundle : SeededRuntimePathOramProofBundle modelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  (realization : PathOramLocalPosmapV1StandardTheoremRealization bundle assumptions) :
+  StandardPathOramStorageTheoremAt
+    assumptions
+    bundle.publicView
+    bundle.storageRun := by
+  simpa [realization.publicPart_eq, realization.storageRun_eq] using
+    realization.target.implementation.standardPathOramStorageTheoremAt
+
 theorem PathOramLocalPosmapV1StandardTheoremRealization.standardPaperMainBoundary
   {modelTags : SGXModelTags}
   {bundle : SeededRuntimePathOramProofBundle modelTags}
@@ -631,5 +643,22 @@ theorem PathOramLocalPosmapV1StandardTheoremRealization.standardPaperMainBoundar
       realization.standardStorageBoundary
       hOutcome
       hBoundary
+
+theorem SeededRuntimePaperMainBundle.pathOramLocalPosmapV1_standardPaperMainBoundaryOfStandardTheorem
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePaperMainBundle modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+  PathOramLocalPosmapV1StandardPaperMainBoundary
+    (modelTags := modelTags)
+    assumptions
+    bundle.publicView
+    bundle.toSeededRuntimePathOramProofBundle.storageRun
+    bundle.publicOutcome
+    bundle.boundarySchedule := by
+  exact
+    (bundle.toSeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealization
+      assumptions).standardPaperMainBoundary
+      bundle.publicOutcomeSafe
+      bundle.boundarySafe
 
 end UOToolchain

@@ -461,16 +461,14 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   bundle rather than a whole-view ORAM theorem
 - `PathOramLocalPosmapV1.lean` now packages that concrete backend target into
   an explicit repo-facing assumption bundle and theorem boundary, so the
-  remaining discharge obligation is stated directly against the
+  standard-theorem discharge obligation is stated directly against the
   `path_oram_local_posmap_v1` candidate instead of being left only as a
   generic path-ORAM reduction
 - `PathOramLocalPosmapV1.lean` now also exposes an explicit standard-theorem
   import boundary,
   `PathOramLocalPosmapV1StandardStorageBoundary`, together with named
   projection lemmas into the concrete computational-UO, paper-main SGX, and
-  TEE-storage theorem endpoints, so the remaining gap is the backend theorem
-  itself rather than any ambiguity about how it composes with the rest of the
-  repository proof stack
+  TEE-storage theorem endpoints
 - `PathOramLocalPosmapV1Refinement.lean` now fixes the imported-theorem route
   one level further by defining a theorem-facing standard Path ORAM
   implementation package, proving that package yields the repo’s standard
@@ -491,6 +489,10 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   making explicit that public metadata-page behavior, bucket projection, and
   storage-shape exactness are concrete implementation facts layered on top of
   the imported ORAM theorem rather than hidden inside it
+- `PathOramLocalPosmapV1StandardTheorem.lean` now also discharges
+  `StandardPathOramStorageTheoremAt` directly from the seeded runtime bundle
+  and packages the result as
+  `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealization`
 - `PathOramJACMTheorem.lean` now exposes a literature-facing theorem object,
   `PathOramJACMLiteratureTheorem`, and a named mapping into
   `StandardPathOramCoreTheorem`, so the import route can be presented in the
@@ -500,6 +502,10 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   `PathOramJACMLiteratureTheoremAt` formulation, which fixes the literature
   theorem directly at the runtime’s theorem-facing `leafRun` and removes the
   separate alignment obligation on the preferred mainline import route
+- that same preferred route is now closed for the concrete bundle by the named
+  exports
+  `pathOramLocalPosmapV1_standardPathOramStorageTheoremAtOfSelfJACMAt` and
+  `pathOramLocalPosmapV1_standardTheoremRealizationOfSelfJACMAt`
 - that path-ORAM theorem now consumes a projected leakage type that drops the
   legacy surrogate-style `schedule` field and keeps only the standard public
   ORAM parameters

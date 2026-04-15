@@ -3,3 +3,5 @@
 *.uo-artifact.json
 *.uo-bytecode.bin
 *.uo-trace.json
+/results-heavy
+/results/heavy_artifacts

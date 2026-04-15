@@ -41,3 +41,7 @@ lean_exe checkCanonicalPathOramPairCertificate where
 @[default_target]
 lean_exe checkCanonicalPathOramPairTheoremInput where
   root := `CheckCanonicalPathOramPairTheoremInput
+
+@[default_target]
+lean_exe checkCanonicalPathOramPaperInstantiation where
+  root := `CheckCanonicalPathOramPaperInstantiation

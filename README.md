@@ -23,6 +23,12 @@ Useful individual commands:
 ./scripts/compile_benches.sh
 cargo test
 ./scripts/run_validation.sh
+./scripts/run_heavy_artifact.sh
 ```
+
+Artifact modes:
+
+- `./scripts/run_validation.sh` keeps the default compact artifact profile. Oversized canonical Path-ORAM families and pair certificates stay validated through compact theorem-input certificates.
+- `./scripts/run_heavy_artifact.sh` switches the probe into explicit heavy-artifact mode and writes a separate `results-heavy/` bundle with `heavy_artifacts/` materializations for the large feasible canonical families/pairs that exceed the default compact budget.
 
 The current prototype is intentionally narrow. The exact supported subset, rejected features, remaining assumptions, and the formal proof roadmap are documented in [docs/supported-subset.md](/home/m285xu/update-oblivious-toolchain/docs/supported-subset.md), [docs/engineering-note.md](/home/m285xu/update-oblivious-toolchain/docs/engineering-note.md), and [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md).

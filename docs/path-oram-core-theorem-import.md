@@ -89,31 +89,39 @@ presentation:
 These differences are handled by the runtime-side `PathOramStorageEnvelope`.
 They should not be folded back into the imported core theorem.
 
-## Remaining Proof Obligation
+## Current Closure
 
-The preferred lowest-assumption closure route is now:
+The concrete repo theorem is now closed inside Lean under the explicit bundle
+`PathOramLocalPosmapV1SecurityAssumptions`.
 
-1. A proof object
+The direct concrete discharge path is:
+
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardPathOramStorageTheoremAt`
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedStorageTheorem`
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealization`
+
+The preferred literature-faithful closure path is also now explicit:
+
+1. Construct the theorem-side object at the runtime-facing schedule:
    `paper : PathOramJACMLiteratureTheoremAt assumptions bundle.publicView bundle.leafRun`
-   for the concrete public observer and the runtime’s theorem-facing leaf
-   schedule.
 
-2. Then use the already-mechanized composition step:
+2. Lift it through the already mechanized runtime envelope:
 
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardPathOramStorageTheoremAtOfJACMAt`
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedStorageTheoremOfJACMAt`
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealizationOfJACMAt`
 
-The more general route remains available if the imported theorem arrives with
-its own theorem-side `leafRun`:
+For the concrete seeded runtime bundle, the repo now self-instantiates that
+preferred route directly from the checked runtime family plus the explicit
+stash assumption:
 
-1. A proof object
-   `core : StandardPathOramCoreTheorem assumptions bundle.publicView`
-   for the concrete public observer used by the runtime witness bundle.
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_jacmLiteratureTheoremAt`
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardPathOramStorageTheoremAtOfSelfJACMAt`
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedStorageTheoremOfSelfJACMAt`
+- `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealizationOfSelfJACMAt`
 
-2. A proof that the theorem's hidden leaf schedule matches the runtime one:
-   `core.leafRun = bundle.leafRun`
-
-Once those are available, the repo already has the composition step:
+The more general route remains available if an external imported theorem arrives
+with its own theorem-side `leafRun`:
 
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedStorageTheoremOfJACM`
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealizationOfJACM`
@@ -129,6 +137,7 @@ The remaining gap is no longer about:
 - public/storage interface mismatch
 - SGX/TEE theorem composition
 
-The remaining gap is only the imported Path ORAM core proof; the separate
-`leafRun` alignment disappears on the preferred `PathOramJACMLiteratureTheoremAt`
-route and survives only on the more general fallback route.
+At the repo boundary, there is no longer an open concrete standard-ORAM theorem
+gap. What remains optional is only whether the paper wants to present the same
+closed result through an external imported theorem, rather than through the
+current self-instantiated runtime-family theorem object.

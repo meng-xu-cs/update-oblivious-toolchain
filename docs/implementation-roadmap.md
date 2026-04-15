@@ -349,8 +349,8 @@ What is now implemented:
   `PathOramLocalPosmapV1StandardTheoremTarget`; it also exposes the abstract
   proposition `StandardPathOramStorageTheoremAt` that an imported Path ORAM
   theorem must discharge, plus the concrete bridge object
-  `PathOramLocalPosmapV1StandardTheoremRealization` that says what still has to
-  be connected from the seeded runtime witness family to that target
+  `PathOramLocalPosmapV1StandardTheoremRealization` that packages the now
+  explicit connection from the seeded runtime witness family to that target
 - that module now also separates the imported theorem route into:
   `StandardPathOramCoreTheorem` for the theorem-side ORAM claim,
   `PathOramStorageEnvelope` for the concrete runtime’s public metadata /
@@ -361,23 +361,20 @@ What is now implemented:
   `StandardPathOramCoreTheorem`, so the paper-facing theorem source is no
   longer just described informally in docs
 
-Remaining work:
+This step is now closed in Lean:
 
-1. freeze the imported standard theorem precisely at
+1. the exact imported target is frozen at
    `PathOramLocalPosmapV1StandardTheoremTarget`
-2. map the chosen literature theorem or self-contained abstract theorem onto
-   `StandardPathOramStorageTheoremAt` and then into
-   `ImportedStandardPathOramImplementation`
-3. construct
-   `PathOramLocalPosmapV1StandardTheoremRealization` for the concrete seeded
-   runtime witness bundle
-4. reuse the existing projection lemmas from that realization to recover the
-   repo’s computational-UO, SGX, and TEE theorem endpoints
-5. if we want a paper appendix with a cleaner abstract simulator, layer it on
-   top of this frozen target instead of reopening the runtime/theorem interface
+2. the concrete seeded runtime bundle discharges
+   `StandardPathOramStorageTheoremAt` directly
+3. that discharge is packaged as
+   `PathOramLocalPosmapV1StandardTheoremRealization`
+4. the standard paper-main boundary is now also recovered explicitly from that
+   realization
+5. the preferred literature-faithful `PathOramJACMLiteratureTheoremAt` route is
+   likewise closed for the concrete bundle
 
-With the new split, the concrete remaining imported-theorem obligation is even
-sharper:
+The optional stronger paper-facing route remains:
 
 - provide a `StandardPathOramCoreTheorem` for the concrete public observer
 - prove that the imported theorem’s `leafRun` matches the runtime’s
@@ -397,8 +394,9 @@ The preferred route is now even tighter:
 
 This removes the extra `leafRun` alignment obligation on the mainline route.
 The concrete backend shape is now aligned with the JACM bucket-size parameter
-`Z = 5`, so the remaining gap is the imported core theorem itself rather than a
-parameter mismatch.
+`Z = 5`, and the concrete repo theorem is already closed under the explicit
+assumption bundle; the optional remaining work is only whether to replace that
+closed self-instantiated route with an external imported theorem presentation.
 
 Acceptance criteria:
 
