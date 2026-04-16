@@ -266,7 +266,7 @@
     "scenarios": [
       {
         "accepted": true,
-        "certificate_json_bytes": 3274,
+        "certificate_json_bytes": 3278,
         "entrypoint": "put(bytes32,uint256)",
         "leaf_steps": 1,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -277,7 +277,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 3274,
+        "certificate_json_bytes": 3276,
         "entrypoint": "put(bytes32,uint256)",
         "leaf_steps": 1,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -288,7 +288,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 5640,
+        "certificate_json_bytes": 5642,
         "entrypoint": "add(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -299,7 +299,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 5640,
+        "certificate_json_bytes": 5642,
         "entrypoint": "add(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -310,7 +310,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 12585,
+        "certificate_json_bytes": 12593,
         "entrypoint": "deposit(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -321,7 +321,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 44227,
+        "certificate_json_bytes": 44218,
         "entrypoint": "transferFrom(address,address,address,uint256)",
         "leaf_steps": 6,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 6 leaf steps",
@@ -625,7 +625,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 1789,
+        "bundle_json_bytes": 1788,
         "controller_accesses": 0,
         "controller_phase_count": 3,
         "entrypoint": "classify(uint256)",
@@ -653,7 +653,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 3209,
+        "bundle_json_bytes": 3210,
         "controller_accesses": 0,
         "controller_phase_count": 3,
         "entrypoint": "auth(bytes32)",
@@ -695,7 +695,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 3211,
+        "bundle_json_bytes": 3210,
         "controller_accesses": 0,
         "controller_phase_count": 3,
         "entrypoint": "upsert(bytes32,uint256)",
@@ -709,7 +709,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 4472,
+        "bundle_json_bytes": 4473,
         "controller_accesses": 0,
         "controller_phase_count": 3,
         "entrypoint": "deposit(bytes32,uint256)",
@@ -723,7 +723,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 4472,
+        "bundle_json_bytes": 4473,
         "controller_accesses": 0,
         "controller_phase_count": 3,
         "entrypoint": "deposit(bytes32,uint256)",
@@ -737,7 +737,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 5027,
+        "bundle_json_bytes": 5028,
         "controller_accesses": 0,
         "controller_phase_count": 3,
         "entrypoint": "approve(address,address,uint256)",
@@ -751,7 +751,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 5029,
+        "bundle_json_bytes": 5028,
         "controller_accesses": 0,
         "controller_phase_count": 3,
         "entrypoint": "approve(address,address,uint256)",
@@ -765,7 +765,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "bundle_json_bytes": 6782,
+        "bundle_json_bytes": 6783,
         "controller_accesses": 1,
         "controller_phase_count": 8,
         "entrypoint": "put(bytes32,uint256)",
@@ -779,7 +779,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "bundle_json_bytes": 6784,
+        "bundle_json_bytes": 6783,
         "controller_accesses": 1,
         "controller_phase_count": 8,
         "entrypoint": "put(bytes32,uint256)",
@@ -793,7 +793,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "bundle_json_bytes": 11335,
+        "bundle_json_bytes": 11333,
         "controller_accesses": 2,
         "controller_phase_count": 13,
         "entrypoint": "add(bytes32,uint256)",
@@ -807,7 +807,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "bundle_json_bytes": 11338,
+        "bundle_json_bytes": 11327,
         "controller_accesses": 2,
         "controller_phase_count": 13,
         "entrypoint": "add(bytes32,uint256)",
@@ -821,7 +821,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "bundle_json_bytes": 26126,
+        "bundle_json_bytes": 26118,
         "controller_accesses": 2,
         "controller_phase_count": 13,
         "entrypoint": "deposit(bytes32,uint256)",
@@ -835,7 +835,7 @@
       {
         "accepted": true,
         "boundary_events": 14,
-        "bundle_json_bytes": 92420,
+        "bundle_json_bytes": 92412,
         "controller_accesses": 6,
         "controller_phase_count": 33,
         "entrypoint": "transferFrom(address,address,address,uint256)",
@@ -880,7 +880,7 @@
         "scenario": "FixedSlotClassifier/uo/class0",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 1742
+        "witness_json_bytes": 1740
       },
       {
         "accepted": true,
@@ -910,7 +910,7 @@
         "scenario": "AuthScan/uo/class0",
         "setup_calls": 2,
         "shared_resource_events": 3,
-        "witness_json_bytes": 3162
+        "witness_json_bytes": 3163
       },
       {
         "accepted": true,
@@ -925,7 +925,7 @@
         "scenario": "AuthScan/uo/class1",
         "setup_calls": 2,
         "shared_resource_events": 3,
-        "witness_json_bytes": 3162
+        "witness_json_bytes": 3163
       },
       {
         "accepted": true,
@@ -940,7 +940,7 @@
         "scenario": "RegistryCRUD/uo/class0",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 3163
+        "witness_json_bytes": 3164
       },
       {
         "accepted": true,
@@ -985,7 +985,7 @@
         "scenario": "ConfidentialMixer/fullscan/class1",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 4425
+        "witness_json_bytes": 4426
       },
       {
         "accepted": true,
@@ -1000,7 +1000,7 @@
         "scenario": "ERC20Lite/fullscan/class0",
         "setup_calls": 1,
         "shared_resource_events": 3,
-        "witness_json_bytes": 4981
+        "witness_json_bytes": 4982
       },
       {
         "accepted": true,
@@ -1030,7 +1030,7 @@
         "scenario": "SingleAccessMap/pathoram/put-class0",
         "setup_calls": 0,
         "shared_resource_events": 34,
-        "witness_json_bytes": 6737
+        "witness_json_bytes": 6733
       },
       {
         "accepted": true,
@@ -1045,7 +1045,7 @@
         "scenario": "SingleAccessMap/pathoram/put-class1",
         "setup_calls": 0,
         "shared_resource_events": 34,
-        "witness_json_bytes": 6736
+        "witness_json_bytes": 6734
       },
       {
         "accepted": true,
@@ -1060,7 +1060,7 @@
         "scenario": "SingleAccessMap/pathoram/add-class0",
         "setup_calls": 0,
         "shared_resource_events": 65,
-        "witness_json_bytes": 11288
+        "witness_json_bytes": 11290
       },
       {
         "accepted": true,
@@ -1075,7 +1075,7 @@
         "scenario": "SingleAccessMap/pathoram/add-class1",
         "setup_calls": 0,
         "shared_resource_events": 65,
-        "witness_json_bytes": 11287
+        "witness_json_bytes": 11285
       },
       {
         "accepted": true,
@@ -1090,7 +1090,7 @@
         "scenario": "ConfidentialMixer/pathoram/deposit",
         "setup_calls": 0,
         "shared_resource_events": 189,
-        "witness_json_bytes": 26077
+        "witness_json_bytes": 26070
       },
       {
         "accepted": true,
@@ -1105,7 +1105,7 @@
         "scenario": "ERC20Lite/pathoram/transferFrom",
         "setup_calls": 2,
         "shared_resource_events": 723,
-        "witness_json_bytes": 92364
+        "witness_json_bytes": 92374
       }
     ]
   }

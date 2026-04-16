@@ -3,6 +3,8 @@
 Accepted Solidity features in this prototype:
 
 - `bool`, `uint256`, `bytes32`, `address`
+- arithmetic, bitwise operators, comparisons, and boolean connectives over the
+  supported scalar types
 - fixed-size arrays with compile-time public length
 - fixed-size structs of supported scalar fields
 - `if/else`
@@ -12,6 +14,9 @@ Accepted Solidity features in this prototype:
 - `require(expr);`
 - `keccak256(abi.encodePacked(...))` on fixed-size arguments
 - explicit public getter/setup entrypoints and explicit confidential entrypoints
+- single return values on admitted functions
+- state-map lowering through sidecar metadata rather than unconstrained native
+  Solidity mapping semantics
 
 Rejected:
 
@@ -23,10 +28,21 @@ Rejected:
 - inheritance, modifiers, constructors/fallbacks/receive
 - early confidential returns
 - external calls and unsupported function-call shapes
+- multi-expression internal functions beyond single-expression pure/view helpers
+- multiple return values
 
 Sidecar metadata requirements:
 
 - every state object must declare `kind`, `backend`, and confidentiality
 - every map must declare a public `capacity`
 - confidential entrypoints must declare `secret_args`
+- `oram_scheme` must be set explicitly when a proof-grade ORAM path is
+  intended; the theorem-facing route is `path_oram_local_posmap_v1`
 - gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
+
+Execution-model note:
+
+- accepted `uint256` syntax is executed by the current prototype in a bounded
+  `u128` domain
+- confidential objects in UO artifacts may not use the raw backend; the proof
+  path is exact backends plus `path_oram_local_posmap_v1`

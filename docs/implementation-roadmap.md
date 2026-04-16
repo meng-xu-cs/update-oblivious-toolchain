@@ -1,443 +1,181 @@
 # Implementation Roadmap To Proof-Grade SGX/TEE Conformance
 
-This note turns the current proof boundary into an implementation plan. The
-goal is to reach an end-to-end artifact whose runtime and checker match the
-proof-grade SGX/TEE theorem boundary without weakening the theorem.
+This note no longer describes a speculative implementation plan. It records the
+current milestone status of the repository and the remaining work needed for
+stronger theorem provenance claims.
 
 ## Goal
 
-The target implementation claim is:
+The implementation target remains:
 
 - confidential entrypoints emit an explicit public observer consisting of
   `public_outcome`, exact `boundary_schedule`, protected `storage_trace`, and a
   normalized SGX controller `micro_trace`
 - persistent state leaving the enclave boundary is confidential and integral
-- unsupported programs are rejected rather than accepted under an inexact public
-  leakage witness
-- the Rust implementation is connected to the Lean theorem by a concrete
-  refinement argument, not just by engineering intent
+- unsupported programs are rejected rather than accepted under an inexact
+  public witness
+- the Rust implementation is connected to the Lean theorem boundary by an
+  explicit certificate / witness bridge rather than by documentation alone
 
-For the strengthened claim path, the theorem-facing backend is
-`path_oram_local_posmap_v1`. The legacy surrogate backend may stay in the repo
-for benchmarks and compatibility, but it should not sit on the proof-grade
-claim path. Likewise, the near-term assurance strategy is not "verify all Rust
-directly"; it is to combine a small runtime refinement boundary with
-checker-side translation validation of proof-relevant compiler output.
+The theorem-facing backend path is
+`path_oram_local_posmap_v1`. The legacy surrogate backend remains in the
+repository only for compatibility and benchmark continuity.
 
 ## Theorem-Preserving Principles
 
-- Do not relax the theorem to fit the current code.
-- When the implementation cannot yet realize a theorem hypothesis, reject the
-  program or mark the backend as out of scope.
-- Make every public observer field explicit in the runtime trace.
-- Keep the public leakage witness exact for supported programs.
+- Do not relax the theorem to fit the implementation.
+- Reject unsupported programs instead of widening the public leakage witness.
+- Keep every public observer field explicit in the runtime trace.
+- Keep the trusted Rust surface small and explicit.
 
 ## Milestones
 
 ### M1. Runtime theorem observer
 
-Status: implemented in this repo.
+Status: implemented.
 
-The runtime now emits a theorem-facing trace object containing:
+The runtime now emits:
 
 - `public_outcome`
 - exact `boundary_schedule`
-- public controller-shape data
+- public controller shape
 - normalized SGX micro trace derived from that controller shape
 
-Acceptance criteria:
-
-- every `ExecutionTrace` carries `theorem_trace`
-- boundary length matches the public controller budget
-- normalized page-trace length matches the sum of public region budgets
-
-This is a public controller envelope. It is the right observer shape for the
-theorem, but it is not yet a proof that the runtime is a proof-grade SGX
-controller.
+That observer is assembled from the runtime controller/recorder path itself,
+and the controller certificate independently reconstructs the same public
+observer before a trace is returned.
 
 ### M2. Sealed persistent storage
 
-Status: implemented in this repo.
+Status: implemented.
 
-Confidential storage records now use authenticated encryption with per-record
-associated data before nonzero transport encoding.
+Confidential storage records now use authenticated encryption with associated
+data before nonzero transport encoding. The old marker-hiding placeholder codec
+is no longer the only storage story:
 
-Acceptance criteria:
-
-- confidentiality and integrity of persistent records are cryptographic, not
-  cosmetic
-- post-initialization confidential writes remain nonzero-to-nonzero updates
+- exact backends keep post-initialization writes on the update-only path
 - decode/open rejects tampering
-
-This closes the previous gap where the storage codec only hid zero markers.
+- sealed-storage facts are now part of the explicit assumption provenance
+  surface
 
 ### M3. Exact public leakage witnesses
 
-Status: partially implemented in this repo.
+Status: implemented on the current admitted subset.
 
-The compiler and checker now reject loops whose ORAM access multiplicity is not
-compile-time exact.
+The compiler/checker path now enforces compile-time-exact loop structure for
+admitted confidential code and validates the manifest fields that the theorem
+bridge consumes:
 
-Acceptance criteria:
+- secret-argument positions
+- arena and stack budgets
+- exact object manifests
+- exact logical read/write counters
+- exact ORAM access counts
+- exact `max_commit_ops`
 
-- `oram_accesses` in the manifest is exact for every supported confidential
-  entrypoint
-- checker and compiler reject any construct that would make the witness
-  inexact
+`uo-check` also supports explicit source-to-artifact translation validation, so
+the proof-relevant artifact surface is re-derived rather than merely trusted
+after compilation.
 
-Still remaining:
+### M4. Proof-grade ORAM backend path
 
-- extend the same exactness discipline to any other manifest fields that are
-  intended to be used in refinement proofs, especially where loop structure
-  affects public budgets
+Status: implemented for the theorem-facing path.
 
-### M4. Replace the surrogate ORAM with a proof-grade ORAM
+The repository now contains a concrete standard-style backend candidate,
+`path_oram_local_posmap_v1`, with:
 
-Status: partially implemented in this repo.
+- a real tree and real path rewrites
+- persisted access counters
+- persisted position-map state
+- persisted stash state
+- immediate access execution on transaction shadow state rather than a
+  one-shot staged commit surrogate
+- multi-access-per-entrypoint support on the theorem-facing path
+- manifest/runtime parameter sharing through `OramManifest::for_object`
 
-The repo now contains a second ORAM scheme candidate,
-`path_oram_local_posmap_v1`, alongside the legacy surrogate backend.
+The stronger backend is already exercised beyond `SingleAccessMap` in the probe
+and witness reports, including multi-access `ConfidentialMixer` and multi-map
+`ERC20Lite` paths.
 
-What is implemented:
+### M5. Explicit SGX/controller runtime path
 
-- scheme selection is explicit in metadata and the compiled artifact
-- the manifest/runtime parameters for the path candidate are no longer the
-  surrogate placeholders
-- the path candidate uses a real tree, real path reads/writes, a persisted
-  position map, and a persisted stash
-- the path candidate now executes immediately at each ORAM access on the
-  transaction shadow state rather than replaying a single staged access at
-  commit time
-- multiple accesses to the same path-ORAM object within one entrypoint are now
-  supported and covered by the runtime/controller trace
-- manifest commit budgets now scale with the admitted per-entrypoint path-ORAM
-  access multiplicity
-- the proof/evaluation path now includes theorem-tight seeded family artifacts
-  and class0/class1 paired certificates for concrete `SingleAccessMap`
-  path-ORAM workloads, including the public access-counter state required by
-  the theorem boundary
+Status: implemented.
 
-What is still missing before this milestone is complete:
+The runtime now has a call-scoped controller recorder that emits:
 
-- a broader benchmark suite using the stronger backend
-- the proof reduction from the implementation candidate to the ORAM theorem
+- ordered logical accesses and logical writes
+- ordered physical reads and writes
+- exact enclave-boundary events
+- controller-phase observations
+- public region page budgets and workset budgets
 
-Required work:
+The emitted theorem trace is controller-derived and then cross-checked against
+an independent pure reconstruction over the recorded public ORAM schedule.
 
-- implement a standard ORAM backend such as Path ORAM or Ring ORAM
-- make `stash_bound`, `recursion_depth`, and position-map handling real runtime
-  state rather than placeholder zeros
-- preserve the update-only physical write invariant under the sealed encoding
-- expose the resulting public ORAM parameters through the manifest
+### M6. Runtime refinement and trusted kernel
 
-Acceptance criteria:
+Status: largely implemented; remaining work is theorem strengthening rather
+than missing bridge engineering.
 
-- the runtime no longer reports the surrogate scheme for proof-grade ORAM mode
-- the manifest parameters correspond to actual runtime behavior
-- the backend is suitable for reduction to a standard ORAM theorem
+The runtime/proof bridge now includes:
 
-### M5. Make the SGX controller explicit in the runtime
+- standalone controller-observer certificates
+- standalone hidden Path-ORAM certificates
+- an explicit `RuntimeTrustedKernelBundle`
+- runtime-enforced refinement-witness extraction
+- Lean JSON import and executable validation for the bundle and witness
+- seeded witness-family and paired-certificate validation
+- canonical fresh-coin family and pair validation, with compact and heavy
+  artifact modes
 
-Status: partially implemented in this repo.
+What remains is not "build the bridge." It is:
 
-The current runtime now has an explicit controller-envelope module that builds:
+- keep the trusted boundary explicitly at that small emitted kernel
+- justify or import the explicit backend/cryptographic assumptions cleanly
+- avoid overclaiming the rest of the Rust stack as verified
 
-- exact `boundary_schedule`
-- public controller shape
-- normalized SGX micro trace
+### M7. Paper-main standard-theorem route
 
-from the runtime controller path itself.
+Status: implemented at the frozen interface; stronger external import remains
+future work.
 
-What is implemented:
+The repository now has:
 
-- a call-scoped runtime recorder now emits ordered logical accesses, ordered
-  physical reads/writes, exact enclave-boundary events, and controller-phase
-  observations in execution order
-- ORAM accesses route through that recorder at the moment they execute
-- the emitted theorem trace is now assembled from the recorder rather than from
-  a manifest-only reconstruction
+- a frozen standard-theorem target:
+  `PathOramLocalPosmapV1StandardTheoremTarget`
+- an explicit literature-facing JACM theorem object and mapping
+- a self-instantiated artifact-side closure at exactly the same interface
+- a separate paper-main provenance route documented for the citation-based
+  presentation
 
-What is still missing before this milestone is complete:
+That means the theorem boundary is fixed and the engineering bridge is closed.
+What remains open is only the provenance choice:
 
-- a stronger refinement argument connecting the Rust recorder/controller state
-  machine to the Lean `View_SGX` observer
-- broader backend coverage beyond the current standard-ORAM-style path
-  candidate and the legacy surrogate mode
+- citation route now
+- stronger external machine-checked theorem import later, if available
 
-Required work:
+## Immediate Next Steps
 
-- preserve exact public `boundary_schedule`
-- keep extending controller-backed execution to every admitted confidential
-  backend mode
-- prove that the recorder/controller trace is the direct image of the supported
-  runtime execution path
+The remaining work should be treated as theorem-strengthening:
 
-Acceptance criteria:
+1. keep `path_oram_local_posmap_v1` as the only proof-grade backend path in
+   docs and claim language
+2. keep the trusted boundary at emitted certificates, the trusted-kernel
+   bundle, and witnesses reconstructed from that bundle
+3. keep `uo-check` as the translation validator for proof-relevant compiler
+   output
+4. present the current paper route as the JACM citation route at the frozen
+   interface
+5. separately justify or import the explicit
+   `PathOramLocalPosmapV1SecurityAssumptions` bundle if a stronger provenance
+   story is needed
+6. do not upgrade the repo into a malicious-host SGX execution theorem until
+   the SGX observer and enclave controller are connected to the real runtime by
+   the same refinement discipline
 
-- controller phases exist as runtime states, not just theorem-side labels
-- runtime-emitted boundary and normalized micro traces are produced by the
-  controller path itself
-- controller traces are stable under secret variation for the admitted observer
+## Practical Readout
 
-### M6. Proof integration and refinement
-
-Status: partially implemented.
-
-Once M4 and M5 exist, the remaining step is to connect the Rust runtime to the
-Lean theorem by a concrete refinement layer.
-
-What is implemented:
-
-- the Rust trace layer now exposes an explicit refinement witness extraction via
-  `ExecutionTrace::runtime_refinement_witness`
-- the runtime engine now treats witness extraction as a postcondition of trace
-  emission: a call fails instead of returning an `ExecutionTrace` whose theorem
-  fields do not admit a refinement witness
-- the controller now cross-checks its incremental theorem observer against an
-  independent pure reconstruction over the recorded public ORAM schedule before
-  returning the trace bundle
-- the runtime also rejects observed ORAM accesses whose public parameters drift
-  from the compiled manifest objects, so the ordered controller certificate is
-  anchored to artifact metadata as well as live execution
-- the runtime CLI can now emit either the full execution trace or the checked
-  refinement witness directly via `uo-evm --format refinement-witness`
-- that witness keeps only the Lean-relevant normalized trace fields together
-  with `public_outcome`, `boundary_schedule`, `controller_shape`,
-  `normalized_micro_trace`, an ordered public controller certificate, and the
-  public ORAM object metadata needed to reconstruct that certificate from the
-  logical trace
-- extraction is checked, not assumed: witness construction fails if gas,
-  boundary/controller reconstruction, logical-trace-derived ORAM access
-  reconstruction, or controller-derived normalized micro trace drift apart
-- the Lean scaffold now contains
-  `proof/lean/UOToolchain/RuntimeRefinement.lean`, which fixes the witness
-  record and proves how it projects into the existing `Trace`/`SGXView`
-  theorem objects while reconstructing the boundary/controller observer from
-  the imported controller certificate and reconstructing the ordered ORAM
-  access schedule from the public logical trace
-- that runtime witness now also carries a hidden path-ORAM leaf schedule, and
-  both the Rust witness extractor and the Lean checker validate that its public
-  scaffold matches the path accesses reconstructed from the logical trace and
-  that its deterministic bucket-path projection reproduces the observed
-  path-ORAM bucket trace exactly
-- that same witness now also carries hidden path-ORAM position-map state both
-  before and after the call, together with an exact hidden per-access
-  transition certificate; witness validity now replays those certified
-  transitions and checks that they produce the exported final hidden state,
-  rather than treating the hidden leaf schedule as an opaque sidecar
-- the Lean runtime witness layer now also exposes a deterministic
-  decomposition of each path-ORAM call into hidden initial position-map state,
-  hidden transition shape, and a minimal fresh-leaf coin sequence, which
-  sharpens the remaining runtime-coins theorem to a statement about fresh
-  resampling rather than about the entire hidden access-leaf schedule
-- that same witness now also exports the certified public leaf scaffold
-  explicitly, so the theorem side can consume equality of that public scaffold
-  directly when instantiating the path-ORAM storage boundary instead of
-  rebuilding the same relation only through the older public-alignment lemma
-- seeded runtime execution is now deterministic end to end for the proof-grade
-  path candidate: the exported `runtime_seed` controls object-local RNG state,
-  store-cipher key generation, and ORAM leaf sampling, and the regression suite
-  checks replayability of seeded path-ORAM traces
-- the Lean package now also contains `RuntimeCoins.lean`, which lifts a
-  finite seeded witness family into leaf-schedule and leaf-value distributions,
-  proves the direct public scaffold lemmas needed by the newer
-  scaffold-indexed path-ORAM theorem variants, and now keeps canonical
-  leaf-value realization as an explicit theorem hypothesis at the exact lemmas
-  that need it instead of bundling that claim into the witness-family record
-- the Lean scaffold now also contains
-  `proof/lean/UOToolchain/RuntimeRefinementJson.lean`, which parses the Rust
-  witness JSON, converts it into the theorem-side witness, and provides a
-  Lean-side executable validity checker equivalent to the `Valid` proposition
-- the Lean package now includes `checkRuntimeWitness`, a small executable that
-  loads a serialized Rust witness and validates it against the theorem-side
-  predicate from the command line
-- the validation pipeline now runs representative benchmark scenarios through
-  the real Rust runtime, extracts refinement witnesses from the resulting
-  traces, and checks those witnesses with the Lean executable; the report is
-  emitted as `results/witness_validation.json`, now including a multi-object
-  ORAM `transferFrom` path
-- the Lean scaffold now contains an explicit standard-ORAM reduction layer in
-  `StandardOramReduction.lean`, which factors `View_M+` into an exact public
-  part plus a backend storage trace and lifts storage theorems into
-  `ComputationalUOWith`
-- the Lean scaffold now also contains `PathOramSecurity.lean`, which narrows
-  the remaining ORAM axiom boundary to a storage theorem for the concrete
-  `path_oram_local_posmap_v1` backend candidate under an explicit security
-  assumption bundle rather than a whole-view ORAM theorem, and projects away
-  the legacy surrogate-style `schedule` field before that theorem is invoked
-- the Lean scaffold now also contains `PathOramLocalPosmapV1.lean`, which
-  specializes that generic path-ORAM theorem boundary to the repo’s concrete
-  backend-facing assumption bundle and packages the resulting
-  computational-UO, paper-main SGX, and TEE-storage statements into one named
-  theorem boundary for seeded runtime proof bundles
-- the proof-grade path interface now also normalizes raw logical path reads to
-  a public skeleton instead of treating concrete `bucket:{i}` details as exact
-  public trace data
-- that path-ORAM theorem boundary is now internally decomposed into a
-  public reconstruction of the ordered leaf scaffold from normalized logical
-  accesses plus public ORAM metadata, a canonical finite-distribution sampler
-  for hidden per-access leaf values, deterministic projection from leaves to
-  bucket traces, exact public constancy of the non-bucket location scaffold,
-  and exact public storage-shape constancy, so the remaining assumption
-  surface is smaller than a single monolithic storage theorem
-- the Lean import layer now also proves `checkValid = true ↔ Valid` for both
-  the seeded runtime witness family checker and the paired path-ORAM
-  certificate checker, so the proof-facing SGX/path-ORAM validation boundary
-  is theorem-tight rather than executable-only
-
-What is still missing before this milestone is complete:
-
-- a theorem tying the Rust public logical-trace/controller-witness constructor
-  to the Lean witness assumptions, rather than only re-checking imported
-  concrete witnesses against the same predicate inside Lean
-- a theorem that lifts the now-explicit `runtime_seed` interface from a
-  deterministic replay handle into a distribution-valued runtime-coins object
-  that discharges the canonical hidden-leaf theorem without adding a larger
-  trusted surrogate
-- discharge of the remaining runtime-coins obligation for the actual
-  implementation: prove that the seeded family of emitted path-ORAM witnesses
-  realizes the canonical leaf-value sampler on the certified public scaffold
-- discharge of the ORAM theorem against the chosen standard construction
-  under the now-explicit `PathOramLocalPosmapV1SecurityAssumptions` boundary
-  through that witness layer
-
-Required work:
-
-- prove that `ExecutionTrace::runtime_refinement_witness` always emits
-  witnesses accepted by the Lean validity checker for each supported backend,
-  not just for the current benchmark-backed scenario family and runtime
-  postcondition
-- strengthen `uo-check` so the proof boundary depends on source-to-artifact
-  translation validation of the exact manifest/function/object fields consumed
-  by the theorem, rather than on trusting those fields after compilation
-- connect the Rust-emitted public logical ORAM trace and ordered controller
-  witness to the Lean observer by a backend-wise refinement argument, not just
-  by a checked serialized witness
-- discharge the ORAM theorem against the chosen standard construction instead of
-  relying on the current axiom boundary
-
-Acceptance criteria:
-
-- the paper-facing theorem is backed by an implementation refinement argument
-- no gap remains where the theorem only describes a modeled controller/backend
-  that the Rust runtime does not actually instantiate
-
-### M7. Imported standard Path ORAM route
-
-Status: theorem-facing boundary implemented.
-
-This is now the preferred route for closing the remaining ORAM gap without
-weakening the theorem:
-
-1. fix an imported standard Path ORAM theorem at the storage-semantics
-   boundary already used by the repo
-2. prove that the concrete `path_oram_local_posmap_v1` runtime witness bundle
-   conforms to that imported theorem interface
-3. reuse the existing projection lemmas to obtain the repo’s computational-UO,
-   SGX, and TEE consequences
-
-What is now implemented:
-
-- `PathOramLocalPosmapV1.lean` exposes the exact standard-theorem import
-  boundary via `PathOramLocalPosmapV1StandardStorageBoundary`
-- `PathOramLocalPosmapV1Refinement.lean` now defines:
-  `ImportedStandardPathOramImplementation`,
-  `ImportedStandardPathOramTheorem`,
-  `ImportedPathOramHiddenWitness`,
-  `ImportedStandardPathOramSample`, and
-  `PathOramLocalPosmapV1ImportedImplementationConformance`
-- the imported theorem object is no longer just a named boundary wrapper: it now
-  carries a theorem-facing implementation witness whose fields match the actual
-  internal Path ORAM theorem hypotheses consumed by `PathOramSecurity.lean`
-- the current seeded runtime proof bundle now factors through that interface by
-  a named theorem:
-  `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedImplementationConformance`
-- that conformance now holds directly at
-  `bundle.publicView` / `bundle.storageRun`, with the equality plumbing removed
-- `PathOramLocalPosmapV1StandardTheorem.lean` now freezes the exact discharge
-  target into one named theorem-facing object,
-  `PathOramLocalPosmapV1StandardTheoremTarget`; it also exposes the abstract
-  proposition `StandardPathOramStorageTheoremAt` that an imported Path ORAM
-  theorem must discharge, plus the concrete bridge object
-  `PathOramLocalPosmapV1StandardTheoremRealization` that packages the now
-  explicit connection from the seeded runtime witness family to that target
-- that module now also separates the imported theorem route into:
-  `StandardPathOramCoreTheorem` for the theorem-side ORAM claim,
-  `PathOramStorageEnvelope` for the concrete runtime’s public metadata /
-  bucket-projection / shape facts, and a one-step composition from the former
-  into the full storage theorem once a `leafRun` alignment proof is available
-- `PathOramJACMTheorem.lean` now adds the literature-faithful import surface
-  `PathOramJACMLiteratureTheorem` together with an explicit formal mapping into
-  `StandardPathOramCoreTheorem`, so the paper-facing theorem source is no
-  longer just described informally in docs
-
-This step is now closed in Lean:
-
-1. the exact imported target is frozen at
-   `PathOramLocalPosmapV1StandardTheoremTarget`
-2. the concrete seeded runtime bundle discharges
-   `StandardPathOramStorageTheoremAt` directly
-3. that discharge is packaged as
-   `PathOramLocalPosmapV1StandardTheoremRealization`
-4. the standard paper-main boundary is now also recovered explicitly from that
-   realization
-5. the preferred literature-faithful `PathOramJACMLiteratureTheoremAt` route is
-   likewise closed for the concrete bundle
-
-The optional stronger paper-facing route remains:
-
-- provide a `StandardPathOramCoreTheorem` for the concrete public observer
-- prove that the imported theorem’s `leafRun` matches the runtime’s
-  theorem-facing `bundle.leafRun`
-- then use the already-mechanized `PathOramStorageEnvelope` to obtain the full
-  `ImportedPathOramStorageTheorem` and `PathOramLocalPosmapV1StandardTheoremRealization`
-
-See `docs/path-oram-core-theorem-import.md` for the exact paper-to-repo mapping
-used by this split.
-
-The preferred route is now even tighter:
-
-- import a `PathOramJACMLiteratureTheoremAt` directly at
-  `bundle.publicView` and `bundle.leafRun`
-- use the existing runtime `PathOramStorageEnvelope` to lift it immediately to
-  `ImportedPathOramStorageTheorem`
-
-This removes the extra `leafRun` alignment obligation on the mainline route.
-The concrete backend shape is now aligned with the JACM bucket-size parameter
-`Z = 5`, and the concrete repo theorem is already closed under the explicit
-assumption bundle; the paper route and the artifact route now share the same
-interface without being symmetric provenance claims, and the current paper
-choice is the citation route while the repo keeps the current self-instantiated
-route only for executable closure and the stronger import route only as future
-work.
-
-Acceptance criteria:
-
-- the imported theorem is a named Lean object rather than an informal paper-only
-  placeholder
-- the exact discharge target is fixed in one Lean module instead of being
-  spread implicitly across the refinement and projection files
-- the concrete runtime witness bundle is connected to that imported theorem by
-  a named conformance theorem
-- the theorem-facing implementation package matches the actual standard Path
-  ORAM proof ingredients and is instantiated by the concrete runtime bundle
-
-## Immediate next steps
-
-The next practical path is:
-
-1. keep `path_oram_local_posmap_v1` as the only theorem-facing backend path
-   and treat the surrogate backend as benchmark-only
-2. use checker-side translation validation as the compiler-side bridge for the
-   exact manifest/function/object fields consumed by the theorem
-3. use the explicit trusted-kernel bundle built from the direct
-   controller/hidden certificate path as the runtime witness kernel
-4. validate that bridge path through the dedicated bridge-validation reports
-   and Lean-backed trusted-kernel / certificate / witness checkers
-5. keep the stronger external-theorem import route as future work while using
-   the citation route now, since the theorem-facing import target is already
-   frozen and the engineering bridge is already complete
-
-That sequence preserves the theorem boundary throughout. It improves the
-implementation until the strong theorem becomes true, rather than redefining the
-theorem around the implementation.
+The implementation roadmap is no longer blocked on missing runtime/controller
+plumbing, missing witness extraction, or missing theorem-interface alignment.
+The remaining work is about provenance, backend assumption discharge, and
+careful claim discipline.

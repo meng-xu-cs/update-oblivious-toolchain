@@ -60,19 +60,21 @@ Paper-main theorem strategy:
 - the theorem boundary does not change between those two routes; only the
   provenance of the ORAM core theorem object changes
 
-Strengthened closure plan:
+Current closure status:
 
 1. keep `path_oram_local_posmap_v1` as the only proof-grade backend target
-2. tighten `uo-check` into source-to-artifact translation validation for
+2. `uo-check` now serves as source-to-artifact translation validation for
    proof-relevant fields
-3. prove that the runtime trusted-kernel bundle emitted by `uo-evm`
-   satisfies the Lean refinement interface for the supported backend path, and
-   reconstruct the full runtime witness from that bundle
-4. use the citation route as the current paper theorem source, keep the current
-   self-instantiated closure as appendix / executable artifact support at the
-   same frozen interface, and treat the stronger import route as future work
-5. reuse the existing projection lemmas for computational-UO, TEE-storage, and
-   paper-facing SGX consequences
+3. the runtime trusted-kernel bundle emitted by `uo-evm` is checked against
+   the Lean refinement interface for the supported backend path, and the full
+   runtime witness is reconstructed from that bundle
+4. the citation route is the current paper theorem source, the
+   self-instantiated closure stays as appendix / executable artifact support at
+   the same frozen interface, and the stronger import route remains future
+   work
+5. the existing projection lemmas already recover the repo's
+   computational-UO, TEE-storage, and paper-facing SGX consequences at that
+   theorem boundary
 
 Build and validate:
 
@@ -88,6 +90,16 @@ cargo test
 ./scripts/run_bridge_validation.sh
 ./scripts/run_validation.sh
 ./scripts/run_heavy_artifact.sh
+```
+
+Direct inspection helpers:
+
+```bash
+cargo run -q -p uo-check -- --artifact benches/uo/FixedSlotClassifier.uo.json --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint classify(uint256) --format trace
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint classify(uint256) --format trusted-kernel
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint classify(uint256) --format refinement-witness
+cargo run -q -p mplus-probe -- --only bridge-validation --out-dir results
 ```
 
 Artifact modes:

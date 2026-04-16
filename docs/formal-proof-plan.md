@@ -669,9 +669,10 @@ Current status:
 
 Remaining change:
 
-- for the current paper route, cite the standard Path ORAM theorem at the
-  fixed storage-semantics boundary
-- independently of that presentation choice, any stronger claim still needs a
+- for the current paper route, keep using the JACM citation route at the fixed
+  storage-semantics boundary rather than implying a stronger external theorem
+  import than the repo actually has
+- independently of that provenance choice, any stronger claim still needs a
   cryptographic/backend justification for the explicit
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
 
@@ -774,19 +775,22 @@ missing bridge engineering:
 
 ## 9. Definition Of Done For A Proof-Grade ORAM Milestone
 
-Do not claim a proof-grade computational-UO ORAM until all of the following are
-true:
+The current repository now meets the repo-internal bridge criteria for a
+proof-grade Path-ORAM theorem boundary under explicit assumptions:
 
 - the theorem-facing backend path is the concrete standard-style Path ORAM
   candidate rather than the legacy surrogate
-- cryptographic assumptions are stated explicitly
+- cryptographic and backend assumptions are stated explicitly
 - the leakage function is stated explicitly
-- a simulator-based theorem is written down and mechanized
-- the implemented runtime matches the proved model by an explicit refinement
-  argument
+- a simulator-based theorem stack is written down and mechanized
+- the runtime/proof bridge is carried by emitted certificates, the
+  trusted-kernel bundle, and checked refinement witnesses
 - the compiler boundary is closed by checker-side translation validation of the
   proof-relevant fields consumed by the theorem
-- the results bundle is regenerated against the proved transcript model
+- the results bundle is regenerated against that transcript model
+
+What still should not be claimed without further work is stronger provenance or
+deployment scope than the repository actually supports.
 
 Do not claim SGX execution obliviousness against a malicious host until all of
 the following are also true:
@@ -798,11 +802,12 @@ the following are also true:
 - the deployment assumptions for freshness, rollback resistance, and platform
   patch level are stated explicitly
 
-Until then, the correct description of the repository is:
+The correct current description of the repository is:
 
-- exact-UO for the exact backends on the instrumented abstract machine
-- computational-UO artifact evidence for the current ORAM path on the same
-  abstract machine
-- a future TEE-backed storage theorem boundary under idealized enclave
-  assumptions
+- exact-UO for the exact backends on the instrumented abstract/runtime model
+- a theorem-facing computational-UO path for
+  `path_oram_local_posmap_v1` under the explicit
+  `PathOramLocalPosmapV1SecurityAssumptions` bundle and the frozen standard
+  Path-ORAM theorem interface
+- an idealized TEE-backed storage theorem boundary under enclave assumptions
 - no current SGX execution-oblivious theorem against a malicious host
