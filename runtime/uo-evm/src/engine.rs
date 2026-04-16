@@ -11,8 +11,8 @@ use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement,
 use uo_core::{
     CompiledArtifact, ExecutionTrace, RuntimeControllerObserverCertificate,
     RuntimeOramAccessCounterWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness,
-    RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness, RuntimeRefinementWitness,
-    Value,
+    RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness,
+    RuntimeTrustedKernelBundle, Value,
 };
 
 #[derive(Clone, Debug)]
@@ -277,6 +277,7 @@ impl ContractInstance {
             gas_used,
             theorem_trace: trace_bundle.theorem_trace,
             runtime_seed: Some(self.deploy_seed),
+            runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(trace_bundle.controller_certificate),
             runtime_oram_objects: runtime_oram_objects(&self.artifact),
             runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
@@ -317,14 +318,16 @@ impl ContractInstance {
             trace.runtime_oram_position_map_after.clone(),
             trace.runtime_oram_leaf_state_transitions.clone(),
         )?;
-        let direct_witness = RuntimeRefinementWitness::from_certificates(
+        let direct_bundle = RuntimeTrustedKernelBundle::new(
             trace.runtime_seed,
             direct_controller_observer,
             direct_hidden_certificate,
         )?;
-        if trace.runtime_refinement_witness()? != direct_witness {
-            bail!("runtime refinement witness drifted from direct certificate witness");
+        let reconstructed_bundle = trace.runtime_trusted_kernel_bundle()?;
+        if reconstructed_bundle != direct_bundle {
+            bail!("runtime trusted kernel drifted from direct certificate reconstruction");
         }
+        trace.runtime_trusted_kernel_bundle = Some(direct_bundle);
         Ok(CallResult {
             return_value,
             aborted: state.aborted,

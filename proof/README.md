@@ -23,6 +23,8 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/SgxOramProjection.lean`
 - `proof/lean/UOToolchain/SgxExactProjection.lean`
 - `proof/lean/UOToolchain/SgxJointProjection.lean`
+- `proof/lean/UOToolchain/RuntimeTrustedKernel.lean`
+- `proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean`
 - `proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean`
 
 These files no longer only freeze the module split. They now contain executable
@@ -32,7 +34,7 @@ certificates into those theorem-facing objects is now implemented under the
 explicit `PathOramLocalPosmapV1SecurityAssumptions` bundle. They still do not
 justify a blanket claim that every layer of the Rust stack, or a malicious-host
 SGX deployment, already satisfies the final paper theorem without additional
-theorem discharge or a smaller formally verified kernel.
+theorem discharge beyond the now-explicit trusted-kernel boundary.
 
 Current status:
 
@@ -104,11 +106,11 @@ Current status:
   as a compatibility/benchmark specialization and is not the strengthened claim
   path
 - the theorem routes are now separated explicitly but remain equivalent at the
-  frozen interface:
+  frozen interface as theorem targets, but not as provenance claims:
   the current paper choice is the citation route at that interface, while the
-  self-instantiated theorem object stays as an appendix / executable-artifact
-  cross-check at the same interface and the stronger external-theorem import
-  route is kept only as future work
+  self-instantiated theorem object stays only as an appendix /
+  executable-artifact cross-check at the same interface and the stronger
+  external-theorem import route is kept only as future work
 - the repo now also contains a concrete imported-theorem bridge checklist in
   [docs/imported-theorem-bridge-checklist.md](/home/m285xu/update-oblivious-toolchain/docs/imported-theorem-bridge-checklist.md),
   which records the completed engineering bridge under the current explicit
@@ -120,6 +122,8 @@ Current status:
 - the recommended literature source, fallback source, and source-to-interface
   mapping are now collected in
   [docs/path-oram-citation-import-plan.md](/home/m285xu/update-oblivious-toolchain/docs/path-oram-citation-import-plan.md)
+- the explicit bibliography entries for that citation route now live in
+  [docs/path-oram-theorem-sources.bib](/home/m285xu/update-oblivious-toolchain/docs/path-oram-theorem-sources.bib)
 - the feasibility boundary for a genuinely stronger external-theorem import
   route is now recorded in
   [docs/stronger-import-route-feasibility.md](/home/m285xu/update-oblivious-toolchain/docs/stronger-import-route-feasibility.md)

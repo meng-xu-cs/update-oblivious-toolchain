@@ -29,7 +29,7 @@ pub use trace::{
     RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
     RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness,
     RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
-    SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
+    RuntimeTrustedKernelBundle, SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
     SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace, TheoremTrace, TraceHashBundle,
     WriteClass,
 };

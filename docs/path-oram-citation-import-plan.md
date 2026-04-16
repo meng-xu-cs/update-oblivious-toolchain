@@ -7,6 +7,10 @@ It does not claim that the external theorem has already been imported. It fixes
 the recommended literature source, the fallback source, and the exact mapping
 from those sources into the repo’s theorem interface.
 
+This is now the current paper-main provenance route for the repository. The
+stronger external-theorem import story remains future work and is tracked
+separately in `docs/stronger-import-route-feasibility.md`.
+
 A ready-to-use bibliography file for these sources now lives at
 `docs/path-oram-theorem-sources.bib`.
 
@@ -78,7 +82,8 @@ the current visible candidates are:
   document / extended abstract rather than an already consumable theorem object.
 
 These are worth citing in related work or future-work positioning, but they do
-not yet remove the need to choose between:
+not yet displace the current citation-route choice or make the stronger import
+route complete:
 
 - a citation-based paper-main theorem route using the JACM paper directly
 - or a dedicated appendix / companion mechanization that exports a theorem
@@ -200,6 +205,11 @@ The recommended provenance split is:
   cite the Path ORAM theorem for access-pattern / stash behavior,
   and separately state or import the confidentiality guarantee required of the
   `ChaCha20-Poly1305` sealed bucket and metadata records.
+
+This closes the current paper-facing assumption-provenance task by fixing one
+explicit assumption statement and one exact source split. It does not pretend
+that those cryptographic/backend assumptions are already discharged by a new
+mechanized proof inside this repo.
 
 ## Crypto Source For The Concrete Runtime Primitive
 

@@ -213,10 +213,11 @@ generic paper-facing aliases below are unchanged. The current seeded runtime
 proof bundle now also instantiates that standard-theorem import boundary
 directly, including the preferred `PathOramJACMLiteratureTheoremAt` route at
 the runtime-facing `leafRun`, so there is no longer an open backend-theorem
-gap at the concrete repo boundary. The two routes remain equivalent at that
-theorem boundary; the current paper choice is to use the citation route as the
-main narrative, while the repo keeps the self-instantiated closure for
-executable validation and keeps the stronger import route as future work.
+gap at the concrete repo boundary. The paper route and the artifact route now
+share that frozen theorem boundary, but they are not symmetric as provenance
+claims: the current paper choice is to use the citation route as the main
+narrative, the repo keeps the self-instantiated closure only for executable
+validation, and the stronger external-theorem import route remains future work.
 
 The current paper-facing aliases are:
 
@@ -250,6 +251,9 @@ For the current paper, the theorem narrative is:
 - use `PaperMainPathOramTheoremSourceAt` and
   `pathOramLocalPosmapV1_paperMainStandardTheoremRealization` as the named Lean
   route for that presentation
+- state the explicit `PathOramLocalPosmapV1SecurityAssumptions` provenance
+  profile from `docs/path-oram-citation-import-plan.md` rather than implying
+  those backend facts are already independently mechanized
 - present the repo contribution as the bridge proving that the concrete
   compiler/runtime artifacts conform to that frozen interface
 - then derive the computational-UO, TEE-storage, and paper-facing SGX

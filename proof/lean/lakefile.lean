@@ -11,6 +11,10 @@ lean_exe checkRuntimeWitness where
   root := `CheckRuntimeWitness
 
 @[default_target]
+lean_exe checkRuntimeTrustedKernel where
+  root := `CheckRuntimeTrustedKernel
+
+@[default_target]
 lean_exe checkRuntimeControllerCertificate where
   root := `CheckRuntimeControllerCertificate
 

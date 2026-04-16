@@ -134,8 +134,8 @@ The repo now deliberately uses one paper-main route and one appendix / artifact
 route at the same theorem boundary.
 
 - Paper-main route:
-  import or cite an external theorem object at
-  `PathOramLocalPosmapV1StandardTheoremTarget`, preferably through
+  cite the JACM theorem source now at
+  `PathOramLocalPosmapV1StandardTheoremTarget`, through
   `PaperMainPathOramTheoremSourceAt` fixed at the runtime-facing
   `publicView` / `leafRun`.
 - Appendix / artifact route:
@@ -146,8 +146,10 @@ route at the same theorem boundary.
 
 These are not different theorem boundaries. They use the same storage envelope,
 the same projection lemmas, and the same explicit backend-assumption bundle.
-The only difference is where the standard Path ORAM core theorem object comes
-from.
+But they are not symmetric provenance claims:
+the citation route is the current paper mainline,
+the self-instantiated route is the executable artifact cross-check, and a
+genuinely external theorem import remains future work.
 
 ## Practical Interpretation
 
@@ -158,13 +160,21 @@ The completed engineering bridge is no longer blocked on:
 - public/storage interface mismatch
 - SGX/TEE theorem composition
 
-What remains open for the paper-main route is narrower:
+What is now fixed for the current paper-main route:
 
-- supply or cite the external literature-proof object at the same frozen
+- the repo cites the JACM theorem as the paper-main external theorem source at
+  the same frozen interface
+- the explicit assumption profile for
+  `PathOramLocalPosmapV1SecurityAssumptions` is now written down, including the
+  stash-theorem citation, the implementation-side fresh-leaf sampling facts,
+  and the concrete sealed-record crypto boundary
+
+Future strengthening beyond that route would be:
+
+- package a genuinely external machine-checked theorem object at the same
   interface
-- or separately justify the explicit
-  `PathOramLocalPosmapV1SecurityAssumptions` bundle with cryptographic/backend
-  arguments outside this repo
+- separately import or mechanize the cryptographic/backend proofs behind the
+  explicit assumption bundle rather than stating them as assumptions
 
 The concrete recommended literature source, fallback source, and theorem-field
 mapping are collected in `docs/path-oram-citation-import-plan.md`.

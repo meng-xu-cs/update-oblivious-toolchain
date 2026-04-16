@@ -266,7 +266,7 @@
     "scenarios": [
       {
         "accepted": true,
-        "certificate_json_bytes": 3278,
+        "certificate_json_bytes": 3274,
         "entrypoint": "put(bytes32,uint256)",
         "leaf_steps": 1,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -277,7 +277,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 3280,
+        "certificate_json_bytes": 3274,
         "entrypoint": "put(bytes32,uint256)",
         "leaf_steps": 1,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -288,7 +288,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 5639,
+        "certificate_json_bytes": 5640,
         "entrypoint": "add(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -299,7 +299,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 5636,
+        "certificate_json_bytes": 5640,
         "entrypoint": "add(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -310,7 +310,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 12593,
+        "certificate_json_bytes": 12585,
         "entrypoint": "deposit(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -321,7 +321,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 44242,
+        "certificate_json_bytes": 44227,
         "entrypoint": "transferFrom(address,address,address,uint256)",
         "leaf_steps": 6,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 6 leaf steps",
@@ -603,6 +603,251 @@
       }
     ]
   },
+  "trusted_kernel_validation": {
+    "checker": "proof/lean/.lake/build/bin/checkRuntimeTrustedKernel",
+    "excluded_scenarios": [
+      {
+        "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ConfidentialMixer/pathoram/*; the trusted-kernel validator reports only the explicit pathoram name",
+        "scenario": "ConfidentialMixer/oram/*"
+      },
+      {
+        "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ERC20Lite/pathoram/*; the trusted-kernel validator reports only the explicit pathoram name",
+        "scenario": "ERC20Lite/oram/*"
+      }
+    ],
+    "model_tags": {
+      "exit_model": "exit_v1",
+      "page_model": "page_v1",
+      "shared_resource_model": "shared_v1"
+    },
+    "scenario_count": 16,
+    "scenarios": [
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 1789,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "classify(uint256)",
+        "gas_used": 4096,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for classify(uint256)",
+        "position_map_objects": 0,
+        "scenario": "FixedSlotClassifier/uo/class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 1789,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "classify(uint256)",
+        "gas_used": 4096,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for classify(uint256)",
+        "position_map_objects": 0,
+        "scenario": "FixedSlotClassifier/uo/class1",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 3209,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "auth(bytes32)",
+        "gas_used": 8192,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for auth(bytes32)",
+        "position_map_objects": 0,
+        "scenario": "AuthScan/uo/class0",
+        "setup_calls": 2
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 3209,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "auth(bytes32)",
+        "gas_used": 8192,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for auth(bytes32)",
+        "position_map_objects": 0,
+        "scenario": "AuthScan/uo/class1",
+        "setup_calls": 2
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 3210,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "upsert(bytes32,uint256)",
+        "gas_used": 12288,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for upsert(bytes32,uint256)",
+        "position_map_objects": 0,
+        "scenario": "RegistryCRUD/uo/class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 3211,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "upsert(bytes32,uint256)",
+        "gas_used": 12288,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for upsert(bytes32,uint256)",
+        "position_map_objects": 0,
+        "scenario": "RegistryCRUD/uo/class1",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 4472,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "gas_used": 16384,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for deposit(bytes32,uint256)",
+        "position_map_objects": 0,
+        "scenario": "ConfidentialMixer/fullscan/class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 4472,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "gas_used": 16384,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for deposit(bytes32,uint256)",
+        "position_map_objects": 0,
+        "scenario": "ConfidentialMixer/fullscan/class1",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 5027,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "approve(address,address,uint256)",
+        "gas_used": 20480,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for approve(address,address,uint256)",
+        "position_map_objects": 0,
+        "scenario": "ERC20Lite/fullscan/class0",
+        "setup_calls": 1
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "bundle_json_bytes": 5029,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "approve(address,address,uint256)",
+        "gas_used": 20480,
+        "leaf_steps": 0,
+        "lean_stdout": "validated runtime trusted kernel bundle for approve(address,address,uint256)",
+        "position_map_objects": 0,
+        "scenario": "ERC20Lite/fullscan/class1",
+        "setup_calls": 1
+      },
+      {
+        "accepted": true,
+        "boundary_events": 4,
+        "bundle_json_bytes": 6782,
+        "controller_accesses": 1,
+        "controller_phase_count": 8,
+        "entrypoint": "put(bytes32,uint256)",
+        "gas_used": 2322,
+        "leaf_steps": 1,
+        "lean_stdout": "validated runtime trusted kernel bundle for put(bytes32,uint256)",
+        "position_map_objects": 1,
+        "scenario": "SingleAccessMap/pathoram/put-class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 4,
+        "bundle_json_bytes": 6784,
+        "controller_accesses": 1,
+        "controller_phase_count": 8,
+        "entrypoint": "put(bytes32,uint256)",
+        "gas_used": 2322,
+        "leaf_steps": 1,
+        "lean_stdout": "validated runtime trusted kernel bundle for put(bytes32,uint256)",
+        "position_map_objects": 1,
+        "scenario": "SingleAccessMap/pathoram/put-class1",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "bundle_json_bytes": 11335,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "add(bytes32,uint256)",
+        "gas_used": 2651,
+        "leaf_steps": 2,
+        "lean_stdout": "validated runtime trusted kernel bundle for add(bytes32,uint256)",
+        "position_map_objects": 1,
+        "scenario": "SingleAccessMap/pathoram/add-class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "bundle_json_bytes": 11338,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "add(bytes32,uint256)",
+        "gas_used": 2651,
+        "leaf_steps": 2,
+        "lean_stdout": "validated runtime trusted kernel bundle for add(bytes32,uint256)",
+        "position_map_objects": 1,
+        "scenario": "SingleAccessMap/pathoram/add-class1",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "bundle_json_bytes": 26126,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "gas_used": 12288,
+        "leaf_steps": 2,
+        "lean_stdout": "validated runtime trusted kernel bundle for deposit(bytes32,uint256)",
+        "position_map_objects": 1,
+        "scenario": "ConfidentialMixer/pathoram/deposit",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 14,
+        "bundle_json_bytes": 92420,
+        "controller_accesses": 6,
+        "controller_phase_count": 33,
+        "entrypoint": "transferFrom(address,address,address,uint256)",
+        "gas_used": 16384,
+        "leaf_steps": 6,
+        "lean_stdout": "validated runtime trusted kernel bundle for transferFrom(address,address,address,uint256)",
+        "position_map_objects": 2,
+        "scenario": "ERC20Lite/pathoram/transferFrom",
+        "setup_calls": 2
+      }
+    ]
+  },
   "witness_validation": {
     "checker": "proof/lean/.lake/build/bin/checkRuntimeWitness",
     "excluded_scenarios": [
@@ -635,7 +880,7 @@
         "scenario": "FixedSlotClassifier/uo/class0",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 1741
+        "witness_json_bytes": 1742
       },
       {
         "accepted": true,
@@ -680,7 +925,7 @@
         "scenario": "AuthScan/uo/class1",
         "setup_calls": 2,
         "shared_resource_events": 3,
-        "witness_json_bytes": 3163
+        "witness_json_bytes": 3162
       },
       {
         "accepted": true,
@@ -710,7 +955,7 @@
         "scenario": "RegistryCRUD/uo/class1",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 3162
+        "witness_json_bytes": 3163
       },
       {
         "accepted": true,
@@ -725,7 +970,7 @@
         "scenario": "ConfidentialMixer/fullscan/class0",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 4424
+        "witness_json_bytes": 4425
       },
       {
         "accepted": true,
@@ -740,7 +985,7 @@
         "scenario": "ConfidentialMixer/fullscan/class1",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 4426
+        "witness_json_bytes": 4425
       },
       {
         "accepted": true,
@@ -770,7 +1015,7 @@
         "scenario": "ERC20Lite/fullscan/class1",
         "setup_calls": 1,
         "shared_resource_events": 3,
-        "witness_json_bytes": 4981
+        "witness_json_bytes": 4982
       },
       {
         "accepted": true,
@@ -785,7 +1030,7 @@
         "scenario": "SingleAccessMap/pathoram/put-class0",
         "setup_calls": 0,
         "shared_resource_events": 34,
-        "witness_json_bytes": 6738
+        "witness_json_bytes": 6737
       },
       {
         "accepted": true,
@@ -815,7 +1060,7 @@
         "scenario": "SingleAccessMap/pathoram/add-class0",
         "setup_calls": 0,
         "shared_resource_events": 65,
-        "witness_json_bytes": 11284
+        "witness_json_bytes": 11288
       },
       {
         "accepted": true,
@@ -830,7 +1075,7 @@
         "scenario": "SingleAccessMap/pathoram/add-class1",
         "setup_calls": 0,
         "shared_resource_events": 65,
-        "witness_json_bytes": 11286
+        "witness_json_bytes": 11287
       },
       {
         "accepted": true,
@@ -845,7 +1090,7 @@
         "scenario": "ConfidentialMixer/pathoram/deposit",
         "setup_calls": 0,
         "shared_resource_events": 189,
-        "witness_json_bytes": 26075
+        "witness_json_bytes": 26077
       },
       {
         "accepted": true,
@@ -860,7 +1105,7 @@
         "scenario": "ERC20Lite/pathoram/transferFrom",
         "setup_calls": 2,
         "shared_resource_events": 723,
-        "witness_json_bytes": 92370
+        "witness_json_bytes": 92364
       }
     ]
   }

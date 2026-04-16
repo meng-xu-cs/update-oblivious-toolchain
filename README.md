@@ -12,8 +12,8 @@ Components:
   supported subset, lowers to explicit UO IR, and emits theorem-facing
   manifests.
 - `runtime/uo-evm`: executes raw and UO artifacts in-process, emits
-  instrumented `M+` traces, and exports checked refinement witnesses for the
-  Lean model.
+  instrumented `M+` traces, and exports checked trusted-kernel bundles,
+  certificates, and refinement witnesses for the Lean model.
 - `checker/uo-check`: rejects unsupported source programs, validates compiled
   artifacts, and is the main translation-validation/security-gate path for
   proof-relevant compiler output.
@@ -30,22 +30,28 @@ Current claim boundary:
 - theorem-facing computational-UO only on the `path_oram_local_posmap_v1`
   backend path; the legacy surrogate backend remains for benchmarking and
   compatibility, not for strengthened proof claims
-- Lean-checked observer models, reduction layers, runtime witness/certificate
-  validators, and a frozen imported standard Path ORAM theorem target
+- Lean-checked observer models, reduction layers, runtime trusted-kernel /
+  witness / certificate validators, and a frozen imported standard Path ORAM
+  theorem target
 - the implementation bridge from source/artifact/runtime output into that
   theorem boundary is now explicit and executable under the current
-  `PathOramLocalPosmapV1SecurityAssumptions` bundle
+  `PathOramLocalPosmapV1SecurityAssumptions` bundle, with emitted runtime
+  traces carrying the direct trusted-kernel bundle that the Lean checker
+  validates
 - no current blanket claim that the full Rust compiler/runtime stack or a
   malicious-host SGX deployment already satisfies the final paper theorem
 
 Paper-main theorem strategy:
 
 - theorem-boundary fact: the paper route and the appendix / artifact route use
-  the same frozen theorem interface
+  the same frozen theorem interface, but they are not symmetric as provenance
+  claims
 - current paper choice: use the citation route, with the JACM Path ORAM theorem
   as the external theorem source at the frozen
   `PathOramLocalPosmapV1StandardTheoremTarget` interface, modeled by
-  `PaperMainPathOramTheoremSourceAt`
+  `PaperMainPathOramTheoremSourceAt`; the concrete citation/writeup lives in
+  `docs/path-oram-citation-import-plan.md` and
+  `docs/path-oram-theorem-sources.bib`
 - appendix / artifact route: keep the self-instantiated theorem object at the
   same interface so the current artifacts can be checked end to end today
 - future work: keep the stronger external-theorem import route alive, but only
@@ -59,8 +65,9 @@ Strengthened closure plan:
 1. keep `path_oram_local_posmap_v1` as the only proof-grade backend target
 2. tighten `uo-check` into source-to-artifact translation validation for
    proof-relevant fields
-3. prove that the runtime witness/certificate bundle emitted by `uo-evm`
-   satisfies the Lean refinement interface for the supported backend path
+3. prove that the runtime trusted-kernel bundle emitted by `uo-evm`
+   satisfies the Lean refinement interface for the supported backend path, and
+   reconstruct the full runtime witness from that bundle
 4. use the citation route as the current paper theorem source, keep the current
    self-instantiated closure as appendix / executable artifact support at the
    same frozen interface, and treat the stronger import route as future work
@@ -98,6 +105,7 @@ The current prototype is intentionally narrow. The exact supported subset,
 rejected features, remaining assumptions, and the formal proof roadmap are
 documented in [docs/supported-subset.md](docs/supported-subset.md),
 [docs/engineering-note.md](docs/engineering-note.md),
+[docs/trusted-kernel-verification.md](docs/trusted-kernel-verification.md),
 [docs/imported-theorem-bridge-checklist.md](docs/imported-theorem-bridge-checklist.md),
 [docs/paper-main-theorem-checklist.md](docs/paper-main-theorem-checklist.md),
 [docs/path-oram-citation-import-plan.md](docs/path-oram-citation-import-plan.md),

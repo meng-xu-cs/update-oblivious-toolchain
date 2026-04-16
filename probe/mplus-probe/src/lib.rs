@@ -260,6 +260,7 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
     let overheads = run_overheads(&suite)?;
     let controller_observer_validation = run_controller_observer_validation(&suite)?;
     let pathoram_hidden_validation = run_pathoram_hidden_validation()?;
+    let trusted_kernel_validation = run_trusted_kernel_validation(&suite)?;
     let witness_validation = run_witness_validation(&suite)?;
     let seeded_witness_validation = run_seeded_witness_validation()?;
     let fresh_coin_validation = run_fresh_coin_validation(options)?;
@@ -276,6 +277,7 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "overheads": overheads,
         "controller_observer_validation": controller_observer_validation,
         "pathoram_hidden_validation": pathoram_hidden_validation,
+        "trusted_kernel_validation": trusted_kernel_validation,
         "witness_validation": witness_validation,
         "seeded_witness_validation": seeded_witness_validation,
         "fresh_coin_validation": fresh_coin_validation,
@@ -303,15 +305,22 @@ pub fn run_bridge_validation_report() -> Result<JsonValue> {
     let static_checks = run_static_checks(&suite)?;
     let controller_observer_validation = run_controller_observer_validation(&suite)?;
     let pathoram_hidden_validation = run_pathoram_hidden_validation()?;
+    let trusted_kernel_validation = run_trusted_kernel_validation(&suite)?;
     let witness_validation = run_witness_validation(&suite)?;
     let seeded_witness_validation = run_seeded_witness_validation()?;
     Ok(json!({
         "static_checks": static_checks,
         "controller_observer_validation": controller_observer_validation,
         "pathoram_hidden_validation": pathoram_hidden_validation,
+        "trusted_kernel_validation": trusted_kernel_validation,
         "witness_validation": witness_validation,
         "seeded_witness_validation": seeded_witness_validation,
     }))
+}
+
+pub fn run_trusted_kernel_validation_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_trusted_kernel_validation(&suite)
 }
 
 pub fn run_witness_validation_report() -> Result<JsonValue> {
@@ -364,6 +373,7 @@ pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
         "overheads",
         "controller_observer_validation",
         "pathoram_hidden_validation",
+        "trusted_kernel_validation",
         "witness_validation",
         "seeded_witness_validation",
         "fresh_coin_validation",
@@ -868,6 +878,235 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
         "checker": display_report_path(&checker),
         "scenario_count": scenarios.len(),
         "scenarios": scenarios,
+    }))
+}
+
+fn run_trusted_kernel_validation(
+    suite: &BTreeMap<&'static str, BenchArtifacts>,
+) -> Result<JsonValue> {
+    let checker = lean_trusted_kernel_checker_path()?;
+    let single_access = compile_artifact(
+        "benches/raw/SingleAccessMap.sol",
+        "benches/raw/SingleAccessMap.pathoram.yaml",
+        ProgramMode::Uo,
+    )?;
+    let mixer_pathoram = compile_artifact(
+        "benches/raw/ConfidentialMixer.sol",
+        "benches/raw/ConfidentialMixer.pathoram.yaml",
+        ProgramMode::Uo,
+    )?;
+    let erc20_pathoram = compile_artifact(
+        "benches/raw/ERC20Lite.sol",
+        "benches/raw/ERC20Lite.pathoram.yaml",
+        ProgramMode::Uo,
+    )?;
+
+    let auth_setup = vec![
+        CallSpec {
+            entrypoint: "seed(uint256,bytes32)",
+            args: vec![Value::Uint(0), b32(1)],
+        },
+        CallSpec {
+            entrypoint: "seed(uint256,bytes32)",
+            args: vec![Value::Uint(1), b32(2)],
+        },
+    ];
+    let erc20_setup = vec![CallSpec {
+        entrypoint: "mint(address,uint256)",
+        args: vec![addr(0x11), Value::Uint(10)],
+    }];
+    let excluded_scenarios = vec![
+        json!({
+            "scenario": "ConfidentialMixer/oram/*",
+            "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ConfidentialMixer/pathoram/*; the trusted-kernel validator reports only the explicit pathoram name"
+        }),
+        json!({
+            "scenario": "ERC20Lite/oram/*",
+            "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ERC20Lite/pathoram/*; the trusted-kernel validator reports only the explicit pathoram name"
+        }),
+    ];
+
+    let mut scenarios = Vec::new();
+    scenarios.push(validate_trusted_kernel_case(
+        "FixedSlotClassifier/uo/class0",
+        &suite["FixedSlotClassifier"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "classify(uint256)",
+            args: vec![Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "FixedSlotClassifier/uo/class1",
+        &suite["FixedSlotClassifier"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "classify(uint256)",
+            args: vec![Value::Uint(1)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "AuthScan/uo/class0",
+        &suite["AuthScan"].uo,
+        &auth_setup,
+        &CallSpec {
+            entrypoint: "auth(bytes32)",
+            args: vec![b32(9)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "AuthScan/uo/class1",
+        &suite["AuthScan"].uo,
+        &auth_setup,
+        &CallSpec {
+            entrypoint: "auth(bytes32)",
+            args: vec![b32(1)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "RegistryCRUD/uo/class0",
+        &suite["RegistryCRUD"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "upsert(bytes32,uint256)",
+            args: vec![b32(7), Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "RegistryCRUD/uo/class1",
+        &suite["RegistryCRUD"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "upsert(bytes32,uint256)",
+            args: vec![b32(7), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "ConfidentialMixer/fullscan/class0",
+        &suite["ConfidentialMixer"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(5), Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "ConfidentialMixer/fullscan/class1",
+        &suite["ConfidentialMixer"].uo,
+        &[],
+        &CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(5), Value::Uint(1)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "ERC20Lite/fullscan/class0",
+        &suite["ERC20Lite"].uo,
+        &erc20_setup,
+        &CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![addr(0x11), addr(0x22), Value::Uint(0)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "ERC20Lite/fullscan/class1",
+        &suite["ERC20Lite"].uo,
+        &erc20_setup,
+        &CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "SingleAccessMap/pathoram/put-class0",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "put(bytes32,uint256)",
+            args: vec![b32(1), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "SingleAccessMap/pathoram/put-class1",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "put(bytes32,uint256)",
+            args: vec![b32(9), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "SingleAccessMap/pathoram/add-class0",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "add(bytes32,uint256)",
+            args: vec![b32(1), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "SingleAccessMap/pathoram/add-class1",
+        &single_access,
+        &[],
+        &CallSpec {
+            entrypoint: "add(bytes32,uint256)",
+            args: vec![b32(9), Value::Uint(7)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "ConfidentialMixer/pathoram/deposit",
+        &mixer_pathoram,
+        &[],
+        &CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(5), Value::Uint(1)],
+        },
+        &checker,
+    )?);
+    scenarios.push(validate_trusted_kernel_case(
+        "ERC20Lite/pathoram/transferFrom",
+        &erc20_pathoram,
+        &[
+            CallSpec {
+                entrypoint: "mint(address,uint256)",
+                args: vec![addr(0x11), Value::Uint(10)],
+            },
+            CallSpec {
+                entrypoint: "approve(address,address,uint256)",
+                args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            },
+        ],
+        &CallSpec {
+            entrypoint: "transferFrom(address,address,address,uint256)",
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+        },
+        &checker,
+    )?);
+
+    Ok(json!({
+        "checker": display_report_path(&checker),
+        "model_tags": {
+            "page_model": "page_v1",
+            "exit_model": "exit_v1",
+            "shared_resource_model": "shared_v1"
+        },
+        "scenario_count": scenarios.len(),
+        "scenarios": scenarios,
+        "excluded_scenarios": excluded_scenarios,
     }))
 }
 
@@ -1534,6 +1773,47 @@ fn validate_witness_case(
         "exit_events": witness.normalized_micro_trace.exit_pattern.len(),
         "shared_resource_events": witness.normalized_micro_trace.shared_resource_pattern.len(),
         "witness_json_bytes": witness_json_bytes,
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "accepted": true,
+    }))
+}
+
+fn validate_trusted_kernel_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    checker: &Path,
+) -> Result<JsonValue> {
+    let trace = run_target_call(artifact, setup, target.entrypoint, target.args.clone())?;
+    let bundle = trace.runtime_trusted_kernel_bundle()?;
+    let (bundle_path, bundle_json_bytes) = write_temp_json(name, &bundle)?;
+    let output = Command::new(checker)
+        .arg(&bundle_path)
+        .arg("page_v1")
+        .arg("exit_v1")
+        .arg("shared_v1")
+        .output()?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean trusted-kernel validation failed for {}: {} (bundle preserved at {})",
+            name,
+            String::from_utf8_lossy(&output.stderr).trim(),
+            bundle_path.display()
+        ));
+    }
+    let _ = fs::remove_file(&bundle_path);
+    Ok(json!({
+        "scenario": name,
+        "entrypoint": target.entrypoint,
+        "setup_calls": setup.len(),
+        "gas_used": bundle.controller_observer.public_outcome.gas_used,
+        "boundary_events": bundle.controller_observer.boundary_schedule.len(),
+        "controller_phase_count": bundle.controller_observer.controller_shape.controller_phase_order.len(),
+        "controller_accesses": bundle.controller_observer.controller_certificate.observed_oram_accesses.len(),
+        "leaf_steps": bundle.hidden_certificate.oram_leaf_schedule.len(),
+        "position_map_objects": bundle.hidden_certificate.oram_position_map_before.len(),
+        "bundle_json_bytes": bundle_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
     }))
@@ -2944,6 +3224,18 @@ fn lean_witness_checker_path() -> Result<PathBuf> {
     }
 }
 
+fn lean_trusted_kernel_checker_path() -> Result<PathBuf> {
+    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeTrustedKernel");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(anyhow!(
+            "Lean trusted-kernel checker not found at {}; build it with `cd proof/lean && lake build`",
+            path.display()
+        ))
+    }
+}
+
 fn lean_controller_certificate_checker_path() -> Result<PathBuf> {
     let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeControllerCertificate");
     if path.is_file() {
@@ -4154,6 +4446,10 @@ The generated reports now also include `witness_validation.json`, which checks
 representative theorem-backed runtime refinement witnesses against the Lean-side
 validator, and `seeded_witness_validation.json`, which checks seeded path-ORAM
 witness families against the Lean-side runtime-coins family validator.
+`trusted_kernel_validation.json` adds the smaller theorem-facing bridge object:
+it checks the explicit runtime trusted-kernel bundle that packages the public
+controller observer certificate plus the hidden Path-ORAM certificate and from
+which the full runtime witness is reconstructed.
 The witness validator now also covers proof-grade path-ORAM executions beyond
 `SingleAccessMap`, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object
@@ -4184,6 +4480,12 @@ full public fresh-coin scaffold and seed count.
 families beyond `SingleAccessMap`, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object
 `ERC20Lite/pathoram/transferFrom` run.
+`bridge_validation.json` is the focused imported-theorem engineering-bridge
+report: it bundles the source-to-artifact translation checks together with the
+direct controller certificate, direct hidden-state certificate, explicit
+trusted-kernel bundle, runtime refinement witness, and seeded witness-family
+validators so the bridge status can be checked without inferring it from the
+full artifact bundle.
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and

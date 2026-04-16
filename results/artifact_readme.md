@@ -6,6 +6,10 @@ The generated reports now also include `witness_validation.json`, which checks
 representative theorem-backed runtime refinement witnesses against the Lean-side
 validator, and `seeded_witness_validation.json`, which checks seeded path-ORAM
 witness families against the Lean-side runtime-coins family validator.
+`trusted_kernel_validation.json` adds the smaller theorem-facing bridge object:
+it checks the explicit runtime trusted-kernel bundle that packages the public
+controller observer certificate plus the hidden Path-ORAM certificate and from
+which the full runtime witness is reconstructed.
 The witness validator now also covers proof-grade path-ORAM executions beyond
 `SingleAccessMap`, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object
@@ -38,9 +42,10 @@ families beyond `SingleAccessMap`, including the multi-access
 `ERC20Lite/pathoram/transferFrom` run.
 `bridge_validation.json` is the focused imported-theorem engineering-bridge
 report: it bundles the source-to-artifact translation checks together with the
-direct controller certificate, direct hidden-state certificate, runtime
-refinement witness, and seeded witness-family validators so the bridge status
-can be checked without inferring it from the full artifact bundle.
+direct controller certificate, direct hidden-state certificate, explicit
+trusted-kernel bundle, runtime refinement witness, and seeded witness-family
+validators so the bridge status can be checked without inferring it from the
+full artifact bundle.
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and

@@ -15,7 +15,8 @@ The repo path here is:
 - imported standard theorem for the cryptographic / ORAM core
 - checker-side translation validation for proof-relevant compiler output
 - runtime-emitted controller and hidden-state certificates
-- direct runtime witness construction from those certificates
+- an explicit runtime trusted-kernel bundle packaging those certificates
+- direct runtime witness reconstruction from that trusted-kernel bundle
 - Lean-checked theorem-facing validation of the resulting witness artifacts
 
 Status labels:
@@ -88,6 +89,22 @@ Status labels:
   The runtime now builds a direct certificate-derived witness and rejects any
   execution whose returned `ExecutionTrace` reconstructs a different witness.
 
+- `cleared` Package the runtime-side trusted boundary as an explicit
+  theorem-facing kernel bundle.
+  Evidence:
+  `crates/uo-core/src/trace.rs`,
+  `proof/lean/UOToolchain/RuntimeTrustedKernel.lean`,
+  `proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean`,
+  `proof/lean/CheckRuntimeTrustedKernel.lean`,
+  `results/trusted_kernel_validation.json`.
+  The runtime now emits a `RuntimeTrustedKernelBundle` containing the public
+  controller observer certificate, the hidden Path-ORAM certificate, and the
+  optional replay seed. That direct bundle is now stored on emitted runtime
+  traces, while the older trace-based reconstruction path survives only as an
+  internal audit check. Lean proves what validity of that bundle means and the
+  probe validates the emitted bundle directly on the benchmark-backed runtime
+  scenarios.
+
 - `cleared` Validate the theorem-facing bridge artifacts with Lean-backed
   checkers.
   Evidence:
@@ -104,7 +121,8 @@ Status labels:
   `probe/mplus-probe/src/main.rs`,
   `scripts/run_bridge_validation.sh`.
   The repo now has a focused `bridge_validation.json` path that runs
-  translation validation plus the controller / hidden / witness bridge reports.
+  translation validation plus the controller / hidden / trusted-kernel /
+  witness bridge reports.
 
 - `optional` The paper-main theorem provenance step is tracked separately in
   `docs/paper-main-theorem-checklist.md`: supply or cite an external

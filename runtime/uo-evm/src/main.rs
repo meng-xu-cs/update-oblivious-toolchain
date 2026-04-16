@@ -4,6 +4,7 @@ use clap::{Parser, ValueEnum};
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
     Trace,
+    TrustedKernel,
     RefinementWitness,
 }
 
@@ -30,6 +31,10 @@ fn main() -> Result<()> {
     match cli.format {
         OutputFormat::Trace => {
             println!("{}", serde_json::to_string_pretty(&trace)?);
+        }
+        OutputFormat::TrustedKernel => {
+            let bundle = trace.runtime_trusted_kernel_bundle()?;
+            println!("{}", bundle.to_json_pretty());
         }
         OutputFormat::RefinementWitness => {
             let witness = trace.runtime_refinement_witness()?;

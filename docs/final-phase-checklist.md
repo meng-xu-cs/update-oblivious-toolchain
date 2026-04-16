@@ -20,6 +20,20 @@ Status labels:
   The validator now accepts the exact-UO benchmark witnesses plus the concrete
   `SingleAccessMap` path-ORAM witnesses.
 
+- `cleared` Checked the explicit runtime trusted-kernel bundle for theorem-backed
+  backends.
+  Evidence:
+  `crates/uo-core/src/trace.rs`,
+  `proof/lean/UOToolchain/RuntimeTrustedKernel.lean`,
+  `proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean`,
+  `proof/lean/CheckRuntimeTrustedKernel.lean`,
+  `results/trusted_kernel_validation.json`.
+  The runtime now packages the public controller observer certificate together
+  with the hidden Path-ORAM certificate as one small theorem-facing kernel
+  bundle. Lean proves the validity condition for that bundle, the runtime now
+  stores that direct bundle on emitted traces, and the probe validates real
+  emitted bundles directly.
+
 - `cleared` Checked seeded path-ORAM witness families.
   Evidence:
   `crates/uo-core/src/trace.rs`,
@@ -33,9 +47,9 @@ Status labels:
 - `cleared` Default Lean build now materializes theorem-facing checkers.
   Evidence:
   `proof/lean/lakefile.lean`.
-  `lake build` now builds both `checkRuntimeWitness` and
-  `checkRuntimeWitnessFamily`, so the evaluation harness no longer depends on a
-  separate manual executable build step.
+  `lake build` now builds `checkRuntimeTrustedKernel`,
+  `checkRuntimeWitness`, and `checkRuntimeWitnessFamily`, so the evaluation
+  harness no longer depends on a separate manual executable build step.
 
 - `cleared` Checked theorem-tight paired path-ORAM certificates for concrete
   class-pair workloads.
@@ -86,9 +100,10 @@ Status labels:
   certificates. Lean validates that certificate independently of the full
   runtime-witness extractor by reconstructing the public scaffold from the
   logical trace, replaying the hidden transitions, and matching the hidden leaf
-  schedule against the observed bucket trace. The full runtime witness is now
-  assembled from the standalone public controller certificate plus this
-  standalone hidden Path-ORAM certificate.
+  schedule against the observed bucket trace. The explicit trusted-kernel
+  bundle and the full runtime witness are both now assembled from the
+  standalone public controller certificate plus this standalone hidden
+  Path-ORAM certificate.
 
 - `cleared` The concrete runtime now realizes the exact canonical fresh-coin
   family required by the theorem-facing Path-ORAM witness interface.

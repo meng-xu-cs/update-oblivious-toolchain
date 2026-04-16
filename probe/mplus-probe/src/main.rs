@@ -24,6 +24,7 @@ impl From<ArtifactModeArg> for mplus_probe::ArtifactMaterializationMode {
 enum ReportKind {
     StaticChecks,
     BridgeValidation,
+    TrustedKernelValidation,
     WitnessValidation,
     SeededWitnessValidation,
     PathoramPairValidation,
@@ -108,6 +109,20 @@ fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "bridge_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::TrustedKernelValidation) => {
+            let report = mplus_probe::run_trusted_kernel_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("trusted_kernel_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "trusted_kernel_validation": report,
                 }))?
             );
         }

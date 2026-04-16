@@ -297,6 +297,13 @@ pub struct RuntimeRefinementWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeTrustedKernelBundle {
+    pub runtime_seed: Option<u64>,
+    pub controller_observer: RuntimeControllerObserverCertificate,
+    pub hidden_certificate: RuntimePathOramHiddenCertificate,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SeededRuntimeWitnessFamily {
     pub seed_count: usize,
     pub witnesses: Vec<RuntimeRefinementWitness>,
@@ -741,6 +748,43 @@ impl RuntimeRefinementWitness {
             &self.oram_leaf_schedule,
             &self.oram_leaf_state_transitions,
         )
+    }
+}
+
+impl RuntimeTrustedKernelBundle {
+    pub fn new(
+        runtime_seed: Option<u64>,
+        controller_observer: RuntimeControllerObserverCertificate,
+        hidden_certificate: RuntimePathOramHiddenCertificate,
+    ) -> Result<Self, RefinementWitnessError> {
+        let bundle = Self {
+            runtime_seed,
+            controller_observer,
+            hidden_certificate,
+        };
+        bundle.validate()?;
+        Ok(bundle)
+    }
+
+    pub fn to_witness(&self) -> Result<RuntimeRefinementWitness, RefinementWitnessError> {
+        RuntimeRefinementWitness::from_certificates(
+            self.runtime_seed,
+            self.controller_observer.clone(),
+            self.hidden_certificate.clone(),
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), RefinementWitnessError> {
+        self.to_witness().map(|_| ())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("runtime trusted kernel bundle is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("runtime trusted kernel bundle is JSON serializable")
     }
 }
 
@@ -2002,6 +2046,8 @@ pub struct ExecutionTrace {
     #[serde(default)]
     pub runtime_seed: Option<u64>,
     #[serde(default)]
+    pub runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,
+    #[serde(default)]
     pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,
     #[serde(default)]
     pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
@@ -2071,6 +2117,10 @@ impl ExecutionTrace {
     pub fn runtime_controller_observer_certificate(
         &self,
     ) -> Result<RuntimeControllerObserverCertificate, RefinementWitnessError> {
+        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+            bundle.controller_observer.validate()?;
+            return Ok(bundle.controller_observer.clone());
+        }
         RuntimeControllerObserverCertificate::new(
             self.theorem_trace
                 .public_outcome
@@ -2094,6 +2144,10 @@ impl ExecutionTrace {
     pub fn runtime_path_oram_hidden_certificate(
         &self,
     ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
+        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+            bundle.hidden_certificate.validate()?;
+            return Ok(bundle.hidden_certificate.clone());
+        }
         RuntimePathOramHiddenCertificate::new(
             self.refinement_trace(),
             self.runtime_oram_objects.clone(),
@@ -2104,16 +2158,22 @@ impl ExecutionTrace {
         )
     }
 
+    pub fn runtime_trusted_kernel_bundle(
+        &self,
+    ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
+        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+            bundle.validate()?;
+            return Ok(bundle.clone());
+        }
+        let controller_observer = self.runtime_controller_observer_certificate()?;
+        let hidden_certificate = self.runtime_path_oram_hidden_certificate()?;
+        RuntimeTrustedKernelBundle::new(self.runtime_seed, controller_observer, hidden_certificate)
+    }
+
     pub fn runtime_refinement_witness(
         &self,
     ) -> Result<RuntimeRefinementWitness, RefinementWitnessError> {
-        let controller_observer = self.runtime_controller_observer_certificate()?;
-        let hidden_certificate = self.runtime_path_oram_hidden_certificate()?;
-        RuntimeRefinementWitness::from_certificates(
-            self.runtime_seed,
-            controller_observer,
-            hidden_certificate,
-        )
+        self.runtime_trusted_kernel_bundle()?.to_witness()
     }
 }
 
@@ -2367,6 +2427,7 @@ mod tests {
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
             runtime_seed: Some(seed),
+            runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()],
             runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
@@ -2531,6 +2592,82 @@ mod tests {
         )
         .unwrap();
         assert_eq!(direct, trace.runtime_refinement_witness().unwrap());
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_matches_trace_extraction() {
+        let trace = sample_runtime_execution_trace_with_seed(0);
+        let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        assert_eq!(bundle.runtime_seed, Some(0));
+        assert_eq!(
+            bundle.controller_observer,
+            trace.runtime_controller_observer_certificate().unwrap()
+        );
+        assert_eq!(
+            bundle.hidden_certificate,
+            trace.runtime_path_oram_hidden_certificate().unwrap()
+        );
+        assert_eq!(
+            bundle.to_witness().unwrap(),
+            trace.runtime_refinement_witness().unwrap()
+        );
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_uses_stored_kernel_on_emitted_trace() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        trace.runtime_trusted_kernel_bundle = Some(bundle.clone());
+        trace.theorem_trace = TheoremTrace::default();
+        trace.runtime_controller_certificate = None;
+        trace.runtime_oram_position_map_after = vec![];
+        assert_eq!(trace.runtime_trusted_kernel_bundle().unwrap(), bundle);
+        assert_eq!(trace.runtime_refinement_witness().unwrap(), bundle.to_witness().unwrap());
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_rejects_invalid_stored_kernel() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        bundle.hidden_certificate.oram_position_map_after[0].leaves[0] = Some(2);
+        trace.runtime_trusted_kernel_bundle = Some(bundle);
+        assert_eq!(
+            trace.runtime_trusted_kernel_bundle().unwrap_err(),
+            RefinementWitnessError::OramLeafStateMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_validate_accepts_sample() {
+        let trace = sample_runtime_execution_trace_with_seed(0);
+        let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        bundle.validate().unwrap();
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_rejects_controller_certificate_drift() {
+        let trace = sample_runtime_execution_trace_with_seed(0);
+        let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        bundle
+            .controller_observer
+            .controller_certificate
+            .observed_oram_accesses[0]
+            .recursion_depth = 0;
+        assert_eq!(
+            bundle.validate().unwrap_err(),
+            RefinementWitnessError::ControllerShapeMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_rejects_path_oram_state_drift() {
+        let trace = sample_runtime_execution_trace_with_seed(0);
+        let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        bundle.hidden_certificate.oram_position_map_after[0].leaves[0] = Some(2);
+        assert_eq!(
+            bundle.to_witness().unwrap_err(),
+            RefinementWitnessError::OramLeafStateMismatch
+        );
     }
 
     #[test]
@@ -2707,6 +2844,7 @@ mod tests {
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
             runtime_seed: None,
+            runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()],
             runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
@@ -2763,6 +2901,7 @@ mod tests {
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
             runtime_seed: None,
+            runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()],
             runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),

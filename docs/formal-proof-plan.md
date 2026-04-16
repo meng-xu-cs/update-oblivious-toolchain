@@ -683,16 +683,23 @@ Current status:
 - Lean can parse and validate that witness bundle against the theorem-side
   predicate
 - the runtime now also exports standalone public-controller and hidden Path
-  ORAM certificates and constructs a direct refinement witness from those
-  certificates before checking agreement with trace-based reconstruction
+  ORAM certificates
+- the runtime now also packages those certificates into an explicit
+  `RuntimeTrustedKernelBundle`, and Lean now has a corresponding
+  `RuntimeTrustedKernelBundle.Valid` predicate plus an executable
+  `checkRuntimeTrustedKernel` checker
+- the full runtime witness is now reconstructed from that explicit trusted
+  kernel bundle rather than treated as the primitive bridge object, and
+  runtime-emitted traces now store that direct bundle so witness extraction on
+  emitted artifacts no longer depends on theorem-trace-side reconstruction
 
 Remaining change:
 
-- keep the trusted boundary explicitly at that small witness-producing kernel
-  rather than at the whole trace bundle
-- if the paper later wants a stronger formal claim about the Rust kernel
+- keep the trusted boundary explicitly at that small certificate-producing
+  kernel rather than at the whole trace bundle
+- if the paper later wants a source-level theorem about the Rust extractor
   itself, add a theorem or separately audited refinement argument for that
-  smaller kernel rather than for the whole runtime
+  smaller extractor rather than for the whole runtime
 
 ### 6.3 Close the compiler/output conformance gap with translation validation
 
@@ -740,7 +747,7 @@ The recommended implementation path is now:
 
 1. keep `path_oram_local_posmap_v1` as the only theorem-facing backend target
 2. narrow the runtime ORAM/controller path around an explicit transcript- and
-   witness-emitting kernel
+   certificate-emitting trusted kernel
 3. prove or validate conformance of that kernel to the Lean witness interface
 4. keep `uo-check` as source-to-artifact translation validation for
    proof-relevant compiler output
@@ -756,7 +763,8 @@ missing bridge engineering:
 1. keep the surrogate backend explicitly marked as legacy/benchmark-only in the
    proof-facing docs and claim surface
 2. preserve the small trusted kernel boundary around emitted certificates,
-   witnesses, and `uo-check`
+   the trusted-kernel bundle, witnesses reconstructed from that bundle, and
+   `uo-check`
 3. cite the external Path ORAM theorem source at
    `PathOramLocalPosmapV1StandardTheoremTarget`
 4. keep the stronger theorem-provenance swap isolated from the theorem

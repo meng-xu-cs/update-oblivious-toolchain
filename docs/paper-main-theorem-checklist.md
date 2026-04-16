@@ -3,7 +3,8 @@
 This checklist fixes the theorem-source strategy for a paper after the current
 repo decision:
 
-- the theorem routes remain equivalent at the frozen interface
+- the paper route and the appendix / artifact route share the same frozen
+  theorem interface, but they are not symmetric as provenance claims
 - the current paper choice is to use the citation route for the standard Path
   ORAM result at that interface
 - the repo should keep the current self-instantiated closure only as appendix /
@@ -20,8 +21,8 @@ source-to-interface mapping, see
 
 Status labels:
 
-- `cleared`: fixed in the repo today
-- `open`: still required for the strongest paper claim
+- `cleared`: fixed for the current citation-route paper profile
+- `future-work`: only needed for a stronger external-theorem import story
 
 ## Checklist
 
@@ -65,19 +66,39 @@ Status labels:
   checkers are already established independently of whether the core theorem is
   externally imported or self-instantiated.
 
-- `open` Supply or cite the external Path ORAM theorem object at the frozen
-  paper-main interface.
-  Required object:
-  `paper : PaperMainPathOramTheoremSourceAt assumptions bundle.publicView bundle.leafRun`.
-  This is now the main remaining theorem-source task for the paper.
+- `cleared` Fix the current paper-main theorem provenance to the JACM citation
+  route at the frozen paper-main interface.
+  Evidence:
+  `docs/path-oram-citation-import-plan.md`,
+  `docs/path-oram-theorem-sources.bib`,
+  `proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean`.
+  The current paper route now cites the JACM theorem as the external theorem
+  source modeled by
+  `PaperMainPathOramTheoremSourceAt assumptions bundle.publicView bundle.leafRun`.
+  This is a citation-based provenance claim, not a claim that an external
+  machine-imported theorem artifact is already packaged in the repo.
 
-- `open` Justify the explicit backend assumption bundle used by the concrete
-  local-posmap wrapper.
-  Required assumptions:
+- `cleared` Fix the current paper-facing provenance statement for the explicit
+  backend assumption bundle used by the concrete local-posmap wrapper.
+  Evidence:
+  `docs/path-oram-citation-import-plan.md`,
+  `crates/uo-core/src/manifest.rs`,
+  `runtime/uo-evm/src/oram.rs`,
+  `runtime/uo-store/src/codec.rs`.
+  The paper route now states one explicit provenance split for
   `bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
-  `freshLeafResampling`, and `stashOverflowBounded`.
-  This can come from imported cryptographic proofs, a separate appendix proof,
-  or a precisely scoped assumption statement in the paper.
+  `freshLeafResampling`, and `stashOverflowBounded`: the JACM theorem is cited
+  for the ORAM access-pattern / stash component, while the runtime documents
+  the concrete leaf-sampling and sealed-record implementation facts required by
+  the remaining assumptions. This is an explicit assumption profile, not a new
+  mechanized cryptographic proof.
+
+- `future-work` Upgrade the citation route to a genuinely external
+  machine-checked theorem import at the same frozen interface.
+  Evidence:
+  `docs/stronger-import-route-feasibility.md`.
+  The stronger import route remains worth pursuing, but it is not the current
+  paper claim.
 
 ## Candidate Theorem Objects
 
@@ -128,7 +149,8 @@ The docs also imply one natural provenance split for the explicit
 
 ## Exit Condition
 
-This checklist is complete when the paper can cite or import an external theorem
-object at `PaperMainPathOramTheoremSourceAt`, keep the appendix route as an
-artifact-side cross-check at the same interface, and state the remaining
-backend assumptions without changing the theorem boundary.
+This checklist is complete for the current paper when the repo fixes the JACM
+citation route at `PaperMainPathOramTheoremSourceAt`, keeps the appendix route
+as an artifact-side cross-check at the same interface, and states the explicit
+`PathOramLocalPosmapV1SecurityAssumptions` profile without changing the theorem
+boundary. A genuinely external theorem import remains future work.

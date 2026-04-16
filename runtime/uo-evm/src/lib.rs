@@ -12,7 +12,8 @@ pub use engine::{
 mod tests {
     use super::{ContractInstance, PathOramFreshCoinPlan};
     use uo_core::{
-        canonical_path_oram_leaf_values_of_seed, ContractMetadata, ProgramMode, Value, WriteClass,
+        canonical_path_oram_leaf_values_of_seed, ContractMetadata, ExecutionTrace, ProgramMode,
+        TheoremTrace, Value, WriteClass,
     };
 
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
@@ -515,6 +516,37 @@ mod tests {
             witness.normalized_micro_trace,
             witness.controller_shape.normalized_micro_trace()
         );
+    }
+
+    #[test]
+    fn serialized_execution_trace_preserves_trusted_kernel_bundle() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let result = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+        let bundle = result.trace.runtime_trusted_kernel_bundle().unwrap();
+        assert!(result.trace.runtime_trusted_kernel_bundle.is_some());
+
+        let encoded = serde_json::to_vec(&result.trace).unwrap();
+        let mut decoded: ExecutionTrace = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded.runtime_trusted_kernel_bundle, Some(bundle.clone()));
+
+        decoded.theorem_trace = TheoremTrace::default();
+        decoded.runtime_controller_certificate = None;
+        decoded.runtime_oram_position_map_after = vec![];
+
+        assert_eq!(decoded.runtime_trusted_kernel_bundle().unwrap(), bundle);
+        assert_eq!(decoded.runtime_refinement_witness().unwrap(), bundle.to_witness().unwrap());
     }
 
     #[test]

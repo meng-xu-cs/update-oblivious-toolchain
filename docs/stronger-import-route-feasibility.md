@@ -146,7 +146,8 @@ Each of those is a real research project, not a small repo-integration step.
 
 At the current evidence level:
 
-- the theorem routes remain equivalent at the frozen interface
+- the citation route and the stronger import route share the same frozen
+  theorem boundary, but they are not symmetric provenance claims
 - the recommended paper mainline is still the external-citation route
 - the stronger import route should be presented only as future strengthening
   unless and until one of the conditions above is actually met

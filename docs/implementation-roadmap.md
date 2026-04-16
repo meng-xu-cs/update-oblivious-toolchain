@@ -405,10 +405,11 @@ The preferred route is now even tighter:
 This removes the extra `leafRun` alignment obligation on the mainline route.
 The concrete backend shape is now aligned with the JACM bucket-size parameter
 `Z = 5`, and the concrete repo theorem is already closed under the explicit
-assumption bundle; the theorem routes are equivalent at the same interface, and
-the current paper choice is the citation route while the repo keeps the current
-self-instantiated route only for executable closure and the stronger import
-route only as future work.
+assumption bundle; the paper route and the artifact route now share the same
+interface without being symmetric provenance claims, and the current paper
+choice is the citation route while the repo keeps the current self-instantiated
+route only for executable closure and the stronger import route only as future
+work.
 
 Acceptance criteria:
 
@@ -429,10 +430,10 @@ The next practical path is:
    and treat the surrogate backend as benchmark-only
 2. use checker-side translation validation as the compiler-side bridge for the
    exact manifest/function/object fields consumed by the theorem
-3. use the direct controller/hidden certificate path plus witness-agreement
-   checks as the runtime witness kernel
+3. use the explicit trusted-kernel bundle built from the direct
+   controller/hidden certificate path as the runtime witness kernel
 4. validate that bridge path through the dedicated bridge-validation reports
-   and Lean-backed certificate/witness checkers
+   and Lean-backed trusted-kernel / certificate / witness checkers
 5. keep the stronger external-theorem import route as future work while using
    the citation route now, since the theorem-facing import target is already
    frozen and the engineering bridge is already complete
