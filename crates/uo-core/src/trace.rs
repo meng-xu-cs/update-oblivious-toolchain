@@ -665,6 +665,62 @@ impl fmt::Display for CanonicalFreshCoinTheoremInputError {
 impl std::error::Error for CanonicalFreshCoinTheoremInputError {}
 
 impl RuntimeRefinementWitness {
+    pub fn from_certificates(
+        runtime_seed: Option<u64>,
+        controller_observer: RuntimeControllerObserverCertificate,
+        hidden_certificate: RuntimePathOramHiddenCertificate,
+    ) -> Result<Self, RefinementWitnessError> {
+        let witness = Self {
+            trace: hidden_certificate.trace,
+            runtime_seed,
+            public_outcome: controller_observer.public_outcome,
+            boundary_schedule: controller_observer.boundary_schedule,
+            controller_shape: controller_observer.controller_shape,
+            normalized_micro_trace: controller_observer.normalized_micro_trace,
+            controller_certificate: controller_observer.controller_certificate,
+            oram_objects: hidden_certificate.oram_objects,
+            oram_leaf_public_scaffold: hidden_certificate.oram_leaf_public_scaffold,
+            oram_leaf_schedule: hidden_certificate.oram_leaf_schedule,
+            oram_position_map_before: hidden_certificate.oram_position_map_before,
+            oram_position_map_after: hidden_certificate.oram_position_map_after,
+            oram_leaf_state_transitions: hidden_certificate.oram_leaf_state_transitions,
+        };
+        witness.validate()?;
+        Ok(witness)
+    }
+
+    pub fn validate(&self) -> Result<(), RefinementWitnessError> {
+        RuntimeControllerObserverCertificate::new(
+            self.public_outcome.clone(),
+            self.boundary_schedule.clone(),
+            self.controller_shape.clone(),
+            self.normalized_micro_trace.clone(),
+            self.controller_certificate.clone(),
+        )?;
+        RuntimePathOramHiddenCertificate::new(
+            self.trace.clone(),
+            self.oram_objects.clone(),
+            self.oram_leaf_schedule.clone(),
+            self.oram_position_map_before.clone(),
+            self.oram_position_map_after.clone(),
+            self.oram_leaf_state_transitions.clone(),
+        )?;
+        let reconstructed_accesses = reconstruct_oram_accesses_from_logical_trace(
+            &self.trace.logical_accesses,
+            &self.oram_objects,
+        )?;
+        if self.trace.gas_used != self.public_outcome.gas_used {
+            return Err(RefinementWitnessError::GasMismatch {
+                trace_gas: self.trace.gas_used,
+                public_outcome_gas: self.public_outcome.gas_used,
+            });
+        }
+        if self.controller_certificate.observed_oram_accesses != reconstructed_accesses {
+            return Err(RefinementWitnessError::OramAccessScheduleMismatch);
+        }
+        Ok(())
+    }
+
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("runtime refinement witness is JSON serializable")
     }
@@ -689,6 +745,40 @@ impl RuntimeRefinementWitness {
 }
 
 impl RuntimePathOramHiddenCertificate {
+    pub fn new(
+        trace: RefinementTrace,
+        oram_objects: Vec<RuntimeOramObjectWitness>,
+        oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+        oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+        oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+        oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    ) -> Result<Self, RefinementWitnessError> {
+        let physical_writes = refinement_physical_writes_as_shape_events(&trace)?;
+        let oram_leaf_public_scaffold = validate_path_oram_leaf_schedule(
+            &oram_leaf_schedule,
+            &trace.logical_accesses,
+            &trace.physical_reads,
+            &physical_writes,
+            &oram_objects,
+        )?;
+        validate_path_oram_leaf_state(
+            &oram_leaf_schedule,
+            &oram_leaf_state_transitions,
+            &oram_position_map_before,
+            &oram_position_map_after,
+            &oram_objects,
+        )?;
+        Ok(Self {
+            trace,
+            oram_objects,
+            oram_leaf_public_scaffold,
+            oram_leaf_schedule,
+            oram_position_map_before,
+            oram_position_map_after,
+            oram_leaf_state_transitions,
+        })
+    }
+
     pub fn to_json(&self) -> String {
         serde_json::to_string(self)
             .expect("runtime path-ORAM hidden certificate is JSON serializable")
@@ -700,27 +790,7 @@ impl RuntimePathOramHiddenCertificate {
     }
 
     pub fn validate(&self) -> Result<(), RefinementWitnessError> {
-        let physical_writes = self
-            .trace
-            .physical_writes
-            .iter()
-            .map(|event| {
-                let class = match event.write_class.as_str() {
-                    "Set" => WriteClass::Set,
-                    "Clear" => WriteClass::Clear,
-                    "Same" => WriteClass::Same,
-                    "Update" => WriteClass::Update,
-                    _ => return Err(RefinementWitnessError::OramLeafScheduleMismatch),
-                };
-                Ok(PhysicalWriteEvent {
-                    object: event.object.clone(),
-                    location: event.location.clone(),
-                    old: vec![1; event.len],
-                    new: vec![2; event.len],
-                    class,
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let physical_writes = refinement_physical_writes_as_shape_events(&self.trace)?;
         let scaffold = validate_path_oram_leaf_schedule(
             &self.oram_leaf_schedule,
             &self.trace.logical_accesses,
@@ -740,6 +810,31 @@ impl RuntimePathOramHiddenCertificate {
         )?;
         Ok(())
     }
+}
+
+fn refinement_physical_writes_as_shape_events(
+    trace: &RefinementTrace,
+) -> Result<Vec<PhysicalWriteEvent>, RefinementWitnessError> {
+    trace
+        .physical_writes
+        .iter()
+        .map(|event| {
+            let class = match event.write_class.as_str() {
+                "Set" => WriteClass::Set,
+                "Clear" => WriteClass::Clear,
+                "Same" => WriteClass::Same,
+                "Update" => WriteClass::Update,
+                _ => return Err(RefinementWitnessError::OramLeafScheduleMismatch),
+            };
+            Ok(PhysicalWriteEvent {
+                object: event.object.clone(),
+                location: event.location.clone(),
+                old: vec![1; event.len],
+                new: vec![2; event.len],
+                class,
+            })
+        })
+        .collect()
 }
 
 fn validate_seeded_runtime_witnesses(
@@ -1242,6 +1337,24 @@ impl RuntimeControllerCertificate {
 }
 
 impl RuntimeControllerObserverCertificate {
+    pub fn new(
+        public_outcome: PublicOutcomeTrace,
+        boundary_schedule: Vec<BoundaryEvent>,
+        controller_shape: SgxControllerShapeTrace,
+        normalized_micro_trace: NormalizedMicroTrace,
+        controller_certificate: RuntimeControllerCertificate,
+    ) -> Result<Self, RefinementWitnessError> {
+        let certificate = Self {
+            public_outcome,
+            boundary_schedule,
+            controller_shape,
+            normalized_micro_trace,
+            controller_certificate,
+        };
+        certificate.validate()?;
+        Ok(certificate)
+    }
+
     pub fn validate(&self) -> Result<(), RefinementWitnessError> {
         if self.boundary_schedule.len() != self.controller_shape.boundary_event_budget {
             return Err(RefinementWitnessError::BoundaryBudgetMismatch {
@@ -1958,58 +2071,37 @@ impl ExecutionTrace {
     pub fn runtime_controller_observer_certificate(
         &self,
     ) -> Result<RuntimeControllerObserverCertificate, RefinementWitnessError> {
-        let certificate = RuntimeControllerObserverCertificate {
-            public_outcome: self
-                .theorem_trace
+        RuntimeControllerObserverCertificate::new(
+            self.theorem_trace
                 .public_outcome
                 .clone()
                 .ok_or(RefinementWitnessError::MissingPublicOutcome)?,
-            boundary_schedule: self.theorem_trace.boundary_schedule.clone(),
-            controller_shape: self
-                .theorem_trace
+            self.theorem_trace.boundary_schedule.clone(),
+            self.theorem_trace
                 .controller_shape
                 .clone()
                 .ok_or(RefinementWitnessError::MissingControllerShape)?,
-            normalized_micro_trace: self
-                .theorem_trace
+            self.theorem_trace
                 .normalized_micro_trace
                 .clone()
                 .ok_or(RefinementWitnessError::MissingNormalizedMicroTrace)?,
-            controller_certificate: self
-                .runtime_controller_certificate
+            self.runtime_controller_certificate
                 .clone()
                 .ok_or(RefinementWitnessError::MissingControllerCertificate)?,
-        };
-        certificate.validate()?;
-        Ok(certificate)
+        )
     }
 
     pub fn runtime_path_oram_hidden_certificate(
         &self,
     ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
-        let oram_leaf_public_scaffold = validate_path_oram_leaf_schedule(
-            &self.runtime_oram_leaf_schedule,
-            &self.logical_accesses,
-            &self.physical_reads,
-            &self.physical_writes,
-            &self.runtime_oram_objects,
-        )?;
-        validate_path_oram_leaf_state(
-            &self.runtime_oram_leaf_schedule,
-            &self.runtime_oram_leaf_state_transitions,
-            &self.runtime_oram_position_map_before,
-            &self.runtime_oram_position_map_after,
-            &self.runtime_oram_objects,
-        )?;
-        Ok(RuntimePathOramHiddenCertificate {
-            trace: self.refinement_trace(),
-            oram_objects: self.runtime_oram_objects.clone(),
-            oram_leaf_public_scaffold,
-            oram_leaf_schedule: self.runtime_oram_leaf_schedule.clone(),
-            oram_position_map_before: self.runtime_oram_position_map_before.clone(),
-            oram_position_map_after: self.runtime_oram_position_map_after.clone(),
-            oram_leaf_state_transitions: self.runtime_oram_leaf_state_transitions.clone(),
-        })
+        RuntimePathOramHiddenCertificate::new(
+            self.refinement_trace(),
+            self.runtime_oram_objects.clone(),
+            self.runtime_oram_leaf_schedule.clone(),
+            self.runtime_oram_position_map_before.clone(),
+            self.runtime_oram_position_map_after.clone(),
+            self.runtime_oram_leaf_state_transitions.clone(),
+        )
     }
 
     pub fn runtime_refinement_witness(
@@ -2017,38 +2109,11 @@ impl ExecutionTrace {
     ) -> Result<RuntimeRefinementWitness, RefinementWitnessError> {
         let controller_observer = self.runtime_controller_observer_certificate()?;
         let hidden_certificate = self.runtime_path_oram_hidden_certificate()?;
-        let public_outcome = controller_observer.public_outcome;
-        let controller_shape = controller_observer.controller_shape;
-        let normalized_micro_trace = controller_observer.normalized_micro_trace;
-        let controller_certificate = controller_observer.controller_certificate;
-        let reconstructed_accesses = reconstruct_oram_accesses_from_logical_trace(
-            &self.logical_accesses,
-            &self.runtime_oram_objects,
-        )?;
-        if self.gas_used != public_outcome.gas_used {
-            return Err(RefinementWitnessError::GasMismatch {
-                trace_gas: self.gas_used,
-                public_outcome_gas: public_outcome.gas_used,
-            });
-        }
-        if controller_certificate.observed_oram_accesses != reconstructed_accesses {
-            return Err(RefinementWitnessError::OramAccessScheduleMismatch);
-        }
-        Ok(RuntimeRefinementWitness {
-            trace: hidden_certificate.trace,
-            runtime_seed: self.runtime_seed,
-            public_outcome,
-            boundary_schedule: self.theorem_trace.boundary_schedule.clone(),
-            controller_shape,
-            normalized_micro_trace,
-            controller_certificate,
-            oram_objects: hidden_certificate.oram_objects,
-            oram_leaf_public_scaffold: hidden_certificate.oram_leaf_public_scaffold,
-            oram_leaf_schedule: hidden_certificate.oram_leaf_schedule,
-            oram_position_map_before: hidden_certificate.oram_position_map_before,
-            oram_position_map_after: hidden_certificate.oram_position_map_after,
-            oram_leaf_state_transitions: hidden_certificate.oram_leaf_state_transitions,
-        })
+        RuntimeRefinementWitness::from_certificates(
+            self.runtime_seed,
+            controller_observer,
+            hidden_certificate,
+        )
     }
 }
 
@@ -2121,7 +2186,7 @@ mod tests {
         PhysicalWriteEvent, PublicOutcomeTrace, RefinementWitnessError,
         RuntimeControllerCertificate, RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness,
         RuntimeOramLeafWitness, RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness,
-        RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness,
+        RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
         SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
         WriteClass,
     };
@@ -2446,6 +2511,26 @@ mod tests {
         assert_eq!(witness.normalized_micro_trace, normalized_micro_trace);
         assert_eq!(witness.controller_certificate, controller_certificate);
         assert_eq!(witness.oram_objects, vec![sample_oram_object()]);
+    }
+
+    #[test]
+    fn runtime_refinement_witness_validate_accepts_sample() {
+        let witness = sample_runtime_refinement_witness_with_seed(0);
+        witness.validate().unwrap();
+    }
+
+    #[test]
+    fn runtime_refinement_witness_from_certificates_matches_trace_extraction() {
+        let trace = sample_runtime_execution_trace_with_seed(0);
+        let controller_observer = trace.runtime_controller_observer_certificate().unwrap();
+        let hidden_certificate = trace.runtime_path_oram_hidden_certificate().unwrap();
+        let direct = RuntimeRefinementWitness::from_certificates(
+            trace.runtime_seed,
+            controller_observer,
+            hidden_certificate,
+        )
+        .unwrap();
+        assert_eq!(direct, trace.runtime_refinement_witness().unwrap());
     }
 
     #[test]

@@ -9,8 +9,9 @@ use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::{
-    CompiledArtifact, ExecutionTrace, RuntimeOramAccessCounterWitness,
-    RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness,
+    CompiledArtifact, ExecutionTrace, RuntimeControllerObserverCertificate,
+    RuntimeOramAccessCounterWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness,
+    RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness, RuntimeRefinementWitness,
     Value,
 };
 
@@ -286,7 +287,44 @@ impl ContractInstance {
             runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
         };
         attach_theorem_metrics(&mut trace);
-        trace.runtime_refinement_witness()?;
+        let direct_controller_observer = RuntimeControllerObserverCertificate::new(
+            trace
+                .theorem_trace
+                .public_outcome
+                .clone()
+                .ok_or_else(|| anyhow!("runtime theorem trace missing public_outcome"))?,
+            trace.theorem_trace.boundary_schedule.clone(),
+            trace
+                .theorem_trace
+                .controller_shape
+                .clone()
+                .ok_or_else(|| anyhow!("runtime theorem trace missing controller_shape"))?,
+            trace
+                .theorem_trace
+                .normalized_micro_trace
+                .clone()
+                .ok_or_else(|| anyhow!("runtime theorem trace missing normalized_micro_trace"))?,
+            trace
+                .runtime_controller_certificate
+                .clone()
+                .ok_or_else(|| anyhow!("execution trace missing runtime controller certificate"))?,
+        )?;
+        let direct_hidden_certificate = RuntimePathOramHiddenCertificate::new(
+            trace.refinement_trace(),
+            trace.runtime_oram_objects.clone(),
+            trace.runtime_oram_leaf_schedule.clone(),
+            trace.runtime_oram_position_map_before.clone(),
+            trace.runtime_oram_position_map_after.clone(),
+            trace.runtime_oram_leaf_state_transitions.clone(),
+        )?;
+        let direct_witness = RuntimeRefinementWitness::from_certificates(
+            trace.runtime_seed,
+            direct_controller_observer,
+            direct_hidden_certificate,
+        )?;
+        if trace.runtime_refinement_witness()? != direct_witness {
+            bail!("runtime refinement witness drifted from direct certificate witness");
+        }
         Ok(CallResult {
             return_value,
             aborted: state.aborted,

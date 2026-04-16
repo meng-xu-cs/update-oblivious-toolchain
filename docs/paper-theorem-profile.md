@@ -214,8 +214,8 @@ proof bundle now also instantiates that standard-theorem import boundary
 directly, including the preferred `PathOramJACMLiteratureTheoremAt` route at
 the runtime-facing `leafRun`, so there is no longer an open backend-theorem
 gap at the concrete repo boundary. What remains optional is only whether the
-paper wants to replace that self-instantiated closure with an external imported
-theorem presentation.
+paper wants to present an external imported theorem as the main narrative while
+the repo keeps that self-instantiated closure for executable validation.
 
 The current paper-facing aliases are:
 
@@ -238,7 +238,26 @@ The leakage-to-simulator normalization lemma for the concrete public controller
 instance is:
 
 - `normalizeMicroTrace_controllerMicroTraceOfShape` in
-  `proof/lean/UOToolchain/SgxMicroGame.lean`
+  `proof/lean/UOToolchain/SgxControllerTrace.lean`
+
+## Presentation Strategy
+
+For a paper, the preferred theorem narrative is:
+
+- present the ORAM core as an external or literature-faithful imported theorem
+  at `PathOramLocalPosmapV1StandardTheoremTarget`
+- present the repo contribution as the bridge proving that the concrete
+  compiler/runtime artifacts conform to that frozen interface
+- then derive the computational-UO, TEE-storage, and paper-facing SGX
+  consequences through the already mechanized projection lemmas
+
+For the executable artifact story, the repo also keeps a self-instantiated
+closure at exactly the same interface. That is not a weaker theorem boundary;
+it is a stronger artifact-completeness move so the current build can validate
+the entire bridge end to end without waiting on an external imported theorem
+object.
+
+## Runtime Witness Interface
 
 The runtime-to-Lean witness interface is now fixed in:
 

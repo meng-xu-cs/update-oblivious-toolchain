@@ -24,8 +24,14 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/SgxExactProjection.lean`
 - `proof/lean/UOToolchain/SgxJointProjection.lean`
 
-These files only freeze the module split and theorem boundary. They do not yet
-contain mechanized proofs of the UO claims.
+These files no longer only freeze the module split. They now contain executable
+definitions, proved lemmas, certificate checkers, and concrete theorem-facing
+boundaries. The engineering bridge from checked artifacts and emitted runtime
+certificates into those theorem-facing objects is now implemented under the
+explicit `PathOramLocalPosmapV1SecurityAssumptions` bundle. They still do not
+justify a blanket claim that every layer of the Rust stack, or a malicious-host
+SGX deployment, already satisfies the final paper theorem without additional
+theorem discharge or a smaller formally verified kernel.
 
 Current status:
 
@@ -92,10 +98,18 @@ Current status:
   [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now includes explicit public output shape plus a ZeroTrace-derived split into
   boundary, paging, exit, and shared-resource traces
-- The remaining unproved boundary is the actual computational indistinguishability
-  theorem for the ORAM backend. The TEE storage layer now reduces
-  definitionally to that existing ORAM boundary rather than introducing a
-  second projection axiom.
+- the theorem-facing ORAM backend path is now the concrete
+  `path_oram_local_posmap_v1` candidate; the legacy surrogate path is kept only
+  as a compatibility/benchmark specialization and is not the strengthened claim
+  path
+- the remaining repo-level theorem question is now explicit:
+  whether the paper should present an external imported standard Path ORAM
+  theorem at the frozen interface, or reuse the current self-instantiated
+  theorem object for the executable artifact story
+- the repo now also contains a concrete imported-theorem bridge checklist in
+  [docs/imported-theorem-bridge-checklist.md](/home/m285xu/update-oblivious-toolchain/docs/imported-theorem-bridge-checklist.md),
+  which records the completed engineering bridge under the current explicit
+  assumption bundle and the remaining optional paper-presentation step
 - [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now also fixes a separate TEE/SGX deployment boundary:
   an idealized TEE storage theorem is in scope as a future deployment theorem,

@@ -1,8 +1,8 @@
 use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
-use uo_core::ir::{BackendKind, Expr, StateObject, Statement};
+use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, Statement};
 use uo_core::manifest::PATH_ORAM_SCHEME;
-use uo_core::{CompiledArtifact, ContractMetadata, OramManifest, ProgramMode};
+use uo_core::{CompiledArtifact, ContractMetadata, OramManifest, StateObjectManifest};
 
 pub fn check_source(source_path: &str, metadata: &ContractMetadata) -> Result<Vec<String>> {
     let report = uo_solc::validate_source(source_path, metadata)?;
@@ -23,6 +23,21 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
         "artifact contract {} mode {:?}",
         artifact.contract.contract, artifact.contract.mode
     ));
+    if artifact.contract.manifest.contract != artifact.contract.contract {
+        bail!(
+            "manifest contract mismatch: {} != {}",
+            artifact.contract.manifest.contract,
+            artifact.contract.contract
+        );
+    }
+    let expected_mode = manifest_mode(&artifact.contract.mode);
+    if artifact.contract.manifest.compilation_mode != expected_mode {
+        bail!(
+            "manifest compilation_mode mismatch: {} != {}",
+            artifact.contract.manifest.compilation_mode,
+            expected_mode
+        );
+    }
     if artifact.contract.mode == ProgramMode::Uo {
         for object in &artifact.contract.state {
             if object.confidential && object.backend == uo_core::BackendKind::Raw {
@@ -45,6 +60,13 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             bail!("manifest is missing entrypoint {}", function.signature);
         }
     }
+    if artifact.contract.manifest.entrypoints.len() != artifact.contract.functions.len() {
+        bail!(
+            "manifest entrypoint count mismatch: {} != {}",
+            artifact.contract.manifest.entrypoints.len(),
+            artifact.contract.functions.len()
+        );
+    }
     let mut object_ids = BTreeSet::new();
     for object in &artifact.contract.state {
         if !object_ids.insert(object.id) {
@@ -65,20 +87,13 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             .iter()
             .find(|candidate| candidate.id == object.id)
             .ok_or_else(|| anyhow::anyhow!("manifest is missing object {}", object.name))?;
-        if object.backend == BackendKind::Oram {
-            let expected = OramManifest::for_object(object)?;
-            let actual = manifest_object.oram.as_ref().ok_or_else(|| {
-                anyhow::anyhow!("manifest is missing ORAM parameters for {}", object.name)
-            })?;
-            if actual != &expected {
-                bail!("manifest ORAM parameters mismatch for {}", object.name);
-            }
-        } else if manifest_object.oram.is_some() {
-            bail!(
-                "non-ORAM object {} unexpectedly carries ORAM parameters",
-                object.name
-            );
+        let expected = expected_state_object_manifest(object)?;
+        if manifest_object != &expected {
+            bail!("manifest object mismatch for {}", object.name);
         }
+    }
+    if manifest_ids != object_ids {
+        bail!("manifest object id set does not match contract state object ids");
     }
     for function in &artifact.contract.functions {
         let entry = artifact
@@ -89,6 +104,65 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             .ok_or_else(|| {
                 anyhow::anyhow!("manifest is missing entrypoint {}", function.signature)
             })?;
+        if entry.secret_args != function.secret_args {
+            bail!(
+                "manifest secret_args mismatch for entrypoint {}",
+                function.signature
+            );
+        }
+        let counts = count_body(&function.body);
+        if entry.arena_bytes != 4096 + counts.local_count * 64 {
+            bail!(
+                "manifest arena_bytes mismatch for entrypoint {}: {} != {}",
+                function.signature,
+                entry.arena_bytes,
+                4096 + counts.local_count * 64
+            );
+        }
+        if entry.max_stack_words != 64 + counts.local_count {
+            bail!(
+                "manifest max_stack_words mismatch for entrypoint {}: {} != {}",
+                function.signature,
+                entry.max_stack_words,
+                64 + counts.local_count
+            );
+        }
+        assert_entry_count_eq(
+            &function.signature,
+            "uocell_reads",
+            entry.uocell_reads,
+            counts.cell_reads,
+        )?;
+        assert_entry_count_eq(
+            &function.signature,
+            "uocell_writes",
+            entry.uocell_writes,
+            counts.cell_writes,
+        )?;
+        assert_entry_count_eq(
+            &function.signature,
+            "uoarray_reads",
+            entry.uoarray_reads,
+            counts.array_reads,
+        )?;
+        assert_entry_count_eq(
+            &function.signature,
+            "uoarray_writes",
+            entry.uoarray_writes,
+            counts.array_writes,
+        )?;
+        assert_entry_count_eq(
+            &function.signature,
+            "uomap_reads",
+            entry.uomap_reads,
+            counts.map_reads,
+        )?;
+        assert_entry_count_eq(
+            &function.signature,
+            "uomap_writes",
+            entry.uomap_writes,
+            counts.map_writes,
+        )?;
         let expected_accesses = count_oram_accesses(&function.body, &artifact.contract.state)?;
         if entry.oram_accesses != expected_accesses {
             bail!(
@@ -112,10 +186,236 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             );
         }
     }
-    report.push("manifest/object consistency: ok".into());
+    report.push("manifest/object exactness: ok".into());
+    report.push("manifest/entrypoint exactness: ok".into());
     report.push("forbidden control flow in confidential IR: none".into());
     report.push("raw storage backend for confidential objects: none".into());
     Ok(report)
+}
+
+pub fn check_artifact_against_source(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    artifact: &CompiledArtifact,
+) -> Result<Vec<String>> {
+    let mut report = check_artifact(artifact)?;
+    let expected = uo_solc::compile(source_path, metadata, artifact.contract.mode.clone())?;
+    assert_translation_equivalence(&expected, artifact)?;
+    report.push("source/artifact translation validation: ok".into());
+    Ok(report)
+}
+
+fn manifest_mode(mode: &ProgramMode) -> &'static str {
+    match mode {
+        ProgramMode::Raw => "raw",
+        ProgramMode::Uo => "uo",
+    }
+}
+
+fn expected_state_object_manifest(object: &StateObject) -> Result<StateObjectManifest> {
+    Ok(StateObjectManifest {
+        id: object.id,
+        name: object.name.clone(),
+        kind: match object.kind {
+            ContainerKind::Cell => "cell".into(),
+            ContainerKind::Array => "array".into(),
+            ContainerKind::Map => "map".into(),
+        },
+        backend: match object.backend {
+            BackendKind::Raw => "raw".into(),
+            BackendKind::FullScan => "full_scan".into(),
+            BackendKind::Oram => "oram".into(),
+        },
+        capacity: object.capacity,
+        value_type: Some(object.value_type.short_name()),
+        key_type: object.key_type.as_ref().map(uo_core::Type::short_name),
+        oram: if object.backend == BackendKind::Oram {
+            Some(OramManifest::for_object(object)?)
+        } else {
+            None
+        },
+    })
+}
+
+fn assert_entry_count_eq(
+    signature: &str,
+    field: &str,
+    actual: usize,
+    expected: usize,
+) -> Result<()> {
+    if actual != expected {
+        bail!(
+            "manifest {} mismatch for entrypoint {}: {} != {}",
+            field,
+            signature,
+            actual,
+            expected
+        );
+    }
+    Ok(())
+}
+
+fn assert_translation_equivalence(
+    expected: &CompiledArtifact,
+    actual: &CompiledArtifact,
+) -> Result<()> {
+    if actual.contract.contract != expected.contract.contract {
+        bail!(
+            "source/artifact contract mismatch: {} != {}",
+            actual.contract.contract,
+            expected.contract.contract
+        );
+    }
+    if actual.contract.mode != expected.contract.mode {
+        bail!(
+            "source/artifact mode mismatch: {:?} != {:?}",
+            actual.contract.mode,
+            expected.contract.mode
+        );
+    }
+    if actual.contract.state != expected.contract.state {
+        bail!("source/artifact state mismatch");
+    }
+    if actual.contract.functions != expected.contract.functions {
+        bail!("source/artifact function mismatch");
+    }
+    if actual.contract.manifest != expected.contract.manifest {
+        bail!("source/artifact manifest mismatch");
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct CountSummary {
+    local_count: usize,
+    cell_reads: usize,
+    cell_writes: usize,
+    array_reads: usize,
+    array_writes: usize,
+    map_reads: usize,
+    map_writes: usize,
+}
+
+fn count_body(statements: &[Statement]) -> CountSummary {
+    let mut counts = CountSummary::default();
+    for statement in statements {
+        match statement {
+            Statement::Declare { value, .. } => {
+                counts.local_count += 1;
+                count_expr(value, &mut counts);
+            }
+            Statement::Assign { value, .. } => count_expr(value, &mut counts),
+            Statement::Require { cond } | Statement::AbortIf { cond } => {
+                count_expr(cond, &mut counts)
+            }
+            Statement::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                count_expr(cond, &mut counts);
+                merge_counts(&mut counts, count_body(then_body));
+                merge_counts(&mut counts, count_body(else_body));
+            }
+            Statement::For {
+                start, end, body, ..
+            } => {
+                count_expr(start, &mut counts);
+                count_expr(end, &mut counts);
+                merge_counts(&mut counts, count_body(body));
+            }
+            Statement::CellSet {
+                value, predicate, ..
+            } => {
+                counts.cell_writes += 1;
+                count_expr(value, &mut counts);
+                if let Some(predicate) = predicate {
+                    count_expr(predicate, &mut counts);
+                }
+            }
+            Statement::ArraySet {
+                index,
+                value,
+                predicate,
+                ..
+            } => {
+                counts.array_writes += 1;
+                count_expr(index, &mut counts);
+                count_expr(value, &mut counts);
+                if let Some(predicate) = predicate {
+                    count_expr(predicate, &mut counts);
+                }
+            }
+            Statement::MapPut {
+                key,
+                value,
+                predicate,
+                ..
+            } => {
+                counts.map_writes += 1;
+                count_expr(key, &mut counts);
+                count_expr(value, &mut counts);
+                if let Some(predicate) = predicate {
+                    count_expr(predicate, &mut counts);
+                }
+            }
+            Statement::Return { value } => {
+                if let Some(value) = value {
+                    count_expr(value, &mut counts);
+                }
+            }
+        }
+    }
+    counts
+}
+
+fn count_expr(expr: &Expr, counts: &mut CountSummary) {
+    match expr {
+        Expr::Unary { expr, .. } => count_expr(expr, counts),
+        Expr::Binary { lhs, rhs, .. } => {
+            count_expr(lhs, counts);
+            count_expr(rhs, counts);
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            count_expr(cond, counts);
+            count_expr(when_true, counts);
+            count_expr(when_false, counts);
+        }
+        Expr::CellGet { .. } => counts.cell_reads += 1,
+        Expr::ArrayGet { index, .. } => {
+            counts.array_reads += 1;
+            count_expr(index, counts);
+        }
+        Expr::MapGet { key, .. } => {
+            counts.map_reads += 1;
+            count_expr(key, counts);
+        }
+        Expr::StructField { base, .. } => count_expr(base, counts),
+        Expr::ArrayIndex { base, index } => {
+            count_expr(base, counts);
+            count_expr(index, counts);
+        }
+        Expr::Keccak256 { parts } => {
+            for part in parts {
+                count_expr(part, counts);
+            }
+        }
+        Expr::Literal(_) | Expr::Var(_) => {}
+    }
+}
+
+fn merge_counts(target: &mut CountSummary, extra: CountSummary) {
+    target.local_count += extra.local_count;
+    target.cell_reads += extra.cell_reads;
+    target.cell_writes += extra.cell_writes;
+    target.array_reads += extra.array_reads;
+    target.array_writes += extra.array_writes;
+    target.map_reads += extra.map_reads;
+    target.map_writes += extra.map_writes;
 }
 
 fn validate_oram_access_shape(
@@ -623,5 +923,124 @@ fn forbid_raw_expr(expr: &Expr, signature: &str) -> Result<()> {
         | Expr::CellGet { .. }
         | Expr::ArrayGet { .. }
         | Expr::MapGet { .. } => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{check_artifact, check_artifact_against_source};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use uo_core::{CompiledArtifact, ContractMetadata, ProgramMode};
+
+    static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn write_temp(name: &str, extension: &str, contents: &str) -> PathBuf {
+        let unique = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = PathBuf::from(format!(
+            "/tmp/uo-check-test-{}-{}-{}.{}",
+            name,
+            std::process::id(),
+            stamp + unique as u128,
+            extension
+        ));
+        fs::write(&path, contents).unwrap();
+        path
+    }
+
+    fn parse_metadata(yaml: &str) -> ContractMetadata {
+        serde_yaml::from_str(yaml).unwrap()
+    }
+
+    fn sample_source_and_metadata() -> (PathBuf, ContractMetadata) {
+        let source = write_temp(
+            "classifier",
+            "sol",
+            r#"
+            contract FixedSlotClassifier {
+                uint256 private last;
+
+                function classify(uint256 secret) public {
+                    last = secret & 1;
+                }
+            }
+            "#,
+        );
+        let metadata = parse_metadata(
+            r#"
+contract: FixedSlotClassifier
+entrypoints:
+  classify(uint256):
+    secret_args: [secret]
+    confidential: true
+    public_gas_budget: 7777
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        (source, metadata)
+    }
+
+    fn sample_artifact() -> (PathBuf, ContractMetadata, CompiledArtifact) {
+        let (source, metadata) = sample_source_and_metadata();
+        let artifact =
+            uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+        (source, metadata, artifact)
+    }
+
+    #[test]
+    fn artifact_checker_derives_manifest_exactness() {
+        let (_, _, artifact) = sample_artifact();
+        let report = check_artifact(&artifact).unwrap();
+        assert!(report.contains(&"manifest/object exactness: ok".to_string()));
+        assert!(report.contains(&"manifest/entrypoint exactness: ok".to_string()));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_secret_arg_drift() {
+        let (_, _, mut artifact) = sample_artifact();
+        let signature = artifact.contract.functions[0].signature.clone();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap()
+            .secret_args = vec![];
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest secret_args mismatch for entrypoint"));
+    }
+
+    #[test]
+    fn translation_validation_rejects_public_gas_budget_drift() {
+        let (source, metadata, mut artifact) = sample_artifact();
+        let signature = artifact.contract.functions[0].signature.clone();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap()
+            .public_gas_budget += 1;
+        assert!(check_artifact(&artifact).is_ok());
+        let err = check_artifact_against_source(source.to_str().unwrap(), &metadata, &artifact)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("source/artifact manifest mismatch"));
     }
 }

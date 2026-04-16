@@ -417,12 +417,16 @@ The proof plan should target the following theorem stack.
 
 ### Theorem A: Checker soundness
 
-If `uo-check` accepts a source contract and its compiled artifact, then:
+If `uo-check` accepts a source contract, its metadata, and its compiled
+artifact, then:
 
 - all confidential state objects use approved backends
 - all public capacities/bounds required by the runtime exist
 - confidential IR contains no forbidden control flow
-- manifest/object metadata is structurally consistent
+- the proof-relevant manifest/function/object fields consumed by the theorem
+  are exact images of the accepted source/IR for the admitted compiler path
+- artifact metadata and theorem-facing backend parameters are structurally
+  consistent
 
 ### Theorem B: Compiler secrecy preservation
 
@@ -633,189 +637,148 @@ Section 3.5.
 
 ## 5. Recommended Mechanization Strategy
 
-Recommended first target: mechanize the artifact-level semantics in Lean 4.
+The Lean workspace now exists and already contains the artifact semantics,
+projection layers, certificate checkers, the runtime/controller witness bridge,
+the checker-side translation-validation path, and the frozen imported-theorem
+target for the concrete Path ORAM candidate. The closure strategy from here is
+now split between a completed engineering bridge and a remaining theorem-source
+question:
 
-Reasons:
+1. keep `path_oram_local_posmap_v1` as the only theorem-facing ORAM backend
+2. keep the runtime-to-Lean bridge at the small emitted
+   witness/certificate-producing kernel rather than at the whole runtime
+3. keep `uo-check` as the translation validator for proof-relevant compiler
+   output rather than trying to verify the whole Rust compiler at once
+4. for paper-facing presentation, import or cite the standard Path ORAM theorem
+   at `PathOramLocalPosmapV1StandardTheoremTarget`
+5. reuse the existing projection lemmas to recover the repo's
+   computational-UO, TEE-storage, and paper-facing SGX claims
 
-- the runtime model is already small and algebraic
-- theorem statements are about normalized traces rather than bit-level EVM
-- Lean is a good fit for executable inductive semantics and proof layering
+## 6. Remaining Gaps Before The Strengthened Claim Is Closed
 
-Suggested proof tree:
+The current repository is no longer at the "blank proof plan" stage. The
+remaining gaps are narrower and should be addressed directly.
 
-- `proof/lean/TraceModel.lean`
-- `proof/lean/IRSemantics.lean`
-- `proof/lean/ExactObjects.lean`
-- `proof/lean/CompilerInvariant.lean`
-- `proof/lean/Composition.lean`
-- `proof/lean/OramGame.lean`
+### 6.1 Discharge the real Path ORAM backend theorem
 
-This repository does not yet include the Lean workspace. Adding the plan first
-is intentional: the theorem boundary must be frozen before mechanization starts.
+Current status:
 
-## 6. What Must Change Before The ORAM Is Actually Proofable
+- the exact imported theorem target is frozen in Lean
+- the theorem-facing backend path is the concrete
+  `path_oram_local_posmap_v1` candidate
+- the runtime-facing projection lemmas are already packaged at that boundary
 
-The current ORAM path is stronger than the original prototype, but it is still
-not in a proof-grade state. The following changes are required.
+Remaining change:
 
-### 6.1 Replace the surrogate payload format with a typed ORAM block format
+- for the strongest paper narrative, replace the current self-instantiated
+  theorem source with an imported or separately proved standard Path ORAM
+  theorem at the fixed storage-semantics boundary
+- independently of that presentation choice, any stronger claim still needs a
+  cryptographic/backend justification for the explicit
+  `PathOramLocalPosmapV1SecurityAssumptions` bundle
 
-Current issue:
+### 6.2 Close the runtime-to-theorem refinement gap
 
-- `oram_bucket_bytes` in [objects.rs](../runtime/uo-evm/src/objects.rs) is an artifact-specific fixed-size serialization.
+Current status:
 
-Required change:
+- the runtime emits a checked refinement witness bundle
+- Lean can parse and validate that witness bundle against the theorem-side
+  predicate
+- the runtime now also exports standalone public-controller and hidden Path
+  ORAM certificates and constructs a direct refinement witness from those
+  certificates before checking agreement with trace-based reconstruction
 
-- define an explicit ORAM block type
-- define bucket layout and padding as typed data
-- make block serialization/deserialization total and proof-friendly
+Remaining change:
 
-### 6.2 Replace ad hoc nonzero rerandomization with real cryptography
+- keep the trusted boundary explicitly at that small witness-producing kernel
+  rather than at the whole trace bundle
+- if the paper later wants a stronger formal claim about the Rust kernel
+  itself, add a theorem or separately audited refinement argument for that
+  smaller kernel rather than for the whole runtime
 
-Current issue:
+### 6.3 Close the compiler/output conformance gap with translation validation
 
-- [codec.rs](../runtime/uo-store/src/codec.rs) provides marker-free encoding and rerandomization, but not a cryptographic confidentiality notion.
+Current status:
 
-Required change:
+- the compiler emits proof-relevant manifest fields and backend parameters
+- `uo-check` now re-derives theorem-relevant function/object/manifest fields
+  and validates admitted artifacts directly against source plus metadata
+- the probe now exercises that translation-validation path directly in both the
+  focused static-check report and the bridge-validation report
 
-- separate marker-hiding record encoding from cryptographic protection
-- introduce an AEAD or IND-CPA encryption layer for buckets and metadata
-- model keys, nonces, and rerandomization explicitly
+Remaining change:
 
-### 6.3 Introduce a standard ORAM construction
+- no additional compiler-engineering change is required for the current bridge
+  story; any future strengthening here is about proving the checker itself, not
+  about widening the validation surface
 
-Current issue:
+### 6.4 Keep the surrogate backend off the strengthened claim path
 
-- the current backend is a public-schedule surrogate with fixed-shape metadata rewrites.
+Current status:
 
-Required change:
+- the legacy surrogate backend still exists in the repo
 
-- implement a standard construction such as Path ORAM or Ring ORAM
-- define bucket capacity `Z`, block size `B`, tree height `H`, stash bound `S`
-- store the position map recursively or prove a bounded public-resident layer
-- keep the Lean theorem boundary parameterized by an abstract ORAM security
-  interface so the current surrogate theorem can be replaced only by
-  instantiation, not by weakening downstream SGX or TEE theorems
+Remaining change:
 
-### 6.4 Make randomness explicit in the runtime interface
+- treat the surrogate as benchmarking/compatibility-only
+- do not route paper-facing or proof-grade claims through it
 
-Current issue:
+### 6.5 Preserve deployment-claim discipline
 
-- randomness is consumed internally through local RNG state in
-  [objects.rs](../runtime/uo-evm/src/objects.rs).
+Current status:
 
-Required change:
+- the repo has an idealized TEE storage theorem boundary and a paper-facing SGX
+  observer profile
 
-- thread an explicit coin source through ORAM operations
-- distinguish public-determined schedule from secret-independent randomization
-- make the security game and simulator interface exact
+Remaining change:
 
-### 6.5 Separate logical state from physical storage in a proof-friendly API
-
-Current issue:
-
-- the ORAM logic is interleaved with the general object runtime.
-
-Required change:
-
-- move ORAM code into a dedicated module with a narrow interface:
-  `access(read/write, key, value, state, coins) -> (result, state', transcript)`
-- keep transcript generation explicit and side-effect free
-
-### 6.6 Add explicit stash and failure semantics
-
-Current issue:
-
-- the current surrogate has no real stash discipline and no overflow theorem.
-
-Required change:
-
-- implement stash state
-- define overflow behavior
-- either prove negligible overflow or compile with public parameters that make
-  overflow impossible within supported capacities
-
-### 6.7 Enrich the manifest with proof-relevant ORAM parameters
-
-Current issue:
-
-- the manifest exposes gas and commit budgets, but not the full ORAM security
-  parameters.
-
-Required change:
-
-- add proof-relevant fields such as:
-  `oram_scheme`, `block_size`, `bucket_size`, `tree_height`,
-  `stash_bound`, `recursion_depth`, `metadata_pages`, `accesses_per_call`
-
-This should live near
-[manifest.rs](../crates/uo-core/src/manifest.rs)
-and the manifest builder in
-[lib.rs](../compiler/uo-solc/src/lib.rs).
-
-### 6.8 Remove secret-dependent enclave-controller behavior before any SGX claim
-
-Current issue:
-
-- the current ORAM runtime still keeps plaintext logical entries in enclave
-  memory and performs secret-dependent searches and updates over that resident
-  structure
-- the repository does not model or normalize enclave-call, OCALL, fault, or
-  paging behavior
-
-Required change:
-
-- replace the surrogate with a standard ORAM backend
-- make the enclave-side ORAM controller data-oblivious, including stash and
-  position-map handling
-- eliminate secret-dependent early exits, branch shape, and memory footprints in
-  the enclave-resident controller logic
-- define a fixed public enclave boundary for host services and persistent I/O
-
-Without these changes, the repository may target Section 1.3 but not Section
-1.4.
+- do not upgrade those into a malicious-host SGX execution claim until the
+  enclave-side controller, host boundary, and admitted SGX micro observer are
+  all connected to the real implementation by the same refinement discipline
 
 ## 7. Proof-Oriented Refactor Plan
 
-The most efficient implementation path is:
+The recommended implementation path is now:
 
-1. Freeze the artifact theorem boundary in this document.
-2. Keep the ORAM-facing Lean theorems parameterized by an explicit ORAM
-   security interface and preserve the current surrogate theorem only as the
-   default instance.
-3. Extract ORAM logic from
-   [objects.rs](../runtime/uo-evm/src/objects.rs)
-   into a dedicated module with explicit transcript outputs.
-4. Introduce typed bucket/block/state structs and explicit serialization.
-5. Split marker-hiding encoding from cryptographic encryption.
-6. Upgrade the surrogate to a standard ORAM construction.
-7. Add manifest fields for ORAM security parameters.
-8. Only then start mechanized proofs for the concrete backend instance.
+1. keep `path_oram_local_posmap_v1` as the only theorem-facing backend target
+2. narrow the runtime ORAM/controller path around an explicit transcript- and
+   witness-emitting kernel
+3. prove or validate conformance of that kernel to the Lean witness interface
+4. keep `uo-check` as source-to-artifact translation validation for
+   proof-relevant compiler output
+5. separate the optional paper-facing imported-theorem presentation from the
+   already completed engineering bridge
+6. reuse the already-mechanized projection lemmas for the repo-facing claims
 
 ## 8. Immediate Next Engineering Tasks
 
-The next code changes that would make this plan executable are:
+The next repo-level work should be treated as theorem-strengthening rather than
+missing bridge engineering:
 
-1. Create a dedicated ORAM runtime module, for example
-   `/runtime/uo-evm/src/oram.rs`, and move the current ORAM state machine there.
-2. Replace `oram_bucket_bytes` with typed `OramBlock` and `OramBucket`
-   serialization.
-3. Introduce a `Transcript` type for ORAM access operations rather than
-   constructing trace events inline.
-4. Extend the manifest and checker with explicit ORAM parameter fields.
-5. Add a `proof/` workspace scaffold for Lean files once the runtime interface
-   is stable.
+1. keep the surrogate backend explicitly marked as legacy/benchmark-only in the
+   proof-facing docs and claim surface
+2. preserve the small trusted kernel boundary around emitted certificates,
+   witnesses, and `uo-check`
+3. decide whether the paper should headline an external imported theorem at
+   `PathOramLocalPosmapV1StandardTheoremTarget`
+4. if so, swap only the ORAM core theorem provenance, not the theorem boundary
+5. separately justify or import the cryptographic/backend assumptions gathered
+   in `PathOramLocalPosmapV1SecurityAssumptions`
 
 ## 9. Definition Of Done For A Proof-Grade ORAM Milestone
 
 Do not claim a proof-grade computational-UO ORAM until all of the following are
 true:
 
-- a standard ORAM construction replaces the current surrogate
+- the theorem-facing backend path is the concrete standard-style Path ORAM
+  candidate rather than the legacy surrogate
 - cryptographic assumptions are stated explicitly
 - the leakage function is stated explicitly
 - a simulator-based theorem is written down and mechanized
-- the implemented runtime matches the proved model
+- the implemented runtime matches the proved model by an explicit refinement
+  argument
+- the compiler boundary is closed by checker-side translation validation of the
+  proof-relevant fields consumed by the theorem
 - the results bundle is regenerated against the proved transcript model
 
 Do not claim SGX execution obliviousness against a malicious host until all of

@@ -293,6 +293,27 @@ pub fn run_fresh_coin_validation_with_options(options: &ProbeRunOptions) -> Resu
     run_fresh_coin_validation(options)
 }
 
+pub fn run_static_checks_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_static_checks(&suite)
+}
+
+pub fn run_bridge_validation_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    let static_checks = run_static_checks(&suite)?;
+    let controller_observer_validation = run_controller_observer_validation(&suite)?;
+    let pathoram_hidden_validation = run_pathoram_hidden_validation()?;
+    let witness_validation = run_witness_validation(&suite)?;
+    let seeded_witness_validation = run_seeded_witness_validation()?;
+    Ok(json!({
+        "static_checks": static_checks,
+        "controller_observer_validation": controller_observer_validation,
+        "pathoram_hidden_validation": pathoram_hidden_validation,
+        "witness_validation": witness_validation,
+        "seeded_witness_validation": seeded_witness_validation,
+    }))
+}
+
 pub fn run_witness_validation_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_witness_validation(&suite)
@@ -468,19 +489,46 @@ fn compile_artifact(source: &str, metadata: &str, mode: ProgramMode) -> Result<C
     uo_solc::compile(source, &metadata, mode)
 }
 
+fn load_metadata(metadata_path: &str) -> Result<ContractMetadata> {
+    Ok(serde_yaml::from_slice(&fs::read(metadata_path)?)?)
+}
+
 fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let mut reports = Vec::new();
     for (name, artifacts) in suite {
         let source = format!("benches/raw/{name}.sol");
         let raw_meta = format!("benches/raw/{name}.raw.yaml");
-        let source_meta: ContractMetadata = serde_yaml::from_slice(&fs::read(&raw_meta)?)?;
+        let raw_metadata = load_metadata(&raw_meta)?;
+        let uo_meta = format!("benches/raw/{name}.uo.yaml");
+        let uo_metadata = load_metadata(&uo_meta)?;
+        let oram_meta = format!("benches/raw/{name}.oram.yaml");
+        let oram_metadata = Path::new(&oram_meta)
+            .exists()
+            .then(|| load_metadata(&oram_meta))
+            .transpose()?;
+        let fullscan64_meta = format!("benches/raw/{name}.fullscan64.yaml");
+        let fullscan64_metadata = Path::new(&fullscan64_meta)
+            .exists()
+            .then(|| load_metadata(&fullscan64_meta))
+            .transpose()?;
         reports.push(json!({
             "benchmark": name,
-            "source": uo_check::check_source(&source, &source_meta)?,
-            "raw_artifact": uo_check::check_artifact(&artifacts.raw)?,
-            "uo_artifact": uo_check::check_artifact(&artifacts.uo)?,
-            "oram_artifact": artifacts.oram.as_ref().map(uo_check::check_artifact).transpose()?,
-            "fullscan64_artifact": artifacts.fullscan64.as_ref().map(uo_check::check_artifact).transpose()?,
+            "source_raw": uo_check::check_source(&source, &raw_metadata)?,
+            "source_uo": uo_check::check_source(&source, &uo_metadata)?,
+            "raw_artifact": uo_check::check_artifact_against_source(&source, &raw_metadata, &artifacts.raw)?,
+            "uo_artifact": uo_check::check_artifact_against_source(&source, &uo_metadata, &artifacts.uo)?,
+            "oram_artifact": artifacts
+                .oram
+                .as_ref()
+                .zip(oram_metadata.as_ref())
+                .map(|(artifact, metadata)| uo_check::check_artifact_against_source(&source, metadata, artifact))
+                .transpose()?,
+            "fullscan64_artifact": artifacts
+                .fullscan64
+                .as_ref()
+                .zip(fullscan64_metadata.as_ref())
+                .map(|(artifact, metadata)| uo_check::check_artifact_against_source(&source, metadata, artifact))
+                .transpose()?,
         }));
     }
     Ok(json!({ "reports": reports }))

@@ -7,6 +7,31 @@ It is written to be **self-contained**. You may consult these reference document
 - `pilot-paper.md`
 - `draft-v1.md`
 
+## Status note
+
+This file started as a build-plan handoff. The repository has since
+implemented much of that plan, so parts of this runbook are now historical.
+The current repository should be read with these adjustments:
+
+- the runtime executes compiled artifact JSON in-process today; "deployment" is
+  a future confidential-runtime/TEE target, not direct public-chain bytecode
+  deployment
+- `path_oram_local_posmap_v1` is the only theorem-facing ORAM path; the legacy
+  surrogate backend should be treated as benchmarking/compatibility-only
+- the strengthened assurance path is not "formally verify every Rust module"
+  up front; it is: checker-side translation validation, runtime-to-Lean
+  refinement, and discharge of the frozen imported standard Path ORAM theorem
+- for paper-facing exposition, prefer an external imported Path ORAM theorem at
+  that frozen interface; for repo-complete artifact validation, keep the
+  self-instantiated theorem object at the same interface and validate the
+  executable bridge end to end
+- the repo now also has a dedicated bridge-validation path,
+  `./scripts/run_bridge_validation.sh`, for the imported-theorem engineering
+  bridge without the full artifact bundle
+- the current claim boundary is documented more precisely in
+  `docs/formal-proof-plan.md` and `docs/implementation-roadmap.md`; those two
+  documents take precedence for proof-grade wording
+
 The final outcome must be an end-to-end toolchain that compiles a restricted but meaningful subset of Solidity into contracts that execute safely on a confidential EVM under the stronger **marker-aware write adversary** `M+`.
 
 ---
@@ -127,7 +152,7 @@ A compiler/rewriter that:
 - performs **semantic write linearization (SWL)**,
 - rewrites persistent-state operations into UO runtime calls,
 - normalizes abort/revert behavior,
-- outputs deployable bytecode plus a machine-readable manifest.
+- outputs a compiled artifact plus a machine-readable manifest.
 
 ### 3.2 `uo-evm`
 
@@ -861,14 +886,16 @@ Prove that transformed programs stay within the supported subset and do not sile
 ### Work
 
 1. Implement a source checker that enforces supported-subset rules and metadata completeness.
-2. Implement a bytecode/output checker that verifies:
-   - no forbidden opcodes,
-   - no non-whitelisted external calls,
-   - no raw storage ops for confidential data,
-   - manifest/resource consistency.
-3. Implement differential translation validation for benchmark harnesses:
-   - compare raw and UO semantics on bounded domains,
-   - use exhaustive enumeration where feasible.
+2. Implement an artifact checker that verifies:
+   - no raw confidential backend escapes,
+   - manifest/object/resource consistency,
+   - exact proof-relevant manifest fields such as access counts, stack/arena
+     budgets, and backend parameters.
+3. Implement source-to-artifact translation validation:
+   - re-derive the admitted compiled artifact from source plus metadata,
+   - compare proof-relevant functions, objects, and manifest fields exactly,
+   - use bounded differential testing only as a secondary semantic check where
+     it is helpful.
 
 ### Benchmark harness policy
 
@@ -884,8 +911,11 @@ Examples:
 
 1. `uo-check` rejects seeded leaks such as raw `SSTORE`, events, unbounded mappings, or secret-dependent `revert`.
 2. Every benchmark has at least one bounded harness variant.
-3. Bounded harnesses pass exhaustive or near-exhaustive semantic equivalence checks.
-4. The checker emits a human-readable certificate/report per contract.
+3. Source-to-artifact validation succeeds for the admitted proof-relevant
+   compiler outputs.
+4. Bounded harnesses pass exhaustive or near-exhaustive semantic equivalence
+   checks.
+5. The checker emits a human-readable certificate/report per contract.
 
 ---
 

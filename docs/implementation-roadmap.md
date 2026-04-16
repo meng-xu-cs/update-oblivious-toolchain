@@ -17,6 +17,13 @@ The target implementation claim is:
 - the Rust implementation is connected to the Lean theorem by a concrete
   refinement argument, not just by engineering intent
 
+For the strengthened claim path, the theorem-facing backend is
+`path_oram_local_posmap_v1`. The legacy surrogate backend may stay in the repo
+for benchmarks and compatibility, but it should not sit on the proof-grade
+claim path. Likewise, the near-term assurance strategy is not "verify all Rust
+directly"; it is to combine a small runtime refinement boundary with
+checker-side translation validation of proof-relevant compiler output.
+
 ## Theorem-Preserving Principles
 
 - Do not relax the theorem to fit the current code.
@@ -300,6 +307,9 @@ Required work:
   witnesses accepted by the Lean validity checker for each supported backend,
   not just for the current benchmark-backed scenario family and runtime
   postcondition
+- strengthen `uo-check` so the proof boundary depends on source-to-artifact
+  translation validation of the exact manifest/function/object fields consumed
+  by the theorem, rather than on trusting those fields after compilation
 - connect the Rust-emitted public logical ORAM trace and ordered controller
   witness to the Lean observer by a backend-wise refinement argument, not just
   by a checked serialized witness
@@ -395,8 +405,9 @@ The preferred route is now even tighter:
 This removes the extra `leafRun` alignment obligation on the mainline route.
 The concrete backend shape is now aligned with the JACM bucket-size parameter
 `Z = 5`, and the concrete repo theorem is already closed under the explicit
-assumption bundle; the optional remaining work is only whether to replace that
-closed self-instantiated route with an external imported theorem presentation.
+assumption bundle; the optional remaining work is only whether the paper should
+present an external imported theorem at the same interface while the repo keeps
+the current self-instantiated route for executable closure.
 
 Acceptance criteria:
 
@@ -413,11 +424,16 @@ Acceptance criteria:
 
 The next practical path is:
 
-1. tighten manifest exactness beyond ORAM loop counts where needed
-2. replace the surrogate ORAM with a standard construction in a new backend mode
-3. factor the current public controller envelope into an explicit runtime
-   controller module
-4. connect that runtime controller/backend pair to the Lean observer
+1. keep `path_oram_local_posmap_v1` as the only theorem-facing backend path
+   and treat the surrogate backend as benchmark-only
+2. use checker-side translation validation as the compiler-side bridge for the
+   exact manifest/function/object fields consumed by the theorem
+3. use the direct controller/hidden certificate path plus witness-agreement
+   checks as the runtime witness kernel
+4. validate that bridge path through the dedicated bridge-validation reports
+   and Lean-backed certificate/witness checkers
+5. keep the external-theorem presentation question separate from the completed
+   engineering bridge, since the theorem-facing import target is already frozen
 
 That sequence preserves the theorem boundary throughout. It improves the
 implementation until the strong theorem becomes true, rather than redefining the

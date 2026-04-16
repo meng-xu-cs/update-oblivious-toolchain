@@ -1,0 +1,867 @@
+{
+  "controller_observer_validation": {
+    "checker": "proof/lean/.lake/build/bin/checkRuntimeControllerCertificate",
+    "excluded_scenarios": [
+      {
+        "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ConfidentialMixer/pathoram/*; the theorem-facing controller certificate is reported only once under the explicit pathoram name",
+        "scenario": "ConfidentialMixer/oram/*"
+      },
+      {
+        "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ERC20Lite/pathoram/*; the theorem-facing controller certificate is reported only once under the explicit pathoram name",
+        "scenario": "ERC20Lite/oram/*"
+      }
+    ],
+    "model_tags": {
+      "exit_model": "exit_v1",
+      "page_model": "page_v1",
+      "shared_resource_model": "shared_v1"
+    },
+    "scenario_count": 16,
+    "scenarios": [
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1230,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "classify(uint256)",
+        "exit_events": 4,
+        "gas_used": 4096,
+        "lean_stdout": "validated runtime controller observer certificate for classify(uint256)",
+        "page_trace_events": 0,
+        "scenario": "FixedSlotClassifier/uo/class0",
+        "setup_calls": 0,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1230,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "classify(uint256)",
+        "exit_events": 4,
+        "gas_used": 4096,
+        "lean_stdout": "validated runtime controller observer certificate for classify(uint256)",
+        "page_trace_events": 0,
+        "scenario": "FixedSlotClassifier/uo/class1",
+        "setup_calls": 0,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1219,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "auth(bytes32)",
+        "exit_events": 4,
+        "gas_used": 8192,
+        "lean_stdout": "validated runtime controller observer certificate for auth(bytes32)",
+        "page_trace_events": 0,
+        "scenario": "AuthScan/uo/class0",
+        "setup_calls": 2,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1219,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "auth(bytes32)",
+        "exit_events": 4,
+        "gas_used": 8192,
+        "lean_stdout": "validated runtime controller observer certificate for auth(bytes32)",
+        "page_trace_events": 0,
+        "scenario": "AuthScan/uo/class1",
+        "setup_calls": 2,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1249,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "upsert(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 12288,
+        "lean_stdout": "validated runtime controller observer certificate for upsert(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "RegistryCRUD/uo/class0",
+        "setup_calls": 0,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1249,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "upsert(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 12288,
+        "lean_stdout": "validated runtime controller observer certificate for upsert(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "RegistryCRUD/uo/class1",
+        "setup_calls": 0,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1252,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 16384,
+        "lean_stdout": "validated runtime controller observer certificate for deposit(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ConfidentialMixer/fullscan/class0",
+        "setup_calls": 0,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1252,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 16384,
+        "lean_stdout": "validated runtime controller observer certificate for deposit(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ConfidentialMixer/fullscan/class1",
+        "setup_calls": 0,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1276,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "approve(address,address,uint256)",
+        "exit_events": 4,
+        "gas_used": 20480,
+        "lean_stdout": "validated runtime controller observer certificate for approve(address,address,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ERC20Lite/fullscan/class0",
+        "setup_calls": 1,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "certificate_json_bytes": 1276,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "approve(address,address,uint256)",
+        "exit_events": 4,
+        "gas_used": 20480,
+        "lean_stdout": "validated runtime controller observer certificate for approve(address,address,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ERC20Lite/fullscan/class1",
+        "setup_calls": 1,
+        "shared_resource_events": 3
+      },
+      {
+        "accepted": true,
+        "boundary_events": 4,
+        "certificate_json_bytes": 3424,
+        "controller_accesses": 1,
+        "controller_phase_count": 8,
+        "entrypoint": "put(bytes32,uint256)",
+        "exit_events": 10,
+        "gas_used": 2322,
+        "lean_stdout": "validated runtime controller observer certificate for put(bytes32,uint256)",
+        "page_trace_events": 26,
+        "scenario": "SingleAccessMap/pathoram/put-class0",
+        "setup_calls": 0,
+        "shared_resource_events": 34
+      },
+      {
+        "accepted": true,
+        "boundary_events": 4,
+        "certificate_json_bytes": 3424,
+        "controller_accesses": 1,
+        "controller_phase_count": 8,
+        "entrypoint": "put(bytes32,uint256)",
+        "exit_events": 10,
+        "gas_used": 2322,
+        "lean_stdout": "validated runtime controller observer certificate for put(bytes32,uint256)",
+        "page_trace_events": 26,
+        "scenario": "SingleAccessMap/pathoram/put-class1",
+        "setup_calls": 0,
+        "shared_resource_events": 34
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "certificate_json_bytes": 5610,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "add(bytes32,uint256)",
+        "exit_events": 16,
+        "gas_used": 2651,
+        "lean_stdout": "validated runtime controller observer certificate for add(bytes32,uint256)",
+        "page_trace_events": 52,
+        "scenario": "SingleAccessMap/pathoram/add-class0",
+        "setup_calls": 0,
+        "shared_resource_events": 65
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "certificate_json_bytes": 5610,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "add(bytes32,uint256)",
+        "exit_events": 16,
+        "gas_used": 2651,
+        "lean_stdout": "validated runtime controller observer certificate for add(bytes32,uint256)",
+        "page_trace_events": 52,
+        "scenario": "SingleAccessMap/pathoram/add-class1",
+        "setup_calls": 0,
+        "shared_resource_events": 65
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "certificate_json_bytes": 13446,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "exit_events": 16,
+        "gas_used": 12288,
+        "lean_stdout": "validated runtime controller observer certificate for deposit(bytes32,uint256)",
+        "page_trace_events": 176,
+        "scenario": "ConfidentialMixer/pathoram/deposit",
+        "setup_calls": 0,
+        "shared_resource_events": 189
+      },
+      {
+        "accepted": true,
+        "boundary_events": 14,
+        "certificate_json_bytes": 48107,
+        "controller_accesses": 6,
+        "controller_phase_count": 33,
+        "entrypoint": "transferFrom(address,address,address,uint256)",
+        "exit_events": 40,
+        "gas_used": 16384,
+        "lean_stdout": "validated runtime controller observer certificate for transferFrom(address,address,address,uint256)",
+        "page_trace_events": 690,
+        "scenario": "ERC20Lite/pathoram/transferFrom",
+        "setup_calls": 2,
+        "shared_resource_events": 723
+      }
+    ]
+  },
+  "pathoram_hidden_validation": {
+    "checker": "proof/lean/.lake/build/bin/checkRuntimePathOramHiddenCertificate",
+    "scenario_count": 6,
+    "scenarios": [
+      {
+        "accepted": true,
+        "certificate_json_bytes": 3278,
+        "entrypoint": "put(bytes32,uint256)",
+        "leaf_steps": 1,
+        "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
+        "position_map_objects": 1,
+        "public_leaf_scaffold_steps": 1,
+        "scenario": "SingleAccessMap/pathoram/put-class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "certificate_json_bytes": 3280,
+        "entrypoint": "put(bytes32,uint256)",
+        "leaf_steps": 1,
+        "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
+        "position_map_objects": 1,
+        "public_leaf_scaffold_steps": 1,
+        "scenario": "SingleAccessMap/pathoram/put-class1",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "certificate_json_bytes": 5639,
+        "entrypoint": "add(bytes32,uint256)",
+        "leaf_steps": 2,
+        "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
+        "position_map_objects": 1,
+        "public_leaf_scaffold_steps": 2,
+        "scenario": "SingleAccessMap/pathoram/add-class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "certificate_json_bytes": 5636,
+        "entrypoint": "add(bytes32,uint256)",
+        "leaf_steps": 2,
+        "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
+        "position_map_objects": 1,
+        "public_leaf_scaffold_steps": 2,
+        "scenario": "SingleAccessMap/pathoram/add-class1",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "certificate_json_bytes": 12593,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "leaf_steps": 2,
+        "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
+        "position_map_objects": 1,
+        "public_leaf_scaffold_steps": 2,
+        "scenario": "ConfidentialMixer/pathoram/deposit",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "certificate_json_bytes": 44242,
+        "entrypoint": "transferFrom(address,address,address,uint256)",
+        "leaf_steps": 6,
+        "lean_stdout": "validated runtime path-ORAM hidden certificate with 6 leaf steps",
+        "position_map_objects": 2,
+        "public_leaf_scaffold_steps": 6,
+        "scenario": "ERC20Lite/pathoram/transferFrom",
+        "setup_calls": 2
+      }
+    ]
+  },
+  "seeded_witness_validation": {
+    "checker": "proof/lean/.lake/build/bin/checkRuntimeWitnessFamily",
+    "model_tags": {
+      "exit_model": "exit_v1",
+      "page_model": "page_v1",
+      "shared_resource_model": "shared_v1"
+    },
+    "scenario_count": 4,
+    "scenarios": [
+      {
+        "accepted": true,
+        "boundary_uniform": true,
+        "canonical_leaf_seed_space_matches": false,
+        "canonical_leaf_seed_space_size": 16,
+        "canonical_leaf_values_match_runtime_seed": false,
+        "controller_phase_uniform": true,
+        "entrypoint": "put(bytes32,uint256)",
+        "gas_uniform": true,
+        "lean_stdout": "validated seeded path-ORAM runtime witness family for put(bytes32,uint256) with 8 seeds",
+        "oram_object_config_uniform": true,
+        "physical_read_shape_uniform": false,
+        "physical_write_shape_uniform": false,
+        "public_leaf_scaffold_steps": 1,
+        "public_leaf_scaffold_uniform": true,
+        "scenario": "SingleAccessMap/pathoram/put-seeded",
+        "seed_count": 8,
+        "setup_calls": 0,
+        "witness_family_json_bytes": 53861
+      },
+      {
+        "accepted": true,
+        "boundary_uniform": true,
+        "canonical_leaf_seed_space_matches": false,
+        "canonical_leaf_seed_space_size": 256,
+        "canonical_leaf_values_match_runtime_seed": false,
+        "controller_phase_uniform": true,
+        "entrypoint": "add(bytes32,uint256)",
+        "gas_uniform": true,
+        "lean_stdout": "validated seeded path-ORAM runtime witness family for add(bytes32,uint256) with 8 seeds",
+        "oram_object_config_uniform": true,
+        "physical_read_shape_uniform": false,
+        "physical_write_shape_uniform": false,
+        "public_leaf_scaffold_steps": 2,
+        "public_leaf_scaffold_uniform": true,
+        "scenario": "SingleAccessMap/pathoram/add-seeded",
+        "seed_count": 8,
+        "setup_calls": 0,
+        "witness_family_json_bytes": 90310
+      },
+      {
+        "accepted": true,
+        "boundary_uniform": true,
+        "canonical_leaf_seed_space_matches": false,
+        "canonical_leaf_seed_space_size": 4096,
+        "canonical_leaf_values_match_runtime_seed": false,
+        "controller_phase_uniform": true,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "gas_uniform": true,
+        "lean_stdout": "validated seeded path-ORAM runtime witness family for deposit(bytes32,uint256) with 4 seeds",
+        "oram_object_config_uniform": true,
+        "physical_read_shape_uniform": false,
+        "physical_write_shape_uniform": false,
+        "public_leaf_scaffold_steps": 2,
+        "public_leaf_scaffold_uniform": true,
+        "scenario": "ConfidentialMixer/pathoram/deposit-seeded",
+        "seed_count": 4,
+        "setup_calls": 0,
+        "witness_family_json_bytes": 104401
+      },
+      {
+        "accepted": true,
+        "boundary_uniform": true,
+        "canonical_leaf_seed_space_matches": false,
+        "canonical_leaf_seed_space_size": 274877906944,
+        "canonical_leaf_values_match_runtime_seed": false,
+        "controller_phase_uniform": true,
+        "entrypoint": "transferFrom(address,address,address,uint256)",
+        "gas_uniform": true,
+        "lean_stdout": "validated seeded path-ORAM runtime witness family for transferFrom(address,address,address,uint256) with 4 seeds",
+        "oram_object_config_uniform": true,
+        "physical_read_shape_uniform": false,
+        "physical_write_shape_uniform": false,
+        "public_leaf_scaffold_steps": 6,
+        "public_leaf_scaffold_uniform": true,
+        "scenario": "ERC20Lite/pathoram/transferFrom-seeded",
+        "seed_count": 4,
+        "setup_calls": 2,
+        "witness_family_json_bytes": 369834
+      }
+    ]
+  },
+  "static_checks": {
+    "reports": [
+      {
+        "benchmark": "AuthScan",
+        "fullscan64_artifact": null,
+        "oram_artifact": null,
+        "raw_artifact": [
+          "artifact contract AuthScan mode Raw",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "source_raw": [
+          "validated contract AuthScan",
+          "entrypoints: seed(uint256,bytes32), auth(bytes32), readLast()",
+          "diagnostics: none"
+        ],
+        "source_uo": [
+          "validated contract AuthScan",
+          "entrypoints: seed(uint256,bytes32), auth(bytes32), readLast()",
+          "diagnostics: none"
+        ],
+        "uo_artifact": [
+          "artifact contract AuthScan mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ]
+      },
+      {
+        "benchmark": "ConfidentialMixer",
+        "fullscan64_artifact": [
+          "artifact contract ConfidentialMixer mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "oram_artifact": [
+          "artifact contract ConfidentialMixer mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "raw_artifact": [
+          "artifact contract ConfidentialMixer mode Raw",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "source_raw": [
+          "validated contract ConfidentialMixer",
+          "entrypoints: deposit(bytes32,uint256), withdraw(bytes32,uint256), balanceOf(bytes32), totalValue()",
+          "diagnostics: none"
+        ],
+        "source_uo": [
+          "validated contract ConfidentialMixer",
+          "entrypoints: deposit(bytes32,uint256), withdraw(bytes32,uint256), balanceOf(bytes32), totalValue()",
+          "diagnostics: none"
+        ],
+        "uo_artifact": [
+          "artifact contract ConfidentialMixer mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ]
+      },
+      {
+        "benchmark": "ERC20Lite",
+        "fullscan64_artifact": null,
+        "oram_artifact": [
+          "artifact contract ERC20Lite mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "raw_artifact": [
+          "artifact contract ERC20Lite mode Raw",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "source_raw": [
+          "validated contract ERC20Lite",
+          "entrypoints: mint(address,uint256), approve(address,address,uint256), transfer(address,address,uint256), transferFrom(address,address,address,uint256), balanceOf(address), allowanceOf(address,address)",
+          "diagnostics: none"
+        ],
+        "source_uo": [
+          "validated contract ERC20Lite",
+          "entrypoints: mint(address,uint256), approve(address,address,uint256), transfer(address,address,uint256), transferFrom(address,address,address,uint256), balanceOf(address), allowanceOf(address,address)",
+          "diagnostics: none"
+        ],
+        "uo_artifact": [
+          "artifact contract ERC20Lite mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ]
+      },
+      {
+        "benchmark": "FixedSlotClassifier",
+        "fullscan64_artifact": null,
+        "oram_artifact": null,
+        "raw_artifact": [
+          "artifact contract FixedSlotClassifier mode Raw",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "source_raw": [
+          "validated contract FixedSlotClassifier",
+          "entrypoints: classify(uint256), sameSame(uint256), peek()",
+          "diagnostics: none"
+        ],
+        "source_uo": [
+          "validated contract FixedSlotClassifier",
+          "entrypoints: classify(uint256), sameSame(uint256), peek()",
+          "diagnostics: none"
+        ],
+        "uo_artifact": [
+          "artifact contract FixedSlotClassifier mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ]
+      },
+      {
+        "benchmark": "RegistryCRUD",
+        "fullscan64_artifact": null,
+        "oram_artifact": null,
+        "raw_artifact": [
+          "artifact contract RegistryCRUD mode Raw",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ],
+        "source_raw": [
+          "validated contract RegistryCRUD",
+          "entrypoints: upsert(bytes32,uint256), clear(bytes32), clearIfMatch(bytes32,uint256), read(bytes32)",
+          "diagnostics: none"
+        ],
+        "source_uo": [
+          "validated contract RegistryCRUD",
+          "entrypoints: upsert(bytes32,uint256), clear(bytes32), clearIfMatch(bytes32,uint256), read(bytes32)",
+          "diagnostics: none"
+        ],
+        "uo_artifact": [
+          "artifact contract RegistryCRUD mode Uo",
+          "manifest/object exactness: ok",
+          "manifest/entrypoint exactness: ok",
+          "forbidden control flow in confidential IR: none",
+          "raw storage backend for confidential objects: none",
+          "source/artifact translation validation: ok"
+        ]
+      }
+    ]
+  },
+  "witness_validation": {
+    "checker": "proof/lean/.lake/build/bin/checkRuntimeWitness",
+    "excluded_scenarios": [
+      {
+        "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ConfidentialMixer/pathoram/*; the Lean runtime witness is reported only once under the explicit pathoram name",
+        "scenario": "ConfidentialMixer/oram/*"
+      },
+      {
+        "reason": "generic ORAM benchmark alias compiles the same path-ORAM backend as ERC20Lite/pathoram/*; the Lean runtime witness is reported only once under the explicit pathoram name",
+        "scenario": "ERC20Lite/oram/*"
+      }
+    ],
+    "model_tags": {
+      "exit_model": "exit_v1",
+      "page_model": "page_v1",
+      "shared_resource_model": "shared_v1"
+    },
+    "scenario_count": 16,
+    "scenarios": [
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "classify(uint256)",
+        "exit_events": 4,
+        "gas_used": 4096,
+        "lean_stdout": "validated runtime refinement witness for classify(uint256)",
+        "page_trace_events": 0,
+        "scenario": "FixedSlotClassifier/uo/class0",
+        "setup_calls": 0,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 1741
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "classify(uint256)",
+        "exit_events": 4,
+        "gas_used": 4096,
+        "lean_stdout": "validated runtime refinement witness for classify(uint256)",
+        "page_trace_events": 0,
+        "scenario": "FixedSlotClassifier/uo/class1",
+        "setup_calls": 0,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 1741
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "auth(bytes32)",
+        "exit_events": 4,
+        "gas_used": 8192,
+        "lean_stdout": "validated runtime refinement witness for auth(bytes32)",
+        "page_trace_events": 0,
+        "scenario": "AuthScan/uo/class0",
+        "setup_calls": 2,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 3162
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "auth(bytes32)",
+        "exit_events": 4,
+        "gas_used": 8192,
+        "lean_stdout": "validated runtime refinement witness for auth(bytes32)",
+        "page_trace_events": 0,
+        "scenario": "AuthScan/uo/class1",
+        "setup_calls": 2,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 3163
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "upsert(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 12288,
+        "lean_stdout": "validated runtime refinement witness for upsert(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "RegistryCRUD/uo/class0",
+        "setup_calls": 0,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 3163
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "upsert(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 12288,
+        "lean_stdout": "validated runtime refinement witness for upsert(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "RegistryCRUD/uo/class1",
+        "setup_calls": 0,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 3162
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 16384,
+        "lean_stdout": "validated runtime refinement witness for deposit(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ConfidentialMixer/fullscan/class0",
+        "setup_calls": 0,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 4424
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "exit_events": 4,
+        "gas_used": 16384,
+        "lean_stdout": "validated runtime refinement witness for deposit(bytes32,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ConfidentialMixer/fullscan/class1",
+        "setup_calls": 0,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 4426
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "approve(address,address,uint256)",
+        "exit_events": 4,
+        "gas_used": 20480,
+        "lean_stdout": "validated runtime refinement witness for approve(address,address,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ERC20Lite/fullscan/class0",
+        "setup_calls": 1,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 4981
+      },
+      {
+        "accepted": true,
+        "boundary_events": 2,
+        "controller_accesses": 0,
+        "controller_phase_count": 3,
+        "entrypoint": "approve(address,address,uint256)",
+        "exit_events": 4,
+        "gas_used": 20480,
+        "lean_stdout": "validated runtime refinement witness for approve(address,address,uint256)",
+        "page_trace_events": 0,
+        "scenario": "ERC20Lite/fullscan/class1",
+        "setup_calls": 1,
+        "shared_resource_events": 3,
+        "witness_json_bytes": 4981
+      },
+      {
+        "accepted": true,
+        "boundary_events": 4,
+        "controller_accesses": 1,
+        "controller_phase_count": 8,
+        "entrypoint": "put(bytes32,uint256)",
+        "exit_events": 10,
+        "gas_used": 2322,
+        "lean_stdout": "validated runtime refinement witness for put(bytes32,uint256)",
+        "page_trace_events": 26,
+        "scenario": "SingleAccessMap/pathoram/put-class0",
+        "setup_calls": 0,
+        "shared_resource_events": 34,
+        "witness_json_bytes": 6738
+      },
+      {
+        "accepted": true,
+        "boundary_events": 4,
+        "controller_accesses": 1,
+        "controller_phase_count": 8,
+        "entrypoint": "put(bytes32,uint256)",
+        "exit_events": 10,
+        "gas_used": 2322,
+        "lean_stdout": "validated runtime refinement witness for put(bytes32,uint256)",
+        "page_trace_events": 26,
+        "scenario": "SingleAccessMap/pathoram/put-class1",
+        "setup_calls": 0,
+        "shared_resource_events": 34,
+        "witness_json_bytes": 6736
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "add(bytes32,uint256)",
+        "exit_events": 16,
+        "gas_used": 2651,
+        "lean_stdout": "validated runtime refinement witness for add(bytes32,uint256)",
+        "page_trace_events": 52,
+        "scenario": "SingleAccessMap/pathoram/add-class0",
+        "setup_calls": 0,
+        "shared_resource_events": 65,
+        "witness_json_bytes": 11284
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "add(bytes32,uint256)",
+        "exit_events": 16,
+        "gas_used": 2651,
+        "lean_stdout": "validated runtime refinement witness for add(bytes32,uint256)",
+        "page_trace_events": 52,
+        "scenario": "SingleAccessMap/pathoram/add-class1",
+        "setup_calls": 0,
+        "shared_resource_events": 65,
+        "witness_json_bytes": 11286
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "deposit(bytes32,uint256)",
+        "exit_events": 16,
+        "gas_used": 12288,
+        "lean_stdout": "validated runtime refinement witness for deposit(bytes32,uint256)",
+        "page_trace_events": 176,
+        "scenario": "ConfidentialMixer/pathoram/deposit",
+        "setup_calls": 0,
+        "shared_resource_events": 189,
+        "witness_json_bytes": 26075
+      },
+      {
+        "accepted": true,
+        "boundary_events": 14,
+        "controller_accesses": 6,
+        "controller_phase_count": 33,
+        "entrypoint": "transferFrom(address,address,address,uint256)",
+        "exit_events": 40,
+        "gas_used": 16384,
+        "lean_stdout": "validated runtime refinement witness for transferFrom(address,address,address,uint256)",
+        "page_trace_events": 690,
+        "scenario": "ERC20Lite/pathoram/transferFrom",
+        "setup_calls": 2,
+        "shared_resource_events": 723,
+        "witness_json_bytes": 92370
+      }
+    ]
+  }
+}

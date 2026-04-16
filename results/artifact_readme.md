@@ -36,6 +36,11 @@ full public fresh-coin scaffold and seed count.
 families beyond `SingleAccessMap`, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object
 `ERC20Lite/pathoram/transferFrom` run.
+`bridge_validation.json` is the focused imported-theorem engineering-bridge
+report: it bundles the source-to-artifact translation checks together with the
+direct controller certificate, direct hidden-state certificate, runtime
+refinement witness, and seeded witness-family validators so the bridge status
+can be checked without inferring it from the full artifact bundle.
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and

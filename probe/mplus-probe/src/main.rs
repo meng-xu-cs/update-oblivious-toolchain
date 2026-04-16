@@ -22,6 +22,8 @@ impl From<ArtifactModeArg> for mplus_probe::ArtifactMaterializationMode {
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum ReportKind {
+    StaticChecks,
+    BridgeValidation,
     WitnessValidation,
     SeededWitnessValidation,
     PathoramPairValidation,
@@ -81,6 +83,34 @@ fn main() -> Result<()> {
             .unwrap_or(20 * 1024 * 1024 * 1024),
     };
     match cli.only {
+        Some(ReportKind::StaticChecks) => {
+            let report = mplus_probe::run_static_checks_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("static_checks.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "static_checks": report,
+                }))?
+            );
+        }
+        Some(ReportKind::BridgeValidation) => {
+            let report = mplus_probe::run_bridge_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("bridge_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "bridge_validation": report,
+                }))?
+            );
+        }
         Some(ReportKind::WitnessValidation) => {
             let report = mplus_probe::run_witness_validation_report()?;
             fs::create_dir_all(&cli.out_dir)?;

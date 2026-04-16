@@ -1,15 +1,64 @@
 # UO Toolchain
 
-This repository contains a research-grade prototype of an update-oblivious toolchain for a restricted Solidity subset.
+This repository contains a research-grade prototype of an update-oblivious
+toolchain for a restricted Solidity subset. The repository centers on a
+compiled artifact plus an instrumented confidential runtime; today it does not
+target "deploy raw EVM bytecode to a public chain" as its main execution
+model.
 
 Components:
 
-- `compiler/uo-solc`: parses sidecar-annotated Solidity, validates the supported subset, lowers to explicit UO IR, and emits a manifest.
-- `runtime/uo-evm`: executes raw and UO artifacts with an instrumented `M+` trace model and fixed-shape UO commits.
-- `checker/uo-check`: validates source contracts and compiled artifacts.
-- `probe/mplus-probe`: runs paired leakage experiments, correctness checks, and writes the reproducible `results/` bundle.
-- `benches/raw`: the mandatory Solidity benchmark suite plus raw/UO metadata.
+- `compiler/uo-solc`: parses sidecar-annotated Solidity, validates the
+  supported subset, lowers to explicit UO IR, and emits theorem-facing
+  manifests.
+- `runtime/uo-evm`: executes raw and UO artifacts in-process, emits
+  instrumented `M+` traces, and exports checked refinement witnesses for the
+  Lean model.
+- `checker/uo-check`: rejects unsupported source programs, validates compiled
+  artifacts, and is the main translation-validation/security-gate path for
+  proof-relevant compiler output.
+- `probe/mplus-probe`: runs paired leakage experiments, correctness checks,
+  witness/certificate validation, and writes the reproducible `results/`
+  bundle.
+- `benches/raw`: the benchmark suite plus raw/UO metadata.
 - `benches/uo`: generated UO artifacts.
+
+Current claim boundary:
+
+- exact-UO for exact backends (`UOCell`, `UOArray`, full-scan `UOMap`) on the
+  repository's instrumented abstract machine
+- theorem-facing computational-UO only on the `path_oram_local_posmap_v1`
+  backend path; the legacy surrogate backend remains for benchmarking and
+  compatibility, not for strengthened proof claims
+- Lean-checked observer models, reduction layers, runtime witness/certificate
+  validators, and a frozen imported standard Path ORAM theorem target
+- the implementation bridge from source/artifact/runtime output into that
+  theorem boundary is now explicit and executable under the current
+  `PathOramLocalPosmapV1SecurityAssumptions` bundle
+- no current blanket claim that the full Rust compiler/runtime stack or a
+  malicious-host SGX deployment already satisfies the final paper theorem
+
+Paper-facing theorem strategy:
+
+- paper-preferred presentation: import or cite an external standard Path ORAM
+  theorem at the frozen `PathOramLocalPosmapV1StandardTheoremTarget` interface
+- artifact-complete repo path: keep the self-instantiated theorem object at the
+  same interface so the current artifacts can be checked end to end today
+- the theorem boundary does not change between those two presentations; only
+  the provenance of the ORAM core theorem object changes
+
+Strengthened closure plan:
+
+1. keep `path_oram_local_posmap_v1` as the only proof-grade backend target
+2. tighten `uo-check` into source-to-artifact translation validation for
+   proof-relevant fields
+3. prove that the runtime witness/certificate bundle emitted by `uo-evm`
+   satisfies the Lean refinement interface for the supported backend path
+4. keep the current self-instantiated closure for executable validation, and
+   optionally replace only the core imported theorem object with an external
+   literature-proof presentation at the same frozen interface
+5. reuse the existing projection lemmas for computational-UO, TEE-storage, and
+   paper-facing SGX consequences
 
 Build and validate:
 
@@ -22,6 +71,7 @@ Useful individual commands:
 ```bash
 ./scripts/compile_benches.sh
 cargo test
+./scripts/run_bridge_validation.sh
 ./scripts/run_validation.sh
 ./scripts/run_heavy_artifact.sh
 ```
@@ -40,5 +90,7 @@ compact theorem-input path.
 The current prototype is intentionally narrow. The exact supported subset,
 rejected features, remaining assumptions, and the formal proof roadmap are
 documented in [docs/supported-subset.md](docs/supported-subset.md),
-[docs/engineering-note.md](docs/engineering-note.md), and
+[docs/engineering-note.md](docs/engineering-note.md),
+[docs/imported-theorem-bridge-checklist.md](docs/imported-theorem-bridge-checklist.md),
+[docs/implementation-roadmap.md](docs/implementation-roadmap.md), and
 [docs/formal-proof-plan.md](docs/formal-proof-plan.md).

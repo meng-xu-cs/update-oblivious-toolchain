@@ -128,16 +128,40 @@ with its own theorem-side `leafRun`:
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedStorageTheoremOfCore`
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealizationOfCore`
 
+## Presentation Policy
+
+The repo now deliberately supports two presentations of the same theorem
+boundary.
+
+- Paper-preferred presentation:
+  import or cite an external theorem object at
+  `PathOramLocalPosmapV1StandardTheoremTarget`, preferably through
+  `PathOramJACMLiteratureTheoremAt` fixed at the runtime-facing
+  `publicView` / `leafRun`.
+- Artifact-complete presentation:
+  keep the current self-instantiated route
+  `pathOramLocalPosmapV1_standardTheoremRealizationOfSelfJACMAt` so the
+  checked artifacts, certificates, and runtime witness bundle close end to end
+  inside the repo today.
+
+These are not different theorem boundaries. They use the same storage envelope,
+the same projection lemmas, and the same explicit backend-assumption bundle.
+The only difference is where the standard Path ORAM core theorem object comes
+from.
+
 ## Practical Interpretation
 
-The remaining gap is no longer about:
+The completed engineering bridge is no longer blocked on:
 
 - theorem plumbing
 - runtime observer extraction
 - public/storage interface mismatch
 - SGX/TEE theorem composition
 
-At the repo boundary, there is no longer an open concrete standard-ORAM theorem
-gap. What remains optional is only whether the paper wants to present the same
-closed result through an external imported theorem, rather than through the
-current self-instantiated runtime-family theorem object.
+What remains open for a stronger paper claim is narrower:
+
+- replace the current self-instantiated theorem source with an external
+  literature-proof object at the same frozen interface, if desired
+- or separately justify the explicit
+  `PathOramLocalPosmapV1SecurityAssumptions` bundle with cryptographic/backend
+  arguments outside this repo
