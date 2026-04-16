@@ -23,6 +23,7 @@ The repository now includes the first Lean scaffold under `proof/lean/`:
 - `proof/lean/UOToolchain/SgxOramProjection.lean`
 - `proof/lean/UOToolchain/SgxExactProjection.lean`
 - `proof/lean/UOToolchain/SgxJointProjection.lean`
+- `proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean`
 
 These files no longer only freeze the module split. They now contain executable
 definitions, proved lemmas, certificate checkers, and concrete theorem-facing
@@ -102,14 +103,22 @@ Current status:
   `path_oram_local_posmap_v1` candidate; the legacy surrogate path is kept only
   as a compatibility/benchmark specialization and is not the strengthened claim
   path
-- the remaining repo-level theorem question is now explicit:
-  whether the paper should present an external imported standard Path ORAM
-  theorem at the frozen interface, or reuse the current self-instantiated
-  theorem object for the executable artifact story
+- the theorem routes are now separated explicitly but remain equivalent at the
+  frozen interface:
+  the recommended paper mainline is an external imported standard Path ORAM
+  theorem at that interface, while the self-instantiated theorem object stays
+  as an appendix / executable-artifact cross-check at the same interface
 - the repo now also contains a concrete imported-theorem bridge checklist in
   [docs/imported-theorem-bridge-checklist.md](/home/m285xu/update-oblivious-toolchain/docs/imported-theorem-bridge-checklist.md),
   which records the completed engineering bridge under the current explicit
-  assumption bundle and the remaining optional paper-presentation step
+  assumption bundle independently of theorem-source provenance
+- the paper-main theorem route itself is now tracked separately in
+  [docs/paper-main-theorem-checklist.md](/home/m285xu/update-oblivious-toolchain/docs/paper-main-theorem-checklist.md),
+  including the Lean naming split between the paper-main theorem source and the
+  appendix / executable-artifact closure
+- the recommended literature source, fallback source, and source-to-interface
+  mapping are now collected in
+  [docs/path-oram-citation-import-plan.md](/home/m285xu/update-oblivious-toolchain/docs/path-oram-citation-import-plan.md)
 - [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now also fixes a separate TEE/SGX deployment boundary:
   an idealized TEE storage theorem is in scope as a future deployment theorem,

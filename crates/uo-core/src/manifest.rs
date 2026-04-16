@@ -66,6 +66,16 @@ pub struct OramManifest {
 }
 
 impl OramManifest {
+    pub fn path_leaf_count(&self) -> Result<usize> {
+        if self.scheme != PATH_ORAM_SCHEME {
+            bail!("path_leaf_count is only defined for {}", PATH_ORAM_SCHEME);
+        }
+        if self.bucket_count == 0 || self.bucket_count % 2 == 0 {
+            bail!("path ORAM bucket_count must equal 2 * leaf_count - 1");
+        }
+        Ok((self.bucket_count + 1) / 2)
+    }
+
     pub fn for_object(object: &StateObject) -> Result<Self> {
         if object.kind != ContainerKind::Map || object.backend != BackendKind::Oram {
             bail!("object {} is not an ORAM-backed map", object.name);
@@ -167,20 +177,27 @@ impl OramManifest {
                 }
             }
             PATH_ORAM_SCHEME => {
+                let leaf_count = self.path_leaf_count()?;
                 if self.blocks_per_bucket != 5 {
                     bail!("path ORAM requires 5 blocks per bucket");
                 }
                 if self.bucket_size != 24 + self.blocks_per_bucket * self.block_size {
                     bail!("path ORAM bucket size does not match theorem shape");
                 }
-                if self.bucket_count == 0 {
-                    bail!("path ORAM bucket count must be positive");
+                if !leaf_count.is_power_of_two() {
+                    bail!("path ORAM leaf count must be a power of two");
                 }
                 if self.stash_bound != capacity.max(1) {
                     bail!("path ORAM stash_bound must equal max(capacity, 1)");
                 }
                 if self.recursion_depth != 0 {
                     bail!("path ORAM recursion_depth must be 0");
+                }
+                if self.tree_height != log2_ceil(leaf_count) {
+                    bail!("path ORAM tree_height must equal log2(leaf_count)");
+                }
+                if self.bucket_count != 2 * leaf_count - 1 {
+                    bail!("path ORAM bucket_count must equal 2 * leaf_count - 1");
                 }
                 if self.metadata_pages_per_access != self.metadata_pages + 1 {
                     bail!("path ORAM metadata_pages_per_access must equal metadata_pages + 1");
@@ -254,4 +271,49 @@ fn state_object_by_id(state: &[StateObject], object_id: u32) -> Result<&StateObj
         .iter()
         .find(|object| object.id == object_id)
         .ok_or_else(|| anyhow!("unknown object id {}", object_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{OramManifest, PATH_ORAM_SCHEME};
+    use crate::ir::{BackendKind, ContainerKind, StateObject};
+    use crate::types::{ScalarType, Type};
+
+    fn path_oram_object(capacity: usize) -> StateObject {
+        StateObject {
+            id: 7,
+            name: "balances".into(),
+            kind: ContainerKind::Map,
+            backend: BackendKind::Oram,
+            oram_scheme: PATH_ORAM_SCHEME.into(),
+            value_type: Type::Scalar(ScalarType::Uint(256)),
+            key_type: Some(Type::Scalar(ScalarType::Bytes32)),
+            capacity: Some(capacity),
+            confidential: true,
+        }
+    }
+
+    #[test]
+    fn path_oram_manifest_uses_power_of_two_leaf_count() {
+        let object = path_oram_object(9);
+        let manifest = OramManifest::for_object(&object).expect("path ORAM manifest");
+        let leaf_count = manifest.path_leaf_count().expect("path leaf count");
+        assert!(leaf_count.is_power_of_two());
+        assert_eq!(leaf_count, 16);
+        assert_eq!(manifest.bucket_count, 2 * leaf_count - 1);
+        assert_eq!(manifest.tree_height, 4);
+    }
+
+    #[test]
+    fn theorem_shape_rejects_non_power_of_two_path_leaf_count() {
+        let object = path_oram_object(9);
+        let mut manifest = OramManifest::for_object(&object).expect("path ORAM manifest");
+        manifest.bucket_count = 2 * 12 - 1;
+        let err = manifest
+            .validate_theorem_shape_for_object(&object)
+            .expect_err("non-power-of-two leaf count must be rejected");
+        assert!(err
+            .to_string()
+            .contains("path ORAM leaf count must be a power of two"));
+    }
 }

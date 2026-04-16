@@ -1,0 +1,228 @@
+# Path ORAM Citation And Import Plan
+
+This note turns the paper-main theorem route into a concrete source-selection
+and mapping plan.
+
+It does not claim that the external theorem has already been imported. It fixes
+the recommended literature source, the fallback source, and the exact mapping
+from those sources into the repo’s theorem interface.
+
+A ready-to-use bibliography file for these sources now lives at
+`docs/path-oram-theorem-sources.bib`.
+
+## Recommended Primary Source
+
+Use the Journal of the ACM version as the main cited theorem source:
+
+- Emil Stefanov, Marten van Dijk, Elaine Shi, T.-H. Hubert Chan, Christopher
+  Fletcher, Ling Ren, Xiangyao Yu, and Srinivas Devadas.
+  "Path ORAM: An Extremely Simple Oblivious RAM Protocol."
+  *Journal of the ACM* 65(4), Article 18, April 2018.
+- DOI: <https://doi.org/10.1145/3177872>
+- Open author-hosted PDF:
+  <https://elaineshi.com/docs/pathoram.pdf>
+
+Why this is the recommended mainline source:
+
+- it is the final archival version of the theorem source already modeled in
+  `PathOramJACMTheorem.lean`
+- it states the nonrecursive access-pattern theorem and the stash bound in one
+  stable place
+- it matches the repo’s `Z = 5` bucket-size choice, which is already recorded
+  in Lean
+- it is easier to cite cleanly in a paper than a repo-internal theorem object
+
+## Fallback Source
+
+If the paper prefers the original conference presentation, use the CCS version
+as the fallback source:
+
+- Emil Stefanov, Marten van Dijk, Elaine Shi, Christopher Fletcher, Ling Ren,
+  Xiangyao Yu, and Srinivas Devadas.
+  "Path ORAM: An Extremely Simple Oblivious RAM Protocol."
+  *Proceedings of CCS 2013*, Berlin, Germany.
+- DOI: <https://doi.org/10.1145/2508859.2516660>
+- Open author-hosted PDF:
+  <https://people.csail.mit.edu/devadas/pubs/PathORam.pdf>
+
+Why this is the fallback rather than the default:
+
+- it is shorter and earlier than the JACM version
+- it is still suitable for the access-pattern theorem narrative
+- but the JACM version is the cleaner single citation for the final paper
+  theorem, especially around the stash analysis and the mature presentation of
+  the protocol
+
+## Mechanization Candidates
+
+If the paper wants a stronger "import" story than a literature citation alone,
+the current visible candidates are:
+
+- Pengbo Yan, Toby Murray, Olga Ohrimenko, Van-Thuan Pham, and Robert Sison.
+  "Combining Classical and Probabilistic Independence Reasoning to Verify the
+  Security of Oblivious Algorithms."
+  FM 2024 / extended version on arXiv.
+  <https://arxiv.org/abs/2407.00514>
+  The paper states that the logic is mechanized in Isabelle/HOL and that Path
+  ORAM is one of the verified case studies. This is the strongest visible
+  external mechanization candidate, but from the public description it is not
+  obviously a drop-in theorem object for the repo’s exact
+  `PaperMainPathOramTheoremSourceAt` interface. It appears to verify
+  obliviousness of a Path ORAM model rather than directly packaging the exact
+  JACM-style theorem object at the repo’s public/storage boundary.
+
+- Hannah Leung, Talia Ringer, and Christopher W. Fletcher.
+  "Towards Formally Verified Path ORAM in Coq."
+  CoqPL 2023 extended abstract.
+  <https://dependenttyp.es/pdf/oramproposal.pdf>
+  This is highly relevant to the repo’s long-term direction, but it is a plan
+  document / extended abstract rather than an already consumable theorem object.
+
+These are worth citing in related work or future-work positioning, but they do
+not yet remove the need to choose between:
+
+- a citation-based paper-main theorem route using the JACM paper directly
+- or a dedicated appendix / companion mechanization that exports a theorem
+  object matching `PaperMainPathOramTheoremSourceAt`
+
+## Theorem-Object Menu
+
+The docs now recommend the theorem objects in this order:
+
+1. `PaperMainPathOramTheoremSourceAt assumptions publicView leafRun`
+2. `PathOramJACMLiteratureTheorem assumptions publicView`
+3. `StandardPathOramCoreTheorem assumptions publicView`
+4. `PathOramLocalPosmapV1StandardTheoremTarget assumptions`
+
+The first option is preferred because it imports the literature theorem already
+fixed at the runtime-facing `leafRun`, so no extra leaf-run alignment lemma is
+needed.
+
+## Source-To-Interface Mapping
+
+The recommended paper-main import should be described as a mapping from the
+JACM theorem source into:
+
+`paper : PaperMainPathOramTheoremSourceAt assumptions bundle.publicView bundle.leafRun`
+
+The intended field-by-field mapping is:
+
+- `cfgWellFormed`:
+  the literature theorem is instantiated only at well-formed Path ORAM
+  configurations with the repo’s concrete public tree shape and bucket size.
+
+- `publicViewSafe`:
+  the imported theorem is parameterized only by the public execution scaffold
+  already exposed in the repo as `bundle.publicView`.
+
+- `accessPatternTheorem`:
+  this is the literature statement that the server-observed accessed paths are
+  distributed like fresh random leaf labels subject only to the public access
+  scaffold. In the repo this becomes the canonical-leaf theorem for
+  `bundle.leafRun`.
+
+- `stashOverflowTheorem`:
+  this is the stash-failure tail bound specialized to the repo’s concrete
+  bucket size and stash parameters.
+
+At the repo boundary, the theorem-source mapping is then:
+
+- JACM access-pattern theorem
+  -> `PathOramJACMLiteratureTheoremAt.accessPatternTheorem`
+  -> `StandardPathOramCoreTheorem.leafValueCanonicalOnPublicPart`
+  -> `PaperMainPathOramTheoremSourceAt`
+
+- JACM stash theorem
+  -> `PathOramJACMLiteratureTheoremAt.stashOverflowTheorem`
+  -> `PathOramLocalPosmapV1SecurityAssumptions.stashOverflowBounded`
+
+- runtime-side public metadata / bucket projection / storage-shape facts
+  are not imported from the paper theorem
+  -> they are provided by the repo’s `PathOramStorageEnvelope`
+
+That split keeps the imported theorem clean: the literature theorem supplies
+the ORAM core, and the repo supplies the wrapper-specific storage envelope.
+
+## Exact Paper Route
+
+The recommended paper mainline is:
+
+1. Cite the JACM paper as the primary Path ORAM theorem source.
+2. State that the imported theorem object is modeled as
+   `PaperMainPathOramTheoremSourceAt`.
+3. Explain that the concrete runtime contributes the
+   `PathOramStorageEnvelope` bridge from that theorem source to the repo’s
+   storage observer.
+4. Use
+   `pathOramLocalPosmapV1_paperMainStandardTheoremRealization`
+   as the named bridge object connecting the external theorem source to the
+   checked runtime witness family.
+5. Keep
+   `pathOramLocalPosmapV1_artifactAppendixStandardTheoremRealization`
+   only as appendix / artifact-side cross-check material.
+
+## Assumption Provenance Plan
+
+The explicit assumption bundle is:
+
+- `bucketEncryptionINDCPA`
+- `metadataEncryptionINDCPA`
+- `freshLeafResampling`
+- `stashOverflowBounded`
+
+The recommended provenance split is:
+
+- `stashOverflowBounded`:
+  cite the Path ORAM stash theorem from the JACM paper, using the already
+  documented repo compatibility fact that `blocks_per_bucket = 5`.
+
+- `freshLeafResampling`:
+  discharge this from the implementation boundary.
+  The repo’s Path ORAM manifest chooses
+  `leaf_count = capacity.max(2).next_power_of_two()` in
+  [manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs:103),
+  and the runtime samples fresh leaves with `next_u64() % leaf_count` in
+  [oram.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/oram.rs:1025).
+  Because `leaf_count` is forced to a power of two, this sampling rule is an
+  exact uniform draw from the leaf space rather than an approximation. The
+  theorem-facing validator now also checks that power-of-two leaf-count shape.
+
+- `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA`:
+  discharge these from the concrete sealed-record layer actually used by the
+  runtime. The implementation uses `ChaCha20Poly1305` with fresh random nonces
+  and associated data in
+  [runtime/uo-store/src/codec.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-store/src/codec.rs:59).
+  The theorem only needs confidentiality-style hiding at these fields, while
+  the runtime primitive is stronger and also provides integrity. A conservative
+  paper route is therefore:
+  cite the Path ORAM theorem for access-pattern / stash behavior,
+  and separately state or import the confidentiality guarantee required of the
+  `ChaCha20-Poly1305` sealed bucket and metadata records.
+
+## Crypto Source For The Concrete Runtime Primitive
+
+For the concrete runtime primitive, the stable implementation reference is:
+
+- Yaron Nir and Adam Langley.
+  "ChaCha20 and Poly1305 for IETF Protocols."
+  RFC 8439, June 2018.
+- <https://www.rfc-editor.org/rfc/rfc8439>
+
+This is not itself the theorem proving the repo’s confidentiality assumptions.
+It is the correct specification reference for the primitive actually used by
+the runtime.
+
+## Next Non-Doc Step
+
+The next non-documentation step is no longer figuring out what to cite. It is
+choosing how strong the paper wants the provenance story to be:
+
+- citation route:
+  cite the JACM theorem source plus explicit assumption statements
+- stronger import route:
+  package a theorem object matching
+  `PaperMainPathOramTheoremSourceAt`
+  in a separately mechanized artifact or appendix
+
+The docs now make that decision explicit instead of leaving the source plan
+underspecified.

@@ -640,17 +640,16 @@ Section 3.5.
 The Lean workspace now exists and already contains the artifact semantics,
 projection layers, certificate checkers, the runtime/controller witness bridge,
 the checker-side translation-validation path, and the frozen imported-theorem
-target for the concrete Path ORAM candidate. The closure strategy from here is
-now split between a completed engineering bridge and a remaining theorem-source
-question:
+target for the concrete Path ORAM candidate. The closure strategy from here now
+has a recommended paper-main route plus a completed executable bridge:
 
 1. keep `path_oram_local_posmap_v1` as the only theorem-facing ORAM backend
 2. keep the runtime-to-Lean bridge at the small emitted
    witness/certificate-producing kernel rather than at the whole runtime
 3. keep `uo-check` as the translation validator for proof-relevant compiler
    output rather than trying to verify the whole Rust compiler at once
-4. for paper-facing presentation, import or cite the standard Path ORAM theorem
-   at `PathOramLocalPosmapV1StandardTheoremTarget`
+4. for the main paper theorem, import or cite the standard Path ORAM theorem at
+   `PathOramLocalPosmapV1StandardTheoremTarget`
 5. reuse the existing projection lemmas to recover the repo's
    computational-UO, TEE-storage, and paper-facing SGX claims
 
@@ -670,9 +669,9 @@ Current status:
 
 Remaining change:
 
-- for the strongest paper narrative, replace the current self-instantiated
-  theorem source with an imported or separately proved standard Path ORAM
-  theorem at the fixed storage-semantics boundary
+- for the recommended paper-main route, supply or cite the imported or
+  separately proved standard Path ORAM theorem at the fixed storage-semantics
+  boundary
 - independently of that presentation choice, any stronger claim still needs a
   cryptographic/backend justification for the explicit
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
@@ -746,8 +745,8 @@ The recommended implementation path is now:
 3. prove or validate conformance of that kernel to the Lean witness interface
 4. keep `uo-check` as source-to-artifact translation validation for
    proof-relevant compiler output
-5. separate the optional paper-facing imported-theorem presentation from the
-   already completed engineering bridge
+5. keep the paper-main imported-theorem presentation separate from the already
+   completed engineering bridge
 6. reuse the already-mechanized projection lemmas for the repo-facing claims
 
 ## 8. Immediate Next Engineering Tasks
@@ -759,9 +758,10 @@ missing bridge engineering:
    proof-facing docs and claim surface
 2. preserve the small trusted kernel boundary around emitted certificates,
    witnesses, and `uo-check`
-3. decide whether the paper should headline an external imported theorem at
+3. supply or cite the external imported theorem at
    `PathOramLocalPosmapV1StandardTheoremTarget`
-4. if so, swap only the ORAM core theorem provenance, not the theorem boundary
+4. keep the ORAM core theorem provenance swap isolated from the theorem
+   boundary and from the executable bridge
 5. separately justify or import the cryptographic/backend assumptions gathered
    in `PathOramLocalPosmapV1SecurityAssumptions`
 

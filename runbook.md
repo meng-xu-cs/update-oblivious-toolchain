@@ -21,10 +21,10 @@ The current repository should be read with these adjustments:
 - the strengthened assurance path is not "formally verify every Rust module"
   up front; it is: checker-side translation validation, runtime-to-Lean
   refinement, and discharge of the frozen imported standard Path ORAM theorem
-- for paper-facing exposition, prefer an external imported Path ORAM theorem at
-  that frozen interface; for repo-complete artifact validation, keep the
-  self-instantiated theorem object at the same interface and validate the
-  executable bridge end to end
+- the two theorem routes are equivalent at the frozen interface; the
+  recommended paper mainline is to use an external imported Path ORAM theorem
+  at that interface, while keeping the self-instantiated theorem object only as
+  appendix / executable-artifact validation at the same interface
 - the repo now also has a dedicated bridge-validation path,
   `./scripts/run_bridge_validation.sh`, for the imported-theorem engineering
   bridge without the full artifact bundle

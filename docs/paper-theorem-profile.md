@@ -213,9 +213,10 @@ generic paper-facing aliases below are unchanged. The current seeded runtime
 proof bundle now also instantiates that standard-theorem import boundary
 directly, including the preferred `PathOramJACMLiteratureTheoremAt` route at
 the runtime-facing `leafRun`, so there is no longer an open backend-theorem
-gap at the concrete repo boundary. What remains optional is only whether the
-paper wants to present an external imported theorem as the main narrative while
-the repo keeps that self-instantiated closure for executable validation.
+gap at the concrete repo boundary. The two routes remain equivalent at that
+theorem boundary; the recommended paper mainline is to present an external
+imported theorem as the main narrative, while the repo keeps the
+self-instantiated closure for executable validation.
 
 The current paper-facing aliases are:
 
@@ -246,16 +247,20 @@ For a paper, the preferred theorem narrative is:
 
 - present the ORAM core as an external or literature-faithful imported theorem
   at `PathOramLocalPosmapV1StandardTheoremTarget`
+- use `PaperMainPathOramTheoremSourceAt` and
+  `pathOramLocalPosmapV1_paperMainStandardTheoremRealization` as the named Lean
+  route for that presentation
 - present the repo contribution as the bridge proving that the concrete
   compiler/runtime artifacts conform to that frozen interface
 - then derive the computational-UO, TEE-storage, and paper-facing SGX
   consequences through the already mechanized projection lemmas
 
 For the executable artifact story, the repo also keeps a self-instantiated
-closure at exactly the same interface. That is not a weaker theorem boundary;
-it is a stronger artifact-completeness move so the current build can validate
-the entire bridge end to end without waiting on an external imported theorem
-object.
+closure at exactly the same interface through
+`pathOramLocalPosmapV1_artifactAppendixStandardTheoremRealization`. That is not
+a weaker theorem boundary; it is a stronger artifact-completeness move so the
+current build can validate the entire bridge end to end without waiting on an
+external imported theorem object.
 
 ## Runtime Witness Interface
 

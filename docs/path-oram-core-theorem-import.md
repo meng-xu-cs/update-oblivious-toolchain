@@ -128,19 +128,19 @@ with its own theorem-side `leafRun`:
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_importedStorageTheoremOfCore`
 - `SeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_standardTheoremRealizationOfCore`
 
-## Presentation Policy
+## Paper Mainline
 
-The repo now deliberately supports two presentations of the same theorem
-boundary.
+The repo now deliberately uses one paper-main route and one appendix / artifact
+route at the same theorem boundary.
 
-- Paper-preferred presentation:
+- Paper-main route:
   import or cite an external theorem object at
   `PathOramLocalPosmapV1StandardTheoremTarget`, preferably through
-  `PathOramJACMLiteratureTheoremAt` fixed at the runtime-facing
+  `PaperMainPathOramTheoremSourceAt` fixed at the runtime-facing
   `publicView` / `leafRun`.
-- Artifact-complete presentation:
+- Appendix / artifact route:
   keep the current self-instantiated route
-  `pathOramLocalPosmapV1_standardTheoremRealizationOfSelfJACMAt` so the
+  `pathOramLocalPosmapV1_artifactAppendixStandardTheoremRealization` so the
   checked artifacts, certificates, and runtime witness bundle close end to end
   inside the repo today.
 
@@ -158,10 +158,13 @@ The completed engineering bridge is no longer blocked on:
 - public/storage interface mismatch
 - SGX/TEE theorem composition
 
-What remains open for a stronger paper claim is narrower:
+What remains open for the paper-main route is narrower:
 
-- replace the current self-instantiated theorem source with an external
-  literature-proof object at the same frozen interface, if desired
+- supply or cite the external literature-proof object at the same frozen
+  interface
 - or separately justify the explicit
   `PathOramLocalPosmapV1SecurityAssumptions` bundle with cryptographic/backend
   arguments outside this repo
+
+The concrete recommended literature source, fallback source, and theorem-field
+mapping are collected in `docs/path-oram-citation-import-plan.md`.

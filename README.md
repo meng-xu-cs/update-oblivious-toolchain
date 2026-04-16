@@ -38,14 +38,17 @@ Current claim boundary:
 - no current blanket claim that the full Rust compiler/runtime stack or a
   malicious-host SGX deployment already satisfies the final paper theorem
 
-Paper-facing theorem strategy:
+Paper-main theorem strategy:
 
-- paper-preferred presentation: import or cite an external standard Path ORAM
-  theorem at the frozen `PathOramLocalPosmapV1StandardTheoremTarget` interface
-- artifact-complete repo path: keep the self-instantiated theorem object at the
+- theorem-boundary fact: the paper route and the appendix / artifact route use
+  the same frozen theorem interface
+- recommended paper mainline: import or cite an external standard Path ORAM
+  theorem at the frozen `PathOramLocalPosmapV1StandardTheoremTarget`
+  interface, preferably through `PaperMainPathOramTheoremSourceAt`
+- appendix / artifact route: keep the self-instantiated theorem object at the
   same interface so the current artifacts can be checked end to end today
-- the theorem boundary does not change between those two presentations; only
-  the provenance of the ORAM core theorem object changes
+- the theorem boundary does not change between those two routes; only the
+  provenance of the ORAM core theorem object changes
 
 Strengthened closure plan:
 
@@ -54,9 +57,9 @@ Strengthened closure plan:
    proof-relevant fields
 3. prove that the runtime witness/certificate bundle emitted by `uo-evm`
    satisfies the Lean refinement interface for the supported backend path
-4. keep the current self-instantiated closure for executable validation, and
-   optionally replace only the core imported theorem object with an external
-   literature-proof presentation at the same frozen interface
+4. use the external imported-theorem route as the main paper theorem source,
+   and keep the current self-instantiated closure only as appendix / executable
+   artifact support at the same frozen interface
 5. reuse the existing projection lemmas for computational-UO, TEE-storage, and
    paper-facing SGX consequences
 
@@ -92,5 +95,7 @@ rejected features, remaining assumptions, and the formal proof roadmap are
 documented in [docs/supported-subset.md](docs/supported-subset.md),
 [docs/engineering-note.md](docs/engineering-note.md),
 [docs/imported-theorem-bridge-checklist.md](docs/imported-theorem-bridge-checklist.md),
+[docs/paper-main-theorem-checklist.md](docs/paper-main-theorem-checklist.md),
+[docs/path-oram-citation-import-plan.md](docs/path-oram-citation-import-plan.md),
 [docs/implementation-roadmap.md](docs/implementation-roadmap.md), and
 [docs/formal-proof-plan.md](docs/formal-proof-plan.md).

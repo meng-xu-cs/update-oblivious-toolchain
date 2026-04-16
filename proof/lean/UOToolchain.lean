@@ -19,6 +19,7 @@ import UOToolchain.PathOramLocalPosmapV1
 import UOToolchain.PathOramLocalPosmapV1Refinement
 import UOToolchain.PathOramLocalPosmapV1StandardTheorem
 import UOToolchain.PathOramJACMTheorem
+import UOToolchain.PaperPathOramTheoremRoute
 import UOToolchain.RuntimeRefinementJson
 import UOToolchain.RuntimeCoinsJson
 import UOToolchain.RuntimePathOramPairJson

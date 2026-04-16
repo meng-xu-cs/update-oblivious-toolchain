@@ -106,13 +106,11 @@ Status labels:
   The repo now has a focused `bridge_validation.json` path that runs
   translation validation plus the controller / hidden / witness bridge reports.
 
-- `optional` For paper-facing exposition, present an external literature-proof
-  object at exactly the same frozen interface while keeping the current
-  self-instantiated route for executable artifact closure. This is a theorem
-  provenance choice, not a repo-completeness blocker. The current repo already
-  exposes the exact import target and a literature-facing JACM mapping;
-  swapping in an external imported theorem would strengthen exposition, not
-  change the engineering bridge.
+- `optional` The paper-main theorem provenance step is tracked separately in
+  `docs/paper-main-theorem-checklist.md`: supply or cite an external
+  literature-proof object at exactly the same frozen interface while keeping
+  the current self-instantiated route for executable artifact closure. This is
+  still a theorem provenance choice, not a repo-completeness blocker.
 
 ## Exit Condition
 
