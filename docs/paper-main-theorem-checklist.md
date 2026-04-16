@@ -4,10 +4,12 @@ This checklist fixes the theorem-source strategy for a paper after the current
 repo decision:
 
 - the theorem routes remain equivalent at the frozen interface
-- the recommended paper mainline is to treat the standard Path ORAM result as
-  an external or literature-faithful imported theorem
+- the current paper choice is to use the citation route for the standard Path
+  ORAM result at that interface
 - the repo should keep the current self-instantiated closure only as appendix /
   executable-artifact support at exactly the same theorem interface
+- the stronger import route should stay documented only as future work until a
+  real external theorem artifact exists
 
 This does not change the theorem boundary. It changes only the provenance and
 presentation of the ORAM core theorem object.

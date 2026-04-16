@@ -22,9 +22,10 @@ The current repository should be read with these adjustments:
   up front; it is: checker-side translation validation, runtime-to-Lean
   refinement, and discharge of the frozen imported standard Path ORAM theorem
 - the two theorem routes are equivalent at the frozen interface; the
-  recommended paper mainline is to use an external imported Path ORAM theorem
-  at that interface, while keeping the self-instantiated theorem object only as
-  appendix / executable-artifact validation at the same interface
+  current paper choice is to use the citation route at that interface, while
+  keeping the self-instantiated theorem object only as appendix /
+  executable-artifact validation and keeping the stronger external-theorem
+  import route only as future work
 - the repo now also has a dedicated bridge-validation path,
   `./scripts/run_bridge_validation.sh`, for the imported-theorem engineering
   bridge without the full artifact bundle

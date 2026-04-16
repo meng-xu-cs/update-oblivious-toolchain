@@ -648,8 +648,8 @@ has a recommended paper-main route plus a completed executable bridge:
    witness/certificate-producing kernel rather than at the whole runtime
 3. keep `uo-check` as the translation validator for proof-relevant compiler
    output rather than trying to verify the whole Rust compiler at once
-4. for the main paper theorem, import or cite the standard Path ORAM theorem at
-   `PathOramLocalPosmapV1StandardTheoremTarget`
+4. for the current paper theorem, use the citation route for the standard Path
+   ORAM theorem at `PathOramLocalPosmapV1StandardTheoremTarget`
 5. reuse the existing projection lemmas to recover the repo's
    computational-UO, TEE-storage, and paper-facing SGX claims
 
@@ -669,9 +669,8 @@ Current status:
 
 Remaining change:
 
-- for the recommended paper-main route, supply or cite the imported or
-  separately proved standard Path ORAM theorem at the fixed storage-semantics
-  boundary
+- for the current paper route, cite the standard Path ORAM theorem at the
+  fixed storage-semantics boundary
 - independently of that presentation choice, any stronger claim still needs a
   cryptographic/backend justification for the explicit
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
@@ -745,8 +744,8 @@ The recommended implementation path is now:
 3. prove or validate conformance of that kernel to the Lean witness interface
 4. keep `uo-check` as source-to-artifact translation validation for
    proof-relevant compiler output
-5. keep the paper-main imported-theorem presentation separate from the already
-   completed engineering bridge
+5. keep the stronger external-theorem import presentation separate from the
+   already completed engineering bridge and treat it as future work
 6. reuse the already-mechanized projection lemmas for the repo-facing claims
 
 ## 8. Immediate Next Engineering Tasks
@@ -758,10 +757,10 @@ missing bridge engineering:
    proof-facing docs and claim surface
 2. preserve the small trusted kernel boundary around emitted certificates,
    witnesses, and `uo-check`
-3. supply or cite the external imported theorem at
+3. cite the external Path ORAM theorem source at
    `PathOramLocalPosmapV1StandardTheoremTarget`
-4. keep the ORAM core theorem provenance swap isolated from the theorem
-   boundary and from the executable bridge
+4. keep the stronger theorem-provenance swap isolated from the theorem
+   boundary and from the executable bridge, and treat it as future work
 5. separately justify or import the cryptographic/backend assumptions gathered
    in `PathOramLocalPosmapV1SecurityAssumptions`
 

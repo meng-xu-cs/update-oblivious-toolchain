@@ -105,9 +105,10 @@ Current status:
   path
 - the theorem routes are now separated explicitly but remain equivalent at the
   frozen interface:
-  the recommended paper mainline is an external imported standard Path ORAM
-  theorem at that interface, while the self-instantiated theorem object stays
-  as an appendix / executable-artifact cross-check at the same interface
+  the current paper choice is the citation route at that interface, while the
+  self-instantiated theorem object stays as an appendix / executable-artifact
+  cross-check at the same interface and the stronger external-theorem import
+  route is kept only as future work
 - the repo now also contains a concrete imported-theorem bridge checklist in
   [docs/imported-theorem-bridge-checklist.md](/home/m285xu/update-oblivious-toolchain/docs/imported-theorem-bridge-checklist.md),
   which records the completed engineering bridge under the current explicit
@@ -119,6 +120,9 @@ Current status:
 - the recommended literature source, fallback source, and source-to-interface
   mapping are now collected in
   [docs/path-oram-citation-import-plan.md](/home/m285xu/update-oblivious-toolchain/docs/path-oram-citation-import-plan.md)
+- the feasibility boundary for a genuinely stronger external-theorem import
+  route is now recorded in
+  [docs/stronger-import-route-feasibility.md](/home/m285xu/update-oblivious-toolchain/docs/stronger-import-route-feasibility.md)
 - [docs/formal-proof-plan.md](/home/m285xu/update-oblivious-toolchain/docs/formal-proof-plan.md)
   now also fixes a separate TEE/SGX deployment boundary:
   an idealized TEE storage theorem is in scope as a future deployment theorem,

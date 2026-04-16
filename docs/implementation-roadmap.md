@@ -406,8 +406,9 @@ This removes the extra `leafRun` alignment obligation on the mainline route.
 The concrete backend shape is now aligned with the JACM bucket-size parameter
 `Z = 5`, and the concrete repo theorem is already closed under the explicit
 assumption bundle; the theorem routes are equivalent at the same interface, and
-the recommended paper mainline is the external imported theorem while the repo
-keeps the current self-instantiated route only for executable closure.
+the current paper choice is the citation route while the repo keeps the current
+self-instantiated route only for executable closure and the stronger import
+route only as future work.
 
 Acceptance criteria:
 
@@ -432,9 +433,9 @@ The next practical path is:
    checks as the runtime witness kernel
 4. validate that bridge path through the dedicated bridge-validation reports
    and Lean-backed certificate/witness checkers
-5. supply or cite the external theorem object for the paper-main route while
-   keeping that theorem-provenance step separate from the completed
-   engineering bridge, since the theorem-facing import target is already frozen
+5. keep the stronger external-theorem import route as future work while using
+   the citation route now, since the theorem-facing import target is already
+   frozen and the engineering bridge is already complete
 
 That sequence preserves the theorem boundary throughout. It improves the
 implementation until the strong theorem becomes true, rather than redefining the

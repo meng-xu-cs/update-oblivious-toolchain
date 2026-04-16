@@ -214,9 +214,9 @@ proof bundle now also instantiates that standard-theorem import boundary
 directly, including the preferred `PathOramJACMLiteratureTheoremAt` route at
 the runtime-facing `leafRun`, so there is no longer an open backend-theorem
 gap at the concrete repo boundary. The two routes remain equivalent at that
-theorem boundary; the recommended paper mainline is to present an external
-imported theorem as the main narrative, while the repo keeps the
-self-instantiated closure for executable validation.
+theorem boundary; the current paper choice is to use the citation route as the
+main narrative, while the repo keeps the self-instantiated closure for
+executable validation and keeps the stronger import route as future work.
 
 The current paper-facing aliases are:
 
@@ -243,10 +243,10 @@ instance is:
 
 ## Presentation Strategy
 
-For a paper, the preferred theorem narrative is:
+For the current paper, the theorem narrative is:
 
-- present the ORAM core as an external or literature-faithful imported theorem
-  at `PathOramLocalPosmapV1StandardTheoremTarget`
+- present the ORAM core through the citation route, using the JACM theorem
+  source at `PathOramLocalPosmapV1StandardTheoremTarget`
 - use `PaperMainPathOramTheoremSourceAt` and
   `pathOramLocalPosmapV1_paperMainStandardTheoremRealization` as the named Lean
   route for that presentation
@@ -254,6 +254,9 @@ For a paper, the preferred theorem narrative is:
   compiler/runtime artifacts conform to that frozen interface
 - then derive the computational-UO, TEE-storage, and paper-facing SGX
   consequences through the already mechanized projection lemmas
+
+The stronger external-theorem import route remains documented as future
+strengthening rather than as the current paper plan.
 
 For the executable artifact story, the repo also keeps a self-instantiated
 closure at exactly the same interface through

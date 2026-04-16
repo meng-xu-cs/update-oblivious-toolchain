@@ -64,12 +64,11 @@ the current visible candidates are:
   FM 2024 / extended version on arXiv.
   <https://arxiv.org/abs/2407.00514>
   The paper states that the logic is mechanized in Isabelle/HOL and that Path
-  ORAM is one of the verified case studies. This is the strongest visible
-  external mechanization candidate, but from the public description it is not
-  obviously a drop-in theorem object for the repo’s exact
-  `PaperMainPathOramTheoremSourceAt` interface. It appears to verify
-  obliviousness of a Path ORAM model rather than directly packaging the exact
-  JACM-style theorem object at the repo’s public/storage boundary.
+  ORAM is one of the case studies, but it also states that the case-study
+  proofs are manual rather than exposing a published machine-checked external
+  theorem object at the repo’s exact interface. This is therefore the strongest
+  visible external formal-methods candidate, but not yet a drop-in theorem
+  source for `PaperMainPathOramTheoremSourceAt`.
 
 - Hannah Leung, Talia Ringer, and Christopher W. Fletcher.
   "Towards Formally Verified Path ORAM in Coq."
@@ -143,9 +142,9 @@ At the repo boundary, the theorem-source mapping is then:
 That split keeps the imported theorem clean: the literature theorem supplies
 the ORAM core, and the repo supplies the wrapper-specific storage envelope.
 
-## Exact Paper Route
+## Current Paper Route
 
-The recommended paper mainline is:
+The current paper choice is:
 
 1. Cite the JACM paper as the primary Path ORAM theorem source.
 2. State that the imported theorem object is modeled as
@@ -160,6 +159,9 @@ The recommended paper mainline is:
 5. Keep
    `pathOramLocalPosmapV1_artifactAppendixStandardTheoremRealization`
    only as appendix / artifact-side cross-check material.
+
+The stronger external-theorem import route stays documented as future work in
+`docs/stronger-import-route-feasibility.md`.
 
 ## Assumption Provenance Plan
 
@@ -214,15 +216,9 @@ the runtime.
 
 ## Next Non-Doc Step
 
-The next non-documentation step is no longer figuring out what to cite. It is
-choosing how strong the paper wants the provenance story to be:
+The next non-documentation step for the current paper is no longer figuring out
+what to cite. It is just executing the citation-route writeup cleanly. The
+stronger import route remains future work.
 
-- citation route:
-  cite the JACM theorem source plus explicit assumption statements
-- stronger import route:
-  package a theorem object matching
-  `PaperMainPathOramTheoremSourceAt`
-  in a separately mechanized artifact or appendix
-
-The docs now make that decision explicit instead of leaving the source plan
-underspecified.
+For a more explicit go / no-go evaluation of the stronger import route, see
+`docs/stronger-import-route-feasibility.md`.

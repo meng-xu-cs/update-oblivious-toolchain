@@ -42,11 +42,15 @@ Paper-main theorem strategy:
 
 - theorem-boundary fact: the paper route and the appendix / artifact route use
   the same frozen theorem interface
-- recommended paper mainline: import or cite an external standard Path ORAM
-  theorem at the frozen `PathOramLocalPosmapV1StandardTheoremTarget`
-  interface, preferably through `PaperMainPathOramTheoremSourceAt`
+- current paper choice: use the citation route, with the JACM Path ORAM theorem
+  as the external theorem source at the frozen
+  `PathOramLocalPosmapV1StandardTheoremTarget` interface, modeled by
+  `PaperMainPathOramTheoremSourceAt`
 - appendix / artifact route: keep the self-instantiated theorem object at the
   same interface so the current artifacts can be checked end to end today
+- future work: keep the stronger external-theorem import route alive, but only
+  as a future strengthening until an actual external theorem artifact can be
+  aligned to that interface
 - the theorem boundary does not change between those two routes; only the
   provenance of the ORAM core theorem object changes
 
@@ -57,9 +61,9 @@ Strengthened closure plan:
    proof-relevant fields
 3. prove that the runtime witness/certificate bundle emitted by `uo-evm`
    satisfies the Lean refinement interface for the supported backend path
-4. use the external imported-theorem route as the main paper theorem source,
-   and keep the current self-instantiated closure only as appendix / executable
-   artifact support at the same frozen interface
+4. use the citation route as the current paper theorem source, keep the current
+   self-instantiated closure as appendix / executable artifact support at the
+   same frozen interface, and treat the stronger import route as future work
 5. reuse the existing projection lemmas for computational-UO, TEE-storage, and
    paper-facing SGX consequences
 
@@ -97,5 +101,6 @@ documented in [docs/supported-subset.md](docs/supported-subset.md),
 [docs/imported-theorem-bridge-checklist.md](docs/imported-theorem-bridge-checklist.md),
 [docs/paper-main-theorem-checklist.md](docs/paper-main-theorem-checklist.md),
 [docs/path-oram-citation-import-plan.md](docs/path-oram-citation-import-plan.md),
+[docs/stronger-import-route-feasibility.md](docs/stronger-import-route-feasibility.md),
 [docs/implementation-roadmap.md](docs/implementation-roadmap.md), and
 [docs/formal-proof-plan.md](docs/formal-proof-plan.md).
