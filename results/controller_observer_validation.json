@@ -1,4 +1,5 @@
 {
+  "accepted": true,
   "checker": "proof/lean/.lake/build/bin/checkRuntimeControllerCertificate",
   "excluded_scenarios": [
     {

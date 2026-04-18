@@ -1,0 +1,348 @@
+import Lean.Data.Json
+import UOToolchain.RuntimeShellBoundary
+import UOToolchain.RuntimeRefinementJson
+
+open Lean
+
+namespace UOToolchain
+
+instance : FromJson ImportedRuntimeKernelSchedule where
+  fromJson? j := do
+    pure
+      { opcodes := ← j.getObjValAs? (List String) "opcodes"
+      , steps := ← j.getObjValAs? (List ImportedRuntimeKernelStep) "steps"
+      }
+
+instance : ToJson ImportedRuntimeKernelSchedule where
+  toJson schedule :=
+    Json.mkObj
+      [ ("opcodes", toJson schedule.opcodes)
+      , ("steps", toJson schedule.steps)
+      ]
+
+def importedRuntimeShellContractFieldNames : List String :=
+  ["public_object_universe", "canonical_loaded_object_schedule", "kernel_schedule"]
+
+def importedRuntimeShellTraceFieldNames : List String :=
+  [ "events"
+  , "projected_kernel_schedule"
+  , "pre_committed_cold_object_schedule"
+  , "shadow_load_object_schedule"
+  , "commit_object_schedule"
+  , "cold_store_object_schedule"
+  , "post_committed_cold_object_schedule"
+  ]
+
+def importedRuntimeShellBoundaryBundleFieldNames : List String :=
+  [ "kernel_witness"
+  , "runtime_kernel_refinement_witness"
+  , "shell_contract"
+  , "shell_trace"
+  ]
+
+structure ImportedRuntimeShellContract where
+  public_object_universe : List Nat
+  canonical_loaded_object_schedule : List Nat
+  kernel_schedule : ImportedRuntimeKernelSchedule
+deriving Repr, DecidableEq, FromJson, ToJson
+
+structure ImportedRuntimeShellTrace where
+  events : List ImportedRuntimeKernelRefinementEvent
+  projected_kernel_schedule : ImportedRuntimeKernelSchedule
+  pre_committed_cold_object_schedule : List Nat
+  shadow_load_object_schedule : List Nat
+  commit_object_schedule : List Nat
+  cold_store_object_schedule : List Nat
+  post_committed_cold_object_schedule : List Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeShellContract.toRuntimeShellContract
+  (contract : ImportedRuntimeShellContract) : RuntimeShellContract :=
+  { publicObjectUniverse := contract.public_object_universe
+  , canonicalLoadedObjectSchedule := contract.canonical_loaded_object_schedule
+  , kernelSchedule := contract.kernel_schedule.toRuntimeKernelSchedule
+  }
+
+def ImportedRuntimeShellTrace.toRuntimeShellTrace
+  (trace : ImportedRuntimeShellTrace) : RuntimeShellTrace :=
+  { events := trace.events.map ImportedRuntimeKernelRefinementEvent.toRuntimeKernelRefinementEvent
+  , projectedKernelSchedule := trace.projected_kernel_schedule.toRuntimeKernelSchedule
+  , preCommittedColdObjectSchedule := trace.pre_committed_cold_object_schedule
+  , shadowLoadObjectSchedule := trace.shadow_load_object_schedule
+  , commitObjectSchedule := trace.commit_object_schedule
+  , coldStoreObjectSchedule := trace.cold_store_object_schedule
+  , postCommittedColdObjectSchedule := trace.post_committed_cold_object_schedule
+  }
+
+def ImportedRuntimeShellTrace.Refines
+  (trace : ImportedRuntimeShellTrace)
+  (contract : ImportedRuntimeShellContract) : Prop :=
+  trace.toRuntimeShellTrace.eventsMatchSummaries ∧
+    trace.toRuntimeShellTrace.replaysContract contract.toRuntimeShellContract ∧
+    trace.projected_kernel_schedule = contract.kernel_schedule ∧
+    trace.pre_committed_cold_object_schedule = contract.public_object_universe ∧
+    trace.post_committed_cold_object_schedule = contract.public_object_universe ∧
+    trace.shadow_load_object_schedule = contract.canonical_loaded_object_schedule ∧
+    trace.commit_object_schedule = contract.canonical_loaded_object_schedule ∧
+    trace.cold_store_object_schedule = contract.canonical_loaded_object_schedule
+
+def ImportedRuntimeShellTrace.checkRefines
+  (trace : ImportedRuntimeShellTrace)
+  (contract : ImportedRuntimeShellContract) : Bool :=
+  trace.toRuntimeShellTrace.checkEventsMatchSummaries &&
+    trace.toRuntimeShellTrace.checkReplaysContract contract.toRuntimeShellContract &&
+    decide (trace.projected_kernel_schedule = contract.kernel_schedule) &&
+    decide (trace.pre_committed_cold_object_schedule = contract.public_object_universe) &&
+    decide (trace.post_committed_cold_object_schedule = contract.public_object_universe) &&
+    decide (trace.shadow_load_object_schedule = contract.canonical_loaded_object_schedule) &&
+    decide (trace.commit_object_schedule = contract.canonical_loaded_object_schedule) &&
+    decide (trace.cold_store_object_schedule = contract.canonical_loaded_object_schedule)
+
+@[simp] theorem importedRuntimeShellTrace_checkRefines_eq_true_iff
+  (trace : ImportedRuntimeShellTrace)
+  (contract : ImportedRuntimeShellContract) :
+  trace.checkRefines contract = true ↔ trace.Refines contract := by
+  unfold ImportedRuntimeShellTrace.checkRefines ImportedRuntimeShellTrace.Refines
+  simp [runtimeShellTrace_checkEventsMatchSummaries_eq_true_iff,
+    runtimeShellTrace_checkReplaysContract_eq_true_iff, and_assoc]
+
+theorem importedRuntimeShellTrace_refines_toRuntime
+  {trace : ImportedRuntimeShellTrace}
+  {contract : ImportedRuntimeShellContract}
+  (hRefines : trace.Refines contract) :
+  trace.toRuntimeShellTrace.Refines contract.toRuntimeShellContract := by
+  rcases hRefines with
+    ⟨_hEventsMatch, _hReplay, hProjected, hPreCommittedCold, hPostCommittedCold,
+      hShadowLoad, hCommit, hColdStore⟩
+  unfold ImportedRuntimeShellTrace.toRuntimeShellTrace
+    ImportedRuntimeShellContract.toRuntimeShellContract RuntimeShellTrace.Refines
+  simp [hProjected, hPreCommittedCold, hPostCommittedCold, hShadowLoad, hCommit, hColdStore]
+
+def ImportedRuntimeKernelWitness.importedShellContract
+  (witness : ImportedRuntimeKernelWitness) : ImportedRuntimeShellContract :=
+  { public_object_universe := witness.public_object_ids
+  , canonical_loaded_object_schedule :=
+      witness.toRuntimeKernelWitness.canonicalLoadedObjectSchedule
+  , kernel_schedule := witness.emittedKernelSchedule
+  }
+
+def ImportedRuntimeKernelWitness.shellContract
+  (witness : ImportedRuntimeKernelWitness) : RuntimeShellContract :=
+  witness.importedShellContract.toRuntimeShellContract
+
+@[simp] theorem importedRuntimeKernelWitness_importedShellContract_toRuntime
+  (witness : ImportedRuntimeKernelWitness) :
+  witness.importedShellContract.toRuntimeShellContract =
+    witness.toRuntimeKernelWitness.shellContract := by
+  unfold ImportedRuntimeKernelWitness.importedShellContract
+    ImportedRuntimeShellContract.toRuntimeShellContract RuntimeKernelWitness.shellContract
+    ImportedRuntimeKernelWitness.emittedKernelSchedule
+  simp [ImportedRuntimeKernelSchedule.toRuntimeKernelSchedule,
+    RuntimeKernelWitness.emittedKernelSchedule, ImportedRuntimeKernelWitness.toRuntimeKernelWitness]
+
+def ImportedRuntimeKernelRefinementWitness.importedShellTrace
+  (witness : ImportedRuntimeKernelRefinementWitness) : ImportedRuntimeShellTrace :=
+  { events := witness.events
+  , projected_kernel_schedule :=
+      { opcodes := witness.toRuntimeKernelRefinementWitness.projectedKernelSchedule.opcodes
+      , steps := witness.toRuntimeKernelRefinementWitness.projectedKernelSchedule.steps.map
+          fun step =>
+            { opcode := step.opcode
+            , object_id := step.objectId
+            }
+      }
+  , pre_committed_cold_object_schedule :=
+      witness.toRuntimeKernelRefinementWitness.preCommittedColdObjectSchedule
+  , shadow_load_object_schedule :=
+      witness.toRuntimeKernelRefinementWitness.shadowLoadObjectSchedule
+  , commit_object_schedule :=
+      witness.toRuntimeKernelRefinementWitness.commitObjectSchedule
+  , cold_store_object_schedule :=
+      witness.toRuntimeKernelRefinementWitness.coldStoreObjectSchedule
+  , post_committed_cold_object_schedule :=
+      witness.toRuntimeKernelRefinementWitness.postCommittedColdObjectSchedule
+  }
+
+def ImportedRuntimeKernelRefinementWitness.shellTrace
+  (witness : ImportedRuntimeKernelRefinementWitness) : RuntimeShellTrace :=
+  witness.importedShellTrace.toRuntimeShellTrace
+
+@[simp] theorem importedRuntimeKernelStep_runtimeRoundtrip
+  (step : RuntimeKernelStep) :
+  ({ opcode := step.opcode, object_id := step.objectId } :
+      ImportedRuntimeKernelStep).toRuntimeKernelStep = step := by
+  cases step
+  rfl
+
+@[simp] theorem importedRuntimeKernelStep_runtimeRoundtrip_comp :
+  ImportedRuntimeKernelStep.toRuntimeKernelStep ∘
+      (fun step : RuntimeKernelStep =>
+        ({ opcode := step.opcode, object_id := step.objectId } : ImportedRuntimeKernelStep)) =
+    id := by
+  funext step
+  exact importedRuntimeKernelStep_runtimeRoundtrip step
+
+@[simp] theorem importedRuntimeKernelRefinementWitness_importedShellTrace_toRuntime
+  (witness : ImportedRuntimeKernelRefinementWitness) :
+  witness.importedShellTrace.toRuntimeShellTrace =
+    witness.toRuntimeKernelRefinementWitness.shellTrace := by
+  unfold ImportedRuntimeKernelRefinementWitness.importedShellTrace
+    ImportedRuntimeShellTrace.toRuntimeShellTrace RuntimeKernelRefinementWitness.shellTrace
+    RuntimeKernelRefinementWitness.projectedKernelSchedule
+    RuntimeKernelRefinementWitness.preCommittedColdObjectSchedule
+    RuntimeKernelRefinementWitness.shadowLoadObjectSchedule
+    RuntimeKernelRefinementWitness.commitObjectSchedule
+    RuntimeKernelRefinementWitness.coldStoreObjectSchedule
+    RuntimeKernelRefinementWitness.postCommittedColdObjectSchedule
+    ImportedRuntimeKernelRefinementWitness.toRuntimeKernelRefinementWitness
+    ImportedRuntimeKernelSchedule.toRuntimeKernelSchedule
+    ImportedRuntimeKernelRefinementEvent.toRuntimeKernelRefinementEvent
+  simp [importedRuntimeKernelStep_runtimeRoundtrip_comp]
+
+structure ImportedRuntimeShellBoundaryBundle where
+  kernel_witness : ImportedRuntimeKernelWitness
+  runtime_kernel_refinement_witness : ImportedRuntimeKernelRefinementWitness
+  shell_contract : ImportedRuntimeShellContract
+  shell_trace : ImportedRuntimeShellTrace
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeShellBoundaryBundle.Valid
+  (bundle : ImportedRuntimeShellBoundaryBundle) : Prop :=
+  bundle.kernel_witness.ProofGradeValid bundle.kernel_witness.entrypoint_id ∧
+    bundle.runtime_kernel_refinement_witness.Valid bundle.kernel_witness ∧
+    bundle.shell_contract = bundle.kernel_witness.importedShellContract ∧
+    bundle.shell_trace = bundle.runtime_kernel_refinement_witness.importedShellTrace ∧
+    bundle.shell_trace.Refines bundle.shell_contract
+
+def ImportedRuntimeShellBoundaryBundle.checkValid
+  (bundle : ImportedRuntimeShellBoundaryBundle) : Bool :=
+  bundle.kernel_witness.checkProofGrade bundle.kernel_witness.entrypoint_id &&
+    bundle.runtime_kernel_refinement_witness.checkValid bundle.kernel_witness &&
+    decide (bundle.shell_contract = bundle.kernel_witness.importedShellContract) &&
+    decide (bundle.shell_trace = bundle.runtime_kernel_refinement_witness.importedShellTrace) &&
+    bundle.shell_trace.checkRefines bundle.shell_contract
+
+@[simp] theorem importedRuntimeShellBoundaryBundle_checkValid_eq_true_iff
+  (bundle : ImportedRuntimeShellBoundaryBundle) :
+  bundle.checkValid = true ↔ bundle.Valid := by
+  unfold ImportedRuntimeShellBoundaryBundle.checkValid ImportedRuntimeShellBoundaryBundle.Valid
+  simp [importedRuntimeKernelWitness_checkProofGrade_eq_true_iff,
+    importedRuntimeKernelRefinementWitness_checkValid_eq_true_iff,
+    importedRuntimeShellTrace_checkRefines_eq_true_iff, and_assoc]
+
+theorem importedRuntimeShellBoundaryBundle_contract_exact
+  {bundle : ImportedRuntimeShellBoundaryBundle}
+  (hValid : bundle.Valid) :
+  bundle.shell_contract = bundle.kernel_witness.importedShellContract := by
+  exact hValid.2.2.1
+
+theorem importedRuntimeShellBoundaryBundle_trace_exact
+  {bundle : ImportedRuntimeShellBoundaryBundle}
+  (hValid : bundle.Valid) :
+  bundle.shell_trace = bundle.runtime_kernel_refinement_witness.importedShellTrace := by
+  exact hValid.2.2.2.1
+
+theorem importedRuntimeShellBoundaryBundle_refines
+  {bundle : ImportedRuntimeShellBoundaryBundle}
+  (hValid : bundle.Valid) :
+  bundle.shell_trace.Refines bundle.shell_contract := by
+  exact hValid.2.2.2.2
+
+theorem importedRuntimeShellBoundaryBundle_witness_refines
+  {bundle : ImportedRuntimeShellBoundaryBundle}
+  (hValid : bundle.Valid) :
+  bundle.runtime_kernel_refinement_witness.shellTrace.Refines
+      bundle.kernel_witness.shellContract := by
+  have hContractExact := importedRuntimeShellBoundaryBundle_contract_exact hValid
+  have hTraceExact := importedRuntimeShellBoundaryBundle_trace_exact hValid
+  have hRefines := importedRuntimeShellBoundaryBundle_refines hValid
+  have hRuntimeRefines :
+      bundle.shell_trace.toRuntimeShellTrace.Refines
+        bundle.shell_contract.toRuntimeShellContract :=
+    importedRuntimeShellTrace_refines_toRuntime hRefines
+  simpa [ImportedRuntimeKernelWitness.shellContract,
+    ImportedRuntimeKernelRefinementWitness.shellTrace, hContractExact, hTraceExact] using
+    hRuntimeRefines
+
+def parseImportedRuntimeShellBoundaryBundle
+  (input : String) : Except String ImportedRuntimeShellBoundaryBundle := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedProofGradeRuntimeShellBoundaryBundle
+  (input : String) : Except String ImportedRuntimeShellBoundaryBundle := do
+  let bundle ← parseImportedRuntimeShellBoundaryBundle input
+  if bundle.checkValid then
+    pure bundle
+  else
+    throw "imported proof-grade runtime shell-boundary bundle does not satisfy Lean validity checks"
+
+def loadImportedRuntimeShellBoundaryBundle
+  (path : System.FilePath) : IO ImportedRuntimeShellBoundaryBundle := do
+  let input ← IO.FS.readFile path
+  match parseImportedRuntimeShellBoundaryBundle input with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <| IO.userError s!"failed to parse runtime shell-boundary bundle: {err}"
+
+def loadAndCheckImportedProofGradeRuntimeShellBoundaryBundle
+  (path : System.FilePath) : IO ImportedRuntimeShellBoundaryBundle := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeRuntimeShellBoundaryBundle input with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate proof-grade runtime shell-boundary bundle: {err}"
+
+theorem importedWitness_proofGradeShellContractRefinement
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness runtimeKernelRefinementWitness,
+    witness.kernel_witness = some kernelWitness ∧
+      witness.runtime_kernel_refinement_witness = some runtimeKernelRefinementWitness ∧
+      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+  have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid := by
+    unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
+    exact hValid.2.2
+  cases hKernel : witness.kernel_witness with
+  | none =>
+      cases hRefinement : witness.runtime_kernel_refinement_witness with
+      | none =>
+          simp [ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+          simp [ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+  | some kernelWitness =>
+      cases hRefinement : witness.runtime_kernel_refinement_witness with
+      | none =>
+          simp [ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+          have hWitnessValid :
+              runtimeKernelRefinementWitness.toRuntimeKernelRefinementWitness.Valid
+                kernelWitness.toRuntimeKernelWitness := by
+            simpa [ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+              ImportedRuntimeKernelRefinementWitness.Valid, hKernel, hRefinement] using
+              hRefinementValid
+          have hImportedTraceToRuntime :
+              runtimeKernelRefinementWitness.importedShellTrace.toRuntimeShellTrace =
+                runtimeKernelRefinementWitness.toRuntimeKernelRefinementWitness.shellTrace := by
+            simp
+          have hImportedContractToRuntime :
+              kernelWitness.importedShellContract.toRuntimeShellContract =
+                kernelWitness.toRuntimeKernelWitness.shellContract := by
+            simp
+          have hImportedRefines :
+              runtimeKernelRefinementWitness.importedShellTrace.toRuntimeShellTrace.Refines
+                kernelWitness.importedShellContract.toRuntimeShellContract := by
+            simpa [hImportedTraceToRuntime, hImportedContractToRuntime] using
+              runtimeKernelRefinementWitness_valid_refinesShellContract hWitnessValid
+          exact
+            ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
+              by
+                simpa [ImportedRuntimeKernelRefinementWitness.shellTrace,
+                  ImportedRuntimeKernelWitness.shellContract] using hImportedRefines⟩
+
+end UOToolchain

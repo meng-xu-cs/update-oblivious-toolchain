@@ -1,35 +1,75 @@
 pub mod artifact;
+pub mod confidential_core;
+pub mod confidential_kernel;
+pub mod fragment;
 pub mod ir;
+pub mod kernel_dsl;
 pub mod manifest;
 pub mod metadata;
+pub mod shell_boundary;
 pub mod trace;
 pub mod types;
 
 pub use artifact::{ArtifactFormat, CompiledArtifact};
+pub use confidential_core::{
+    RuntimeConfidentialCoreBundle, RuntimeConfidentialCoreBundleError,
+    RuntimeConfidentialCoreLoweringBundle, RuntimeConfidentialCoreLoweringBundleError,
+    RuntimeConfidentialCoreShellBoundaryLoweringBundle,
+    RuntimeConfidentialCoreShellBoundaryLoweringBundleError, RuntimeConfidentialCoreSlotBundle,
+    RuntimeConfidentialCoreSlotBundleError,
+};
+pub use confidential_kernel::{
+    lower_confidential_kernel_expr, lower_confidential_kernel_pure_expr,
+    lower_confidential_kernel_statements, ConfidentialKernelExpr, ConfidentialKernelLoweringError,
+    ConfidentialKernelParam, ConfidentialKernelProgram, ConfidentialKernelPureExpr,
+    ConfidentialKernelSlotExpr, ConfidentialKernelSlotLoweringError, ConfidentialKernelSlotProgram,
+    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement, ConfidentialKernelStatement,
+    ConfidentialKernelStep,
+};
+pub use fragment::{
+    ConfidentialFragmentEntrypointWitness, ConfidentialFragmentStats, ConfidentialFragmentWitness,
+};
 pub use ir::{
     BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
     Statement, UnaryOp,
 };
+pub use kernel_dsl::{
+    RuntimeKernelDslBundle, RuntimeKernelDslBundleError, RuntimeKernelLoweringBundle,
+    RuntimeKernelLoweringBundleError, RuntimeKernelSlotDslBundle, RuntimeKernelSlotDslBundleError,
+    RuntimeShellBoundaryLoweringBundle, RuntimeShellBoundaryLoweringBundleError,
+};
 pub use manifest::{
-    validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeManifest,
-    StateObjectManifest,
+    validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeKernelStepManifest,
+    RuntimeManifest, StateObjectManifest,
 };
 pub use metadata::{BoundsMetadata, ContractMetadata, EntrypointMetadata, StateMetadata};
+pub use shell_boundary::{
+    RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError, RuntimeShellContract,
+    RuntimeShellTrace,
+};
 pub use trace::{
     canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
-    canonical_path_oram_seed_of_leaf_values, classify_write,
+    canonical_path_oram_seed_of_leaf_values, canonical_runtime_public_object_ids, classify_write,
+    expected_runtime_kernel_opcodes_for_confidential,
+    expected_runtime_kernel_steps_for_confidential,
+    expected_runtime_manifest_kernel_steps_for_confidential,
     extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
     BoundaryDirection, BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
     CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
     CanonicalFreshCoinWitnessFamilyError, ControllerPageBudget, ControllerPhase, ExecutionTrace,
-    ExitEvent, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
-    PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace, RefinementPhysicalWrite,
-    RefinementTrace, RefinementWitnessError, RuntimeControllerCertificate,
-    RuntimeControllerObserverCertificate, RuntimeOramAccessCounterWitness,
-    RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
-    RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness,
-    RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
-    RuntimeTrustedKernelBundle, SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
+    ExitEvent, KernelWitnessError, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
+    OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace,
+    RefinementPhysicalWrite, RefinementTrace, RefinementWitnessError, RuntimeControllerCertificate,
+    RuntimeControllerObserverCertificate, RuntimeKernelRefinementEventKindWitness,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
+    RuntimeKernelRefinementWitnessError, RuntimeKernelResourceEventKindWitness,
+    RuntimeKernelResourceEventWitness, RuntimeKernelScheduleWitness,
+    RuntimeKernelScratchRegionWitness, RuntimeKernelStepWitness, RuntimeKernelWitness,
+    RuntimeOramAccessCounterWitness, RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness,
+    RuntimeOramLeafWitness, RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate,
+    RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
+    RuntimePathOramTransitionWitness, RuntimeRefinementWitness, RuntimeTrustedKernelBundle,
+    SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
     SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace, TheoremTrace, TraceHashBundle,
     WriteClass,
 };

@@ -13,3 +13,4 @@ serde_yaml.workspace = true
 solang-parser.workspace = true
 uo-core = { path = "../../crates/uo-core" }
 uo-solc = { path = "../../compiler/uo-solc" }
+uo-precompiles = { path = "../../runtime/uo-precompiles" }

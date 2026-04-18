@@ -24,12 +24,26 @@ impl From<ArtifactModeArg> for mplus_probe::ArtifactMaterializationMode {
 enum ReportKind {
     StaticChecks,
     BridgeValidation,
+    KernelValidation,
+    KernelRefinementValidation,
     TrustedKernelValidation,
     WitnessValidation,
     SeededWitnessValidation,
     PathoramPairValidation,
     ControllerValidation,
     PathoramHiddenValidation,
+    RuntimeBoundaryValidation,
+    KernelModelAlignmentValidation,
+    ShellBoundaryValidation,
+    ShellBoundaryLoweringValidation,
+    ConfidentialFragmentValidation,
+    KernelDslValidation,
+    KernelSlotDslValidation,
+    KernelLoweringValidation,
+    ConfidentialCoreValidation,
+    ConfidentialCoreSlotValidation,
+    ConfidentialCoreLoweringValidation,
+    ConfidentialCoreShellBoundaryLoweringValidation,
     CanonicalPathoramPairValidation,
     FreshCoinValidation,
 }
@@ -109,6 +123,34 @@ fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "bridge_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::KernelValidation) => {
+            let report = mplus_probe::run_kernel_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("kernel_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "kernel_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::KernelRefinementValidation) => {
+            let report = mplus_probe::run_kernel_refinement_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("kernel_refinement_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "kernel_refinement_validation": report,
                 }))?
             );
         }
@@ -193,6 +235,176 @@ fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "pathoram_hidden_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::RuntimeBoundaryValidation) => {
+            let report = mplus_probe::run_runtime_boundary_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("runtime_boundary_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "runtime_boundary_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::KernelModelAlignmentValidation) => {
+            let report = mplus_probe::run_kernel_model_alignment_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("kernel_model_alignment_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "kernel_model_alignment_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::ShellBoundaryValidation) => {
+            let report = mplus_probe::run_shell_boundary_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("shell_boundary_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "shell_boundary_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::ShellBoundaryLoweringValidation) => {
+            let report = mplus_probe::run_shell_boundary_lowering_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("shell_boundary_lowering_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "shell_boundary_lowering_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::ConfidentialFragmentValidation) => {
+            let report = mplus_probe::run_confidential_fragment_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("confidential_fragment_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "confidential_fragment_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::KernelDslValidation) => {
+            let report = mplus_probe::run_kernel_dsl_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("kernel_dsl_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "kernel_dsl_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::KernelSlotDslValidation) => {
+            let report = mplus_probe::run_kernel_slot_dsl_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("kernel_slot_dsl_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "kernel_slot_dsl_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::KernelLoweringValidation) => {
+            let report = mplus_probe::run_kernel_lowering_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("kernel_lowering_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "kernel_lowering_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::ConfidentialCoreValidation) => {
+            let report = mplus_probe::run_confidential_core_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("confidential_core_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "confidential_core_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::ConfidentialCoreSlotValidation) => {
+            let report = mplus_probe::run_confidential_core_slot_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("confidential_core_slot_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "confidential_core_slot_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::ConfidentialCoreLoweringValidation) => {
+            let report = mplus_probe::run_confidential_core_lowering_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("confidential_core_lowering_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "confidential_core_lowering_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::ConfidentialCoreShellBoundaryLoweringValidation) => {
+            let report =
+                mplus_probe::run_confidential_core_shell_boundary_lowering_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir)
+                    .join("confidential_core_shell_boundary_lowering_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "confidential_core_shell_boundary_lowering_validation": report,
                 }))?
             );
         }

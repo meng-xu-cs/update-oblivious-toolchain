@@ -688,7 +688,7 @@ Current status:
 - the runtime now also packages those certificates into an explicit
   `RuntimeTrustedKernelBundle`, and Lean now has a corresponding
   `RuntimeTrustedKernelBundle.Valid` predicate plus an executable
-  `checkRuntimeTrustedKernel` checker
+  proof-grade `checkProofGradeRuntimeTrustedKernel` checker
 - the full runtime witness is now reconstructed from that explicit trusted
   kernel bundle rather than treated as the primitive bridge object, and
   runtime-emitted traces now store that direct bundle so witness extraction on

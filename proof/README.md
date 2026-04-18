@@ -12,17 +12,29 @@ workspace map.
 - Core artifact semantics:
   `TraceModel.lean`, `IRSemantics.lean`, `ExactObjects.lean`,
   `CompilerInvariant.lean`, `Composition.lean`
+- Confidential-fragment and shared kernel-DSL layers:
+  `ConfidentialFragment.lean`, `ConfidentialFragmentJson.lean`,
+  `ConfidentialKernelDsl.lean`
 - SGX-facing observer and controller model:
   `SgxBoundary.lean`, `SgxRelation.lean`, `SgxController.lean`,
   `SgxControllerTrace.lean`, `SgxMicroGame.lean`,
   `SgxExactProjection.lean`, `SgxOramProjection.lean`,
   `SgxJointProjection.lean`, `TeeDeployment.lean`
-- Runtime refinement and trusted-kernel bridge:
+- Runtime refinement, trusted-kernel, and runtime-family bridge:
   `RuntimeRefinement.lean`, `RuntimeRefinementJson.lean`,
   `RuntimeTrustedKernel.lean`, `RuntimeTrustedKernelJson.lean`,
-  `RuntimeCoins.lean`, `RuntimeCoinsJson.lean`
-- Standard-ORAM and concrete Path-ORAM layers:
-  `OramGame.lean`, `StandardOramReduction.lean`,
+  `RuntimeCoins.lean`, `RuntimeCoinsJson.lean`,
+  `RuntimePaperInstantiation.lean`, `RuntimePathOramPairJson.lean`,
+  `RuntimeCanonicalPathOramPairJson.lean`
+- Runtime shell-boundary, kernel-DSL, and confidential-core bridge:
+  `RuntimeShellBoundary.lean`, `RuntimeShellBoundaryJson.lean`,
+  `RuntimeShellBoundaryLoweringJson.lean`,
+  `RuntimeKernelDslJson.lean`,
+  `RuntimeConfidentialCoreAssurance.lean`,
+  `RuntimeConfidentialCoreAssuranceJson.lean`,
+  `RuntimeConfidentialCoreShellBoundaryLoweringJson.lean`
+- Standard-ORAM, finite-distribution, and concrete Path-ORAM layers:
+  `OramGame.lean`, `FiniteDistribution.lean`, `StandardOramReduction.lean`,
   `PathOramSecurity.lean`, `PathOramLocalPosmapV1.lean`,
   `PathOramLocalPosmapV1Refinement.lean`,
   `PathOramLocalPosmapV1StandardTheorem.lean`,
@@ -30,19 +42,39 @@ workspace map.
 
 ## Executable Checkers
 
-`lake build` now materializes Lean-side validators for the runtime artifacts:
+`lake build` now materializes Lean-side validators for the runtime artifacts.
+The current probe-driven proof-grade path uses:
 
-- `checkRuntimeTrustedKernel`
+- `checkProofGradeRuntimeKernelWitness`
+- `checkProofGradeRuntimeKernelRefinementWitness`
+- `checkProofGradeRuntimeTrustedKernel`
+- `checkProofGradeRuntimeWitness`
+- `checkProofGradeRuntimeShellBoundary`
+- `checkProofGradeRuntimeShellBoundaryLowering`
+- `checkProofGradeRuntimeKernelDsl`
+- `checkProofGradeRuntimeKernelSlotDsl`
+- `checkProofGradeRuntimeKernelLowering`
+- `checkProofGradeRuntimeConfidentialCore`
+- `checkProofGradeRuntimeConfidentialCoreSlot`
+- `checkProofGradeRuntimeConfidentialCoreLowering`
+- `checkProofGradeRuntimeConfidentialCoreShellBoundaryLowering`
 - `checkRuntimeControllerCertificate`
 - `checkRuntimePathOramHiddenCertificate`
-- `checkRuntimeWitness`
 - `checkRuntimeWitnessFamily`
+- `checkRuntimeFreshCoinFamily`
+- `checkRuntimeFreshCoinTheoremInput`
 - `checkPathOramPairCertificate`
 - `checkCanonicalPathOramPairCertificate`
+- `checkCanonicalPathOramPairTheoremInput`
 - `checkCanonicalPathOramPaperInstantiation`
 
 These are the executables the probe invokes when it validates emitted runtime
-bundles, witnesses, seeded families, and canonical pair artifacts.
+bundles, witnesses, proof-grade kernel/shell/DSL compositions, seeded
+families, compact theorem-input fallbacks for oversized canonical artifacts,
+and canonical pair artifacts. The legacy `checkRuntimeTrustedKernel` and
+`checkRuntimeWitness` entrypoints still exist for compatibility, but the
+default probe/report path now uses the proof-grade checkers instead of those
+older compatibility binaries.
 
 ## Current Status
 
@@ -55,7 +87,10 @@ The proof workspace now fixes the following pieces explicitly:
   only as a compatibility specialization
 - the runtime bridge is explicit:
   controller certificate, hidden Path-ORAM certificate, trusted-kernel bundle,
-  refinement witness, seeded witness family, and canonical fresh-coin artifacts
+  refinement witness, standalone kernel witness, kernel DSL / slot-DSL /
+  lowering bundles, shell-boundary bundle, confidential-core bundles, seeded
+  witness family, path-ORAM pair artifacts, and canonical fresh-coin
+  artifacts
 - the standard-theorem import target is frozen at
   `PathOramLocalPosmapV1StandardTheoremTarget`
 - the paper route and the appendix / executable-artifact route share the same

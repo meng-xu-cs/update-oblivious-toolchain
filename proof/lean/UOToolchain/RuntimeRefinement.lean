@@ -3011,10 +3011,1084 @@ theorem runtimePathOramHiddenCertificate_pathOramBucketProjection_exact
     certificate.pathOramBucketTrace := by
   exact hValid.2.2.2.2
 
+def runtimeKernelOpcodeNames : List String :=
+  [ "Begin"
+  , "CellGet"
+  , "CellSet"
+  , "ArrayGet"
+  , "ArraySet"
+  , "MapGet"
+  , "MapPut"
+  , "Commit"
+  , "Wipe"
+  ]
+
+def runtimeKernelObjectOpcodeNames : List String :=
+  [ "CellGet"
+  , "CellSet"
+  , "ArrayGet"
+  , "ArraySet"
+  , "MapGet"
+  , "MapPut"
+  ]
+
+def runtimeKernelOpcodeRequiresObjectId
+  (opcode : String) : Bool :=
+  decide (opcode ∈ runtimeKernelObjectOpcodeNames)
+
+structure RuntimeKernelStep where
+  opcode : String
+  objectId : Option Nat
+deriving Repr, DecidableEq
+
+def RuntimeKernelStep.checkShapeValid
+  (step : RuntimeKernelStep) : Bool :=
+  decide (step.objectId.isSome = runtimeKernelOpcodeRequiresObjectId step.opcode)
+
+def RuntimeKernelStep.publicObjectFragment
+  (step : RuntimeKernelStep) : List Nat :=
+  match step.objectId with
+  | none => []
+  | some objectId => [objectId]
+
+structure RuntimeKernelSchedule where
+  opcodes : List String
+  steps : List RuntimeKernelStep
+deriving Repr, DecidableEq
+
+def RuntimeKernelSchedule.projectedOpcodes
+  (schedule : RuntimeKernelSchedule) : List String :=
+  schedule.steps.map RuntimeKernelStep.opcode
+
+def RuntimeKernelSchedule.publicObjectSchedule
+  (schedule : RuntimeKernelSchedule) : List Nat :=
+  schedule.steps.filterMap RuntimeKernelStep.objectId
+
+def RuntimeKernelSchedule.opcodesAllowed
+  (schedule : RuntimeKernelSchedule) : Bool :=
+  schedule.opcodes.all (fun opcode => decide (opcode ∈ runtimeKernelOpcodeNames))
+
+def RuntimeKernelSchedule.checkShapeValid
+  (schedule : RuntimeKernelSchedule) : Bool :=
+  schedule.steps.all RuntimeKernelStep.checkShapeValid &&
+    decide (schedule.steps = [] ∨ schedule.projectedOpcodes = schedule.opcodes)
+
+inductive RuntimeKernelExecutionPhase
+  | ready
+  | active
+  | committed
+  | finished
+deriving Repr, DecidableEq
+
+structure RuntimeKernelExecutionState where
+  phase : RuntimeKernelExecutionPhase
+  publicObjectSchedule : List Nat
+deriving Repr, DecidableEq
+
+def RuntimeKernelExecutionState.init : RuntimeKernelExecutionState :=
+  { phase := .ready
+  , publicObjectSchedule := []
+  }
+
+def RuntimeKernelExecutionState.step
+  (state : RuntimeKernelExecutionState)
+  (step : RuntimeKernelStep) : Option RuntimeKernelExecutionState :=
+  match state.phase, step.objectId with
+  | .ready, none =>
+      if step.opcode = "Begin" then
+        some { state with phase := .active }
+      else
+        none
+  | .active, some objectId =>
+      if runtimeKernelOpcodeRequiresObjectId step.opcode then
+        some
+          { state with
+              publicObjectSchedule := state.publicObjectSchedule ++ [objectId] }
+      else
+        none
+  | .active, none =>
+      if step.opcode = "Commit" then
+        some { state with phase := .committed }
+      else
+        none
+  | .committed, none =>
+      if step.opcode = "Wipe" then
+        some { state with phase := .finished }
+      else
+        none
+  | _, _ =>
+      none
+
+def RuntimeKernelSchedule.finalState?
+  (schedule : RuntimeKernelSchedule) : Option RuntimeKernelExecutionState :=
+  schedule.steps.foldlM RuntimeKernelExecutionState.step RuntimeKernelExecutionState.init
+
+def RuntimeKernelSchedule.checkRunsToCompletion
+  (schedule : RuntimeKernelSchedule) : Bool :=
+  match schedule.finalState? with
+  | some finalState => decide (finalState.phase = .finished)
+  | none => false
+
+def RuntimeKernelSchedule.hasBeginCommitWipeEnvelope
+  (schedule : RuntimeKernelSchedule) : Bool :=
+  decide (schedule.opcodes.head? = some "Begin") &&
+    decide
+      (schedule.opcodes.drop (schedule.opcodes.length - 2) = ["Commit", "Wipe"])
+
+def RuntimeKernelSchedule.Valid
+  (schedule : RuntimeKernelSchedule) : Prop :=
+  schedule.opcodesAllowed = true ∧
+    schedule.checkShapeValid = true ∧
+    schedule.hasBeginCommitWipeEnvelope = true ∧
+    schedule.checkRunsToCompletion = true
+
+def RuntimeKernelSchedule.checkValid
+  (schedule : RuntimeKernelSchedule) : Bool :=
+  schedule.opcodesAllowed &&
+    schedule.checkShapeValid &&
+    schedule.hasBeginCommitWipeEnvelope &&
+    schedule.checkRunsToCompletion
+
+@[simp] theorem runtimeKernelSchedule_checkValid_eq_true_iff
+  (schedule : RuntimeKernelSchedule) :
+  schedule.checkValid = true ↔ schedule.Valid := by
+  simp [RuntimeKernelSchedule.checkValid, RuntimeKernelSchedule.Valid, and_assoc]
+
+@[simp] theorem runtimeKernelSchedule_checkRunsToCompletion_eq_true_iff
+  (schedule : RuntimeKernelSchedule) :
+  schedule.checkRunsToCompletion = true ↔
+    ∃ finalState, schedule.finalState? = some finalState ∧
+      finalState.phase = .finished := by
+  unfold RuntimeKernelSchedule.checkRunsToCompletion
+  cases hFinal : schedule.finalState? with
+  | none =>
+      simp
+  | some finalState =>
+      simp
+
+theorem runtimeKernelExecutionState_step_publicObjectSchedule
+  {state nextState : RuntimeKernelExecutionState}
+  {step : RuntimeKernelStep}
+  (hStep : RuntimeKernelExecutionState.step state step = some nextState) :
+  nextState.publicObjectSchedule =
+    state.publicObjectSchedule ++ step.publicObjectFragment := by
+  cases hPhase : state.phase <;> cases hObject : step.objectId <;>
+    simp [RuntimeKernelExecutionState.step, RuntimeKernelStep.publicObjectFragment,
+      hPhase, hObject] at hStep ⊢
+  case ready.none =>
+    rcases hStep with ⟨_, hEq⟩
+    cases hEq
+    simp
+  case active.some objectId =>
+    rcases hStep with ⟨_, hEq⟩
+    cases hEq
+    simp
+  case active.none =>
+    rcases hStep with ⟨_, hEq⟩
+    cases hEq
+    simp
+  case committed.none =>
+    rcases hStep with ⟨_, hEq⟩
+    cases hEq
+    simp
+
+theorem runtimeKernelExecutionState_runSteps_publicObjectSchedule
+  {steps : List RuntimeKernelStep}
+  {state finalState : RuntimeKernelExecutionState}
+  (hRun : steps.foldlM RuntimeKernelExecutionState.step state = some finalState) :
+  finalState.publicObjectSchedule =
+    state.publicObjectSchedule ++ steps.filterMap RuntimeKernelStep.objectId := by
+  induction steps generalizing state with
+  | nil =>
+      simp at hRun
+      cases hRun
+      simp
+  | cons step rest ih =>
+      simp [List.foldlM] at hRun
+      cases hStep : RuntimeKernelExecutionState.step state step with
+      | none =>
+          simp [hStep] at hRun
+      | some nextState =>
+          have hStepSchedule :
+              nextState.publicObjectSchedule =
+                state.publicObjectSchedule ++ step.publicObjectFragment :=
+            runtimeKernelExecutionState_step_publicObjectSchedule hStep
+          have hRunRest :
+              rest.foldlM RuntimeKernelExecutionState.step nextState = some finalState := by
+            simpa [hStep] using hRun
+          have hRest :
+              finalState.publicObjectSchedule =
+                nextState.publicObjectSchedule ++ rest.filterMap RuntimeKernelStep.objectId := by
+            exact ih hRunRest
+          rw [hRest, hStepSchedule]
+          cases hObject : step.objectId <;>
+            simp [RuntimeKernelStep.publicObjectFragment, hObject, List.append_assoc]
+
+theorem runtimeKernelSchedule_finalState_publicObjectSchedule
+  {schedule : RuntimeKernelSchedule}
+  {finalState : RuntimeKernelExecutionState}
+  (hFinal : schedule.finalState? = some finalState) :
+  finalState.publicObjectSchedule = schedule.publicObjectSchedule := by
+  unfold RuntimeKernelSchedule.finalState? at hFinal
+  simpa [RuntimeKernelSchedule.publicObjectSchedule, RuntimeKernelExecutionState.init] using
+    runtimeKernelExecutionState_runSteps_publicObjectSchedule hFinal
+
+theorem runtimeKernelSchedule_finalState_finished
+  {schedule : RuntimeKernelSchedule}
+  {finalState : RuntimeKernelExecutionState}
+  (hCompletion : schedule.checkRunsToCompletion = true)
+  (hFinal : schedule.finalState? = some finalState) :
+  finalState.phase = .finished := by
+  rcases (runtimeKernelSchedule_checkRunsToCompletion_eq_true_iff schedule).mp hCompletion with
+    ⟨finishedState, hFinishedState, hFinished⟩
+  rw [hFinal] at hFinishedState
+  cases hFinishedState
+  exact hFinished
+
+theorem runtimeKernelSchedule_finalState_exact
+  {schedule : RuntimeKernelSchedule}
+  {finalState : RuntimeKernelExecutionState}
+  (hCompletion : schedule.checkRunsToCompletion = true)
+  (hFinal : schedule.finalState? = some finalState) :
+  finalState =
+    { phase := .finished, publicObjectSchedule := schedule.publicObjectSchedule } := by
+  have hFinished : finalState.phase = .finished :=
+    runtimeKernelSchedule_finalState_finished hCompletion hFinal
+  have hObjects : finalState.publicObjectSchedule = schedule.publicObjectSchedule :=
+    runtimeKernelSchedule_finalState_publicObjectSchedule hFinal
+  cases finalState with
+  | mk phase publicObjectSchedule =>
+      simp at hFinished hObjects
+      simp [hFinished, hObjects]
+
+theorem runtimeKernelSchedule_valid_finalState_exact
+  {schedule : RuntimeKernelSchedule}
+  (hValid : schedule.Valid) :
+  schedule.finalState? =
+    some { phase := .finished, publicObjectSchedule := schedule.publicObjectSchedule } := by
+  rcases (runtimeKernelSchedule_checkRunsToCompletion_eq_true_iff schedule).mp hValid.2.2.2 with
+    ⟨finalState, hFinal, _⟩
+  rw [runtimeKernelSchedule_finalState_exact hValid.2.2.2 hFinal] at hFinal
+  exact hFinal
+
+def runtimeKernelResourceEventKindNames : List String :=
+  [ "stack_check"
+  , "reserve_scratch"
+  , "wipe_scratch"
+  ]
+
+def runtimeKernelScratchRegionNames : List String :=
+  [ "value_scratch"
+  , "hash_scratch"
+  , "io_scratch"
+  ]
+
+structure RuntimeKernelResourceEvent where
+  kind : String
+  region : Option String
+  words : Option Nat
+  bytes : Option Nat
+deriving Repr, DecidableEq
+
+def RuntimeKernelResourceEvent.checkShapeValid
+  (event : RuntimeKernelResourceEvent) : Bool :=
+  decide (event.kind ∈ runtimeKernelResourceEventKindNames) &&
+    match event.kind, event.region, event.words, event.bytes with
+    | "stack_check", none, some _, none =>
+        true
+    | "reserve_scratch", some region, none, some _ =>
+        decide (region ∈ runtimeKernelScratchRegionNames)
+    | "wipe_scratch", some region, none, none =>
+        decide (region ∈ runtimeKernelScratchRegionNames)
+    | _, _, _, _ =>
+        false
+
+structure RuntimeKernelScratchUsage where
+  liveBytes : Nat
+  peakBytes : Nat
+  wipeCount : Nat
+deriving Repr, DecidableEq
+
+def RuntimeKernelScratchUsage.reserve
+  (usage : RuntimeKernelScratchUsage)
+  (bytes : Nat) : RuntimeKernelScratchUsage :=
+  { liveBytes := bytes
+  , peakBytes := max usage.peakBytes bytes
+  , wipeCount := usage.wipeCount
+  }
+
+def RuntimeKernelScratchUsage.wipe
+  (usage : RuntimeKernelScratchUsage) : RuntimeKernelScratchUsage :=
+  { liveBytes := 0
+  , peakBytes := usage.peakBytes
+  , wipeCount := usage.wipeCount + 1
+  }
+
+structure RuntimeKernelResourceState where
+  peakStackWords : Nat
+  valueScratch : RuntimeKernelScratchUsage
+  hashScratch : RuntimeKernelScratchUsage
+  ioScratch : RuntimeKernelScratchUsage
+deriving Repr, DecidableEq
+
+def RuntimeKernelResourceState.init : RuntimeKernelResourceState :=
+  { peakStackWords := 0
+  , valueScratch := { liveBytes := 0, peakBytes := 0, wipeCount := 0 }
+  , hashScratch := { liveBytes := 0, peakBytes := 0, wipeCount := 0 }
+  , ioScratch := { liveBytes := 0, peakBytes := 0, wipeCount := 0 }
+  }
+
+def RuntimeKernelResourceState.step
+  (maxStackWords scratchBytes : Nat)
+  (state : RuntimeKernelResourceState)
+  (event : RuntimeKernelResourceEvent) : Option RuntimeKernelResourceState :=
+  match event.kind, event.region, event.words, event.bytes with
+  | "stack_check", none, some words, none =>
+      if words ≤ maxStackWords then
+        some { state with peakStackWords := max state.peakStackWords words }
+      else
+        none
+  | "reserve_scratch", some "value_scratch", none, some bytes =>
+      if bytes ≤ scratchBytes then
+        some { state with valueScratch := state.valueScratch.reserve bytes }
+      else
+        none
+  | "reserve_scratch", some "hash_scratch", none, some bytes =>
+      if bytes ≤ scratchBytes then
+        some { state with hashScratch := state.hashScratch.reserve bytes }
+      else
+        none
+  | "reserve_scratch", some "io_scratch", none, some bytes =>
+      if bytes ≤ scratchBytes then
+        some { state with ioScratch := state.ioScratch.reserve bytes }
+      else
+        none
+  | "wipe_scratch", some "value_scratch", none, none =>
+      some { state with valueScratch := state.valueScratch.wipe }
+  | "wipe_scratch", some "hash_scratch", none, none =>
+      some { state with hashScratch := state.hashScratch.wipe }
+  | "wipe_scratch", some "io_scratch", none, none =>
+      some { state with ioScratch := state.ioScratch.wipe }
+  | _, _, _, _ =>
+      none
+
+structure RuntimeKernelWitness where
+  entrypointId : String
+  arenaBytes : Nat
+  maxStackWords : Nat
+  scratchBytes : Nat
+  peakStackWords : Nat
+  valueScratchPeakBytes : Nat
+  valueScratchLiveBytesEnd : Nat
+  valueScratchWipeCount : Nat
+  hashScratchPeakBytes : Nat
+  hashScratchLiveBytesEnd : Nat
+  hashScratchWipeCount : Nat
+  ioScratchPeakBytes : Nat
+  ioScratchLiveBytesEnd : Nat
+  ioScratchWipeCount : Nat
+  resourceEvents : List RuntimeKernelResourceEvent
+  expectedKernelOpcodes : Option (List String)
+  expectedKernelSteps : Option (List RuntimeKernelStep)
+  publicObjectIds : List Nat
+  expectedPublicObjectIds : Option (List Nat)
+  kernelOpcodes : List String
+  kernelSteps : List RuntimeKernelStep
+deriving Repr, DecidableEq
+
+def RuntimeKernelWitness.emittedKernelSchedule
+  (witness : RuntimeKernelWitness) : RuntimeKernelSchedule :=
+  { opcodes := witness.kernelOpcodes
+  , steps := witness.kernelSteps
+  }
+
+def RuntimeKernelWitness.expectedKernelSchedule?
+  (witness : RuntimeKernelWitness) : Option RuntimeKernelSchedule := do
+  let opcodes ← witness.expectedKernelOpcodes
+  let steps ← witness.expectedKernelSteps
+  some { opcodes := opcodes, steps := steps }
+
+def RuntimeKernelWitness.replayedResourceState?
+  (witness : RuntimeKernelWitness) : Option RuntimeKernelResourceState :=
+  witness.resourceEvents.foldlM
+    (RuntimeKernelResourceState.step witness.maxStackWords witness.scratchBytes)
+    RuntimeKernelResourceState.init
+
+def RuntimeKernelWitness.claimedResourceState
+  (witness : RuntimeKernelWitness) : RuntimeKernelResourceState :=
+  { peakStackWords := witness.peakStackWords
+  , valueScratch :=
+      { liveBytes := witness.valueScratchLiveBytesEnd
+      , peakBytes := witness.valueScratchPeakBytes
+      , wipeCount := witness.valueScratchWipeCount
+      }
+  , hashScratch :=
+      { liveBytes := witness.hashScratchLiveBytesEnd
+      , peakBytes := witness.hashScratchPeakBytes
+      , wipeCount := witness.hashScratchWipeCount
+      }
+  , ioScratch :=
+      { liveBytes := witness.ioScratchLiveBytesEnd
+      , peakBytes := witness.ioScratchPeakBytes
+      , wipeCount := witness.ioScratchWipeCount
+      }
+  }
+
+def RuntimeKernelWitness.ResourceReplayExact
+  (witness : RuntimeKernelWitness) : Prop :=
+  ∃ state, witness.replayedResourceState? = some state ∧
+    state.peakStackWords = witness.peakStackWords ∧
+    state.valueScratch.peakBytes = witness.valueScratchPeakBytes ∧
+    state.valueScratch.liveBytes = witness.valueScratchLiveBytesEnd ∧
+    state.valueScratch.wipeCount = witness.valueScratchWipeCount ∧
+    state.hashScratch.peakBytes = witness.hashScratchPeakBytes ∧
+    state.hashScratch.liveBytes = witness.hashScratchLiveBytesEnd ∧
+    state.hashScratch.wipeCount = witness.hashScratchWipeCount ∧
+    state.ioScratch.peakBytes = witness.ioScratchPeakBytes ∧
+    state.ioScratch.liveBytes = witness.ioScratchLiveBytesEnd ∧
+    state.ioScratch.wipeCount = witness.ioScratchWipeCount
+
+def RuntimeKernelWitness.checkResourceReplayExact
+  (witness : RuntimeKernelWitness) : Bool :=
+  match witness.replayedResourceState? with
+  | none => false
+  | some state =>
+      decide (state.peakStackWords = witness.peakStackWords) &&
+        decide (state.valueScratch.peakBytes = witness.valueScratchPeakBytes) &&
+        decide (state.valueScratch.liveBytes = witness.valueScratchLiveBytesEnd) &&
+        decide (state.valueScratch.wipeCount = witness.valueScratchWipeCount) &&
+        decide (state.hashScratch.peakBytes = witness.hashScratchPeakBytes) &&
+        decide (state.hashScratch.liveBytes = witness.hashScratchLiveBytesEnd) &&
+        decide (state.hashScratch.wipeCount = witness.hashScratchWipeCount) &&
+        decide (state.ioScratch.peakBytes = witness.ioScratchPeakBytes) &&
+        decide (state.ioScratch.liveBytes = witness.ioScratchLiveBytesEnd) &&
+        decide (state.ioScratch.wipeCount = witness.ioScratchWipeCount)
+
+@[simp] theorem runtimeKernelWitness_checkResourceReplayExact_eq_true_iff
+  (witness : RuntimeKernelWitness) :
+  witness.checkResourceReplayExact = true ↔ witness.ResourceReplayExact := by
+  unfold RuntimeKernelWitness.checkResourceReplayExact
+    RuntimeKernelWitness.ResourceReplayExact
+  cases hReplay : witness.replayedResourceState? with
+  | none =>
+      simp
+  | some state =>
+      simp [and_assoc]
+
+theorem runtimeKernelWitness_resourceReplayExact_eq_claimed
+  (witness : RuntimeKernelWitness) :
+  witness.ResourceReplayExact ↔
+    witness.replayedResourceState? = some witness.claimedResourceState := by
+  constructor
+  · intro hReplay
+    rcases hReplay with
+      ⟨⟨peakStackWords, ⟨valueLiveBytes, valuePeakBytes, valueWipeCount⟩,
+          ⟨hashLiveBytes, hashPeakBytes, hashWipeCount⟩,
+          ⟨ioLiveBytes, ioPeakBytes, ioWipeCount⟩⟩,
+        hState, hPeakStack, hValuePeak, hValueLive, hValueWipe, hHashPeak, hHashLive,
+        hHashWipe, hIoPeak, hIoLive, hIoWipe⟩
+    cases hPeakStack
+    cases hValuePeak
+    cases hValueLive
+    cases hValueWipe
+    cases hHashPeak
+    cases hHashLive
+    cases hHashWipe
+    cases hIoPeak
+    cases hIoLive
+    cases hIoWipe
+    simpa [RuntimeKernelWitness.claimedResourceState] using hState
+  · intro hReplay
+    refine ⟨witness.claimedResourceState, hReplay, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp [RuntimeKernelWitness.claimedResourceState]
+
+def RuntimeKernelWitness.kernelOpcodesAllowed
+  (witness : RuntimeKernelWitness) : Bool :=
+  witness.kernelOpcodes.all (fun opcode => decide (opcode ∈ runtimeKernelOpcodeNames))
+
+def RuntimeKernelWitness.kernelStepsShapeValid
+  (witness : RuntimeKernelWitness) : Bool :=
+  witness.kernelSteps.all RuntimeKernelStep.checkShapeValid
+
+def RuntimeKernelWitness.projectedKernelOpcodes
+  (witness : RuntimeKernelWitness) : List String :=
+  witness.emittedKernelSchedule.projectedOpcodes
+
+def RuntimeKernelWitness.kernelStepOpcodesMatch
+  (witness : RuntimeKernelWitness) : Bool :=
+  decide (witness.kernelSteps = [] ∨ witness.projectedKernelOpcodes = witness.kernelOpcodes)
+
+def RuntimeKernelWitness.hasBeginCommitWipeEnvelope
+  (witness : RuntimeKernelWitness) : Bool :=
+  decide (witness.kernelOpcodes.head? = some "Begin") &&
+    decide
+      (witness.kernelOpcodes.drop (witness.kernelOpcodes.length - 2) = ["Commit", "Wipe"])
+
+def runtimeKernelObjectIdScheduleCanonical : List Nat → Bool
+  | [] => true
+  | [_] => true
+  | head :: next :: tail =>
+      decide (head < next) && runtimeKernelObjectIdScheduleCanonical (next :: tail)
+
+def RuntimeKernelWitness.publicObjectIdsShapeValid
+  (witness : RuntimeKernelWitness) : Bool :=
+  runtimeKernelObjectIdScheduleCanonical witness.publicObjectIds
+
+def RuntimeKernelWitness.expectedPublicObjectIdsShapeAndMatch
+  (witness : RuntimeKernelWitness) : Bool :=
+  match witness.expectedPublicObjectIds with
+  | none => true
+  | some expectedPublicObjectIds =>
+      runtimeKernelObjectIdScheduleCanonical expectedPublicObjectIds &&
+        decide (witness.publicObjectIds = expectedPublicObjectIds)
+
+def RuntimeKernelWitness.kernelObjectsInPublicObjectUniverse
+  (witness : RuntimeKernelWitness) : Bool :=
+  witness.kernelSteps.filterMap RuntimeKernelStep.objectId |>.all (fun objectId =>
+    decide (objectId ∈ witness.publicObjectIds))
+
+def RuntimeKernelWitness.ValidForEntrypoint
+  (witness : RuntimeKernelWitness)
+  (entrypointId : String) : Prop :=
+  witness.entrypointId = entrypointId ∧
+    witness.scratchBytes = witness.arenaBytes / 4 ∧
+    witness.peakStackWords ≤ witness.maxStackWords ∧
+    witness.valueScratchPeakBytes ≤ witness.scratchBytes ∧
+    witness.hashScratchPeakBytes ≤ witness.scratchBytes ∧
+    witness.ioScratchPeakBytes ≤ witness.scratchBytes ∧
+    witness.valueScratchLiveBytesEnd = 0 ∧
+    (witness.valueScratchPeakBytes = 0 ∨ 0 < witness.valueScratchWipeCount) ∧
+    witness.hashScratchLiveBytesEnd = 0 ∧
+    (witness.hashScratchPeakBytes = 0 ∨ 0 < witness.hashScratchWipeCount) ∧
+    witness.ioScratchLiveBytesEnd = 0 ∧
+    (witness.ioScratchPeakBytes = 0 ∨ 0 < witness.ioScratchWipeCount) ∧
+    witness.ResourceReplayExact ∧
+    witness.kernelOpcodesAllowed = true ∧
+    witness.kernelStepsShapeValid = true ∧
+    witness.kernelStepOpcodesMatch = true ∧
+    witness.hasBeginCommitWipeEnvelope = true ∧
+    witness.emittedKernelSchedule.checkRunsToCompletion = true ∧
+    (match witness.expectedKernelOpcodes with
+    | none => True
+    | some expectedKernelOpcodes => witness.kernelOpcodes = expectedKernelOpcodes) ∧
+    (match witness.expectedKernelSteps with
+    | none => True
+    | some expectedKernelSteps => witness.kernelSteps = expectedKernelSteps) ∧
+    witness.publicObjectIdsShapeValid = true ∧
+    witness.expectedPublicObjectIdsShapeAndMatch = true ∧
+    witness.kernelObjectsInPublicObjectUniverse = true
+
+def RuntimeKernelWitness.checkValidForEntrypoint
+  (witness : RuntimeKernelWitness)
+  (entrypointId : String) : Bool :=
+  decide (witness.entrypointId = entrypointId) &&
+    decide (witness.scratchBytes = witness.arenaBytes / 4) &&
+    decide (witness.peakStackWords ≤ witness.maxStackWords) &&
+    decide (witness.valueScratchPeakBytes ≤ witness.scratchBytes) &&
+    decide (witness.hashScratchPeakBytes ≤ witness.scratchBytes) &&
+    decide (witness.ioScratchPeakBytes ≤ witness.scratchBytes) &&
+    decide (witness.valueScratchLiveBytesEnd = 0) &&
+    decide
+      (witness.valueScratchPeakBytes = 0 ∨ 0 < witness.valueScratchWipeCount) &&
+    decide (witness.hashScratchLiveBytesEnd = 0) &&
+    decide
+      (witness.hashScratchPeakBytes = 0 ∨ 0 < witness.hashScratchWipeCount) &&
+    decide (witness.ioScratchLiveBytesEnd = 0) &&
+    decide
+      (witness.ioScratchPeakBytes = 0 ∨ 0 < witness.ioScratchWipeCount) &&
+    witness.checkResourceReplayExact &&
+    witness.kernelOpcodesAllowed &&
+    witness.kernelStepsShapeValid &&
+    witness.kernelStepOpcodesMatch &&
+    witness.hasBeginCommitWipeEnvelope &&
+    witness.emittedKernelSchedule.checkRunsToCompletion &&
+    (match witness.expectedKernelOpcodes with
+    | none => true
+    | some expectedKernelOpcodes => decide (witness.kernelOpcodes = expectedKernelOpcodes)) &&
+    (match witness.expectedKernelSteps with
+    | none => true
+    | some expectedKernelSteps => decide (witness.kernelSteps = expectedKernelSteps)) &&
+    witness.publicObjectIdsShapeValid &&
+    witness.expectedPublicObjectIdsShapeAndMatch &&
+    witness.kernelObjectsInPublicObjectUniverse
+
+def RuntimeKernelWitness.ProofGradeValid
+  (witness : RuntimeKernelWitness)
+  (entrypointId : String) : Prop :=
+  witness.ValidForEntrypoint entrypointId ∧
+    match witness.expectedKernelOpcodes with
+    | none => False
+    | some _ =>
+        match witness.expectedKernelSteps with
+        | none => False
+        | some _ =>
+            match witness.expectedPublicObjectIds with
+            | none => False
+            | some _ => True
+
+def RuntimeKernelWitness.checkProofGradeForEntrypoint
+  (witness : RuntimeKernelWitness)
+  (entrypointId : String) : Bool :=
+  witness.checkValidForEntrypoint entrypointId &&
+    witness.expectedKernelOpcodes.isSome &&
+    witness.expectedKernelSteps.isSome &&
+    witness.expectedPublicObjectIds.isSome
+
+@[simp] theorem runtimeKernelWitness_checkValidForEntrypoint_eq_true_iff
+  (witness : RuntimeKernelWitness)
+  (entrypointId : String) :
+  witness.checkValidForEntrypoint entrypointId = true ↔
+    witness.ValidForEntrypoint entrypointId := by
+  cases hExpectedOpcodes : witness.expectedKernelOpcodes <;>
+    cases hExpectedSteps : witness.expectedKernelSteps <;>
+    cases hExpectedPublicObjectIds : witness.expectedPublicObjectIds <;>
+    simp [RuntimeKernelWitness.checkValidForEntrypoint,
+      RuntimeKernelWitness.ValidForEntrypoint,
+      runtimeKernelWitness_checkResourceReplayExact_eq_true_iff,
+      RuntimeKernelWitness.kernelOpcodesAllowed,
+      RuntimeKernelWitness.kernelStepsShapeValid,
+      RuntimeKernelWitness.projectedKernelOpcodes,
+      RuntimeKernelWitness.kernelStepOpcodesMatch,
+      RuntimeKernelStep.checkShapeValid,
+      RuntimeKernelWitness.hasBeginCommitWipeEnvelope,
+      RuntimeKernelWitness.publicObjectIdsShapeValid,
+      RuntimeKernelWitness.expectedPublicObjectIdsShapeAndMatch,
+      RuntimeKernelWitness.kernelObjectsInPublicObjectUniverse,
+      hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds,
+      List.all_eq_true, and_assoc]
+
+@[simp] theorem runtimeKernelWitness_checkProofGradeForEntrypoint_eq_true_iff
+  (witness : RuntimeKernelWitness)
+  (entrypointId : String) :
+  witness.checkProofGradeForEntrypoint entrypointId = true ↔
+    witness.ProofGradeValid entrypointId := by
+  cases hExpectedOpcodes : witness.expectedKernelOpcodes <;>
+    cases hExpectedSteps : witness.expectedKernelSteps <;>
+    cases hExpectedPublicObjectIds : witness.expectedPublicObjectIds <;>
+    simp [RuntimeKernelWitness.checkProofGradeForEntrypoint,
+      RuntimeKernelWitness.ProofGradeValid,
+      hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds]
+
+theorem runtimeKernelWitness_valid_replayedResourceState_exact
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ValidForEntrypoint entrypointId) :
+  witness.replayedResourceState? = some witness.claimedResourceState := by
+  rcases hValid with
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, hReplay, _, _, _, _, _, _, _, _, _⟩
+  exact (runtimeKernelWitness_resourceReplayExact_eq_claimed witness).mp hReplay
+
+theorem runtimeKernelWitness_proofGradeKernelSchedule_exact
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  ∃ expectedKernelSteps,
+    witness.expectedKernelSteps = some expectedKernelSteps ∧
+      witness.kernelSteps = expectedKernelSteps := by
+  rcases hValid with ⟨hValidForEntrypoint, hProofGrade⟩
+  cases hExpectedSteps : witness.expectedKernelSteps with
+  | none =>
+      cases hExpectedOpcodes : witness.expectedKernelOpcodes <;>
+        simp [hExpectedSteps, hExpectedOpcodes] at hProofGrade
+  | some expectedKernelSteps =>
+      refine ⟨expectedKernelSteps, rfl, ?_⟩
+      rcases hValidForEntrypoint with
+        ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hKernelSteps, _, _, _⟩
+      simpa [hExpectedSteps] using hKernelSteps
+
+theorem runtimeKernelWitness_proofGradeKernelScheduleObject_exact
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  ∃ expectedKernelSchedule,
+    witness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      witness.emittedKernelSchedule = expectedKernelSchedule := by
+  rcases hValid with ⟨hValidForEntrypoint, hProofGrade⟩
+  cases hExpectedOpcodes : witness.expectedKernelOpcodes with
+  | none =>
+      simp [hExpectedOpcodes] at hProofGrade
+  | some expectedKernelOpcodes =>
+      cases hExpectedSteps : witness.expectedKernelSteps with
+      | none =>
+          simp [hExpectedOpcodes, hExpectedSteps] at hProofGrade
+      | some expectedKernelSteps =>
+          refine ⟨{ opcodes := expectedKernelOpcodes, steps := expectedKernelSteps }, ?_, ?_⟩
+          · simp [RuntimeKernelWitness.expectedKernelSchedule?, hExpectedOpcodes, hExpectedSteps]
+          · rcases hValidForEntrypoint with
+              ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hKernelOpcodes,
+                hKernelSteps, _, _, _⟩
+            simp [hExpectedOpcodes] at hKernelOpcodes
+            simp [hExpectedSteps] at hKernelSteps
+            cases hKernelOpcodes
+            cases hKernelSteps
+            rfl
+
+theorem runtimeKernelWitness_proofGradePublicObjectUniverse_exact
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  ∃ expectedPublicObjectIds,
+    witness.expectedPublicObjectIds = some expectedPublicObjectIds ∧
+      witness.publicObjectIds = expectedPublicObjectIds := by
+  rcases hValid with ⟨hValidForEntrypoint, hProofGrade⟩
+  cases hExpectedPublicObjectIds : witness.expectedPublicObjectIds with
+  | none =>
+      cases hExpectedOpcodes : witness.expectedKernelOpcodes <;>
+        cases hExpectedSteps : witness.expectedKernelSteps <;>
+        simp [hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds] at hProofGrade
+  | some expectedPublicObjectIds =>
+      refine ⟨expectedPublicObjectIds, rfl, ?_⟩
+      rcases hValidForEntrypoint with
+        ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+          hPublicObjectIdsMatch, _⟩
+      simp [RuntimeKernelWitness.expectedPublicObjectIdsShapeAndMatch, hExpectedPublicObjectIds]
+        at hPublicObjectIdsMatch
+      exact hPublicObjectIdsMatch.2
+
+theorem runtimeKernelWitness_emittedKernelSchedule_valid
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ValidForEntrypoint entrypointId) :
+  witness.emittedKernelSchedule.Valid := by
+  rcases hValid with
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, hOpcodesAllowed, hStepsShape, hOpcodeMatch,
+      hEnvelope, hCompletion, _, _, _, _, _⟩
+  have hAllowedEq :
+      witness.emittedKernelSchedule.opcodesAllowed = witness.kernelOpcodesAllowed := by
+    simp [RuntimeKernelSchedule.opcodesAllowed, RuntimeKernelWitness.kernelOpcodesAllowed,
+      RuntimeKernelWitness.emittedKernelSchedule]
+  have hCheckShape : witness.emittedKernelSchedule.checkShapeValid = true := by
+    have hShapeEq :
+        witness.emittedKernelSchedule.checkShapeValid =
+          (witness.kernelStepsShapeValid && witness.kernelStepOpcodesMatch) := by
+      simp [RuntimeKernelSchedule.checkShapeValid, RuntimeKernelWitness.emittedKernelSchedule,
+        RuntimeKernelWitness.kernelStepsShapeValid, RuntimeKernelWitness.kernelStepOpcodesMatch,
+        RuntimeKernelSchedule.projectedOpcodes, RuntimeKernelWitness.projectedKernelOpcodes]
+    rw [hShapeEq]
+    simp [hStepsShape, hOpcodeMatch]
+  have hEnvelopeEq :
+      witness.emittedKernelSchedule.hasBeginCommitWipeEnvelope =
+        witness.hasBeginCommitWipeEnvelope := by
+    unfold RuntimeKernelSchedule.hasBeginCommitWipeEnvelope
+      RuntimeKernelWitness.emittedKernelSchedule
+      RuntimeKernelWitness.hasBeginCommitWipeEnvelope
+    rfl
+  have hScheduleCheck : witness.emittedKernelSchedule.checkValid = true := by
+    rw [RuntimeKernelSchedule.checkValid, hAllowedEq, hEnvelopeEq]
+    simp [hOpcodesAllowed, hCheckShape, hEnvelope, hCompletion]
+  exact (runtimeKernelSchedule_checkValid_eq_true_iff witness.emittedKernelSchedule).mp
+    hScheduleCheck
+
+theorem runtimeKernelWitness_emittedKernelSchedule_completes
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ValidForEntrypoint entrypointId) :
+  ∃ finalState, witness.emittedKernelSchedule.finalState? = some finalState ∧
+    finalState.phase = .finished := by
+  rcases runtimeKernelWitness_emittedKernelSchedule_valid hValid with
+    ⟨_, _, _, hCompletion⟩
+  exact
+    (runtimeKernelSchedule_checkRunsToCompletion_eq_true_iff witness.emittedKernelSchedule).mp
+      hCompletion
+
+theorem runtimeKernelWitness_proofGradeResourceState_exact
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  witness.replayedResourceState? = some witness.claimedResourceState := by
+  exact runtimeKernelWitness_valid_replayedResourceState_exact hValid.1
+
+theorem runtimeKernelWitness_proofGradeExpectedKernelSchedule_valid
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  ∃ expectedKernelSchedule,
+    witness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      expectedKernelSchedule.Valid := by
+  rcases runtimeKernelWitness_proofGradeKernelScheduleObject_exact hValid with
+    ⟨expectedKernelSchedule, hExpectedSchedule, hScheduleExact⟩
+  refine ⟨expectedKernelSchedule, hExpectedSchedule, ?_⟩
+  have hEmittedValid :
+      witness.emittedKernelSchedule.Valid :=
+    runtimeKernelWitness_emittedKernelSchedule_valid hValid.1
+  simpa [hScheduleExact] using hEmittedValid
+
+theorem runtimeKernelWitness_proofGradeExpectedKernelSchedule_completes
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  ∃ expectedKernelSchedule finalState,
+    witness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? = some finalState ∧
+      finalState.phase = .finished := by
+  rcases runtimeKernelWitness_proofGradeKernelScheduleObject_exact hValid with
+    ⟨expectedKernelSchedule, hExpectedSchedule, hScheduleExact⟩
+  rcases runtimeKernelWitness_emittedKernelSchedule_completes hValid.1 with
+    ⟨finalState, hFinalState, hFinished⟩
+  refine ⟨expectedKernelSchedule, finalState, hExpectedSchedule, ?_, hFinished⟩
+  simpa [hScheduleExact] using hFinalState
+
+theorem runtimeKernelWitness_proofGradeExpectedKernelSchedule_publicObjects_exact
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  ∃ expectedKernelSchedule finalState,
+    witness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? = some finalState ∧
+      finalState.publicObjectSchedule = expectedKernelSchedule.publicObjectSchedule := by
+  rcases runtimeKernelWitness_proofGradeExpectedKernelSchedule_completes hValid with
+    ⟨expectedKernelSchedule, finalState, hExpectedSchedule, hFinalState, _⟩
+  refine ⟨expectedKernelSchedule, finalState, hExpectedSchedule, hFinalState, ?_⟩
+  exact runtimeKernelSchedule_finalState_publicObjectSchedule hFinalState
+
+theorem runtimeKernelWitness_proofGradeExpectedKernelSchedule_finalState_exact
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  ∃ expectedKernelSchedule,
+    witness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? =
+        some
+          { phase := .finished
+          , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
+          } := by
+  rcases runtimeKernelWitness_proofGradeExpectedKernelSchedule_valid hValid with
+    ⟨expectedKernelSchedule, hExpectedSchedule, hScheduleValid⟩
+  exact ⟨expectedKernelSchedule, hExpectedSchedule,
+    runtimeKernelSchedule_valid_finalState_exact hScheduleValid⟩
+
+structure RuntimeKernelRefinementEvent where
+  kind : String
+  objectId : Option Nat
+  opcode : Option String
+deriving Repr, DecidableEq
+
+def runtimeKernelRefinementEventKindNames : List String :=
+  [ "pre_committed_cold_object"
+  , "shadow_load_object"
+  , "kernel_step"
+  , "commit_object"
+  , "cold_store_object"
+  , "post_committed_cold_object"
+  ]
+
+def RuntimeKernelRefinementEvent.projectedKernelStep?
+  (event : RuntimeKernelRefinementEvent) : Option RuntimeKernelStep := do
+  if event.kind = "kernel_step" then
+    let opcode ← event.opcode
+    some
+      { opcode := opcode
+      , objectId := event.objectId
+      }
+  else
+    none
+
+def RuntimeKernelRefinementEvent.checkShapeValid
+  (event : RuntimeKernelRefinementEvent) : Bool :=
+  decide (event.kind ∈ runtimeKernelRefinementEventKindNames) &&
+    match event.kind with
+    | "pre_committed_cold_object" =>
+        decide (event.objectId.isSome ∧ event.opcode.isNone)
+    | "shadow_load_object" =>
+        decide (event.objectId.isSome ∧ event.opcode.isNone)
+    | "kernel_step" =>
+        match event.projectedKernelStep? with
+        | some step => RuntimeKernelStep.checkShapeValid step
+        | none => false
+    | "commit_object" =>
+        decide (event.objectId.isSome ∧ event.opcode.isNone)
+    | "cold_store_object" =>
+        decide (event.objectId.isSome ∧ event.opcode.isNone)
+    | "post_committed_cold_object" =>
+        decide (event.objectId.isSome ∧ event.opcode.isNone)
+    | _ =>
+        false
+
+inductive RuntimeKernelRefinementPhase
+  | beforeBegin
+  | preCommittedColdWindow
+  | shadowLoadWindow
+  | activeKernel
+  | commitObjectWindow
+  | afterWipe
+  | coldStoreWindow
+  | postCommittedColdWindow
+deriving Repr, DecidableEq
+
+def RuntimeKernelRefinementPhase.step
+  (phase : RuntimeKernelRefinementPhase)
+  (event : RuntimeKernelRefinementEvent) : Option RuntimeKernelRefinementPhase :=
+  if event.checkShapeValid then
+    match phase, event.kind, event.opcode with
+    | .beforeBegin, "pre_committed_cold_object", _ =>
+        some .preCommittedColdWindow
+    | .preCommittedColdWindow, "pre_committed_cold_object", _ =>
+        some .preCommittedColdWindow
+    | .beforeBegin, "kernel_step", some "Begin" =>
+        some .shadowLoadWindow
+    | .preCommittedColdWindow, "kernel_step", some "Begin" =>
+        some .shadowLoadWindow
+    | .shadowLoadWindow, "shadow_load_object", _ =>
+        some .shadowLoadWindow
+    | .shadowLoadWindow, "kernel_step", some "Commit" =>
+        some .commitObjectWindow
+    | .shadowLoadWindow, "kernel_step", some "Wipe" =>
+        none
+    | .shadowLoadWindow, "kernel_step", some _ =>
+        some .activeKernel
+    | .activeKernel, "kernel_step", some "Commit" =>
+        some .commitObjectWindow
+    | .activeKernel, "kernel_step", some "Wipe" =>
+        none
+    | .activeKernel, "kernel_step", some "Begin" =>
+        none
+    | .activeKernel, "kernel_step", some _ =>
+        some .activeKernel
+    | .commitObjectWindow, "commit_object", _ =>
+        some .commitObjectWindow
+    | .commitObjectWindow, "kernel_step", some "Wipe" =>
+        some .afterWipe
+    | .afterWipe, "cold_store_object", _ =>
+        some .coldStoreWindow
+    | .coldStoreWindow, "cold_store_object", _ =>
+        some .coldStoreWindow
+    | .afterWipe, "post_committed_cold_object", _ =>
+        some .postCommittedColdWindow
+    | .coldStoreWindow, "post_committed_cold_object", _ =>
+        some .postCommittedColdWindow
+    | .postCommittedColdWindow, "post_committed_cold_object", _ =>
+        some .postCommittedColdWindow
+    | _, _, _ =>
+        none
+  else
+    none
+
+structure RuntimeKernelRefinementWitness where
+  events : List RuntimeKernelRefinementEvent
+deriving Repr, DecidableEq
+
+def RuntimeKernelRefinementWitness.projectedKernelSchedule
+  (witness : RuntimeKernelRefinementWitness) : RuntimeKernelSchedule :=
+  let steps := witness.events.filterMap RuntimeKernelRefinementEvent.projectedKernelStep?
+  { opcodes := steps.map RuntimeKernelStep.opcode
+  , steps := steps
+  }
+
+def RuntimeKernelRefinementWitness.shadowLoadObjectSchedule
+  (witness : RuntimeKernelRefinementWitness) : List Nat :=
+  witness.events.filterMap (fun event =>
+    if event.kind = "shadow_load_object" then
+      event.objectId
+    else
+      none)
+
+def RuntimeKernelRefinementWitness.preCommittedColdObjectSchedule
+  (witness : RuntimeKernelRefinementWitness) : List Nat :=
+  witness.events.filterMap (fun event =>
+    if event.kind = "pre_committed_cold_object" then
+      event.objectId
+    else
+      none)
+
+def RuntimeKernelRefinementWitness.commitObjectSchedule
+  (witness : RuntimeKernelRefinementWitness) : List Nat :=
+  witness.events.filterMap (fun event =>
+    if event.kind = "commit_object" then
+      event.objectId
+    else
+      none)
+
+def RuntimeKernelRefinementWitness.coldStoreObjectSchedule
+  (witness : RuntimeKernelRefinementWitness) : List Nat :=
+  witness.events.filterMap (fun event =>
+    if event.kind = "cold_store_object" then
+      event.objectId
+    else
+      none)
+
+def RuntimeKernelRefinementWitness.postCommittedColdObjectSchedule
+  (witness : RuntimeKernelRefinementWitness) : List Nat :=
+  witness.events.filterMap (fun event =>
+    if event.kind = "post_committed_cold_object" then
+      event.objectId
+    else
+      none)
+
+def runtimeKernelInsertCanonicalObjectId (objectId : Nat) : List Nat → List Nat
+  | [] => [objectId]
+  | head :: tail =>
+      if objectId = head then
+        head :: tail
+      else if objectId < head then
+        objectId :: head :: tail
+      else
+        head :: runtimeKernelInsertCanonicalObjectId objectId tail
+
+def RuntimeKernelWitness.canonicalLoadedObjectSchedule
+  (witness : RuntimeKernelWitness) : List Nat :=
+  witness.kernelSteps.foldl
+    (fun acc step =>
+      match step.objectId with
+      | some objectId => runtimeKernelInsertCanonicalObjectId objectId acc
+      | none => acc)
+    []
+
+def RuntimeKernelRefinementWitness.replayedPhase?
+  (witness : RuntimeKernelRefinementWitness) : Option RuntimeKernelRefinementPhase :=
+  witness.events.foldlM RuntimeKernelRefinementPhase.step .beforeBegin
+
+def RuntimeKernelRefinementWitness.phaseTerminates
+  (witness : RuntimeKernelRefinementWitness) : Bool :=
+  match witness.replayedPhase? with
+  | some .afterWipe => true
+  | some .coldStoreWindow => true
+  | some .postCommittedColdWindow => true
+  | _ => false
+
+def RuntimeKernelRefinementWitness.kernelObjectCoverage
+  (witness : RuntimeKernelRefinementWitness) : Bool :=
+  witness.projectedKernelSchedule.publicObjectSchedule.all (fun objectId =>
+    decide (objectId ∈ witness.shadowLoadObjectSchedule))
+
+def RuntimeKernelRefinementWitness.Valid
+  (witness : RuntimeKernelRefinementWitness)
+  (kernelWitness : RuntimeKernelWitness) : Prop :=
+  witness.events.all RuntimeKernelRefinementEvent.checkShapeValid = true ∧
+    witness.phaseTerminates = true ∧
+    witness.projectedKernelSchedule = kernelWitness.emittedKernelSchedule ∧
+    witness.preCommittedColdObjectSchedule = kernelWitness.publicObjectIds ∧
+    witness.postCommittedColdObjectSchedule = kernelWitness.publicObjectIds ∧
+    witness.shadowLoadObjectSchedule = witness.commitObjectSchedule ∧
+    witness.shadowLoadObjectSchedule = witness.coldStoreObjectSchedule ∧
+    witness.shadowLoadObjectSchedule = kernelWitness.canonicalLoadedObjectSchedule ∧
+    witness.kernelObjectCoverage = true
+
+def RuntimeKernelRefinementWitness.checkValid
+  (witness : RuntimeKernelRefinementWitness)
+  (kernelWitness : RuntimeKernelWitness) : Bool :=
+  witness.events.all RuntimeKernelRefinementEvent.checkShapeValid &&
+    witness.phaseTerminates &&
+    decide (witness.projectedKernelSchedule = kernelWitness.emittedKernelSchedule) &&
+    decide (witness.preCommittedColdObjectSchedule = kernelWitness.publicObjectIds) &&
+    decide (witness.postCommittedColdObjectSchedule = kernelWitness.publicObjectIds) &&
+    decide (witness.shadowLoadObjectSchedule = witness.commitObjectSchedule) &&
+    decide (witness.shadowLoadObjectSchedule = witness.coldStoreObjectSchedule) &&
+    decide (witness.shadowLoadObjectSchedule = kernelWitness.canonicalLoadedObjectSchedule) &&
+    witness.kernelObjectCoverage
+
+@[simp] theorem runtimeKernelRefinementWitness_checkValid_eq_true_iff
+  (witness : RuntimeKernelRefinementWitness)
+  (kernelWitness : RuntimeKernelWitness) :
+  witness.checkValid kernelWitness = true ↔ witness.Valid kernelWitness := by
+  simp [RuntimeKernelRefinementWitness.checkValid, RuntimeKernelRefinementWitness.Valid,
+    RuntimeKernelRefinementWitness.phaseTerminates, and_assoc]
+
 structure RuntimeRefinementWitness where
   trace : Trace
   runtimeSeed : Option Nat
   publicOutcome : SGXPublicOutcome
+  kernelWitness : Option RuntimeKernelWitness
+  runtimeKernelRefinementWitness : Option RuntimeKernelRefinementWitness
   boundarySchedule : List BoundaryEvent
   controllerShape : SGXControllerShape
   normalizedMicroTrace : NormalizedMicroTrace
@@ -3161,6 +4235,70 @@ def RuntimeRefinementWitness.ObjectsMatchPublicConfig
   (cfg : OramConfig) : Prop :=
   RuntimeOramObjectsMatchPublicConfig witness.oramObjects cfg
 
+def RuntimeRefinementWitness.kernelWitnessValid
+  (witness : RuntimeRefinementWitness) : Prop :=
+  match witness.kernelWitness with
+  | none => True
+  | some kernelWitness =>
+      kernelWitness.ValidForEntrypoint witness.publicOutcome.entrypointId
+
+def RuntimeRefinementWitness.checkKernelWitness
+  (witness : RuntimeRefinementWitness) : Bool :=
+  match witness.kernelWitness with
+  | none => true
+  | some kernelWitness =>
+      kernelWitness.checkValidForEntrypoint witness.publicOutcome.entrypointId
+
+def RuntimeRefinementWitness.proofGradeKernelWitnessValid
+  (witness : RuntimeRefinementWitness) : Prop :=
+  match witness.kernelWitness with
+  | none => False
+  | some kernelWitness =>
+      kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId
+
+def RuntimeRefinementWitness.checkProofGradeKernelWitness
+  (witness : RuntimeRefinementWitness) : Bool :=
+  match witness.kernelWitness with
+  | none => false
+  | some kernelWitness =>
+      kernelWitness.checkProofGradeForEntrypoint witness.publicOutcome.entrypointId
+
+def RuntimeRefinementWitness.runtimeKernelRefinementWitnessValid
+  (witness : RuntimeRefinementWitness) : Prop :=
+  match witness.runtimeKernelRefinementWitness with
+  | none => True
+  | some runtimeKernelRefinementWitness =>
+      match witness.kernelWitness with
+      | none => False
+      | some kernelWitness =>
+          runtimeKernelRefinementWitness.Valid kernelWitness
+
+def RuntimeRefinementWitness.checkRuntimeKernelRefinementWitness
+  (witness : RuntimeRefinementWitness) : Bool :=
+  match witness.runtimeKernelRefinementWitness with
+  | none => true
+  | some runtimeKernelRefinementWitness =>
+      match witness.kernelWitness with
+      | none => false
+      | some kernelWitness =>
+          runtimeKernelRefinementWitness.checkValid kernelWitness
+
+def RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid
+  (witness : RuntimeRefinementWitness) : Prop :=
+  match witness.kernelWitness, witness.runtimeKernelRefinementWitness with
+  | some kernelWitness, some runtimeKernelRefinementWitness =>
+      runtimeKernelRefinementWitness.Valid kernelWitness
+  | _, _ =>
+      False
+
+def RuntimeRefinementWitness.checkProofGradeRuntimeKernelRefinementWitness
+  (witness : RuntimeRefinementWitness) : Bool :=
+  match witness.kernelWitness, witness.runtimeKernelRefinementWitness with
+  | some kernelWitness, some runtimeKernelRefinementWitness =>
+      runtimeKernelRefinementWitness.checkValid kernelWitness
+  | _, _ =>
+      false
+
 def RuntimeRefinementWitness.Valid
   (witness : RuntimeRefinementWitness)
   (modelTags : SGXModelTags) : Prop :=
@@ -3183,7 +4321,9 @@ def RuntimeRefinementWitness.Valid
     pathOramBucketTraceOfLeafScheduleTrace witness.pathOramLeafScheduleTrace =
       witness.pathOramBucketTrace ∧
     witness.normalizedMicroTrace =
-      simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags)
+      simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags) ∧
+    witness.kernelWitnessValid ∧
+    witness.runtimeKernelRefinementWitnessValid
 
 def RuntimeRefinementWitness.checkValid
   (witness : RuntimeRefinementWitness)
@@ -3213,13 +4353,89 @@ def RuntimeRefinementWitness.checkValid
         witness.pathOramBucketTrace) &&
     decide
       (witness.normalizedMicroTrace =
-        simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags))
+        simulateNormalizedMicroTraceFromLeakage (witness.microLeakage modelTags)) &&
+    witness.checkKernelWitness &&
+    witness.checkRuntimeKernelRefinementWitness
+
+def RuntimeRefinementWitness.ProofGradeValid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags) : Prop :=
+  witness.Valid modelTags ∧
+    witness.proofGradeKernelWitnessValid ∧
+    witness.proofGradeRuntimeKernelRefinementWitnessValid
+
+def RuntimeRefinementWitness.checkProofGrade
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags) : Bool :=
+  witness.checkValid modelTags &&
+    witness.checkProofGradeKernelWitness &&
+    witness.checkProofGradeRuntimeKernelRefinementWitness
+
+@[simp] theorem runtimeWitness_checkKernelWitness_eq_true_iff
+  (witness : RuntimeRefinementWitness) :
+  witness.checkKernelWitness = true ↔ witness.kernelWitnessValid := by
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.checkKernelWitness,
+        RuntimeRefinementWitness.kernelWitnessValid, hKernel]
+  | some kernelWitness =>
+      simp [RuntimeRefinementWitness.checkKernelWitness,
+        RuntimeRefinementWitness.kernelWitnessValid, hKernel,
+        runtimeKernelWitness_checkValidForEntrypoint_eq_true_iff]
+
+@[simp] theorem runtimeWitness_checkProofGradeKernelWitness_eq_true_iff
+  (witness : RuntimeRefinementWitness) :
+  witness.checkProofGradeKernelWitness = true ↔
+    witness.proofGradeKernelWitnessValid := by
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.checkProofGradeKernelWitness,
+        RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel]
+  | some kernelWitness =>
+      simp [RuntimeRefinementWitness.checkProofGradeKernelWitness,
+        RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel,
+        runtimeKernelWitness_checkProofGradeForEntrypoint_eq_true_iff]
+
+@[simp] theorem runtimeWitness_checkRuntimeKernelRefinementWitness_eq_true_iff
+  (witness : RuntimeRefinementWitness) :
+  witness.checkRuntimeKernelRefinementWitness = true ↔
+    witness.runtimeKernelRefinementWitnessValid := by
+  cases hRefinement : witness.runtimeKernelRefinementWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.checkRuntimeKernelRefinementWitness,
+        RuntimeRefinementWitness.runtimeKernelRefinementWitnessValid, hRefinement]
+  | some runtimeKernelRefinementWitness =>
+      cases hKernel : witness.kernelWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.checkRuntimeKernelRefinementWitness,
+            RuntimeRefinementWitness.runtimeKernelRefinementWitnessValid, hRefinement, hKernel]
+      | some kernelWitness =>
+          simp [RuntimeRefinementWitness.checkRuntimeKernelRefinementWitness,
+            RuntimeRefinementWitness.runtimeKernelRefinementWitnessValid, hRefinement, hKernel,
+            runtimeKernelRefinementWitness_checkValid_eq_true_iff]
+
+@[simp] theorem runtimeWitness_checkProofGradeRuntimeKernelRefinementWitness_eq_true_iff
+  (witness : RuntimeRefinementWitness) :
+  witness.checkProofGradeRuntimeKernelRefinementWitness = true ↔
+    witness.proofGradeRuntimeKernelRefinementWitnessValid := by
+  cases hKernel : witness.kernelWitness <;>
+    cases hRefinement : witness.runtimeKernelRefinementWitness <;>
+    simp [RuntimeRefinementWitness.checkProofGradeRuntimeKernelRefinementWitness,
+      RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+      hKernel, hRefinement, runtimeKernelRefinementWitness_checkValid_eq_true_iff]
 
 @[simp] theorem runtimeWitness_checkValid_eq_true_iff
   (witness : RuntimeRefinementWitness)
   (modelTags : SGXModelTags) :
   witness.checkValid modelTags = true ↔ witness.Valid modelTags := by
   simp [RuntimeRefinementWitness.checkValid, RuntimeRefinementWitness.Valid, and_assoc]
+
+@[simp] theorem runtimeWitness_checkProofGrade_eq_true_iff
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags) :
+  witness.checkProofGrade modelTags = true ↔ witness.ProofGradeValid modelTags := by
+  simp [RuntimeRefinementWitness.checkProofGrade,
+    RuntimeRefinementWitness.ProofGradeValid, and_assoc]
 
 theorem runtimeWitness_valid_iff_subcertificates
   (witness : RuntimeRefinementWitness)
@@ -3231,23 +4447,80 @@ theorem runtimeWitness_valid_iff_subcertificates
           witness.oramObjects =
         some witness.controllerCertificate.observedOramAccesses ∧
       witness.controllerObserverCertificate.Valid modelTags ∧
-      witness.pathOramHiddenCertificate.Valid := by
+      witness.pathOramHiddenCertificate.Valid ∧
+      witness.kernelWitnessValid ∧
+      witness.runtimeKernelRefinementWitnessValid := by
   constructor
   · intro hValid
     rcases hValid with
       ⟨hGas, hBoundary, hShape, hAccess, hLeafScaffold, hPublicLeafScaffold,
-        hLeafStateEq, hLeafStateSome, hLeafBuckets, hNormalized⟩
-    refine ⟨hGas, hAccess, ?_, ?_⟩
+        hLeafStateEq, hLeafStateSome, hLeafBuckets, hNormalized, hKernel, hRefinement⟩
+    refine ⟨hGas, hAccess, ?_, ?_, hKernel, hRefinement⟩
     · exact ⟨hBoundary, hShape, hNormalized⟩
     · exact ⟨hLeafScaffold, hPublicLeafScaffold, hLeafStateEq, hLeafStateSome, hLeafBuckets⟩
   · intro hValid
-    rcases hValid with ⟨hGas, hAccess, hController, hHidden⟩
+    rcases hValid with ⟨hGas, hAccess, hController, hHidden, hKernel, hRefinement⟩
     rcases hController with ⟨hBoundary, hShape, hNormalized⟩
     rcases hHidden with
       ⟨hLeafScaffold, hPublicLeafScaffold, hLeafStateEq, hLeafStateSome, hLeafBuckets⟩
     exact
       ⟨hGas, hBoundary, hShape, hAccess, hLeafScaffold, hPublicLeafScaffold,
-        hLeafStateEq, hLeafStateSome, hLeafBuckets, hNormalized⟩
+        hLeafStateEq, hLeafStateSome, hLeafBuckets, hNormalized, hKernel, hRefinement⟩
+
+theorem runtimeWitness_proofGradeValid_iff_subcertificates
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags) :
+  witness.ProofGradeValid modelTags ↔
+    witness.trace.gasUsed = witness.publicOutcome.gasUsed ∧
+      reconstructObservedOramAccessesFromLogicalTrace
+          witness.trace.logicalAccesses
+          witness.oramObjects =
+        some witness.controllerCertificate.observedOramAccesses ∧
+      witness.controllerObserverCertificate.Valid modelTags ∧
+      witness.pathOramHiddenCertificate.Valid ∧
+      witness.proofGradeKernelWitnessValid ∧
+      witness.proofGradeRuntimeKernelRefinementWitnessValid := by
+  unfold RuntimeRefinementWitness.ProofGradeValid
+  rw [runtimeWitness_valid_iff_subcertificates]
+  constructor
+  · intro hValid
+    exact
+      ⟨hValid.1.1, hValid.1.2.1, hValid.1.2.2.1, hValid.1.2.2.2.1,
+        hValid.2.1, hValid.2.2⟩
+  · intro hValid
+    have hKernelValid : witness.kernelWitnessValid := by
+      cases hKernel : witness.kernelWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hValid
+      | some kernelWitness =>
+          have hProofGrade :
+              kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+            simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hValid.2.2.2.2.1
+          simpa [RuntimeRefinementWitness.kernelWitnessValid, hKernel] using hProofGrade.1
+    have hRefinementValid : witness.runtimeKernelRefinementWitnessValid := by
+      cases hKernel : witness.kernelWitness with
+      | none =>
+          cases hRefinement : witness.runtimeKernelRefinementWitness with
+          | none =>
+              simp [RuntimeRefinementWitness.runtimeKernelRefinementWitnessValid,
+                hRefinement]
+          | some runtimeKernelRefinementWitness =>
+              simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+                hKernel, hRefinement] at hValid
+      | some kernelWitness =>
+          cases hRefinement : witness.runtimeKernelRefinementWitness with
+          | none =>
+              simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+                hKernel, hRefinement] at hValid
+          | some runtimeKernelRefinementWitness =>
+              simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+                hKernel, hRefinement] at hValid
+              simp [RuntimeRefinementWitness.runtimeKernelRefinementWitnessValid,
+                hKernel, hRefinement]
+              exact hValid.2.2.2.2.2
+    exact
+      ⟨⟨hValid.1, hValid.2.1, hValid.2.2.1, hValid.2.2.2.1, hKernelValid, hRefinementValid⟩,
+        hValid.2.2.2.2.1, hValid.2.2.2.2.2⟩
 
 theorem runtimeWitness_controllerObserverCertificate_valid
   (witness : RuntimeRefinementWitness)
@@ -3261,7 +4534,256 @@ theorem runtimeWitness_pathOramHiddenCertificate_valid
   (modelTags : SGXModelTags)
   (hValid : witness.Valid modelTags) :
   witness.pathOramHiddenCertificate.Valid := by
-  exact (runtimeWitness_valid_iff_subcertificates witness modelTags).mp hValid |>.2.2.2
+  exact (runtimeWitness_valid_iff_subcertificates witness modelTags).mp hValid |>.2.2.2.1
+
+theorem runtimeWitness_kernelWitness_valid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.kernelWitnessValid := by
+  exact (runtimeWitness_valid_iff_subcertificates witness modelTags).mp hValid |>.2.2.2.2.1
+
+theorem runtimeWitness_runtimeKernelRefinementWitness_valid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.Valid modelTags) :
+  witness.runtimeKernelRefinementWitnessValid := by
+  exact (runtimeWitness_valid_iff_subcertificates witness modelTags).mp hValid |>.2.2.2.2.2
+
+theorem runtimeWitness_proofGradeKernelWitness_valid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  witness.proofGradeKernelWitnessValid := by
+  exact
+    (runtimeWitness_proofGradeValid_iff_subcertificates witness modelTags).mp hValid |>.2.2.2.2.1
+
+theorem runtimeWitness_proofGradeRuntimeKernelRefinementWitness_valid
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  witness.proofGradeRuntimeKernelRefinementWitnessValid := by
+  exact
+    (runtimeWitness_proofGradeValid_iff_subcertificates witness modelTags).mp hValid |>.2.2.2.2.2
+
+theorem runtimeWitness_proofGradeKernelSchedule_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness expectedKernelSteps,
+    witness.kernelWitness = some kernelWitness ∧
+      kernelWitness.expectedKernelSteps = some expectedKernelSteps ∧
+      kernelWitness.kernelSteps = expectedKernelSteps := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      have hProofGrade :
+          kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+        simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+      rcases runtimeKernelWitness_proofGradeKernelSchedule_exact hProofGrade with
+        ⟨expectedKernelSteps, hExpectedSteps, hKernelSteps⟩
+      exact ⟨kernelWitness, expectedKernelSteps, rfl, hExpectedSteps, hKernelSteps⟩
+
+theorem runtimeWitness_proofGradePublicObjectUniverse_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness expectedPublicObjectIds,
+    witness.kernelWitness = some kernelWitness ∧
+      kernelWitness.expectedPublicObjectIds = some expectedPublicObjectIds ∧
+      kernelWitness.publicObjectIds = expectedPublicObjectIds := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      have hProofGrade :
+          kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+        simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+      rcases runtimeKernelWitness_proofGradePublicObjectUniverse_exact hProofGrade with
+        ⟨expectedPublicObjectIds, hExpectedPublicObjectIds, hPublicObjectIds⟩
+      exact
+        ⟨kernelWitness, expectedPublicObjectIds, rfl, hExpectedPublicObjectIds,
+          hPublicObjectIds⟩
+
+theorem runtimeWitness_proofGradeKernelResourceState_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness,
+    witness.kernelWitness = some kernelWitness ∧
+      kernelWitness.replayedResourceState? = some kernelWitness.claimedResourceState := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      have hProofGrade :
+          kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+        simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+      exact ⟨kernelWitness, rfl, runtimeKernelWitness_proofGradeResourceState_exact hProofGrade⟩
+
+theorem runtimeWitness_proofGradeRuntimeKernelRefinementProjection_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness runtimeKernelRefinementWitness,
+    witness.kernelWitness = some kernelWitness ∧
+      witness.runtimeKernelRefinementWitness = some runtimeKernelRefinementWitness ∧
+      runtimeKernelRefinementWitness.projectedKernelSchedule =
+        kernelWitness.emittedKernelSchedule := by
+  have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid :=
+    runtimeWitness_proofGradeRuntimeKernelRefinementWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      cases hRefinement : witness.runtimeKernelRefinementWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+  | some kernelWitness =>
+      cases hRefinement : witness.runtimeKernelRefinementWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+              simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+                hKernel, hRefinement, RuntimeKernelRefinementWitness.Valid] at hRefinementValid
+              exact ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
+                hRefinementValid.2.2.1⟩
+
+theorem runtimeWitness_proofGradeRuntimeKernelRefinementBoundaryExact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness runtimeKernelRefinementWitness,
+    witness.kernelWitness = some kernelWitness ∧
+      witness.runtimeKernelRefinementWitness = some runtimeKernelRefinementWitness ∧
+      runtimeKernelRefinementWitness.preCommittedColdObjectSchedule =
+        kernelWitness.publicObjectIds ∧
+      runtimeKernelRefinementWitness.postCommittedColdObjectSchedule =
+        kernelWitness.publicObjectIds := by
+  have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid :=
+    runtimeWitness_proofGradeRuntimeKernelRefinementWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      cases hRefinement : witness.runtimeKernelRefinementWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+  | some kernelWitness =>
+      cases hRefinement : witness.runtimeKernelRefinementWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement, RuntimeKernelRefinementWitness.Valid] at hRefinementValid
+          exact
+            ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
+              hRefinementValid.2.2.2.1, hRefinementValid.2.2.2.2.1⟩
+
+theorem runtimeWitness_proofGradeKernelScheduleObject_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness expectedKernelSchedule,
+    witness.kernelWitness = some kernelWitness ∧
+      kernelWitness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      kernelWitness.emittedKernelSchedule = expectedKernelSchedule := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      have hProofGrade :
+          kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+        simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+      rcases runtimeKernelWitness_proofGradeKernelScheduleObject_exact hProofGrade with
+        ⟨expectedKernelSchedule, hExpectedSchedule, hKernelSchedule⟩
+      exact ⟨kernelWitness, expectedKernelSchedule, rfl, hExpectedSchedule, hKernelSchedule⟩
+
+theorem runtimeWitness_proofGradeKernelScheduleObject_completes
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness expectedKernelSchedule finalState,
+    witness.kernelWitness = some kernelWitness ∧
+      kernelWitness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? = some finalState ∧
+      finalState.phase = .finished := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      have hProofGrade :
+          kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+        simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+      rcases runtimeKernelWitness_proofGradeExpectedKernelSchedule_completes hProofGrade with
+        ⟨expectedKernelSchedule, finalState, hExpectedSchedule, hFinalState, hFinished⟩
+      exact ⟨kernelWitness, expectedKernelSchedule, finalState, rfl, hExpectedSchedule,
+        hFinalState, hFinished⟩
+
+theorem runtimeWitness_proofGradeKernelScheduleObject_publicObjects_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness expectedKernelSchedule finalState,
+    witness.kernelWitness = some kernelWitness ∧
+      kernelWitness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? = some finalState ∧
+      finalState.publicObjectSchedule = expectedKernelSchedule.publicObjectSchedule := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      have hProofGrade :
+          kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+        simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+      rcases runtimeKernelWitness_proofGradeExpectedKernelSchedule_publicObjects_exact hProofGrade with
+        ⟨expectedKernelSchedule, finalState, hExpectedSchedule, hFinalState, hObjects⟩
+      exact ⟨kernelWitness, expectedKernelSchedule, finalState, rfl, hExpectedSchedule,
+        hFinalState, hObjects⟩
+
+theorem runtimeWitness_proofGradeKernelScheduleObject_finalState_exact
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness expectedKernelSchedule,
+    witness.kernelWitness = some kernelWitness ∧
+      kernelWitness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? =
+        some
+          { phase := .finished
+          , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
+          } := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      have hProofGrade :
+          kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+        simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+      rcases runtimeKernelWitness_proofGradeExpectedKernelSchedule_finalState_exact hProofGrade with
+        ⟨expectedKernelSchedule, hExpectedSchedule, hFinalExact⟩
+      exact ⟨kernelWitness, expectedKernelSchedule, rfl, hExpectedSchedule, hFinalExact⟩
 
 @[simp] theorem sgxPublicOutcome_runtimeWitness
   (witness : RuntimeRefinementWitness) :
@@ -3307,7 +4829,7 @@ theorem sgxView_normalizedMicro_eq_witness
   normalizeMicroTrace (sgxMicroTrace witness.sgxView) = witness.normalizedMicroTrace := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, hNormalized, _hKernel⟩
   rw [sgxMicroTrace_runtimeWitness]
   rw [reconstructedMicroTrace_normalizedByLeakage]
   exact hNormalized.symm
@@ -3319,7 +4841,7 @@ theorem runtimeWitness_boundaryBudget_exact
   witness.boundarySchedule.length = witness.controllerShape.boundaryEventBudget := by
   rcases hValid with
     ⟨_hGas, hBoundary, hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized, _hKernel⟩
   rw [hBoundary, hShape]
   exact runtimeControllerCertificate_boundarySchedule_budget
     witness.controllerCertificate
@@ -3342,7 +4864,7 @@ theorem runtimeWitness_pathOramLeafScaffold_exact
     some witness.pathOramLeafScaffold := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized, _hKernel⟩
   exact hLeafScaffold
 
 theorem runtimeWitness_object_isPathOram_of_matchPublicConfig
@@ -3373,7 +4895,7 @@ theorem runtimeWitness_publicPathOramLeafScaffold_matches_hidden
   witness.oramLeafPublicScaffold = witness.pathOramLeafScaffold := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, hPublicLeafScaffold,
-      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized, _hKernel⟩
   exact hPublicLeafScaffold
 
 theorem runtimeWitness_pathOramLeafStateReplay_exact
@@ -3384,7 +4906,7 @@ theorem runtimeWitness_pathOramLeafStateReplay_exact
     witness.expectedPathOramPositionMapState := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized⟩
+      hLeafStateEq, _hLeafStateSome, _hLeafBuckets, _hNormalized, _hKernel⟩
   exact hLeafStateEq
 
 theorem runtimeWitness_pathOramLeafStateReplay_some
@@ -3394,7 +4916,7 @@ theorem runtimeWitness_pathOramLeafStateReplay_some
   witness.replayedPathOramPositionMapState.isSome = true := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafStateEq, hLeafStateSome, _hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, hLeafStateSome, _hLeafBuckets, _hNormalized, _hKernel⟩
   exact hLeafStateSome
 
 theorem runtimeWitness_pathOramFreshCoinValues_of_blocks
@@ -3522,8 +5044,9 @@ theorem runtimeWitness_publicPathOramLeafScaffold_of_matchPublicConfig
   pathOramLeafScheduleScaffold witness.pathOramLeafScheduleTrace =
     witness.projectedPathOramLeafScaffold := by
   cases witness with
-  | mk trace runtimeSeed publicOutcome boundarySchedule controllerShape normalizedMicroTrace
-      controllerCertificate oramObjects oramLeafPublicScaffold oramLeafSchedule
+  | mk trace runtimeSeed publicOutcome kernelWitness runtimeKernelRefinementWitness
+      boundarySchedule controllerShape normalizedMicroTrace controllerCertificate
+      oramObjects oramLeafPublicScaffold oramLeafSchedule
       oramPositionMapBefore oramPositionMapAfter oramLeafStateTransitions =>
       induction oramLeafSchedule with
       | nil =>
@@ -3547,7 +5070,7 @@ theorem runtimeWitness_pathOramBucketProjection_exact
     witness.pathOramBucketTrace := by
   rcases hValid with
     ⟨_hGas, _hBoundary, _hShape, _hAccesses, _hLeafScaffold, _hPublicLeafScaffold,
-      _hLeafStateEq, _hLeafStateSome, hLeafBuckets, _hNormalized⟩
+      _hLeafStateEq, _hLeafStateSome, hLeafBuckets, _hNormalized, _hKernel⟩
   exact hLeafBuckets
 
 theorem runtimeWitness_pathOramLeafScaffold_singletonExactProjection

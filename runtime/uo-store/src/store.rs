@@ -4,7 +4,8 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use uo_core::trace::{classify_write, LogicalEvent, PhysicalWriteEvent, WriteClass};
+use uo_core::trace::{LogicalEvent, PhysicalWriteEvent, WriteClass};
+use zeroize::Zeroize;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct StoreExecutionMetrics {
@@ -18,7 +19,7 @@ pub struct StoreExecutionMetrics {
 
 pub trait ObjectStore {
     fn read_cell(&mut self, object: &str) -> Result<Vec<u8>>;
-    fn write_cell(&mut self, object: &str, value: &[u8]) -> Result<()>;
+    fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()>;
     fn physical_writes(&self) -> &[PhysicalWriteEvent];
     fn logical_events(&self) -> &[LogicalEvent];
     fn metrics(&self) -> &StoreExecutionMetrics;
@@ -67,7 +68,7 @@ impl ObjectStore for RawObjectStore {
             .clone())
     }
 
-    fn write_cell(&mut self, object: &str, value: &[u8]) -> Result<()> {
+    fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()> {
         self.metrics.logical_writes += 1;
         self.metrics.physical_writes += 1;
         if value.iter().all(|byte| *byte == 0) {
@@ -79,19 +80,15 @@ impl ObjectStore for RawObjectStore {
             .or_insert_with(|| vec![0u8; value.len()])
             .clone();
         let new = value.to_vec();
+        value.zeroize();
         self.slots.insert(object.into(), new.clone());
         self.logical_events.push(LogicalEvent {
             kind: "raw_cell_set".into(),
             object: object.into(),
             detail: format!("{} bytes", value.len()),
         });
-        self.physical_writes.push(PhysicalWriteEvent {
-            object: object.into(),
-            location: object.into(),
-            class: classify_write(&old, &new),
-            old,
-            new,
-        });
+        self.physical_writes
+            .push(PhysicalWriteEvent::from_buffers(object, object, &old, &new));
         Ok(())
     }
 
@@ -164,29 +161,32 @@ impl ObjectStore for UoObjectStore {
             .ok_or_else(|| anyhow!("unknown UO object: {object}"))
     }
 
-    fn write_cell(&mut self, object: &str, value: &[u8]) -> Result<()> {
+    fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()> {
         self.metrics.logical_writes += 1;
         self.metrics.physical_writes += 1;
-        let old = self
+        let slot = self
             .slots
-            .get(object)
-            .cloned()
+            .get_mut(object)
             .ok_or_else(|| anyhow!("unknown UO object: {object}"))?;
+        let old = slot.clone();
         let aad = format!("uo_store:{object}");
-        let new = self.cipher.seal(aad.as_bytes(), value, &mut self.rng);
+        let value_len = value.len();
+        if !self
+            .cipher
+            .seal_and_wipe_into(aad.as_bytes(), value, &mut self.rng, slot)
+        {
+            return Err(anyhow!(
+                "sealed slot buffer for {object} fell below required public ciphertext size"
+            ));
+        }
+        let new = slot.clone();
         self.logical_events.push(LogicalEvent {
             kind: "uo_cell_set".into(),
             object: object.into(),
-            detail: format!("{} bytes", value.len()),
+            detail: format!("{} bytes", value_len),
         });
-        self.slots.insert(object.into(), new.clone());
-        self.physical_writes.push(PhysicalWriteEvent {
-            object: object.into(),
-            location: object.into(),
-            class: classify_write(&old, &new),
-            old,
-            new,
-        });
+        self.physical_writes
+            .push(PhysicalWriteEvent::from_buffers(object, object, &old, &new));
         Ok(())
     }
 
@@ -211,8 +211,12 @@ mod tests {
     #[test]
     fn raw_store_exposes_set_and_same() {
         let mut store = RawObjectStore::with_zeroed_slots(["slot".to_string()]);
-        store.write_cell("slot", &[0u8; 32]).unwrap();
-        store.write_cell("slot", &[1u8; 32]).unwrap();
+        let mut first = [0u8; 32];
+        let mut second = [1u8; 32];
+        store.write_cell("slot", &mut first).unwrap();
+        store.write_cell("slot", &mut second).unwrap();
+        assert_eq!(first, [0u8; 32]);
+        assert_eq!(second, [0u8; 32]);
         let classes: Vec<_> = store
             .physical_writes()
             .iter()
@@ -224,9 +228,15 @@ mod tests {
     #[test]
     fn uo_store_emits_update_only_after_init() {
         let mut store = UoObjectStore::preinitialized([("slot".to_string(), 32)]);
-        store.write_cell("slot", &[0u8; 32]).unwrap();
-        store.write_cell("slot", &[0u8; 32]).unwrap();
-        store.write_cell("slot", &[1u8; 32]).unwrap();
+        let mut first = [0u8; 32];
+        let mut second = [0u8; 32];
+        let mut third = [1u8; 32];
+        store.write_cell("slot", &mut first).unwrap();
+        store.write_cell("slot", &mut second).unwrap();
+        store.write_cell("slot", &mut third).unwrap();
+        assert_eq!(first, [0u8; 32]);
+        assert_eq!(second, [0u8; 32]);
+        assert_eq!(third, [0u8; 32]);
         store.ensure_update_only().unwrap();
         assert!(store
             .physical_writes()

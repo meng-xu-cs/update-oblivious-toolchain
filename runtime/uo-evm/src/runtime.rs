@@ -1,0 +1,8 @@
+#[path = "kernel.rs"]
+pub(crate) mod kernel;
+
+#[path = "objects.rs"]
+pub(crate) mod objects;
+
+#[path = "state.rs"]
+pub(crate) mod state;

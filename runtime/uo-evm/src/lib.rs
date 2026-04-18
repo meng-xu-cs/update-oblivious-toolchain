@@ -1,20 +1,24 @@
 mod controller;
 mod engine;
-mod objects;
 mod oram;
+mod runtime;
 mod theorem;
 
 pub use engine::{
     run_artifact, run_artifact_with_seed, CallResult, ContractInstance, PathOramFreshCoinPlan,
 };
+#[cfg(feature = "diagnostics")]
+pub use engine::{CallTelemetry, DiagnosticCallResult};
 
 #[cfg(test)]
 mod tests {
     use super::{ContractInstance, PathOramFreshCoinPlan};
     use uo_core::{
-        canonical_path_oram_leaf_values_of_seed, ContractMetadata, ExecutionTrace, ProgramMode,
-        TheoremTrace, Value, WriteClass,
+        canonical_path_oram_leaf_values_of_seed, expected_runtime_kernel_opcodes_for_confidential,
+        expected_runtime_kernel_steps_for_confidential, ContractMetadata, ExecutionTrace,
+        ProgramMode, RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value, WriteClass,
     };
+    use uo_precompiles::UoOpcode;
 
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
         let metadata: ContractMetadata = serde_yaml::from_str(metadata).unwrap();
@@ -143,6 +147,30 @@ mod tests {
     }
 
     #[test]
+    fn same_same_entrypoint_runs_with_exact_kernel_budget() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut inst = ContractInstance::deploy(artifact).unwrap();
+        let result = inst
+            .call("sameSame(uint256)", vec![Value::Uint(5)])
+            .unwrap();
+        let peek = inst.call("peek()", vec![]).unwrap();
+
+        assert_eq!(result.trace.gas_used, 4096);
+        assert!(result
+            .trace
+            .physical_writes
+            .iter()
+            .all(|event| event.class == WriteClass::Update));
+        assert_eq!(peek.return_value, Some(Value::Uint(1)));
+    }
+
+    #[test]
     fn mixer_abort_is_normalized_but_state_is_preserved() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
@@ -195,6 +223,33 @@ mod tests {
         assert_eq!(abort.return_value, None);
         assert_eq!(ok_balance.return_value, Some(Value::Uint(3)));
         assert_eq!(abort_balance.return_value, Some(Value::Uint(5)));
+    }
+
+    #[test]
+    fn registry_clear_if_match_roundtrips() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let key = Value::Bytes32([4u8; 32]);
+
+        let mut inst = ContractInstance::deploy(artifact).unwrap();
+        inst.call("upsert(bytes32,uint256)", vec![key.clone(), Value::Uint(9)])
+            .unwrap();
+        let clear = inst
+            .call(
+                "clearIfMatch(bytes32,uint256)",
+                vec![key.clone(), Value::Uint(9)],
+            )
+            .unwrap();
+        let read = inst.call("read(bytes32)", vec![key]).unwrap();
+
+        assert_eq!(clear.trace.gas_used, 12288);
+        assert_eq!(clear.return_value, Some(Value::Uint(1)));
+        assert_eq!(read.return_value, Some(Value::Uint(0)));
     }
 
     #[test]
@@ -261,7 +316,10 @@ mod tests {
                 vec![Value::Bytes32([9u8; 32]), Value::Uint(3)],
             )
             .unwrap();
-        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(
+            first_trace.trace.theorem_trace,
+            second_trace.trace.theorem_trace
+        );
         assert!(first_trace
             .trace
             .physical_writes
@@ -307,7 +365,10 @@ mod tests {
                 ],
             )
             .unwrap();
-        assert_eq!(first_trace.trace.theorem_trace, second_trace.trace.theorem_trace);
+        assert_eq!(
+            first_trace.trace.theorem_trace,
+            second_trace.trace.theorem_trace
+        );
         assert_eq!(first_trace.trace.gas_used, 14336);
         assert_eq!(second_trace.trace.gas_used, 14336);
     }
@@ -498,7 +559,7 @@ mod tests {
             ),
             ProgramMode::Uo,
         );
-        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
         let result = instance
             .call(
                 "add(bytes32,uint256)",
@@ -508,6 +569,7 @@ mod tests {
         let witness = result.trace.runtime_refinement_witness().unwrap();
         assert_eq!(witness.public_outcome.gas_used, result.trace.gas_used);
         assert_eq!(witness.trace.gas_used, result.trace.gas_used);
+        assert_eq!(witness.kernel_witness, result.trace.runtime_kernel_witness);
         assert_eq!(
             witness.boundary_schedule.len(),
             witness.controller_shape.boundary_event_budget
@@ -519,7 +581,80 @@ mod tests {
     }
 
     #[test]
-    fn serialized_execution_trace_preserves_trusted_kernel_bundle() {
+    fn execution_trace_exports_confidential_kernel_witness() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
+            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+            )
+            .unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+            )
+            .unwrap();
+        let result = instance
+            .call("auth(bytes32)", vec![Value::Bytes32([1u8; 32])])
+            .unwrap();
+        let witness = result
+            .trace
+            .runtime_kernel_witness_for_confidential(&artifact, "auth(bytes32)")
+            .unwrap();
+        let bundle = result.trace.runtime_trusted_kernel_bundle().unwrap();
+        assert_eq!(bundle.kernel_witness, Some(witness.clone()));
+        assert_eq!(
+            result
+                .trace
+                .runtime_refinement_witness()
+                .unwrap()
+                .kernel_witness,
+            Some(witness.clone())
+        );
+        let function = artifact
+            .contract
+            .functions
+            .iter()
+            .find(|function| function.signature == "auth(bytes32)")
+            .unwrap();
+        assert_eq!(
+            witness.kernel_opcodes,
+            expected_runtime_kernel_opcodes_for_confidential(function).unwrap()
+        );
+        assert_eq!(
+            witness.expected_kernel_steps,
+            Some(expected_runtime_kernel_steps_for_confidential(function).unwrap())
+        );
+        assert_eq!(
+            witness.kernel_steps,
+            witness.expected_kernel_steps.clone().unwrap()
+        );
+        assert_eq!(
+            witness.kernel_opcodes.first().copied(),
+            Some(uo_precompiles::UoOpcode::Begin)
+        );
+        assert_eq!(
+            witness.kernel_opcodes.last().copied(),
+            Some(uo_precompiles::UoOpcode::Wipe)
+        );
+        assert_eq!(
+            witness.kernel_steps.first().and_then(|step| step.object_id),
+            None
+        );
+        assert_eq!(
+            witness.kernel_steps.last().and_then(|step| step.object_id),
+            None
+        );
+    }
+
+    #[test]
+    fn execution_trace_exports_runtime_phase_refinement_witness() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
             include_str!(
@@ -534,19 +669,82 @@ mod tests {
                 vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
             )
             .unwrap();
+        let kernel_witness = result.trace.runtime_kernel_witness.clone().unwrap();
+        let phase_witness = result
+            .trace
+            .runtime_kernel_refinement_witness
+            .clone()
+            .unwrap();
+        assert_eq!(
+            phase_witness.projected_kernel_schedule(),
+            kernel_witness.emitted_kernel_schedule()
+        );
+        assert_eq!(phase_witness.shadow_load_object_schedule(), vec![1]);
+        assert_eq!(phase_witness.commit_object_schedule(), vec![1]);
+        assert_eq!(phase_witness.cold_store_object_schedule(), vec![1]);
+        assert_eq!(
+            phase_witness.events.first().map(|event| event.kind),
+            Some(RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject)
+        );
+        assert_eq!(
+            phase_witness.events.last().map(|event| event.kind),
+            Some(RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject)
+        );
+        phase_witness
+            .validate_with_kernel_witness(&kernel_witness)
+            .unwrap();
+    }
+
+    #[test]
+    fn serialized_execution_trace_preserves_trusted_kernel_bundle() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let result = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
         let bundle = result.trace.runtime_trusted_kernel_bundle().unwrap();
+        let kernel_witness = result
+            .trace
+            .runtime_kernel_witness_for_confidential(&artifact, "add(bytes32,uint256)")
+            .unwrap();
         assert!(result.trace.runtime_trusted_kernel_bundle.is_some());
+        assert!(result.trace.runtime_kernel_witness.is_some());
+        assert_eq!(bundle.kernel_witness, Some(kernel_witness.clone()));
 
         let encoded = serde_json::to_vec(&result.trace).unwrap();
         let mut decoded: ExecutionTrace = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(decoded.runtime_trusted_kernel_bundle, Some(bundle.clone()));
+        assert_eq!(decoded.runtime_kernel_witness, Some(kernel_witness.clone()));
+        assert_eq!(
+            decoded.runtime_kernel_refinement_witness,
+            result.trace.runtime_kernel_refinement_witness
+        );
 
         decoded.theorem_trace = TheoremTrace::default();
         decoded.runtime_controller_certificate = None;
         decoded.runtime_oram_position_map_after = vec![];
+        decoded.runtime_kernel_witness = None;
 
         assert_eq!(decoded.runtime_trusted_kernel_bundle().unwrap(), bundle);
-        assert_eq!(decoded.runtime_refinement_witness().unwrap(), bundle.to_witness().unwrap());
+        assert_eq!(
+            decoded
+                .runtime_kernel_witness_for_confidential(&artifact, "add(bytes32,uint256)")
+                .unwrap(),
+            kernel_witness
+        );
+        assert_eq!(
+            decoded.runtime_refinement_witness().unwrap(),
+            result.trace.runtime_refinement_witness().unwrap()
+        );
     }
 
     #[test]
@@ -725,6 +923,30 @@ mod tests {
                 balances_id,
             ]
         );
+        let phase_witness = witness
+            .runtime_kernel_refinement_witness
+            .expect("runtime refinement witness should carry the lower-level phase witness");
+        assert_eq!(
+            phase_witness.shadow_load_object_schedule(),
+            vec![
+                allowances_id.min(balances_id),
+                allowances_id.max(balances_id)
+            ]
+        );
+        assert_eq!(
+            phase_witness.commit_object_schedule(),
+            vec![
+                allowances_id.min(balances_id),
+                allowances_id.max(balances_id)
+            ]
+        );
+        assert_eq!(
+            phase_witness.cold_store_object_schedule(),
+            vec![
+                allowances_id.min(balances_id),
+                allowances_id.max(balances_id)
+            ]
+        );
     }
 
     #[test]
@@ -758,5 +980,86 @@ mod tests {
         assert!(err
             .to_string()
             .contains("runtime ORAM parameter mismatch for object"));
+    }
+
+    #[test]
+    fn call_rejects_manifest_kernel_opcode_drift() {
+        let mut artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("classify(uint256)")
+            .unwrap()
+            .kernel_opcodes
+            .push(UoOpcode::Commit);
+
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let err = instance
+            .call("classify(uint256)", vec![Value::Uint(1)])
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest kernel opcode trace drifted"));
+    }
+
+    #[test]
+    fn call_rejects_missing_manifest_kernel_opcode_trace() {
+        let mut artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("classify(uint256)")
+            .unwrap()
+            .kernel_opcodes
+            .clear();
+
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let err = instance
+            .call("classify(uint256)", vec![Value::Uint(1)])
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest kernel opcode trace drifted"));
+    }
+
+    #[test]
+    fn call_rejects_manifest_kernel_step_drift() {
+        let mut artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("classify(uint256)")
+            .unwrap()
+            .kernel_steps
+            .clear();
+
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let err = instance
+            .call("classify(uint256)", vec![Value::Uint(1)])
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest kernel step trace drifted"));
     }
 }

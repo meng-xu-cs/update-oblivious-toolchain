@@ -3,6 +3,7 @@ use crate::types::{ScalarType, Type};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use uo_precompiles::UoOpcode;
 
 pub const SURROGATE_ORAM_SCHEME: &str = "surrogate_public_schedule_v1";
 pub const PATH_ORAM_SCHEME: &str = "path_oram_local_posmap_v1";
@@ -32,12 +33,23 @@ pub struct StateObjectManifest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeKernelStepManifest {
+    pub opcode: UoOpcode,
+    #[serde(default)]
+    pub object_id: Option<u32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EntrypointManifest {
     #[serde(default)]
     pub secret_args: Vec<usize>,
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
+    #[serde(default)]
+    pub kernel_opcodes: Vec<UoOpcode>,
+    #[serde(default)]
+    pub kernel_steps: Vec<RuntimeKernelStepManifest>,
     pub uocell_reads: usize,
     pub uocell_writes: usize,
     pub uoarray_reads: usize,
@@ -230,14 +242,16 @@ pub fn validate_oram_access_shape(
             );
         }
         let manifest = OramManifest::for_object(object)?;
-        manifest.validate_theorem_shape_for_object(object).map_err(|err| {
-            anyhow!(
-                "entrypoint {} object {} violates theorem-facing ORAM shape: {}",
-                signature,
-                object.name,
-                err
-            )
-        })?;
+        manifest
+            .validate_theorem_shape_for_object(object)
+            .map_err(|err| {
+                anyhow!(
+                    "entrypoint {} object {} violates theorem-facing ORAM shape: {}",
+                    signature,
+                    object.name,
+                    err
+                )
+            })?;
         if *accesses > 1 && !manifest.supports_multi_access_per_entrypoint() {
             bail!(
                 "entrypoint {} performs {} ORAM accesses to {} but scheme {} only supports one access per entrypoint; use {} for multi-access workloads",

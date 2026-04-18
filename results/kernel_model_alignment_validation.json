@@ -1,0 +1,340 @@
+{
+  "accepted": true,
+  "confidential_kernel_expr_kind_names_match": true,
+  "confidential_kernel_expr_serde_snake_case": true,
+  "confidential_kernel_param_field_names_match": true,
+  "confidential_kernel_program_field_names_match": true,
+  "confidential_kernel_pure_expr_kind_names_match": true,
+  "confidential_kernel_pure_expr_serde_snake_case": true,
+  "confidential_kernel_slot_expr_kind_names_match": true,
+  "confidential_kernel_slot_expr_serde_snake_case": true,
+  "confidential_kernel_slot_program_field_names_match": true,
+  "confidential_kernel_slot_pure_expr_kind_names_match": true,
+  "confidential_kernel_slot_pure_expr_serde_snake_case": true,
+  "confidential_kernel_slot_statement_kind_names_match": true,
+  "confidential_kernel_slot_statement_serde_snake_case": true,
+  "confidential_kernel_statement_kind_names_match": true,
+  "confidential_kernel_statement_serde_snake_case": true,
+  "lean_confidential_kernel_expr_kind_names": [
+    "literal",
+    "var",
+    "unary",
+    "binary",
+    "select",
+    "cell_get",
+    "array_get",
+    "map_get",
+    "keccak256"
+  ],
+  "lean_confidential_kernel_param_field_names": [
+    "name",
+    "ty"
+  ],
+  "lean_confidential_kernel_program_field_names": [
+    "entrypoint_id",
+    "params",
+    "return_type",
+    "secret_args",
+    "body"
+  ],
+  "lean_confidential_kernel_pure_expr_kind_names": [
+    "literal",
+    "var",
+    "unary",
+    "binary",
+    "select",
+    "keccak256"
+  ],
+  "lean_confidential_kernel_slot_expr_kind_names": [
+    "literal",
+    "slot",
+    "unary",
+    "binary",
+    "select",
+    "cell_get",
+    "array_get",
+    "map_get",
+    "keccak256"
+  ],
+  "lean_confidential_kernel_slot_program_field_names": [
+    "entrypoint_id",
+    "param_count",
+    "return_type",
+    "secret_args",
+    "slot_count",
+    "body"
+  ],
+  "lean_confidential_kernel_slot_pure_expr_kind_names": [
+    "literal",
+    "slot",
+    "unary",
+    "binary",
+    "select",
+    "keccak256"
+  ],
+  "lean_confidential_kernel_slot_statement_kind_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "lean_confidential_kernel_statement_kind_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "lean_opcode_names": [
+    "Begin",
+    "CellGet",
+    "CellSet",
+    "ArrayGet",
+    "ArraySet",
+    "MapGet",
+    "MapPut",
+    "Commit",
+    "Wipe"
+  ],
+  "lean_refinement_event_kind_names": [
+    "pre_committed_cold_object",
+    "shadow_load_object",
+    "kernel_step",
+    "commit_object",
+    "cold_store_object",
+    "post_committed_cold_object"
+  ],
+  "lean_resource_event_kind_names": [
+    "stack_check",
+    "reserve_scratch",
+    "wipe_scratch"
+  ],
+  "lean_runtime_confidential_core_lowering_bundle_field_names": [
+    "runtime_witness",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "lean_runtime_confidential_core_shell_boundary_lowering_bundle_field_names": [
+    "runtime_witness",
+    "shell_boundary_bundle",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "lean_runtime_kernel_lowering_bundle_field_names": [
+    "kernel_witness",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "lean_runtime_shell_boundary_bundle_field_names": [
+    "kernel_witness",
+    "runtime_kernel_refinement_witness",
+    "shell_contract",
+    "shell_trace"
+  ],
+  "lean_runtime_shell_boundary_lowering_bundle_field_names": [
+    "shell_boundary_bundle",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "lean_runtime_shell_contract_field_names": [
+    "public_object_universe",
+    "canonical_loaded_object_schedule",
+    "kernel_schedule"
+  ],
+  "lean_runtime_shell_trace_field_names": [
+    "events",
+    "projected_kernel_schedule",
+    "pre_committed_cold_object_schedule",
+    "shadow_load_object_schedule",
+    "commit_object_schedule",
+    "cold_store_object_schedule",
+    "post_committed_cold_object_schedule"
+  ],
+  "lean_scratch_region_names": [
+    "value_scratch",
+    "hash_scratch",
+    "io_scratch"
+  ],
+  "opcode_names_match": true,
+  "refinement_event_kind_names_match": true,
+  "refinement_event_kind_serde_snake_case": true,
+  "resource_event_kind_names_match": true,
+  "resource_event_kind_serde_snake_case": true,
+  "runtime_confidential_core_lowering_bundle_field_names_match": true,
+  "runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match": true,
+  "runtime_kernel_lowering_bundle_field_names_match": true,
+  "runtime_shell_boundary_bundle_field_names_match": true,
+  "runtime_shell_boundary_lowering_bundle_field_names_match": true,
+  "runtime_shell_contract_field_names_match": true,
+  "runtime_shell_trace_field_names_match": true,
+  "rust_confidential_kernel_expr_kind_names": [
+    "literal",
+    "var",
+    "unary",
+    "binary",
+    "select",
+    "cell_get",
+    "array_get",
+    "map_get",
+    "keccak256"
+  ],
+  "rust_confidential_kernel_param_field_names": [
+    "name",
+    "ty"
+  ],
+  "rust_confidential_kernel_program_field_names": [
+    "entrypoint_id",
+    "params",
+    "return_type",
+    "secret_args",
+    "body"
+  ],
+  "rust_confidential_kernel_pure_expr_kind_names": [
+    "literal",
+    "var",
+    "unary",
+    "binary",
+    "select",
+    "keccak256"
+  ],
+  "rust_confidential_kernel_slot_expr_kind_names": [
+    "literal",
+    "slot",
+    "unary",
+    "binary",
+    "select",
+    "cell_get",
+    "array_get",
+    "map_get",
+    "keccak256"
+  ],
+  "rust_confidential_kernel_slot_program_field_names": [
+    "entrypoint_id",
+    "param_count",
+    "return_type",
+    "secret_args",
+    "slot_count",
+    "body"
+  ],
+  "rust_confidential_kernel_slot_pure_expr_kind_names": [
+    "literal",
+    "slot",
+    "unary",
+    "binary",
+    "select",
+    "keccak256"
+  ],
+  "rust_confidential_kernel_slot_statement_kind_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "rust_confidential_kernel_statement_kind_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "rust_opcode_names": [
+    "Begin",
+    "CellGet",
+    "CellSet",
+    "ArrayGet",
+    "ArraySet",
+    "MapGet",
+    "MapPut",
+    "Commit",
+    "Wipe"
+  ],
+  "rust_refinement_event_kind_names": [
+    "pre_committed_cold_object",
+    "shadow_load_object",
+    "kernel_step",
+    "commit_object",
+    "cold_store_object",
+    "post_committed_cold_object"
+  ],
+  "rust_resource_event_kind_names": [
+    "stack_check",
+    "reserve_scratch",
+    "wipe_scratch"
+  ],
+  "rust_runtime_confidential_core_lowering_bundle_field_names": [
+    "runtime_witness",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "rust_runtime_confidential_core_shell_boundary_lowering_bundle_field_names": [
+    "runtime_witness",
+    "shell_boundary_bundle",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "rust_runtime_kernel_lowering_bundle_field_names": [
+    "kernel_witness",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "rust_runtime_shell_boundary_bundle_field_names": [
+    "kernel_witness",
+    "runtime_kernel_refinement_witness",
+    "shell_contract",
+    "shell_trace"
+  ],
+  "rust_runtime_shell_boundary_lowering_bundle_field_names": [
+    "shell_boundary_bundle",
+    "confidential_program",
+    "confidential_slot_program"
+  ],
+  "rust_runtime_shell_contract_field_names": [
+    "public_object_universe",
+    "canonical_loaded_object_schedule",
+    "kernel_schedule"
+  ],
+  "rust_runtime_shell_trace_field_names": [
+    "events",
+    "projected_kernel_schedule",
+    "pre_committed_cold_object_schedule",
+    "shadow_load_object_schedule",
+    "commit_object_schedule",
+    "cold_store_object_schedule",
+    "post_committed_cold_object_schedule"
+  ],
+  "rust_scratch_region_names": [
+    "value_scratch",
+    "hash_scratch",
+    "io_scratch"
+  ],
+  "scratch_region_names_match": true,
+  "scratch_region_serde_snake_case": true,
+  "sources": {
+    "lean_runtime_confidential_core": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean",
+    "lean_runtime_confidential_core_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean",
+    "lean_runtime_kernel_dsl": "proof/lean/UOToolchain/RuntimeKernelDslJson.lean",
+    "lean_runtime_refinement": "proof/lean/UOToolchain/RuntimeRefinement.lean",
+    "lean_runtime_shell_boundary": "proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean",
+    "lean_runtime_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean",
+    "rust_confidential_core": "crates/uo-core/src/confidential_core.rs",
+    "rust_confidential_kernel": "crates/uo-core/src/confidential_kernel.rs",
+    "rust_core_trace": "crates/uo-core/src/trace.rs",
+    "rust_kernel_dsl": "crates/uo-core/src/kernel_dsl.rs",
+    "rust_precompiles": "runtime/uo-precompiles/src/lib.rs",
+    "rust_shell_boundary": "crates/uo-core/src/shell_boundary.rs"
+  }
+}

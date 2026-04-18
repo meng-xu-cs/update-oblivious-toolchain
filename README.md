@@ -12,8 +12,9 @@ Components:
   supported subset, lowers to explicit UO IR, and emits theorem-facing
   manifests.
 - `runtime/uo-evm`: executes raw and UO artifacts in-process, emits
-  instrumented `M+` traces, and exports checked trusted-kernel bundles,
-  certificates, and refinement witnesses for the Lean model.
+  instrumented `M+` traces, explicit runtime kernel witnesses, and checked
+  trusted-kernel bundles, certificates, and refinement witnesses for the Lean
+  model.
 - `checker/uo-check`: rejects unsupported source programs, validates compiled
   artifacts, and is the main translation-validation/security-gate path for
   proof-relevant compiler output.
@@ -64,10 +65,115 @@ Current closure status:
 
 1. keep `path_oram_local_posmap_v1` as the only proof-grade backend target
 2. `uo-check` now serves as source-to-artifact translation validation for
-   proof-relevant fields
-3. the runtime trusted-kernel bundle emitted by `uo-evm` is checked against
-   the Lean refinement interface for the supported backend path, and the full
-   runtime witness is reconstructed from that bundle
+   proof-relevant fields, including exact confidential kernel-op manifest
+   sequences plus the exact public `{ opcode, object_id? }` kernel-step
+   schedule for confidential entrypoints
+3. the runtime trusted-kernel bundle and refinement witness emitted by
+   `uo-evm` are checked against the Lean refinement interface for the
+   supported backend path, and both now carry the kernel witness that Lean
+   threads through imported JSON plus theorem-side runtime/trusted-kernel
+   validity for envelope / budget / wipe shape, with the proof-grade checker
+   path now also requiring the embedded artifact-side expected opcode
+   sequence and expected public kernel-step schedule; the runtime kernel now
+   also enforces that admitted public schedule online during confidential
+   execution, and the repo exposes a direct proof-grade kernel-witness checker
+   alongside the larger trusted-kernel / refinement validators; Lean now also
+   requires that this exact admitted public schedule replay to a finished
+   small-kernel state under the modeled `Begin -> object ops* -> Commit ->
+   Wipe` machine, and that replay determines the exact final public object-id
+   schedule seen by the modeled kernel state; the runtime now also exports the
+   lower-level runtime phase witness that projects back to that small kernel
+   schedule, and Lean now packages that bridge as an explicit
+   `RuntimeShellContract` / `RuntimeShellTrace` refinement theorem: the
+   concrete shell trace outside the confidential kernel is fixed by the
+   kernel's public object universe plus the canonical touched-object set
+   derived from the public kernel schedule. That shell trace now carries the
+   ordered public runtime-phase event list itself, and Rust and Lean both
+   check that the exported summary schedules are honest projections of those
+   events and that the event trace replays the public shell contract. The
+   probe reports now surface those emitted / expected public object schedules
+   plus the phase-witness projection facts directly, and the post-call
+   `cold_store_object` / `post_committed_cold_object` tail is now finalized
+   behind the runtime state boundary instead of being assembled in
+   `engine.rs`; the post-call proof-facing `ExecutionTrace` packaging now also lives in
+   `runtime/uo-evm/src/theorem.rs`, so `engine.rs` no longer constructs the
+   controller-observer certificate, hidden Path-ORAM certificate, or
+   trusted-kernel bundle directly; the
+   confidential interpreter itself now runs inside `RuntimeKernel`, so the
+   generic engine interpreter is public-only and the secret-bearing object
+   transition / hidden-witness helpers are compile-time restricted to the
+   shared `crate::runtime` module rather than being callable from `engine.rs`;
+   the confidential-path `RuntimeKernel` entrypoints that shadow-load
+   committed state, run confidential calls, and commit public shadows are now
+   also visibility-restricted to `crate::runtime`, so the shell cannot call
+   those kernel hooks directly; `engine.rs` now also uses only the
+   `PublicRuntimeKernel` facade instead of importing the raw `RuntimeKernel`
+   type;
+   confidential `Expr::Select` now also evaluates both admitted pure arms and
+   combines them with `Value::confidential_select` instead of branching on the
+   secret condition in Rust, while `uo-check` and the proof-grade
+   kernel-witness validator reject confidential select arms outside that
+   branchless pure fragment; confidential `Expr::StructField` and
+   `Expr::ArrayIndex` are now both rejected from the admitted confidential
+   fragment entirely;
+   `engine.rs` now also holds an opaque committed-state handle
+   (`CommittedRuntimeState`) plus a public shadow-state wrapper
+   (`PublicRuntimeShadowState`) instead of directly owning raw
+   `BTreeMap<u32, RuntimeObject>` storage; the probe now also includes a
+   source-level `kernel_model_alignment_validation` report that checks the
+   Rust kernel opcode vocabulary, the confidential-kernel DSL kind tags and
+   struct field names, and the kernel resource/refinement witness event kinds
+   against the explicit Lean vocabularies, while
+   `confidential_fragment_validation` now scans the admitted UO benchmark
+   artifacts directly and confirms that their confidential entrypoints contain
+   no non-branchless select arms, no confidential `StructField`, and no
+   confidential `ArrayIndex`; `kernel_dsl_validation` now serializes the same
+   lowered confidential-kernel DSL object that `uo-evm` interprets, imports it
+   into Lean, and checks that its derived kernel schedule matches the exact
+   proof-grade runtime kernel witness; `kernel_slot_dsl_validation` checks the
+   fixed-slot program that `RuntimeKernel` actually executes against that same
+   witness; `kernel_lowering_validation` then checks the canonical lowering
+   from the named DSL to the slot DSL against that same exported kernel
+   witness; `shell_boundary_validation` now checks
+   the explicit exported `RuntimeShellContract` / `RuntimeShellTrace` views
+   against that same proof-grade kernel witness and lower-level runtime phase
+   witness, including the ordered public shell-event trace and its replay
+   against the public shell contract; `shell_boundary_lowering_validation`
+   then composes that explicit shell interface with the named and slot
+   confidential programs for the same entrypoint; `confidential_core_validation` now jointly checks each
+   representative proof-grade runtime witness together with that same lowered
+   confidential program, so the shell-refinement theorem is only reported for
+   executions whose embedded kernel witness matches the exact Rust-executed
+   confidential body; `confidential_core_slot_validation` ties the same claim
+   to the fixed-slot program that `RuntimeKernel` actually executes;
+   `confidential_core_lowering_validation` joins the named and slot DSL views
+   into one exported bundle with checker-visible canonical lowering; and
+   `confidential_core_shell_boundary_lowering_validation` lifts the whole
+   composition one layer higher, so Lean checks that the runtime witness,
+   explicit shell-boundary bundle, named DSL, and slot DSL all share one
+   exact proof-grade kernel witness and one exact runtime phase witness rather
+   than being validated only as separate artifacts; the artifact-derived
+   confidential-fragment witness is still reported separately as a diagnostic
+   summary over the admitted fragment, and those combined checkers now consume
+   serialized confidential-core bundles rather than coordinating separate
+   witness files;
+   `runtime_boundary_validation` now also checks that confidential entrypoints
+   are lowered to the shared confidential-kernel DSL only inside
+   `runtime/uo-evm/src/kernel.rs`, that `runtime/uo-evm/src/state.rs`
+   delegates confidential execution through that kernel, that production
+   runtime phase-witness events are constructed only in
+   `runtime/uo-evm/src/kernel.rs` and `runtime/uo-evm/src/state.rs`, and
+   that production resource-event witnesses are constructed only in
+   `runtime/uo-allocator/src/lib.rs`; the same report now also fixes the
+   public write-evidence surface by rejecting regressions from shape-only
+   `PhysicalWriteEvent` / ORAM-write traces back to retained `old` / `new`
+   ciphertext snapshots, and it now checks that theorem-facing
+   `ExecutionTrace` and the default `ContractInstance::call` result both omit
+   runtime telemetry entirely while `uo-evm` keeps only the irreducible
+   aggregate `zero_writes` count in an explicit feature-gated diagnostic
+   channel that is absent from the default runtime surface, and `mplus-probe`
+   recomputes the other
+   byte/count/fraction analytics from the raw trace
 4. the citation route is the current paper theorem source, the
    self-instantiated closure stays as appendix / executable artifact support at
    the same frozen interface, and the stronger import route remains future
@@ -96,9 +202,11 @@ Direct inspection helpers:
 
 ```bash
 cargo run -q -p uo-check -- --artifact benches/uo/FixedSlotClassifier.uo.json --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml
-cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint classify(uint256) --format trace
-cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint classify(uint256) --format trusted-kernel
-cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint classify(uint256) --format refinement-witness
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format trace
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format kernel-witness
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format kernel-refinement-witness
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format trusted-kernel
+cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format refinement-witness
 cargo run -q -p mplus-probe -- --only bridge-validation --out-dir results
 ```
 
@@ -122,5 +230,6 @@ documented in [docs/supported-subset.md](docs/supported-subset.md),
 [docs/paper-main-theorem-checklist.md](docs/paper-main-theorem-checklist.md),
 [docs/path-oram-citation-import-plan.md](docs/path-oram-citation-import-plan.md),
 [docs/stronger-import-route-feasibility.md](docs/stronger-import-route-feasibility.md),
+[docs/tee-runtime-hardening.md](docs/tee-runtime-hardening.md),
 [docs/implementation-roadmap.md](docs/implementation-roadmap.md), and
 [docs/formal-proof-plan.md](docs/formal-proof-plan.md).

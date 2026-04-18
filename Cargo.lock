@@ -902,8 +902,10 @@ checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 name = "uo-allocator"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "serde",
  "uo-core",
+ "uo-precompiles",
 ]
 
 [[package]]
@@ -917,6 +919,7 @@ dependencies = [
  "serde_yaml",
  "solang-parser",
  "uo-core",
+ "uo-precompiles",
  "uo-solc",
 ]
 
@@ -930,6 +933,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "thiserror",
+ "uo-precompiles",
 ]
 
 [[package]]
@@ -946,6 +950,7 @@ dependencies = [
  "tiny-keccak",
  "uo-allocator",
  "uo-core",
+ "uo-precompiles",
  "uo-solc",
  "uo-store",
 ]
@@ -983,6 +988,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "uo-core",
+ "zeroize",
 ]
 
 [[package]]

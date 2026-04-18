@@ -673,6 +673,8 @@
           "public_gas_budget": 3246,
           "arena_bytes": 4160,
           "max_stack_words": 65,
+          "kernel_opcodes": [],
+          "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -693,6 +695,30 @@
           "public_gas_budget": 14336,
           "arena_bytes": 4160,
           "max_stack_words": 65,
+          "kernel_opcodes": [
+            "Begin",
+            "MapPut",
+            "Commit",
+            "Wipe"
+          ],
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -709,6 +735,8 @@
           "public_gas_budget": 2721,
           "arena_bytes": 4096,
           "max_stack_words": 64,
+          "kernel_opcodes": [],
+          "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -725,6 +753,8 @@
           "public_gas_budget": 3438,
           "arena_bytes": 4096,
           "max_stack_words": 64,
+          "kernel_opcodes": [],
+          "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -745,6 +775,45 @@
           "public_gas_budget": 14336,
           "arena_bytes": 4160,
           "max_stack_words": 65,
+          "kernel_opcodes": [
+            "Begin",
+            "MapGet",
+            "MapPut",
+            "MapGet",
+            "MapPut",
+            "Commit",
+            "Wipe"
+          ],
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -766,6 +835,55 @@
           "public_gas_budget": 16384,
           "arena_bytes": 4288,
           "max_stack_words": 67,
+          "kernel_opcodes": [
+            "Begin",
+            "MapGet",
+            "MapGet",
+            "MapPut",
+            "MapPut",
+            "MapGet",
+            "MapPut",
+            "Commit",
+            "Wipe"
+          ],
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 2
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 2
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,

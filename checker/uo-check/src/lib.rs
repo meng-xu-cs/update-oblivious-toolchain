@@ -2,7 +2,14 @@ use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, Statement};
 use uo_core::manifest::PATH_ORAM_SCHEME;
-use uo_core::{CompiledArtifact, ContractMetadata, OramManifest, StateObjectManifest};
+use uo_core::{
+    expected_runtime_kernel_opcodes_for_confidential,
+    expected_runtime_manifest_kernel_steps_for_confidential, lower_confidential_kernel_statements,
+    CompiledArtifact, ContractMetadata, OramManifest, StateObjectManifest,
+};
+
+#[cfg(test)]
+use uo_core::lower_confidential_kernel_expr;
 
 pub fn check_source(source_path: &str, metadata: &ContractMetadata) -> Result<Vec<String>> {
     let report = uo_solc::validate_source(source_path, metadata)?;
@@ -125,6 +132,28 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 function.signature,
                 entry.max_stack_words,
                 64 + counts.local_count
+            );
+        }
+        let expected_kernel_opcodes = if function.confidential {
+            expected_runtime_kernel_opcodes_for_confidential(function)?
+        } else {
+            Vec::new()
+        };
+        if entry.kernel_opcodes != expected_kernel_opcodes {
+            bail!(
+                "manifest kernel_opcodes mismatch for entrypoint {}",
+                function.signature
+            );
+        }
+        let expected_kernel_steps = if function.confidential {
+            expected_runtime_manifest_kernel_steps_for_confidential(function)?
+        } else {
+            Vec::new()
+        };
+        if entry.kernel_steps != expected_kernel_steps {
+            bail!(
+                "manifest kernel_steps mismatch for entrypoint {}",
+                function.signature
             );
         }
         assert_entry_count_eq(
@@ -297,6 +326,13 @@ struct CountSummary {
 }
 
 fn count_body(statements: &[Statement]) -> CountSummary {
+    count_body_with_env(statements, &BTreeMap::new())
+}
+
+fn count_body_with_env(
+    statements: &[Statement],
+    loop_env: &BTreeMap<String, u128>,
+) -> CountSummary {
     let mut counts = CountSummary::default();
     for statement in statements {
         match statement {
@@ -318,11 +354,26 @@ fn count_body(statements: &[Statement]) -> CountSummary {
                 merge_counts(&mut counts, count_body(else_body));
             }
             Statement::For {
-                start, end, body, ..
+                index_var,
+                start,
+                end,
+                body,
+                ..
             } => {
                 count_expr(start, &mut counts);
                 count_expr(end, &mut counts);
-                merge_counts(&mut counts, count_body(body));
+                let start = eval_loop_bound(start, loop_env);
+                let end = eval_loop_bound(end, loop_env);
+                match (start, end) {
+                    (Some(start), Some(end)) => {
+                        for index in start..end {
+                            let mut nested_env = loop_env.clone();
+                            nested_env.insert(index_var.clone(), index);
+                            merge_counts(&mut counts, count_body_with_env(body, &nested_env));
+                        }
+                    }
+                    _ => merge_counts(&mut counts, count_body_with_env(body, loop_env)),
+                }
             }
             Statement::CellSet {
                 value, predicate, ..
@@ -835,105 +886,25 @@ fn state_object_by_id(state: &[StateObject], object_id: u32) -> Result<&StateObj
 }
 
 fn forbid_control_flow(statements: &[Statement], signature: &str) -> Result<()> {
-    for statement in statements {
-        match statement {
-            Statement::If { .. } | Statement::For { .. } => {
-                bail!(
-                    "confidential entrypoint {} still contains control flow",
-                    signature
-                )
-            }
-            Statement::Declare { value, .. } | Statement::Assign { value, .. } => {
-                forbid_raw_expr(value, signature)?
-            }
-            Statement::Require { cond } | Statement::AbortIf { cond } => {
-                forbid_raw_expr(cond, signature)?
-            }
-            Statement::CellSet {
-                value, predicate, ..
-            } => {
-                forbid_raw_expr(value, signature)?;
-                if let Some(predicate) = predicate {
-                    forbid_raw_expr(predicate, signature)?;
-                }
-            }
-            Statement::ArraySet {
-                index,
-                value,
-                predicate,
-                ..
-            } => {
-                forbid_raw_expr(index, signature)?;
-                forbid_raw_expr(value, signature)?;
-                if let Some(predicate) = predicate {
-                    forbid_raw_expr(predicate, signature)?;
-                }
-            }
-            Statement::MapPut {
-                key,
-                value,
-                predicate,
-                ..
-            } => {
-                forbid_raw_expr(key, signature)?;
-                forbid_raw_expr(value, signature)?;
-                if let Some(predicate) = predicate {
-                    forbid_raw_expr(predicate, signature)?;
-                }
-            }
-            Statement::Return { value } => {
-                if let Some(value) = value {
-                    forbid_raw_expr(value, signature)?;
-                }
-            }
-        }
-    }
+    lower_confidential_kernel_statements(statements, signature)?;
     Ok(())
 }
 
+#[cfg(test)]
 fn forbid_raw_expr(expr: &Expr, signature: &str) -> Result<()> {
-    match expr {
-        Expr::Unary { expr, .. } => forbid_raw_expr(expr, signature),
-        Expr::Binary { lhs, rhs, .. } => {
-            forbid_raw_expr(lhs, signature)?;
-            forbid_raw_expr(rhs, signature)
-        }
-        Expr::Select {
-            cond,
-            when_true,
-            when_false,
-        } => {
-            forbid_raw_expr(cond, signature)?;
-            forbid_raw_expr(when_true, signature)?;
-            forbid_raw_expr(when_false, signature)
-        }
-        Expr::StructField { base, .. } => forbid_raw_expr(base, signature),
-        Expr::ArrayIndex { base, index } => {
-            forbid_raw_expr(base, signature)?;
-            forbid_raw_expr(index, signature)
-        }
-        Expr::Keccak256 { parts } => {
-            for part in parts {
-                forbid_raw_expr(part, signature)?;
-            }
-            Ok(())
-        }
-        Expr::Literal(_)
-        | Expr::Var(_)
-        | Expr::CellGet { .. }
-        | Expr::ArrayGet { .. }
-        | Expr::MapGet { .. } => Ok(()),
-    }
+    lower_confidential_kernel_expr(expr, signature)?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{check_artifact, check_artifact_against_source};
+    use super::{check_artifact, check_artifact_against_source, forbid_raw_expr};
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
-    use uo_core::{CompiledArtifact, ContractMetadata, ProgramMode};
+    use uo_core::{CompiledArtifact, ContractMetadata, Expr, ProgramMode, Value};
+    use uo_precompiles::UoOpcode;
 
     static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -1026,6 +997,103 @@ bounds:
     }
 
     #[test]
+    fn checker_rejects_confidential_select_arm_outside_branchless_fragment() {
+        let expr = Expr::Select {
+            cond: Box::new(Expr::Var("cond".into())),
+            when_true: Box::new(Expr::ArrayIndex {
+                base: Box::new(Expr::Literal(Value::Array(vec![Value::Uint(1)]))),
+                index: Box::new(Expr::Literal(Value::Uint(0))),
+            }),
+            when_false: Box::new(Expr::Literal(Value::Uint(0))),
+        };
+        let err = forbid_raw_expr(&expr, "confidentialSelect(uint256)").unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("select arm outside the branchless pure fragment"));
+    }
+
+    #[test]
+    fn checker_rejects_confidential_array_index() {
+        let expr = Expr::ArrayIndex {
+            base: Box::new(Expr::Literal(Value::Array(vec![Value::Uint(1)]))),
+            index: Box::new(Expr::Literal(Value::Uint(0))),
+        };
+        let err = forbid_raw_expr(&expr, "confidentialArrayIndex()").unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("unsupported array indexing in the confidential fragment"));
+    }
+
+    #[test]
+    fn checker_rejects_confidential_struct_field() {
+        let expr = Expr::StructField {
+            base: Box::new(Expr::Literal(Value::Struct(vec![(
+                "flag".into(),
+                Value::Bool(true),
+            )]))),
+            field: "flag".into(),
+        };
+        let err = forbid_raw_expr(&expr, "confidentialStructField()").unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("unsupported struct-field projection in the confidential fragment"));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_kernel_opcode_drift() {
+        let (_, _, mut artifact) = sample_artifact();
+        let signature = artifact.contract.functions[0].signature.clone();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap()
+            .kernel_opcodes
+            .push(UoOpcode::Wipe);
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest kernel_opcodes mismatch for entrypoint"));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_missing_confidential_kernel_opcode_trace() {
+        let (_, _, mut artifact) = sample_artifact();
+        let signature = artifact.contract.functions[0].signature.clone();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap()
+            .kernel_opcodes
+            .clear();
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest kernel_opcodes mismatch for entrypoint"));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_confidential_kernel_step_drift() {
+        let (_, _, mut artifact) = sample_artifact();
+        let signature = artifact.contract.functions[0].signature.clone();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap()
+            .kernel_steps
+            .clear();
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest kernel_steps mismatch for entrypoint"));
+    }
+
+    #[test]
     fn translation_validation_rejects_public_gas_budget_drift() {
         let (source, metadata, mut artifact) = sample_artifact();
         let signature = artifact.contract.functions[0].signature.clone();
@@ -1042,5 +1110,18 @@ bounds:
         assert!(err
             .to_string()
             .contains("source/artifact manifest mismatch"));
+    }
+
+    #[test]
+    fn artifact_checker_accepts_raw_bounded_loop_manifest_counts() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let source = root.join("benches/raw/AuthScan.sol");
+        let metadata: ContractMetadata = serde_yaml::from_str(
+            &fs::read_to_string(root.join("benches/raw/AuthScan.raw.yaml")).unwrap(),
+        )
+        .unwrap();
+        let artifact =
+            uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Raw).unwrap();
+        check_artifact(&artifact).unwrap();
     }
 }

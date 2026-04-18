@@ -26,8 +26,9 @@ The maintained codebase implements:
 - an in-process runtime with exact backends plus the concrete
   `path_oram_local_posmap_v1` path
 - Lean-backed validation for controller certificates, hidden Path-ORAM
-  certificates, trusted-kernel bundles, refinement witnesses, seeded witness
-  families, and canonical Path-ORAM pair artifacts
+  certificates, proof-grade kernel witnesses, trusted-kernel bundles,
+  refinement witnesses, shell-boundary and confidential-core bundles, seeded
+  witness families, and canonical Path-ORAM pair artifacts
 
 ## Current Documentation
 

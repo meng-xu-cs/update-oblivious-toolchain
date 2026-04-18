@@ -187,9 +187,9 @@ The recommended provenance split is:
   discharge this from the implementation boundary.
   The repo’s Path ORAM manifest chooses
   `leaf_count = capacity.max(2).next_power_of_two()` in
-  [manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs:103),
+  [manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs),
   and the runtime samples fresh leaves with `next_u64() % leaf_count` in
-  [oram.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/oram.rs:1025).
+  [oram.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/oram.rs).
   Because `leaf_count` is forced to a power of two, this sampling rule is an
   exact uniform draw from the leaf space rather than an approximation. The
   theorem-facing validator now also checks that power-of-two leaf-count shape.
@@ -198,7 +198,7 @@ The recommended provenance split is:
   discharge these from the concrete sealed-record layer actually used by the
   runtime. The implementation uses `ChaCha20Poly1305` with fresh random nonces
   and associated data in
-  [runtime/uo-store/src/codec.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-store/src/codec.rs:59).
+  [runtime/uo-store/src/codec.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-store/src/codec.rs).
   The theorem only needs confidentiality-style hiding at these fields, while
   the runtime primitive is stronger and also provides integrity. A conservative
   paper route is therefore:

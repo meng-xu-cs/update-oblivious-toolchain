@@ -1,0 +1,992 @@
+{
+  "accepted": true,
+  "all_kernel_restricted_signatures_present": true,
+  "all_restricted_signatures_present": true,
+  "all_state_restricted_signatures_present": true,
+  "checker_path": "checker/uo-check/src/lib.rs",
+  "checker_uses_shared_confidential_kernel_lowering": true,
+  "confidential_object_api_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": ".get_cell(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": ".set_cell(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": ".get_array(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": ".set_array(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": ".get_map(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": ".put_map(",
+      "restricted": true
+    }
+  ],
+  "confidential_object_api_surface_restricted": true,
+  "contract_instance_clone_uses_cold_runtime_clone": true,
+  "core_trace_path": "crates/uo-core/src/trace.rs",
+  "default_call_result_omits_runtime_telemetry": true,
+  "diagnostic_api_gated_behind_feature": true,
+  "diagnostic_call_api_exposes_runtime_telemetry": true,
+  "direct_store_open_surface_files": [
+    "runtime/uo-store/src/codec.rs"
+  ],
+  "direct_store_open_surface_restricted": true,
+  "direct_store_seal_surface_files": [
+    "runtime/uo-store/src/codec.rs"
+  ],
+  "direct_store_seal_surface_restricted": true,
+  "engine_assembles_execution_trace_directly": false,
+  "engine_constructs_runtime_phase_events_directly": false,
+  "engine_constructs_theorem_certificates_directly": false,
+  "engine_does_not_lower_confidential_program_directly": true,
+  "engine_forbidden_helpers_absent": true,
+  "engine_imports_raw_runtime_kernel": false,
+  "engine_imports_runtime_object_directly": false,
+  "engine_owns_raw_runtime_object_map": false,
+  "engine_path": "runtime/uo-evm/src/engine.rs",
+  "engine_uses_opaque_committed_state": true,
+  "engine_uses_public_runtime_kernel": true,
+  "engine_uses_shadow_wrapper": true,
+  "execution_trace_omits_runtime_telemetry": true,
+  "forbidden_engine_helper_checks": [
+    {
+      "helper": "clone_for_tx(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "commit(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "shadow_load_objects(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "enable_injected_path_oram_leaf_coins(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "install_path_oram_leaf_coins(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "ensure_path_oram_leaf_coins_consumed(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "path_oram_position_map_witness(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "path_oram_access_counter_witness(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "into_cold_committed(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "committed_cache_is_cold(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "cold_store_object(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "post_committed_cold_object(",
+      "present_in_engine_impl": false
+    }
+  ],
+  "fullscan_buffer_reuse_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "pattern": "self.values.clear();\n        self.values.resize(\n            self.physical_slots.len(),",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "pattern": "self.entries.clear();\n        self.entries.resize(\n            self.physical_slots.len(),\n            MapEntry {",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "pattern": "fn decode_values_from_storage_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "pattern": "fn decode_entries_from_storage_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "pattern": "old.decode_values_from_storage_into(allocator, &mut next.values)?;",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs"
+      ],
+      "pattern": "old.decode_entries_from_storage_into(allocator, &mut next.entries)?;",
+      "restricted": true
+    },
+    {
+      "expected_files": [],
+      "files": [],
+      "pattern": "next.physical = old.physical.clone();",
+      "restricted": true
+    },
+    {
+      "expected_files": [],
+      "files": [],
+      "pattern": "next.physical_slots = old.physical_slots.clone();",
+      "restricted": true
+    }
+  ],
+  "fullscan_buffer_reuse_restricted": true,
+  "kernel_bounded_journal_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "struct BoundedJournal<T>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "kernel_steps: BoundedJournal<RuntimeKernelStepWitness>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "runtime_phase_events: BoundedJournal<RuntimeKernelRefinementEventWitness>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "entries: Vec::with_capacity(max_len.max(1))",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "fn max_runtime_phase_event_count(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "max_runtime_phase_event_count(public_object_ids.len(), plan.max_kernel_ops)?;",
+      "restricted": true
+    }
+  ],
+  "kernel_bounded_journal_restricted": true,
+  "kernel_confidential_select_uses_branchless_value_select": true,
+  "kernel_eval_uses_confidential_slot_exprs": true,
+  "kernel_exec_block_uses_confidential_slot_statements": true,
+  "kernel_exec_state_avoids_name_keyed_env": true,
+  "kernel_exec_state_uses_slot_vector": true,
+  "kernel_executes_program_body_via_shared_dsl": true,
+  "kernel_lowers_confidential_entrypoint_to_slot_program": true,
+  "kernel_only_state_helper_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "committed.shadow_load(shadow_load_object_ids, &mut self.allocator)?",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": ".object_mut(object_id)?",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "objects.install_path_oram_leaf_coins(fresh_coins_by_object)",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "objects.ensure_path_oram_leaf_coins_consumed()",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "objects.commit_against(committed, aborted, recorder, &mut self.allocator)?",
+      "restricted": true
+    }
+  ],
+  "kernel_only_state_helper_surface_restricted": true,
+  "kernel_path": "runtime/uo-evm/src/kernel.rs",
+  "kernel_restricted_signature_checks": [
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn inner_mut"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn into_inner"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn commit_public_objects"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn run_confidential_call"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn shadow_load_objects"
+    }
+  ],
+  "kernel_witness_validation_tracks_confidential_kernel_lowering_errors": true,
+  "kernel_witness_validation_uses_lowered_confidential_program": true,
+  "objects_path": "runtime/uo-evm/src/objects.rs",
+  "oram_buffer_reuse_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "impl Clone for OramState",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "clone_vec_with_min_capacity(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "entries: Vec::with_capacity(self.parameters.capacity)",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "position_map: Vec::with_capacity(self.parameters.capacity)",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "decode_path_metadata_pages_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "decode_path_position_map_pages_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": ".resize(self.parameters.capacity, empty_map_entry(spec)?);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "position_map.clear();",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "fn restore_from_old(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": ".directory_pages\n            .clone_from(&old.storage.directory_pages);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "self.storage.buckets.clone_from(&old.storage.buckets);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": ".access_counter_slot\n            .clone_from(&old.storage.access_counter_slot);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "fn decode_surrogate_entries_from_storage_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "Self::decode_surrogate_entries_from_storage_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "next.restore_from_old(spec, old, allocator)?;",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "rewrite_path_metadata_pages_in_place(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "let mut payload = Vec::with_capacity(parameters.directory_page_bytes);",
+      "restricted": true
+    },
+    {
+      "expected_files": [],
+      "files": [],
+      "pattern": "old.clone_for_tx(spec, allocator)?",
+      "restricted": true
+    },
+    {
+      "expected_files": [],
+      "files": [],
+      "pattern": "let new_directory_pages = encode_path_metadata_pages(",
+      "restricted": true
+    }
+  ],
+  "oram_buffer_reuse_restricted": true,
+  "oram_path": "runtime/uo-evm/src/oram.rs",
+  "oram_state_derive_line": "#[derive(Debug)]",
+  "oram_state_nonderive_clone": true,
+  "oram_working_stash_avoids_midcall_reserve": true,
+  "oram_working_stash_capacity_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "fn working_stash_capacity(parameters: &OramParameters) -> Result<usize>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "stash: Vec::with_capacity(working_stash_capacity(&self.parameters)?)",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "let stash = Vec::with_capacity(working_stash_capacity(&parameters)?);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "let mut stash = Vec::with_capacity(working_stash_capacity(parameters)?);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "self.stash.clear();",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": "if working_stash.capacity() < required_stash_capacity {",
+      "restricted": true
+    }
+  ],
+  "oram_working_stash_capacity_restricted": true,
+  "oram_write_trace_is_shape_only": true,
+  "oram_write_trace_projects_to_public_shape": true,
+  "path_oram_restore_reuses_in_place_buffers": true,
+  "physical_write_event_builders_are_shape_only": true,
+  "physical_write_event_is_shape_only": true,
+  "probe_enables_runtime_diagnostics_feature": true,
+  "probe_path": "probe/mplus-probe/src/lib.rs",
+  "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
+  "resource_event_constructor_files": [
+    "runtime/uo-allocator/src/lib.rs"
+  ],
+  "resource_event_constructor_surface_restricted": true,
+  "restricted_signature_checks": [
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn clone_for_tx"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn clone_committed_cold"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn path_oram_position_map_witness"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn path_oram_access_counter_witness"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn get_cell"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn set_cell"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn get_array"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn set_array"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn get_map"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn put_map"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn commit"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn into_cold_committed"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn committed_cache_is_cold"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn enable_injected_path_oram_leaf_coins"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn install_path_oram_leaf_coins"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed"
+    }
+  ],
+  "runtime_diagnostics_feature_declared": true,
+  "runtime_module_layout_present": true,
+  "runtime_module_path": "runtime/uo-evm/src/runtime.rs",
+  "runtime_object_derive_line": "#[derive(Debug)]",
+  "runtime_object_nonclone": true,
+  "runtime_phase_event_constructor_files": [
+    "runtime/uo-evm/src/kernel.rs",
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "runtime_phase_event_constructor_surface_restricted": true,
+  "runtime_state_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "pub(in crate::runtime) fn object_mut",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/engine.rs",
+        "runtime/uo-evm/src/kernel.rs",
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/engine.rs",
+        "runtime/uo-evm/src/kernel.rs",
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "CommittedRuntimeState",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs"
+      ],
+      "pattern": "slots: Vec<Option<Value>>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "let mut runtime_oram_position_maps = Vec::with_capacity(self.objects.len());",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "let mut committed_object_ids = Vec::with_capacity(committed.objects().len());",
+      "restricted": true
+    }
+  ],
+  "runtime_state_surface_restricted": true,
+  "state_finalizes_runtime_phase_witness": true,
+  "state_only_kernel_helper_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "shadow_load_objects(self, public_object_ids)?",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": ".commit_public_objects(shadow, self, aborted, recorder)",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "kernel.into_inner().run_confidential_call(",
+      "restricted": true
+    }
+  ],
+  "state_only_kernel_helper_surface_restricted": true,
+  "state_only_runtime_helper_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": ".insert(*object_id, object.clone_for_tx(allocator)?);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "clone_committed_cold()",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "path_oram_position_map_witness()?",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "RuntimeObject::path_oram_access_counter_witness",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "let committed_object = object.commit(old, aborted, recorder, allocator)?;",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": ".map(|(id, object)| (id, object.into_cold_committed()))",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "object.enable_injected_path_oram_leaf_coins();",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": ".install_path_oram_leaf_coins(coins.clone())?;",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "object.ensure_path_oram_leaf_coins_consumed()?;",
+      "restricted": true
+    }
+  ],
+  "state_only_runtime_helper_surface_restricted": true,
+  "state_owns_committed_reconciliation": true,
+  "state_owns_path_oram_fresh_coin_routing": true,
+  "state_owns_shadow_loading": true,
+  "state_path": "runtime/uo-evm/src/state.rs",
+  "state_restricted_signature_checks": [
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn objects"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn shadow_load"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn object_mut"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn enable_injected_path_oram_leaf_coins"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn install_path_oram_leaf_coins"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn commit_against"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn into_cold_committed_state"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn inner_mut"
+    }
+  ],
+  "state_routes_confidential_calls_through_runtime_kernel": true,
+  "state_wrapper_present": true,
+  "store_cipher_exposes_wipe_helpers": true,
+  "store_cipher_key_zeroizes_on_drop": true,
+  "store_codec_path": "runtime/uo-store/src/codec.rs",
+  "store_store_path": "runtime/uo-store/src/store.rs",
+  "store_wipe_helper_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs",
+        "runtime/uo-evm/src/oram.rs",
+        "runtime/uo-store/src/codec.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs",
+        "runtime/uo-evm/src/oram.rs",
+        "runtime/uo-store/src/codec.rs"
+      ],
+      "pattern": "seal_and_wipe(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs",
+        "runtime/uo-evm/src/oram.rs",
+        "runtime/uo-store/src/codec.rs",
+        "runtime/uo-store/src/store.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs",
+        "runtime/uo-evm/src/oram.rs",
+        "runtime/uo-store/src/codec.rs",
+        "runtime/uo-store/src/store.rs"
+      ],
+      "pattern": "seal_and_wipe_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/objects.rs",
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/objects.rs",
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "pattern": ".with_opened_payload(",
+      "restricted": true
+    }
+  ],
+  "store_wipe_helper_surface_restricted": true,
+  "store_write_api_uses_mutable_plaintext": true,
+  "theorem_finalizer_omits_runtime_telemetry": true,
+  "theorem_finalizes_execution_trace": true,
+  "theorem_path": "runtime/uo-evm/src/theorem.rs"
+}

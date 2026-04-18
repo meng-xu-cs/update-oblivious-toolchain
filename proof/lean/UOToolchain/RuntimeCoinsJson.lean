@@ -61,7 +61,7 @@ def ImportedSeededRuntimeWitnessFamily.toSeededRuntimeWitnessFamily
       rcases hValid.2 seed hSeed with ⟨witness, hGet, _hTag, hWitnessValid⟩
       change (family.runtimeWitnessAt seed).Valid modelTags
       rw [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt, hGet]
-      simpa using hWitnessValid
+      simpa using hWitnessValid.1
   }
 
 def parseImportedSeededRuntimeWitnessFamily
@@ -366,7 +366,7 @@ def ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.toCanonicalFreshCoinR
         ⟨witness, hGet, hWitnessValid, _hLeafScaffold, _hFreshScaffold, _hFreshValues⟩
       change (family.runtimeWitnessAt seed).Valid modelTags
       rw [ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.runtimeWitnessAt, hGet]
-      simpa using hWitnessValid
+      simpa using hWitnessValid.1
   , publicLeafScaffold := family.projectedPublicLeafScaffold
   , publicLeafScaffoldExact := by
       intro seed hSeed

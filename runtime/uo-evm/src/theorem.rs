@@ -1,8 +1,26 @@
 use crate::controller::CallRecorder;
+use crate::runtime::state::CommittedRuntimeWitnessSnapshot;
 use anyhow::Result;
 use uo_core::ir::CompiledFunction;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
-use uo_core::{ExecutionTrace, Value};
+use uo_core::{
+    CompiledArtifact, ExecutionTrace, RuntimeControllerObserverCertificate,
+    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness,
+    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, Value,
+};
+
+pub(crate) struct FinalizeExecutionTraceInput<'a> {
+    pub artifact: &'a CompiledArtifact,
+    pub function: &'a CompiledFunction,
+    pub deploy_seed: u64,
+    pub opcode_trace: Vec<String>,
+    pub gas_used: u64,
+    pub trace_bundle: crate::controller::CallTraceBundle,
+    pub runtime_kernel_witness: RuntimeKernelWitness,
+    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
+    pub runtime_state_before: CommittedRuntimeWitnessSnapshot,
+    pub runtime_state_after: CommittedRuntimeWitnessSnapshot,
+}
 
 pub fn build_theorem_trace(
     recorder: CallRecorder,
@@ -25,23 +43,124 @@ pub fn build_theorem_trace(
     )
 }
 
-pub fn attach_theorem_metrics(trace: &mut ExecutionTrace) {
-    if let Some(shape) = &trace.theorem_trace.controller_shape {
-        trace.host_proxy_metrics.insert(
-            "boundary_events".into(),
-            trace.theorem_trace.boundary_schedule.len() as f64,
-        );
-        trace.host_proxy_metrics.insert(
-            "controller_phase_count".into(),
-            shape.controller_phase_order.len() as f64,
-        );
-        trace.host_proxy_metrics.insert(
-            "normalized_page_events".into(),
-            shape
-                .page_trace_regions
-                .iter()
-                .map(|region| region.event_budget)
-                .sum::<usize>() as f64,
-        );
+pub(crate) fn finalize_execution_trace(
+    input: FinalizeExecutionTraceInput<'_>,
+) -> Result<ExecutionTrace> {
+    let FinalizeExecutionTraceInput {
+        artifact,
+        function,
+        deploy_seed,
+        opcode_trace,
+        gas_used,
+        trace_bundle,
+        runtime_kernel_witness,
+        runtime_kernel_refinement_witness,
+        runtime_state_before,
+        runtime_state_after,
+    } = input;
+
+    let mut trace = ExecutionTrace {
+        opcode_trace,
+        logical_accesses: trace_bundle.logical_accesses,
+        logical_writes: trace_bundle.logical_writes,
+        physical_reads: trace_bundle.physical_reads,
+        physical_writes: trace_bundle.physical_writes,
+        gas_used,
+        theorem_trace: trace_bundle.theorem_trace,
+        runtime_seed: Some(deploy_seed),
+        runtime_kernel_witness: Some(runtime_kernel_witness.clone()),
+        runtime_kernel_refinement_witness: Some(runtime_kernel_refinement_witness),
+        runtime_trusted_kernel_bundle: None,
+        runtime_controller_certificate: Some(trace_bundle.controller_certificate),
+        runtime_oram_objects: runtime_oram_objects(artifact),
+        runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
+        runtime_oram_access_counters_before: runtime_state_before.runtime_oram_access_counters,
+        runtime_oram_access_counters_after: runtime_state_after.runtime_oram_access_counters,
+        runtime_oram_position_map_before: runtime_state_before.runtime_oram_position_maps,
+        runtime_oram_position_map_after: runtime_state_after.runtime_oram_position_maps,
+        runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
+    };
+    if function.confidential {
+        trace
+            .runtime_kernel_witness_for_confidential(artifact, &function.signature)
+            .map_err(|err| {
+                anyhow::anyhow!("runtime kernel witness drifted from admitted artifact: {err}")
+            })?;
     }
+
+    let direct_controller_observer = RuntimeControllerObserverCertificate::new(
+        trace
+            .theorem_trace
+            .public_outcome
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("runtime theorem trace missing public_outcome"))?,
+        trace.theorem_trace.boundary_schedule.clone(),
+        trace
+            .theorem_trace
+            .controller_shape
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("runtime theorem trace missing controller_shape"))?,
+        trace
+            .theorem_trace
+            .normalized_micro_trace
+            .clone()
+            .ok_or_else(|| {
+                anyhow::anyhow!("runtime theorem trace missing normalized_micro_trace")
+            })?,
+        trace
+            .runtime_controller_certificate
+            .clone()
+            .ok_or_else(|| {
+                anyhow::anyhow!("execution trace missing runtime controller certificate")
+            })?,
+    )?;
+    let direct_hidden_certificate = RuntimePathOramHiddenCertificate::new(
+        trace.refinement_trace(),
+        trace.runtime_oram_objects.clone(),
+        trace.runtime_oram_leaf_schedule.clone(),
+        trace.runtime_oram_position_map_before.clone(),
+        trace.runtime_oram_position_map_after.clone(),
+        trace.runtime_oram_leaf_state_transitions.clone(),
+    )?;
+    let direct_bundle = RuntimeTrustedKernelBundle::new_with_kernel_witness(
+        trace.runtime_seed,
+        direct_controller_observer,
+        Some(runtime_kernel_witness),
+        direct_hidden_certificate,
+    )?;
+    let reconstructed_bundle = trace.runtime_trusted_kernel_bundle()?;
+    if reconstructed_bundle != direct_bundle {
+        anyhow::bail!("runtime trusted kernel drifted from direct certificate reconstruction");
+    }
+    trace.runtime_trusted_kernel_bundle = Some(direct_bundle);
+    Ok(trace)
+}
+
+fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWitness> {
+    artifact
+        .contract
+        .manifest
+        .objects
+        .iter()
+        .filter_map(|object| {
+            let oram = object.oram.as_ref()?;
+            Some(RuntimeOramObjectWitness {
+                object_id: object.id,
+                object_name: object.name.clone(),
+                scheme: oram.scheme.clone(),
+                capacity: object.capacity.unwrap_or_default(),
+                block_size: oram.block_size,
+                bucket_size: oram.bucket_size,
+                bucket_count: oram.bucket_count,
+                blocks_per_bucket: oram.blocks_per_bucket,
+                tree_height: oram.tree_height,
+                stash_bound: oram.stash_bound,
+                recursion_depth: oram.recursion_depth,
+                metadata_pages: oram.metadata_pages,
+                metadata_pages_per_access: oram.metadata_pages_per_access,
+                buckets_per_access: oram.buckets_per_access,
+                accesses_per_call: oram.accesses_per_call,
+            })
+        })
+        .collect()
 }

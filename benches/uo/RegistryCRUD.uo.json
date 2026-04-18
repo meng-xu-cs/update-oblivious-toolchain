@@ -282,6 +282,30 @@
           "public_gas_budget": 12288,
           "arena_bytes": 4096,
           "max_stack_words": 64,
+          "kernel_opcodes": [
+            "Begin",
+            "MapPut",
+            "Commit",
+            "Wipe"
+          ],
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -299,6 +323,35 @@
           "public_gas_budget": 12288,
           "arena_bytes": 4224,
           "max_stack_words": 66,
+          "kernel_opcodes": [
+            "Begin",
+            "MapGet",
+            "MapPut",
+            "Commit",
+            "Wipe"
+          ],
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -313,6 +366,8 @@
           "public_gas_budget": 2257,
           "arena_bytes": 4096,
           "max_stack_words": 64,
+          "kernel_opcodes": [],
+          "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -330,6 +385,30 @@
           "public_gas_budget": 12288,
           "arena_bytes": 4096,
           "max_stack_words": 64,
+          "kernel_opcodes": [
+            "Begin",
+            "MapPut",
+            "Commit",
+            "Wipe"
+          ],
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,

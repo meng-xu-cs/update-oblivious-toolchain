@@ -95,7 +95,7 @@ Status labels:
   `crates/uo-core/src/trace.rs`,
   `proof/lean/UOToolchain/RuntimeTrustedKernel.lean`,
   `proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean`,
-  `proof/lean/CheckRuntimeTrustedKernel.lean`,
+  `proof/lean/CheckProofGradeRuntimeTrustedKernel.lean`,
   `results/trusted_kernel_validation.json`.
   The runtime now emits a `RuntimeTrustedKernelBundle` containing the public
   controller observer certificate, the hidden Path-ORAM certificate, and the
@@ -121,8 +121,8 @@ Status labels:
   `probe/mplus-probe/src/main.rs`,
   `scripts/run_bridge_validation.sh`.
   The repo now has a focused `bridge_validation.json` path that runs
-  translation validation plus the controller / hidden / trusted-kernel /
-  witness bridge reports.
+  translation validation plus the controller / hidden / kernel /
+  kernel-refinement / trusted-kernel / witness bridge reports.
 
 - `optional` The paper-main theorem provenance step is tracked separately in
   `docs/paper-main-theorem-checklist.md`: supply or cite an external

@@ -176,9 +176,11 @@ literal equality of seed spaces. Concretely:
   family into the theorem-facing hidden leaf-value family
 
 This is the exact bridge used by
-`CheckCanonicalPathOramPaperInstantiation.lean` and the probe’s explicit
-canonical-pair validation path. It closes the runtime/theorem instantiation gap
-without weakening the theorem boundary or adding new backend assumptions.
+`CheckCanonicalPathOramPaperInstantiation.lean`,
+`CheckCanonicalPathOramPairTheoremInput.lean`, and the probe’s explicit and
+compact canonical-pair validation paths. It closes the
+runtime/theorem instantiation gap without weakening the theorem boundary or
+adding new backend assumptions.
 
 The concrete backend specialization is now surfaced explicitly in:
 
@@ -288,8 +290,12 @@ The runtime-to-Lean witness interface is now fixed in:
   conversion into the theorem objects, including logical-trace reconstruction
   of the ordered ORAM access schedule and certificate-based observer
   reconstruction
-- `checkRuntimeWitness` in `proof/lean/CheckRuntimeWitness.lean` for
-  end-to-end witness validation from the Lean side
+- `checkProofGradeRuntimeWitness` in
+  `proof/lean/CheckProofGradeRuntimeWitness.lean` for end-to-end
+  proof-grade witness validation from the Lean side
+- `results/kernel_refinement_validation.json` for benchmark-backed validation
+  that the lower-level runtime phase witness is accepted directly against the
+  exported kernel witness on representative supported paths
 - `results/witness_validation.json` for benchmark-backed validation that the
   emitted runtime witnesses are accepted by the Lean checker on representative
   supported paths, including a multi-object ORAM `transferFrom` witness

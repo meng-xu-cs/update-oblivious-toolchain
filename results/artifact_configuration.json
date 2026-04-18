@@ -1,0 +1,6 @@
+{
+  "compact_budget_bytes": 10737418240,
+  "heavy_artifact_dir": "results/heavy_artifacts",
+  "heavy_budget_bytes": 21474836480,
+  "materialization_mode": "compact"
+}

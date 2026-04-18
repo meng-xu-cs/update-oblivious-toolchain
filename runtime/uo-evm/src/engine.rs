@@ -1,25 +1,41 @@
 use crate::controller::CallRecorder;
-use crate::objects::RuntimeObject;
-use crate::theorem::{attach_theorem_metrics, build_theorem_trace};
+use crate::runtime::kernel::PublicRuntimeKernel;
+use crate::runtime::state::{CommittedRuntimeState, PublicRuntimeShadowState};
+use crate::theorem::{build_theorem_trace, finalize_execution_trace, FinalizeExecutionTraceInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::{
-    CompiledArtifact, ExecutionTrace, RuntimeControllerObserverCertificate,
-    RuntimeOramAccessCounterWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness,
-    RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness,
-    RuntimeTrustedKernelBundle, Value,
+    canonical_runtime_public_object_ids, expected_runtime_kernel_opcodes_for_confidential,
+    expected_runtime_manifest_kernel_steps_for_confidential, CompiledArtifact, ExecutionTrace,
+    RuntimeKernelStepWitness, RuntimeOramLeafScaffoldWitness, Value,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ContractInstance {
     artifact: CompiledArtifact,
-    objects: BTreeMap<u32, RuntimeObject>,
+    state: CommittedRuntimeState,
     deploy_seed: u64,
+}
+
+impl Clone for ContractInstance {
+    fn clone(&self) -> Self {
+        Self {
+            artifact: self.artifact.clone(),
+            state: self.state.clone(),
+            deploy_seed: self.deploy_seed,
+        }
+    }
+}
+
+#[cfg(feature = "diagnostics")]
+#[derive(Clone, Debug)]
+pub struct CallTelemetry {
+    pub zero_writes: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -29,9 +45,26 @@ pub struct CallResult {
     pub trace: ExecutionTrace,
 }
 
+#[cfg(feature = "diagnostics")]
+#[derive(Clone, Debug)]
+pub struct DiagnosticCallResult {
+    pub call: CallResult,
+    pub telemetry: CallTelemetry,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct PathOramFreshCoinPlan {
     by_object: BTreeMap<u32, Vec<usize>>,
+}
+
+impl Drop for PathOramFreshCoinPlan {
+    fn drop(&mut self) {
+        for coins in self.by_object.values_mut() {
+            for coin in coins.iter_mut() {
+                *coin = 0;
+            }
+        }
+    }
 }
 
 impl PathOramFreshCoinPlan {
@@ -80,26 +113,15 @@ impl ContractInstance {
     }
 
     pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
-        let mut objects = BTreeMap::new();
-        let mut master_seed = deploy_seed;
-        for spec in &artifact.contract.state {
-            objects.insert(
-                spec.id,
-                RuntimeObject::instantiate_with_seed(spec, master_seed)?,
-            );
-            master_seed = master_seed
-                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add(0xA5A5_A5A5_A5A5_A5A5);
-        }
         Ok(Self {
+            state: CommittedRuntimeState::deploy(&artifact.contract.state, deploy_seed)?,
             artifact,
-            objects,
             deploy_seed,
         })
     }
 
     pub fn call(&mut self, entrypoint: &str, args: Vec<Value>) -> Result<CallResult> {
-        self.call_impl(entrypoint, args, None)
+        Ok(self.call_impl(entrypoint, args, None)?.0)
     }
 
     pub fn call_with_path_oram_fresh_coins(
@@ -108,7 +130,20 @@ impl ContractInstance {
         args: Vec<Value>,
         fresh_coins: &PathOramFreshCoinPlan,
     ) -> Result<CallResult> {
-        self.call_impl(entrypoint, args, Some(fresh_coins))
+        Ok(self.call_impl(entrypoint, args, Some(fresh_coins))?.0)
+    }
+
+    #[cfg(feature = "diagnostics")]
+    pub fn call_with_diagnostics(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+    ) -> Result<DiagnosticCallResult> {
+        let (call, zero_writes) = self.call_impl(entrypoint, args, None)?;
+        Ok(DiagnosticCallResult {
+            call,
+            telemetry: CallTelemetry { zero_writes },
+        })
     }
 
     fn call_impl(
@@ -116,7 +151,7 @@ impl ContractInstance {
         entrypoint: &str,
         args: Vec<Value>,
         fresh_coins: Option<&PathOramFreshCoinPlan>,
-    ) -> Result<CallResult> {
+    ) -> Result<(CallResult, usize)> {
         let function = self
             .artifact
             .contract
@@ -133,7 +168,7 @@ impl ContractInstance {
                 args.len()
             );
         }
-        let call_args = args.clone();
+        let mut call_args = args.clone();
         let manifest_entry = self
             .artifact
             .contract
@@ -142,83 +177,162 @@ impl ContractInstance {
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
-        let _allocator = AllocatorPlan::for_entrypoint(
-            manifest_entry.arena_bytes,
-            manifest_entry.max_stack_words,
-        );
-        let committed = self.objects.clone();
-        let runtime_oram_access_counters_before = runtime_path_oram_access_counters(&committed);
-        let runtime_oram_position_map_before = runtime_path_oram_position_maps(&committed);
-        let mut shadow = committed
-            .iter()
-            .map(|(id, object)| (*id, object.clone_for_tx()))
-            .collect::<BTreeMap<_, _>>();
-        if let Some(fresh_coins) = fresh_coins {
-            for object in shadow.values_mut() {
-                object.enable_injected_path_oram_leaf_coins();
-            }
-            for (object_id, coins) in &fresh_coins.by_object {
-                let object = shadow.get_mut(object_id).ok_or_else(|| {
-                    anyhow!(
-                        "path-ORAM fresh-coin plan references unknown object {}",
-                        object_id
-                    )
-                })?;
-                object.install_path_oram_leaf_coins(coins.clone())?;
-            }
-        }
-        let mut recorder = CallRecorder::begin(entrypoint, &call_args);
-        let mut state = ExecState::default();
-        for ((param_name, _), arg) in function.params.iter().zip(args.into_iter()) {
-            state.env.insert(param_name.clone(), arg);
-        }
-        let mut opcode_trace = Vec::new();
-        exec_block(
-            &self.artifact.contract,
-            &function,
-            &function.body,
-            &mut shadow,
-            &mut state,
-            &mut opcode_trace,
-            &mut recorder,
-        )?;
-        if fresh_coins.is_some() {
-            for object in shadow.values() {
-                object.ensure_path_oram_leaf_coins_consumed()?;
-            }
-        }
-        let mut next_objects = BTreeMap::new();
-        for (id, object) in shadow {
-            let old = committed
-                .get(&id)
-                .ok_or_else(|| anyhow!("missing committed object {id}"))?;
-            let committed_object = object.commit(old, state.aborted, &mut recorder)?;
-            next_objects.insert(id, committed_object);
-        }
-        let mut gas_used = 0u64;
-        gas_used += recorder.metrics().logical_reads as u64 * 3;
-        gas_used += recorder.metrics().logical_writes as u64 * 5;
-        gas_used += recorder.metrics().physical_writes as u64 * 17;
-        let manifest_budget = manifest_entry.public_gas_budget;
-        if function.confidential {
-            if recorder.physical_write_count() > manifest_entry.max_commit_ops {
-                bail!(
-                    "entrypoint {} exceeded manifest commit budget: {} > {}",
-                    entrypoint,
-                    recorder.physical_write_count(),
-                    manifest_entry.max_commit_ops
-                );
-            }
-            gas_used = manifest_budget;
-        }
-        self.objects = next_objects;
-        let runtime_oram_access_counters_after = runtime_path_oram_access_counters(&self.objects);
-        let runtime_oram_position_map_after = runtime_path_oram_position_maps(&self.objects);
-        let return_value = if function.confidential && state.aborted {
-            None
+        let mut allocator = AllocatorPlan::from_manifest(&manifest_entry);
+        let expected_kernel_steps = if function.confidential {
+            Some(
+                manifest_entry
+                    .kernel_steps
+                    .iter()
+                    .map(|step| RuntimeKernelStepWitness {
+                        opcode: step.opcode,
+                        object_id: step.object_id,
+                    })
+                    .collect::<Vec<_>>(),
+            )
         } else {
-            state.return_value
+            None
         };
+        if function.confidential {
+            let expected_kernel_steps = expected_runtime_manifest_kernel_steps_for_confidential(
+                &function,
+            )
+            .map_err(|err| anyhow!("confidential kernel witness derivation failed: {err}"))?;
+            let expected_kernel_opcodes =
+                expected_runtime_kernel_opcodes_for_confidential(&function).map_err(|err| {
+                    anyhow!("confidential kernel witness derivation failed: {err}")
+                })?;
+            if manifest_entry.kernel_opcodes != expected_kernel_opcodes {
+                bail!("manifest kernel opcode trace drifted for {entrypoint}");
+            }
+            if manifest_entry.kernel_steps != expected_kernel_steps {
+                bail!("manifest kernel step trace drifted for {entrypoint}");
+            }
+            allocator.max_kernel_ops = manifest_entry.kernel_opcodes.len();
+        }
+        let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
+        self.state.ensure_cold(
+            &public_object_ids,
+            "before executing the next call from committed storage",
+        )?;
+        let runtime_state_before = self.state.witness_snapshot()?;
+        let shadow_load_object_ids = if function.confidential {
+            manifest_entry
+                .kernel_steps
+                .iter()
+                .filter_map(|step| step.object_id)
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>()
+        } else {
+            public_object_ids.clone()
+        };
+        let execution = (|| -> Result<_> {
+            let kernel = PublicRuntimeKernel::begin(
+                allocator,
+                expected_kernel_steps,
+                public_object_ids.clone(),
+                Some(public_object_ids.clone()),
+            )?;
+            let mut recorder = CallRecorder::begin(entrypoint, &call_args);
+            let mut opcode_trace = Vec::new();
+            let (runtime_kernel_witness, runtime_kernel_refinement_witness, aborted, return_value) =
+                if function.confidential {
+                    let outcome = self.state.run_confidential_call(
+                        kernel,
+                        &function,
+                        &shadow_load_object_ids,
+                        args,
+                        fresh_coins.map(|plan| &plan.by_object),
+                        &mut recorder,
+                        &mut opcode_trace,
+                    )?;
+                    (
+                        outcome.runtime_kernel_witness,
+                        outcome.runtime_kernel_refinement_witness,
+                        outcome.aborted,
+                        outcome.return_value,
+                    )
+                } else {
+                    let mut kernel = kernel;
+                    let mut shadow = self
+                        .state
+                        .prepare_public_shadow(&mut kernel, &shadow_load_object_ids)?;
+                    let mut state = ExecState::default();
+                    for ((param_name, _), arg) in function.params.iter().zip(args.into_iter()) {
+                        store_env_value(&mut state, &mut kernel, param_name, arg)?;
+                    }
+                    exec_block(
+                        &self.artifact.contract,
+                        &function,
+                        &function.body,
+                        &mut shadow,
+                        &mut state,
+                        &mut opcode_trace,
+                        &mut recorder,
+                        &mut kernel,
+                    )?;
+                    let aborted = state.aborted;
+                    let return_value = state.return_value.take();
+                    self.state.commit_public_shadow(
+                        &mut kernel,
+                        &mut shadow,
+                        aborted,
+                        &mut recorder,
+                    )?;
+                    let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
+                        kernel.finish(&function.signature)?;
+                    self.state.replace_with_cold_public_shadow(shadow);
+                    (
+                        runtime_kernel_witness,
+                        runtime_kernel_refinement_witness,
+                        aborted,
+                        return_value,
+                    )
+                };
+            let mut gas_used = 0u64;
+            gas_used += recorder.metrics().logical_reads as u64 * 3;
+            gas_used += recorder.metrics().logical_writes as u64 * 5;
+            gas_used += recorder.metrics().physical_writes as u64 * 17;
+            let manifest_budget = manifest_entry.public_gas_budget;
+            if function.confidential {
+                if recorder.physical_write_count() > manifest_entry.max_commit_ops {
+                    bail!(
+                        "entrypoint {} exceeded manifest commit budget: {} > {}",
+                        entrypoint,
+                        recorder.physical_write_count(),
+                        manifest_entry.max_commit_ops
+                    );
+                }
+                gas_used = manifest_budget;
+            }
+            Ok((
+                runtime_kernel_witness,
+                runtime_kernel_refinement_witness,
+                gas_used,
+                recorder,
+                aborted,
+                return_value,
+                opcode_trace,
+            ))
+        })();
+        let (
+            runtime_kernel_witness,
+            mut runtime_kernel_refinement_witness,
+            gas_used,
+            recorder,
+            aborted,
+            return_value,
+            opcode_trace,
+        ) = match execution {
+            Ok(result) => result,
+            Err(err) => return Err(err),
+        };
+        self.state.finalize_runtime_kernel_refinement_witness(
+            &mut runtime_kernel_refinement_witness,
+            &public_object_ids,
+            "after completing the call and returning to committed storage",
+        )?;
+        let runtime_state_after = self.state.witness_snapshot()?;
         let trace_bundle = build_theorem_trace(
             recorder,
             &function,
@@ -226,113 +340,33 @@ impl ContractInstance {
             &self.artifact.contract.manifest.objects,
             &call_args,
             &return_value,
-            state.aborted,
+            aborted,
             gas_used,
         )?;
-        let mut host_proxy_metrics = BTreeMap::new();
-        host_proxy_metrics.insert(
-            "bytes_read".into(),
-            bytes_read(&trace_bundle.physical_reads) as f64,
-        );
-        host_proxy_metrics.insert(
-            "backend_reads".into(),
-            trace_bundle.physical_reads.len() as f64,
-        );
-        host_proxy_metrics.insert(
-            "bytes_written".into(),
-            bytes_written(&trace_bundle.physical_writes) as f64,
-        );
-        host_proxy_metrics.insert(
-            "backend_writes".into(),
-            trace_bundle.physical_writes.len() as f64,
-        );
-        host_proxy_metrics.insert(
-            "zero_writes".into(),
-            trace_bundle
-                .physical_writes
-                .iter()
-                .filter(|event| event.new.iter().all(|byte| *byte == 0))
-                .count() as f64,
-        );
-        host_proxy_metrics.insert(
-            "update_only_fraction".into(),
-            if trace_bundle.physical_writes.is_empty() {
-                1.0
-            } else {
-                trace_bundle
-                    .physical_writes
-                    .iter()
-                    .filter(|event| event.class == uo_core::WriteClass::Update)
-                    .count() as f64
-                    / trace_bundle.physical_writes.len() as f64
-            },
-        );
-        let mut trace = ExecutionTrace {
-            opcode_trace,
-            logical_accesses: trace_bundle.logical_accesses,
-            logical_writes: trace_bundle.logical_writes,
-            physical_reads: trace_bundle.physical_reads,
-            physical_writes: trace_bundle.physical_writes,
-            host_proxy_metrics,
-            gas_used,
-            theorem_trace: trace_bundle.theorem_trace,
-            runtime_seed: Some(self.deploy_seed),
-            runtime_trusted_kernel_bundle: None,
-            runtime_controller_certificate: Some(trace_bundle.controller_certificate),
-            runtime_oram_objects: runtime_oram_objects(&self.artifact),
-            runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
-            runtime_oram_access_counters_before,
-            runtime_oram_access_counters_after,
-            runtime_oram_position_map_before,
-            runtime_oram_position_map_after,
-            runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
-        };
-        attach_theorem_metrics(&mut trace);
-        let direct_controller_observer = RuntimeControllerObserverCertificate::new(
-            trace
-                .theorem_trace
-                .public_outcome
-                .clone()
-                .ok_or_else(|| anyhow!("runtime theorem trace missing public_outcome"))?,
-            trace.theorem_trace.boundary_schedule.clone(),
-            trace
-                .theorem_trace
-                .controller_shape
-                .clone()
-                .ok_or_else(|| anyhow!("runtime theorem trace missing controller_shape"))?,
-            trace
-                .theorem_trace
-                .normalized_micro_trace
-                .clone()
-                .ok_or_else(|| anyhow!("runtime theorem trace missing normalized_micro_trace"))?,
-            trace
-                .runtime_controller_certificate
-                .clone()
-                .ok_or_else(|| anyhow!("execution trace missing runtime controller certificate"))?,
-        )?;
-        let direct_hidden_certificate = RuntimePathOramHiddenCertificate::new(
-            trace.refinement_trace(),
-            trace.runtime_oram_objects.clone(),
-            trace.runtime_oram_leaf_schedule.clone(),
-            trace.runtime_oram_position_map_before.clone(),
-            trace.runtime_oram_position_map_after.clone(),
-            trace.runtime_oram_leaf_state_transitions.clone(),
-        )?;
-        let direct_bundle = RuntimeTrustedKernelBundle::new(
-            trace.runtime_seed,
-            direct_controller_observer,
-            direct_hidden_certificate,
-        )?;
-        let reconstructed_bundle = trace.runtime_trusted_kernel_bundle()?;
-        if reconstructed_bundle != direct_bundle {
-            bail!("runtime trusted kernel drifted from direct certificate reconstruction");
+        for arg in &mut call_args {
+            arg.wipe_secrets();
         }
-        trace.runtime_trusted_kernel_bundle = Some(direct_bundle);
-        Ok(CallResult {
-            return_value,
-            aborted: state.aborted,
-            trace,
-        })
+        let zero_writes = trace_bundle.metrics.zero_writes;
+        let trace = finalize_execution_trace(FinalizeExecutionTraceInput {
+            artifact: &self.artifact,
+            function: &function,
+            deploy_seed: self.deploy_seed,
+            opcode_trace,
+            gas_used,
+            trace_bundle,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            runtime_state_before,
+            runtime_state_after,
+        })?;
+        Ok((
+            CallResult {
+                return_value,
+                aborted,
+                trace,
+            },
+            zero_writes,
+        ))
     }
 }
 
@@ -354,11 +388,16 @@ fn exec_block(
     contract: &CompiledContract,
     function: &CompiledFunction,
     statements: &[Statement],
-    objects: &mut BTreeMap<u32, RuntimeObject>,
+    objects: &mut PublicRuntimeShadowState,
     state: &mut ExecState,
     opcode_trace: &mut Vec<String>,
     recorder: &mut CallRecorder,
+    kernel: &mut PublicRuntimeKernel,
 ) -> Result<()> {
+    debug_assert!(
+        !function.confidential,
+        "public interpreter must not execute confidential entrypoints"
+    );
     for statement in statements {
         if state.returned {
             break;
@@ -371,83 +410,34 @@ fn exec_block(
             state,
             opcode_trace,
             recorder,
+            kernel,
         )?;
     }
     Ok(())
-}
-
-fn bytes_read(reads: &[uo_core::PhysicalReadEvent]) -> usize {
-    reads.iter().map(|event| event.len).sum()
-}
-
-fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWitness> {
-    artifact
-        .contract
-        .manifest
-        .objects
-        .iter()
-        .filter_map(|object| {
-            let oram = object.oram.as_ref()?;
-            Some(RuntimeOramObjectWitness {
-                object_id: object.id,
-                object_name: object.name.clone(),
-                scheme: oram.scheme.clone(),
-                capacity: object.capacity.unwrap_or_default(),
-                block_size: oram.block_size,
-                bucket_size: oram.bucket_size,
-                bucket_count: oram.bucket_count,
-                blocks_per_bucket: oram.blocks_per_bucket,
-                tree_height: oram.tree_height,
-                stash_bound: oram.stash_bound,
-                recursion_depth: oram.recursion_depth,
-                metadata_pages: oram.metadata_pages,
-                metadata_pages_per_access: oram.metadata_pages_per_access,
-                buckets_per_access: oram.buckets_per_access,
-                accesses_per_call: oram.accesses_per_call,
-            })
-        })
-        .collect()
-}
-
-fn runtime_path_oram_position_maps(
-    objects: &BTreeMap<u32, RuntimeObject>,
-) -> Vec<RuntimePathOramPositionMapWitness> {
-    objects
-        .values()
-        .filter_map(RuntimeObject::path_oram_position_map_witness)
-        .collect()
-}
-
-fn runtime_path_oram_access_counters(
-    objects: &BTreeMap<u32, RuntimeObject>,
-) -> Vec<RuntimeOramAccessCounterWitness> {
-    objects
-        .values()
-        .filter_map(RuntimeObject::path_oram_access_counter_witness)
-        .collect()
 }
 
 fn exec_statement(
     contract: &CompiledContract,
     function: &CompiledFunction,
     statement: &Statement,
-    objects: &mut BTreeMap<u32, RuntimeObject>,
+    objects: &mut PublicRuntimeShadowState,
     state: &mut ExecState,
     opcode_trace: &mut Vec<String>,
     recorder: &mut CallRecorder,
+    kernel: &mut PublicRuntimeKernel,
 ) -> Result<()> {
     opcode_trace.push(statement_name(statement).into());
     match statement {
         Statement::Declare { name, value, .. } => {
-            let value = eval_expr(contract, function, value, objects, state, recorder)?;
-            state.env.insert(name.clone(), value);
+            let value = eval_expr(contract, function, value, objects, state, recorder, kernel)?;
+            store_env_value(state, kernel, name, value)?;
         }
         Statement::Assign { name, value } => {
-            let value = eval_expr(contract, function, value, objects, state, recorder)?;
-            state.env.insert(name.clone(), value);
+            let value = eval_expr(contract, function, value, objects, state, recorder, kernel)?;
+            store_env_value(state, kernel, name, value)?;
         }
         Statement::Require { cond } => {
-            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder, kernel)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("require condition must be boolean"))?;
             if !cond {
@@ -456,7 +446,7 @@ fn exec_statement(
             }
         }
         Statement::AbortIf { cond } => {
-            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder, kernel)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("abort condition must be boolean"))?;
             if cond {
@@ -468,7 +458,7 @@ fn exec_statement(
             then_body,
             else_body,
         } => {
-            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder, kernel)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("if condition must be boolean"))?;
             if cond {
@@ -480,6 +470,7 @@ fn exec_statement(
                     state,
                     opcode_trace,
                     recorder,
+                    kernel,
                 )?;
             } else {
                 exec_block(
@@ -490,6 +481,7 @@ fn exec_statement(
                     state,
                     opcode_trace,
                     recorder,
+                    kernel,
                 )?;
             }
         }
@@ -500,17 +492,17 @@ fn exec_statement(
             body,
             ..
         } => {
-            let start = eval_expr(contract, function, start, objects, state, recorder)?
+            let start = eval_expr(contract, function, start, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("for loop start must be uint"))?;
-            let end = eval_expr(contract, function, end, objects, state, recorder)?
+            let end = eval_expr(contract, function, end, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("for loop end must be uint"))?;
             for index in start..end {
                 if state.returned {
                     break;
                 }
-                state.env.insert(index_var.clone(), Value::uint(index));
+                store_env_value(state, kernel, index_var, Value::uint(index))?;
                 exec_block(
                     contract,
                     function,
@@ -519,6 +511,7 @@ fn exec_statement(
                     state,
                     opcode_trace,
                     recorder,
+                    kernel,
                 )?;
             }
         }
@@ -527,10 +520,10 @@ fn exec_statement(
             value,
             predicate,
         } => {
-            let value = eval_expr(contract, function, value, objects, state, recorder)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder, kernel)?;
             let predicate = predicate
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder, kernel))
                 .transpose()?
                 .map(|value| {
                     value
@@ -538,7 +531,7 @@ fn exec_statement(
                         .ok_or_else(|| anyhow!("cell predicate must be boolean"))
                 })
                 .transpose()?;
-            object_mut(objects, *object_id)?.set_cell(value, predicate, recorder)?;
+            kernel.cell_set(objects, recorder, *object_id, value, predicate)?;
         }
         Statement::ArraySet {
             object_id,
@@ -546,14 +539,14 @@ fn exec_statement(
             value,
             predicate,
         } => {
-            let index = eval_expr(contract, function, index, objects, state, recorder)?
+            let index = eval_expr(contract, function, index, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
                 as usize;
-            let value = eval_expr(contract, function, value, objects, state, recorder)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder, kernel)?;
             let predicate = predicate
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder, kernel))
                 .transpose()?
                 .map(|value| {
                     value
@@ -561,7 +554,7 @@ fn exec_statement(
                         .ok_or_else(|| anyhow!("array predicate must be boolean"))
                 })
                 .transpose()?;
-            object_mut(objects, *object_id)?.set_array(index, value, predicate, recorder)?;
+            kernel.array_set(objects, recorder, *object_id, index, value, predicate)?;
         }
         Statement::MapPut {
             object_id,
@@ -569,11 +562,11 @@ fn exec_statement(
             value,
             predicate,
         } => {
-            let key = eval_expr(contract, function, key, objects, state, recorder)?;
-            let value = eval_expr(contract, function, value, objects, state, recorder)?;
+            let key = eval_expr(contract, function, key, objects, state, recorder, kernel)?;
+            let value = eval_expr(contract, function, value, objects, state, recorder, kernel)?;
             let predicate = predicate
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder, kernel))
                 .transpose()?
                 .map(|value| {
                     value
@@ -581,12 +574,12 @@ fn exec_statement(
                         .ok_or_else(|| anyhow!("map predicate must be boolean"))
                 })
                 .transpose()?;
-            object_mut(objects, *object_id)?.put_map(key, value, predicate, recorder)?;
+            kernel.map_put(objects, recorder, *object_id, key, value, predicate)?;
         }
         Statement::Return { value } => {
             state.return_value = value
                 .as_ref()
-                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder))
+                .map(|expr| eval_expr(contract, function, expr, objects, state, recorder, kernel))
                 .transpose()?;
             state.returned = true;
         }
@@ -598,10 +591,15 @@ fn eval_expr(
     contract: &CompiledContract,
     function: &CompiledFunction,
     expr: &Expr,
-    objects: &mut BTreeMap<u32, RuntimeObject>,
+    objects: &mut PublicRuntimeShadowState,
     state: &mut ExecState,
     recorder: &mut CallRecorder,
+    kernel: &mut PublicRuntimeKernel,
 ) -> Result<Value> {
+    debug_assert!(
+        !function.confidential,
+        "public interpreter must not evaluate confidential expressions"
+    );
     match expr {
         Expr::Literal(value) => Ok(value.clone()),
         Expr::Var(name) => state
@@ -610,7 +608,7 @@ fn eval_expr(
             .cloned()
             .ok_or_else(|| anyhow!("unknown variable {name}")),
         Expr::Unary { op, expr } => {
-            let value = eval_expr(contract, function, expr, objects, state, recorder)?;
+            let value = eval_expr(contract, function, expr, objects, state, recorder, kernel)?;
             match op {
                 UnaryOp::Not => Ok(Value::Bool(
                     !value
@@ -627,8 +625,8 @@ fn eval_expr(
             }
         }
         Expr::Binary { op, lhs, rhs } => {
-            let lhs = eval_expr(contract, function, lhs, objects, state, recorder)?;
-            let rhs = eval_expr(contract, function, rhs, objects, state, recorder)?;
+            let lhs = eval_expr(contract, function, lhs, objects, state, recorder, kernel)?;
+            let rhs = eval_expr(contract, function, rhs, objects, state, recorder, kernel)?;
             eval_binary(op, lhs, rhs)
         }
         Expr::Select {
@@ -636,43 +634,54 @@ fn eval_expr(
             when_true,
             when_false,
         } => {
-            let cond = eval_expr(contract, function, cond, objects, state, recorder)?
+            let cond = eval_expr(contract, function, cond, objects, state, recorder, kernel)?
                 .as_bool()
                 .ok_or_else(|| anyhow!("select condition must be boolean"))?;
             if cond {
-                eval_expr(contract, function, when_true, objects, state, recorder)
+                eval_expr(
+                    contract, function, when_true, objects, state, recorder, kernel,
+                )
             } else {
-                eval_expr(contract, function, when_false, objects, state, recorder)
+                eval_expr(
+                    contract, function, when_false, objects, state, recorder, kernel,
+                )
             }
         }
-        Expr::CellGet { object_id } => object_mut(objects, *object_id)?.get_cell(recorder),
+        Expr::CellGet { object_id } => kernel.cell_get(objects, recorder, *object_id),
         Expr::ArrayGet { object_id, index } => {
-            let index = eval_expr(contract, function, index, objects, state, recorder)?
+            let index = eval_expr(contract, function, index, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
                 as usize;
-            object_mut(objects, *object_id)?.get_array(index, recorder)
+            kernel.array_get(objects, recorder, *object_id, index)
         }
         Expr::MapGet { object_id, key } => {
-            let key = eval_expr(contract, function, key, objects, state, recorder)?;
-            object_mut(objects, *object_id)?.get_map(&key, recorder)
+            let key = eval_expr(contract, function, key, objects, state, recorder, kernel)?;
+            kernel.map_get(objects, recorder, *object_id, &key)
         }
         Expr::StructField { base, field } => {
-            match eval_expr(contract, function, base, objects, state, recorder)? {
+            let base = eval_expr(contract, function, base, objects, state, recorder, kernel)?;
+            match &base {
                 Value::Struct(fields) => fields
-                    .into_iter()
-                    .find_map(|(name, value)| if name == *field { Some(value) } else { None })
+                    .iter()
+                    .find_map(|(name, value)| {
+                        if name == field {
+                            Some(value.clone())
+                        } else {
+                            None
+                        }
+                    })
                     .ok_or_else(|| anyhow!("unknown struct field {field}")),
                 _ => bail!("struct field access requires struct value"),
             }
         }
         Expr::ArrayIndex { base, index } => {
-            let base = eval_expr(contract, function, base, objects, state, recorder)?;
-            let index = eval_expr(contract, function, index, objects, state, recorder)?
+            let base = eval_expr(contract, function, base, objects, state, recorder, kernel)?;
+            let index = eval_expr(contract, function, index, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
                 as usize;
-            match base {
+            match &base {
                 Value::Array(values) => values
                     .get(index)
                     .cloned()
@@ -683,9 +692,10 @@ fn eval_expr(
         Expr::Keccak256 { parts } => {
             let mut hasher = Keccak::v256();
             for part in parts {
-                let bytes = eval_expr(contract, function, part, objects, state, recorder)?
-                    .canonical_bytes();
-                hasher.update(&bytes);
+                let value = eval_expr(contract, function, part, objects, state, recorder, kernel)?;
+                kernel.note_hash_bytes(value.canonical_len())?;
+                value.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));
+                kernel.wipe_hash_scratch();
             }
             let mut out = [0u8; 32];
             hasher.finalize(&mut out);
@@ -756,12 +766,234 @@ fn statement_name(statement: &Statement) -> &'static str {
     }
 }
 
-fn object_mut(objects: &mut BTreeMap<u32, RuntimeObject>, id: u32) -> Result<&mut RuntimeObject> {
-    objects
-        .get_mut(&id)
-        .ok_or_else(|| anyhow!("unknown object id {id}"))
+fn store_env_value(
+    state: &mut ExecState,
+    kernel: &mut PublicRuntimeKernel,
+    name: &str,
+    value: Value,
+) -> Result<()> {
+    state.env.insert(name.into(), value);
+    kernel.enforce_stack_words(state.env.len())
 }
 
-fn bytes_written(events: &[uo_core::PhysicalWriteEvent]) -> usize {
-    events.iter().map(|event| event.new.len()).sum()
+#[cfg(test)]
+mod tests {
+    use super::ContractInstance;
+    use crate::runtime::kernel::PublicRuntimeKernel;
+    use crate::runtime::objects::RuntimeObject;
+    use uo_allocator::AllocatorPlan;
+    use uo_core::{canonical_runtime_public_object_ids, ContractMetadata, ProgramMode, Value};
+
+    fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
+        let metadata: ContractMetadata = serde_yaml::from_str(metadata).unwrap();
+        uo_solc::compile(source, &metadata, mode).unwrap()
+    }
+
+    fn b32(byte: u8) -> Value {
+        Value::Bytes32([byte; 32])
+    }
+
+    fn assert_objects_are_cold(instance: &ContractInstance) {
+        instance
+            .state
+            .ensure_cold(
+                &canonical_runtime_public_object_ids(&instance.artifact.contract.state),
+                "in engine test",
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn engine_source_keeps_secret_object_helpers_behind_runtime_boundary() {
+        let source = include_str!("engine.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("engine.rs should contain a test boundary marker");
+        assert!(
+            source.contains("state: CommittedRuntimeState"),
+            "engine.rs should hold an opaque committed runtime state handle"
+        );
+        assert!(
+            source.contains("objects: &mut PublicRuntimeShadowState"),
+            "engine.rs public interpreter should run over the public shadow-state wrapper"
+        );
+        assert!(
+            !source.contains("use crate::runtime::objects::RuntimeObject;"),
+            "engine.rs implementation should not import RuntimeObject directly"
+        );
+        assert!(
+            !source.contains("use crate::runtime::kernel::RuntimeKernel;"),
+            "engine.rs implementation should not import the raw RuntimeKernel directly"
+        );
+        assert!(
+            source.contains("use crate::runtime::kernel::PublicRuntimeKernel;"),
+            "engine.rs implementation should use the public kernel facade"
+        );
+        assert!(
+            !source.contains("RuntimeKernelRefinementEventWitness"),
+            "engine.rs implementation should not construct runtime phase witness events directly"
+        );
+        for forbidden_type in [
+            "RuntimeControllerObserverCertificate",
+            "RuntimePathOramHiddenCertificate",
+            "RuntimeTrustedKernelBundle",
+        ] {
+            assert!(
+                !source.contains(forbidden_type),
+                "engine.rs implementation should not construct theorem-side certificate type `{forbidden_type}` directly"
+            );
+        }
+        assert!(
+            !source.contains("BTreeMap<u32, RuntimeObject>"),
+            "engine.rs implementation should not own raw runtime object maps"
+        );
+        assert!(
+            !source.contains("ExecutionTrace {"),
+            "engine.rs implementation should not assemble ExecutionTrace directly"
+        );
+        for forbidden in [
+            "clone_for_tx(",
+            "commit(",
+            "shadow_load_objects(",
+            "enable_injected_path_oram_leaf_coins(",
+            "install_path_oram_leaf_coins(",
+            "ensure_path_oram_leaf_coins_consumed(",
+            "path_oram_position_map_witness(",
+            "path_oram_access_counter_witness(",
+            "into_cold_committed(",
+            "committed_cache_is_cold(",
+            "cold_store_object(",
+            "post_committed_cold_object(",
+        ] {
+            assert!(
+                !source.contains(forbidden),
+                "engine.rs should not call low-level runtime object helper `{forbidden}` directly"
+            );
+        }
+    }
+
+    #[test]
+    fn committed_uo_cell_state_is_cold_between_calls() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 7).unwrap();
+        instance
+            .call("classify(uint256)", vec![Value::Uint(1)])
+            .unwrap();
+
+        instance
+            .state
+            .objects_for_test()
+            .values()
+            .find(|object| matches!(object, RuntimeObject::UoCell(_)))
+            .expect("expected one UO cell object");
+        assert_objects_are_cold(&instance);
+
+        let peek = instance.call("peek()", vec![]).unwrap();
+        assert_eq!(peek.return_value, Some(Value::Uint(1)));
+    }
+
+    #[test]
+    fn call_rejects_hot_committed_state_before_execution() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 11).unwrap();
+        instance
+            .call("classify(uint256)", vec![Value::Uint(1)])
+            .unwrap();
+
+        let (cell_id, hot_cell) = {
+            let (&cell_id, _) = instance
+                .state
+                .objects_for_test()
+                .iter()
+                .find(|(_, object)| matches!(object, RuntimeObject::UoCell(_)))
+                .expect("expected one UO cell object");
+            let mut kernel = PublicRuntimeKernel::begin(
+                AllocatorPlan {
+                    arena_bytes: 4096,
+                    max_stack_words: 64,
+                    scratch_bytes: 1024,
+                    max_kernel_ops: 16,
+                },
+                None,
+                vec![],
+                Some(vec![]),
+            )
+            .unwrap();
+            let mut shadow = instance
+                .state
+                .shadow_load_for_test(&mut kernel, &[cell_id])
+                .unwrap();
+            let hot_cell = shadow.remove_object_for_test(cell_id).unwrap();
+            (cell_id, hot_cell)
+        };
+        instance.state.insert_object_for_test(cell_id, hot_cell);
+
+        let err = instance.call("peek()", vec![]).unwrap_err();
+        assert!(
+            err.to_string().contains(&format!(
+                "object {} was not cold before executing the next call from committed storage",
+                cell_id
+            )),
+            "unexpected error: {err:?}"
+        );
+    }
+
+    #[test]
+    fn committed_path_oram_state_is_cold_between_calls() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 9).unwrap();
+        instance
+            .call("put(bytes32,uint256)", vec![b32(7), Value::Uint(9)])
+            .unwrap();
+
+        let committed_map = instance
+            .state
+            .objects_for_test()
+            .values()
+            .find(|object| matches!(object, RuntimeObject::UoOramMap(_)))
+            .expect("expected one UO ORAM map object");
+        assert_objects_are_cold(&instance);
+        assert_eq!(committed_map.path_oram_access_counter_for_test(), Some(1));
+
+        let read = instance.call("read(bytes32)", vec![b32(7)]).unwrap();
+        assert_eq!(read.return_value, Some(Value::Uint(9)));
+    }
+
+    #[test]
+    fn deployed_path_oram_state_is_cold_before_first_call() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let instance = ContractInstance::deploy_with_seed(artifact, 13).unwrap();
+        let committed_map = instance
+            .state
+            .objects_for_test()
+            .values()
+            .find(|object| matches!(object, RuntimeObject::UoOramMap(_)))
+            .expect("expected one UO ORAM map object");
+        assert_objects_are_cold(&instance);
+        assert_eq!(committed_map.path_oram_access_counter_for_test(), Some(0));
+    }
 }

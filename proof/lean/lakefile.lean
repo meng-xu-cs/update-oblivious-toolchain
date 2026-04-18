@@ -15,6 +15,58 @@ lean_exe checkRuntimeTrustedKernel where
   root := `CheckRuntimeTrustedKernel
 
 @[default_target]
+lean_exe checkProofGradeRuntimeWitness where
+  root := `CheckProofGradeRuntimeWitness
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCore where
+  root := `CheckProofGradeRuntimeConfidentialCore
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCoreSlot where
+  root := `CheckProofGradeRuntimeConfidentialCoreSlot
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCoreLowering where
+  root := `CheckProofGradeRuntimeConfidentialCoreLowering
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCoreShellBoundaryLowering where
+  root := `CheckProofGradeRuntimeConfidentialCoreShellBoundaryLowering
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelDsl where
+  root := `CheckProofGradeRuntimeKernelDsl
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelSlotDsl where
+  root := `CheckProofGradeRuntimeKernelSlotDsl
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelLowering where
+  root := `CheckProofGradeRuntimeKernelLowering
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelWitness where
+  root := `CheckProofGradeRuntimeKernelWitness
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelRefinementWitness where
+  root := `CheckProofGradeRuntimeKernelRefinementWitness
+
+@[default_target]
+lean_exe checkProofGradeRuntimeShellBoundary where
+  root := `CheckProofGradeRuntimeShellBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeShellBoundaryLowering where
+  root := `CheckProofGradeRuntimeShellBoundaryLowering
+
+@[default_target]
+lean_exe checkProofGradeRuntimeTrustedKernel where
+  root := `CheckProofGradeRuntimeTrustedKernel
+
+@[default_target]
 lean_exe checkRuntimeControllerCertificate where
   root := `CheckRuntimeControllerCertificate
 

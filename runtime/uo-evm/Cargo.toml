@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+diagnostics = []
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
@@ -14,6 +17,7 @@ serde_json.workspace = true
 tiny-keccak.workspace = true
 uo-core = { path = "../../crates/uo-core" }
 uo-allocator = { path = "../uo-allocator" }
+uo-precompiles = { path = "../uo-precompiles" }
 uo-store = { path = "../uo-store" }
 
 [dev-dependencies]

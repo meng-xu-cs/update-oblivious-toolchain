@@ -20,8 +20,9 @@ summarized here.
 - update-only sealed storage for the exact backends
 - controller-oriented theorem observers for the SGX-facing paper profile
 - an explicit runtime bridge consisting of controller certificates, hidden
-  Path-ORAM certificates, trusted-kernel bundles, refinement witnesses, and
-  Lean-backed validators
+  Path-ORAM certificates, proof-grade kernel witnesses, trusted-kernel
+  bundles, refinement witnesses, shell-boundary / confidential-core bundles,
+  and Lean-backed validators
 
 ## What This Repository Does Not Currently Document Through Code
 

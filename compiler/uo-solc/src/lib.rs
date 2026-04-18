@@ -9,7 +9,9 @@ use uo_core::manifest::{
     EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
 };
 use uo_core::{
-    CompiledArtifact, ContractMetadata, ScalarType, StateMetadata, StructField, Type, Value,
+    expected_runtime_kernel_opcodes_for_confidential,
+    expected_runtime_manifest_kernel_steps_for_confidential, CompiledArtifact, ContractMetadata,
+    ScalarType, StateMetadata, StructField, Type, Value,
 };
 
 use solang_parser::{diagnostics::Diagnostic, parse, pt};
@@ -1052,11 +1054,23 @@ fn build_manifest_entry(
             + counts.expr_count as u64 * 7
             + max_commit_ops as u64 * 29,
     );
+    let kernel_opcodes = if function.confidential {
+        expected_runtime_kernel_opcodes_for_confidential(function)?
+    } else {
+        Vec::new()
+    };
+    let kernel_steps = if function.confidential {
+        expected_runtime_manifest_kernel_steps_for_confidential(function)?
+    } else {
+        Vec::new()
+    };
     Ok(EntrypointManifest {
         secret_args: function.secret_args.clone(),
         public_gas_budget: budget,
         arena_bytes: 4096 + counts.local_count * 64,
         max_stack_words: 64 + counts.local_count,
+        kernel_opcodes,
+        kernel_steps,
         uocell_reads: counts.cell_reads,
         uocell_writes: counts.cell_writes,
         uoarray_reads: counts.array_reads,
@@ -1091,6 +1105,13 @@ struct CountSummary {
 }
 
 fn count_body(statements: &[Statement]) -> CountSummary {
+    count_body_with_env(statements, &BTreeMap::new())
+}
+
+fn count_body_with_env(
+    statements: &[Statement],
+    loop_env: &BTreeMap<String, u128>,
+) -> CountSummary {
     let mut counts = CountSummary::default();
     for statement in statements {
         counts.statement_count += 1;
@@ -1115,12 +1136,30 @@ fn count_body(statements: &[Statement]) -> CountSummary {
                 merge_counts(&mut counts, else_counts);
             }
             Statement::For {
-                start, end, body, ..
+                index_var,
+                start,
+                end,
+                body,
+                ..
             } => {
                 count_expr(start, &mut counts);
                 count_expr(end, &mut counts);
-                let body_counts = count_body(body);
-                merge_counts(&mut counts, body_counts);
+                let start = eval_loop_bound(start, loop_env);
+                let end = eval_loop_bound(end, loop_env);
+                match (start, end) {
+                    (Some(start), Some(end)) => {
+                        for index in start..end {
+                            let mut nested_env = loop_env.clone();
+                            nested_env.insert(index_var.clone(), index);
+                            let body_counts = count_body_with_env(body, &nested_env);
+                            merge_counts(&mut counts, body_counts);
+                        }
+                    }
+                    _ => {
+                        let body_counts = count_body_with_env(body, loop_env);
+                        merge_counts(&mut counts, body_counts);
+                    }
+                }
             }
             Statement::CellSet {
                 value, predicate, ..
@@ -2422,6 +2461,61 @@ bounds:
 "#,
         );
         let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
-        assert!(err.to_string().contains("only supports one access per entrypoint"));
+        assert!(err
+            .to_string()
+            .contains("only supports one access per entrypoint"));
+    }
+
+    #[test]
+    fn uo_manifest_embeds_kernel_step_trace() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let source = root.join("benches/raw/FixedSlotClassifier.sol");
+        let metadata: ContractMetadata = serde_yaml::from_str(
+            &fs::read_to_string(root.join("benches/raw/FixedSlotClassifier.uo.yaml")).unwrap(),
+        )
+        .unwrap();
+        let artifact = compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("classify(uint256)")
+            .unwrap();
+        assert_eq!(
+            entry
+                .kernel_steps
+                .iter()
+                .map(|step| step.opcode)
+                .collect::<Vec<_>>(),
+            entry.kernel_opcodes
+        );
+        assert_eq!(
+            entry.kernel_steps.first().and_then(|step| step.object_id),
+            None
+        );
+        assert_eq!(
+            entry.kernel_steps.last().and_then(|step| step.object_id),
+            None
+        );
+    }
+
+    #[test]
+    fn raw_manifest_counts_bounded_loop_accesses_exactly() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let source = root.join("benches/raw/AuthScan.sol");
+        let metadata: ContractMetadata = serde_yaml::from_str(
+            &fs::read_to_string(root.join("benches/raw/AuthScan.raw.yaml")).unwrap(),
+        )
+        .unwrap();
+        let artifact = compile(source.to_str().unwrap(), &metadata, ProgramMode::Raw).unwrap();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("auth(bytes32)")
+            .unwrap();
+        assert_eq!(entry.uoarray_reads, 4);
+        assert_eq!(entry.uocell_writes, 1);
+        assert_eq!(entry.max_commit_ops, 5);
     }
 }

@@ -324,6 +324,50 @@
           "public_gas_budget": 8192,
           "arena_bytes": 4160,
           "max_stack_words": 65,
+          "kernel_opcodes": [
+            "Begin",
+            "ArrayGet",
+            "ArrayGet",
+            "ArrayGet",
+            "ArrayGet",
+            "CellSet",
+            "Commit",
+            "Wipe"
+          ],
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "ArrayGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "ArrayGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "ArrayGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "ArrayGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "CellSet",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 1,
           "uoarray_reads": 4,
@@ -338,6 +382,8 @@
           "public_gas_budget": 2047,
           "arena_bytes": 4096,
           "max_stack_words": 64,
+          "kernel_opcodes": [],
+          "kernel_steps": [],
           "uocell_reads": 1,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -352,6 +398,8 @@
           "public_gas_budget": 2141,
           "arena_bytes": 4096,
           "max_stack_words": 64,
+          "kernel_opcodes": [],
+          "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,

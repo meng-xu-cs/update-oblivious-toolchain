@@ -4,6 +4,8 @@ use clap::{Parser, ValueEnum};
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
     Trace,
+    KernelWitness,
+    KernelRefinementWitness,
     TrustedKernel,
     RefinementWitness,
 }
@@ -31,6 +33,21 @@ fn main() -> Result<()> {
     match cli.format {
         OutputFormat::Trace => {
             println!("{}", serde_json::to_string_pretty(&trace)?);
+        }
+        OutputFormat::KernelWitness => {
+            let witness = trace.runtime_kernel_witness.clone().ok_or_else(|| {
+                anyhow::anyhow!("execution trace is missing runtime kernel witness")
+            })?;
+            println!("{}", witness.to_json_pretty());
+        }
+        OutputFormat::KernelRefinementWitness => {
+            let witness = trace
+                .runtime_kernel_refinement_witness
+                .clone()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("execution trace is missing runtime kernel refinement witness")
+                })?;
+            println!("{}", witness.to_json_pretty());
         }
         OutputFormat::TrustedKernel => {
             let bundle = trace.runtime_trusted_kernel_bundle()?;

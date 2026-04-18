@@ -15,7 +15,7 @@ Status labels:
   theorem-backed paths.
   Evidence:
   `results/witness_validation.json`,
-  `proof/lean/CheckRuntimeWitness.lean`.
+  `proof/lean/CheckProofGradeRuntimeWitness.lean`.
 
 - `cleared` Checked standalone controller-observer certificates.
   Evidence:
@@ -31,7 +31,36 @@ Status labels:
   traces.
   Evidence:
   `results/trusted_kernel_validation.json`,
-  `proof/lean/CheckRuntimeTrustedKernel.lean`.
+  `proof/lean/CheckProofGradeRuntimeTrustedKernel.lean`.
+
+- `cleared` Checked the standalone kernel witness and the lower-level
+  runtime-phase refinement witness exported from emitted traces.
+  Evidence:
+  `results/kernel_validation.json`,
+  `results/kernel_refinement_validation.json`,
+  `proof/lean/CheckProofGradeRuntimeKernelWitness.lean`,
+  `proof/lean/CheckProofGradeRuntimeKernelRefinementWitness.lean`.
+
+- `cleared` Checked the explicit shell/kernel proof interface and its shared
+  DSL/interpreter compositions, up through the full runtime witness +
+  shell-boundary + named/slot DSL bundle.
+  Evidence:
+  `results/kernel_dsl_validation.json`,
+  `results/kernel_slot_dsl_validation.json`,
+  `results/kernel_lowering_validation.json`,
+  `results/shell_boundary_validation.json`,
+  `results/shell_boundary_lowering_validation.json`,
+  `results/confidential_core_validation.json`,
+  `results/confidential_core_slot_validation.json`,
+  `results/confidential_core_lowering_validation.json`,
+  `results/confidential_core_shell_boundary_lowering_validation.json`,
+  `proof/lean/UOToolchain/RuntimeKernelDslJson.lean`,
+  `proof/lean/UOToolchain/RuntimeShellBoundary.lean`,
+  `proof/lean/UOToolchain/RuntimeConfidentialCoreAssurance.lean`,
+  `proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean`,
+  `proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean`,
+  `proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean`,
+  `proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean`.
 
 - `cleared` Checked seeded runtime witness families and paired Path-ORAM proof
   inputs.
@@ -48,7 +77,9 @@ Status labels:
   `results/fresh_coin_validation.json`,
   `results/canonical_pathoram_pair_validation.json`,
   `scripts/run_heavy_artifact.sh`,
+  `proof/lean/CheckRuntimeFreshCoinTheoremInput.lean`,
   `proof/lean/CheckCanonicalPathOramPairCertificate.lean`,
+  `proof/lean/CheckCanonicalPathOramPairTheoremInput.lean`,
   `proof/lean/CheckCanonicalPathOramPaperInstantiation.lean`.
 
 - `cleared` Closed the source-to-artifact bridge for proof-relevant fields by

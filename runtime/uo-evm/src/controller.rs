@@ -23,6 +23,7 @@ pub(crate) struct CallTraceBundle {
     pub logical_writes: Vec<LogicalEvent>,
     pub physical_reads: Vec<PhysicalReadEvent>,
     pub physical_writes: Vec<PhysicalWriteEvent>,
+    pub metrics: StoreExecutionMetrics,
     pub theorem_trace: TheoremTrace,
     pub controller_certificate: RuntimeControllerCertificate,
     pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
@@ -58,7 +59,7 @@ pub(crate) struct CallRecorder {
 
 impl CallRecorder {
     pub(crate) fn begin(entrypoint: &str, args: &[Value]) -> Self {
-        let total_input_len = args.iter().map(|arg| arg.canonical_bytes().len()).sum();
+        let total_input_len = args.iter().map(Value::canonical_len).sum();
         let mut recorder = Self {
             entrypoint: entrypoint.into(),
             ..Self::default()
@@ -112,10 +113,26 @@ impl CallRecorder {
 
     pub(crate) fn physical_write(&mut self, event: PhysicalWriteEvent) {
         self.metrics.physical_writes += 1;
-        if event.new.iter().all(|byte| *byte == 0) {
+        self.physical_writes.push(event);
+    }
+
+    pub(crate) fn physical_write_from_buffers(
+        &mut self,
+        object: &str,
+        location: impl Into<String>,
+        old: &[u8],
+        new: &[u8],
+    ) {
+        self.metrics.physical_writes += 1;
+        if new.iter().all(|byte| *byte == 0) {
             self.metrics.zero_writes += 1;
         }
-        self.physical_writes.push(event);
+        self.physical_writes
+            .push(PhysicalWriteEvent::from_buffers(object, location, old, new));
+    }
+
+    pub(crate) fn add_zero_writes(&mut self, count: usize) {
+        self.metrics.zero_writes += count;
     }
 
     pub(crate) fn record_oram_access(&mut self, object_id: u32, parameters: &OramParameters) {
@@ -211,7 +228,7 @@ impl CallRecorder {
     ) -> Result<CallTraceBundle> {
         self.assert_manifest_exactness(manifest_entry)?;
         self.assert_oram_parameter_exactness(manifest_objects)?;
-        let entry_input_len = args.iter().map(|arg| arg.canonical_bytes().len()).sum();
+        let entry_input_len = args.iter().map(Value::canonical_len).sum();
         let output_shape = output_shape_of(return_value);
         self.controller_phase_order.extend([
             ControllerPhase::SealPersistentState,
@@ -248,6 +265,7 @@ impl CallRecorder {
             logical_writes: self.logical_writes,
             physical_reads: self.physical_reads,
             physical_writes: self.physical_writes,
+            metrics: self.metrics,
             theorem_trace: expected_theorem_trace,
             controller_certificate,
             oram_leaf_schedule: self.path_oram_leaf_schedule,
@@ -477,7 +495,7 @@ fn output_shape_of(return_value: &Option<Value>) -> OutputShape {
     match return_value {
         Some(value) => OutputShape {
             return_present: true,
-            return_length: value.canonical_bytes().len(),
+            return_length: value.canonical_len(),
         },
         None => OutputShape::default(),
     }
