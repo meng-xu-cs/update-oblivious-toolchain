@@ -67,6 +67,10 @@ lean_exe checkProofGradeRuntimeTrustedKernel where
   root := `CheckProofGradeRuntimeTrustedKernel
 
 @[default_target]
+lean_exe checkProofGradeTranslationArtifacts where
+  root := `CheckProofGradeTranslationArtifacts
+
+@[default_target]
 lean_exe checkRuntimeControllerCertificate where
   root := `CheckRuntimeControllerCertificate
 

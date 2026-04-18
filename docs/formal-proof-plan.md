@@ -415,11 +415,14 @@ any secret-dependent micro-event identities remain out of scope.
 
 The proof plan should target the following theorem stack.
 
-### Theorem A: Checker soundness
+### Theorem A: Translation-boundary soundness
 
-If `uo-check` accepts a source contract, its metadata, and its compiled
-artifact, then:
+If the direct translation-boundary checker accepts the source-side compiled
+artifact and the candidate artifact for a given metadata contract, then:
 
+- the accepted proof-grade artifact can be reduced to metadata plus raw
+  source/artifact contract JSON, with proof-relevant views reconstructed in
+  Lean rather than trusted from Rust
 - all confidential state objects use approved backends
 - all public capacities/bounds required by the runtime exist
 - confidential IR contains no forbidden control flow
@@ -646,8 +649,9 @@ has a recommended paper-main route plus a completed executable bridge:
 1. keep `path_oram_local_posmap_v1` as the only theorem-facing ORAM backend
 2. keep the runtime-to-Lean bridge at the small emitted
    witness/certificate-producing kernel rather than at the whole runtime
-3. keep `uo-check` as the translation validator for proof-relevant compiler
-   output rather than trying to verify the whole Rust compiler at once
+3. keep the compiler bridge on the explicit direct-artifact-plus-Lean-check
+   path rather than trying to verify the whole Rust compiler at once, and keep
+   residual Rust-side debug emission off the proof-grade acceptance path
 4. for the current paper theorem, use the citation route for the standard Path
    ORAM theorem at `PathOramLocalPosmapV1StandardTheoremTarget`
 5. reuse the existing projection lemmas to recover the repo's
@@ -707,16 +711,33 @@ Remaining change:
 Current status:
 
 - the compiler emits proof-relevant manifest fields and backend parameters
-- `uo-check` now re-derives theorem-relevant function/object/manifest fields
-  and validates admitted artifacts directly against source plus metadata
+- the strongest proof-grade path now feeds a source-side compiled artifact and
+  the candidate artifact directly to a Lean checker, which extracts the raw
+  contract JSON itself, reconstructs the proof-relevant source/artifact views
+  internally, and accepts only when those reconstructed views match and
+  satisfy proof-grade replay checks for:
+  manifest contract/mode exactness, state-object / manifest exactness,
+  object-id coverage, entrypoint coverage, secret-arg agreement, confidential
+  raw-backend rejection, arena/stack budgets, logical read/write counters,
+  ORAM access counts and theorem-facing ORAM shape, `max_commit_ops`, and the
+  confidential kernel lowering / runtime-step schedule
+- `uo-check` no longer sits on the proof-grade CLI path and no longer sends
+  Rust-computed proof-relevant views to the proof-grade checker; the richer
+  view bundle is now debug-only and outside proof-grade acceptance
 - the probe now exercises that translation-validation path directly in both the
-  focused static-check report and the bridge-validation report
+  focused static-check report and the bridge-validation report; insecure raw
+  confidential artifacts are now reported there as explicit proof-grade
+  rejections rather than being treated as accepted cases
 
 Remaining change:
 
-- no additional compiler-engineering change is required for the current bridge
-  story; any future strengthening here is about proving the checker itself, not
-  about widening the validation surface
+- the Rust-side debug-bundle emitter is no longer trusted to choose the
+  proof-relevant projection, and the strongest automated path no longer
+  depends on that emitter at all: Lean recomputes the projection from the raw
+  contract JSON extracted directly from separately materialized artifacts and
+  exposes theorem-level exactness lemmas for both imported views. Remaining
+  translation-side work is therefore limited to debug-surface hygiene rather
+  than a substantive proof-boundary trust gap
 
 ### 6.4 Keep the surrogate backend off the strengthened claim path
 
@@ -750,8 +771,9 @@ The recommended implementation path is now:
 2. narrow the runtime ORAM/controller path around an explicit transcript- and
    certificate-emitting trusted kernel
 3. prove or validate conformance of that kernel to the Lean witness interface
-4. keep `uo-check` as source-to-artifact translation validation for
-   proof-relevant compiler output
+4. keep source-to-artifact translation validation on the explicit
+   direct artifact-checker plus Lean path, and continue isolating residual
+   Rust-side debug logic from that imported interface
 5. keep the stronger external-theorem import presentation separate from the
    already completed engineering bridge and treat it as future work
 6. reuse the already-mechanized projection lemmas for the repo-facing claims
@@ -765,7 +787,10 @@ missing bridge engineering:
    proof-facing docs and claim surface
 2. preserve the small trusted kernel boundary around emitted certificates,
    the trusted-kernel bundle, witnesses reconstructed from that bundle, and
-   `uo-check`
+   the direct Lean-checked translation boundary; the proof-grade path now
+   already accepts separately materialized artifacts directly, so the remaining
+   work is to keep any residual Rust-side convenience/debug emission fully out
+   of that proof-facing path
 3. cite the external Path ORAM theorem source at
    `PathOramLocalPosmapV1StandardTheoremTarget`
 4. keep the stronger theorem-provenance swap isolated from the theorem
@@ -785,8 +810,12 @@ proof-grade Path-ORAM theorem boundary under explicit assumptions:
 - a simulator-based theorem stack is written down and mechanized
 - the runtime/proof bridge is carried by emitted certificates, the
   trusted-kernel bundle, and checked refinement witnesses
-- the compiler boundary is closed by checker-side translation validation of the
-  proof-relevant fields consumed by the theorem
+- the compiler boundary is closed at the current bridge layer by the direct
+  Lean `checkProofGradeTranslationArtifacts` validator over separately
+  materialized source and candidate artifacts; the Lean checker reconstructs
+  the proof-relevant fields itself and then checks exact replay of
+  state-object manifests, resource budgets, ORAM access/budget metadata, and
+  confidential kernel schedule metadata
 - the results bundle is regenerated against that transcript model
 
 What still should not be claimed without further work is stronger provenance or

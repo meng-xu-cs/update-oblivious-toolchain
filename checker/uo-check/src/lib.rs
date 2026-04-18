@@ -5,7 +5,8 @@ use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{
     expected_runtime_kernel_opcodes_for_confidential,
     expected_runtime_manifest_kernel_steps_for_confidential, lower_confidential_kernel_statements,
-    CompiledArtifact, ContractMetadata, OramManifest, StateObjectManifest,
+    CompiledArtifact, ContractMetadata, OramManifest, ProofRelevantTranslationBundle,
+    StateObjectManifest,
 };
 
 #[cfg(test)]
@@ -232,6 +233,14 @@ pub fn check_artifact_against_source(
     assert_translation_equivalence(&expected, artifact)?;
     report.push("source/artifact translation validation: ok".into());
     Ok(report)
+}
+
+pub fn translation_validation_bundle_against_source(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    artifact: &CompiledArtifact,
+) -> Result<ProofRelevantTranslationBundle> {
+    uo_solc::translation_validation_bundle_against_artifact(source_path, metadata, artifact)
 }
 
 fn manifest_mode(mode: &ProgramMode) -> &'static str {
@@ -898,7 +907,10 @@ fn forbid_raw_expr(expr: &Expr, signature: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{check_artifact, check_artifact_against_source, forbid_raw_expr};
+    use super::{
+        check_artifact, check_artifact_against_source, forbid_raw_expr,
+        translation_validation_bundle_against_source,
+    };
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1110,6 +1122,19 @@ bounds:
         assert!(err
             .to_string()
             .contains("source/artifact manifest mismatch"));
+    }
+
+    #[test]
+    fn debug_translation_bundle_includes_projection_views() {
+        let (source, metadata, artifact) = sample_artifact();
+        let debug_bundle =
+            translation_validation_bundle_against_source(source.to_str().unwrap(), &metadata, &artifact)
+                .unwrap();
+        let debug_json = serde_json::to_value(&debug_bundle).unwrap();
+        let debug_obj = debug_json.as_object().unwrap();
+        assert!(debug_obj.contains_key("source_path"));
+        assert!(debug_obj.contains_key("source_view"));
+        assert!(debug_obj.contains_key("artifact_view"));
     }
 
     #[test]

@@ -13,6 +13,5 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 uo-core = { path = "../../crates/uo-core" }
-uo-check = { path = "../../checker/uo-check" }
 uo-evm = { path = "../../runtime/uo-evm", features = ["diagnostics"] }
 uo-solc = { path = "../../compiler/uo-solc" }

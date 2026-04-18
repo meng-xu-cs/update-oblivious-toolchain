@@ -62,8 +62,8 @@ The current runtime has a first hardening layer:
   during each call
 - the emitted manifest now records the exact confidential kernel-op sequence
   plus the exact public kernel-step trace `{ opcode, object_id? }` for each
-  confidential entrypoint, and both `uo-check` and `uo-evm` reject drift
-  against that artifact-side schedule when it is present
+  confidential entrypoint, and checker-side source/artifact validation plus
+  `uo-evm` reject drift against that artifact-side schedule when it is present
 - that allocator session enforces:
   - exact confidential-entrypoint kernel-op budgets derived from the admitted
     function body or the checked manifest sequence, plus `Begin` / `Commit` /
@@ -347,7 +347,8 @@ The current runtime has a first hardening layer:
   importing the raw `RuntimeKernel` type
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
-  secret condition in Rust, while `uo-check` and the proof-grade
+  secret condition in Rust, while the proof-grade translation checker, the
+  confidential-fragment validation report, and the proof-grade
   kernel-witness validator reject confidential select arms outside that
   branchless pure fragment
 - confidential `Expr::StructField` and `Expr::ArrayIndex` are now both
@@ -472,14 +473,14 @@ The current runtime has a first hardening layer:
   universe plus the kernel-step public object schedule, so the artifact
   evidence mirrors that theorem boundary rather than
   hiding it behind counts only
-- `uo-check` now also rejects confidential `Select` arms that either contain
-  storage-visible accesses or fall outside the admitted branchless pure
-  fragment, because the confidential runtime now evaluates both arms and then
-  performs a branchless data-level selection
-- `uo-check` now also rejects confidential `StructField` and
-  confidential `ArrayIndex` outright, because the current malicious-host
-  hardening story does not carry a proof-grade runtime account for those
-  projection forms in the admitted confidential fragment
+- the proof-grade translation checker now also rejects confidential `Select`
+  arms that either contain storage-visible accesses or fall outside the
+  admitted branchless pure fragment, because the confidential runtime now
+  evaluates both arms and then performs a branchless data-level selection
+- the proof-grade translation checker now also rejects confidential
+  `StructField` and confidential `ArrayIndex` outright, because the current
+  malicious-host hardening story does not carry a proof-grade runtime account
+  for those projection forms in the admitted confidential fragment
 
 This is the first point at which `uo-allocator` and `uo-precompiles` are real
 enforcement surfaces rather than dead stubs, and the first point at which the

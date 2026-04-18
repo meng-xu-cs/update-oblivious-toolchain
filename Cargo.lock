@@ -449,7 +449,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "uo-check",
  "uo-core",
  "uo-evm",
  "uo-solc",

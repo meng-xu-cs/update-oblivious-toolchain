@@ -86,8 +86,23 @@ Status labels:
   checker-side translation validation.
   Evidence:
   `checker/uo-check/src/lib.rs`,
+  `crates/uo-core/src/translation_validation.rs`,
+  `compiler/uo-solc/src/lib.rs`,
+  `proof/lean/UOToolchain/TranslationValidationJson.lean`,
+  `proof/lean/CheckProofGradeTranslationArtifacts.lean`,
   `results/static_checks.json`,
   `results/bridge_validation.json`.
+  The current bridge path now goes through a direct Lean acceptance check over
+  separately materialized source and candidate artifacts, rather than a
+  Rust-only translation validator, and the probe no longer depends on
+  `uo-check` as a library on that path. The Lean check reconstructs the
+  proof-relevant source/artifact views from raw contract JSON extracted
+  directly from those artifacts, and then replays state-object manifests,
+  confidential raw-backend rejection, resource counts/budgets, ORAM access
+  metadata, `max_commit_ops`, and confidential kernel step/opcode schedules
+  directly from those Lean-reconstructed views. The richer Rust-emitted
+  proof-relevant view bundle is now debug-only and is no longer accepted by
+  the proof-grade checker.
 
 - `cleared` Kept the theorem-facing backend on the concrete
   `path_oram_local_posmap_v1` path and off the legacy surrogate backend.

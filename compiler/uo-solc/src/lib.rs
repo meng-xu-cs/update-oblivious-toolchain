@@ -11,7 +11,7 @@ use uo_core::manifest::{
 use uo_core::{
     expected_runtime_kernel_opcodes_for_confidential,
     expected_runtime_manifest_kernel_steps_for_confidential, CompiledArtifact, ContractMetadata,
-    ScalarType, StateMetadata, StructField, Type, Value,
+    ProofRelevantTranslationBundle, ScalarType, StateMetadata, StructField, Type, Value,
 };
 
 use solang_parser::{diagnostics::Diagnostic, parse, pt};
@@ -168,6 +168,15 @@ pub fn compile(
         transformed_source: Some(render_contract(&functions)),
         disassembly,
     })
+}
+
+pub fn translation_validation_bundle_against_artifact(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    artifact: &CompiledArtifact,
+) -> Result<ProofRelevantTranslationBundle> {
+    let expected = compile(source_path, metadata, artifact.contract.mode.clone())?;
+    ProofRelevantTranslationBundle::from_artifacts(source_path, metadata, &expected, artifact)
 }
 
 fn parse_frontend(

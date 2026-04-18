@@ -66,16 +66,24 @@ The compiler/checker path now enforces compile-time-exact loop structure for
 admitted confidential code and validates the manifest fields that the theorem
 bridge consumes:
 
+- confidential state objects do not use raw backends on the proof-grade path
 - secret-argument positions
+- exact confidential kernel lowering acceptance and kernel step/opcode replay
 - arena and stack budgets
 - exact object manifests
 - exact logical read/write counters
 - exact ORAM access counts
 - exact `max_commit_ops`
 
-`uo-check` also supports explicit source-to-artifact translation validation, so
-the proof-relevant artifact surface is re-derived rather than merely trusted
-after compilation.
+The strongest proof-grade path now feeds a source-side compiled artifact and
+the candidate artifact directly to the Lean checker
+`checkProofGradeTranslationArtifacts`, which re-projects the proof-relevant
+source/artifact views from raw contract JSON extracted from those artifacts.
+The current trust point is therefore no longer a Rust-side proof-relevant
+projection decision. The probe now builds and checks that direct artifacts
+path from `uo-solc` plus `uo-core`, `uo-check` is no longer on the
+proof-grade library or CLI path, and the static-check report records
+confidential raw artifacts as explicit proof-grade rejections.
 
 ### M4. Proof-grade ORAM backend path
 
@@ -162,8 +170,9 @@ The remaining work should be treated as theorem-strengthening:
    docs and claim language
 2. keep the trusted boundary at emitted certificates, the trusted-kernel
    bundle, and witnesses reconstructed from that bundle
-3. keep `uo-check` as the translation validator for proof-relevant compiler
-   output
+3. keep the compiler bridge on the explicit direct-artifact-plus-Lean-check
+   path, and keep any remaining Rust-side bundle emission isolated as
+   convenience/debug tooling rather than part of proof-grade acceptance
 4. present the current paper route as the JACM citation route at the frozen
    interface
 5. separately justify or import the explicit
@@ -191,8 +200,8 @@ The first implementation step is now present in the codebase:
   budgets, bounded scratch regions, and end-of-call wipe checks
 - the emitted manifest now also records both the exact confidential
   kernel-op sequence and the exact public kernel-step trace
-  `{ opcode, object_id? }`, so `uo-check` and `uo-evm` can reject
-  manifest/runtime schedule drift at the artifact boundary
+  `{ opcode, object_id? }`, so checker-side source/artifact validation and
+  `uo-evm` can reject manifest/runtime schedule drift at the artifact boundary
 - the runtime kernel now also enforces that admitted public schedule online
   while the confidential call is executing, which narrows the remaining gap to
   proving the kernel/runtime refines the modeled observer rather than merely
@@ -322,9 +331,9 @@ The first implementation step is now present in the codebase:
   importing the raw `RuntimeKernel` type
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
-  secret condition in Rust, while `uo-check` and the proof-grade
-  kernel-witness validator reject confidential select arms outside that
-  branchless pure fragment
+  secret condition in Rust, while checker-side compiler validation and the
+  proof-grade kernel-witness validator reject confidential select arms outside
+  that branchless pure fragment
 - confidential `Expr::StructField` and `Expr::ArrayIndex` are now both
   rejected from the admitted confidential fragment entirely
 - `confidential_fragment_validation.json` now scans the admitted UO benchmark

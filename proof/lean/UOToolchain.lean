@@ -36,6 +36,7 @@ import UOToolchain.RuntimeConfidentialCoreShellBoundaryLoweringJson
 import UOToolchain.RuntimeCoinsJson
 import UOToolchain.RuntimePathOramPairJson
 import UOToolchain.RuntimeCanonicalPathOramPairJson
+import UOToolchain.TranslationValidationJson
 import UOToolchain.RuntimePaperInstantiation
 import UOToolchain.SgxOramProjection
 import UOToolchain.SgxExactProjection

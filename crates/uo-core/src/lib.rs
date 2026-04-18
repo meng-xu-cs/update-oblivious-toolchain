@@ -8,6 +8,7 @@ pub mod manifest;
 pub mod metadata;
 pub mod shell_boundary;
 pub mod trace;
+pub mod translation_validation;
 pub mod types;
 
 pub use artifact::{ArtifactFormat, CompiledArtifact};
@@ -72,5 +73,11 @@ pub use trace::{
     SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
     SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace, TheoremTrace, TraceHashBundle,
     WriteClass,
+};
+pub use translation_validation::{
+    ProofRelevantContractView, ProofRelevantEntrypointView, ProofRelevantFunctionView,
+    ProofRelevantKernelStepView, ProofRelevantManifestObjectView, ProofRelevantManifestView,
+    ProofRelevantOramAccessView, ProofRelevantOramView, ProofRelevantParamView,
+    ProofRelevantStateObjectView, ProofRelevantTranslationBundle,
 };
 pub use types::{ScalarType, StructField, Type, Value};

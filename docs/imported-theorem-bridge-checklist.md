@@ -13,7 +13,9 @@ This is deliberately not a claim that every line of Rust is formally verified.
 The repo path here is:
 
 - imported standard theorem for the cryptographic / ORAM core
-- checker-side translation validation for proof-relevant compiler output
+- an explicit proof-relevant source/artifact translation boundary plus a Lean
+  checker over that boundary, now driven on the proof-grade path by direct
+  checking of separately materialized artifacts
 - runtime-emitted controller and hidden-state certificates
 - an explicit runtime trusted-kernel bundle packaging those certificates
 - direct runtime witness reconstruction from that trusted-kernel bundle
@@ -57,12 +59,30 @@ Status labels:
 - `cleared` Translation-validate proof-relevant compiler output against source
   and metadata.
   Evidence:
+  `crates/uo-core/src/translation_validation.rs`,
+  `compiler/uo-solc/src/lib.rs`,
   `checker/uo-check/src/lib.rs`,
   `checker/uo-check/src/main.rs`,
+  `proof/lean/UOToolchain/TranslationValidationJson.lean`,
+  `proof/lean/CheckProofGradeTranslationArtifacts.lean`,
   `probe/mplus-probe/src/lib.rs`.
-  `uo-check` now re-derives theorem-relevant manifest/object/function fields
-  and also supports explicit source-to-artifact validation via
-  `check_artifact_against_source`.
+  The bridge path now builds a proof-relevant source/artifact translation
+  payload from `uo-solc` plus `uo-core`, but the strongest proof-grade checker
+  path now consumes separately materialized source and candidate artifacts and
+  extracts the raw contract JSON internally. Lean reconstructs the
+  proof-relevant views internally, accepts only when those reconstructed views
+  match, and then checks the current proof-grade replay obligations used by
+  `results/static_checks.json` and `results/bridge_validation.json`:
+  state-object / manifest exactness, secret-arg agreement, confidential
+  raw-backend rejection, arena/stack budgets, logical access counters, ORAM
+  access counts and theorem-facing ORAM shape, `max_commit_ops`, and
+  confidential kernel opcode / step replay from the admitted fragment.
+  The probe no longer depends on `uo-check` as a library, and `uo-check` now
+  remains only as a diagnostics/debug wrapper on this path. The remaining gap
+  is no longer a Rust-side proof-relevant projection decision and is no longer
+  a proof-grade acceptance dependency in the automated path; the richer
+  Rust-emitted proof-relevant view bundle is now outside the proof-grade
+  acceptance path and treated as debug-only output.
 
 - `cleared` Export the public SGX/controller slice as a standalone theorem-facing
   runtime certificate.

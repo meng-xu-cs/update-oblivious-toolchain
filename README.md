@@ -16,8 +16,8 @@ Components:
   trusted-kernel bundles, certificates, and refinement witnesses for the Lean
   model.
 - `checker/uo-check`: rejects unsupported source programs, validates compiled
-  artifacts, and is the main translation-validation/security-gate path for
-  proof-relevant compiler output.
+  artifacts for CLI/reporting purposes, and exposes debug/compatibility
+  translation-bundle tooling outside the proof-grade acceptance path.
 - `probe/mplus-probe`: runs paired leakage experiments, correctness checks,
   witness/certificate validation, and writes the reproducible `results/`
   bundle.
@@ -64,10 +64,26 @@ Paper-main theorem strategy:
 Current closure status:
 
 1. keep `path_oram_local_posmap_v1` as the only proof-grade backend target
-2. `uo-check` now serves as source-to-artifact translation validation for
-   proof-relevant fields, including exact confidential kernel-op manifest
-   sequences plus the exact public `{ opcode, object_id? }` kernel-step
-   schedule for confidential entrypoints
+2. source-to-artifact conformance for proof-relevant fields now goes through
+   a direct Lean artifact check: the strongest proof-grade path now feeds a
+   source-side compiled artifact plus the candidate artifact directly to
+   `checkProofGradeTranslationArtifacts`, and Lean extracts the raw contract
+   JSON itself. `uo-check` may still emit the richer proof-relevant view
+   bundle as a tooling/debug wrapper outside the proof-grade acceptance path.
+   The Lean checker accepts only when the proof-relevant views match and are
+   exactly the views that Lean re-projects from raw contract JSON extracted
+   from those artifacts,
+   while independently replaying the theorem-facing fields consumed by the
+   bridge:
+   state-object / manifest exactness, secret-arg agreement, arena / stack
+   budgets, logical access counts, ORAM access counts and theorem-facing ORAM
+   shape, `max_commit_ops`, confidential-fragment lowering acceptance, and the
+   exact confidential kernel opcode / step schedule; proof-grade static checks
+   now also report confidential raw artifacts as rejected rather than silently
+   accepting them. In the theorem-facing interface, imported proof-grade
+   validity now yields not only `source_view = artifact_view`, but also that
+   each imported view is exactly the one Lean reconstructed from the raw
+   contract JSON extracted from the artifacts
 3. the runtime trusted-kernel bundle and refinement witness emitted by
    `uo-evm` are checked against the Lean refinement interface for the
    supported backend path, and both now carry the kernel witness that Lean
@@ -111,9 +127,9 @@ Current closure status:
    type;
    confidential `Expr::Select` now also evaluates both admitted pure arms and
    combines them with `Value::confidential_select` instead of branching on the
-   secret condition in Rust, while `uo-check` and the proof-grade
-   kernel-witness validator reject confidential select arms outside that
-   branchless pure fragment; confidential `Expr::StructField` and
+   secret condition in Rust, while checker-side compiler validation and the
+   proof-grade kernel-witness validator reject confidential select arms
+   outside that branchless pure fragment; confidential `Expr::StructField` and
    `Expr::ArrayIndex` are now both rejected from the admitted confidential
    fragment entirely;
    `engine.rs` now also holds an opaque committed-state handle
@@ -202,6 +218,9 @@ Direct inspection helpers:
 
 ```bash
 cargo run -q -p uo-check -- --artifact benches/uo/FixedSlotClassifier.uo.json --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml
+cargo run -q -p uo-solc -- --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml --mode uo --out /tmp/fixedslot.expected.json
+proof/lean/.lake/build/bin/checkProofGradeTranslationArtifacts FixedSlotClassifier /tmp/fixedslot.expected.json benches/uo/FixedSlotClassifier.uo.json
+cargo run -q -p uo-check -- --artifact benches/uo/FixedSlotClassifier.uo.json --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml --debug-translation-bundle-out /tmp/fixedslot.debug.translation.json
 cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format trace
 cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format kernel-witness
 cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format kernel-refinement-witness

@@ -774,7 +774,21 @@ fn workspace_path(path: &str) -> PathBuf {
     }
 }
 
+fn check_source_report(source_path: &str, metadata: &ContractMetadata) -> Result<Vec<String>> {
+    let report = uo_solc::validate_source(source_path, metadata)?;
+    let mut lines = Vec::new();
+    lines.push(format!("validated contract {}", report.contract_name));
+    lines.push(format!("entrypoints: {}", report.entrypoints.join(", ")));
+    if report.diagnostics.is_empty() {
+        lines.push("diagnostics: none".into());
+    } else {
+        lines.push(format!("diagnostics: {}", report.diagnostics.join(" | ")));
+    }
+    Ok(lines)
+}
+
 fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let checker = lean_proofgrade_translation_artifacts_checker_path()?;
     let mut reports = Vec::new();
     for (name, artifacts) in suite {
         let source = format!("benches/raw/{name}.sol");
@@ -795,25 +809,98 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             .transpose()?;
         reports.push(json!({
             "benchmark": name,
-            "source_raw": uo_check::check_source(source_path.to_str().unwrap(), &raw_metadata)?,
-            "source_uo": uo_check::check_source(source_path.to_str().unwrap(), &uo_metadata)?,
-            "raw_artifact": uo_check::check_artifact_against_source(source_path.to_str().unwrap(), &raw_metadata, &artifacts.raw)?,
-            "uo_artifact": uo_check::check_artifact_against_source(source_path.to_str().unwrap(), &uo_metadata, &artifacts.uo)?,
+            "source_raw": check_source_report(source_path.to_str().unwrap(), &raw_metadata)?,
+            "source_uo": check_source_report(source_path.to_str().unwrap(), &uo_metadata)?,
+            "raw_artifact": validate_translation_artifacts_against_source(
+                &format!("{name}-raw-artifact"),
+                source_path.to_str().unwrap(),
+                &raw_metadata,
+                &artifacts.raw,
+                &checker,
+            )?,
+            "uo_artifact": validate_translation_artifacts_against_source(
+                &format!("{name}-uo-artifact"),
+                source_path.to_str().unwrap(),
+                &uo_metadata,
+                &artifacts.uo,
+                &checker,
+            )?,
             "oram_artifact": artifacts
                 .oram
                 .as_ref()
                 .zip(oram_metadata.as_ref())
-                .map(|(artifact, metadata)| uo_check::check_artifact_against_source(source_path.to_str().unwrap(), metadata, artifact))
+                .map(|(artifact, metadata)| {
+                    validate_translation_artifacts_against_source(
+                        &format!("{name}-oram-artifact"),
+                        source_path.to_str().unwrap(),
+                        metadata,
+                        artifact,
+                        &checker,
+                    )
+                })
                 .transpose()?,
             "fullscan64_artifact": artifacts
                 .fullscan64
                 .as_ref()
                 .zip(fullscan64_metadata.as_ref())
-                .map(|(artifact, metadata)| uo_check::check_artifact_against_source(source_path.to_str().unwrap(), metadata, artifact))
+                .map(|(artifact, metadata)| {
+                    validate_translation_artifacts_against_source(
+                        &format!("{name}-fullscan64-artifact"),
+                        source_path.to_str().unwrap(),
+                        metadata,
+                        artifact,
+                        &checker,
+                    )
+                })
                 .transpose()?,
         }));
     }
-    Ok(json!({ "reports": reports }))
+    Ok(json!({
+        "checker": display_report_path(&checker),
+        "reports": reports,
+    }))
+}
+
+fn validate_translation_artifacts_against_source(
+    case_name: &str,
+    source_path: &str,
+    metadata: &ContractMetadata,
+    artifact: &CompiledArtifact,
+    checker: &Path,
+) -> Result<JsonValue> {
+    let expected = uo_solc::compile(source_path, metadata, artifact.contract.mode.clone())?;
+    let source_artifact_case_name = format!("{case_name}-source-artifact");
+    let artifact_case_name = format!("{case_name}-artifact");
+    let (source_artifact_path, source_artifact_json_bytes) =
+        write_temp_json(&source_artifact_case_name, &expected)?;
+    let (artifact_path, artifact_json_bytes) = write_temp_json(&artifact_case_name, artifact)?;
+    let output = Command::new(checker)
+        .arg(&metadata.contract)
+        .arg(&source_artifact_path)
+        .arg(&artifact_path)
+        .output()?;
+    let _ = fs::remove_file(&source_artifact_path);
+    let _ = fs::remove_file(&artifact_path);
+    let lean_stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let lean_stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let accepted = output.status.success();
+    Ok(json!({
+        "contract": artifact.contract.contract,
+        "mode": match artifact.contract.mode {
+            ProgramMode::Raw => "raw",
+            ProgramMode::Uo => "uo",
+        },
+        "metadata_contract": metadata.contract,
+        "state_object_count": artifact.contract.state.len(),
+        "function_count": artifact.contract.functions.len(),
+        "manifest_object_count": artifact.contract.manifest.objects.len(),
+        "manifest_entrypoint_count": artifact.contract.manifest.entrypoints.len(),
+        "source_artifact_json_bytes": source_artifact_json_bytes,
+        "artifact_json_bytes": artifact_json_bytes,
+        "lean_stdout": lean_stdout,
+        "lean_stderr": lean_stderr,
+        "accepted": accepted,
+    }))
 }
 
 fn run_correctness(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
@@ -7029,6 +7116,18 @@ fn lean_proofgrade_trusted_kernel_checker_path() -> Result<PathBuf> {
     } else {
         Err(anyhow!(
             "Lean proof-grade trusted-kernel checker not found at {}; build it with `cd proof/lean && lake build`",
+            path.display()
+        ))
+    }
+}
+
+fn lean_proofgrade_translation_artifacts_checker_path() -> Result<PathBuf> {
+    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeTranslationArtifacts");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(anyhow!(
+            "Lean proof-grade translation artifacts checker not found at {}; build it with `cd proof/lean && lake build`",
             path.display()
         ))
     }
