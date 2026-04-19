@@ -101,7 +101,10 @@ also consumes the finalized theorem result only through its explicit
 `into_engine_result_parts()` handoff. The same report also
 pins the top-level `ContractRuntime` entrypoints themselves: only
 `runtime/uo-evm/src/shell.rs` may prepare, commit, or replace the public
-shadow wrapper, while only `runtime/uo-evm/src/engine.rs` may invoke
+shadow wrapper, that shell module now lives under `crate::runtime` rather than
+as a top-level crate module, the `PublicRuntimeKernel` facade is likewise now
+restricted to `pub(in crate::runtime)`, and only
+`runtime/uo-evm/src/engine.rs` may invoke
 `runtime.run_confidential_entrypoint(...)` inside the traced-call bridge.
 The same report now also pins the residual raw public-field surface in the
 runtime hot path: after the `MapEntry` / `OramState` / `OramTranscript` /

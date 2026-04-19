@@ -8996,7 +8996,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !state_source
             .contains("pub(crate) fn ensure_ready_for_call(&self, context: &str) -> Result<()>");
     let engine_delegates_public_execution_to_shell = engine_impl_source
-        .contains("use crate::shell::run_public_entrypoint;")
+        .contains("use crate::runtime::shell::run_public_entrypoint;")
         && engine_impl_source.contains("run_public_entrypoint(")
         && !engine_impl_source.contains("AllocatorPlan::from_manifest(")
         && shell_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
@@ -9023,6 +9023,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         shell_impl_source.contains("objects: &mut PublicRuntimeShadowState");
     let shell_uses_public_runtime_kernel =
         shell_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
+    let public_shell_is_runtime_owned = runtime_evm_lib_source.contains("mod runtime;")
+        && !runtime_evm_lib_source.contains("mod shell;")
+        && engine_impl_source.contains("use crate::runtime::shell::run_public_entrypoint;");
     let state_uses_public_runtime_kernel = state_source
         .contains("use crate::runtime::kernel::PublicRuntimeKernel;")
         && state_source.contains("PublicRuntimeKernel::begin(");
@@ -9178,6 +9181,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("pub(in crate::runtime) struct ConfidentialRuntimeShadowState")
         && state_source.contains("pub(crate) struct PublicRuntimeShadowState");
     let kernel_restricted_signatures = [
+        "pub(in crate::runtime) fn begin(",
+        "pub(in crate::runtime) fn note_hash_bytes",
+        "pub(in crate::runtime) fn enforce_stack_words",
+        "pub(in crate::runtime) fn wipe_hash_scratch",
+        "pub(in crate::runtime) fn cell_get(",
+        "pub(in crate::runtime) fn cell_set(",
+        "pub(in crate::runtime) fn array_get(",
+        "pub(in crate::runtime) fn array_set(",
+        "pub(in crate::runtime) fn map_get(",
+        "pub(in crate::runtime) fn map_put(",
+        "pub(in crate::runtime) fn finish(",
         "pub(in crate::runtime) fn shadow_load_public_objects",
         "pub(in crate::runtime) fn commit_public_objects",
         "pub(in crate::runtime) fn run_confidential_call",
@@ -9200,6 +9214,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let kernel_avoids_raw_escape_hatches = !kernel_source
         .contains("pub(in crate::runtime) fn inner_mut")
         && !kernel_source.contains("pub(in crate::runtime) fn into_inner");
+    let public_kernel_facade_restricted_to_runtime = kernel_source
+        .contains("pub(in crate::runtime) struct PublicRuntimeKernel {")
+        && !kernel_source.contains("pub(crate) struct PublicRuntimeKernel {")
+        && !kernel_source.contains("pub(crate) fn begin(plan: AllocatorPlan")
+        && !kernel_source.contains("pub(crate) fn note_hash_bytes(")
+        && !kernel_source.contains("pub(crate) fn enforce_stack_words(")
+        && !kernel_source.contains("pub(crate) fn wipe_hash_scratch(")
+        && !kernel_source.contains("pub(crate) fn cell_get(")
+        && !kernel_source.contains("pub(crate) fn cell_set(")
+        && !kernel_source.contains("pub(crate) fn array_get(")
+        && !kernel_source.contains("pub(crate) fn array_set(")
+        && !kernel_source.contains("pub(crate) fn map_get(")
+        && !kernel_source.contains("pub(crate) fn map_put(")
+        && !kernel_source.contains("pub(crate) fn finish(");
     let kernel_confidential_shadow_load_private = kernel_source
         .contains("fn shadow_load_confidential_objects(")
         && !kernel_source.contains("pub(in crate::runtime) fn shadow_load_confidential_objects(")
@@ -10184,10 +10212,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source
             .contains("allocator.max_kernel_ops = manifest_expected_kernel_steps.len();")
         && state_source
-            .contains("PublicRuntimeKernel::begin(allocator, None, public_object_ids.clone())?")
+            .contains("PublicRuntimeKernel::begin(allocator, public_object_ids.clone())?")
         && !state_source.contains("let expected_kernel_steps =")
         && !state_source.contains("expected_kernel_steps: Vec<RuntimeKernelStepWitness>,")
         && !state_source.contains("shadow_load_object_ids")
+        && !kernel_source.contains(
+            "pub(crate) fn begin(\n        plan: AllocatorPlan,\n        expected_kernel_steps:",
+        )
         && kernel_source.contains("self.bind_expected_kernel_program(program)?;")
         && kernel_source.contains("fn bind_expected_kernel_program(")
         && kernel_source
@@ -11015,6 +11046,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             engine_does_not_import_public_runtime_kernel,
         "shell_uses_shadow_wrapper": shell_uses_shadow_wrapper,
         "shell_uses_public_runtime_kernel": shell_uses_public_runtime_kernel,
+        "public_shell_is_runtime_owned": public_shell_is_runtime_owned,
         "state_uses_public_runtime_kernel": state_uses_public_runtime_kernel,
         "shell_confidential_surface_absent": shell_confidential_surface_absent,
         "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
@@ -11034,6 +11066,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "all_kernel_restricted_signatures_present": all_kernel_restricted_signatures_present,
         "kernel_restricted_signature_checks": kernel_restricted_signature_checks,
         "kernel_avoids_raw_escape_hatches": kernel_avoids_raw_escape_hatches,
+        "public_kernel_facade_restricted_to_runtime":
+            public_kernel_facade_restricted_to_runtime,
         "kernel_confidential_shadow_load_private":
             kernel_confidential_shadow_load_private,
         "raw_kernel_private_surface_checks": raw_kernel_private_surface_checks,
@@ -11425,6 +11459,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_does_not_import_public_runtime_kernel
             && shell_uses_shadow_wrapper
             && shell_uses_public_runtime_kernel
+            && public_shell_is_runtime_owned
             && state_uses_public_runtime_kernel
             && shell_confidential_surface_absent
             && !engine_defines_fresh_coin_plan_directly
@@ -11441,6 +11476,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && all_restricted_signatures_present
             && all_kernel_restricted_signatures_present
             && kernel_avoids_raw_escape_hatches
+            && public_kernel_facade_restricted_to_runtime
             && kernel_confidential_shadow_load_private
             && raw_kernel_private_surface_restricted
             && all_state_restricted_signatures_present

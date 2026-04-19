@@ -527,8 +527,11 @@ The current runtime has a first hardening layer:
   itself forward, deriving both the public kernel-step witness list and the
   confidential shadow-load object set from that canonical DSL object at the
   kernel boundary instead of caching duplicate schedule-derived vectors in the
-  runtime plan, while `PublicRuntimeKernel::begin(...)` now internalizes the
-  exact public object universe (`expected_public_object_ids =
+  runtime plan, with `PublicRuntimeKernel::begin(...)` now taking only the
+  allocator plan plus the public object universe, and with
+  `run_confidential_call(...)` binding the admitted runtime schedule from the
+  canonical slot DSL program itself, while `PublicRuntimeKernel::begin(...)`
+  also internalizes the exact public object universe (`expected_public_object_ids =
   public_object_ids`) instead of making callers pass both copies
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the

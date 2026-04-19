@@ -268,7 +268,7 @@ impl ContractRuntime {
         self.committed.witness_snapshot()
     }
 
-    pub(crate) fn prepare_public_shadow(
+    pub(in crate::runtime) fn prepare_public_shadow(
         &self,
         kernel: &mut PublicRuntimeKernel,
         public_object_ids: &[u32],
@@ -277,7 +277,7 @@ impl ContractRuntime {
             .prepare_public_shadow(kernel, public_object_ids)
     }
 
-    pub(crate) fn commit_public_shadow(
+    pub(in crate::runtime) fn commit_public_shadow(
         &self,
         kernel: &mut PublicRuntimeKernel,
         shadow: &mut PublicRuntimeShadowState,
@@ -310,7 +310,7 @@ impl ContractRuntime {
             max_hash_part_bytes,
         } = plan;
         let call_inputs = ConfidentialCallInputs::from_raw_args(args);
-        let kernel = PublicRuntimeKernel::begin(allocator, None, public_object_ids.clone())?;
+        let kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.clone())?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
         let outcome = self.committed.run_confidential_call(
             kernel,
@@ -373,12 +373,19 @@ impl ContractRuntime {
     }
 
     #[cfg(test)]
-    pub(crate) fn shadow_remove_object_for_test(
-        &self,
-        kernel: &mut PublicRuntimeKernel,
-        object_id: u32,
-    ) -> Result<RuntimeObject> {
-        let mut shadow = self.committed.shadow_load_for_test(kernel, &[object_id])?;
+    pub(crate) fn shadow_remove_object_for_test(&self, object_id: u32) -> Result<RuntimeObject> {
+        let mut kernel = PublicRuntimeKernel::begin(
+            AllocatorPlan {
+                arena_bytes: 4096,
+                max_stack_words: 64,
+                scratch_bytes: 1024,
+                max_kernel_ops: 16,
+            },
+            vec![],
+        )?;
+        let mut shadow = self
+            .committed
+            .shadow_load_for_test(&mut kernel, &[object_id])?;
         shadow
             .remove_object_for_test(object_id)
             .ok_or_else(|| anyhow!("shadow object {object_id} missing after test shadow load"))
@@ -442,7 +449,7 @@ impl CommittedRuntimeState {
         })
     }
 
-    pub(crate) fn prepare_public_shadow(
+    pub(in crate::runtime) fn prepare_public_shadow(
         &self,
         kernel: &mut PublicRuntimeKernel,
         public_object_ids: &[u32],
@@ -450,7 +457,7 @@ impl CommittedRuntimeState {
         kernel.shadow_load_public_objects(self, public_object_ids)
     }
 
-    pub(crate) fn commit_public_shadow(
+    pub(in crate::runtime) fn commit_public_shadow(
         &self,
         kernel: &mut PublicRuntimeKernel,
         shadow: &mut PublicRuntimeShadowState,

@@ -1,6 +1,6 @@
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
+use crate::runtime::shell::run_public_entrypoint;
 use crate::runtime::state::ContractRuntime;
-use crate::shell::run_public_entrypoint;
 use crate::theorem::run_traced_call;
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
@@ -174,9 +174,7 @@ pub fn run_artifact_with_seed(
 #[cfg(test)]
 mod tests {
     use super::ContractInstance;
-    use crate::runtime::kernel::PublicRuntimeKernel;
     use crate::runtime::objects::RuntimeObject;
-    use uo_allocator::AllocatorPlan;
     use uo_core::{canonical_runtime_public_object_ids, ContractMetadata, ProgramMode, Value};
 
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
@@ -209,8 +207,8 @@ mod tests {
             "engine.rs should hold an opaque runtime wrapper rather than the raw committed state"
         );
         assert!(
-            source.contains("use crate::shell::run_public_entrypoint;"),
-            "engine.rs should delegate public execution to the explicit public shell module"
+            source.contains("use crate::runtime::shell::run_public_entrypoint;"),
+            "engine.rs should delegate public execution to the runtime-owned public shell module"
         );
         assert!(
             !source.contains("ConfidentialCallInputs"),
@@ -368,20 +366,9 @@ mod tests {
                 .iter()
                 .find(|(_, object)| matches!(object, RuntimeObject::UoCell(_)))
                 .expect("expected one UO cell object");
-            let mut kernel = PublicRuntimeKernel::begin(
-                AllocatorPlan {
-                    arena_bytes: 4096,
-                    max_stack_words: 64,
-                    scratch_bytes: 1024,
-                    max_kernel_ops: 16,
-                },
-                None,
-                vec![],
-            )
-            .unwrap();
             let hot_cell = instance
                 .state
-                .shadow_remove_object_for_test(&mut kernel, cell_id)
+                .shadow_remove_object_for_test(cell_id)
                 .unwrap();
             (cell_id, hot_cell)
         };

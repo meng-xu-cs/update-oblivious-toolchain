@@ -26,7 +26,7 @@ pub(crate) struct RuntimeKernel {
     runtime_phase_events: BoundedJournal<RuntimeKernelRefinementEventWitness>,
 }
 
-pub(crate) struct PublicRuntimeKernel {
+pub(in crate::runtime) struct PublicRuntimeKernel {
     inner: RuntimeKernel,
 }
 
@@ -189,29 +189,28 @@ impl ConfidentialKernelRunOutcome {
 }
 
 impl PublicRuntimeKernel {
-    pub(crate) fn begin(
+    pub(in crate::runtime) fn begin(
         plan: AllocatorPlan,
-        expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
         public_object_ids: Vec<u32>,
     ) -> Result<Self> {
         Ok(Self {
-            inner: RuntimeKernel::begin(plan, expected_kernel_steps, public_object_ids)?,
+            inner: RuntimeKernel::begin(plan, public_object_ids)?,
         })
     }
 
-    pub(crate) fn note_hash_bytes(&mut self, bytes: usize) -> Result<()> {
+    pub(in crate::runtime) fn note_hash_bytes(&mut self, bytes: usize) -> Result<()> {
         self.inner.note_hash_bytes(bytes)
     }
 
-    pub(crate) fn enforce_stack_words(&mut self, words: usize) -> Result<()> {
+    pub(in crate::runtime) fn enforce_stack_words(&mut self, words: usize) -> Result<()> {
         self.inner.enforce_stack_words(words)
     }
 
-    pub(crate) fn wipe_hash_scratch(&mut self) {
+    pub(in crate::runtime) fn wipe_hash_scratch(&mut self) {
         self.inner.wipe_hash_scratch();
     }
 
-    pub(crate) fn cell_get(
+    pub(in crate::runtime) fn cell_get(
         &mut self,
         objects: &mut PublicRuntimeShadowState,
         recorder: &mut CallRecorder,
@@ -220,7 +219,7 @@ impl PublicRuntimeKernel {
         self.inner.cell_get_public(objects, recorder, object_id)
     }
 
-    pub(crate) fn cell_set(
+    pub(in crate::runtime) fn cell_set(
         &mut self,
         objects: &mut PublicRuntimeShadowState,
         recorder: &mut CallRecorder,
@@ -232,7 +231,7 @@ impl PublicRuntimeKernel {
             .cell_set_public(objects, recorder, object_id, value, predicate)
     }
 
-    pub(crate) fn array_get(
+    pub(in crate::runtime) fn array_get(
         &mut self,
         objects: &mut PublicRuntimeShadowState,
         recorder: &mut CallRecorder,
@@ -243,7 +242,7 @@ impl PublicRuntimeKernel {
             .array_get_public(objects, recorder, object_id, index)
     }
 
-    pub(crate) fn array_set(
+    pub(in crate::runtime) fn array_set(
         &mut self,
         objects: &mut PublicRuntimeShadowState,
         recorder: &mut CallRecorder,
@@ -256,7 +255,7 @@ impl PublicRuntimeKernel {
             .array_set_public(objects, recorder, object_id, index, value, predicate)
     }
 
-    pub(crate) fn map_get(
+    pub(in crate::runtime) fn map_get(
         &mut self,
         objects: &mut PublicRuntimeShadowState,
         recorder: &mut CallRecorder,
@@ -266,7 +265,7 @@ impl PublicRuntimeKernel {
         self.inner.map_get_public(objects, recorder, object_id, key)
     }
 
-    pub(crate) fn map_put(
+    pub(in crate::runtime) fn map_put(
         &mut self,
         objects: &mut PublicRuntimeShadowState,
         recorder: &mut CallRecorder,
@@ -279,7 +278,7 @@ impl PublicRuntimeKernel {
             .map_put_public(objects, recorder, object_id, key, value, predicate)
     }
 
-    pub(crate) fn finish(
+    pub(in crate::runtime) fn finish(
         self,
         entrypoint_id: &str,
     ) -> Result<(RuntimeKernelWitness, RuntimeKernelRefinementWitness)> {
@@ -339,17 +338,13 @@ impl PublicRuntimeKernel {
 }
 
 impl RuntimeKernel {
-    fn begin(
-        plan: AllocatorPlan,
-        expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
-        public_object_ids: Vec<u32>,
-    ) -> Result<Self> {
+    fn begin(plan: AllocatorPlan, public_object_ids: Vec<u32>) -> Result<Self> {
         let kernel_step_capacity = plan.max_kernel_ops;
         let runtime_phase_event_capacity =
             max_runtime_phase_event_count(public_object_ids.len(), plan.max_kernel_ops)?;
         let mut kernel = Self {
             allocator: AllocatorSession::new(plan),
-            expected_kernel_steps,
+            expected_kernel_steps: None,
             public_object_ids,
             max_hash_part_bytes: 0,
             expected_kernel_step_index: 0,
@@ -368,6 +363,38 @@ impl RuntimeKernel {
                 .push(RuntimeKernelRefinementEventWitness::pre_committed_cold_object(object_id))?;
         }
         kernel.record_kernel_step(UoOpcode::Begin, None)?;
+        Ok(kernel)
+    }
+
+    fn bind_expected_kernel_steps(
+        &mut self,
+        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+        context: &str,
+    ) -> Result<()> {
+        if self.expected_kernel_steps.is_some() {
+            return Ok(());
+        }
+        let Some(begin_step) = expected_kernel_steps.first() else {
+            return Err(anyhow!("{context} emitted no admitted runtime steps"));
+        };
+        if begin_step.opcode != UoOpcode::Begin || begin_step.object_id.is_some() {
+            return Err(anyhow!(
+                "{context} does not begin with the admitted Begin step"
+            ));
+        }
+        self.expected_kernel_step_index = 1;
+        self.expected_kernel_steps = Some(expected_kernel_steps);
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn begin_with_expected_kernel_steps(
+        plan: AllocatorPlan,
+        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+        public_object_ids: Vec<u32>,
+    ) -> Result<Self> {
+        let mut kernel = Self::begin(plan, public_object_ids)?;
+        kernel.bind_expected_kernel_steps(expected_kernel_steps, "test runtime schedule")?;
         Ok(kernel)
     }
 
@@ -650,25 +677,10 @@ impl RuntimeKernel {
         &mut self,
         program: &ConfidentialKernelSlotProgram,
     ) -> Result<()> {
-        if self.expected_kernel_steps.is_some() {
-            return Ok(());
-        }
-        let expected_kernel_steps = program.expected_runtime_step_witnesses();
-        let Some(begin_step) = expected_kernel_steps.first() else {
-            return Err(anyhow!(
-                "confidential kernel program {} emitted no admitted runtime steps",
-                program.entrypoint_id
-            ));
-        };
-        if begin_step.opcode != UoOpcode::Begin || begin_step.object_id.is_some() {
-            return Err(anyhow!(
-                "confidential kernel program {} does not begin with the admitted Begin step",
-                program.entrypoint_id
-            ));
-        }
-        self.expected_kernel_step_index = 1;
-        self.expected_kernel_steps = Some(expected_kernel_steps);
-        Ok(())
+        self.bind_expected_kernel_steps(
+            program.expected_runtime_step_witnesses(),
+            &format!("confidential kernel program {}", program.entrypoint_id),
+        )
     }
 
     fn expected_shadow_load_object_ids(&self) -> Result<Vec<u32>> {
@@ -1209,7 +1221,6 @@ mod tests {
                 scratch_bytes: 1024,
                 max_kernel_ops: 1,
             },
-            None,
             vec![],
         )
         .unwrap();
@@ -1218,14 +1229,14 @@ mod tests {
 
     #[test]
     fn kernel_rejects_runtime_step_schedule_mismatch_online() {
-        let mut kernel = RuntimeKernel::begin(
+        let mut kernel = RuntimeKernel::begin_with_expected_kernel_steps(
             AllocatorPlan {
                 arena_bytes: 4096,
                 max_stack_words: 64,
                 scratch_bytes: 1024,
                 max_kernel_ops: 4,
             },
-            Some(vec![
+            vec![
                 RuntimeKernelStepWitness {
                     opcode: UoOpcode::Begin,
                     object_id: None,
@@ -1242,7 +1253,7 @@ mod tests {
                     opcode: UoOpcode::Wipe,
                     object_id: None,
                 },
-            ]),
+            ],
             vec![7],
         )
         .unwrap();
@@ -1257,14 +1268,14 @@ mod tests {
 
     #[test]
     fn kernel_exports_matching_expected_schedule_when_enforced_online() {
-        let mut kernel = RuntimeKernel::begin(
+        let mut kernel = RuntimeKernel::begin_with_expected_kernel_steps(
             AllocatorPlan {
                 arena_bytes: 4096,
                 max_stack_words: 64,
                 scratch_bytes: 1024,
                 max_kernel_ops: 3,
             },
-            Some(vec![
+            vec![
                 RuntimeKernelStepWitness {
                     opcode: UoOpcode::Begin,
                     object_id: None,
@@ -1277,7 +1288,7 @@ mod tests {
                     opcode: UoOpcode::Wipe,
                     object_id: None,
                 },
-            ]),
+            ],
             vec![],
         )
         .unwrap();

@@ -7,6 +7,9 @@ pub(crate) mod kernel;
 #[path = "objects.rs"]
 pub(crate) mod objects;
 
+#[path = "shell.rs"]
+pub(crate) mod shell;
+
 #[path = "state.rs"]
 pub(crate) mod state;
 
