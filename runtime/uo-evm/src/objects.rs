@@ -574,13 +574,7 @@ impl RuntimeObject {
                     && !object.accessed
                     && !object.dirty
             }
-            Self::UoOramMap(object) => {
-                object.oram.entries.is_empty()
-                    && object.oram.position_map.is_empty()
-                    && object.oram.stash.is_empty()
-                    && !object.accessed
-                    && !object.dirty
-            }
+            Self::UoOramMap(object) => object.oram.is_cold() && !object.accessed && !object.dirty,
             _ => true,
         }
     }
@@ -588,7 +582,7 @@ impl RuntimeObject {
     #[cfg(test)]
     pub(crate) fn path_oram_access_counter_for_test(&self) -> Option<u64> {
         match self {
-            Self::UoOramMap(object) => Some(object.oram.access_counter),
+            Self::UoOramMap(object) => Some(object.oram.access_counter_for_test()),
             _ => None,
         }
     }
@@ -598,16 +592,7 @@ impl RuntimeObject {
     ) -> Result<Option<RuntimePathOramPositionMapWitness>> {
         match self {
             Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
-                let leaves = if object.oram.position_map.len() == object.oram.parameters.capacity {
-                    object.oram.position_map.clone()
-                } else {
-                    object.oram.path_position_map_from_storage(&object.spec)?
-                };
-                Ok(Some(RuntimePathOramPositionMapWitness {
-                    object_id: object.spec.id,
-                    object_name: object.spec.name.clone(),
-                    leaves,
-                }))
+                Ok(Some(object.oram.path_position_map_witness(&object.spec)?))
             }
             _ => Ok(None),
         }
@@ -618,11 +603,7 @@ impl RuntimeObject {
     ) -> Option<RuntimeOramAccessCounterWitness> {
         match self {
             Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
-                Some(RuntimeOramAccessCounterWitness {
-                    object_id: object.spec.id,
-                    object_name: object.spec.name.clone(),
-                    access_counter: object.oram.access_counter,
-                })
+                Some(object.oram.access_counter_witness(&object.spec))
             }
             _ => None,
         }
@@ -814,7 +795,7 @@ impl RuntimeObject {
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
-                trace.record_oram_access(object.spec.id, &object.oram.parameters);
+                trace.record_oram_access(object.spec.id, object.oram.parameters());
                 let (value, transcript) = object.oram.get(
                     &object.spec,
                     key,
@@ -834,7 +815,7 @@ impl RuntimeObject {
                     trace.record_path_oram_leaf_access(
                         object.spec.id,
                         &object.spec.name,
-                        object.oram.parameters.bucket_count,
+                        object.oram.path_bucket_count(),
                         leaf,
                     );
                 }
@@ -917,7 +898,7 @@ impl RuntimeObject {
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
-                trace.record_oram_access(object.spec.id, &object.oram.parameters);
+                trace.record_oram_access(object.spec.id, object.oram.parameters());
                 let transcript = object.oram.put(
                     &object.spec,
                     key,
@@ -939,7 +920,7 @@ impl RuntimeObject {
                     trace.record_path_oram_leaf_access(
                         object.spec.id,
                         &object.spec.name,
-                        object.oram.parameters.bucket_count,
+                        object.oram.path_bucket_count(),
                         leaf,
                     );
                 }
@@ -1935,22 +1916,21 @@ mod tests {
         }
         old_allocator.finish().unwrap();
         let (expected_entries, expected_position_map, expected_stash) = match &old {
-            RuntimeObject::UoOramMap(map) => (
-                map.oram.entries.clone(),
-                map.oram.position_map.clone(),
-                map.oram.stash.clone(),
-            ),
+            RuntimeObject::UoOramMap(map) => map.oram.logical_state_snapshot_for_test(),
             _ => unreachable!(),
         };
 
         match &mut old {
             RuntimeObject::UoOramMap(map) => {
-                map.oram.entries[0] = MapEntry {
-                    occupied: true,
-                    key: Value::Address([0x66; 20]),
-                    value: Value::Uint(19),
-                };
-                map.oram.position_map[0] = Some(0);
+                map.oram.install_slot_for_test(
+                    0,
+                    MapEntry {
+                        occupied: true,
+                        key: Value::Address([0x66; 20]),
+                        value: Value::Uint(19),
+                    },
+                    Some(0),
+                );
             }
             _ => unreachable!(),
         }
@@ -1959,11 +1939,7 @@ mod tests {
         let new = old.clone_for_tx(&mut shadow_allocator).unwrap();
         shadow_allocator.finish().unwrap();
         let (entries_ptr, position_map_ptr, stash_ptr) = match &new {
-            RuntimeObject::UoOramMap(map) => (
-                map.oram.entries.as_ptr(),
-                map.oram.position_map.as_ptr(),
-                map.oram.stash.as_ptr(),
-            ),
+            RuntimeObject::UoOramMap(map) => map.oram.logical_state_ptrs_for_test(),
             _ => unreachable!(),
         };
 
@@ -1976,12 +1952,15 @@ mod tests {
 
         match committed {
             RuntimeObject::UoOramMap(map) => {
-                assert_eq!(map.oram.entries, expected_entries);
-                assert_eq!(map.oram.position_map, expected_position_map);
-                assert_eq!(map.oram.stash, expected_stash);
-                assert_eq!(map.oram.entries.as_ptr(), entries_ptr);
-                assert_eq!(map.oram.position_map.as_ptr(), position_map_ptr);
-                assert_eq!(map.oram.stash.as_ptr(), stash_ptr);
+                let (entries, position_map, stash) = map.oram.logical_state_snapshot_for_test();
+                assert_eq!(entries, expected_entries);
+                assert_eq!(position_map, expected_position_map);
+                assert_eq!(stash, expected_stash);
+                let (current_entries_ptr, current_position_map_ptr, current_stash_ptr) =
+                    map.oram.logical_state_ptrs_for_test();
+                assert_eq!(current_entries_ptr, entries_ptr);
+                assert_eq!(current_position_map_ptr, position_map_ptr);
+                assert_eq!(current_stash_ptr, stash_ptr);
                 assert!(!map.accessed);
                 assert!(!map.dirty);
             }
@@ -2012,11 +1991,12 @@ mod tests {
             expected_counter_slot,
         ) = match &old {
             RuntimeObject::UoOramMap(map) => {
+                let (entries, position_map, stash) = map.oram.logical_state_snapshot_for_test();
                 let (directory_pages, buckets, counter_slot) = map.oram.storage_snapshot_for_test();
                 (
-                    map.oram.entries.clone(),
-                    map.oram.position_map.clone(),
-                    map.oram.stash.clone(),
+                    entries,
+                    position_map,
+                    stash,
                     directory_pages,
                     buckets,
                     counter_slot,
@@ -2037,12 +2017,14 @@ mod tests {
             counter_ptr,
         ) = match &new {
             RuntimeObject::UoOramMap(map) => {
+                let (entries_ptr, position_map_ptr, stash_ptr) =
+                    map.oram.logical_state_ptrs_for_test();
                 let (directory_pages_ptr, buckets_ptr, counter_ptr) =
                     map.oram.storage_ptrs_for_test();
                 (
-                    map.oram.entries.as_ptr(),
-                    map.oram.position_map.as_ptr(),
-                    map.oram.stash.as_ptr(),
+                    entries_ptr,
+                    position_map_ptr,
+                    stash_ptr,
                     directory_pages_ptr,
                     buckets_ptr,
                     counter_ptr,
@@ -2053,12 +2035,15 @@ mod tests {
 
         match &mut new {
             RuntimeObject::UoOramMap(map) => {
-                map.oram.entries[0] = MapEntry {
-                    occupied: true,
-                    key: Value::Address([0x77; 20]),
-                    value: Value::Uint(23),
-                };
-                map.oram.position_map[0] = Some(0);
+                map.oram.install_slot_for_test(
+                    0,
+                    MapEntry {
+                        occupied: true,
+                        key: Value::Address([0x77; 20]),
+                        value: Value::Uint(23),
+                    },
+                    Some(0),
+                );
                 map.oram.corrupt_storage_for_test();
                 map.accessed = true;
                 map.dirty = true;
@@ -2075,16 +2060,19 @@ mod tests {
 
         match committed {
             RuntimeObject::UoOramMap(map) => {
-                assert_eq!(map.oram.entries, expected_entries);
-                assert_eq!(map.oram.position_map, expected_position_map);
-                assert_eq!(map.oram.stash, expected_stash);
+                let (entries, position_map, stash) = map.oram.logical_state_snapshot_for_test();
+                assert_eq!(entries, expected_entries);
+                assert_eq!(position_map, expected_position_map);
+                assert_eq!(stash, expected_stash);
                 let (directory_pages, buckets, counter_slot) = map.oram.storage_snapshot_for_test();
                 assert_eq!(directory_pages, expected_directory_pages);
                 assert_eq!(buckets, expected_buckets);
                 assert_eq!(counter_slot, expected_counter_slot);
-                assert_eq!(map.oram.entries.as_ptr(), entries_ptr);
-                assert_eq!(map.oram.position_map.as_ptr(), position_map_ptr);
-                assert_eq!(map.oram.stash.as_ptr(), stash_ptr);
+                let (current_entries_ptr, current_position_map_ptr, current_stash_ptr) =
+                    map.oram.logical_state_ptrs_for_test();
+                assert_eq!(current_entries_ptr, entries_ptr);
+                assert_eq!(current_position_map_ptr, position_map_ptr);
+                assert_eq!(current_stash_ptr, stash_ptr);
                 let (current_directory_pages_ptr, current_buckets_ptr, current_counter_ptr) =
                     map.oram.storage_ptrs_for_test();
                 assert_eq!(current_directory_pages_ptr, directory_pages_ptr);

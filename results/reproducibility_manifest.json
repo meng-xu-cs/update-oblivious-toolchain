@@ -14,8 +14,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 7745820,
-      "sha256": "0e76e31750794db6c1c35ce192aacf0f4bb87cdca826fbf86ee6a13d8d082b95"
+      "bytes": 7745899,
+      "sha256": "83fb4a50ad1a35cd000ea00d4729dd4eed3f16f5085ace2cc4ea04783a6ce3cb"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -134,8 +134,8 @@
     },
     {
       "path": "runtime_boundary_validation.json",
-      "bytes": 51848,
-      "sha256": "b392e5f76a1eec8bfaf2fbdbaec80634b6845978812af8180d6386c747a1f4a2"
+      "bytes": 51923,
+      "sha256": "1afff55c6093d06b5b802a58fc9a78ac77b24dcc71b48f168ec39b6aff9db836"
     },
     {
       "path": "seeded_witness_validation.json",

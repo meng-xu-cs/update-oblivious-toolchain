@@ -8,7 +8,10 @@ use uo_core::manifest::{OramManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME};
 use uo_core::trace::{
     classify_write, LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass,
 };
-use uo_core::{RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness};
+use uo_core::{
+    RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
+    RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness,
+};
 use uo_core::{ScalarType, Type, Value};
 use uo_store::StoreCipher;
 
@@ -216,13 +219,13 @@ fn record_oram_write(
 
 #[derive(Debug)]
 pub(crate) struct OramState {
-    pub parameters: OramParameters,
-    pub entries: Vec<MapEntry>,
-    pub position_map: Vec<Option<usize>>,
-    pub stash: Vec<OramBlock>,
-    pub storage: OramStorage,
-    pub access_counter: u64,
-    pub cipher: StoreCipher,
+    parameters: OramParameters,
+    entries: Vec<MapEntry>,
+    position_map: Vec<Option<usize>>,
+    stash: Vec<OramBlock>,
+    storage: OramStorage,
+    access_counter: u64,
+    cipher: StoreCipher,
 }
 
 impl Clone for OramState {
@@ -391,6 +394,83 @@ impl OramState {
         }
     }
 
+    pub(crate) fn parameters(&self) -> &OramParameters {
+        &self.parameters
+    }
+
+    pub(crate) fn path_bucket_count(&self) -> usize {
+        self.parameters.bucket_count
+    }
+
+    pub(crate) fn is_cold(&self) -> bool {
+        self.entries.is_empty() && self.position_map.is_empty() && self.stash.is_empty()
+    }
+
+    pub(crate) fn path_position_map_witness(
+        &self,
+        spec: &StateObject,
+    ) -> Result<RuntimePathOramPositionMapWitness> {
+        let leaves = if self.position_map.len() == self.parameters.capacity {
+            self.position_map.clone()
+        } else {
+            self.path_position_map_from_storage(spec)?
+        };
+        Ok(RuntimePathOramPositionMapWitness {
+            object_id: spec.id,
+            object_name: spec.name.clone(),
+            leaves,
+        })
+    }
+
+    pub(crate) fn access_counter_witness(
+        &self,
+        spec: &StateObject,
+    ) -> RuntimeOramAccessCounterWitness {
+        RuntimeOramAccessCounterWitness {
+            object_id: spec.id,
+            object_name: spec.name.clone(),
+            access_counter: self.access_counter,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn access_counter_for_test(&self) -> u64 {
+        self.access_counter
+    }
+
+    #[cfg(test)]
+    pub(crate) fn logical_state_snapshot_for_test(
+        &self,
+    ) -> (Vec<MapEntry>, Vec<Option<usize>>, Vec<OramBlock>) {
+        (
+            self.entries.clone(),
+            self.position_map.clone(),
+            self.stash.clone(),
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn logical_state_ptrs_for_test(
+        &self,
+    ) -> (*const MapEntry, *const Option<usize>, *const OramBlock) {
+        (
+            self.entries.as_ptr(),
+            self.position_map.as_ptr(),
+            self.stash.as_ptr(),
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn install_slot_for_test(
+        &mut self,
+        slot_index: usize,
+        entry: MapEntry,
+        leaf: Option<usize>,
+    ) {
+        self.entries[slot_index] = entry;
+        self.position_map[slot_index] = leaf;
+    }
+
     pub(crate) fn clone_for_tx(
         &self,
         spec: &StateObject,
@@ -465,10 +545,7 @@ impl OramState {
         self.stash.clear();
     }
 
-    pub(crate) fn path_position_map_from_storage(
-        &self,
-        spec: &StateObject,
-    ) -> Result<Vec<Option<usize>>> {
+    fn path_position_map_from_storage(&self, spec: &StateObject) -> Result<Vec<Option<usize>>> {
         let scratch = self.parameters.directory_page_bytes.max(8);
         let mut allocator = AllocatorSession::new(AllocatorPlan {
             arena_bytes: scratch.saturating_mul(4),

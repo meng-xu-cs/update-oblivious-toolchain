@@ -10654,6 +10654,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !oram_source.contains("pub directory_pages: Vec<Vec<u8>>,")
         && !oram_source.contains("pub buckets: Vec<Vec<u8>>,")
         && !oram_source.contains("pub access_counter_slot: Vec<u8>,");
+    let oram_state_fields_private = oram_source.contains(
+        "pub(crate) struct OramState {\n    parameters: OramParameters,\n    entries: Vec<MapEntry>,\n    position_map: Vec<Option<usize>>,\n    stash: Vec<OramBlock>,\n    storage: OramStorage,\n    access_counter: u64,\n    cipher: StoreCipher,\n}",
+    );
+    let oram_state_api_is_explicit = oram_source
+        .contains("pub(crate) fn parameters(&self) -> &OramParameters {")
+        && oram_source.contains("pub(crate) fn path_bucket_count(&self) -> usize {")
+        && oram_source.contains("pub(crate) fn is_cold(&self) -> bool {")
+        && oram_source.contains("pub(crate) fn path_position_map_witness(")
+        && oram_source.contains("pub(crate) fn access_counter_witness(")
+        && objects_source.contains("object.oram.is_cold()")
+        && objects_source.contains("object.oram.parameters()")
+        && objects_source.contains("object.oram.path_bucket_count()")
+        && objects_source.contains("object.oram.path_position_map_witness(&object.spec)?")
+        && objects_source.contains("object.oram.access_counter_witness(&object.spec)");
     let oram_transcript_fields_private = oram_source
         .contains("logical_accesses: Vec<LogicalEvent>,")
         && oram_source.contains("physical_reads: Vec<PhysicalReadEvent>,")
@@ -11302,6 +11316,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "oram_write_trace_projects_to_public_shape":
             oram_write_trace_projects_to_public_shape,
         "oram_storage_fields_private": oram_storage_fields_private,
+        "oram_state_fields_private": oram_state_fields_private,
+        "oram_state_api_is_explicit": oram_state_api_is_explicit,
         "oram_transcript_fields_private": oram_transcript_fields_private,
         "oram_transcript_api_is_explicit": oram_transcript_api_is_explicit,
         "oram_commit_fields_private": oram_commit_fields_private,
@@ -11447,6 +11463,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && oram_write_fields_private
             && oram_write_trace_projects_to_public_shape
             && oram_storage_fields_private
+            && oram_state_fields_private
+            && oram_state_api_is_explicit
             && oram_transcript_fields_private
             && oram_transcript_api_is_explicit
             && oram_commit_fields_private
