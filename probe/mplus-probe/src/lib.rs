@@ -6044,7 +6044,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>");
     let engine_delegates_public_execution_to_shell = engine_impl_source
         .contains("use crate::shell::run_public_entrypoint;")
-        && engine_impl_source.contains("let public_execution = run_public_entrypoint(")
+        && engine_impl_source.contains("run_public_entrypoint(")
         && !engine_impl_source.contains("AllocatorPlan::from_manifest(")
         && shell_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
         && !engine_impl_source.contains("fn exec_block(")
@@ -6349,7 +6349,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness")
         && theorem_source
-            .contains("let output_shape = output_shape_of(manifest_entry, return_value)?;");
+            .contains("let output_shape = output_shape_of(manifest_entry, &return_value)?;");
     let controller_public_call_summary_uses_manifest_only = controller_source
         .contains("fn from_manifest_entry")
         && controller_source.contains("manifest_entry.param_names")
@@ -6377,8 +6377,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("CallRecorder::begin_with_input_len(")
         && !engine_impl_source.contains("runtime_kernel_witness,")
         && !engine_impl_source.contains("runtime_kernel_refinement_witness,")
-        && !engine_impl_source.contains("opcode_trace,")
-        && !engine_impl_source.contains("return_value,");
+        && !engine_impl_source.contains("opcode_trace,");
     let state_prepares_confidential_manifest_plan = state_source
         .contains("struct ConfidentialEntrypointPlan")
         && state_source.contains("ConfidentialEntrypointPlan::from_manifest_entry(")
@@ -6949,6 +6948,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 String::from("runtime/uo-evm/src/engine.rs"),
                 String::from("runtime/uo-evm/src/shell.rs"),
                 String::from("runtime/uo-evm/src/state.rs"),
+                String::from("runtime/uo-evm/src/theorem.rs"),
             ],
         ),
         (
@@ -6959,11 +6959,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             ],
         ),
         (
-            "RuntimeShadowState",
-            vec![
-                String::from("runtime/uo-evm/src/kernel.rs"),
-                String::from("runtime/uo-evm/src/state.rs"),
-            ],
+            "pub(in crate::runtime) struct RuntimeShadowState",
+            vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
             "ConfidentialRuntimeShadowState",
@@ -7050,7 +7047,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_finalizer_omits_runtime_telemetry = theorem_source
         .contains("let mut trace = ExecutionTrace {")
         && theorem_source.contains("let zero_writes = trace_bundle.metrics.zero_writes;")
-        && theorem_source.contains("Ok(FinalizedCallTrace { trace, zero_writes })")
+        && theorem_source.contains("Ok(FinalizedCallTrace {")
+        && theorem_source.contains("zero_writes,")
         && !theorem_source.contains("host_proxy_metrics");
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
