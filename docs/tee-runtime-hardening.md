@@ -420,7 +420,10 @@ The current runtime has a first hardening layer:
   handoff is now explicit too, with `ConfidentialKernelRunOutcome` and
   `ConfidentialCommittedKernelOutcome` keeping private fields and exposing only
   the by-value `into_committed_outcome_parts(...)` /
-  `into_runtime_execution_parts(...)` transitions
+  `into_runtime_execution_parts(...)` transitions, and the
+  controller/theorem `CallTraceBundle` now follows the same pattern through
+  `zero_writes()` plus `into_execution_trace_parts(...)` instead of public
+  field reads
 - the theorem-facing constructor surface is now pinned as well:
   `RuntimeControllerObserverCertificate::new`,
   `RuntimePathOramHiddenCertificate::new`, and

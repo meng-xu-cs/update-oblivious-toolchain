@@ -4,6 +4,13 @@
   "all_restricted_signatures_present": true,
   "all_state_restricted_signatures_present": true,
   "allocator_uses_manifest_kernel_step_budget": true,
+  "call_trace_bundle_api_is_explicit": true,
+  "call_trace_bundle_fields_private": true,
+  "call_trace_bundle_surface_files": [
+    "runtime/uo-evm/src/controller.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "call_trace_bundle_surface_restricted": true,
   "checker_path": "checker/uo-check/src/lib.rs",
   "checker_uses_manifest_slot_schedule_directly": true,
   "checker_uses_shared_confidential_kernel_lowering": true,
@@ -193,6 +200,10 @@
   "engine_uses_opaque_committed_state": true,
   "engine_uses_runtime_public_object_universe": true,
   "execution_trace_omits_runtime_telemetry": true,
+  "expected_call_trace_bundle_surface_files": [
+    "runtime/uo-evm/src/controller.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
   "expected_committed_runtime_witness_snapshot_surface_files": [
     "runtime/uo-evm/src/state.rs"
   ],
@@ -247,7 +258,6 @@
     "runtime/uo-evm/src/theorem.rs"
   ],
   "expected_traced_runtime_call_witness_state_consumer_surface_files": [
-    "runtime/uo-evm/src/state.rs",
     "runtime/uo-evm/src/theorem.rs"
   ],
   "expected_traced_runtime_call_witness_state_surface_files": [
@@ -1677,7 +1687,6 @@
   "traced_runtime_call_start_surface_restricted": true,
   "traced_runtime_call_witness_state_api_is_explicit": true,
   "traced_runtime_call_witness_state_consumer_surface_files": [
-    "runtime/uo-evm/src/state.rs",
     "runtime/uo-evm/src/theorem.rs"
   ],
   "traced_runtime_call_witness_state_consumer_surface_restricted": true,

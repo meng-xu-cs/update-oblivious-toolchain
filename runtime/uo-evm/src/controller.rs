@@ -18,15 +18,45 @@ const STASH_REGION: &str = "stash";
 
 #[derive(Clone, Debug)]
 pub(crate) struct CallTraceBundle {
-    pub logical_accesses: Vec<LogicalEvent>,
-    pub logical_writes: Vec<LogicalEvent>,
-    pub physical_reads: Vec<PhysicalReadEvent>,
-    pub physical_writes: Vec<PhysicalWriteEvent>,
-    pub metrics: StoreExecutionMetrics,
-    pub theorem_trace: TheoremTrace,
-    pub controller_certificate: RuntimeControllerCertificate,
-    pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
-    pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    logical_accesses: Vec<LogicalEvent>,
+    logical_writes: Vec<LogicalEvent>,
+    physical_reads: Vec<PhysicalReadEvent>,
+    physical_writes: Vec<PhysicalWriteEvent>,
+    metrics: StoreExecutionMetrics,
+    theorem_trace: TheoremTrace,
+    controller_certificate: RuntimeControllerCertificate,
+    oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+}
+
+impl CallTraceBundle {
+    pub(crate) fn zero_writes(&self) -> usize {
+        self.metrics.zero_writes
+    }
+
+    pub(crate) fn into_execution_trace_parts(
+        self,
+    ) -> (
+        Vec<LogicalEvent>,
+        Vec<LogicalEvent>,
+        Vec<PhysicalReadEvent>,
+        Vec<PhysicalWriteEvent>,
+        TheoremTrace,
+        RuntimeControllerCertificate,
+        Vec<RuntimeOramLeafWitness>,
+        Vec<RuntimePathOramTransitionWitness>,
+    ) {
+        (
+            self.logical_accesses,
+            self.logical_writes,
+            self.physical_reads,
+            self.physical_writes,
+            self.theorem_trace,
+            self.controller_certificate,
+            self.oram_leaf_schedule,
+            self.oram_leaf_state_transitions,
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -144,6 +144,16 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         runtime_witness_state,
     } = input;
     let (
+        logical_accesses,
+        logical_writes,
+        physical_reads,
+        physical_writes,
+        theorem_trace,
+        controller_certificate,
+        oram_leaf_schedule,
+        oram_leaf_state_transitions,
+    ) = trace_bundle.into_execution_trace_parts();
+    let (
         runtime_oram_access_counters_before,
         runtime_oram_access_counters_after,
         runtime_oram_position_map_before,
@@ -152,23 +162,23 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
 
     let mut trace = ExecutionTrace::from_runtime_trace_parts(RuntimeExecutionTraceParts {
         opcode_trace,
-        logical_accesses: trace_bundle.logical_accesses,
-        logical_writes: trace_bundle.logical_writes,
-        physical_reads: trace_bundle.physical_reads,
-        physical_writes: trace_bundle.physical_writes,
+        logical_accesses,
+        logical_writes,
+        physical_reads,
+        physical_writes,
         gas_used,
-        theorem_trace: trace_bundle.theorem_trace,
+        theorem_trace,
         runtime_seed: Some(deploy_seed),
         runtime_kernel_witness: Some(runtime_kernel_witness.clone()),
         runtime_kernel_refinement_witness: Some(runtime_kernel_refinement_witness),
-        runtime_controller_certificate: Some(trace_bundle.controller_certificate),
+        runtime_controller_certificate: Some(controller_certificate),
         runtime_oram_objects: runtime_oram_objects(artifact),
-        runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
+        runtime_oram_leaf_schedule: oram_leaf_schedule,
         runtime_oram_access_counters_before,
         runtime_oram_access_counters_after,
         runtime_oram_position_map_before,
         runtime_oram_position_map_after,
-        runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
+        runtime_oram_leaf_state_transitions: oram_leaf_state_transitions,
     });
     if confidential {
         trace
@@ -272,7 +282,7 @@ fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCal
         aborted,
         gas_used,
     )?;
-    let zero_writes = trace_bundle.metrics.zero_writes;
+    let zero_writes = trace_bundle.zero_writes();
     let trace = finalize_execution_trace(FinalizeExecutionTraceInput {
         artifact,
         entrypoint,

@@ -9491,6 +9491,43 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("theorem certificate constructor restriction flag must be boolean")
         });
+    let call_trace_bundle_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "CallTraceBundle")?;
+    let expected_call_trace_bundle_surface_files = vec![
+        String::from("runtime/uo-evm/src/controller.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let call_trace_bundle_surface_restricted =
+        call_trace_bundle_surface_files == expected_call_trace_bundle_surface_files;
+    let call_trace_bundle_fields_private = controller_source
+        .contains("logical_accesses: Vec<LogicalEvent>")
+        && controller_source.contains("logical_writes: Vec<LogicalEvent>")
+        && controller_source.contains("physical_reads: Vec<PhysicalReadEvent>")
+        && controller_source.contains("physical_writes: Vec<PhysicalWriteEvent>")
+        && controller_source.contains("metrics: StoreExecutionMetrics")
+        && controller_source.contains("theorem_trace: TheoremTrace")
+        && controller_source.contains("controller_certificate: RuntimeControllerCertificate")
+        && controller_source.contains("oram_leaf_schedule: Vec<RuntimeOramLeafWitness>")
+        && controller_source
+            .contains("oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>")
+        && !controller_source.contains("pub logical_accesses: Vec<LogicalEvent>")
+        && !controller_source.contains("pub logical_writes: Vec<LogicalEvent>")
+        && !controller_source.contains("pub physical_reads: Vec<PhysicalReadEvent>")
+        && !controller_source.contains("pub physical_writes: Vec<PhysicalWriteEvent>")
+        && !controller_source.contains("pub metrics: StoreExecutionMetrics")
+        && !controller_source.contains("pub theorem_trace: TheoremTrace")
+        && !controller_source.contains(
+            "pub controller_certificate: RuntimeControllerCertificate",
+        )
+        && !controller_source.contains("pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>")
+        && !controller_source.contains(
+            "pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>",
+        );
+    let call_trace_bundle_api_is_explicit = controller_source
+        .contains("pub(crate) fn zero_writes(&self)")
+        && controller_source.contains("pub(crate) fn into_execution_trace_parts(")
+        && theorem_source.contains("let zero_writes = trace_bundle.zero_writes();")
+        && theorem_source.contains(") = trace_bundle.into_execution_trace_parts();");
     let controller_theorem_trace_constructor_files =
         collect_production_pattern_hits(&runtime_evm_src, "TheoremTrace {")?;
     let expected_controller_theorem_trace_constructor_files =
@@ -9884,11 +9921,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         traced_runtime_call_outcome_consumer_surface_files
             == expected_traced_runtime_call_outcome_consumer_surface_files;
     let traced_runtime_call_witness_state_consumer_surface_files =
-        collect_production_pattern_hits(&runtime_evm_src, "into_execution_trace_parts(")?;
-    let expected_traced_runtime_call_witness_state_consumer_surface_files = vec![
-        String::from("runtime/uo-evm/src/state.rs"),
-        String::from("runtime/uo-evm/src/theorem.rs"),
-    ];
+        collect_production_pattern_hits(&runtime_evm_src, "runtime_witness_state.into_execution_trace_parts()")?;
+    let expected_traced_runtime_call_witness_state_consumer_surface_files =
+        vec![String::from("runtime/uo-evm/src/theorem.rs")];
     let traced_runtime_call_witness_state_consumer_surface_restricted =
         traced_runtime_call_witness_state_consumer_surface_files
             == expected_traced_runtime_call_witness_state_consumer_surface_files;
@@ -10569,7 +10604,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("pub use engine::{CallTelemetry, DiagnosticCallResult};");
     let theorem_finalizer_omits_runtime_telemetry = theorem_source
         .contains("let mut trace = ExecutionTrace::from_runtime_trace_parts(")
-        && theorem_source.contains("let zero_writes = trace_bundle.metrics.zero_writes;")
+        && theorem_source.contains("let zero_writes = trace_bundle.zero_writes();")
         && theorem_source.contains("Ok(FinalizedCallTrace {")
         && theorem_source.contains("zero_writes,")
         && !theorem_source.contains("host_proxy_metrics");
@@ -10914,6 +10949,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
             theorem_certificate_constructor_surface_restricted,
+        "call_trace_bundle_surface_files":
+            call_trace_bundle_surface_files,
+        "expected_call_trace_bundle_surface_files":
+            expected_call_trace_bundle_surface_files,
+        "call_trace_bundle_surface_restricted":
+            call_trace_bundle_surface_restricted,
+        "call_trace_bundle_fields_private":
+            call_trace_bundle_fields_private,
+        "call_trace_bundle_api_is_explicit":
+            call_trace_bundle_api_is_explicit,
         "controller_theorem_trace_constructor_files":
             controller_theorem_trace_constructor_files,
         "expected_controller_theorem_trace_constructor_files":
@@ -11256,6 +11301,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && theorem_private_surface_restricted
             && theorem_finalize_input_fields_private
             && theorem_certificate_constructor_surface_restricted
+            && call_trace_bundle_surface_restricted
+            && call_trace_bundle_fields_private
+            && call_trace_bundle_api_is_explicit
             && controller_theorem_trace_constructor_surface_restricted
             && public_trace_helper_surface_restricted
             && controller_public_call_summary_uses_manifest_only
