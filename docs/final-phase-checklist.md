@@ -49,17 +49,21 @@ Status labels:
   `results/kernel_slot_dsl_validation.json`,
   `results/kernel_lowering_validation.json`,
   `results/shell_boundary_validation.json`,
+  `results/shell_boundary_slot_validation.json`,
   `results/shell_boundary_lowering_validation.json`,
   `results/confidential_core_validation.json`,
   `results/confidential_core_slot_validation.json`,
+  `results/confidential_core_shell_boundary_slot_validation.json`,
   `results/confidential_core_lowering_validation.json`,
   `results/confidential_core_shell_boundary_lowering_validation.json`,
   `proof/lean/UOToolchain/RuntimeKernelDslJson.lean`,
   `proof/lean/UOToolchain/RuntimeShellBoundary.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreAssurance.lean`,
   `proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean`,
+  `proof/lean/UOToolchain/RuntimeShellBoundarySlotJson.lean`,
   `proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean`,
+  `proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundarySlotJson.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean`.
 
 - `cleared` Checked seeded runtime witness families and paired Path-ORAM proof

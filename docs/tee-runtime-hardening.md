@@ -375,6 +375,13 @@ The current runtime has a first hardening layer:
   refinement claim and the named-to-slot lowering claim against the same
   proof-grade kernel witness; the probe validates that composed bridge
   separately as `shell_boundary_lowering_validation.json`
+- that same shell interface now also has a direct slot-only proof path:
+  `uo-core` exports a `RuntimeShellBoundarySlotBundle` carrying the
+  shell-boundary bundle plus the exact fixed-slot confidential program that
+  `RuntimeKernel` executes, and Lean checks that the shell-boundary
+  refinement claim and the slot-derived kernel schedule share the same
+  proof-grade kernel witness; the probe validates that path separately as
+  `shell_boundary_slot_validation.json`
 - the confidential-kernel lowering functions on both the runtime and imported
   Lean sides are now structurally recursive total definitions rather than
   opaque `partial def`s, and the imported/runtime lowering bridge is restored
@@ -452,6 +459,10 @@ The current runtime has a first hardening layer:
 - `confidential_core_slot_validation.json` ties that same proof-grade
   runtime/refinement guarantee directly to the fixed-slot confidential
   program that the concrete runtime executes, while
+  `confidential_core_shell_boundary_slot_validation.json` lifts that slot-only
+  path across the explicit shell-boundary bundle so the runtime witness,
+  shell-boundary bundle, and exact slot schedule are checked together against
+  one shared proof-grade kernel witness and runtime phase witness, while
   `confidential_core_lowering_validation.json` composes the named and slot
   DSL objects and checks their canonical lowering against the same exported
   witness
@@ -462,8 +473,10 @@ The current runtime has a first hardening layer:
   witness and one exact runtime phase witness rather than being accepted only
   as separate artifacts
 - the theorem side now also mirrors those exported artifacts directly:
-  `RuntimeShellBoundaryBundle`, `RuntimeShellBoundaryLoweringBundle`,
+  `RuntimeShellBoundaryBundle`, `RuntimeShellBoundarySlotBundle`,
+  `RuntimeShellBoundaryLoweringBundle`,
   `RuntimeConfidentialCoreBundle`, `RuntimeConfidentialCoreSlotBundle`,
+  `RuntimeConfidentialCoreShellBoundarySlotBundle`,
   `RuntimeConfidentialCoreLoweringBundle`, and
   `RuntimeConfidentialCoreShellBoundaryLoweringBundle` are now first-class
   runtime theorem objects with `Valid` predicates, so the imported JSON

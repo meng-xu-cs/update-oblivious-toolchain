@@ -313,6 +313,13 @@ The first implementation step is now present in the codebase:
   lowering claim against one shared proof-grade kernel witness; the probe
   reports that composition step separately as
   `shell_boundary_lowering_validation.json`
+- that shell interface now also has a direct slot-only proof path:
+  `uo-core` exports a `RuntimeShellBoundarySlotBundle` carrying the
+  shell-boundary bundle plus the exact fixed-slot confidential program that
+  `RuntimeKernel` actually executes, and Lean checks that the shell-boundary
+  refinement claim and the slot-derived kernel schedule share one exact
+  proof-grade kernel witness; the probe reports that slot-only path
+  separately as `shell_boundary_slot_validation.json`
 - the confidential-kernel lowering definitions that underlie that bridge are
   now total structurally recursive Lean definitions on both the runtime and
   imported sides rather than opaque `partial def`s, which removes the old
@@ -371,6 +378,10 @@ The first implementation step is now present in the codebase:
 - `confidential_core_slot_validation.json` ties that same proof-grade
   runtime/refinement claim directly to the manifest-carried fixed-slot
   confidential program that `RuntimeKernel` actually executes, while
+  `confidential_core_shell_boundary_slot_validation.json` lifts that slot-only
+  path across the explicit shell-boundary bundle so the runtime witness,
+  shell-boundary bundle, and exact slot schedule are checked together against
+  one shared proof-grade kernel witness and runtime phase witness, while
   `confidential_core_lowering_validation.json` composes the named and slot
   DSL objects and checks canonical lowering against the same exported witness
 - `confidential_core_shell_boundary_lowering_validation.json` now lifts the
@@ -381,8 +392,10 @@ The first implementation step is now present in the codebase:
   only validating each layer independently
 - the theorem-facing Lean side now also exposes matching runtime bundle
   objects, not only imported JSON checkers:
-  `RuntimeShellBoundaryBundle`, `RuntimeShellBoundaryLoweringBundle`,
+  `RuntimeShellBoundaryBundle`, `RuntimeShellBoundarySlotBundle`,
+  `RuntimeShellBoundaryLoweringBundle`,
   `RuntimeConfidentialCoreBundle`, `RuntimeConfidentialCoreSlotBundle`,
+  `RuntimeConfidentialCoreShellBoundarySlotBundle`,
   `RuntimeConfidentialCoreLoweringBundle`, and
   `RuntimeConfidentialCoreShellBoundaryLoweringBundle` all now exist as direct
   theorem objects with corresponding `Valid` predicates, so the imported

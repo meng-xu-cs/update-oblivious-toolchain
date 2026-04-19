@@ -211,16 +211,23 @@ Current closure status:
    the explicit exported `RuntimeShellContract` / `RuntimeShellTrace` views
    against that same proof-grade kernel witness and lower-level runtime phase
    witness, including the ordered public shell-event trace and its replay
-   against the public shell contract; `shell_boundary_lowering_validation`
-   then composes that explicit shell interface with the manifest-carried named
-   and slot confidential programs for the same entrypoint;
+   against the public shell contract; `shell_boundary_slot_validation` ties
+   that same explicit shell interface directly to the manifest-carried
+   fixed-slot confidential program that `RuntimeKernel` actually executes;
+   `shell_boundary_lowering_validation` then composes that explicit shell
+   interface with the manifest-carried named and slot confidential programs
+   for the same entrypoint;
    `confidential_core_validation` now jointly checks each representative
    proof-grade runtime witness together with that same manifest-carried named
    confidential program, so the shell-refinement theorem is only reported for
    executions whose embedded kernel witness matches the exact Rust-executed
    confidential body; `confidential_core_slot_validation` ties the same claim
    to the manifest-carried fixed-slot program that `RuntimeKernel` actually
-   executes;
+   executes; `confidential_core_shell_boundary_slot_validation` lifts that
+   slot-only theorem path across the explicit shell-boundary bundle, so Lean
+   checks that the runtime witness, shell-boundary bundle, and slot schedule
+   share one exact proof-grade kernel witness and one exact runtime phase
+   witness;
    `confidential_core_lowering_validation` joins the named and slot DSL views
    into one exported bundle with checker-visible canonical lowering; and
    `confidential_core_shell_boundary_lowering_validation` lifts the whole
