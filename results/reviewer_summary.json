@@ -124,13 +124,13 @@
         "report": "pathoram_pair_validation"
       },
       {
-        "bytes": 297480,
+        "bytes": 297476,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_lowering_validation"
       },
       {
-        "bytes": 295537,
+        "bytes": 295547,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_slot_validation"
@@ -154,19 +154,19 @@
         "report": "seeded_witness_validation"
       },
       {
-        "bytes": 195543,
+        "bytes": 195531,
         "estimated": false,
         "metric": "confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes",
         "report": "confidential_core_lowering_validation"
       },
       {
-        "bytes": 193963,
+        "bytes": 193951,
         "estimated": false,
         "metric": "confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes",
         "report": "confidential_core_validation"
       },
       {
-        "bytes": 193605,
+        "bytes": 193585,
         "estimated": false,
         "metric": "confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes",
         "report": "confidential_core_slot_validation"
@@ -233,37 +233,37 @@
     }
   ],
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 56705,
-    "confidential_core_lowering_validation": 2929,
-    "confidential_core_shell_boundary_lowering_validation": 3001,
-    "confidential_core_shell_boundary_slot_validation": 2943,
-    "confidential_core_slot_validation": 2690,
-    "confidential_core_validation": 2702,
+    "canonical_pathoram_pair_validation": 56898,
+    "confidential_core_lowering_validation": 3041,
+    "confidential_core_shell_boundary_lowering_validation": 2930,
+    "confidential_core_shell_boundary_slot_validation": 2617,
+    "confidential_core_slot_validation": 2714,
+    "confidential_core_validation": 2997,
     "confidential_fragment_validation": 0,
-    "controller_observer_validation": 2825,
-    "correctness": 1212,
-    "fresh_coin_validation": 13681,
-    "kernel_dsl_validation": 2879,
-    "kernel_lowering_validation": 2920,
+    "controller_observer_validation": 2760,
+    "correctness": 1210,
+    "fresh_coin_validation": 13716,
+    "kernel_dsl_validation": 2725,
+    "kernel_lowering_validation": 2831,
     "kernel_model_alignment_validation": 3,
-    "kernel_refinement_validation": 2887,
-    "kernel_slot_dsl_validation": 2817,
-    "kernel_validation": 2908,
-    "leakage_auc": 2506,
-    "mutual_information": 2506,
-    "overheads": 115,
-    "pathoram_hidden_validation": 1956,
-    "pathoram_pair_validation": 6046,
+    "kernel_refinement_validation": 2684,
+    "kernel_slot_dsl_validation": 2842,
+    "kernel_validation": 2835,
+    "leakage_auc": 2546,
+    "mutual_information": 2545,
+    "overheads": 117,
+    "pathoram_hidden_validation": 2036,
+    "pathoram_pair_validation": 6088,
     "runtime_boundary_validation": 282,
-    "seeded_witness_validation": 3126,
-    "shell_boundary_lowering_validation": 2819,
-    "shell_boundary_slot_validation": 2732,
-    "shell_boundary_validation": 2848,
-    "static_checks": 1607,
-    "tamper_validation": 10191,
-    "total_probe_ms": 147469,
-    "trace_equivalence": 2723,
-    "trusted_kernel_validation": 2912,
+    "seeded_witness_validation": 3234,
+    "shell_boundary_lowering_validation": 2805,
+    "shell_boundary_slot_validation": 3260,
+    "shell_boundary_validation": 2832,
+    "static_checks": 1578,
+    "tamper_validation": 10754,
+    "total_probe_ms": 148632,
+    "trace_equivalence": 2748,
+    "trusted_kernel_validation": 2986,
     "witness_validation": 1837
   },
   "runtime_overheads": {
@@ -637,7 +637,7 @@
         },
         {
           "file": "runtime/uo-evm/src/state.rs",
-          "nonempty_loc": 654
+          "nonempty_loc": 687
         },
         {
           "file": "runtime/uo-evm/src/theorem.rs",
@@ -648,7 +648,7 @@
           "nonempty_loc": 4797
         }
       ],
-      "total_nonempty_loc": 6935
+      "total_nonempty_loc": 6968
     }
   }
 }

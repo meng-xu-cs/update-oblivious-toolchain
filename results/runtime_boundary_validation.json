@@ -13,6 +13,8 @@
     "runtime/uo-evm/src/state.rs"
   ],
   "committed_runtime_witness_snapshot_surface_restricted": true,
+  "committed_runtime_witness_snapshot_wipes_on_drop": true,
+  "confidential_call_inputs_wipe_on_drop": true,
   "confidential_committed_kernel_outcome_derive_line": "#[derive(Debug)]",
   "confidential_committed_kernel_outcome_nonclone": true,
   "confidential_committed_kernel_outcome_surface_files": [
@@ -1049,7 +1051,7 @@
   "runtime_phase_event_constructor_surface_restricted": true,
   "runtime_secret_state_inventory": [
     {
-      "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime",
+      "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime and whose buffered values wipe on drop",
       "checked": true,
       "name": "ConfidentialCallInputs",
       "owner": "runtime/uo-evm/src/state.rs"
@@ -1097,7 +1099,7 @@
       "owner": "runtime/uo-evm/src/state.rs"
     },
     {
-      "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers",
+      "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers, and wiping those hidden witness vectors on drop",
       "checked": true,
       "name": "TracedRuntimeCallWitnessState",
       "owner": "runtime/uo-evm/src/state.rs"
@@ -1109,7 +1111,7 @@
       "owner": "runtime/uo-evm/src/state.rs"
     },
     {
-      "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs and used only to assemble traced-call start/outcome/witness handoff bundles",
+      "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs, used only to assemble traced-call start/outcome/witness handoff bundles, and wiping its hidden vectors on drop",
       "checked": true,
       "name": "CommittedRuntimeWitnessSnapshot",
       "owner": "runtime/uo-evm/src/state.rs"
@@ -1595,6 +1597,7 @@
     "runtime/uo-evm/src/theorem.rs"
   ],
   "traced_runtime_call_witness_state_surface_restricted": true,
+  "traced_runtime_call_witness_state_wipes_on_drop": true,
   "trusted_kernel_checker_uses_slot_bundle": true,
   "trusted_kernel_cli_uses_slot_bundle": true,
   "trusted_kernel_probe_uses_slot_bundle": true,

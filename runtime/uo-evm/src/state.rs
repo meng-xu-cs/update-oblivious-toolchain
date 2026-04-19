@@ -23,8 +23,16 @@ impl ConfidentialCallInputs {
         Self { raw_args: args }
     }
 
-    pub(in crate::runtime) fn into_raw_args(self) -> Vec<Value> {
-        self.raw_args
+    pub(in crate::runtime) fn into_raw_args(mut self) -> Vec<Value> {
+        std::mem::take(&mut self.raw_args)
+    }
+}
+
+impl Drop for ConfidentialCallInputs {
+    fn drop(&mut self) {
+        for value in self.raw_args.iter_mut() {
+            value.wipe_secrets();
+        }
     }
 }
 
@@ -70,17 +78,38 @@ struct CommittedRuntimeWitnessSnapshot {
     runtime_oram_position_maps: Vec<RuntimePathOramPositionMapWitness>,
 }
 
+fn wipe_runtime_oram_access_counters(witnesses: &mut [RuntimeOramAccessCounterWitness]) {
+    for witness in witnesses.iter_mut() {
+        witness.access_counter = 0;
+    }
+}
+
+fn wipe_runtime_oram_position_maps(witnesses: &mut [RuntimePathOramPositionMapWitness]) {
+    for witness in witnesses.iter_mut() {
+        for leaf in witness.leaves.iter_mut() {
+            *leaf = None;
+        }
+    }
+}
+
 impl CommittedRuntimeWitnessSnapshot {
     fn into_hidden_oram_state(
-        self,
+        mut self,
     ) -> (
         Vec<RuntimeOramAccessCounterWitness>,
         Vec<RuntimePathOramPositionMapWitness>,
     ) {
         (
-            self.runtime_oram_access_counters,
-            self.runtime_oram_position_maps,
+            std::mem::take(&mut self.runtime_oram_access_counters),
+            std::mem::take(&mut self.runtime_oram_position_maps),
         )
+    }
+}
+
+impl Drop for CommittedRuntimeWitnessSnapshot {
+    fn drop(&mut self) {
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_maps);
     }
 }
 
@@ -99,7 +128,7 @@ pub(crate) struct TracedRuntimeCallWitnessState {
 
 impl TracedRuntimeCallWitnessState {
     pub(crate) fn into_execution_trace_parts(
-        self,
+        mut self,
     ) -> (
         Vec<RuntimeOramAccessCounterWitness>,
         Vec<RuntimeOramAccessCounterWitness>,
@@ -107,11 +136,20 @@ impl TracedRuntimeCallWitnessState {
         Vec<RuntimePathOramPositionMapWitness>,
     ) {
         (
-            self.runtime_oram_access_counters_before,
-            self.runtime_oram_access_counters_after,
-            self.runtime_oram_position_map_before,
-            self.runtime_oram_position_map_after,
+            std::mem::take(&mut self.runtime_oram_access_counters_before),
+            std::mem::take(&mut self.runtime_oram_access_counters_after),
+            std::mem::take(&mut self.runtime_oram_position_map_before),
+            std::mem::take(&mut self.runtime_oram_position_map_after),
         )
+    }
+}
+
+impl Drop for TracedRuntimeCallWitnessState {
+    fn drop(&mut self) {
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_before);
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_after);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_before);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_after);
     }
 }
 

@@ -165,7 +165,8 @@ The current runtime has a first hardening layer:
   the shell now holds an opaque `ContractRuntime` wrapper rather than the raw
   committed confidential state, and that wrapper internalizes the remaining
   raw confidential argument vector into `ConfidentialCallInputs`, whose unwrap
-  surface is restricted to `crate::runtime`,
+  surface is restricted to `crate::runtime` and whose buffered `Value`s wipe
+  on drop,
   and the controller/theorem path now derives public return length from
   manifest-stored `return_canonical_len` and receives only the public
   `OutputShape` summary rather than the full return payload; injected
@@ -416,6 +417,9 @@ The current runtime has a first hardening layer:
   finalizer now consumes the whole `RuntimeCallOutcome` directly rather than
   having the engine unpack kernel witnesses, opcode traces, and return values
   just to pass them straight back in
+- the hidden traced-call witness staging objects in `state.rs` now also wipe
+  their access-counter and position-map vectors on drop unless the theorem
+  finalizer explicitly consumes them
 - the confidential-path `RuntimeKernel` entrypoints that shadow-load
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot

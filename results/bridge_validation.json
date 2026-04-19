@@ -21,7 +21,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_lowering_bundle_json_bytes": 4801,
+        "confidential_core_lowering_bundle_json_bytes": 4800,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "FixedSlotClassifier",
@@ -240,7 +240,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_lowering_bundle_json_bytes": 4799,
+        "confidential_core_lowering_bundle_json_bytes": 4801,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "FixedSlotClassifier",
@@ -459,7 +459,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_lowering_bundle_json_bytes": 11461,
+        "confidential_core_lowering_bundle_json_bytes": 11462,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "AuthScan",
@@ -1688,7 +1688,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_lowering_bundle_json_bytes": 8053,
+        "confidential_core_lowering_bundle_json_bytes": 8052,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "RegistryCRUD",
@@ -2075,7 +2075,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_lowering_bundle_json_bytes": 11452,
+        "confidential_core_lowering_bundle_json_bytes": 11451,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -2545,7 +2545,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_lowering_bundle_json_bytes": 11451,
+        "confidential_core_lowering_bundle_json_bytes": 11452,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -3637,7 +3637,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_lowering_bundle_json_bytes": 13101,
+        "confidential_core_lowering_bundle_json_bytes": 13100,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -5873,7 +5873,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_lowering_bundle_json_bytes": 24189,
+        "confidential_core_lowering_bundle_json_bytes": 24192,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -6883,7 +6883,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_lowering_bundle_json_bytes": 24194,
+        "confidential_core_lowering_bundle_json_bytes": 24188,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -7893,7 +7893,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_lowering_bundle_json_bytes": 60852,
+        "confidential_core_lowering_bundle_json_bytes": 60857,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -10643,7 +10643,7 @@
       {
         "accepted": true,
         "boundary_events": 14,
-        "confidential_core_lowering_bundle_json_bytes": 195543,
+        "confidential_core_lowering_bundle_json_bytes": 195531,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -19127,7 +19127,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 8256,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 8257,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "FixedSlotClassifier",
@@ -19394,7 +19394,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 18653,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 18654,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "AuthScan",
@@ -20370,7 +20370,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 13537,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 13538,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "RegistryCRUD",
@@ -20805,7 +20805,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 13538,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 13537,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "RegistryCRUD",
@@ -21774,7 +21774,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 19014,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 19012,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -23654,7 +23654,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 27347,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 27342,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -24509,7 +24509,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 27343,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 27341,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -25364,7 +25364,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 37458,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 37457,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -26425,7 +26425,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 37455,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 37459,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -30300,7 +30300,7 @@
       {
         "accepted": true,
         "boundary_events": 14,
-        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 297480,
+        "confidential_core_shell_boundary_lowering_bundle_json_bytes": 297476,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -38846,7 +38846,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 7786,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 7787,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "FixedSlotClassifier",
@@ -40065,7 +40065,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 13166,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 13167,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "RegistryCRUD",
@@ -40492,7 +40492,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 13167,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 13166,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "RegistryCRUD",
@@ -40919,7 +40919,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 18198,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 18197,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -41445,7 +41445,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 18199,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 18198,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -41971,7 +41971,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 21015,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 21016,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -42636,7 +42636,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 21015,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 21016,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -43301,7 +43301,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 26976,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 26978,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -44148,7 +44148,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 26976,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 26973,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -44995,7 +44995,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 36880,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 36877,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -46048,7 +46048,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 36877,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 36878,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -47101,7 +47101,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 95347,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 95357,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -49907,7 +49907,7 @@
       {
         "accepted": true,
         "boundary_events": 14,
-        "confidential_core_shell_boundary_slot_bundle_json_bytes": 295537,
+        "confidential_core_shell_boundary_slot_bundle_json_bytes": 295547,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -58186,7 +58186,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_slot_bundle_json_bytes": 4331,
+        "confidential_core_slot_bundle_json_bytes": 4330,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "FixedSlotClassifier",
@@ -60654,7 +60654,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_slot_bundle_json_bytes": 10636,
+        "confidential_core_slot_bundle_json_bytes": 10637,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -61116,7 +61116,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_slot_bundle_json_bytes": 12509,
+        "confidential_core_slot_bundle_json_bytes": 12510,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -62344,7 +62344,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_slot_bundle_json_bytes": 16373,
+        "confidential_core_slot_bundle_json_bytes": 16367,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -63143,7 +63143,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_slot_bundle_json_bytes": 16368,
+        "confidential_core_slot_bundle_json_bytes": 16369,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -63942,7 +63942,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_slot_bundle_json_bytes": 23613,
+        "confidential_core_slot_bundle_json_bytes": 23603,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -64944,7 +64944,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_slot_bundle_json_bytes": 23605,
+        "confidential_core_slot_bundle_json_bytes": 23607,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -65946,7 +65946,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_slot_bundle_json_bytes": 60038,
+        "confidential_core_slot_bundle_json_bytes": 60041,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -68688,7 +68688,7 @@
       {
         "accepted": true,
         "boundary_events": 14,
-        "confidential_core_slot_bundle_json_bytes": 193605,
+        "confidential_core_slot_bundle_json_bytes": 193585,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -77107,7 +77107,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_bundle_json_bytes": 4394,
+        "confidential_core_bundle_json_bytes": 4395,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "FixedSlotClassifier",
@@ -77729,7 +77729,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_bundle_json_bytes": 9883,
+        "confidential_core_bundle_json_bytes": 9882,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "AuthScan",
@@ -78141,7 +78141,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_bundle_json_bytes": 7751,
+        "confidential_core_bundle_json_bytes": 7752,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "RegistryCRUD",
@@ -78519,7 +78519,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_bundle_json_bytes": 7752,
+        "confidential_core_bundle_json_bytes": 7751,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "RegistryCRUD",
@@ -79358,7 +79358,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_bundle_json_bytes": 10788,
+        "confidential_core_bundle_json_bytes": 10789,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ConfidentialMixer",
@@ -79819,7 +79819,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "confidential_core_bundle_json_bytes": 12672,
+        "confidential_core_bundle_json_bytes": 12671,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -81045,7 +81045,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_bundle_json_bytes": 16437,
+        "confidential_core_bundle_json_bytes": 16441,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -81843,7 +81843,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "confidential_core_bundle_json_bytes": 16438,
+        "confidential_core_bundle_json_bytes": 16442,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -82641,7 +82641,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_bundle_json_bytes": 23724,
+        "confidential_core_bundle_json_bytes": 23729,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -83642,7 +83642,7 @@
       {
         "accepted": true,
         "boundary_events": 6,
-        "confidential_core_bundle_json_bytes": 23726,
+        "confidential_core_bundle_json_bytes": 23729,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "SingleAccessMap",
@@ -87384,7 +87384,7 @@
       {
         "accepted": true,
         "boundary_events": 14,
-        "confidential_core_bundle_json_bytes": 193963,
+        "confidential_core_bundle_json_bytes": 193951,
         "confidential_fragment_witness": {
           "accepted": true,
           "contract": "ERC20Lite",
@@ -184742,7 +184742,7 @@
     "scenarios": [
       {
         "accepted": true,
-        "certificate_json_bytes": 3276,
+        "certificate_json_bytes": 3278,
         "entrypoint": "put(bytes32,uint256)",
         "leaf_steps": 1,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -184753,7 +184753,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 3274,
+        "certificate_json_bytes": 3278,
         "entrypoint": "put(bytes32,uint256)",
         "leaf_steps": 1,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -184775,7 +184775,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 5640,
+        "certificate_json_bytes": 5644,
         "entrypoint": "add(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -184786,7 +184786,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 12592,
+        "certificate_json_bytes": 12588,
         "entrypoint": "deposit(bytes32,uint256)",
         "leaf_steps": 2,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -184797,7 +184797,7 @@
       },
       {
         "accepted": true,
-        "certificate_json_bytes": 44221,
+        "certificate_json_bytes": 44220,
         "entrypoint": "transferFrom(address,address,address,uint256)",
         "leaf_steps": 6,
         "lean_stdout": "validated runtime path-ORAM hidden certificate with 6 leaf steps",
@@ -184823,6 +184823,8 @@
       "runtime/uo-evm/src/state.rs"
     ],
     "committed_runtime_witness_snapshot_surface_restricted": true,
+    "committed_runtime_witness_snapshot_wipes_on_drop": true,
+    "confidential_call_inputs_wipe_on_drop": true,
     "confidential_committed_kernel_outcome_derive_line": "#[derive(Debug)]",
     "confidential_committed_kernel_outcome_nonclone": true,
     "confidential_committed_kernel_outcome_surface_files": [
@@ -185859,7 +185861,7 @@
     "runtime_phase_event_constructor_surface_restricted": true,
     "runtime_secret_state_inventory": [
       {
-        "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime",
+        "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime and whose buffered values wipe on drop",
         "checked": true,
         "name": "ConfidentialCallInputs",
         "owner": "runtime/uo-evm/src/state.rs"
@@ -185907,7 +185909,7 @@
         "owner": "runtime/uo-evm/src/state.rs"
       },
       {
-        "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers",
+        "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers, and wiping those hidden witness vectors on drop",
         "checked": true,
         "name": "TracedRuntimeCallWitnessState",
         "owner": "runtime/uo-evm/src/state.rs"
@@ -185919,7 +185921,7 @@
         "owner": "runtime/uo-evm/src/state.rs"
       },
       {
-        "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs and used only to assemble traced-call start/outcome/witness handoff bundles",
+        "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs, used only to assemble traced-call start/outcome/witness handoff bundles, and wiping its hidden vectors on drop",
         "checked": true,
         "name": "CommittedRuntimeWitnessSnapshot",
         "owner": "runtime/uo-evm/src/state.rs"
@@ -186405,6 +186407,7 @@
       "runtime/uo-evm/src/theorem.rs"
     ],
     "traced_runtime_call_witness_state_surface_restricted": true,
+    "traced_runtime_call_witness_state_wipes_on_drop": true,
     "trusted_kernel_checker_uses_slot_bundle": true,
     "trusted_kernel_cli_uses_slot_bundle": true,
     "trusted_kernel_probe_uses_slot_bundle": true,
@@ -244945,7 +244948,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 3279,
+        "artifact_json_bytes": 3278,
         "artifact_kind": "runtime_path_oram_hidden_certificate",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245064,7 +245067,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 16285,
+        "artifact_json_bytes": 16284,
         "artifact_kind": "proofgrade_runtime_confidential_core_bundle",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245078,7 +245081,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 16223,
+        "artifact_json_bytes": 16222,
         "artifact_kind": "proofgrade_runtime_confidential_core_slot_bundle",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245092,7 +245095,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 16591,
+        "artifact_json_bytes": 16590,
         "artifact_kind": "proofgrade_runtime_confidential_core_lowering_bundle",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245106,7 +245109,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 27196,
+        "artifact_json_bytes": 27195,
         "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_lowering_bundle",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245120,7 +245123,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 26828,
+        "artifact_json_bytes": 26827,
         "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_slot_bundle",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245134,7 +245137,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 16054,
+        "artifact_json_bytes": 16053,
         "artifact_kind": "proofgrade_runtime_refinement_witness",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245146,7 +245149,7 @@
       },
       {
         "accepted": false,
-        "artifact_json_bytes": 15851,
+        "artifact_json_bytes": 15850,
         "artifact_kind": "proofgrade_runtime_trusted_kernel_bundle",
         "benchmark": "SingleAccessMap/pathoram/put",
         "entrypoint": "put(bytes32,uint256)",
@@ -245264,7 +245267,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 3808,
+        "bundle_json_bytes": 3809,
         "confidential_slot_program": {
           "entrypoint_id": "classify(uint256)",
           "expected_runtime_step_count": 4,
@@ -245412,7 +245415,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 3809,
+        "bundle_json_bytes": 3808,
         "confidential_slot_program": {
           "entrypoint_id": "classify(uint256)",
           "expected_runtime_step_count": 4,
@@ -245560,7 +245563,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 8695,
+        "bundle_json_bytes": 8694,
         "confidential_slot_program": {
           "entrypoint_id": "auth(bytes32)",
           "expected_runtime_step_count": 8,
@@ -245893,7 +245896,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 8696,
+        "bundle_json_bytes": 8695,
         "confidential_slot_program": {
           "entrypoint_id": "auth(bytes32)",
           "expected_runtime_step_count": 8,
@@ -246226,7 +246229,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 7161,
+        "bundle_json_bytes": 7159,
         "confidential_slot_program": {
           "entrypoint_id": "upsert(bytes32,uint256)",
           "expected_runtime_step_count": 4,
@@ -246542,7 +246545,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 7161,
+        "bundle_json_bytes": 7160,
         "confidential_slot_program": {
           "entrypoint_id": "upsert(bytes32,uint256)",
           "expected_runtime_step_count": 4,
@@ -246858,7 +246861,7 @@
       {
         "accepted": true,
         "boundary_events": 2,
-        "bundle_json_bytes": 9650,
+        "bundle_json_bytes": 9649,
         "confidential_slot_program": {
           "entrypoint_id": "deposit(bytes32,uint256)",
           "expected_runtime_step_count": 7,
@@ -248720,7 +248723,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "bundle_json_bytes": 15848,
+        "bundle_json_bytes": 15851,
         "confidential_slot_program": {
           "entrypoint_id": "put(bytes32,uint256)",
           "expected_runtime_step_count": 4,
@@ -249456,7 +249459,7 @@
       {
         "accepted": true,
         "boundary_events": 4,
-        "bundle_json_bytes": 15846,
+        "bundle_json_bytes": 15847,
         "confidential_slot_program": {
           "entrypoint_id": "put(bytes32,uint256)",
           "expected_runtime_step_count": 4,
@@ -250187,943 +250190,6 @@
         "lean_stdout": "validated proof-grade runtime trusted kernel bundle for put(bytes32,uint256)",
         "position_map_objects": 1,
         "scenario": "SingleAccessMap/pathoram/put-class1",
-        "setup_calls": 0
-      },
-      {
-        "accepted": true,
-        "boundary_events": 6,
-        "bundle_json_bytes": 23033,
-        "confidential_slot_program": {
-          "entrypoint_id": "add(bytes32,uint256)",
-          "expected_runtime_step_count": 5,
-          "matches_trusted_kernel_entrypoint": true,
-          "param_count": 2,
-          "secret_arg_count": 2,
-          "slot_count": 3,
-          "statement_count": 2
-        },
-        "controller_accesses": 2,
-        "controller_phase_count": 13,
-        "entrypoint": "add(bytes32,uint256)",
-        "gas_used": 2651,
-        "kernel_witness": {
-          "canonical_loaded_object_schedule": [
-            1
-          ],
-          "claimed_resource_state": {
-            "hash_scratch": {
-              "live_bytes": 0,
-              "peak_bytes": 0,
-              "wipe_count": 1
-            },
-            "io_scratch": {
-              "live_bytes": 0,
-              "peak_bytes": 648,
-              "wipe_count": 67
-            },
-            "peak_stack_words": 3,
-            "value_scratch": {
-              "live_bytes": 0,
-              "peak_bytes": 32,
-              "wipe_count": 3
-            }
-          },
-          "entrypoint": "add(bytes32,uint256)",
-          "expected_kernel_step_public_object_schedule": [
-            1,
-            1
-          ],
-          "expected_public_object_universe": [
-            1
-          ],
-          "hash_scratch_peak_bytes": 0,
-          "hash_scratch_wipe_count": 1,
-          "io_scratch_peak_bytes": 648,
-          "io_scratch_wipe_count": 67,
-          "kernel_op_count": 5,
-          "kernel_step_public_object_schedule": [
-            1,
-            1
-          ],
-          "peak_stack_words": 3,
-          "present": true,
-          "public_object_universe": [
-            1
-          ],
-          "resource_event_count": 142,
-          "resource_events": [
-            {
-              "bytes": 8,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "stack_check",
-              "region": null,
-              "words": 1
-            },
-            {
-              "bytes": null,
-              "kind": "stack_check",
-              "region": null,
-              "words": 2
-            },
-            {
-              "bytes": 32,
-              "kind": "reserve_scratch",
-              "region": "value_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "value_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 8,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "stack_check",
-              "region": null,
-              "words": 3
-            },
-            {
-              "bytes": 32,
-              "kind": "reserve_scratch",
-              "region": "value_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "value_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 429,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 648,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": 8,
-              "kind": "reserve_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "value_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "hash_scratch",
-              "words": null
-            },
-            {
-              "bytes": null,
-              "kind": "wipe_scratch",
-              "region": "io_scratch",
-              "words": null
-            }
-          ],
-          "shell_contract": {
-            "canonical_loaded_object_schedule": [
-              1
-            ],
-            "kernel_step_public_object_schedule": [
-              1,
-              1
-            ],
-            "public_object_universe": [
-              1
-            ]
-          },
-          "value_scratch_peak_bytes": 32,
-          "value_scratch_wipe_count": 3
-        },
-        "leaf_steps": 2,
-        "lean_stdout": "validated proof-grade runtime trusted kernel bundle for add(bytes32,uint256)",
-        "position_map_objects": 1,
-        "scenario": "SingleAccessMap/pathoram/add-class0",
         "setup_calls": 0
       },
       {
@@ -252060,13 +251126,950 @@
         "leaf_steps": 2,
         "lean_stdout": "validated proof-grade runtime trusted kernel bundle for add(bytes32,uint256)",
         "position_map_objects": 1,
+        "scenario": "SingleAccessMap/pathoram/add-class0",
+        "setup_calls": 0
+      },
+      {
+        "accepted": true,
+        "boundary_events": 6,
+        "bundle_json_bytes": 23032,
+        "confidential_slot_program": {
+          "entrypoint_id": "add(bytes32,uint256)",
+          "expected_runtime_step_count": 5,
+          "matches_trusted_kernel_entrypoint": true,
+          "param_count": 2,
+          "secret_arg_count": 2,
+          "slot_count": 3,
+          "statement_count": 2
+        },
+        "controller_accesses": 2,
+        "controller_phase_count": 13,
+        "entrypoint": "add(bytes32,uint256)",
+        "gas_used": 2651,
+        "kernel_witness": {
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "claimed_resource_state": {
+            "hash_scratch": {
+              "live_bytes": 0,
+              "peak_bytes": 0,
+              "wipe_count": 1
+            },
+            "io_scratch": {
+              "live_bytes": 0,
+              "peak_bytes": 648,
+              "wipe_count": 67
+            },
+            "peak_stack_words": 3,
+            "value_scratch": {
+              "live_bytes": 0,
+              "peak_bytes": 32,
+              "wipe_count": 3
+            }
+          },
+          "entrypoint": "add(bytes32,uint256)",
+          "expected_kernel_step_public_object_schedule": [
+            1,
+            1
+          ],
+          "expected_public_object_universe": [
+            1
+          ],
+          "hash_scratch_peak_bytes": 0,
+          "hash_scratch_wipe_count": 1,
+          "io_scratch_peak_bytes": 648,
+          "io_scratch_wipe_count": 67,
+          "kernel_op_count": 5,
+          "kernel_step_public_object_schedule": [
+            1,
+            1
+          ],
+          "peak_stack_words": 3,
+          "present": true,
+          "public_object_universe": [
+            1
+          ],
+          "resource_event_count": 142,
+          "resource_events": [
+            {
+              "bytes": 8,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "stack_check",
+              "region": null,
+              "words": 1
+            },
+            {
+              "bytes": null,
+              "kind": "stack_check",
+              "region": null,
+              "words": 2
+            },
+            {
+              "bytes": 32,
+              "kind": "reserve_scratch",
+              "region": "value_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "value_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 8,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "stack_check",
+              "region": null,
+              "words": 3
+            },
+            {
+              "bytes": 32,
+              "kind": "reserve_scratch",
+              "region": "value_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "value_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 429,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 648,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": 8,
+              "kind": "reserve_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "value_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "hash_scratch",
+              "words": null
+            },
+            {
+              "bytes": null,
+              "kind": "wipe_scratch",
+              "region": "io_scratch",
+              "words": null
+            }
+          ],
+          "shell_contract": {
+            "canonical_loaded_object_schedule": [
+              1
+            ],
+            "kernel_step_public_object_schedule": [
+              1,
+              1
+            ],
+            "public_object_universe": [
+              1
+            ]
+          },
+          "value_scratch_peak_bytes": 32,
+          "value_scratch_wipe_count": 3
+        },
+        "leaf_steps": 2,
+        "lean_stdout": "validated proof-grade runtime trusted kernel bundle for add(bytes32,uint256)",
+        "position_map_objects": 1,
         "scenario": "SingleAccessMap/pathoram/add-class1",
         "setup_calls": 0
       },
       {
         "accepted": true,
         "boundary_events": 6,
-        "bundle_json_bytes": 59051,
+        "bundle_json_bytes": 59056,
         "confidential_slot_program": {
           "entrypoint_id": "deposit(bytes32,uint256)",
           "expected_runtime_step_count": 7,
@@ -254730,7 +254733,7 @@
       {
         "accepted": true,
         "boundary_events": 14,
-        "bundle_json_bytes": 192498,
+        "bundle_json_bytes": 192497,
         "confidential_slot_program": {
           "entrypoint_id": "transferFrom(address,address,address,uint256)",
           "expected_runtime_step_count": 9,
@@ -263041,7 +263044,7 @@
         "scenario": "FixedSlotClassifier/uo/class0",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 3904
+        "witness_json_bytes": 3905
       },
       {
         "accepted": true,
@@ -263621,7 +263624,7 @@
         "scenario": "AuthScan/uo/class0",
         "setup_calls": 2,
         "shared_resource_events": 3,
-        "witness_json_bytes": 8146
+        "witness_json_bytes": 8145
       },
       {
         "accepted": true,
@@ -264012,7 +264015,7 @@
         "scenario": "AuthScan/uo/class1",
         "setup_calls": 2,
         "shared_resource_events": 3,
-        "witness_json_bytes": 8146
+        "witness_json_bytes": 8145
       },
       {
         "accepted": true,
@@ -264726,7 +264729,7 @@
         "scenario": "RegistryCRUD/uo/class1",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 7361
+        "witness_json_bytes": 7360
       },
       {
         "accepted": true,
@@ -265166,7 +265169,7 @@
         "scenario": "ConfidentialMixer/fullscan/class0",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 9954
+        "witness_json_bytes": 9953
       },
       {
         "accepted": true,
@@ -265606,7 +265609,7 @@
         "scenario": "ConfidentialMixer/fullscan/class1",
         "setup_calls": 0,
         "shared_resource_events": 3,
-        "witness_json_bytes": 9954
+        "witness_json_bytes": 9953
       },
       {
         "accepted": true,
@@ -266790,7 +266793,7 @@
         "scenario": "ERC20Lite/fullscan/class1",
         "setup_calls": 1,
         "shared_resource_events": 3,
-        "witness_json_bytes": 12061
+        "witness_json_bytes": 12062
       },
       {
         "accepted": true,
@@ -267567,7 +267570,7 @@
         "scenario": "SingleAccessMap/pathoram/put-class0",
         "setup_calls": 0,
         "shared_resource_events": 34,
-        "witness_json_bytes": 16053
+        "witness_json_bytes": 16056
       },
       {
         "accepted": true,
@@ -269324,7 +269327,7 @@
         "scenario": "SingleAccessMap/pathoram/add-class0",
         "setup_calls": 0,
         "shared_resource_events": 65,
-        "witness_json_bytes": 23126
+        "witness_json_bytes": 23124
       },
       {
         "accepted": true,
@@ -270304,7 +270307,7 @@
         "scenario": "SingleAccessMap/pathoram/add-class1",
         "setup_calls": 0,
         "shared_resource_events": 65,
-        "witness_json_bytes": 23123
+        "witness_json_bytes": 23126
       },
       {
         "accepted": true,
@@ -273024,7 +273027,7 @@
         "scenario": "ConfidentialMixer/pathoram/deposit",
         "setup_calls": 0,
         "shared_resource_events": 189,
-        "witness_json_bytes": 59354
+        "witness_json_bytes": 59355
       },
       {
         "accepted": true,
@@ -281190,7 +281193,7 @@
         "scenario": "ERC20Lite/pathoram/transferFrom",
         "setup_calls": 2,
         "shared_resource_events": 723,
-        "witness_json_bytes": 191998
+        "witness_json_bytes": 192003
       }
     ]
   }

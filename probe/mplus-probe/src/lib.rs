@@ -8832,6 +8832,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .ok_or_else(|| anyhow!("failed to locate CommittedRuntimeWitnessSnapshot declaration"))?;
     let committed_runtime_witness_snapshot_nonclone =
         !committed_runtime_witness_snapshot_derive_line.contains("Clone");
+    let committed_runtime_witness_snapshot_wipes_on_drop = state_source
+        .contains("impl Drop for CommittedRuntimeWitnessSnapshot")
+        && state_source
+            .contains("wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters);")
+        && state_source
+            .contains("wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_maps);");
     let committed_runtime_witness_snapshot_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "CommittedRuntimeWitnessSnapshot")?;
     let expected_committed_runtime_witness_snapshot_surface_files =
@@ -8847,9 +8853,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("pub(in crate::runtime) struct ConfidentialCallInputs")
         && state_source.contains("raw_args: Vec<Value>")
         && state_source.contains("pub(crate) fn from_raw_args(args: Vec<Value>) -> Self")
-        && state_source.contains("pub(in crate::runtime) fn into_raw_args(self) -> Vec<Value>")
+        && state_source.contains("pub(in crate::runtime) fn into_raw_args(mut self) -> Vec<Value>")
+        && state_source.contains("std::mem::take(&mut self.raw_args)")
         && !state_source.contains("pub(crate) fn into_raw_args(self) -> Vec<Value>")
+        && !state_source.contains("pub(crate) fn into_raw_args(mut self) -> Vec<Value>")
         && !state_source.contains("pub(crate) fn from_manifest_entry(");
+    let confidential_call_inputs_wipe_on_drop = state_source
+        .contains("impl Drop for ConfidentialCallInputs")
+        && state_source.contains("for value in self.raw_args.iter_mut() {")
+        && state_source.contains("value.wipe_secrets();");
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_call_trace(")
         && theorem_source.contains("fn begin_call_trace(")
         && theorem_source.contains("pub(crate) fn run_traced_call<F>(")
@@ -9197,6 +9209,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .ok_or_else(|| anyhow!("failed to locate TracedRuntimeCallWitnessState declaration"))?;
     let traced_runtime_call_witness_state_nonclone =
         !traced_runtime_call_witness_state_derive_line.contains("Clone");
+    let traced_runtime_call_witness_state_wipes_on_drop = state_source
+        .contains("impl Drop for TracedRuntimeCallWitnessState")
+        && state_source.contains(
+            "wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_before);",
+        )
+        && state_source.contains(
+            "wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_after);",
+        )
+        && state_source.contains(
+            "wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_before);",
+        )
+        && state_source.contains(
+            "wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_after);",
+        );
     let traced_runtime_call_witness_state_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "TracedRuntimeCallWitnessState")?;
     let expected_traced_runtime_call_witness_state_surface_files = vec![
@@ -9990,9 +10016,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "ConfidentialCallInputs",
             "owner": "runtime/uo-evm/src/state.rs",
-            "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime",
+            "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime and whose buffered values wipe on drop",
             "checked": engine_keeps_confidential_call_inputs_inside_runtime
                 && state_confidential_call_inputs_wrapper_restricted
+                && confidential_call_inputs_wipe_on_drop
                 && kernel_confidential_call_inputs_stay_inside_runtime,
         }),
         json!({
@@ -10073,11 +10100,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "TracedRuntimeCallWitnessState",
             "owner": "runtime/uo-evm/src/state.rs",
-            "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers",
+            "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers, and wiping those hidden witness vectors on drop",
             "checked": traced_runtime_call_witness_state_nonclone
                 && traced_runtime_call_witness_state_surface_restricted
                 && traced_runtime_call_witness_state_api_is_explicit
                 && traced_runtime_call_witness_state_consumer_surface_restricted
+                && traced_runtime_call_witness_state_wipes_on_drop
                 && theorem_finalizes_execution_trace,
         }),
         json!({
@@ -10091,9 +10119,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "CommittedRuntimeWitnessSnapshot",
             "owner": "runtime/uo-evm/src/state.rs",
-            "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs and used only to assemble traced-call start/outcome/witness handoff bundles",
+            "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs, used only to assemble traced-call start/outcome/witness handoff bundles, and wiping its hidden vectors on drop",
             "checked": state_committed_runtime_witness_snapshot_is_opaque
                 && committed_runtime_witness_snapshot_nonclone
+                && committed_runtime_witness_snapshot_wipes_on_drop
                 && committed_runtime_witness_snapshot_surface_restricted
                 && theorem_only_runtime_helper_visibility_restricted
                 && theorem_finalizes_execution_trace,
@@ -10205,6 +10234,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             committed_runtime_witness_snapshot_derive_line,
         "committed_runtime_witness_snapshot_nonclone":
             committed_runtime_witness_snapshot_nonclone,
+        "committed_runtime_witness_snapshot_wipes_on_drop":
+            committed_runtime_witness_snapshot_wipes_on_drop,
         "committed_runtime_witness_snapshot_surface_files":
             committed_runtime_witness_snapshot_surface_files,
         "expected_committed_runtime_witness_snapshot_surface_files":
@@ -10217,6 +10248,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             engine_leaves_runtime_phase_tail_inside_runtime,
         "state_confidential_call_inputs_wrapper_restricted":
             state_confidential_call_inputs_wrapper_restricted,
+        "confidential_call_inputs_wipe_on_drop":
+            confidential_call_inputs_wipe_on_drop,
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
         "theorem_private_surface_checks": theorem_private_surface_checks,
         "theorem_private_surface_restricted":
@@ -10342,6 +10375,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             traced_runtime_call_witness_state_derive_line,
         "traced_runtime_call_witness_state_nonclone":
             traced_runtime_call_witness_state_nonclone,
+        "traced_runtime_call_witness_state_wipes_on_drop":
+            traced_runtime_call_witness_state_wipes_on_drop,
         "traced_runtime_call_witness_state_surface_files":
             traced_runtime_call_witness_state_surface_files,
         "expected_traced_runtime_call_witness_state_surface_files":
@@ -12409,7 +12444,8 @@ controller path must derive a `PublicCallSummary` from the checked manifest's
 `param_names`, `secret_args`, and manifest-stored `entry_input_len`, and
 `ContractRuntime` must internalize the remaining raw confidential argument
 vector into `ConfidentialCallInputs`, whose unwrap surface stays restricted to
-`crate::runtime`; the theorem-finalization path must avoid depending on
+`crate::runtime` and whose buffered `Value` payload now wipes on drop; the
+theorem-finalization path must avoid depending on
 `CompiledFunction` entirely while the public trace path sees only the
 exported `OutputShape` rather than the full return payload, and the committed
 before/after ORAM witness snapshot consumed by `theorem.rs` is now captured
@@ -12425,6 +12461,11 @@ trusted-kernel` must emit `runtime_trusted_kernel_slot_bundle`, the probe's
 trusted-kernel validator must validate that same slot-wrapped artifact, and
 `CheckProofGradeRuntimeTrustedKernel.lean` must load the corresponding slot
 bundle checker path rather than the older bare trusted-kernel bundle loader.
+The same boundary report also requires the hidden traced-call witness staging
+buffers in `state.rs` to wipe on drop: both the internal committed-state ORAM
+snapshot and the finalized traced-call witness bundle must clear their hidden
+access-counter and position-map leaves unless they are explicitly consumed by
+the theorem finalizer.
 The same report also checks that the
 confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to

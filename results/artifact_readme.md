@@ -110,7 +110,8 @@ controller path must derive a `PublicCallSummary` from the checked manifest's
 `param_names`, `secret_args`, and manifest-stored `entry_input_len`, and
 `ContractRuntime` must internalize the remaining raw confidential argument
 vector into `ConfidentialCallInputs`, whose unwrap surface stays restricted to
-`crate::runtime`; the theorem-finalization path must avoid depending on
+`crate::runtime` and whose buffered `Value` payload now wipes on drop; the
+theorem-finalization path must avoid depending on
 `CompiledFunction` entirely while the public trace path sees only the
 exported `OutputShape` rather than the full return payload, and the committed
 before/after ORAM witness snapshot consumed by `theorem.rs` is now captured
@@ -126,6 +127,11 @@ trusted-kernel` must emit `runtime_trusted_kernel_slot_bundle`, the probe's
 trusted-kernel validator must validate that same slot-wrapped artifact, and
 `CheckProofGradeRuntimeTrustedKernel.lean` must load the corresponding slot
 bundle checker path rather than the older bare trusted-kernel bundle loader.
+The same boundary report also requires the hidden traced-call witness staging
+buffers in `state.rs` to wipe on drop: both the internal committed-state ORAM
+snapshot and the finalized traced-call witness bundle must clear their hidden
+access-counter and position-map leaves unless they are explicitly consumed by
+the theorem finalizer.
 The same report also checks that the
 confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to
