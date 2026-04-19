@@ -187,72 +187,64 @@ impl ContractInstance {
             public_object_ids.clone()
         };
         let execution = (|| -> Result<_> {
-            let kernel = PublicRuntimeKernel::begin(
-                allocator,
-                expected_kernel_steps,
-                public_object_ids.clone(),
-                Some(public_object_ids.clone()),
-            )?;
             let mut recorder =
                 CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
-            let mut opcode_trace = Vec::new();
-            let (runtime_kernel_witness, runtime_kernel_refinement_witness, aborted, return_value) =
-                if function.confidential {
-                    let (slot_program, _) = confidential_slot_program
-                        .as_ref()
-                        .expect("confidential entrypoint must carry slot program");
-                    let confidential_args = confidential_args
-                        .expect("confidential entrypoint must carry confidential call args");
-                    let outcome = self.state.run_confidential_call(
-                        kernel,
-                        slot_program,
-                        &shadow_load_object_ids,
-                        max_hash_part_bytes,
-                        confidential_args,
-                        fresh_coins,
-                        &mut recorder,
-                        &mut opcode_trace,
-                    )?;
-                    (
-                        outcome.runtime_kernel_witness,
-                        outcome.runtime_kernel_refinement_witness,
-                        outcome.aborted,
-                        outcome.return_value,
-                    )
-                } else {
-                    let mut kernel = kernel;
-                    let mut shadow = self
-                        .state
-                        .prepare_public_shadow(&mut kernel, &shadow_load_object_ids)?;
-                    let public_args =
-                        public_args.expect("public entrypoint must keep raw argument vector");
-                    let public_execution = run_public_entrypoint(
-                        &self.artifact.contract,
-                        &function,
-                        public_args,
-                        &mut shadow,
-                        &mut recorder,
-                        &mut kernel,
-                    )?;
-                    let aborted = public_execution.aborted;
-                    let return_value = public_execution.return_value;
-                    opcode_trace = public_execution.opcode_trace;
-                    self.state.commit_public_shadow(
-                        &mut kernel,
-                        &mut shadow,
-                        aborted,
-                        &mut recorder,
-                    )?;
-                    let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
-                        kernel.finish(&function.signature)?;
-                    self.state.replace_with_cold_public_shadow(shadow);
-                    (
-                        runtime_kernel_witness,
-                        runtime_kernel_refinement_witness,
-                        aborted,
-                        return_value,
-                    )
-                };
+            let (
+                runtime_kernel_witness,
+                runtime_kernel_refinement_witness,
+                aborted,
+                return_value,
+                opcode_trace,
+            ) = if function.confidential {
+                let kernel = PublicRuntimeKernel::begin(
+                    allocator,
+                    expected_kernel_steps,
+                    public_object_ids.clone(),
+                    Some(public_object_ids.clone()),
+                )?;
+                let mut opcode_trace = Vec::new();
+                let (slot_program, _) = confidential_slot_program
+                    .as_ref()
+                    .expect("confidential entrypoint must carry slot program");
+                let confidential_args = confidential_args
+                    .expect("confidential entrypoint must carry confidential call args");
+                let outcome = self.state.run_confidential_call(
+                    kernel,
+                    slot_program,
+                    &shadow_load_object_ids,
+                    max_hash_part_bytes,
+                    confidential_args,
+                    fresh_coins,
+                    &mut recorder,
+                    &mut opcode_trace,
+                )?;
+                (
+                    outcome.runtime_kernel_witness,
+                    outcome.runtime_kernel_refinement_witness,
+                    outcome.aborted,
+                    outcome.return_value,
+                    opcode_trace,
+                )
+            } else {
+                let public_args =
+                    public_args.expect("public entrypoint must keep raw argument vector");
+                let public_execution = run_public_entrypoint(
+                    &mut self.state,
+                    &self.artifact.contract,
+                    &function,
+                    public_args,
+                    allocator,
+                    public_object_ids.clone(),
+                    &mut recorder,
+                )?;
+                (
+                    public_execution.runtime_kernel_witness,
+                    public_execution.runtime_kernel_refinement_witness,
+                    public_execution.aborted,
+                    public_execution.return_value,
+                    public_execution.opcode_trace,
+                )
+            };
             let mut gas_used = 0u64;
             gas_used += recorder.metrics().logical_reads as u64 * 3;
             gas_used += recorder.metrics().logical_writes as u64 * 5;
@@ -442,6 +434,9 @@ mod tests {
             "engine.rs implementation should not assemble ExecutionTrace directly"
         );
         for forbidden in [
+            "prepare_public_shadow(",
+            "commit_public_shadow(",
+            "replace_with_cold_public_shadow(",
             "clone_for_tx(",
             "commit(",
             "shadow_load_objects(",

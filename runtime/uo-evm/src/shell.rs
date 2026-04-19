@@ -1,17 +1,27 @@
 use crate::controller::CallRecorder;
 use crate::runtime::kernel::PublicRuntimeKernel;
-use crate::runtime::state::PublicRuntimeShadowState;
+use crate::runtime::state::{ContractRuntime, PublicRuntimeShadowState};
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
+use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
-use uo_core::Value;
+use uo_core::{RuntimeKernelRefinementWitness, RuntimeKernelWitness, Value};
 
 #[derive(Clone, Debug)]
-pub(crate) struct PublicExecutionOutcome {
+pub(crate) struct PublicCallOutcome {
+    pub runtime_kernel_witness: RuntimeKernelWitness,
+    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
     pub aborted: bool,
     pub return_value: Option<Value>,
     pub opcode_trace: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct PublicExecutionOutcome {
+    aborted: bool,
+    return_value: Option<Value>,
+    opcode_trace: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -23,6 +33,43 @@ struct ExecState {
 }
 
 pub(crate) fn run_public_entrypoint(
+    runtime: &mut ContractRuntime,
+    contract: &CompiledContract,
+    function: &CompiledFunction,
+    public_args: Vec<Value>,
+    allocator: AllocatorPlan,
+    public_object_ids: Vec<u32>,
+    recorder: &mut CallRecorder,
+) -> Result<PublicCallOutcome> {
+    let mut kernel = PublicRuntimeKernel::begin(
+        allocator,
+        None,
+        public_object_ids.clone(),
+        Some(public_object_ids.clone()),
+    )?;
+    let mut shadow = runtime.prepare_public_shadow(&mut kernel, &public_object_ids)?;
+    let execution = interpret_public_entrypoint(
+        contract,
+        function,
+        public_args,
+        &mut shadow,
+        recorder,
+        &mut kernel,
+    )?;
+    runtime.commit_public_shadow(&mut kernel, &mut shadow, execution.aborted, recorder)?;
+    let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
+        kernel.finish(&function.signature)?;
+    runtime.replace_with_cold_public_shadow(shadow);
+    Ok(PublicCallOutcome {
+        runtime_kernel_witness,
+        runtime_kernel_refinement_witness,
+        aborted: execution.aborted,
+        return_value: execution.return_value,
+        opcode_trace: execution.opcode_trace,
+    })
+}
+
+fn interpret_public_entrypoint(
     contract: &CompiledContract,
     function: &CompiledFunction,
     public_args: Vec<Value>,
@@ -461,7 +508,7 @@ mod tests {
             "shell.rs should run through the public kernel facade"
         );
         assert!(
-            source.contains("use crate::runtime::state::PublicRuntimeShadowState;"),
+            source.contains("PublicRuntimeShadowState"),
             "shell.rs should manipulate only the public shadow wrapper"
         );
         for forbidden in [

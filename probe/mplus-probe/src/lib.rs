@@ -5963,6 +5963,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_impl_source = production_source_slice(&engine_source);
     let shell_impl_source = production_source_slice(&shell_source);
     let forbidden_engine_helpers = [
+        "prepare_public_shadow(",
+        "commit_public_shadow(",
+        "replace_with_cold_public_shadow(",
         "clone_for_tx(",
         "commit(",
         "shadow_load_objects(",
@@ -6753,6 +6756,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "ContractRuntime",
             vec![
                 String::from("runtime/uo-evm/src/engine.rs"),
+                String::from("runtime/uo-evm/src/shell.rs"),
                 String::from("runtime/uo-evm/src/state.rs"),
             ],
         ),
@@ -8914,11 +8918,11 @@ call the low-level runtime object helpers, that those helpers remain
 restricted to `crate::runtime`, that `RuntimeObject` itself is not `Clone`,
 that `ContractInstance::clone` goes through the cold committed-state clone
 path, that `engine.rs` now holds only an opaque `ContractRuntime` wrapper and
-delegates the public interpreter to `shell.rs`, that `shell.rs` itself stays
-on the `PublicRuntimeKernel` plus `PublicRuntimeShadowState` side of the
-boundary instead of importing raw runtime objects or confidential kernel
-types, and that `engine.rs` no longer constructs runtime phase-witness events
-directly because the post-call phase tail is finalized
+delegates the entire public-call lifecycle to `shell.rs`, that `shell.rs`
+itself stays on the `PublicRuntimeKernel` plus `PublicRuntimeShadowState`
+side of the boundary instead of importing raw runtime objects or confidential
+kernel types, and that `engine.rs` no longer constructs runtime phase-witness
+events directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
 certificates directly, no longer assembles `ExecutionTrace` directly
 beyond `runtime/uo-evm/src/theorem.rs`, and no longer clones the full call
