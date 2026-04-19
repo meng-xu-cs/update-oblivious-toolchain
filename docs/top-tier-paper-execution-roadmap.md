@@ -398,9 +398,9 @@ Deliverables:
 - one reviewer-facing proved/assumed/trusted table
 
 Current artifact-side realization: the full probe bundle emits
-`reviewer_summary.json` as the machine-generated reviewer-facing table over
-proof/report cost, artifact sizes, runtime overheads, TCB surface, and
-explicit assumptions.
+`reviewer_summary.json` plus `reviewer_summary.md` as the machine-generated
+reviewer-facing table over proof/report cost, artifact sizes, runtime
+overheads, TCB surface, and explicit assumptions.
 
 Exit gate:
 

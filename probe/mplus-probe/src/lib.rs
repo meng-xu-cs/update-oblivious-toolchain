@@ -744,6 +744,9 @@ pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
             .as_str()
             .ok_or_else(|| anyhow!("artifact_readme missing"))?,
     )?;
+    if !results["reviewer_summary"].is_null() {
+        write_reviewer_summary_markdown(out_dir, &results["reviewer_summary"])?;
+    }
     write_reproducibility_manifest(out_dir)?;
     Ok(())
 }
@@ -807,6 +810,144 @@ fn collect_bundle_files(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Re
             .cmp(rhs.strip_prefix(root).unwrap_or(rhs))
     });
     Ok(())
+}
+
+pub fn write_reviewer_summary_markdown(out_dir: &str, summary: &JsonValue) -> Result<()> {
+    fs::write(
+        Path::new(out_dir).join("reviewer_summary.md"),
+        render_reviewer_summary_markdown(summary)?,
+    )?;
+    Ok(())
+}
+
+fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
+    let mut out = String::from("# Reviewer Summary\n\n");
+
+    out.push_str("## Proof And Report Cost\n\n");
+    out.push_str("| Report | Milliseconds |\n");
+    out.push_str("| --- | ---: |\n");
+    if let Some(costs) = summary["proof_checking_cost_ms"].as_object() {
+        let mut rows = costs
+            .iter()
+            .filter_map(|(name, value)| value.as_u64().map(|ms| (name.as_str(), ms)))
+            .collect::<Vec<_>>();
+        rows.sort_by(|lhs, rhs| rhs.1.cmp(&lhs.1).then_with(|| lhs.0.cmp(rhs.0)));
+        for (name, ms) in rows {
+            out.push_str(&format!("| `{}` | `{}` |\n", name, ms));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## Largest Materialized Artifacts\n\n");
+    out.push_str("| Report Field | Bytes |\n");
+    out.push_str("| --- | ---: |\n");
+    if let Some(entries) = summary["artifact_size_bytes"]["top_materialized_report_fields"].as_array()
+    {
+        for entry in entries {
+            let metric = entry["metric"].as_str().unwrap_or("unknown");
+            let bytes = entry["bytes"].as_u64().unwrap_or_default();
+            out.push_str(&format!("| `{}` | `{}` |\n", metric, bytes));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## Largest Estimated Artifacts\n\n");
+    out.push_str("| Report Field | Estimated Bytes |\n");
+    out.push_str("| --- | ---: |\n");
+    if let Some(entries) = summary["artifact_size_bytes"]["top_estimated_report_fields"].as_array() {
+        for entry in entries {
+            let metric = entry["metric"].as_str().unwrap_or("unknown");
+            let bytes = entry["bytes"].as_u64().unwrap_or_default();
+            out.push_str(&format!("| `{}` | `{}` |\n", metric, bytes));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## Runtime Overheads\n\n");
+    out.push_str(
+        "| Benchmark | Raw Gas | Raw Writes | Raw Bytes | Full-Scan Gas | Full-Scan Writes | Full-Scan Bytes | ORAM Gas | ORAM Writes | ORAM Bytes |\n",
+    );
+    out.push_str(
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
+    );
+    if let Some(cases) = summary["runtime_overheads"]["cases"].as_array() {
+        for case in cases {
+            out.push_str(&format!(
+                "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
+                case["benchmark"].as_str().unwrap_or("unknown"),
+                case["raw"]["gas_used"].as_u64().unwrap_or_default(),
+                case["raw"]["physical_writes"].as_u64().unwrap_or_default(),
+                case["raw"]["bytes_written"].as_f64().unwrap_or_default(),
+                case["full_scan_64"]["gas_used"].as_u64().unwrap_or_default(),
+                case["full_scan_64"]["physical_writes"].as_u64().unwrap_or_default(),
+                case["full_scan_64"]["bytes_written"].as_f64().unwrap_or_default(),
+                case["oram_64"]["gas_used"].as_u64().unwrap_or_default(),
+                case["oram_64"]["physical_writes"].as_u64().unwrap_or_default(),
+                case["oram_64"]["bytes_written"].as_f64().unwrap_or_default(),
+            ));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## TCB Surface\n\n");
+    out.push_str("| Surface | Total Non-Empty LOC |\n");
+    out.push_str("| --- | ---: |\n");
+    out.push_str(&format!(
+        "| Trusted Rust runtime surface | `{}` |\n",
+        summary["tcb_size"]["trusted_runtime_surface"]["total_nonempty_loc"]
+            .as_u64()
+            .unwrap_or_default()
+    ));
+    out.push_str(&format!(
+        "| Outer runtime risk surface | `{}` |\n",
+        summary["tcb_size"]["outer_runtime_risk_surface"]["total_nonempty_loc"]
+            .as_u64()
+            .unwrap_or_default()
+    ));
+    out.push_str(&format!(
+        "| Lean theorem/checker repo surface | `{}` |\n",
+        summary["tcb_size"]["lean_theorem_checker_repo_surface"]["total_nonempty_loc"]
+            .as_u64()
+            .unwrap_or_default()
+    ));
+    out.push('\n');
+
+    out.push_str("## Current TCB Table\n\n");
+    out.push_str("| Component | In Current Proof-Grade TCB? | Role |\n");
+    out.push_str("| --- | --- | --- |\n");
+    if let Some(entries) = summary["current_tcb"].as_array() {
+        for entry in entries {
+            out.push_str(&format!(
+                "| {} | `{}` | {} |\n",
+                markdown_escape(entry["component"].as_str().unwrap_or("unknown")),
+                entry["in_current_proofgrade_tcb"]
+                    .as_bool()
+                    .unwrap_or(false),
+                markdown_escape(entry["role"].as_str().unwrap_or("unknown")),
+            ));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## Explicit Assumptions\n\n");
+    out.push_str("| Assumption | Meaning | Status |\n");
+    out.push_str("| --- | --- | --- |\n");
+    if let Some(entries) = summary["explicit_assumptions"].as_array() {
+        for entry in entries {
+            out.push_str(&format!(
+                "| `{}` | {} | {} |\n",
+                entry["assumption"].as_str().unwrap_or("unknown"),
+                markdown_escape(entry["meaning"].as_str().unwrap_or("unknown")),
+                markdown_escape(entry["status"].as_str().unwrap_or("unknown")),
+            ));
+        }
+    }
+
+    Ok(out)
+}
+
+fn markdown_escape(value: &str) -> String {
+    value.replace('|', "\\|")
 }
 
 fn build_reviewer_summary(
@@ -11369,12 +11510,12 @@ canonical pairs directly, and validates both
 `ConfidentialMixer/pathoram/deposit-canonical-pair` and
 `ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
 theorem-input path with their concrete explicit-size estimates attached.
-`reviewer_summary.json` condenses the current paper-facing metrics into one
-machine-generated table: it records per-report wall-clock cost, the largest
-materialized and estimated artifact-size fields, the runtime overhead report,
-the current TCB table, explicit assumptions, and non-empty source-line counts
-for the trusted Rust runtime surface plus the repo-side Lean theorem/checker
-surface.
+`reviewer_summary.json` plus `reviewer_summary.md` condense the current
+paper-facing metrics into one machine-generated table: they record per-report
+wall-clock cost, the largest materialized and estimated artifact-size fields,
+the runtime overhead report, the current TCB table, explicit assumptions, and
+non-empty source-line counts for the trusted Rust runtime surface plus the
+repo-side Lean theorem/checker surface.
 
 Security tiers:
 
@@ -11421,6 +11562,9 @@ Prototype assumptions:
     }
     readme.push_str(
         "- `reproducibility_manifest.json` records every emitted file with its bundle-relative path, byte size, and SHA-256 digest.\n",
+    );
+    readme.push_str(
+        "- `reviewer_summary.md` renders the same machine-generated reviewer table as `reviewer_summary.json` in Markdown form for paper/artifact writeups.\n",
     );
     readme.push_str(
         "- `./scripts/check_probe_reproducibility.sh` reruns `mplus-probe` twice and checks that the two output directories are byte-for-byte identical.\n",

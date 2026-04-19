@@ -85,6 +85,9 @@ fn write_single_report(
 ) -> Result<()> {
     fs::create_dir_all(out_dir)?;
     fs::write(Path::new(out_dir).join(file_name), serde_json::to_vec_pretty(report)?)?;
+    if report_name == "reviewer_summary" {
+        mplus_probe::write_reviewer_summary_markdown(out_dir, report)?;
+    }
     mplus_probe::write_reproducibility_manifest(out_dir)?;
     println!(
         "{}",

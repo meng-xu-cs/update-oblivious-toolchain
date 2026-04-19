@@ -21,7 +21,7 @@ Components:
 - `probe/mplus-probe`: runs paired leakage experiments, correctness checks,
   witness/certificate validation, and writes the reproducible `results/`
   bundle together with `reproducibility_manifest.json` and
-  `reviewer_summary.json`.
+  `reviewer_summary.json` / `reviewer_summary.md`.
 - `benches/raw`: the benchmark suite plus raw/UO metadata.
 - `benches/uo`: generated UO artifacts.
 
@@ -305,10 +305,11 @@ Every results directory now also carries `reproducibility_manifest.json`,
 which records bundle-relative output paths, byte sizes, and SHA-256 digests so
 two runs can be compared byte-for-byte even when they were written to
 different output directories.
-The full bundle also emits `reviewer_summary.json`, which condenses proof/report
-costs, the largest materialized and estimated artifact sizes, runtime
-overheads, current TCB components, TCB source-line counts, and the explicit
-assumption table into one machine-generated reviewer-facing summary.
+The full bundle also emits `reviewer_summary.json` plus the paper-ready
+`reviewer_summary.md`, which condense proof/report costs, the largest
+materialized and estimated artifact sizes, runtime overheads, current TCB
+components, TCB source-line counts, and the explicit assumption table into one
+machine-generated reviewer-facing summary.
 
 Artifact modes:
 

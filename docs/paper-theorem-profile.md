@@ -33,6 +33,10 @@ What is already established at the frozen interface:
 - Lean-side proof-grade predicates and executable checkers for the runtime
   kernel witness, runtime refinement witness, and runtime trusted-kernel
   bundle
+- a machine-generated reviewer summary emitted by the full probe bundle as
+  `reviewer_summary.json` plus `reviewer_summary.md`, covering proof/report
+  cost, artifact sizes, runtime overheads, TCB surface, and explicit
+  assumptions
 - proof-grade checker entrypoints are pinned to the legacy-free
   `UOToolchain.ProofGrade` umbrella, while the remaining legacy bridge wrappers
   live only in `Legacy*` companion modules
