@@ -157,10 +157,11 @@ The current runtime has a first hardening layer:
   just to build the public theorem trace: it now retains only a
   `PublicCallSummary` derived from the checked manifest's `param_names`,
   `secret_args`, and manifest-stored `entry_input_len`, containing the
-  already-public argument projection plus a type-derived total input length,
-  while the remaining raw confidential argument vector moves into a
-  `ConfidentialCallInputs` wrapper whose unwrap surface is restricted to
-  `crate::runtime`,
+  already-public argument projection plus a type-derived total input length;
+  the shell now holds an opaque `ContractRuntime` wrapper rather than the raw
+  committed confidential state, and that wrapper internalizes the remaining
+  raw confidential argument vector into `ConfidentialCallInputs`, whose unwrap
+  surface is restricted to `crate::runtime`,
   and the controller/theorem path now derives public return length from
   manifest-stored `return_canonical_len` and receives only the public
   `OutputShape` summary rather than the full return payload; injected

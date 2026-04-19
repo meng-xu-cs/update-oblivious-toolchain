@@ -454,9 +454,11 @@ The first implementation step is now present in the codebase:
   checked manifest's `param_names`, `secret_args`, and manifest-stored
   `entry_input_len` during theorem-trace construction instead of cloning the
   full secret-bearing call-argument vector or recomputing input length from
-  those values, and the remaining raw confidential argument vector now moves
-  into a `ConfidentialCallInputs` wrapper whose unwrap surface is restricted
-  to `crate::runtime`; the controller/theorem path now also derives output
+  those values; `engine.rs` now holds an opaque `ContractRuntime` wrapper
+  rather than the raw committed confidential state, and that wrapper
+  internalizes the remaining raw confidential argument vector into
+  `ConfidentialCallInputs`, whose unwrap surface is restricted to
+  `crate::runtime`; the controller/theorem path now also derives output
   length from manifest-stored `return_canonical_len` and consumes only the
   public `OutputShape` summary rather than the full return payload
 - kernel object-operation scratch reservations and UO object commit `io`

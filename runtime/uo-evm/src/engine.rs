@@ -1,9 +1,7 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
-use crate::runtime::state::{
-    CommittedRuntimeState, ConfidentialCallInputs, PublicRuntimeShadowState,
-};
+use crate::runtime::state::{ContractRuntime, PublicRuntimeShadowState};
 use crate::theorem::{build_theorem_trace, finalize_execution_trace, FinalizeExecutionTraceInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
@@ -20,7 +18,7 @@ use uo_core::{
 #[derive(Debug)]
 pub struct ContractInstance {
     artifact: CompiledArtifact,
-    state: CommittedRuntimeState,
+    state: ContractRuntime,
     deploy_seed: u64,
 }
 
@@ -70,7 +68,7 @@ impl ContractInstance {
 
     pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
         Ok(Self {
-            state: CommittedRuntimeState::deploy(&artifact.contract.state, deploy_seed)?,
+            state: ContractRuntime::deploy(&artifact.contract.state, deploy_seed)?,
             artifact,
             deploy_seed,
         })
@@ -133,9 +131,9 @@ impl ContractInstance {
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
-        let (public_call, confidential_call_inputs, public_args) = if function.confidential {
-            let call_inputs = ConfidentialCallInputs::from_manifest_entry(&manifest_entry, args)?;
-            (call_inputs.public_call().clone(), Some(call_inputs), None)
+        let (public_call, confidential_args, public_args) = if function.confidential {
+            let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
+            (public_call, Some(args), None)
         } else {
             let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
             (public_call, None, Some(args))
@@ -212,14 +210,14 @@ impl ContractInstance {
                     let (slot_program, _) = confidential_slot_program
                         .as_ref()
                         .expect("confidential entrypoint must carry slot program");
-                    let confidential_call_inputs = confidential_call_inputs
-                        .expect("confidential entrypoint must carry confidential call inputs");
+                    let confidential_args = confidential_args
+                        .expect("confidential entrypoint must carry confidential call args");
                     let outcome = self.state.run_confidential_call(
                         kernel,
                         slot_program,
                         &shadow_load_object_ids,
                         max_hash_part_bytes,
-                        confidential_call_inputs,
+                        confidential_args,
                         fresh_coins,
                         &mut recorder,
                         &mut opcode_trace,
@@ -790,12 +788,16 @@ mod tests {
             .next()
             .expect("engine.rs should contain a test boundary marker");
         assert!(
-            source.contains("state: CommittedRuntimeState"),
-            "engine.rs should hold an opaque committed runtime state handle"
+            source.contains("state: ContractRuntime"),
+            "engine.rs should hold an opaque runtime wrapper rather than the raw committed state"
         );
         assert!(
             source.contains("objects: &mut PublicRuntimeShadowState"),
             "engine.rs public interpreter should run over the public shadow-state wrapper"
+        );
+        assert!(
+            !source.contains("ConfidentialCallInputs"),
+            "engine.rs should not construct confidential runtime call wrappers directly"
         );
         assert!(
             !source.contains("use crate::runtime::objects::RuntimeObject;"),

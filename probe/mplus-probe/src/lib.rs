@@ -5985,8 +5985,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("helper presence must be boolean")
     });
-    let engine_uses_opaque_committed_state =
-        engine_impl_source.contains("state: CommittedRuntimeState");
+    let engine_uses_opaque_committed_state = engine_impl_source.contains("state: ContractRuntime")
+        && !engine_impl_source.contains("state: CommittedRuntimeState");
     let engine_uses_shadow_wrapper =
         engine_impl_source.contains("objects: &mut PublicRuntimeShadowState");
     let engine_uses_public_runtime_kernel =
@@ -5996,10 +5996,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         || engine_source.contains("struct PathOramFreshCoinPlan");
     let engine_uses_manifest_public_call_summary =
         engine_impl_source.contains("PublicCallSummary::from_manifest_entry");
-    let engine_uses_confidential_call_inputs_wrapper = engine_impl_source
-        .contains("ConfidentialCallInputs::from_manifest_entry(&manifest_entry, args)?")
-        && engine_impl_source
-            .contains("confidential entrypoint must carry confidential call inputs");
+    let engine_keeps_confidential_call_inputs_inside_runtime = !engine_impl_source
+        .contains("ConfidentialCallInputs::from_manifest_entry")
+        && engine_impl_source.contains("self.state.run_confidential_call(")
+        && state_source.contains("let call_inputs = ConfidentialCallInputs::from_raw_args(args);");
     let engine_clones_call_args_directly = engine_impl_source
         .contains("let mut call_args = args.clone();")
         || engine_impl_source.contains("let call_args = args.clone();");
@@ -6117,7 +6117,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let fresh_coin_plan_zeroizes_on_drop = fresh_coins_source
         .contains("impl Drop for PathOramFreshCoinPlan")
         && fresh_coins_source.contains("*coin = 0;");
-    let state_wrapper_present = state_source.contains("pub(crate) struct CommittedRuntimeState")
+    let state_wrapper_present = state_source.contains("pub(crate) struct ContractRuntime")
+        && state_source.contains("pub(in crate::runtime) struct CommittedRuntimeState")
         && state_source.contains("pub(crate) struct RuntimeShadowState")
         && state_source.contains("pub(crate) struct PublicRuntimeShadowState");
     let kernel_restricted_signatures = [
@@ -6217,11 +6218,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("RuntimeKernelRefinementEventWitness::cold_store_object")
         && state_source.contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
     let state_confidential_call_inputs_wrapper_restricted = state_source
-        .contains("pub(crate) struct ConfidentialCallInputs")
-        && state_source.contains("public_call: PublicCallSummary")
+        .contains("pub(in crate::runtime) struct ConfidentialCallInputs")
         && state_source.contains("raw_args: Vec<Value>")
+        && state_source.contains("pub(crate) fn from_raw_args(args: Vec<Value>) -> Self")
         && state_source.contains("pub(in crate::runtime) fn into_raw_args(self) -> Vec<Value>")
-        && !state_source.contains("pub(crate) fn into_raw_args(self) -> Vec<Value>");
+        && !state_source.contains("pub(crate) fn into_raw_args(self) -> Vec<Value>")
+        && !state_source.contains("pub(crate) fn from_manifest_entry(");
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness");
@@ -6727,9 +6729,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
-            "CommittedRuntimeState",
+            "ContractRuntime",
             vec![
                 String::from("runtime/uo-evm/src/engine.rs"),
+                String::from("runtime/uo-evm/src/state.rs"),
+            ],
+        ),
+        (
+            "CommittedRuntimeState",
+            vec![
                 String::from("runtime/uo-evm/src/kernel.rs"),
                 String::from("runtime/uo-evm/src/state.rs"),
             ],
@@ -6905,8 +6913,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "ConfidentialCallInputs",
             "owner": "runtime/uo-evm/src/state.rs",
-            "boundary": "shell projects only PublicCallSummary; raw confidential args unwrap stays inside crate::runtime",
-            "checked": engine_uses_confidential_call_inputs_wrapper
+            "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime",
+            "checked": engine_keeps_confidential_call_inputs_inside_runtime
                 && state_confidential_call_inputs_wrapper_restricted
                 && kernel_confidential_call_inputs_stay_inside_runtime,
         }),
@@ -7030,8 +7038,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             theorem_public_trace_path_avoids_compiled_function,
         "engine_public_trace_uses_output_shape_only":
             engine_public_trace_uses_output_shape_only,
-        "engine_uses_confidential_call_inputs_wrapper":
-            engine_uses_confidential_call_inputs_wrapper,
+        "engine_keeps_confidential_call_inputs_inside_runtime":
+            engine_keeps_confidential_call_inputs_inside_runtime,
         "engine_uses_manifest_confidential_slot_program":
             engine_uses_manifest_confidential_slot_program,
         "engine_uses_manifest_hash_scratch_bound":
@@ -7175,7 +7183,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && controller_output_shape_uses_manifest_return_len
             && theorem_public_trace_path_avoids_compiled_function
             && engine_public_trace_uses_output_shape_only
-            && engine_uses_confidential_call_inputs_wrapper
+            && engine_keeps_confidential_call_inputs_inside_runtime
             && engine_uses_manifest_confidential_slot_program
             && engine_uses_manifest_hash_scratch_bound
             && kernel_executes_program_body_via_shared_dsl
@@ -8981,18 +8989,19 @@ directly by reading the runtime sources: it verifies that `engine.rs` does not
 call the low-level runtime object helpers, that those helpers remain
 restricted to `crate::runtime`, that `RuntimeObject` itself is not `Clone`,
 that `ContractInstance::clone` goes through the cold committed-state clone
-path, that the shell now holds an opaque `CommittedRuntimeState` handle plus a
+path, that the shell now holds an opaque `ContractRuntime` wrapper plus a
 public `PublicRuntimeShadowState` wrapper instead of directly owning raw
-runtime object maps, and that `engine.rs` no longer constructs runtime
+runtime object maps or the raw committed confidential state handle, and that
+`engine.rs` no longer constructs runtime
 phase-witness events directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
 certificates directly, no longer assembles `ExecutionTrace` directly
 beyond `runtime/uo-evm/src/theorem.rs`, and no longer clones the full call
 argument vector just to recover public theorem-trace fields; instead the
 controller path must derive a `PublicCallSummary` from the checked manifest's
-`param_names`, `secret_args`, and manifest-stored `entry_input_len`, and the
-remaining raw confidential argument vector must move into
-`ConfidentialCallInputs`, whose unwrap surface stays restricted to
+`param_names`, `secret_args`, and manifest-stored `entry_input_len`, and
+`ContractRuntime` must internalize the remaining raw confidential argument
+vector into `ConfidentialCallInputs`, whose unwrap surface stays restricted to
 `crate::runtime`; the public output-shape path must derive return length from
 manifest-stored `return_canonical_len`; the theorem-finalization path must
 avoid depending on `CompiledFunction` entirely while the public trace path

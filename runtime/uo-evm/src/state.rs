@@ -1,4 +1,4 @@
-use crate::controller::{CallRecorder, PublicCallSummary};
+use crate::controller::CallRecorder;
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
@@ -6,31 +6,19 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
 use uo_core::{
-    ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
-    RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
+    ir::StateObject, ConfidentialKernelSlotProgram, RuntimeKernelRefinementEventWitness,
+    RuntimeKernelRefinementWitness, RuntimeOramAccessCounterWitness,
+    RuntimePathOramPositionMapWitness, Value,
 };
 
 #[derive(Debug)]
-pub(crate) struct ConfidentialCallInputs {
-    public_call: PublicCallSummary,
+pub(in crate::runtime) struct ConfidentialCallInputs {
     raw_args: Vec<Value>,
 }
 
 impl ConfidentialCallInputs {
-    pub(crate) fn from_manifest_entry(
-        manifest_entry: &EntrypointManifest,
-        args: Vec<Value>,
-    ) -> Result<Self> {
-        let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, &args)?;
-        Ok(Self {
-            public_call,
-            raw_args: args,
-        })
-    }
-
-    pub(crate) fn public_call(&self) -> &PublicCallSummary {
-        &self.public_call
+    pub(crate) fn from_raw_args(args: Vec<Value>) -> Self {
+        Self { raw_args: args }
     }
 
     pub(in crate::runtime) fn into_raw_args(self) -> Vec<Value> {
@@ -39,8 +27,13 @@ impl ConfidentialCallInputs {
 }
 
 #[derive(Debug)]
-pub(crate) struct CommittedRuntimeState {
+pub(in crate::runtime) struct CommittedRuntimeState {
     objects: BTreeMap<u32, RuntimeObject>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ContractRuntime {
+    committed: CommittedRuntimeState,
 }
 
 #[derive(Debug, Default)]
@@ -68,6 +61,110 @@ impl Clone for CommittedRuntimeState {
                 .map(|(id, object)| (*id, object.clone_committed_cold()))
                 .collect(),
         }
+    }
+}
+
+impl Clone for ContractRuntime {
+    fn clone(&self) -> Self {
+        Self {
+            committed: self.committed.clone(),
+        }
+    }
+}
+
+impl ContractRuntime {
+    pub(crate) fn deploy(contract_state: &[StateObject], deploy_seed: u64) -> Result<Self> {
+        Ok(Self {
+            committed: CommittedRuntimeState::deploy(contract_state, deploy_seed)?,
+        })
+    }
+
+    pub(crate) fn ensure_cold(&self, expected_object_ids: &[u32], context: &str) -> Result<()> {
+        self.committed.ensure_cold(expected_object_ids, context)
+    }
+
+    pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
+        self.committed.witness_snapshot()
+    }
+
+    pub(crate) fn prepare_public_shadow(
+        &self,
+        kernel: &mut PublicRuntimeKernel,
+        public_object_ids: &[u32],
+    ) -> Result<PublicRuntimeShadowState> {
+        self.committed
+            .prepare_public_shadow(kernel, public_object_ids)
+    }
+
+    pub(crate) fn commit_public_shadow(
+        &self,
+        kernel: &mut PublicRuntimeKernel,
+        shadow: &mut PublicRuntimeShadowState,
+        aborted: bool,
+        recorder: &mut CallRecorder,
+    ) -> Result<()> {
+        self.committed
+            .commit_public_shadow(kernel, shadow, aborted, recorder)
+    }
+
+    pub(crate) fn run_confidential_call(
+        &mut self,
+        kernel: PublicRuntimeKernel,
+        program: &ConfidentialKernelSlotProgram,
+        shadow_load_object_ids: &[u32],
+        max_hash_part_bytes: usize,
+        args: Vec<Value>,
+        fresh_coins: Option<&PathOramFreshCoinPlan>,
+        recorder: &mut CallRecorder,
+        opcode_trace: &mut Vec<String>,
+    ) -> Result<ConfidentialCommittedCallOutcome> {
+        let call_inputs = ConfidentialCallInputs::from_raw_args(args);
+        self.committed.run_confidential_call(
+            kernel,
+            program,
+            shadow_load_object_ids,
+            max_hash_part_bytes,
+            call_inputs,
+            fresh_coins,
+            recorder,
+            opcode_trace,
+        )
+    }
+
+    pub(crate) fn replace_with_cold_public_shadow(&mut self, shadow: PublicRuntimeShadowState) {
+        self.committed.replace_with_cold_public_shadow(shadow);
+    }
+
+    pub(crate) fn finalize_runtime_kernel_refinement_witness(
+        &self,
+        runtime_kernel_refinement_witness: &mut RuntimeKernelRefinementWitness,
+        public_object_ids: &[u32],
+        context: &str,
+    ) -> Result<()> {
+        self.committed.finalize_runtime_kernel_refinement_witness(
+            runtime_kernel_refinement_witness,
+            public_object_ids,
+            context,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn objects_for_test(&self) -> &BTreeMap<u32, RuntimeObject> {
+        self.committed.objects_for_test()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn insert_object_for_test(&mut self, object_id: u32, object: RuntimeObject) {
+        self.committed.insert_object_for_test(object_id, object);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shadow_load_for_test(
+        &self,
+        kernel: &mut PublicRuntimeKernel,
+        object_ids: &[u32],
+    ) -> Result<RuntimeShadowState> {
+        self.committed.shadow_load_for_test(kernel, object_ids)
     }
 }
 
