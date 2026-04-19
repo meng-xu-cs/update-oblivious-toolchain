@@ -59,6 +59,7 @@ def RuntimeConfidentialCoreSlotAssurance
   (program : ConfidentialKernelSlotProgram)
   (modelTags : SGXModelTags) : Prop :=
   runtimeWitness.ProofGradeValid modelTags ∧
+    program.RuntimeNormalForm ∧
     ∃ kernelWitness,
       runtimeWitness.kernelWitness = some kernelWitness ∧
         kernelWitness.expectedKernelSteps = some program.expectedRuntimeKernelSteps ∧
@@ -75,7 +76,8 @@ theorem runtimeWitness_proofGradeConfidentialCoreSlotAssurance
       kernelWitness.kernelSteps = program.expectedRuntimeKernelSteps ∧
       runtimeWitness.runtimeKernelRefinementWitness = some runtimeKernelRefinementWitness ∧
       runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
-  rcases hAssured with ⟨hRuntimeValid, kernelWitness, hKernel, hExpectedSteps, hKernelSteps⟩
+  rcases hAssured with
+    ⟨hRuntimeValid, _hRuntimeNormalForm, kernelWitness, hKernel, hExpectedSteps, hKernelSteps⟩
   rcases runtimeWitness_proofGradeKernelBoundaryFacts runtimeWitness modelTags hRuntimeValid with
     ⟨kernelWitness', runtimeKernelRefinementWitness, _expectedKernelSteps,
       _expectedPublicObjectIds, _expectedKernelSchedule, hKernel', hRefinement,
@@ -104,7 +106,8 @@ theorem runtimeConfidentialCoreAssurance_slotAssurance_of_lowering
   have hStepEq :
       program.expectedRuntimeKernelSteps = slotProgram.expectedRuntimeKernelSteps := by
     exact confidentialKernelProgram_slotLowering_expectedRuntimeKernelSteps hLowering
-  refine ⟨hRuntimeValid, kernelWitness, hKernel, ?_, ?_⟩
+  refine ⟨hRuntimeValid, confidentialKernelProgram_slotLowering_runtimeNormalForm hLowering,
+    kernelWitness, hKernel, ?_, ?_⟩
   · simpa [hStepEq] using hExpectedSteps
   · simpa [hStepEq] using hKernelSteps
 
@@ -278,6 +281,7 @@ theorem runtimeShellBoundaryLoweringBundle_proofGradeAssurance
 def RuntimeShellBoundarySlotBundle.Valid
   (bundle : RuntimeShellBoundarySlotBundle) : Prop :=
   bundle.shellBoundaryBundle.Valid ∧
+    bundle.confidentialSlotProgram.RuntimeNormalForm ∧
     bundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
       some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
     bundle.shellBoundaryBundle.kernelWitness.kernelSteps =
@@ -293,7 +297,7 @@ theorem runtimeShellBoundarySlotBundle_proofGradeAssurance
     bundle.shellBoundaryBundle.kernelWitness.kernelSteps =
       bundle.confidentialSlotProgram.expectedRuntimeKernelSteps := by
   exact
-    ⟨runtimeShellBoundaryBundle_witness_refines hValid.1, hValid.2.1, hValid.2.2⟩
+    ⟨runtimeShellBoundaryBundle_witness_refines hValid.1, hValid.2.2.1, hValid.2.2.2⟩
 
 structure RuntimeConfidentialCoreShellBoundaryLoweringBundle where
   runtimeWitness : RuntimeRefinementWitness

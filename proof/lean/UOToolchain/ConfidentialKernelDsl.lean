@@ -228,6 +228,47 @@ structure ConfidentialKernelSlotProgram where
   slotCount : Nat
   body : List ConfidentialKernelSlotStatement
 
+def ConfidentialKernelSlotStatement.RuntimeNormalForm :
+  ConfidentialKernelSlotStatement → Prop
+  | .require _ => False
+  | _ => True
+
+def ConfidentialKernelSlotStatement.checkRuntimeNormalForm
+  (stmt : ConfidentialKernelSlotStatement) : Bool :=
+  match stmt with
+  | .require _ => false
+  | _ => true
+
+@[simp] theorem confidentialKernelSlotStatement_checkRuntimeNormalForm_eq_true_iff
+  (stmt : ConfidentialKernelSlotStatement) :
+  stmt.checkRuntimeNormalForm = true ↔ stmt.RuntimeNormalForm := by
+  cases stmt <;> simp [ConfidentialKernelSlotStatement.checkRuntimeNormalForm,
+    ConfidentialKernelSlotStatement.RuntimeNormalForm]
+
+def ConfidentialKernelSlotProgram.RuntimeNormalForm
+  (program : ConfidentialKernelSlotProgram) : Prop :=
+  ∀ stmt ∈ program.body, stmt.RuntimeNormalForm
+
+def ConfidentialKernelSlotProgram.checkRuntimeNormalForm
+  (program : ConfidentialKernelSlotProgram) : Bool :=
+  program.body.all ConfidentialKernelSlotStatement.checkRuntimeNormalForm
+
+@[simp] theorem confidentialKernelSlotProgram_checkRuntimeNormalForm_eq_true_iff
+  (program : ConfidentialKernelSlotProgram) :
+  program.checkRuntimeNormalForm = true ↔ program.RuntimeNormalForm := by
+  unfold ConfidentialKernelSlotProgram.checkRuntimeNormalForm
+    ConfidentialKernelSlotProgram.RuntimeNormalForm
+  rw [List.all_eq_true]
+  constructor
+  · intro h stmt hMem
+    exact
+      (confidentialKernelSlotStatement_checkRuntimeNormalForm_eq_true_iff stmt).mp
+        (h stmt hMem)
+  · intro h stmt hMem
+    exact
+      (confidentialKernelSlotStatement_checkRuntimeNormalForm_eq_true_iff stmt).mpr
+        (h stmt hMem)
+
 mutual
 
 def ConfidentialKernelSlotStatement.expectedRuntimeKernelSteps :
@@ -454,7 +495,7 @@ def confidentialKernelStatementToSlotStatement
       let slot ← confidentialKernelSlotEnvResolve env name
       pure (.assign slot (← confidentialKernelExprToSlotExpr value env), env)
   | .require cond =>
-      pure (.require (← confidentialKernelExprToSlotExpr cond env), env)
+      pure (.abortIf (← confidentialKernelExprToSlotExpr cond env), env)
   | .abortIf cond =>
       pure (.abortIf (← confidentialKernelExprToSlotExpr cond env), env)
   | .cellSet objectId value predicate =>
@@ -505,6 +546,290 @@ def confidentialKernelStatementsToSlotStatements
       let (slotRest, env'') ← confidentialKernelStatementsToSlotStatements entrypoint rest env'
       pure (slotStmt :: slotRest, env'')
 
+theorem confidentialKernelStatementToSlotStatement_runtimeNormalForm
+  (entrypoint : String)
+  (stmt : ConfidentialKernelStatement)
+  (env : ConfidentialKernelSlotEnv)
+  (slotStmt : ConfidentialKernelSlotStatement)
+  (env' : ConfidentialKernelSlotEnv)
+  (h :
+    confidentialKernelStatementToSlotStatement entrypoint stmt env =
+      .ok (slotStmt, env')) :
+  slotStmt.RuntimeNormalForm := by
+  cases stmt with
+  | declare name ty value =>
+      cases hDecl : confidentialKernelSlotEnvDeclare entrypoint env name with
+      | error err =>
+          simp [confidentialKernelStatementToSlotStatement, hDecl] at h
+          cases h
+      | ok decl =>
+          cases decl with
+          | mk slot env1 =>
+              cases hValue : confidentialKernelExprToSlotExpr value (slot, env1).snd with
+              | error err =>
+                  have hTmp := h
+                  simp [confidentialKernelStatementToSlotStatement, hDecl] at hTmp
+                  have hTmp' :
+                      (fun a => (ConfidentialKernelSlotStatement.declare slot a, env1)) <$>
+                        confidentialKernelExprToSlotExpr value env1 =
+                        Except.ok (slotStmt, env') := by
+                    simpa using hTmp
+                  have hEq : Except.error err = Except.ok (slotStmt, env') := by
+                    simpa [Functor.map, Except.map, hValue] using hTmp'
+                  cases hEq
+              | ok value' =>
+                  have hTmp := h
+                  simp [confidentialKernelStatementToSlotStatement, hDecl] at hTmp
+                  have hTmp' :
+                      (fun a => (ConfidentialKernelSlotStatement.declare slot a, env1)) <$>
+                        confidentialKernelExprToSlotExpr value env1 =
+                        Except.ok (slotStmt, env') := by
+                    simpa using hTmp
+                  have hPairEq :
+                      ConfidentialKernelSlotStatement.declare slot value' = slotStmt ∧
+                        env1 = env' := by
+                    simpa [Functor.map, Except.map, hValue] using hTmp'
+                  rcases hPairEq with ⟨hStmtEq, hEnvEq⟩
+                  subst hStmtEq
+                  subst hEnvEq
+                  trivial
+  | assign name value =>
+      cases hSlot : confidentialKernelSlotEnvResolve env name with
+      | error err =>
+          simp [confidentialKernelStatementToSlotStatement, hSlot] at h
+          cases h
+      | ok slot =>
+          cases hValue : confidentialKernelExprToSlotExpr value env with
+          | error err =>
+              simp [confidentialKernelStatementToSlotStatement, hSlot, hValue] at h
+              cases h
+          | ok value' =>
+              simp [confidentialKernelStatementToSlotStatement, hSlot, hValue] at h
+              cases h
+              trivial
+  | require cond =>
+      cases hCond : confidentialKernelExprToSlotExpr cond env with
+      | error err =>
+          simp [confidentialKernelStatementToSlotStatement, hCond] at h
+          cases h
+      | ok cond' =>
+          simp [confidentialKernelStatementToSlotStatement, hCond] at h
+          cases h
+          trivial
+  | abortIf cond =>
+      cases hCond : confidentialKernelExprToSlotExpr cond env with
+      | error err =>
+          simp [confidentialKernelStatementToSlotStatement, hCond] at h
+          cases h
+      | ok cond' =>
+          simp [confidentialKernelStatementToSlotStatement, hCond] at h
+          cases h
+          trivial
+  | cellSet objectId value predicate =>
+      cases hValue : confidentialKernelExprToSlotExpr value env with
+      | error err =>
+          cases predicate with
+          | none =>
+              simp [confidentialKernelStatementToSlotStatement, hValue] at h
+              cases h
+          | some cond =>
+              cases hCond : confidentialKernelExprToSlotExpr cond env with
+              | error err =>
+                  simp [confidentialKernelStatementToSlotStatement, hValue, hCond] at h
+                  cases h
+              | ok cond' =>
+                  simp [confidentialKernelStatementToSlotStatement, hValue, hCond] at h
+                  cases h
+      | ok value' =>
+          cases predicate with
+          | none =>
+              simp [confidentialKernelStatementToSlotStatement, hValue] at h
+              cases h
+              trivial
+          | some cond =>
+              cases hCond : confidentialKernelExprToSlotExpr cond env with
+              | error err =>
+                  simp [confidentialKernelStatementToSlotStatement, hValue, hCond] at h
+                  cases h
+              | ok cond' =>
+                  simp [confidentialKernelStatementToSlotStatement, hValue, hCond] at h
+                  cases h
+                  trivial
+  | arraySet objectId index value predicate =>
+      cases hIndex : confidentialKernelExprToSlotExpr index env with
+      | error err =>
+          cases predicate with
+          | none =>
+              simp [confidentialKernelStatementToSlotStatement, hIndex] at h
+              cases h
+          | some cond =>
+              cases hCond : confidentialKernelExprToSlotExpr cond env with
+              | error err =>
+                  simp [confidentialKernelStatementToSlotStatement, hIndex, hCond] at h
+                  cases h
+              | ok cond' =>
+                  simp [confidentialKernelStatementToSlotStatement, hIndex, hCond] at h
+                  cases h
+      | ok index' =>
+          cases hValue : confidentialKernelExprToSlotExpr value env with
+          | error err =>
+              cases predicate with
+              | none =>
+                  simp [confidentialKernelStatementToSlotStatement, hIndex, hValue] at h
+                  cases h
+              | some cond =>
+                  cases hCond : confidentialKernelExprToSlotExpr cond env with
+                  | error err =>
+                      simp [confidentialKernelStatementToSlotStatement, hIndex, hValue, hCond] at h
+                      cases h
+                  | ok cond' =>
+                      simp [confidentialKernelStatementToSlotStatement, hIndex, hValue, hCond] at h
+                      cases h
+          | ok value' =>
+              cases predicate with
+              | none =>
+                  simp [confidentialKernelStatementToSlotStatement, hIndex, hValue] at h
+                  cases h
+                  trivial
+              | some cond =>
+                  cases hCond : confidentialKernelExprToSlotExpr cond env with
+                  | error err =>
+                      simp [confidentialKernelStatementToSlotStatement, hIndex, hValue, hCond] at h
+                      cases h
+                  | ok cond' =>
+                      simp [confidentialKernelStatementToSlotStatement, hIndex, hValue, hCond] at h
+                      cases h
+                      trivial
+  | mapPut objectId key value predicate =>
+      cases hKey : confidentialKernelExprToSlotExpr key env with
+      | error err =>
+          cases predicate with
+          | none =>
+              simp [confidentialKernelStatementToSlotStatement, hKey] at h
+              cases h
+          | some cond =>
+              cases hCond : confidentialKernelExprToSlotExpr cond env with
+              | error err =>
+                  simp [confidentialKernelStatementToSlotStatement, hKey, hCond] at h
+                  cases h
+              | ok cond' =>
+                  simp [confidentialKernelStatementToSlotStatement, hKey, hCond] at h
+                  cases h
+      | ok key' =>
+          cases hValue : confidentialKernelExprToSlotExpr value env with
+          | error err =>
+              cases predicate with
+              | none =>
+                  simp [confidentialKernelStatementToSlotStatement, hKey, hValue] at h
+                  cases h
+              | some cond =>
+                  cases hCond : confidentialKernelExprToSlotExpr cond env with
+                  | error err =>
+                      simp [confidentialKernelStatementToSlotStatement, hKey, hValue, hCond] at h
+                      cases h
+                  | ok cond' =>
+                      simp [confidentialKernelStatementToSlotStatement, hKey, hValue, hCond] at h
+                      cases h
+          | ok value' =>
+              cases predicate with
+              | none =>
+                  simp [confidentialKernelStatementToSlotStatement, hKey, hValue] at h
+                  cases h
+                  trivial
+              | some cond =>
+                  cases hCond : confidentialKernelExprToSlotExpr cond env with
+                  | error err =>
+                      simp [confidentialKernelStatementToSlotStatement, hKey, hValue, hCond] at h
+                      cases h
+                  | ok cond' =>
+                      simp [confidentialKernelStatementToSlotStatement, hKey, hValue, hCond] at h
+                      cases h
+                      trivial
+  | ret value =>
+      cases value with
+      | none =>
+          simp [confidentialKernelStatementToSlotStatement] at h
+          cases h
+          trivial
+      | some expr =>
+          cases hExpr : confidentialKernelExprToSlotExpr expr env with
+          | error err =>
+              simp [confidentialKernelStatementToSlotStatement, hExpr] at h
+              cases h
+          | ok expr' =>
+              simp [confidentialKernelStatementToSlotStatement, hExpr] at h
+              cases h
+              trivial
+
+theorem confidentialKernelStatementsToSlotStatements_runtimeNormalForm
+  (entrypoint : String)
+  (stmts : List ConfidentialKernelStatement)
+  (env env' : ConfidentialKernelSlotEnv)
+  (slotBody : List ConfidentialKernelSlotStatement)
+  (h :
+    confidentialKernelStatementsToSlotStatements entrypoint stmts env =
+      .ok (slotBody, env')) :
+  slotBody.all ConfidentialKernelSlotStatement.checkRuntimeNormalForm = true := by
+  induction stmts generalizing env env' slotBody with
+  | nil =>
+      simp [confidentialKernelStatementsToSlotStatements] at h
+      cases h
+      simp
+  | cons stmt rest ih =>
+      unfold confidentialKernelStatementsToSlotStatements at h
+      cases hStmt : confidentialKernelStatementToSlotStatement entrypoint stmt env with
+      | error err =>
+          rw [hStmt] at h
+          simp at h
+          cases h
+      | ok stmtResult =>
+          cases stmtResult with
+          | mk slotStmt env1 =>
+              cases hRest :
+                  confidentialKernelStatementsToSlotStatements entrypoint rest env1 with
+              | error err =>
+                  have hTmp := h
+                  simp [confidentialKernelStatementsToSlotStatements, hStmt] at hTmp
+                  have hTmp' :
+                      (fun a => (slotStmt :: a.fst, a.snd)) <$>
+                        confidentialKernelStatementsToSlotStatements entrypoint rest env1 =
+                        Except.ok (slotBody, env') := by
+                    simpa using hTmp
+                  have hEq : Except.error err = Except.ok (slotBody, env') := by
+                    simpa [Functor.map, Except.map, hRest] using hTmp'
+                  cases hEq
+              | ok restResult =>
+                  cases restResult with
+                  | mk restBody env2 =>
+                      have hTmp := h
+                      simp [confidentialKernelStatementsToSlotStatements, hStmt] at hTmp
+                      have hTmp' :
+                          (fun a => (slotStmt :: a.fst, a.snd)) <$>
+                            confidentialKernelStatementsToSlotStatements entrypoint rest env1 =
+                            Except.ok (slotBody, env') := by
+                        simpa using hTmp
+                      have hPairEq :
+                          slotStmt :: restBody = slotBody ∧ env2 = env' := by
+                        simpa [Functor.map, Except.map, hRest] using hTmp'
+                      rcases hPairEq with ⟨hBody, hEnv⟩
+                      subst hBody
+                      subst hEnv
+                      have hStmtNormal :
+                          slotStmt.RuntimeNormalForm := by
+                        exact
+                          confidentialKernelStatementToSlotStatement_runtimeNormalForm
+                            entrypoint stmt env slotStmt env1 hStmt
+                      have hStmtCheck :
+                          slotStmt.checkRuntimeNormalForm = true := by
+                        exact
+                          (confidentialKernelSlotStatement_checkRuntimeNormalForm_eq_true_iff slotStmt).mpr
+                            hStmtNormal
+                      have hRestNormal :
+                          restBody.all ConfidentialKernelSlotStatement.checkRuntimeNormalForm = true := by
+                        exact
+                          ih env1 env2 restBody hRest
+                      simp [hStmtCheck, hRestNormal]
+
 def ConfidentialKernelProgram.toConfidentialKernelSlotProgram?
   (program : ConfidentialKernelProgram) : Except String ConfidentialKernelSlotProgram := do
   let env ← confidentialKernelParamsToSlotEnv program.entrypointId program.params
@@ -523,6 +848,86 @@ def ConfidentialKernelProgram.SlotLoweringMatches
   (program : ConfidentialKernelProgram)
   (slotProgram : ConfidentialKernelSlotProgram) : Prop :=
   program.toConfidentialKernelSlotProgram? = .ok slotProgram
+
+theorem confidentialKernelProgram_toConfidentialKernelSlotProgram_runtimeNormalForm
+  (program : ConfidentialKernelProgram)
+  {slotProgram : ConfidentialKernelSlotProgram}
+  (h : program.toConfidentialKernelSlotProgram? = .ok slotProgram) :
+  slotProgram.RuntimeNormalForm := by
+  unfold ConfidentialKernelProgram.toConfidentialKernelSlotProgram? at h
+  cases hEnv : confidentialKernelParamsToSlotEnv program.entrypointId program.params with
+  | error err =>
+      simp [hEnv] at h
+      cases h
+  | ok env =>
+      cases hBody :
+          confidentialKernelStatementsToSlotStatements program.entrypointId program.body env with
+      | error err =>
+          have hTmp := h
+          simp [ConfidentialKernelProgram.toConfidentialKernelSlotProgram?, hEnv] at hTmp
+          have hTmp' :
+              (fun a =>
+                    { entrypointId := program.entrypointId
+                    , paramCount := program.params.length
+                    , returnType := program.returnType
+                    , secretArgs := program.secretArgs
+                    , slotCount := List.length a.snd
+                    , body := a.fst
+                    }) <$>
+                confidentialKernelStatementsToSlotStatements program.entrypointId program.body env =
+                Except.ok slotProgram := by
+            simpa using hTmp
+          have hEq : Except.error err = Except.ok slotProgram := by
+            simpa [Functor.map, Except.map, hBody] using hTmp'
+          cases hEq
+      | ok bodyResult =>
+          cases bodyResult with
+          | mk body env' =>
+              have hTmp := h
+              simp [ConfidentialKernelProgram.toConfidentialKernelSlotProgram?, hEnv] at hTmp
+              have hTmp' :
+                  (fun a =>
+                        { entrypointId := program.entrypointId
+                        , paramCount := program.params.length
+                        , returnType := program.returnType
+                        , secretArgs := program.secretArgs
+                        , slotCount := List.length a.snd
+                        , body := a.fst
+                        }) <$>
+                    confidentialKernelStatementsToSlotStatements program.entrypointId program.body env =
+                    Except.ok slotProgram := by
+                simpa using hTmp
+              have hProgramEq :
+                  { entrypointId := program.entrypointId
+                  , paramCount := program.params.length
+                  , returnType := program.returnType
+                  , secretArgs := program.secretArgs
+                  , slotCount := env'.length
+                  , body := body
+                  } = slotProgram := by
+                simpa [Functor.map, Except.map, hBody] using hTmp'
+              cases hProgramEq
+              unfold ConfidentialKernelSlotProgram.RuntimeNormalForm
+              have hBodyNormal :
+                  body.all ConfidentialKernelSlotStatement.checkRuntimeNormalForm = true := by
+                exact
+                  confidentialKernelStatementsToSlotStatements_runtimeNormalForm
+                    program.entrypointId program.body env env' body hBody
+              rw [List.all_eq_true] at hBodyNormal
+              intro stmt hMem
+              exact
+                (confidentialKernelSlotStatement_checkRuntimeNormalForm_eq_true_iff stmt).mp
+                  (hBodyNormal stmt hMem)
+
+theorem confidentialKernelProgram_slotLowering_runtimeNormalForm
+  {program : ConfidentialKernelProgram}
+  {slotProgram : ConfidentialKernelSlotProgram}
+  (h : program.SlotLoweringMatches slotProgram) :
+  slotProgram.RuntimeNormalForm := by
+  unfold ConfidentialKernelProgram.SlotLoweringMatches at h
+  exact
+    confidentialKernelProgram_toConfidentialKernelSlotProgram_runtimeNormalForm
+      program h
 
 mutual
 
@@ -1191,6 +1596,7 @@ structure RuntimeKernelSlotDslBundle where
 def RuntimeKernelSlotDslBundle.Valid
   (bundle : RuntimeKernelSlotDslBundle) : Prop :=
   bundle.kernelWitness.ProofGradeValid bundle.confidentialProgram.entrypointId ∧
+    bundle.confidentialProgram.RuntimeNormalForm ∧
     bundle.kernelWitness.expectedKernelSteps =
       some bundle.confidentialProgram.expectedRuntimeKernelSteps ∧
     bundle.kernelWitness.kernelSteps =
@@ -1203,7 +1609,13 @@ theorem runtimeKernelSlotDslBundle_schedule_exact
       some bundle.confidentialProgram.expectedRuntimeKernelSteps ∧
     bundle.kernelWitness.kernelSteps =
       bundle.confidentialProgram.expectedRuntimeKernelSteps := by
-  exact hValid.2
+  exact hValid.2.2
+
+theorem runtimeKernelSlotDslBundle_runtimeNormalForm
+  {bundle : RuntimeKernelSlotDslBundle}
+  (hValid : bundle.Valid) :
+  bundle.confidentialProgram.RuntimeNormalForm := by
+  exact hValid.2.1
 
 theorem runtimeKernelSlotDslBundle_entrypoint_exact
   {bundle : RuntimeKernelSlotDslBundle}

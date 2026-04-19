@@ -232,6 +232,10 @@ The first implementation step is now present in the codebase:
 - that modeled final state now also exposes the exact public object-id schedule
   induced by the admitted `{ opcode, object_id? }` trace, so the proof-grade
   boundary fixes both successful replay and the resulting public object-order
+- the runtime phase witness now also has a first-class theorem-facing
+  refinement relation to that finished Lean kernel state, so the remaining
+  proof gap is no longer "define the relation" but "prove the real runtime
+  implementation always emits witnesses honest to that relation"
 - the runtime now also emits a lower-level
   `RuntimeKernelRefinementWitness` under the public kernel witness: it records
   the concrete runtime phase order `pre-committed-cold objects* -> Begin ->
@@ -256,6 +260,10 @@ The first implementation step is now present in the codebase:
   kernel-op/object bounds, and the remaining public shell-side commit /
   witness helper lists start from explicit `Vec::with_capacity(...)` bounds
   rather than plain `Vec::new()`
+- the runtime phase witness commit/cold-store windows now also append through
+  shared `uo-core` phase-aware helpers plus a bounded runtime-phase journal
+  wrapper, so `kernel.rs` / `state.rs` no longer extend those witness tails by
+  mutating raw event vectors directly
 - live Path-ORAM stash state now also carries one public
   `working_stash_capacity(...)` bound, is rebuilt with that headroom up front,
   preserved across cold commits with `.clear()`, and checked before use so the

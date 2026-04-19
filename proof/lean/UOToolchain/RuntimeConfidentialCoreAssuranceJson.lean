@@ -315,7 +315,7 @@ theorem importedWitness_toRuntimeWitness_proofGradeConfidentialCoreSlotAssurance
         kernelWitness.toRuntimeKernelWitness.kernelSteps =
           program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
     exact importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact hDslValid
-  refine ⟨hRuntimeProofGrade, ?_⟩
+  refine ⟨hRuntimeProofGrade, importedRuntimeKernelSlotDslBundle_runtimeNormalForm hDslValid, ?_⟩
   exact
     ⟨kernelWitness.toRuntimeKernelWitness,
       by simp [ImportedRuntimeRefinementWitness.toRuntimeWitness, hKernel],

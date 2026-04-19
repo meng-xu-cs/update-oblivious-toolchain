@@ -2095,69 +2095,7 @@ enum RuntimeKernelRefinementPhase {
 }
 
 impl RuntimeKernelRefinementWitness {
-    pub fn projected_kernel_schedule(&self) -> RuntimeKernelScheduleWitness {
-        let steps = self
-            .events
-            .iter()
-            .filter_map(RuntimeKernelRefinementEventWitness::projected_kernel_step)
-            .collect::<Vec<_>>();
-        RuntimeKernelScheduleWitness {
-            opcodes: steps
-                .iter()
-                .map(RuntimeKernelStepWitness::projected_opcode)
-                .collect(),
-            steps,
-        }
-    }
-
-    pub fn shadow_load_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::ShadowLoadObject)
-            .filter_map(|event| event.object_id)
-            .collect()
-    }
-
-    pub fn pre_committed_cold_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| {
-                event.kind == RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject
-            })
-            .filter_map(|event| event.object_id)
-            .collect()
-    }
-
-    pub fn commit_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::CommitObject)
-            .filter_map(|event| event.object_id)
-            .collect()
-    }
-
-    pub fn cold_store_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::ColdStoreObject)
-            .filter_map(|event| event.object_id)
-            .collect()
-    }
-
-    pub fn post_committed_cold_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| {
-                event.kind == RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject
-            })
-            .filter_map(|event| event.object_id)
-            .collect()
-    }
-
-    pub fn validate_with_kernel_witness(
-        &self,
-        kernel_witness: &RuntimeKernelWitness,
-    ) -> Result<(), RuntimeKernelRefinementWitnessError> {
+    fn replay_phase(&self) -> Result<RuntimeKernelRefinementPhase, RuntimeKernelRefinementWitnessError> {
         let mut phase = RuntimeKernelRefinementPhase::BeforeBegin;
         for event in &self.events {
             event.validate_shape()?;
@@ -2284,6 +2222,114 @@ impl RuntimeKernelRefinementWitness {
                 }
             }
         }
+        Ok(phase)
+    }
+
+    pub fn append_commit_object_schedule<I>(&mut self, object_ids: I) -> Result<(), RuntimeKernelRefinementWitnessError>
+    where
+        I: IntoIterator<Item = u32>,
+    {
+        if self.replay_phase()? != RuntimeKernelRefinementPhase::CommitObjectWindow {
+            return Err(RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                witnessed: self.events.clone(),
+            });
+        }
+        self.events.extend(
+            object_ids
+                .into_iter()
+                .map(RuntimeKernelRefinementEventWitness::commit_object),
+        );
+        Ok(())
+    }
+
+    pub fn append_cold_store_window(
+        &mut self,
+        public_object_ids: &[u32],
+    ) -> Result<(), RuntimeKernelRefinementWitnessError> {
+        if self.replay_phase()? != RuntimeKernelRefinementPhase::AfterWipe {
+            return Err(RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                witnessed: self.events.clone(),
+            });
+        }
+        let cold_stored_object_ids = self.shadow_load_object_schedule();
+        self.events.extend(
+            cold_stored_object_ids
+                .into_iter()
+                .map(RuntimeKernelRefinementEventWitness::cold_store_object),
+        );
+        self.events.extend(
+            public_object_ids
+                .iter()
+                .copied()
+                .map(RuntimeKernelRefinementEventWitness::post_committed_cold_object),
+        );
+        Ok(())
+    }
+
+    pub fn projected_kernel_schedule(&self) -> RuntimeKernelScheduleWitness {
+        let steps = self
+            .events
+            .iter()
+            .filter_map(RuntimeKernelRefinementEventWitness::projected_kernel_step)
+            .collect::<Vec<_>>();
+        RuntimeKernelScheduleWitness {
+            opcodes: steps
+                .iter()
+                .map(RuntimeKernelStepWitness::projected_opcode)
+                .collect(),
+            steps,
+        }
+    }
+
+    pub fn shadow_load_object_schedule(&self) -> Vec<u32> {
+        self.events
+            .iter()
+            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::ShadowLoadObject)
+            .filter_map(|event| event.object_id)
+            .collect()
+    }
+
+    pub fn pre_committed_cold_object_schedule(&self) -> Vec<u32> {
+        self.events
+            .iter()
+            .filter(|event| {
+                event.kind == RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject
+            })
+            .filter_map(|event| event.object_id)
+            .collect()
+    }
+
+    pub fn commit_object_schedule(&self) -> Vec<u32> {
+        self.events
+            .iter()
+            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::CommitObject)
+            .filter_map(|event| event.object_id)
+            .collect()
+    }
+
+    pub fn cold_store_object_schedule(&self) -> Vec<u32> {
+        self.events
+            .iter()
+            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::ColdStoreObject)
+            .filter_map(|event| event.object_id)
+            .collect()
+    }
+
+    pub fn post_committed_cold_object_schedule(&self) -> Vec<u32> {
+        self.events
+            .iter()
+            .filter(|event| {
+                event.kind == RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject
+            })
+            .filter_map(|event| event.object_id)
+            .collect()
+    }
+
+    pub fn validate_with_kernel_witness(
+        &self,
+        kernel_witness: &RuntimeKernelWitness,
+    ) -> Result<(), RuntimeKernelRefinementWitnessError> {
+        let phase = self.replay_phase()?;
         if !matches!(
             phase,
             RuntimeKernelRefinementPhase::AfterWipe
@@ -4541,6 +4587,66 @@ mod tests {
         assert_eq!(
             refinement_witness.projected_kernel_schedule(),
             kernel_witness.emitted_kernel_schedule()
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_refinement_witness_append_commit_object_schedule_requires_commit_window() {
+        let mut refinement_witness = RuntimeKernelRefinementWitness {
+            events: vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            ],
+        };
+        assert_eq!(
+            refinement_witness
+                .append_commit_object_schedule(vec![7])
+                .unwrap_err(),
+            RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                witnessed: refinement_witness.events.clone(),
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_refinement_witness_append_cold_store_window_completes_tail() {
+        let mut refinement_witness = RuntimeKernelRefinementWitness {
+            events: vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+            ],
+        };
+        refinement_witness.append_cold_store_window(&[7]).unwrap();
+        assert_eq!(
+            refinement_witness,
+            sample_runtime_kernel_refinement_witness()
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_refinement_witness_append_cold_store_window_requires_after_wipe() {
+        let mut refinement_witness = RuntimeKernelRefinementWitness {
+            events: vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+            ],
+        };
+        assert_eq!(
+            refinement_witness
+                .append_cold_store_window(&[7])
+                .unwrap_err(),
+            RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                witnessed: refinement_witness.events.clone(),
+            }
         );
     }
 

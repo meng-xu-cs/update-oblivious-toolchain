@@ -31,7 +31,10 @@ The repository has not yet closed the scientifically strongest end-to-end
 story. The remaining gaps are:
 
 - there is not yet a machine-checked theorem that the real Rust kernel
-  implementation refines the Lean kernel model
+  implementation refines the Lean kernel model; the repo now has an explicit
+  witness-to-finished-Lean-state refinement relation, but not yet an
+  honesty-by-construction theorem connecting the actual Rust states to that
+  relation
 - there is not yet a machine-checked theorem that all secret-dependent runtime
   behavior is confined to that kernel
 - there is not yet a source-to-kernel compiler correctness theorem for the
@@ -235,15 +238,17 @@ Primary files:
 
 Concrete tasks:
 
-1. Remaining: define the formal refinement relation between Rust kernel states
-   and Lean kernel states.
+1. Completed on April 19, 2026: define the theorem-facing refinement relation
+   from the proof-grade runtime phase witness and kernel witness to one exact
+   finished Lean `RuntimeKernelSchedule` state, including exact schedule,
+   resource-state, and boundary/public-object projections.
 2. Remaining: prove witness honesty by construction, not merely by post hoc
    checking.
-3. Substantially completed in the current proof-grade path: trusted-kernel
-   bundles and runtime-kernel refinement witnesses already have exactness
-   theorems for schedule, public-object universe, resource state, and boundary
-   projections; the remaining gap is to tie those proof-grade witness objects
-   to a formal Rust-state refinement relation.
+3. Completed in the current proof-grade path: trusted-kernel bundles and
+   runtime-kernel refinement witnesses now have exactness theorems for
+   schedule, public-object universe, resource state, and boundary projections,
+   and those proof-grade witness objects are packaged by an explicit Lean
+   refinement relation on both the native and imported-JSON sides.
 4. Completed in the current proof-grade path: the shell-boundary theorem
    proves that the non-kernel shell refines a public contract over admitted
    public data, and the proof stack now packages the exact schedule /

@@ -718,9 +718,11 @@ theorem. Remaining gaps include:
 - the Lean side now threads the kernel witness through the theorem-side
   runtime refinement witness and trusted-kernel bundle, and it also checks
   exact kernel-op equality plus exact public kernel-step equality when the
-  runtime exports the artifact-side expected kernel witness; what remains open
-  is proving the real runtime kernel implementation or the full
-  runtime-to-observer refinement rather than only validating emitted witnesses
+  runtime exports the artifact-side expected kernel witness; the theorem side
+  now also packages an explicit relation from that runtime phase witness to one
+  exact finished Lean kernel state, so what remains open is proving the real
+  runtime kernel implementation or the full runtime-to-observer refinement
+  rather than only validating emitted witnesses
 - the new lower-level runtime phase witness is still a schedule-level
   certificate, not yet a full small-kernel operational semantics for every
   live plaintext buffer and helper-state transition inside the runtime; it
@@ -755,7 +757,7 @@ These are the revived and still-valid instructions for the stronger story.
 
 ### 1. Keep the kernel ABI small and auditable
 
-Status: started.
+Status: completed on April 19, 2026 for the current confidential kernel ABI.
 
 The confidential operation vocabulary should stay limited to:
 
@@ -789,7 +791,7 @@ paths outside the kernel.
 
 ### 3. Export a checkable kernel-discipline witness
 
-Status: started.
+Status: completed on April 19, 2026.
 
 The runtime now emits a compact witness stating:
 
@@ -829,6 +831,9 @@ That witness is now in the proof-facing boundary:
   finished small-kernel state under the modeled semantics while the emitted
   public resource-event trace replays to the exact claimed stack/scratch
   summary
+- the runtime-side commit-object and cold-store/post-committed witness tails
+  are now also routed through shared phase-aware helper methods rather than
+  open-coded raw event-vector extension in the runtime modules
 
 What remains open is to strengthen that bridge further:
 
@@ -836,6 +841,9 @@ What remains open is to strengthen that bridge further:
 - prove that the real runtime/refinement path always emits the admitted
   proof-grade witness and online schedule object, rather than only validating
   the emitted artifact after the fact
+- keep the new theorem-facing runtime-phase-to-Lean-state refinement relation
+  aligned with any future kernel/state-model tightening so the proof interface
+  continues to speak about one exact finished small-kernel execution
 
 ### 4. Connect the real runtime to the SGX observer by refinement
 

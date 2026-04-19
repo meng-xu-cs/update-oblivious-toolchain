@@ -3669,6 +3669,25 @@ def RuntimeKernelWitness.checkProofGradeForEntrypoint
       RuntimeKernelWitness.ProofGradeValid,
       hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds]
 
+theorem runtimeKernelWitness_proofGradeValid_self
+  {witness : RuntimeKernelWitness}
+  {entrypointId : String}
+  (hValid : witness.ProofGradeValid entrypointId) :
+  witness.ProofGradeValid witness.entrypointId := by
+  rcases hValid with ⟨hWitnessValid, hProofGradeShape⟩
+  rcases hWitnessValid with
+    ⟨hEntrypoint, hScratch, hPeakStack, hValuePeak, hHashPeak, hIoPeak,
+      hValueEnd, hValueWipe, hHashEnd, hHashWipe, hIoEnd, hIoWipe, hReplay,
+      hOpcodesAllowed, hShape, hOpcodeMatch, hEnvelope, hCompletion,
+      hExpectedOpcodes, hExpectedSteps, hPublicShape, hExpectedPublic, hUniverse⟩
+  refine ⟨?_, hProofGradeShape⟩
+  subst hEntrypoint
+  exact
+    ⟨rfl, hScratch, hPeakStack, hValuePeak, hHashPeak, hIoPeak, hValueEnd, hValueWipe,
+      hHashEnd, hHashWipe, hIoEnd, hIoWipe, hReplay, hOpcodesAllowed, hShape,
+      hOpcodeMatch, hEnvelope, hCompletion, hExpectedOpcodes, hExpectedSteps,
+      hPublicShape, hExpectedPublic, hUniverse⟩
+
 theorem runtimeKernelWitness_valid_replayedResourceState_exact
   {witness : RuntimeKernelWitness}
   {entrypointId : String}
@@ -4082,6 +4101,83 @@ def RuntimeKernelRefinementWitness.checkValid
   witness.checkValid kernelWitness = true ↔ witness.Valid kernelWitness := by
   simp [RuntimeKernelRefinementWitness.checkValid, RuntimeKernelRefinementWitness.Valid,
     RuntimeKernelRefinementWitness.phaseTerminates, and_assoc]
+
+def RuntimeKernelRefinementWitness.RefinesLeanKernelState
+  (runtimeKernelRefinementWitness : RuntimeKernelRefinementWitness)
+  (kernelWitness : RuntimeKernelWitness) : Prop :=
+  ∃ expectedKernelSchedule,
+    kernelWitness.ProofGradeValid kernelWitness.entrypointId ∧
+      runtimeKernelRefinementWitness.Valid kernelWitness ∧
+      kernelWitness.replayedResourceState? = some kernelWitness.claimedResourceState ∧
+      kernelWitness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      kernelWitness.emittedKernelSchedule = expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? =
+        some
+          { phase := .finished
+          , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
+          } ∧
+      runtimeKernelRefinementWitness.projectedKernelSchedule =
+        kernelWitness.emittedKernelSchedule ∧
+      runtimeKernelRefinementWitness.preCommittedColdObjectSchedule =
+        kernelWitness.publicObjectIds ∧
+      runtimeKernelRefinementWitness.postCommittedColdObjectSchedule =
+        kernelWitness.publicObjectIds ∧
+      runtimeKernelRefinementWitness.shadowLoadObjectSchedule =
+        kernelWitness.canonicalLoadedObjectSchedule ∧
+      runtimeKernelRefinementWitness.commitObjectSchedule =
+        kernelWitness.canonicalLoadedObjectSchedule ∧
+      runtimeKernelRefinementWitness.coldStoreObjectSchedule =
+        kernelWitness.canonicalLoadedObjectSchedule
+
+theorem runtimeKernelRefinementWitness_refinesLeanKernelState_of_proofGrade
+  {runtimeKernelRefinementWitness : RuntimeKernelRefinementWitness}
+  {kernelWitness : RuntimeKernelWitness}
+  (hKernel : kernelWitness.ProofGradeValid kernelWitness.entrypointId)
+  (hRefinement : runtimeKernelRefinementWitness.Valid kernelWitness) :
+  runtimeKernelRefinementWitness.RefinesLeanKernelState kernelWitness := by
+  have hWitnessValid := hRefinement
+  rcases runtimeKernelWitness_proofGradeKernelScheduleObject_exact hKernel with
+    ⟨expectedKernelSchedule, hExpectedKernelSchedule, hEmittedKernelSchedule⟩
+  have hResourceState :
+      kernelWitness.replayedResourceState? = some kernelWitness.claimedResourceState :=
+    runtimeKernelWitness_proofGradeResourceState_exact hKernel
+  have hFinalStateExact :
+      expectedKernelSchedule.finalState? =
+        some
+          { phase := .finished
+          , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
+          } := by
+    rcases runtimeKernelWitness_proofGradeExpectedKernelSchedule_finalState_exact hKernel with
+      ⟨expectedKernelSchedule', hExpectedKernelSchedule', hFinalStateExact⟩
+    have hExpectedKernelScheduleEq : expectedKernelSchedule = expectedKernelSchedule' := by
+      apply Option.some.inj
+      calc
+        some expectedKernelSchedule = kernelWitness.expectedKernelSchedule? := by
+          symm
+          exact hExpectedKernelSchedule
+        _ = some expectedKernelSchedule' := hExpectedKernelSchedule'
+    cases hExpectedKernelScheduleEq
+    exact hFinalStateExact
+  rcases hRefinement with
+    ⟨_hShape, _hTerminates, hProjectedKernelSchedule, hPreCommittedCold,
+      hPostCommittedCold, hShadowEqualsCommit, hShadowEqualsColdStore,
+      hShadowEqualsCanonical, _hCoverage⟩
+  refine
+    ⟨expectedKernelSchedule, hKernel, hWitnessValid, hResourceState, hExpectedKernelSchedule,
+      hEmittedKernelSchedule, hFinalStateExact, hProjectedKernelSchedule,
+      hPreCommittedCold, hPostCommittedCold, hShadowEqualsCanonical, ?_, ?_⟩
+  · calc
+      runtimeKernelRefinementWitness.commitObjectSchedule =
+          runtimeKernelRefinementWitness.shadowLoadObjectSchedule := by
+            symm
+            exact hShadowEqualsCommit
+      _ = kernelWitness.canonicalLoadedObjectSchedule := hShadowEqualsCanonical
+  · calc
+      runtimeKernelRefinementWitness.coldStoreObjectSchedule =
+          runtimeKernelRefinementWitness.shadowLoadObjectSchedule := by
+            symm
+            exact hShadowEqualsColdStore
+      _ = kernelWitness.canonicalLoadedObjectSchedule := hShadowEqualsCanonical
 
 structure RuntimeRefinementWitness where
   trace : Trace
@@ -4692,6 +4788,45 @@ theorem runtimeWitness_proofGradeRuntimeKernelRefinementBoundaryExact
           exact
             ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
               hRefinementValid.2.2.2.1, hRefinementValid.2.2.2.2.1⟩
+
+theorem runtimeWitness_proofGradeKernelStateRefinement
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness runtimeKernelRefinementWitness,
+    witness.kernelWitness = some kernelWitness ∧
+      witness.runtimeKernelRefinementWitness = some runtimeKernelRefinementWitness ∧
+      runtimeKernelRefinementWitness.RefinesLeanKernelState kernelWitness := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid :=
+    runtimeWitness_proofGradeKernelWitness_valid witness modelTags hValid
+  have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid :=
+    runtimeWitness_proofGradeRuntimeKernelRefinementWitness_valid witness modelTags hValid
+  cases hKernel : witness.kernelWitness with
+  | none =>
+      cases hRefinement : witness.runtimeKernelRefinementWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+      | some runtimeKernelRefinementWitness =>
+          simp [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      cases hRefinement : witness.runtimeKernelRefinementWitness with
+      | none =>
+          simp [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+          have hProofGrade :
+              kernelWitness.ProofGradeValid witness.publicOutcome.entrypointId := by
+            simpa [RuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using hKernelValid
+          have hProofGradeSelf :
+              kernelWitness.ProofGradeValid kernelWitness.entrypointId :=
+            runtimeKernelWitness_proofGradeValid_self hProofGrade
+          have hWitnessValid : runtimeKernelRefinementWitness.Valid kernelWitness := by
+            simpa [RuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+              hKernel, hRefinement] using hRefinementValid
+          exact
+            ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
+              runtimeKernelRefinementWitness_refinesLeanKernelState_of_proofGrade
+                hProofGradeSelf hWitnessValid⟩
 
 theorem runtimeWitness_proofGradeKernelScheduleObject_exact
   (witness : RuntimeRefinementWitness)

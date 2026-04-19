@@ -424,6 +424,12 @@ impl ConfidentialKernelSlotProgram {
         ]);
         steps
     }
+
+    pub fn is_runtime_normal_form(&self) -> bool {
+        self.body
+            .iter()
+            .all(ConfidentialKernelSlotStatement::is_runtime_normal_form)
+    }
 }
 
 impl ConfidentialKernelStatement {
@@ -510,6 +516,10 @@ impl ConfidentialKernelStatement {
 }
 
 impl ConfidentialKernelSlotStatement {
+    pub fn is_runtime_normal_form(&self) -> bool {
+        !matches!(self, Self::Require { .. })
+    }
+
     pub fn trace_name(&self) -> &'static str {
         match self {
             Self::Declare { .. } => "declare",
@@ -1018,7 +1028,7 @@ impl ConfidentialKernelStatement {
                 slot: layout.resolve(name)?,
                 value: value.to_slot_expr(layout)?,
             }),
-            Self::Require { cond } => Ok(ConfidentialKernelSlotStatement::Require {
+            Self::Require { cond } => Ok(ConfidentialKernelSlotStatement::AbortIf {
                 cond: cond.to_slot_expr(layout)?,
             }),
             Self::AbortIf { cond } => Ok(ConfidentialKernelSlotStatement::AbortIf {
@@ -1552,6 +1562,34 @@ mod tests {
         assert!(matches!(
             err,
             ConfidentialKernelSlotLoweringError::UnknownVariable { .. }
+        ));
+    }
+
+    #[test]
+    fn confidential_kernel_slot_program_normalizes_require_to_abort_if() {
+        let function = CompiledFunction {
+            signature: "guard(uint256)".into(),
+            params: vec![("arg".into(), uint_type())],
+            return_type: None,
+            body: vec![Statement::Require {
+                cond: Expr::Var("arg".into()),
+            }],
+            secret_args: vec![0],
+            confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
+        };
+
+        let slot = function
+            .confidential_kernel_program()
+            .unwrap()
+            .to_slot_program()
+            .unwrap();
+
+        assert!(slot.is_runtime_normal_form());
+        assert!(matches!(
+            slot.body.as_slice(),
+            [ConfidentialKernelSlotStatement::AbortIf { .. }]
         ));
     }
 

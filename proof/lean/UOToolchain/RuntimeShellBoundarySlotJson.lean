@@ -74,16 +74,20 @@ theorem importedRuntimeShellBoundarySlotBundle_toRuntimeValid
         bundle.shell_boundary_bundle.kernel_witness.toRuntimeKernelWitness.kernelSteps =
           bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
     exact importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact hValid.2
+  have hRuntimeNormalForm :
+      bundle.confidential_slot_program.toConfidentialKernelSlotProgram.RuntimeNormalForm := by
+    exact importedRuntimeKernelSlotDslBundle_runtimeNormalForm hValid.2
   unfold ImportedRuntimeShellBoundarySlotBundle.toRuntimeShellBoundarySlotBundle
     RuntimeShellBoundarySlotBundle.Valid
   simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle] using
     (show
       bundle.shell_boundary_bundle.toRuntimeShellBoundaryBundle.Valid ∧
+        bundle.confidential_slot_program.toConfidentialKernelSlotProgram.RuntimeNormalForm ∧
         bundle.shell_boundary_bundle.toRuntimeShellBoundaryBundle.kernelWitness.expectedKernelSteps =
           some bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps ∧
         bundle.shell_boundary_bundle.toRuntimeShellBoundaryBundle.kernelWitness.kernelSteps =
           bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps from
-      ⟨hShell, hSlot.1, hSlot.2⟩)
+      ⟨hShell, hRuntimeNormalForm, hSlot.1, hSlot.2⟩)
 
 def parseImportedRuntimeShellBoundarySlotBundle
   (input : String) : Except String ImportedRuntimeShellBoundarySlotBundle := do

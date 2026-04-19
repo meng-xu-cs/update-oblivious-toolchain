@@ -987,6 +987,21 @@ def ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram
   , body := program.body.map ImportedConfidentialKernelSlotStatement.toConfidentialKernelSlotStatement
   }
 
+def ImportedConfidentialKernelSlotProgram.RuntimeNormalForm
+  (program : ImportedConfidentialKernelSlotProgram) : Prop :=
+  program.toConfidentialKernelSlotProgram.RuntimeNormalForm
+
+def ImportedConfidentialKernelSlotProgram.checkRuntimeNormalForm
+  (program : ImportedConfidentialKernelSlotProgram) : Bool :=
+  program.toConfidentialKernelSlotProgram.checkRuntimeNormalForm
+
+@[simp] theorem importedConfidentialKernelSlotProgram_checkRuntimeNormalForm_eq_true_iff
+  (program : ImportedConfidentialKernelSlotProgram) :
+  program.checkRuntimeNormalForm = true ↔ program.RuntimeNormalForm := by
+  unfold ImportedConfidentialKernelSlotProgram.checkRuntimeNormalForm
+    ImportedConfidentialKernelSlotProgram.RuntimeNormalForm
+  simp [confidentialKernelSlotProgram_checkRuntimeNormalForm_eq_true_iff]
+
 abbrev ImportedConfidentialKernelSlotEnv := List (String × Nat)
 
 private def importedConfidentialKernelSlotEnvResolve
@@ -1115,7 +1130,7 @@ private def importedConfidentialKernelStatementToSlotStatement
       let slot ← importedConfidentialKernelSlotEnvResolve env name
       pure (.assign slot (← importedConfidentialKernelExprToSlotExpr value env), env)
   | .require cond =>
-      pure (.require (← importedConfidentialKernelExprToSlotExpr cond env), env)
+      pure (.abortIf (← importedConfidentialKernelExprToSlotExpr cond env), env)
   | .abortIf cond =>
       pure (.abortIf (← importedConfidentialKernelExprToSlotExpr cond env), env)
   | .cellSet objectId value predicate =>
@@ -1970,8 +1985,8 @@ theorem importedConfidentialKernelStatementToSlotStatement_toRuntime
           (toMid := ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr)
           (toOut := importedConfidentialKernelStatementResultToRuntime)
           (source := importedConfidentialKernelExprToSlotExpr cond env)
-          (fRuntime := fun cond' => (ConfidentialKernelSlotStatement.require cond', env))
-          (fImported := fun cond' => (ImportedConfidentialKernelSlotStatement.require cond', env))
+          (fRuntime := fun cond' => (ConfidentialKernelSlotStatement.abortIf cond', env))
+          (fImported := fun cond' => (ImportedConfidentialKernelSlotStatement.abortIf cond', env))
           (by
             intro cond'
             rfl)
@@ -2397,6 +2412,17 @@ theorem importedConfidentialKernelProgram_slotLowering_ok_toRuntime
   simpa [h, ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram] using
     importedConfidentialKernelProgram_toConfidentialKernelSlotProgram_toRuntime program
 
+theorem importedConfidentialKernelProgram_slotLowering_ok_runtimeNormalForm
+  {program : ImportedConfidentialKernelProgram}
+  {slotProgram : ImportedConfidentialKernelSlotProgram}
+  (h : program.toConfidentialKernelSlotProgram? = .ok slotProgram) :
+  slotProgram.RuntimeNormalForm := by
+  unfold ImportedConfidentialKernelSlotProgram.RuntimeNormalForm
+  exact
+    confidentialKernelProgram_toConfidentialKernelSlotProgram_runtimeNormalForm
+      program.toConfidentialKernelProgram
+      (importedConfidentialKernelProgram_slotLowering_ok_toRuntime h)
+
 mutual
 
 private partial def checkImportedConfidentialKernelSlotExprEq
@@ -2500,7 +2526,9 @@ private partial def checkOptionalImportedConfidentialKernelSlotExprEq
   | some lhsExpr, some rhsExpr => checkImportedConfidentialKernelSlotExprEq lhsExpr rhsExpr
   | _, _ => false
 
-private partial def checkImportedConfidentialKernelSlotStatementListEq
+end
+
+private def checkImportedConfidentialKernelSlotStatementListEq
   (lhs rhs : List ImportedConfidentialKernelSlotStatement) : Bool :=
   match lhs, rhs with
   | [], [] => true
@@ -2508,8 +2536,6 @@ private partial def checkImportedConfidentialKernelSlotStatementListEq
       checkImportedConfidentialKernelSlotStatementEq lhsHead rhsHead &&
         checkImportedConfidentialKernelSlotStatementListEq lhsTail rhsTail
   | _, _ => false
-
-end
 
 def checkImportedConfidentialKernelSlotProgramEq
   (lhs rhs : ImportedConfidentialKernelSlotProgram) : Bool :=
@@ -2539,6 +2565,96 @@ def ImportedConfidentialKernelProgram.SlotLoweringMatches
     program.SlotLoweringMatches slotProgram := by
   rfl
 
+private theorem checkImportedConfidentialKernelSlotStatementEq_toRuntime_runtimeNormalForm
+  {lhs rhs : ImportedConfidentialKernelSlotStatement}
+  (h : checkImportedConfidentialKernelSlotStatementEq lhs rhs = true) :
+  lhs.toConfidentialKernelSlotStatement.RuntimeNormalForm ↔
+    rhs.toConfidentialKernelSlotStatement.RuntimeNormalForm := by
+  cases lhs <;> cases rhs <;>
+    simp [checkImportedConfidentialKernelSlotStatementEq,
+      ImportedConfidentialKernelSlotStatement.toConfidentialKernelSlotStatement,
+      ConfidentialKernelSlotStatement.RuntimeNormalForm] at h ⊢
+
+private theorem checkImportedConfidentialKernelSlotStatementListEq_toRuntime_runtimeNormalForm
+  {lhs rhs : List ImportedConfidentialKernelSlotStatement}
+  (h : checkImportedConfidentialKernelSlotStatementListEq lhs rhs = true) :
+  (∀ stmt ∈ lhs, stmt.toConfidentialKernelSlotStatement.RuntimeNormalForm) →
+    (∀ stmt ∈ rhs, stmt.toConfidentialKernelSlotStatement.RuntimeNormalForm) := by
+  induction lhs generalizing rhs with
+  | nil =>
+      cases rhs with
+      | nil =>
+          intro hNorm
+          simpa using hNorm
+      | cons rhsHead rhsTail =>
+          have : False := by
+            change false = true at h
+            cases h
+          contradiction
+  | cons lhsHead lhsTail ih =>
+      cases rhs with
+      | nil =>
+          have : False := by
+            change false = true at h
+            cases h
+          contradiction
+      | cons rhsHead rhsTail =>
+          have hPair :
+              checkImportedConfidentialKernelSlotStatementEq lhsHead rhsHead = true ∧
+                checkImportedConfidentialKernelSlotStatementListEq lhsTail rhsTail = true := by
+            change
+              (checkImportedConfidentialKernelSlotStatementEq lhsHead rhsHead &&
+                checkImportedConfidentialKernelSlotStatementListEq lhsTail rhsTail) = true at h
+            simpa [Bool.and_eq_true] using h
+          clear h
+          rcases hPair with ⟨hHead, hTail⟩
+          have hHeadNorm :=
+            checkImportedConfidentialKernelSlotStatementEq_toRuntime_runtimeNormalForm hHead
+          intro hNorm
+          intro stmt hMem
+          simp at hMem
+          cases hMem with
+          | inl hEq =>
+              subst hEq
+              have hHeadLeft :
+                  lhsHead.toConfidentialKernelSlotStatement.RuntimeNormalForm := by
+                exact hNorm lhsHead (by simp)
+              exact hHeadNorm.mp hHeadLeft
+          | inr hMemTail =>
+              have hTailNorm :
+                  ∀ stmt ∈ lhsTail, stmt.toConfidentialKernelSlotStatement.RuntimeNormalForm := by
+                intro stmt hMemTail'
+                exact hNorm stmt (by simp [hMemTail'])
+              exact ih hTail hTailNorm stmt hMemTail
+
+private theorem checkImportedConfidentialKernelSlotProgramEq_runtimeNormalForm
+  {lhs rhs : ImportedConfidentialKernelSlotProgram}
+  (hEq : checkImportedConfidentialKernelSlotProgramEq lhs rhs = true) :
+  lhs.RuntimeNormalForm → rhs.RuntimeNormalForm := by
+  intro hNorm
+  unfold ImportedConfidentialKernelSlotProgram.RuntimeNormalForm at hNorm ⊢
+  have hChecks := hEq
+  simp [checkImportedConfidentialKernelSlotProgramEq, Bool.and_eq_true] at hChecks
+  have hBodyEq : checkImportedConfidentialKernelSlotStatementListEq lhs.body rhs.body = true :=
+    hChecks.2
+  have hNormImported :
+      ∀ stmt ∈ lhs.body, stmt.toConfidentialKernelSlotStatement.RuntimeNormalForm := by
+    intro stmt hMem
+    exact
+      hNorm stmt.toConfidentialKernelSlotStatement
+        (by
+          refine List.mem_map.mpr ?_
+          exact ⟨stmt, hMem, rfl⟩)
+  have hRhsImported :
+      ∀ stmt ∈ rhs.body, stmt.toConfidentialKernelSlotStatement.RuntimeNormalForm := by
+    exact
+      checkImportedConfidentialKernelSlotStatementListEq_toRuntime_runtimeNormalForm hBodyEq
+        hNormImported
+  intro stmt hMem
+  rcases List.mem_map.mp hMem with ⟨importedStmt, hImportedMem, hStmtEq⟩
+  subst hStmtEq
+  exact hRhsImported importedStmt hImportedMem
+
 theorem importedConfidentialKernelProgram_slotLowering_exists
   (program : ImportedConfidentialKernelProgram)
   (slotProgram : ImportedConfidentialKernelSlotProgram)
@@ -2551,6 +2667,23 @@ theorem importedConfidentialKernelProgram_slotLowering_exists
       simp [hLowered] at h
   | ok lowered =>
       exact ⟨lowered, rfl⟩
+
+theorem importedConfidentialKernelProgram_slotLowering_runtimeNormalForm
+  {program : ImportedConfidentialKernelProgram}
+  {slotProgram : ImportedConfidentialKernelSlotProgram}
+  (h : program.SlotLoweringMatches slotProgram) :
+  slotProgram.RuntimeNormalForm := by
+  rcases importedConfidentialKernelProgram_slotLowering_exists program slotProgram h with
+    ⟨lowered, hLowered⟩
+  have hEq :
+      checkImportedConfidentialKernelSlotProgramEq lowered slotProgram = true := by
+    unfold ImportedConfidentialKernelProgram.SlotLoweringMatches
+      checkImportedConfidentialKernelProgramSlotLowering at h
+    rw [hLowered] at h
+    simpa using h
+  exact
+    checkImportedConfidentialKernelSlotProgramEq_runtimeNormalForm hEq
+      (importedConfidentialKernelProgram_slotLowering_ok_runtimeNormalForm hLowered)
 
 mutual
 
@@ -3499,12 +3632,14 @@ def ImportedRuntimeKernelSlotDslBundle.programSteps
 def ImportedRuntimeKernelSlotDslBundle.Valid
   (bundle : ImportedRuntimeKernelSlotDslBundle) : Prop :=
   bundle.kernel_witness.ProofGradeValid bundle.confidential_slot_program.entrypoint_id ∧
+    bundle.confidential_slot_program.RuntimeNormalForm ∧
     bundle.kernel_witness.expected_kernel_steps = some bundle.programSteps ∧
     bundle.kernel_witness.kernel_steps = bundle.programSteps
 
 def ImportedRuntimeKernelSlotDslBundle.checkValid
   (bundle : ImportedRuntimeKernelSlotDslBundle) : Bool :=
   bundle.kernel_witness.checkProofGrade bundle.confidential_slot_program.entrypoint_id &&
+    bundle.confidential_slot_program.checkRuntimeNormalForm &&
     decide (bundle.kernel_witness.expected_kernel_steps = some bundle.programSteps) &&
     decide (bundle.kernel_witness.kernel_steps = bundle.programSteps)
 
@@ -3519,7 +3654,13 @@ theorem importedRuntimeKernelSlotDslBundle_schedule_exact
   (hValid : bundle.Valid) :
   bundle.kernel_witness.expected_kernel_steps = some bundle.programSteps ∧
     bundle.kernel_witness.kernel_steps = bundle.programSteps := by
-  exact hValid.2
+  exact hValid.2.2
+
+theorem importedRuntimeKernelSlotDslBundle_runtimeNormalForm
+  {bundle : ImportedRuntimeKernelSlotDslBundle}
+  (hValid : bundle.Valid) :
+  bundle.confidential_slot_program.RuntimeNormalForm := by
+  exact hValid.2.1
 
 theorem importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact
   {bundle : ImportedRuntimeKernelSlotDslBundle}

@@ -1378,6 +1378,33 @@ def ImportedRuntimeKernelRefinementWitness.checkProofGrade
     importedRuntimeKernelWitness_checkProofGrade_eq_true_iff,
     importedRuntimeKernelRefinementWitness_checkValid_eq_true_iff]
 
+def ImportedRuntimeKernelRefinementWitness.RefinesLeanKernelState
+  (witness : ImportedRuntimeKernelRefinementWitness)
+  (kernelWitness : ImportedRuntimeKernelWitness) : Prop :=
+  witness.toRuntimeKernelRefinementWitness.RefinesLeanKernelState
+    kernelWitness.toRuntimeKernelWitness
+
+theorem importedRuntimeKernelRefinementWitness_refinesLeanKernelState_of_proofGrade
+  {witness : ImportedRuntimeKernelRefinementWitness}
+  {kernelWitness : ImportedRuntimeKernelWitness}
+  {entrypointId : String}
+  (hKernel : kernelWitness.ProofGradeValid entrypointId)
+  (hRefinement : witness.Valid kernelWitness) :
+  witness.RefinesLeanKernelState kernelWitness := by
+  have hRuntimeKernel :
+      kernelWitness.toRuntimeKernelWitness.ProofGradeValid
+        kernelWitness.toRuntimeKernelWitness.entrypointId := by
+    exact
+      runtimeKernelWitness_proofGradeValid_self
+        (importedRuntimeKernelWitness_toRuntimeKernelWitness_proofGradeValid
+          kernelWitness entrypointId hKernel)
+  have hRuntimeRefinement :
+      witness.toRuntimeKernelRefinementWitness.Valid kernelWitness.toRuntimeKernelWitness := by
+    simpa [ImportedRuntimeKernelRefinementWitness.Valid] using hRefinement
+  exact
+    runtimeKernelRefinementWitness_refinesLeanKernelState_of_proofGrade
+      hRuntimeKernel hRuntimeRefinement
+
 def parseImportedRuntimeKernelRefinementWitness
   (input : String) : Except String ImportedRuntimeKernelRefinementWitness := do
   let json ← Lean.Json.parse input
@@ -1873,6 +1900,45 @@ theorem importedWitness_proofGradeRuntimeKernelRefinementBoundaryExact
           exact
             ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
               hRefinementValid.2.2.2.1, hRefinementValid.2.2.2.2.1⟩
+
+theorem importedWitness_proofGradeKernelStateRefinement
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ kernelWitness runtimeKernelRefinementWitness,
+    witness.kernel_witness = some kernelWitness ∧
+      witness.runtime_kernel_refinement_witness = some runtimeKernelRefinementWitness ∧
+      runtimeKernelRefinementWitness.RefinesLeanKernelState kernelWitness := by
+  have hKernelValid : witness.proofGradeKernelWitnessValid := by
+    unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
+    exact hValid.2.1
+  have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid := by
+    unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
+    exact hValid.2.2
+  cases hKernel : witness.kernel_witness with
+  | none =>
+      cases hRefinement : witness.runtime_kernel_refinement_witness with
+      | none =>
+          simp [ImportedRuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+      | some runtimeKernelRefinementWitness =>
+          simp [ImportedRuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] at hKernelValid
+  | some kernelWitness =>
+      cases hRefinement : witness.runtime_kernel_refinement_witness with
+      | none =>
+          simp [ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+            hKernel, hRefinement] at hRefinementValid
+      | some runtimeKernelRefinementWitness =>
+          have hProofGrade :
+              kernelWitness.ProofGradeValid witness.public_outcome.entrypoint_id := by
+            simpa [ImportedRuntimeRefinementWitness.proofGradeKernelWitnessValid, hKernel] using
+              hKernelValid
+          have hWitnessValid : runtimeKernelRefinementWitness.Valid kernelWitness := by
+            simpa [ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
+              hKernel, hRefinement] using hRefinementValid
+          exact
+            ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
+              importedRuntimeKernelRefinementWitness_refinesLeanKernelState_of_proofGrade
+                hProofGrade hWitnessValid⟩
 
 theorem importedWitness_proofGradeKernelScheduleObject_exact
   (witness : ImportedRuntimeRefinementWitness)

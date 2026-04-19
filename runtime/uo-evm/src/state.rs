@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
-    RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
+    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramAccessCounterWitness,
+    RuntimePathOramPositionMapWitness, Value,
 };
 
 #[derive(Debug)]
@@ -505,19 +505,7 @@ impl CommittedRuntimeState {
         context: &str,
     ) -> Result<()> {
         self.ensure_cold(public_object_ids, context)?;
-        let cold_stored_object_ids =
-            runtime_kernel_refinement_witness.shadow_load_object_schedule();
-        runtime_kernel_refinement_witness.events.extend(
-            cold_stored_object_ids
-                .into_iter()
-                .map(RuntimeKernelRefinementEventWitness::cold_store_object),
-        );
-        runtime_kernel_refinement_witness.events.extend(
-            public_object_ids
-                .iter()
-                .copied()
-                .map(RuntimeKernelRefinementEventWitness::post_committed_cold_object),
-        );
+        runtime_kernel_refinement_witness.append_cold_store_window(public_object_ids)?;
         Ok(())
     }
 

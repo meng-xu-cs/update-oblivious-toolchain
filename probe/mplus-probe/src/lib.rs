@@ -9346,8 +9346,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         });
     let state_finalizes_runtime_phase_witness = state_source
         .contains("fn finalize_runtime_kernel_refinement_witness")
-        && state_source.contains("RuntimeKernelRefinementEventWitness::cold_store_object")
-        && state_source.contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
+        && state_source
+            .contains("runtime_kernel_refinement_witness.append_cold_store_window(public_object_ids)?;")
+        && !state_source.contains("RuntimeKernelRefinementEventWitness::cold_store_object")
+        && !state_source.contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
     let state_committed_runtime_witness_snapshot_is_opaque = state_source
         .contains("struct CommittedRuntimeWitnessSnapshot")
         && !state_source.contains("pub(crate) struct CommittedRuntimeWitnessSnapshot")
@@ -9770,7 +9772,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/kernel.rs")],
         ),
         (
-            "runtime_phase_events: BoundedJournal<RuntimeKernelRefinementEventWitness>",
+            "struct RuntimePhaseJournal",
+            vec![String::from("runtime/uo-evm/src/kernel.rs")],
+        ),
+        (
+            "runtime_phase_events: RuntimePhaseJournal",
             vec![String::from("runtime/uo-evm/src/kernel.rs")],
         ),
         (
@@ -10243,10 +10249,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("loadAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundle");
     let runtime_phase_event_constructor_files =
         collect_production_pattern_hits(&runtime_evm_src, "RuntimeKernelRefinementEventWitness::")?;
-    let expected_runtime_phase_event_constructor_files = vec![
-        String::from("runtime/uo-evm/src/kernel.rs"),
-        String::from("runtime/uo-evm/src/state.rs"),
-    ];
+    let expected_runtime_phase_event_constructor_files =
+        vec![String::from("runtime/uo-evm/src/kernel.rs")];
     let runtime_phase_event_constructor_surface_restricted =
         runtime_phase_event_constructor_files == expected_runtime_phase_event_constructor_files;
     let resource_event_constructor_files =
@@ -13464,8 +13468,10 @@ call sites (`.get_cell`, `.set_cell`, `.get_array`, `.set_array`, `.get_map`,
 `.put_map`) remain confined to `runtime/uo-evm/src/kernel.rs`. The same
 report now also checks constructor authority for exported witnesses:
 production runtime phase-witness events may only be constructed in
-`runtime/uo-evm/src/kernel.rs` and `runtime/uo-evm/src/state.rs`, while
-production resource-event witnesses may only be constructed in
+`runtime/uo-evm/src/kernel.rs`, while `runtime/uo-evm/src/state.rs` may only
+finish the cold-store/post-committed tail through the shared
+`append_cold_store_window(...)` helper, and production resource-event
+witnesses may only be constructed in
 `runtime/uo-allocator/src/lib.rs`. Inside the shared `crate::runtime` module,
 the same report now also checks finer helper authority: secret-bearing
 `RuntimeObject` reopen / commit / cold-store / witness-export / fresh-coin

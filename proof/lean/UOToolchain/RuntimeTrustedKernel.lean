@@ -429,7 +429,7 @@ theorem runtimeTrustedKernelSlotBundle_schedule_exact
             } := by
         simpa [RuntimeTrustedKernelSlotBundle.Valid,
           RuntimeTrustedKernelSlotBundle.kernelSlotBundle?, hKernel] using hValid.2
-      exact ⟨kernelWitness, rfl, hSlot.2.1, hSlot.2.2⟩
+      exact ⟨kernelWitness, rfl, hSlot.2.2.1, hSlot.2.2.2⟩
 
 theorem runtimeTrustedKernelSlotBundle_controllerObserver_valid
   (bundle : RuntimeTrustedKernelSlotBundle)

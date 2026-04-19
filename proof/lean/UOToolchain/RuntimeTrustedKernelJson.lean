@@ -452,7 +452,8 @@ theorem importedRuntimeTrustedKernelSlotBundle_toRuntimeValid
             } := by
         refine
           ⟨importedRuntimeKernelWitness_toRuntimeKernelWitness_proofGradeValid
-              kernelWitness bundle.confidential_slot_program.entrypoint_id hImportedSlot.1, ?_, ?_⟩
+              kernelWitness bundle.confidential_slot_program.entrypoint_id hImportedSlot.1,
+            importedRuntimeKernelSlotDslBundle_runtimeNormalForm hImportedSlot, ?_, ?_⟩
         exact (importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact hImportedSlot).1
         exact (importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact hImportedSlot).2
       unfold ImportedRuntimeTrustedKernelSlotBundle.toRuntimeTrustedKernelSlotBundle

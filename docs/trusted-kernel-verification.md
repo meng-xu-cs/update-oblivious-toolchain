@@ -34,7 +34,7 @@ The current runtime-side TCB should be read explicitly rather than inferred.
 | Lean kernel plus Lean theorem/checker development | yes | proof checker and theorem body |
 | Explicit backend / cryptographic assumptions | yes | they are the named remaining assumptions |
 | `RuntimeTrustedKernelBundle` / `RuntimeTrustedKernelSlotBundle` acceptance predicates and imported JSON checker | yes | theorem-facing validation boundary |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | implementation honesty is not yet derived by a full refinement proof |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | the theorem-facing witness-to-Lean-state refinement relation now exists, but implementation honesty is not yet derived by a full refinement proof |
 | Rust shell/object code outside the tiny kernel | partially | the confidential surface is narrower now, but this code still matters until confinement and refinement are proved end to end |
 | `uo-check` | no | removed from the proof-grade acceptance path |
 | `mplus-probe` | no | validation/reporting only |
@@ -124,6 +124,11 @@ the accepted public schedule must replay from `ready` to `finished` under the
 modeled `Begin -> object ops* -> Commit -> Wipe` machine, not merely satisfy a
 flat shape predicate. The replayed final state also exposes the exact public
 object-id schedule induced by that admitted step trace.
+The runtime refinement witness now also has an explicit theorem-facing
+relation to that finished Lean kernel state, so accepted proof-grade runtime
+phase witnesses no longer stop at "shape-consistent trace" and instead certify
+one exact admitted small-kernel execution object with exact boundary and
+resource projections.
 The kernel witness now also carries an explicit public resource-event trace
 covering stack checks plus scratch reservations and wipes. Lean replays that
 trace against the public stack/scratch budgets and fixes one exact replayed

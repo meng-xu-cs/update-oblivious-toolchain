@@ -4,7 +4,7 @@ use crate::runtime::state::{
     CommittedRuntimeState, ConfidentialRuntimeShadowState, PublicRuntimeShadowState,
     RuntimeShadowState,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
@@ -23,7 +23,7 @@ struct RuntimeKernel {
     max_hash_part_bytes: usize,
     expected_kernel_step_index: usize,
     kernel_steps: BoundedJournal<RuntimeKernelStepWitness>,
-    runtime_phase_events: BoundedJournal<RuntimeKernelRefinementEventWitness>,
+    runtime_phase_events: RuntimePhaseJournal,
 }
 
 pub(in crate::runtime) struct PublicRuntimeKernel {
@@ -71,6 +71,64 @@ impl<T> BoundedJournal<T> {
 
     fn into_vec(self) -> Vec<T> {
         self.entries
+    }
+}
+
+struct RuntimePhaseJournal {
+    inner: BoundedJournal<RuntimeKernelRefinementEventWitness>,
+}
+
+impl RuntimePhaseJournal {
+    fn with_capacity(max_len: usize) -> Self {
+        Self {
+            inner: BoundedJournal::with_capacity("runtime-phase-event", max_len),
+        }
+    }
+
+    fn snapshot(&self) -> RuntimeKernelRefinementWitness {
+        RuntimeKernelRefinementWitness {
+            events: self.inner.entries.clone(),
+        }
+    }
+
+    fn push(&mut self, event: RuntimeKernelRefinementEventWitness) -> Result<()> {
+        self.inner.push(event)
+    }
+
+    fn push_pre_committed_cold_object(&mut self, object_id: u32) -> Result<()> {
+        self.push(RuntimeKernelRefinementEventWitness::pre_committed_cold_object(
+            object_id,
+        ))
+    }
+
+    fn push_shadow_load_object(&mut self, object_id: u32) -> Result<()> {
+        self.push(RuntimeKernelRefinementEventWitness::shadow_load_object(object_id))
+    }
+
+    fn push_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
+        self.push(RuntimeKernelRefinementEventWitness::kernel_step(
+            opcode, object_id,
+        ))
+    }
+
+    fn append_commit_object_schedule<I>(&mut self, object_ids: I) -> Result<()>
+    where
+        I: IntoIterator<Item = u32>,
+    {
+        let object_ids: Vec<u32> = object_ids.into_iter().collect();
+        let mut witness = self.snapshot();
+        witness.append_commit_object_schedule(object_ids.clone())?;
+        self.inner.extend(
+            object_ids
+                .into_iter()
+                .map(RuntimeKernelRefinementEventWitness::commit_object),
+        )
+    }
+
+    fn into_witness(self) -> RuntimeKernelRefinementWitness {
+        RuntimeKernelRefinementWitness {
+            events: self.inner.into_vec(),
+        }
     }
 }
 
@@ -352,15 +410,12 @@ impl RuntimeKernel {
                 "runtime-kernel-step",
                 kernel_step_capacity,
             ),
-            runtime_phase_events: BoundedJournal::with_capacity(
-                "runtime-phase-event",
-                runtime_phase_event_capacity,
-            ),
+            runtime_phase_events: RuntimePhaseJournal::with_capacity(runtime_phase_event_capacity),
         };
         for object_id in kernel.public_object_ids.clone() {
             kernel
                 .runtime_phase_events
-                .push(RuntimeKernelRefinementEventWitness::pre_committed_cold_object(object_id))?;
+                .push_pre_committed_cold_object(object_id)?;
         }
         kernel.record_kernel_step(UoOpcode::Begin, None)?;
         Ok(kernel)
@@ -412,10 +467,7 @@ impl RuntimeKernel {
     }
 
     fn record_shadow_load_object(&mut self, object_id: u32) -> Result<()> {
-        self.runtime_phase_events
-            .push(RuntimeKernelRefinementEventWitness::shadow_load_object(
-                object_id,
-            ))
+        self.runtime_phase_events.push_shadow_load_object(object_id)
     }
 
     fn cell_get(
@@ -608,11 +660,8 @@ impl RuntimeKernel {
         self.record_kernel_step(UoOpcode::Commit, None)?;
         let committed_object_ids =
             objects.commit_against(committed, aborted, recorder, &mut self.allocator)?;
-        self.runtime_phase_events.extend(
-            committed_object_ids
-                .into_iter()
-                .map(RuntimeKernelRefinementEventWitness::commit_object),
-        )?;
+        self.runtime_phase_events
+            .append_commit_object_schedule(committed_object_ids)?;
         Ok(())
     }
 
@@ -626,11 +675,8 @@ impl RuntimeKernel {
         self.record_kernel_step(UoOpcode::Commit, None)?;
         let committed_object_ids =
             objects.commit_against(committed, aborted, recorder, &mut self.allocator)?;
-        self.runtime_phase_events.extend(
-            committed_object_ids
-                .into_iter()
-                .map(RuntimeKernelRefinementEventWitness::commit_object),
-        )?;
+        self.runtime_phase_events
+            .append_commit_object_schedule(committed_object_ids)?;
         Ok(())
     }
 
@@ -650,6 +696,12 @@ impl RuntimeKernel {
         bool,
         Option<Value>,
     )> {
+        if !program.is_runtime_normal_form() {
+            return Err(anyhow!(
+                "confidential slot program {} is not in runtime normal form",
+                program.entrypoint_id
+            ));
+        }
         let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);
         self.max_hash_part_bytes = max_hash_part_bytes;
         self.bind_expected_kernel_program(program)?;
@@ -760,9 +812,7 @@ impl RuntimeKernel {
         };
         Ok((
             kernel_witness,
-            RuntimeKernelRefinementWitness {
-                events: self.runtime_phase_events.into_vec(),
-            },
+            self.runtime_phase_events.into_witness(),
         ))
     }
 
@@ -815,15 +865,8 @@ impl RuntimeKernel {
                 let value = self.eval_confidential_expr(value, objects, state, recorder)?;
                 self.store_confidential_slot_value(state, *slot, value)?;
             }
-            ConfidentialKernelSlotStatement::Require { cond } => {
-                let cond = self
-                    .eval_confidential_expr(cond, objects, state, recorder)?
-                    .as_bool()
-                    .ok_or_else(|| anyhow!("require condition must be boolean"))?;
-                if !cond {
-                    state.aborted = true;
-                    state.returned = true;
-                }
+            ConfidentialKernelSlotStatement::Require { .. } => {
+                bail!("confidential slot program must be normalized before runtime execution");
             }
             ConfidentialKernelSlotStatement::AbortIf { cond } => {
                 let cond = self
@@ -1045,10 +1088,7 @@ impl RuntimeKernel {
         self.allocator.record_kernel_op(opcode)?;
         self.kernel_steps
             .push(RuntimeKernelStepWitness { opcode, object_id })?;
-        self.runtime_phase_events
-            .push(RuntimeKernelRefinementEventWitness::kernel_step(
-                opcode, object_id,
-            ))?;
+        self.runtime_phase_events.push_kernel_step(opcode, object_id)?;
         Ok(())
     }
 
