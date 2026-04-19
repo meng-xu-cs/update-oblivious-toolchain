@@ -418,6 +418,20 @@ fn read_u32_be(bytes: &[u8], offset: &mut usize) -> Result<u32> {
 }
 
 impl Type {
+    pub fn canonical_len(&self) -> usize {
+        match self {
+            Type::Scalar(ScalarType::Bool) => 1,
+            Type::Scalar(ScalarType::Uint(_)) => 32,
+            Type::Scalar(ScalarType::Bytes32) => 32,
+            Type::Scalar(ScalarType::Address) => 20,
+            Type::Struct(fields) => fields
+                .iter()
+                .map(|field| 4 + field.name.len() + 4 + field.ty.canonical_len())
+                .sum(),
+            Type::Array(element, size) => size * (4 + element.canonical_len()),
+        }
+    }
+
     pub fn short_name(&self) -> String {
         match self {
             Type::Scalar(ScalarType::Bool) => "bool".into(),
@@ -548,6 +562,25 @@ mod tests {
         ]);
         let encoded = value.canonical_bytes();
         assert_eq!(Value::decode_canonical(&ty, &encoded).unwrap(), value);
+    }
+
+    #[test]
+    fn type_canonical_len_matches_zero_value_shape() {
+        let ty = Type::Array(
+            Box::new(Type::Struct(vec![
+                super::StructField {
+                    name: "flag".into(),
+                    ty: Type::Scalar(ScalarType::Bool),
+                },
+                super::StructField {
+                    name: "counter".into(),
+                    ty: Type::Scalar(ScalarType::Uint(256)),
+                },
+            ])),
+            3,
+        );
+        let value = Value::zero_for_type(&ty);
+        assert_eq!(ty.canonical_len(), value.canonical_len());
     }
 
     #[test]

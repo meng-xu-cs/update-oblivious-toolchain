@@ -234,9 +234,11 @@ mod tests {
         EntrypointManifest {
             secret_args: vec![0],
             param_names: vec!["secret".into()],
+            entry_input_len: 32,
             public_gas_budget: 4096,
             arena_bytes: 4096,
             max_stack_words: 65,
+            return_canonical_len: None,
             confidential_program: None,
             confidential_slot_program: None,
             kernel_steps: vec![

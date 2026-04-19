@@ -73,9 +73,11 @@ structure ImportedProofRelevantEntrypointView where
   signature : String
   secret_args : List Nat
   param_names : List String
+  entry_input_len : Nat
   public_gas_budget : Nat
   arena_bytes : Nat
   max_stack_words : Nat
+  return_canonical_len : Option Nat
   confidential_program : Option String
   confidential_slot_program : Option String
   kernel_steps : List ImportedProofRelevantKernelStepView
@@ -311,6 +313,68 @@ private partial def typeShortNameFromJson (json : Json) : Except String String :
   else
     throw "unsupported type encoding"
 
+private partial def typeCanonicalLenFromJson (json : Json) : Except String Nat := do
+  if let some payload := taggedPayload? json "Scalar" then
+    match payload with
+    | Json.str "Bool" => pure 1
+    | Json.str "Bytes32" => pure 32
+    | Json.str "Address" => pure 20
+    | Json.obj obj =>
+        match obj.toList with
+        | [("Uint", _)] => pure 32
+        | _ => throw "unsupported scalar type encoding"
+    | _ => throw "unsupported scalar type encoding"
+  else if let some payload := taggedPayload? json "Struct" then
+    let fields ← expectJsonArray payload
+    fields.foldlM
+      (init := 0)
+      (fun acc fieldJson => do
+        let name : String ← lookupFieldAs fieldJson "name"
+        let tyJson ← lookupFieldJson fieldJson "ty"
+        pure (acc + 4 + name.length + 4 + (← typeCanonicalLenFromJson tyJson)))
+  else if let some payload := taggedPayload? json "Array" then
+    let items ← expectJsonArray payload
+    match items with
+    | [elementJson, sizeJson] =>
+        let size : Nat ← fromJson? sizeJson
+        pure (size * (4 + (← typeCanonicalLenFromJson elementJson)))
+    | _ => throw "unsupported array type encoding"
+  else
+    throw "unsupported type encoding"
+
+private def typeCanonicalLenFromRawString (input : String) : Except String Nat := do
+  typeCanonicalLenFromJson (← parseJsonString input)
+
+private def expectedEntrypointInputLen
+  (fn : ImportedProofRelevantFunctionView) : Except String Nat := do
+  let lengths ← fn.params.mapM fun param => typeCanonicalLenFromRawString param.ty
+  pure (lengths.foldl (· + ·) 0)
+
+private def expectedReturnCanonicalLen
+  (fn : ImportedProofRelevantFunctionView) : Except String (Option Nat) := do
+  match fn.return_type with
+  | none => pure none
+  | some ty => some <$> typeCanonicalLenFromRawString ty
+
+private def functionBoundaryLengthsMatchManifest
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  match expectedEntrypointInputLen fn, expectedReturnCanonicalLen fn with
+  | .ok expectedInputLen, .ok expectedReturnLen =>
+      entry.entry_input_len == expectedInputLen &&
+        entry.return_canonical_len == expectedReturnLen
+  | _, _ => false
+
+private def functionBoundaryLengthMismatchMessage
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : String :=
+  match expectedEntrypointInputLen fn, expectedReturnCanonicalLen fn with
+  | .error err, _
+  | _, .error err =>
+      s!"{fn.signature}: failed to compute manifest boundary lengths: {err}"
+  | .ok expectedInputLen, .ok expectedReturnLen =>
+      s!"{fn.signature}: expected entry_input_len={expectedInputLen}, return_canonical_len={expectedReturnLen}; manifest has entry_input_len={entry.entry_input_len}, return_canonical_len={entry.return_canonical_len}"
+
 private def insertOramAccessSorted
   (access : ImportedProofRelevantOramAccessView) :
   List ImportedProofRelevantOramAccessView →
@@ -336,13 +400,16 @@ private def parseImportedOramAccessViewsFromRawJson
 private def parseImportedManifestEntrypointViewFromRawJson
   (signature : String)
   (json : Json) : Except String ImportedProofRelevantEntrypointView := do
+  let entryInputLen? : Option Nat ← lookupOptionalFieldAs json "entry_input_len"
   pure
     { signature := signature
     , secret_args := ← lookupFieldAs json "secret_args"
     , param_names := ← lookupFieldAs json "param_names"
+    , entry_input_len := entryInputLen?.getD 0
     , public_gas_budget := ← lookupFieldAs json "public_gas_budget"
     , arena_bytes := ← lookupFieldAs json "arena_bytes"
     , max_stack_words := ← lookupFieldAs json "max_stack_words"
+    , return_canonical_len := ← lookupOptionalFieldAs json "return_canonical_len"
     , confidential_program := (← lookupOptionalFieldJson json "confidential_program").map Json.compress
     , confidential_slot_program :=
         (← lookupOptionalFieldJson json "confidential_slot_program").map Json.compress
@@ -1216,6 +1283,31 @@ private def functionsMatchManifestCounts :
           functionCountsMatchManifest fn entry &&
             functionsMatchManifestCounts rest entrypoints
 
+private def functionsMatchManifestBoundaryLengths :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → Bool
+  | [], _ => true
+  | fn :: rest, entrypoints =>
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => false
+      | some entry =>
+          functionBoundaryLengthsMatchManifest fn entry &&
+            functionsMatchManifestBoundaryLengths rest entrypoints
+
+private def manifestBoundaryLengthMismatchMessages :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → List String
+  | [], _ => []
+  | fn :: rest, entrypoints =>
+      let tail := manifestBoundaryLengthMismatchMessages rest entrypoints
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => s!"{fn.signature}: missing manifest entrypoint" :: tail
+      | some entry =>
+          if functionBoundaryLengthsMatchManifest fn entry then
+            tail
+          else
+            functionBoundaryLengthMismatchMessage fn entry :: tail
+
 private def manifestCountMismatchMessages :
   List ImportedProofRelevantFunctionView →
   List ImportedProofRelevantEntrypointView → List String
@@ -1751,6 +1843,7 @@ def ImportedProofRelevantContractView.checkStructuralValid
     (view.functions.length == view.manifest.entrypoints.length) &&
     functionsMatchConfidentialLowering view.functions view.manifest.entrypoints &&
     functionsMatchManifestSecrets view.functions view.manifest.entrypoints &&
+    functionsMatchManifestBoundaryLengths view.functions view.manifest.entrypoints &&
     functionsMatchManifestCounts view.functions view.manifest.entrypoints &&
     functionsMatchManifestOramAccesses view view.functions view.manifest.entrypoints &&
     functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints
@@ -1811,6 +1904,12 @@ def ImportedProofRelevantContractView.validationErrors
       []) ++
     (if !(functionsMatchManifestSecrets view.functions view.manifest.entrypoints) then
       ["manifest secret_args/param_names do not match function metadata"]
+    else
+      []) ++
+    (if !(functionsMatchManifestBoundaryLengths view.functions view.manifest.entrypoints) then
+      ["manifest boundary lengths do not match function ABI metadata for: " ++
+        String.intercalate ", "
+          (manifestBoundaryLengthMismatchMessages view.functions view.manifest.entrypoints)]
     else
       []) ++
     (if !(functionsMatchManifestCounts view.functions view.manifest.entrypoints) then

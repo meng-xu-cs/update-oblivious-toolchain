@@ -1089,9 +1089,15 @@ fn build_manifest_entry(
             .iter()
             .map(|(name, _)| name.clone())
             .collect(),
+        entry_input_len: function
+            .params
+            .iter()
+            .map(|(_, ty)| ty.canonical_len())
+            .sum(),
         public_gas_budget: budget,
         arena_bytes: 4096 + counts.local_count * 64,
         max_stack_words: 64 + counts.local_count,
+        return_canonical_len: function.return_type.as_ref().map(Type::canonical_len),
         confidential_program,
         confidential_slot_program,
         kernel_steps,

@@ -1223,7 +1223,7 @@ fn decode_sealed_value(
     object_name: &str,
     allocator: &mut AllocatorSession,
 ) -> Result<Value> {
-    let payload_len = Value::zero_for_type(ty).canonical_len();
+    let payload_len = ty.canonical_len();
     let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;
     cipher
         .with_opened_payload(aad.as_bytes(), payload_len, physical, |payload| {
@@ -1237,8 +1237,7 @@ fn map_record_len(spec: &StateObject) -> Result<usize> {
         .key_type
         .as_ref()
         .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
-    Ok(1 + Value::zero_for_type(key_type).canonical_len()
-        + Value::zero_for_type(&spec.value_type).canonical_len())
+    Ok(1 + key_type.canonical_len() + spec.value_type.canonical_len())
 }
 
 fn record_array_scan(object: &ArrayObject, trace: &mut CallRecorder) {

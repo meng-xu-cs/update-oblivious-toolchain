@@ -302,7 +302,7 @@ impl ContractInstance {
             "after completing the call and returning to committed storage",
         )?;
         let runtime_state_after = self.state.witness_snapshot()?;
-        let output_shape = output_shape_of(&return_value);
+        let output_shape = output_shape_of(&manifest_entry, &return_value)?;
         let trace_bundle = build_theorem_trace(
             recorder,
             &manifest_entry,

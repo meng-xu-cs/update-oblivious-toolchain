@@ -2258,8 +2258,8 @@ pub(crate) fn decode_map_record(spec: &StateObject, bytes: &[u8]) -> Result<MapE
         .key_type
         .as_ref()
         .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
-    let key_len = Value::zero_for_type(key_type).canonical_len();
-    let value_len = Value::zero_for_type(&spec.value_type).canonical_len();
+    let key_len = key_type.canonical_len();
+    let value_len = spec.value_type.canonical_len();
     let expected_len = 1 + key_len + value_len;
     if bytes.len() != expected_len {
         bail!(

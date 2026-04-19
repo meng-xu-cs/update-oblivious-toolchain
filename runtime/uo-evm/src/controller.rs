@@ -75,7 +75,7 @@ impl PublicCallSummary {
             );
         }
         Ok(Self {
-            entry_input_len: args.iter().map(Value::canonical_len).sum(),
+            entry_input_len: manifest_entry.entry_input_len,
             public_args: manifest_entry
                 .param_names
                 .iter()
@@ -509,12 +509,19 @@ fn controller_region_budgets(regions: &BTreeMap<&'static str, usize>) -> Vec<Con
     .collect()
 }
 
-pub(crate) fn output_shape_of(return_value: &Option<Value>) -> OutputShape {
+pub(crate) fn output_shape_of(
+    manifest_entry: &EntrypointManifest,
+    return_value: &Option<Value>,
+) -> Result<OutputShape> {
     match return_value {
-        Some(value) => OutputShape {
+        Some(_) => Ok(OutputShape {
             return_present: true,
-            return_length: value.canonical_len(),
-        },
-        None => OutputShape::default(),
+            return_length: manifest_entry.return_canonical_len.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "manifest return_canonical_len missing for entrypoint with return value"
+                )
+            })?,
+        }),
+        None => Ok(OutputShape::default()),
     }
 }

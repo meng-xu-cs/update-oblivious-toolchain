@@ -4,7 +4,7 @@ use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, St
 use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{
     lower_confidential_kernel_statements, CompiledArtifact, ContractMetadata, OramManifest,
-    ProofRelevantTranslationBundle, RuntimeKernelStepManifest, StateObjectManifest,
+    ProofRelevantTranslationBundle, RuntimeKernelStepManifest, StateObjectManifest, Type,
 };
 
 #[cfg(test)]
@@ -130,6 +130,29 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             bail!(
                 "manifest param_names mismatch for entrypoint {}",
                 function.signature
+            );
+        }
+        let expected_entry_input_len = function
+            .params
+            .iter()
+            .map(|(_, ty)| ty.canonical_len())
+            .sum::<usize>();
+        if entry.entry_input_len != expected_entry_input_len {
+            bail!(
+                "manifest entry_input_len mismatch for entrypoint {}: {} != {}",
+                function.signature,
+                entry.entry_input_len,
+                expected_entry_input_len
+            );
+        }
+        let expected_return_canonical_len =
+            function.return_type.as_ref().map(Type::canonical_len);
+        if entry.return_canonical_len != expected_return_canonical_len {
+            bail!(
+                "manifest return_canonical_len mismatch for entrypoint {}: {:?} != {:?}",
+                function.signature,
+                entry.return_canonical_len,
+                expected_return_canonical_len
             );
         }
         let counts = count_body(&function.body);

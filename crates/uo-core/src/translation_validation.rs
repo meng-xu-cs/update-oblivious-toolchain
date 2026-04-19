@@ -274,9 +274,12 @@ pub struct ProofRelevantEntrypointView {
     pub signature: String,
     pub secret_args: Vec<usize>,
     pub param_names: Vec<String>,
+    pub entry_input_len: usize,
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub return_canonical_len: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidential_program: Option<ConfidentialKernelProgram>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -298,9 +301,11 @@ impl ProofRelevantEntrypointView {
             signature: signature.into(),
             secret_args: entrypoint.secret_args.clone(),
             param_names: entrypoint.param_names.clone(),
+            entry_input_len: entrypoint.entry_input_len,
             public_gas_budget: entrypoint.public_gas_budget,
             arena_bytes: entrypoint.arena_bytes,
             max_stack_words: entrypoint.max_stack_words,
+            return_canonical_len: entrypoint.return_canonical_len,
             confidential_program: entrypoint.confidential_program.clone(),
             confidential_slot_program: entrypoint.confidential_slot_program.clone(),
             kernel_steps: entrypoint
