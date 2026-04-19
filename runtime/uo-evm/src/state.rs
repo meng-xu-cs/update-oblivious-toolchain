@@ -1,4 +1,4 @@
-use crate::controller::CallRecorder;
+use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
@@ -9,7 +9,8 @@ use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
     RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
-    RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
+    RuntimeKernelWitness, RuntimeOramAccessCounterWitness,
+    RuntimePathOramPositionMapWitness, Value,
 };
 
 #[derive(Debug)]
@@ -83,6 +84,41 @@ impl CommittedRuntimeWitnessSnapshot {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct TracedRuntimeCallOutcome {
+    call_outcome: RuntimeCallOutcome,
+    runtime_state_after: CommittedRuntimeWitnessSnapshot,
+}
+
+impl TracedRuntimeCallOutcome {
+    pub(crate) fn into_finalized_call_trace_parts(
+        self,
+    ) -> (
+        RuntimeKernelWitness,
+        RuntimeKernelRefinementWitness,
+        bool,
+        Option<Value>,
+        Vec<String>,
+        CommittedRuntimeWitnessSnapshot,
+    ) {
+        let (
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            aborted,
+            return_value,
+            opcode_trace,
+        ) = self.call_outcome.into_theorem_trace_parts();
+        (
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            aborted,
+            return_value,
+            opcode_trace,
+            self.runtime_state_after,
+        )
+    }
+}
+
 impl Clone for CommittedRuntimeState {
     fn clone(&self) -> Self {
         Self {
@@ -118,12 +154,38 @@ impl ContractRuntime {
         self.committed.public_object_ids()
     }
 
-    pub(crate) fn ensure_ready_for_call(&self, context: &str) -> Result<()> {
+    pub(crate) fn begin_traced_call(
+        &self,
+        entrypoint: &str,
+        manifest_entry: &EntrypointManifest,
+        args: &[Value],
+    ) -> Result<(
+        CommittedRuntimeWitnessSnapshot,
+        PublicCallSummary,
+        CallRecorder,
+    )> {
+        self.ensure_ready_for_call("before executing the next call from committed storage")?;
+        let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, args)?;
+        let recorder = CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
+        Ok((self.witness_snapshot()?, public_call, recorder))
+    }
+
+    fn ensure_ready_for_call(&self, context: &str) -> Result<()> {
         let public_object_ids = self.public_object_ids();
         self.ensure_cold(&public_object_ids, context)
     }
 
-    pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
+    pub(crate) fn finish_traced_call(
+        &self,
+        call_outcome: RuntimeCallOutcome,
+    ) -> Result<TracedRuntimeCallOutcome> {
+        Ok(TracedRuntimeCallOutcome {
+            call_outcome,
+            runtime_state_after: self.witness_snapshot()?,
+        })
+    }
+
+    fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
         self.committed.witness_snapshot()
     }
 

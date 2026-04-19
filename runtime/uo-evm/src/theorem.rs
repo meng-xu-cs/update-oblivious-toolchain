@@ -1,5 +1,7 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
-use crate::runtime::state::{CommittedRuntimeWitnessSnapshot, ContractRuntime};
+use crate::runtime::state::{
+    CommittedRuntimeWitnessSnapshot, ContractRuntime, TracedRuntimeCallOutcome,
+};
 use crate::runtime::RuntimeCallOutcome;
 use anyhow::Result;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
@@ -21,11 +23,10 @@ fn begin_call_trace(
     manifest_entry: &EntrypointManifest,
     args: &[Value],
 ) -> Result<CallTraceContext> {
-    runtime.ensure_ready_for_call("before executing the next call from committed storage")?;
-    let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, args)?;
-    let recorder = CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
+    let (runtime_state_before, public_call, recorder) =
+        runtime.begin_traced_call(entrypoint, manifest_entry, args)?;
     Ok(CallTraceContext {
-        runtime_state_before: runtime.witness_snapshot()?,
+        runtime_state_before,
         public_call,
         recorder,
     })
@@ -52,7 +53,6 @@ struct FinalizeExecutionTraceInput<'a> {
 }
 
 struct FinalizeCallTraceInput<'a> {
-    pub runtime: &'a ContractRuntime,
     pub context: CallTraceContext,
     pub artifact: &'a CompiledArtifact,
     pub entrypoint: &'a str,
@@ -60,7 +60,7 @@ struct FinalizeCallTraceInput<'a> {
     pub deploy_seed: u64,
     pub manifest_entry: &'a EntrypointManifest,
     pub manifest_objects: &'a [StateObjectManifest],
-    pub call_outcome: RuntimeCallOutcome,
+    pub traced_outcome: TracedRuntimeCallOutcome,
 }
 
 pub(crate) struct FinalizedCallTrace {
@@ -92,8 +92,8 @@ where
 {
     let mut context = begin_call_trace(&*runtime, entrypoint, manifest_entry, &args)?;
     let call_outcome = execute(runtime, args, context.recorder_mut())?;
+    let traced_outcome = runtime.finish_traced_call(call_outcome)?;
     finalize_call_trace(FinalizeCallTraceInput {
-        runtime: &*runtime,
         context,
         artifact,
         entrypoint,
@@ -101,7 +101,7 @@ where
         deploy_seed,
         manifest_entry,
         manifest_objects,
-        call_outcome,
+        traced_outcome,
     })
 }
 
@@ -237,7 +237,6 @@ fn gas_used_of(
 
 fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCallTrace> {
     let FinalizeCallTraceInput {
-        runtime,
         context,
         artifact,
         entrypoint,
@@ -245,7 +244,7 @@ fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCal
         deploy_seed,
         manifest_entry,
         manifest_objects,
-        call_outcome,
+        traced_outcome,
     } = input;
     let (
         runtime_kernel_witness,
@@ -253,13 +252,13 @@ fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCal
         aborted,
         return_value,
         opcode_trace,
-    ) = call_outcome.into_theorem_trace_parts();
+        runtime_state_after,
+    ) = traced_outcome.into_finalized_call_trace_parts();
     let CallTraceContext {
         runtime_state_before,
         public_call,
         recorder,
     } = context;
-    let runtime_state_after = runtime.witness_snapshot()?;
     let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
     let output_shape = output_shape_of(manifest_entry, &return_value)?;
     let trace_bundle = build_theorem_trace(
