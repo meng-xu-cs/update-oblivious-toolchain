@@ -35,12 +35,7 @@ pub(crate) fn run_public_entrypoint(
 ) -> Result<RuntimeCallOutcome> {
     let allocator = AllocatorPlan::from_manifest(manifest_entry);
     let public_object_ids = runtime.public_object_ids();
-    let mut kernel = PublicRuntimeKernel::begin(
-        allocator,
-        None,
-        public_object_ids.clone(),
-        Some(public_object_ids.clone()),
-    )?;
+    let mut kernel = PublicRuntimeKernel::begin(allocator, None, public_object_ids.clone())?;
     let mut shadow = runtime.prepare_public_shadow(&mut kernel, &public_object_ids)?;
     let execution = interpret_public_entrypoint(
         contract,

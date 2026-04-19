@@ -19,7 +19,6 @@ pub(crate) struct RuntimeKernel {
     allocator: AllocatorSession,
     expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
     public_object_ids: Vec<u32>,
-    expected_public_object_ids: Option<Vec<u32>>,
     max_hash_part_bytes: usize,
     expected_kernel_step_index: usize,
     kernel_steps: BoundedJournal<RuntimeKernelStepWitness>,
@@ -193,15 +192,9 @@ impl PublicRuntimeKernel {
         plan: AllocatorPlan,
         expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
         public_object_ids: Vec<u32>,
-        expected_public_object_ids: Option<Vec<u32>>,
     ) -> Result<Self> {
         Ok(Self {
-            inner: RuntimeKernel::begin(
-                plan,
-                expected_kernel_steps,
-                public_object_ids,
-                expected_public_object_ids,
-            )?,
+            inner: RuntimeKernel::begin(plan, expected_kernel_steps, public_object_ids)?,
         })
     }
 
@@ -351,7 +344,6 @@ impl RuntimeKernel {
         plan: AllocatorPlan,
         expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
         public_object_ids: Vec<u32>,
-        expected_public_object_ids: Option<Vec<u32>>,
     ) -> Result<Self> {
         let kernel_step_capacity = plan.max_kernel_ops;
         let runtime_phase_event_capacity =
@@ -360,7 +352,6 @@ impl RuntimeKernel {
             allocator: AllocatorSession::new(plan),
             expected_kernel_steps,
             public_object_ids,
-            expected_public_object_ids,
             max_hash_part_bytes: 0,
             expected_kernel_step_index: 0,
             kernel_steps: BoundedJournal::with_capacity(
@@ -707,8 +698,8 @@ impl RuntimeKernel {
             io_scratch_wipe_count: allocator.io_scratch_usage().wipe_count,
             resource_events: allocator.resource_events().to_vec(),
             expected_kernel_steps,
+            expected_public_object_ids: Some(self.public_object_ids.clone()),
             public_object_ids: self.public_object_ids,
-            expected_public_object_ids: self.expected_public_object_ids,
             kernel_steps: self.kernel_steps.into_vec(),
         };
         Ok((
@@ -1183,7 +1174,6 @@ mod tests {
             },
             None,
             vec![],
-            Some(vec![]),
         )
         .unwrap();
         assert!(kernel.finish("demo()").is_err());
@@ -1217,7 +1207,6 @@ mod tests {
                 },
             ]),
             vec![7],
-            Some(vec![7]),
         )
         .unwrap();
 
@@ -1253,7 +1242,6 @@ mod tests {
                 },
             ]),
             vec![],
-            Some(vec![]),
         )
         .unwrap();
 

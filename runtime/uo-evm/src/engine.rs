@@ -377,7 +377,6 @@ mod tests {
                 },
                 None,
                 vec![],
-                Some(vec![]),
             )
             .unwrap();
             let hot_cell = instance

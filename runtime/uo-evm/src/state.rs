@@ -321,7 +321,6 @@ impl ContractRuntime {
             allocator,
             Some(expected_kernel_steps),
             public_object_ids.clone(),
-            Some(public_object_ids.clone()),
         )?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
         let outcome = self.committed.run_confidential_call(
