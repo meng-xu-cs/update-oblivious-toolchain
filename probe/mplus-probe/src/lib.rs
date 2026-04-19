@@ -9045,7 +9045,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_keeps_confidential_call_inputs_inside_runtime = !engine_impl_source
         .contains("ConfidentialCallInputs::from_manifest_entry")
         && engine_impl_source.contains("runtime.run_confidential_entrypoint(")
-        && state_source.contains("let call_inputs = ConfidentialCallInputs::from_raw_args(args);")
+        && !state_source.contains("ConfidentialCallInputs")
+        && kernel_source
+            .contains("let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);")
         && kernel_source.contains("call_inputs.into_raw_args().into_iter()");
     let engine_clones_call_args_directly = engine_impl_source
         .contains("let mut call_args = args.clone();")
@@ -9378,19 +9380,21 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("finalize_runtime_kernel_refinement_witness(")
         && shell_source.contains("runtime.finalize_runtime_kernel_refinement_witness(")
         && state_source.contains("self.finalize_runtime_kernel_refinement_witness(");
-    let state_confidential_call_inputs_wrapper_restricted = state_source
-        .contains("pub(in crate::runtime) struct ConfidentialCallInputs")
-        && state_source.contains("raw_args: Vec<Value>")
-        && state_source.contains("pub(crate) fn from_raw_args(args: Vec<Value>) -> Self")
-        && state_source.contains("pub(in crate::runtime) fn into_raw_args(mut self) -> Vec<Value>")
-        && state_source.contains("std::mem::take(&mut self.raw_args)")
-        && !state_source.contains("pub(crate) fn into_raw_args(self) -> Vec<Value>")
-        && !state_source.contains("pub(crate) fn into_raw_args(mut self) -> Vec<Value>")
-        && !state_source.contains("pub(crate) fn from_manifest_entry(");
-    let confidential_call_inputs_wipe_on_drop = state_source
+    let kernel_confidential_call_inputs_wrapper_restricted = kernel_source
+        .contains("struct ConfidentialCallInputs")
+        && kernel_source.contains("raw_args: Vec<Value>")
+        && kernel_source.contains("fn from_raw_args(args: Vec<Value>) -> Self")
+        && kernel_source.contains("fn into_raw_args(mut self) -> Vec<Value>")
+        && kernel_source.contains("std::mem::take(&mut self.raw_args)")
+        && !kernel_source.contains("pub(crate) struct ConfidentialCallInputs")
+        && !kernel_source.contains("pub(in crate::runtime) struct ConfidentialCallInputs")
+        && !kernel_source.contains("pub(crate) fn into_raw_args(self) -> Vec<Value>")
+        && !kernel_source.contains("pub(crate) fn into_raw_args(mut self) -> Vec<Value>")
+        && !kernel_source.contains("pub(crate) fn from_manifest_entry(");
+    let confidential_call_inputs_wipe_on_drop = kernel_source
         .contains("impl Drop for ConfidentialCallInputs")
-        && state_source.contains("for value in self.raw_args.iter_mut() {")
-        && state_source.contains("value.wipe_secrets();");
+        && kernel_source.contains("for value in self.raw_args.iter_mut() {")
+        && kernel_source.contains("value.wipe_secrets();");
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_call_trace(")
         && theorem_source.contains("fn begin_call_trace(")
         && theorem_source.contains("pub(crate) fn run_traced_call<F>(")
@@ -9692,7 +9696,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
     let kernel_confidential_call_inputs_stay_inside_runtime = kernel_source
-        .contains("call_inputs: ConfidentialCallInputs")
+        .contains("raw_args: Vec<Value>")
+        && kernel_source
+            .contains("let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);")
+        && kernel_source.contains("call_inputs: ConfidentialCallInputs")
         && kernel_source.contains("call_inputs.into_raw_args().into_iter()");
     let kernel_exec_block_uses_confidential_slot_statements = kernel_source
         .contains("statements: &[ConfidentialKernelSlotStatement]")
@@ -10870,10 +10877,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let runtime_secret_state_inventory = vec![
         json!({
             "name": "ConfidentialCallInputs",
-            "owner": "runtime/uo-evm/src/state.rs",
-            "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime and whose buffered values wipe on drop",
+            "owner": "runtime/uo-evm/src/kernel.rs",
+            "boundary": "shell projects only PublicCallSummary; ContractRuntime passes the raw confidential args straight into RuntimeKernel, which internalizes them into a private ConfidentialCallInputs buffer whose unwrap stays local to kernel.rs and whose buffered values wipe on drop",
             "checked": engine_keeps_confidential_call_inputs_inside_runtime
-                && state_confidential_call_inputs_wrapper_restricted
+                && kernel_confidential_call_inputs_wrapper_restricted
                 && confidential_call_inputs_wipe_on_drop
                 && kernel_confidential_call_inputs_stay_inside_runtime,
         }),
@@ -11109,8 +11116,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             theorem_only_runtime_helper_visibility_restricted,
         "engine_leaves_runtime_phase_tail_inside_runtime":
             engine_leaves_runtime_phase_tail_inside_runtime,
-        "state_confidential_call_inputs_wrapper_restricted":
-            state_confidential_call_inputs_wrapper_restricted,
+        "kernel_confidential_call_inputs_wrapper_restricted":
+            kernel_confidential_call_inputs_wrapper_restricted,
         "confidential_call_inputs_wipe_on_drop":
             confidential_call_inputs_wipe_on_drop,
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
@@ -11492,7 +11499,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_finalizes_runtime_phase_witness
             && state_committed_runtime_witness_snapshot_is_opaque
             && engine_leaves_runtime_phase_tail_inside_runtime
-            && state_confidential_call_inputs_wrapper_restricted
+            && kernel_confidential_call_inputs_wrapper_restricted
             && theorem_finalizes_execution_trace
             && theorem_private_surface_restricted
             && theorem_finalize_input_fields_private
@@ -13390,9 +13397,10 @@ manifest's `return_canonical_len`. `engine.rs` also no longer clones the full
 call argument vector just to recover public theorem-trace fields; instead the
 controller path must derive a `PublicCallSummary` from the checked manifest's
 `param_names`, `secret_args`, and manifest-stored `entry_input_len`, and
-`ContractRuntime` must internalize the remaining raw confidential argument
-vector into `ConfidentialCallInputs`, whose unwrap surface stays restricted to
-`crate::runtime` and whose buffered `Value` payload now wipes on drop; the
+`ContractRuntime` must pass the remaining raw confidential argument vector
+straight into `RuntimeKernel`, which internalizes it into a private
+`ConfidentialCallInputs` buffer whose unwrap surface stays local to
+`kernel.rs` and whose buffered `Value` payload now wipes on drop; the
 theorem-finalization path must avoid depending on
 `CompiledFunction` entirely while the public trace path sees only the
 exported `OutputShape` rather than the full return payload, and the committed

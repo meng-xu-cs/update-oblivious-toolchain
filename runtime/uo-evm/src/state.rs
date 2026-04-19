@@ -13,29 +13,6 @@ use uo_core::{
 };
 
 #[derive(Debug)]
-pub(in crate::runtime) struct ConfidentialCallInputs {
-    raw_args: Vec<Value>,
-}
-
-impl ConfidentialCallInputs {
-    pub(crate) fn from_raw_args(args: Vec<Value>) -> Self {
-        Self { raw_args: args }
-    }
-
-    pub(in crate::runtime) fn into_raw_args(mut self) -> Vec<Value> {
-        std::mem::take(&mut self.raw_args)
-    }
-}
-
-impl Drop for ConfidentialCallInputs {
-    fn drop(&mut self) {
-        for value in self.raw_args.iter_mut() {
-            value.wipe_secrets();
-        }
-    }
-}
-
-#[derive(Debug)]
 pub(in crate::runtime) struct CommittedRuntimeState {
     objects: BTreeMap<u32, RuntimeObject>,
 }
@@ -309,14 +286,13 @@ impl ContractRuntime {
             program,
             max_hash_part_bytes,
         } = plan;
-        let call_inputs = ConfidentialCallInputs::from_raw_args(args);
         let kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.clone())?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
         let outcome = self.committed.run_confidential_call(
             kernel,
             &program,
             max_hash_part_bytes,
-            call_inputs,
+            args,
             fresh_coins,
             recorder,
             &mut opcode_trace,
@@ -475,7 +451,7 @@ impl CommittedRuntimeState {
         kernel: PublicRuntimeKernel,
         program: &ConfidentialKernelSlotProgram,
         max_hash_part_bytes: usize,
-        call_inputs: ConfidentialCallInputs,
+        raw_args: Vec<Value>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
@@ -484,7 +460,7 @@ impl CommittedRuntimeState {
             program,
             self,
             max_hash_part_bytes,
-            call_inputs,
+            raw_args,
             fresh_coins,
             recorder,
             opcode_trace,

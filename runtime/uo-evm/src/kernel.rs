@@ -1,8 +1,8 @@
 use crate::controller::CallRecorder;
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::{
-    CommittedRuntimeState, ConfidentialCallInputs, ConfidentialRuntimeShadowState,
-    PublicRuntimeShadowState, RuntimeShadowState,
+    CommittedRuntimeState, ConfidentialRuntimeShadowState, PublicRuntimeShadowState,
+    RuntimeShadowState,
 };
 use anyhow::{anyhow, Result};
 use std::collections::BTreeSet;
@@ -87,6 +87,29 @@ struct ConfidentialExecState {
 struct ConfidentialExecutionOutcome {
     aborted: bool,
     return_value: Option<Value>,
+}
+
+#[derive(Debug)]
+struct ConfidentialCallInputs {
+    raw_args: Vec<Value>,
+}
+
+impl ConfidentialCallInputs {
+    fn from_raw_args(args: Vec<Value>) -> Self {
+        Self { raw_args: args }
+    }
+
+    fn into_raw_args(mut self) -> Vec<Value> {
+        std::mem::take(&mut self.raw_args)
+    }
+}
+
+impl Drop for ConfidentialCallInputs {
+    fn drop(&mut self) {
+        for value in self.raw_args.iter_mut() {
+            value.wipe_secrets();
+        }
+    }
 }
 
 impl ConfidentialExecState {
@@ -310,7 +333,7 @@ impl PublicRuntimeKernel {
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
         max_hash_part_bytes: usize,
-        call_inputs: ConfidentialCallInputs,
+        raw_args: Vec<Value>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
@@ -319,7 +342,7 @@ impl PublicRuntimeKernel {
             program,
             committed,
             max_hash_part_bytes,
-            call_inputs,
+            raw_args,
             fresh_coins,
             recorder,
             opcode_trace,
@@ -639,11 +662,12 @@ impl RuntimeKernel {
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
         max_hash_part_bytes: usize,
-        call_inputs: ConfidentialCallInputs,
+        raw_args: Vec<Value>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialKernelRunOutcome> {
+        let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);
         self.max_hash_part_bytes = max_hash_part_bytes;
         self.bind_expected_kernel_program(program)?;
         let shadow_load_object_ids = self.expected_shadow_load_object_ids()?;

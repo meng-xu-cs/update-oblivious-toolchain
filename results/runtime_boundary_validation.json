@@ -562,6 +562,7 @@
   ],
   "kernel_bounded_journal_restricted": true,
   "kernel_confidential_call_inputs_stay_inside_runtime": true,
+  "kernel_confidential_call_inputs_wrapper_restricted": true,
   "kernel_confidential_select_uses_branchless_value_select": true,
   "kernel_confidential_shadow_load_private": true,
   "kernel_eval_uses_confidential_slot_exprs": true,
@@ -1203,10 +1204,10 @@
   "runtime_public_field_surface_is_public_shape_only": true,
   "runtime_secret_state_inventory": [
     {
-      "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime and whose buffered values wipe on drop",
+      "boundary": "shell projects only PublicCallSummary; ContractRuntime passes the raw confidential args straight into RuntimeKernel, which internalizes them into a private ConfidentialCallInputs buffer whose unwrap stays local to kernel.rs and whose buffered values wipe on drop",
       "checked": true,
       "name": "ConfidentialCallInputs",
-      "owner": "runtime/uo-evm/src/state.rs"
+      "owner": "runtime/uo-evm/src/kernel.rs"
     },
     {
       "boundary": "opaque public handle; raw per-object fresh-coin map stays inside crate::runtime, the handle is non-Clone and consumed by value, and the per-object tapes move into live shadow state without cloning",
@@ -1386,7 +1387,6 @@
   "shell_uses_public_runtime_kernel": true,
   "shell_uses_shadow_wrapper": true,
   "state_committed_runtime_witness_snapshot_is_opaque": true,
-  "state_confidential_call_inputs_wrapper_restricted": true,
   "state_confidential_outcome_layering_is_explicit": true,
   "state_enforces_confidential_commit_budget": true,
   "state_finalizes_runtime_phase_witness": true,
