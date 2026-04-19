@@ -86,11 +86,13 @@ Status labels:
   `runtime/uo-evm/src/oram.rs`,
   `runtime/uo-store/src/codec.rs`.
   The paper route now states one explicit provenance split for
-  `bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
-  `freshLeafResampling`, and `stashOverflowBounded`: the JACM theorem is cited
-  for the ORAM access-pattern / stash component, while the runtime documents
-  the concrete leaf-sampling and sealed-record implementation facts required by
-  the remaining assumptions. This is an explicit assumption profile, not a new
+  `bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`, and
+  `stashOverflowBounded`: the JACM theorem is cited for the ORAM
+  access-pattern / stash component, while the runtime documents the concrete
+  leaf-sampling and sealed-record implementation facts required by the
+  remaining assumptions. The fresh-leaf remapping bridge is now discharged by
+  the canonical fresh-coin runtime-family interface rather than carried as a
+  separate assumption field. This is an explicit assumption profile, not a new
   mechanized cryptographic proof.
 
 - `future-work` Upgrade the citation route to a genuinely external
@@ -135,10 +137,6 @@ The docs also imply one natural provenance split for the explicit
   cite or import the standard Path ORAM stash bound at the concrete repo
   parameters, using the already documented `Z = 5` compatibility.
 
-- `freshLeafResampling`:
-  justify that the implementation’s leaf remapping coins realize the uniform
-  fresh-leaf distribution required by the theorem-side `leafRun`.
-
 - `bucketEncryptionINDCPA`:
   cite or import the confidentiality theorem for bucket/path ciphertext
   rerandomization at the concrete encryption boundary used by the runtime.
@@ -146,6 +144,10 @@ The docs also imply one natural provenance split for the explicit
 - `metadataEncryptionINDCPA`:
   cite or import the corresponding confidentiality theorem for the encrypted
   position-map metadata pages in the local-posmap wrapper.
+
+The exact fresh-leaf remapping bridge is no longer part of that explicit
+assumption bundle: the canonical fresh-coin runtime-family interface now
+discharges the theorem-side leaf-seed-space realization directly.
 
 ## Exit Condition
 

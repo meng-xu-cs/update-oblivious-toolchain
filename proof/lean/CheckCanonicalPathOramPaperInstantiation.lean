@@ -8,7 +8,6 @@ def usage : String :=
 def checkerAssumptions : PathOramLocalPosmapV1SecurityAssumptions :=
   { bucketEncryptionINDCPA := True
   , metadataEncryptionINDCPA := True
-  , freshLeafResampling := True
   , stashOverflowBounded := True
   }
 

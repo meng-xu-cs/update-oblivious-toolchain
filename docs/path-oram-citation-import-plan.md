@@ -174,7 +174,6 @@ The explicit assumption bundle is:
 
 - `bucketEncryptionINDCPA`
 - `metadataEncryptionINDCPA`
-- `freshLeafResampling`
 - `stashOverflowBounded`
 
 The recommended provenance split is:
@@ -182,17 +181,6 @@ The recommended provenance split is:
 - `stashOverflowBounded`:
   cite the Path ORAM stash theorem from the JACM paper, using the already
   documented repo compatibility fact that `blocks_per_bucket = 5`.
-
-- `freshLeafResampling`:
-  discharge this from the implementation boundary.
-  The repo’s Path ORAM manifest chooses
-  `leaf_count = capacity.max(2).next_power_of_two()` in
-  [manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs),
-  and the runtime samples fresh leaves with `next_u64() % leaf_count` in
-  [oram.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/oram.rs).
-  Because `leaf_count` is forced to a power of two, this sampling rule is an
-  exact uniform draw from the leaf space rather than an approximation. The
-  theorem-facing validator now also checks that power-of-two leaf-count shape.
 
 - `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA`:
   discharge these from the concrete sealed-record layer actually used by the
@@ -205,6 +193,15 @@ The recommended provenance split is:
   cite the Path ORAM theorem for access-pattern / stash behavior,
   and separately state or import the confidentiality guarantee required of the
   `ChaCha20-Poly1305` sealed bucket and metadata records.
+
+Fresh leaf remapping is no longer part of that explicit assumption bundle.
+The repo now discharges it at the runtime-family boundary: the manifest fixes
+`leaf_count = capacity.max(2).next_power_of_two()` in
+[manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs),
+the runtime samples fresh leaves with `next_u64() % leaf_count` in
+[oram.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/oram.rs),
+and the canonical fresh-coin / hidden-leaf coverage checkers prove that the
+runtime witness family realizes the exact theorem-side leaf seed space.
 
 This closes the current paper-facing assumption-provenance task by fixing one
 explicit assumption statement and one exact source split. It does not pretend

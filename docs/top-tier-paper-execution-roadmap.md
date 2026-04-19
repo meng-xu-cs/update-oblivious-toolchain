@@ -310,12 +310,11 @@ Concrete tasks:
    suitable external artifact can be imported cleanly.
 2. Otherwise build the companion mechanization locally at that exact interface.
 3. Discharge `stashOverflowBounded` for the deployed parameter regime.
-4. Discharge `freshLeafResampling` for the exact runtime RNG path.
-5. Discharge `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA` for the
+4. Discharge `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA` for the
    concrete cryptographic scheme boundary actually used by the runtime.
-6. Prove that the store/codec/serialization layer matches the theorem-side
+5. Prove that the store/codec/serialization layer matches the theorem-side
    storage abstraction.
-7. Remove any assumption that survives only because of convenience engineering.
+6. Remove any assumption that survives only because of convenience engineering.
 
 Deliverables:
 

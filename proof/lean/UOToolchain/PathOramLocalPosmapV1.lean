@@ -9,11 +9,11 @@ namespace UOToolchain
 /-- Explicit remaining security assumptions for the concrete
 `path_oram_local_posmap_v1` backend candidate. The canonical leaf-value
 realization is no longer an additional assumption here; it is discharged by the
-runtime-family bundle interface. -/
+runtime-family bundle interface, so the remaining backend assumptions are only
+the encryption and stash components. -/
 structure PathOramLocalPosmapV1SecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
-  freshLeafResampling : Prop
   stashOverflowBounded : Prop
 
 def PathOramLocalPosmapV1SecurityAssumptions.toCanonicalLeafValueSecurityAssumptions
@@ -21,7 +21,6 @@ def PathOramLocalPosmapV1SecurityAssumptions.toCanonicalLeafValueSecurityAssumpt
   PathOramCanonicalLeafValueSecurityAssumptions :=
   { bucketEncryptionINDCPA := assumptions.bucketEncryptionINDCPA
   , metadataEncryptionINDCPA := assumptions.metadataEncryptionINDCPA
-  , freshLeafResampling := assumptions.freshLeafResampling
   , stashOverflowBounded := assumptions.stashOverflowBounded
   }
 

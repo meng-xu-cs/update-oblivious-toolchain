@@ -44,8 +44,8 @@ Status labels:
   Evidence:
   `proof/lean/UOToolchain/PathOramLocalPosmapV1.lean`.
   The remaining backend assumptions are explicit as
-  `bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
-  `freshLeafResampling`, and `stashOverflowBounded`.
+  `bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`, and
+  `stashOverflowBounded`.
 
 - `cleared` Keep the legacy surrogate and legacy theorem shims off the
   proof-grade dependency path.

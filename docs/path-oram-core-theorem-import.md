@@ -54,7 +54,10 @@ For the standard nonrecursive Path ORAM theorem:
   `bucketEncryptionINDCPA`
 - encrypted metadata-page protection in the local-posmap wrapper maps to
   `metadataEncryptionINDCPA`
-- fresh remapping after each access maps to `freshLeafResampling`
+
+Fresh remapping after each access is no longer carried as a separate backend
+assumption field: the canonical fresh-coin runtime-family interface now
+discharges that exact leaf-seed-space realization directly.
 
 The formal mapping from the literature-facing object to the repo core theorem
 is now:
@@ -166,8 +169,10 @@ What is now fixed for the current paper-main route:
   the same frozen interface
 - the explicit assumption profile for
   `PathOramLocalPosmapV1SecurityAssumptions` is now written down, including the
-  stash-theorem citation, the implementation-side fresh-leaf sampling facts,
-  and the concrete sealed-record crypto boundary
+  stash-theorem citation and the concrete sealed-record crypto boundary, while
+  the implementation-side fresh-leaf sampling facts are discharged through the
+  canonical fresh-coin runtime-family interface rather than carried as a
+  separate assumption field
 
 Future strengthening beyond that route would be:
 

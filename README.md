@@ -76,9 +76,12 @@ Explicit assumption profile:
 | --- | --- | --- |
 | `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents for the concrete local-posmap backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
-| `freshLeafResampling` | connects the runtime leaf-remapping coins to the theorem-side fresh-leaf distribution | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; runtime bridge fixed, full proof still open |
 | `stashOverflowBounded` | bounds stash-overflow failure for the deployed parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet fully discharged in-repo |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model | required by the final malicious-host deployment theorem; not yet fully closed in Lean |
+
+The fresh-leaf remapping bridge is no longer a separate backend assumption.
+The canonical fresh-coin runtime-family and hidden-leaf coverage checkers now
+discharge that exact leaf-seed-space interface directly.
 
 Current proof-grade TCB:
 

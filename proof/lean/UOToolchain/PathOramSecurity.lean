@@ -530,35 +530,30 @@ def pathOramLocationRelationFromBucketRelation
 structure PathOramSecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
-  freshLeafResampling : Prop
   stashOverflowBounded : Prop
   locationSecurity : PathOramLocationRelation
 
 structure PathOramBucketSecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
-  freshLeafResampling : Prop
   stashOverflowBounded : Prop
   bucketLocationSecurity : PathOramBucketRelation
 
 structure PathOramLeafSecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
-  freshLeafResampling : Prop
   stashOverflowBounded : Prop
   leafScheduleSecurity : PathOramLeafScheduleRelation
 
 structure PathOramLeafValueSecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
-  freshLeafResampling : Prop
   stashOverflowBounded : Prop
   leafValueSecurity : PathOramLeafValueRelation
 
 structure PathOramCanonicalLeafValueSecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
-  freshLeafResampling : Prop
   stashOverflowBounded : Prop
 
 def PathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
@@ -566,7 +561,6 @@ def PathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
   PathOramSecurityAssumptions :=
   { bucketEncryptionINDCPA := assumptions.bucketEncryptionINDCPA
   , metadataEncryptionINDCPA := assumptions.metadataEncryptionINDCPA
-  , freshLeafResampling := assumptions.freshLeafResampling
   , stashOverflowBounded := assumptions.stashOverflowBounded
   , locationSecurity :=
       pathOramLocationRelationFromBucketRelation assumptions.bucketLocationSecurity
@@ -577,7 +571,6 @@ def PathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions
   PathOramBucketSecurityAssumptions :=
   { bucketEncryptionINDCPA := assumptions.bucketEncryptionINDCPA
   , metadataEncryptionINDCPA := assumptions.metadataEncryptionINDCPA
-  , freshLeafResampling := assumptions.freshLeafResampling
   , stashOverflowBounded := assumptions.stashOverflowBounded
   , bucketLocationSecurity :=
       pathOramBucketRelationFromLeafScheduleRelation assumptions.leafScheduleSecurity
@@ -588,7 +581,6 @@ def PathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions
   PathOramLeafSecurityAssumptions :=
   { bucketEncryptionINDCPA := assumptions.bucketEncryptionINDCPA
   , metadataEncryptionINDCPA := assumptions.metadataEncryptionINDCPA
-  , freshLeafResampling := assumptions.freshLeafResampling
   , stashOverflowBounded := assumptions.stashOverflowBounded
   , leafScheduleSecurity :=
       pathOramLeafScheduleRelationFromLeafValueRelation assumptions.leafValueSecurity
@@ -599,7 +591,6 @@ def PathOramCanonicalLeafValueSecurityAssumptions.toPathOramLeafValueSecurityAss
   PathOramLeafValueSecurityAssumptions :=
   { bucketEncryptionINDCPA := assumptions.bucketEncryptionINDCPA
   , metadataEncryptionINDCPA := assumptions.metadataEncryptionINDCPA
-  , freshLeafResampling := assumptions.freshLeafResampling
   , stashOverflowBounded := assumptions.stashOverflowBounded
   , leafValueSecurity := canonicalPathOramLeafValueRelation
   }
