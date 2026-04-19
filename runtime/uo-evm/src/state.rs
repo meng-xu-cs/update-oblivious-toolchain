@@ -114,6 +114,10 @@ impl ContractRuntime {
         self.committed.ensure_cold(expected_object_ids, context)
     }
 
+    pub(crate) fn public_object_ids(&self) -> Vec<u32> {
+        self.committed.public_object_ids()
+    }
+
     pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
         self.committed.witness_snapshot()
     }
@@ -142,11 +146,11 @@ impl ContractRuntime {
         &mut self,
         entrypoint: &str,
         manifest_entry: &EntrypointManifest,
-        public_object_ids: Vec<u32>,
         args: Vec<Value>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
     ) -> Result<RuntimeCallOutcome> {
+        let public_object_ids = self.public_object_ids();
         let plan = ConfidentialEntrypointPlan::from_manifest_entry(
             entrypoint,
             manifest_entry,
@@ -275,6 +279,10 @@ impl CommittedRuntimeState {
             bail!("object {} was not cold {}", object_id, context);
         }
         Ok(())
+    }
+
+    pub(crate) fn public_object_ids(&self) -> Vec<u32> {
+        self.objects.keys().copied().collect()
     }
 
     pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {

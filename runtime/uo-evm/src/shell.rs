@@ -30,9 +30,9 @@ pub(crate) fn run_public_entrypoint(
     function: &CompiledFunction,
     public_args: Vec<Value>,
     allocator: AllocatorPlan,
-    public_object_ids: Vec<u32>,
     recorder: &mut CallRecorder,
 ) -> Result<RuntimeCallOutcome> {
+    let public_object_ids = runtime.public_object_ids();
     let mut kernel = PublicRuntimeKernel::begin(
         allocator,
         None,

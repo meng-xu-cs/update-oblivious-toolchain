@@ -6035,6 +6035,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     });
     let engine_uses_opaque_committed_state = engine_impl_source.contains("state: ContractRuntime")
         && !engine_impl_source.contains("state: CommittedRuntimeState");
+    let engine_uses_runtime_public_object_universe = engine_impl_source
+        .contains("let public_object_ids = self.state.public_object_ids();")
+        && !engine_impl_source.contains("canonical_runtime_public_object_ids(")
+        && state_source.contains("fn public_object_ids(&self) -> Vec<u32>");
     let engine_delegates_public_execution_to_shell = engine_impl_source
         .contains("use crate::shell::run_public_entrypoint;")
         && engine_impl_source.contains("let public_execution = run_public_entrypoint(")
@@ -7151,6 +7155,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_forbidden_helpers_absent": engine_forbidden_helpers_absent,
         "forbidden_engine_helper_checks": forbidden_engine_helper_checks,
         "engine_uses_opaque_committed_state": engine_uses_opaque_committed_state,
+        "engine_uses_runtime_public_object_universe":
+            engine_uses_runtime_public_object_universe,
         "engine_delegates_public_execution_to_shell": engine_delegates_public_execution_to_shell,
         "engine_delegates_confidential_execution_to_runtime":
             engine_delegates_confidential_execution_to_runtime,
@@ -7336,6 +7342,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             runtime_secret_state_inventory_complete,
         "accepted": engine_forbidden_helpers_absent
             && engine_uses_opaque_committed_state
+            && engine_uses_runtime_public_object_universe
             && engine_delegates_public_execution_to_shell
             && engine_delegates_confidential_execution_to_runtime
             && engine_confidential_manifest_surface_absent
@@ -9071,7 +9078,9 @@ those kernel hooks directly. `engine.rs` now delegates public execution to
 manifest-to-kernel planning is now fully internal to `ContractRuntime`, so
 `engine.rs` no longer stages a `ConfidentialEntrypointPlan`, imports either
 the raw `RuntimeKernel` or the public kernel facade directly, or threads the
-manifest hash-scratch bound or confidential commit budget itself.
+manifest hash-scratch bound or confidential commit budget itself, and it now
+derives the canonical public object universe from `ContractRuntime` rather
+than the artifact-side state list.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade

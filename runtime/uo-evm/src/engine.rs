@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use uo_allocator::AllocatorPlan;
-use uo_core::{canonical_runtime_public_object_ids, CompiledArtifact, ExecutionTrace, Value};
+use uo_core::{CompiledArtifact, ExecutionTrace, Value};
 
 #[derive(Debug)]
 pub struct ContractInstance {
@@ -123,7 +123,7 @@ impl ContractInstance {
         } else {
             (None, Some(args))
         };
-        let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
+        let public_object_ids = self.state.public_object_ids();
         self.state.ensure_cold(
             &public_object_ids,
             "before executing the next call from committed storage",
@@ -141,7 +141,6 @@ impl ContractInstance {
                 let outcome = self.state.run_confidential_entrypoint(
                     entrypoint,
                     &manifest_entry,
-                    public_object_ids.clone(),
                     confidential_args,
                     fresh_coins,
                     call_trace_context.recorder_mut(),
@@ -162,7 +161,6 @@ impl ContractInstance {
                     &function,
                     public_args,
                     AllocatorPlan::from_manifest(&manifest_entry),
-                    public_object_ids.clone(),
                     call_trace_context.recorder_mut(),
                 )?;
                 (
