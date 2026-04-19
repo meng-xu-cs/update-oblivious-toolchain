@@ -5880,6 +5880,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let objects_path = root.join("runtime/uo-evm/src/objects.rs");
     let oram_path = root.join("runtime/uo-evm/src/oram.rs");
     let state_path = root.join("runtime/uo-evm/src/state.rs");
+    let controller_path = root.join("runtime/uo-evm/src/controller.rs");
     let theorem_path = root.join("runtime/uo-evm/src/theorem.rs");
     let probe_path = root.join("probe/mplus-probe/src/lib.rs");
     let store_codec_path = root.join("runtime/uo-store/src/codec.rs");
@@ -5906,6 +5907,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&oram_path)))?;
     let state_source = fs::read_to_string(&state_path)
         .with_context(|| format!("reading {}", display_report_path(&state_path)))?;
+    let controller_source = fs::read_to_string(&controller_path)
+        .with_context(|| format!("reading {}", display_report_path(&controller_path)))?;
     let theorem_source = fs::read_to_string(&theorem_path)
         .with_context(|| format!("reading {}", display_report_path(&theorem_path)))?;
     let probe_source = fs::read_to_string(&probe_path)
@@ -5990,6 +5993,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         engine_impl_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
     let engine_defines_fresh_coin_plan_directly = engine_source.contains("pub struct PathOramFreshCoinPlan")
         || engine_source.contains("struct PathOramFreshCoinPlan");
+    let engine_uses_manifest_public_call_summary =
+        engine_impl_source.contains("PublicCallSummary::from_manifest_entry");
     let engine_clones_call_args_directly =
         engine_impl_source.contains("let mut call_args = args.clone();")
             || engine_impl_source.contains("let call_args = args.clone();");
@@ -6208,6 +6213,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness");
+    let controller_public_call_summary_uses_manifest_only =
+        controller_source.contains("fn from_manifest_entry")
+            && controller_source.contains("manifest_entry.param_names")
+            && !controller_source.contains("CompiledFunction");
+    let theorem_public_trace_path_avoids_compiled_function =
+        !theorem_source.contains("CompiledFunction");
     let engine_uses_manifest_confidential_slot_program = engine_source
         .contains(".confidential_slot_program")
         && engine_source.contains("manifest confidential_slot_program missing");
@@ -6904,6 +6915,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "objects_path": display_report_path(&objects_path),
         "oram_path": display_report_path(&oram_path),
         "state_path": display_report_path(&state_path),
+        "controller_path": display_report_path(&controller_path),
         "theorem_path": display_report_path(&theorem_path),
         "probe_path": display_report_path(&probe_path),
         "store_codec_path": display_report_path(&store_codec_path),
@@ -6917,6 +6929,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_uses_shadow_wrapper": engine_uses_shadow_wrapper,
         "engine_uses_public_runtime_kernel": engine_uses_public_runtime_kernel,
         "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
+        "engine_uses_manifest_public_call_summary": engine_uses_manifest_public_call_summary,
         "engine_clones_call_args_directly": engine_clones_call_args_directly,
         "engine_peeks_into_fresh_coin_map": engine_peeks_into_fresh_coin_map,
         "engine_imports_raw_runtime_kernel": engine_imports_raw_runtime_kernel,
@@ -6946,6 +6959,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "state_wrapper_present": state_wrapper_present,
         "state_finalizes_runtime_phase_witness": state_finalizes_runtime_phase_witness,
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
+        "controller_public_call_summary_uses_manifest_only":
+            controller_public_call_summary_uses_manifest_only,
+        "theorem_public_trace_path_avoids_compiled_function":
+            theorem_public_trace_path_avoids_compiled_function,
         "engine_uses_manifest_confidential_slot_program":
             engine_uses_manifest_confidential_slot_program,
         "kernel_executes_program_body_via_shared_dsl":
@@ -7054,6 +7071,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_uses_shadow_wrapper
             && engine_uses_public_runtime_kernel
             && !engine_defines_fresh_coin_plan_directly
+            && engine_uses_manifest_public_call_summary
             && !engine_clones_call_args_directly
             && !engine_peeks_into_fresh_coin_map
             && !engine_imports_raw_runtime_kernel
@@ -7072,6 +7090,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_wrapper_present
             && state_finalizes_runtime_phase_witness
             && theorem_finalizes_execution_trace
+            && controller_public_call_summary_uses_manifest_only
+            && theorem_public_trace_path_avoids_compiled_function
             && engine_uses_manifest_confidential_slot_program
             && kernel_executes_program_body_via_shared_dsl
             && kernel_exec_block_uses_confidential_slot_statements
@@ -8879,8 +8899,10 @@ phase-witness events directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
 certificates directly, no longer assembles `ExecutionTrace` directly
 beyond `runtime/uo-evm/src/theorem.rs`, and no longer clones the full call
-argument vector just to recover public theorem-trace fields; the same report
-also checks that the
+argument vector just to recover public theorem-trace fields; instead the
+controller path must derive a `PublicCallSummary` from the checked manifest's
+`param_names` plus `secret_args`, and the theorem-finalization path must avoid
+depending on `CompiledFunction` entirely. The same report also checks that the
 confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
 commit, and confidential execution are visibility-restricted to
 `crate::runtime`, and that `engine.rs` uses the `PublicRuntimeKernel` facade
