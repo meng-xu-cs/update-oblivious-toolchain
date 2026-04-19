@@ -11,8 +11,8 @@ use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::{
-    canonical_runtime_public_object_ids, expected_runtime_manifest_kernel_steps_for_confidential,
-    CompiledArtifact, ExecutionTrace, RuntimeKernelStepWitness, Value,
+    canonical_runtime_public_object_ids, CompiledArtifact, ExecutionTrace,
+    RuntimeKernelStepWitness, Value,
 };
 
 #[derive(Debug)]
@@ -133,7 +133,7 @@ impl ContractInstance {
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
         let mut allocator = AllocatorPlan::from_manifest(&manifest_entry);
-        let expected_kernel_steps = if function.confidential {
+        let manifest_expected_kernel_steps = if function.confidential {
             Some(
                 manifest_entry
                     .kernel_steps
@@ -147,15 +147,31 @@ impl ContractInstance {
         } else {
             None
         };
-        if function.confidential {
-            let expected_kernel_steps = expected_runtime_manifest_kernel_steps_for_confidential(
-                &function,
-            )
-            .map_err(|err| anyhow!("confidential kernel witness derivation failed: {err}"))?;
-            if manifest_entry.kernel_steps != expected_kernel_steps {
-                bail!("manifest kernel step trace drifted for {entrypoint}");
+        let confidential_slot_program = if function.confidential {
+            let program = manifest_entry
+                .confidential_slot_program
+                .clone()
+                .ok_or_else(|| anyhow!("manifest confidential_slot_program missing for {entrypoint}"))?;
+            let expected_kernel_steps = program
+                .expected_runtime_steps()
+                .into_iter()
+                .map(RuntimeKernelStepWitness::from)
+                .collect::<Vec<_>>();
+            if manifest_expected_kernel_steps.as_ref() != Some(&expected_kernel_steps) {
+                bail!("manifest kernel step trace drifted from confidential slot program for {entrypoint}");
             }
-            allocator.max_kernel_ops = manifest_entry.kernel_steps.len();
+            allocator.max_kernel_ops = expected_kernel_steps.len();
+            Some((program, expected_kernel_steps))
+        } else {
+            None
+        };
+        let expected_kernel_steps = confidential_slot_program
+            .as_ref()
+            .map(|(_, expected_kernel_steps)| expected_kernel_steps.clone());
+        if function.confidential {
+            if manifest_entry.confidential_program.is_none() {
+                bail!("manifest confidential_program missing for {entrypoint}");
+            }
         }
         let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
         self.state.ensure_cold(
@@ -164,8 +180,9 @@ impl ContractInstance {
         )?;
         let runtime_state_before = self.state.witness_snapshot()?;
         let shadow_load_object_ids = if function.confidential {
-            manifest_entry
-                .kernel_steps
+            expected_kernel_steps
+                .as_ref()
+                .expect("confidential entrypoint must derive expected kernel steps")
                 .iter()
                 .filter_map(|step| step.object_id)
                 .collect::<BTreeSet<_>>()
@@ -185,9 +202,12 @@ impl ContractInstance {
             let mut opcode_trace = Vec::new();
             let (runtime_kernel_witness, runtime_kernel_refinement_witness, aborted, return_value) =
                 if function.confidential {
+                    let (slot_program, _) = confidential_slot_program
+                        .as_ref()
+                        .expect("confidential entrypoint must carry slot program");
                     let outcome = self.state.run_confidential_call(
                         kernel,
-                        &function,
+                        slot_program,
                         &shadow_load_object_ids,
                         args,
                         fresh_coins,

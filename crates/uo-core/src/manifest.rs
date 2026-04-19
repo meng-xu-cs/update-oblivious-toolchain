@@ -1,3 +1,4 @@
+use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSlotProgram};
 use crate::ir::{BackendKind, ContainerKind, StateObject};
 use crate::types::{ScalarType, Type};
 use anyhow::{anyhow, bail, Result};
@@ -46,6 +47,10 @@ pub struct EntrypointManifest {
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidential_program: Option<ConfidentialKernelProgram>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidential_slot_program: Option<ConfidentialKernelSlotProgram>,
     #[serde(default)]
     pub kernel_steps: Vec<RuntimeKernelStepManifest>,
     pub uocell_reads: usize,

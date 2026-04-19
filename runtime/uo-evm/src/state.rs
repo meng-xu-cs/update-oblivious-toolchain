@@ -6,7 +6,8 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
 use uo_core::{
-    ir::{CompiledFunction, StateObject},
+    ir::StateObject,
+    ConfidentialKernelSlotProgram,
     RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
     RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
 };
@@ -124,7 +125,7 @@ impl CommittedRuntimeState {
     pub(crate) fn run_confidential_call(
         &mut self,
         kernel: PublicRuntimeKernel,
-        function: &CompiledFunction,
+        program: &ConfidentialKernelSlotProgram,
         shadow_load_object_ids: &[u32],
         args: Vec<Value>,
         fresh_coins: Option<&PathOramFreshCoinPlan>,
@@ -132,7 +133,7 @@ impl CommittedRuntimeState {
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialCommittedCallOutcome> {
         let outcome = kernel.into_inner().run_confidential_call(
-            function,
+            program,
             self,
             shadow_load_object_ids,
             args,

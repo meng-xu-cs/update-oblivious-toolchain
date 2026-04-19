@@ -1,53 +1,44 @@
 use crate::{
-    artifact::CompiledArtifact, CompiledFunction, ConfidentialKernelLoweringError,
-    ConfidentialKernelProgram, ConfidentialKernelSlotLoweringError, ConfidentialKernelSlotProgram,
-    RuntimeKernelWitness, RuntimeShellBoundaryBundle,
+    artifact::CompiledArtifact, manifest::EntrypointManifest, ConfidentialKernelProgram,
+    ConfidentialKernelSlotProgram, RuntimeKernelWitness, RuntimeShellBoundaryBundle,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum RuntimeKernelDslBundleError {
-    #[error("runtime kernel DSL bundle requires a valid confidential kernel program: {0}")]
-    ConfidentialKernel(#[from] ConfidentialKernelLoweringError),
     #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
     MissingEntrypoint { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_program")]
+    MissingConfidentialProgram { entrypoint: String },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum RuntimeKernelSlotDslBundleError {
-    #[error(
-        "runtime kernel slot-DSL bundle requires a valid confidential kernel slot program: {0}"
-    )]
-    ConfidentialKernelSlot(#[from] ConfidentialKernelSlotLoweringError),
     #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
     MissingEntrypoint { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
+    MissingConfidentialSlotProgram { entrypoint: String },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum RuntimeKernelLoweringBundleError {
-    #[error("runtime kernel lowering bundle requires a valid confidential kernel program: {0}")]
-    ConfidentialKernel(#[from] ConfidentialKernelLoweringError),
-    #[error(
-        "runtime kernel lowering bundle requires a valid confidential kernel slot program: {0}"
-    )]
-    ConfidentialKernelSlot(#[from] ConfidentialKernelSlotLoweringError),
     #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
     MissingEntrypoint { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_program")]
+    MissingConfidentialProgram { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
+    MissingConfidentialSlotProgram { entrypoint: String },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum RuntimeShellBoundaryLoweringBundleError {
-    #[error(
-        "runtime shell-boundary lowering bundle requires a valid confidential kernel program: {0}"
-    )]
-    ConfidentialKernel(#[from] ConfidentialKernelLoweringError),
-    #[error(
-        "runtime shell-boundary lowering bundle requires a valid confidential kernel slot program: {0}"
-    )]
-    ConfidentialKernelSlot(#[from] ConfidentialKernelSlotLoweringError),
     #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
     MissingEntrypoint { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_program")]
+    MissingConfidentialProgram { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
+    MissingConfidentialSlotProgram { entrypoint: String },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -77,40 +68,57 @@ pub struct RuntimeShellBoundaryLoweringBundle {
 }
 
 impl RuntimeKernelDslBundle {
-    pub fn from_function(
+    pub fn from_manifest_entry(
         kernel_witness: RuntimeKernelWitness,
-        function: &CompiledFunction,
+        entrypoint: &str,
+        entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeKernelDslBundleError> {
         Ok(Self {
             kernel_witness,
-            confidential_program: function.confidential_kernel_program()?,
+            confidential_program: entry.confidential_program.clone().ok_or_else(|| {
+                RuntimeKernelDslBundleError::MissingConfidentialProgram {
+                    entrypoint: entrypoint.into(),
+                }
+            })?,
         })
     }
 }
 
 impl RuntimeKernelSlotDslBundle {
-    pub fn from_function(
+    pub fn from_manifest_entry(
         kernel_witness: RuntimeKernelWitness,
-        function: &CompiledFunction,
+        entrypoint: &str,
+        entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeKernelSlotDslBundleError> {
         Ok(Self {
             kernel_witness,
-            confidential_program: function.confidential_kernel_slot_program()?,
+            confidential_program: entry.confidential_slot_program.clone().ok_or_else(|| {
+                RuntimeKernelSlotDslBundleError::MissingConfidentialSlotProgram {
+                    entrypoint: entrypoint.into(),
+                }
+            })?,
         })
     }
 }
 
 impl RuntimeKernelLoweringBundle {
-    pub fn from_function(
+    pub fn from_manifest_entry(
         kernel_witness: RuntimeKernelWitness,
-        function: &CompiledFunction,
+        entrypoint: &str,
+        entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeKernelLoweringBundleError> {
-        let confidential_program = function.confidential_kernel_program()?;
-        let confidential_slot_program = confidential_program.to_slot_program()?;
         Ok(Self {
             kernel_witness,
-            confidential_program,
-            confidential_slot_program,
+            confidential_program: entry.confidential_program.clone().ok_or_else(|| {
+                RuntimeKernelLoweringBundleError::MissingConfidentialProgram {
+                    entrypoint: entrypoint.into(),
+                }
+            })?,
+            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(|| {
+                RuntimeKernelLoweringBundleError::MissingConfidentialSlotProgram {
+                    entrypoint: entrypoint.into(),
+                }
+            })?,
         })
     }
 }
@@ -125,16 +133,23 @@ impl RuntimeShellBoundaryLoweringBundle {
             && self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_function(
+    pub fn from_manifest_entry(
         shell_boundary_bundle: RuntimeShellBoundaryBundle,
-        function: &CompiledFunction,
+        entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeShellBoundaryLoweringBundleError> {
-        let confidential_program = function.confidential_kernel_program()?;
-        let confidential_slot_program = confidential_program.to_slot_program()?;
+        let entrypoint = shell_boundary_bundle.entrypoint_id().to_owned();
         Ok(Self {
             shell_boundary_bundle,
-            confidential_program,
-            confidential_slot_program,
+            confidential_program: entry.confidential_program.clone().ok_or_else(|| {
+                RuntimeShellBoundaryLoweringBundleError::MissingConfidentialProgram {
+                    entrypoint: entrypoint.clone(),
+                }
+            })?,
+            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(|| {
+                RuntimeShellBoundaryLoweringBundleError::MissingConfidentialSlotProgram {
+                    entrypoint,
+                }
+            })?,
         })
     }
 }
@@ -145,15 +160,15 @@ impl CompiledArtifact {
         kernel_witness: RuntimeKernelWitness,
         entrypoint: &str,
     ) -> Result<RuntimeKernelDslBundle, RuntimeKernelDslBundleError> {
-        let function = self
+        let manifest_entry = self
             .contract
-            .functions
-            .iter()
-            .find(|function| function.signature == entrypoint)
+            .manifest
+            .entrypoints
+            .get(entrypoint)
             .ok_or_else(|| RuntimeKernelDslBundleError::MissingEntrypoint {
                 entrypoint: entrypoint.into(),
             })?;
-        RuntimeKernelDslBundle::from_function(kernel_witness, function)
+        RuntimeKernelDslBundle::from_manifest_entry(kernel_witness, entrypoint, manifest_entry)
     }
 
     pub fn runtime_kernel_slot_dsl_bundle_for_entrypoint(
@@ -161,15 +176,19 @@ impl CompiledArtifact {
         kernel_witness: RuntimeKernelWitness,
         entrypoint: &str,
     ) -> Result<RuntimeKernelSlotDslBundle, RuntimeKernelSlotDslBundleError> {
-        let function = self
+        let manifest_entry = self
             .contract
-            .functions
-            .iter()
-            .find(|function| function.signature == entrypoint)
+            .manifest
+            .entrypoints
+            .get(entrypoint)
             .ok_or_else(|| RuntimeKernelSlotDslBundleError::MissingEntrypoint {
                 entrypoint: entrypoint.into(),
             })?;
-        RuntimeKernelSlotDslBundle::from_function(kernel_witness, function)
+        RuntimeKernelSlotDslBundle::from_manifest_entry(
+            kernel_witness,
+            entrypoint,
+            manifest_entry,
+        )
     }
 
     pub fn runtime_kernel_lowering_bundle_for_entrypoint(
@@ -177,15 +196,19 @@ impl CompiledArtifact {
         kernel_witness: RuntimeKernelWitness,
         entrypoint: &str,
     ) -> Result<RuntimeKernelLoweringBundle, RuntimeKernelLoweringBundleError> {
-        let function = self
+        let manifest_entry = self
             .contract
-            .functions
-            .iter()
-            .find(|function| function.signature == entrypoint)
+            .manifest
+            .entrypoints
+            .get(entrypoint)
             .ok_or_else(|| RuntimeKernelLoweringBundleError::MissingEntrypoint {
                 entrypoint: entrypoint.into(),
             })?;
-        RuntimeKernelLoweringBundle::from_function(kernel_witness, function)
+        RuntimeKernelLoweringBundle::from_manifest_entry(
+            kernel_witness,
+            entrypoint,
+            manifest_entry,
+        )
     }
 
     pub fn runtime_shell_boundary_lowering_bundle(
@@ -193,16 +216,19 @@ impl CompiledArtifact {
         shell_boundary_bundle: RuntimeShellBoundaryBundle,
     ) -> Result<RuntimeShellBoundaryLoweringBundle, RuntimeShellBoundaryLoweringBundleError> {
         let entrypoint = shell_boundary_bundle.entrypoint_id().to_owned();
-        let function = self
+        let manifest_entry = self
             .contract
-            .functions
-            .iter()
-            .find(|function| function.signature == entrypoint)
+            .manifest
+            .entrypoints
+            .get(&entrypoint)
             .ok_or_else(
                 || RuntimeShellBoundaryLoweringBundleError::MissingEntrypoint {
                     entrypoint: entrypoint.clone(),
                 },
             )?;
-        RuntimeShellBoundaryLoweringBundle::from_function(shell_boundary_bundle, function)
+        RuntimeShellBoundaryLoweringBundle::from_manifest_entry(
+            shell_boundary_bundle,
+            manifest_entry,
+        )
     }
 }

@@ -88,13 +88,14 @@ The current runtime has a first hardening layer:
 - `runtime/uo-allocator/src/lib.rs` now derives a manifest-facing
   `AllocatorPlan::from_manifest` and enforces a bounded `AllocatorSession`
   during each call
-- the emitted manifest now records the exact confidential kernel-op sequence
-  plus the exact public kernel-step trace `{ opcode, object_id? }` for each
-  confidential entrypoint, and checker-side source/artifact validation plus
-  `uo-evm` reject drift against that artifact-side schedule when it is present
+- the emitted manifest now records the canonical confidential named DSL
+  object, the canonical confidential slot DSL object, and the exact public
+  kernel-step trace `{ opcode, object_id? }` for each confidential entrypoint,
+  and checker-side source/artifact validation plus `uo-evm` reject drift
+  against that artifact-side kernel program/schedule package when it is present
 - that allocator session enforces:
-  - exact confidential-entrypoint kernel-op budgets derived from the admitted
-    function body or the checked manifest sequence, plus `Begin` / `Commit` /
+  - exact confidential-entrypoint kernel-op budgets derived from the checked
+    manifest's stored slot program and step trace, plus `Begin` / `Commit` /
     `Wipe`
   - stack-word bounds using the manifest `max_stack_words`
   - bounded value/hash scratch regions
@@ -216,7 +217,8 @@ The current runtime has a first hardening layer:
   public kernel-step trace, derived schedule facts, peak stack usage, public
   allocator bounds, scratch peaks, wipe counts, and the public object universe
 - for accepted confidential entrypoints, `uo-evm` now validates that witness
-  against the admitted function body before returning the trace
+  against the checked manifest's stored confidential slot program before
+  returning the trace
 - for accepted confidential entrypoints, the runtime kernel now also executes
   against the checked manifest's exact admitted public `{ opcode, object_id? }`
   step schedule and rejects missing, extra, or mismatched steps online rather
@@ -350,15 +352,14 @@ The current runtime has a first hardening layer:
   opaque `partial def`s, and the imported/runtime lowering bridge is restored
   all the way through program lowering: Lean now proves exact commutation for
   imported expression, statement-list, and whole-program lowering, so an
-  imported named confidential program that lowers successfully induces a
-  runtime-side `SlotLoweringMatches` witness for the recomputed slot program
-- the imported lowering bundles now also expose runtime-facing recomputation
-  theorems and executable `toRuntime...LoweringBundle?` helpers: after Lean
-  validates an imported kernel-only, confidential-core, shell-boundary, or
-  combined lowering bundle, the runtime-facing interface re-runs
-  named-to-slot lowering from the named DSL object and returns the
-  corresponding runtime bundle with the recomputed slot program rather than
-  trusting the imported slot artifact
+  imported named confidential program that lowers successfully must match the
+  stored manifest slot program through `SlotLoweringMatches`
+- the imported lowering bundles now also expose runtime-facing theorems and
+  executable `toRuntime...LoweringBundle?` helpers over that stored manifest
+  pair: after Lean validates an imported kernel-only, confidential-core,
+  shell-boundary, or combined lowering bundle, the runtime-facing interface
+  preserves the manifest-carried named/slot program pair rather than silently
+  re-lowering from the named DSL object
 - the post-call `cold_store_object` / `post_committed_cold_object` tail for
   that runtime phase witness is now also finalized behind the runtime state
   boundary rather than being assembled in `engine.rs`, which further shrinks
@@ -396,7 +397,7 @@ The current runtime has a first hardening layer:
   witness
 - `confidential_core_validation.json` now runs the combined Lean checker over
   each representative proof-grade runtime witness together with the exact
-  lowered confidential program for the invoked entrypoint, so the
+  manifest-carried named confidential program for the invoked entrypoint, so the
   shell-refinement theorem is tied to the same DSL body that the runtime
   actually executes; the artifact-derived confidential-fragment witness
   remains in the report as a separate diagnostic summary over the admitted
@@ -486,10 +487,11 @@ The current runtime has a first hardening layer:
   the old `next.physical = old.physical.clone()` /
   `next.physical_slots = old.physical_slots.clone()` assignments
 - that same boundary report now also rejects regressions back to a
-  string-keyed confidential runtime environment: the production kernel must
-  lower confidential entrypoints through `confidential_kernel_slot_program`,
-  execute slot-based statements / expressions, and keep the confidential
-  execution state as a fixed slot vector rather than `BTreeMap<String, Value>`
+  string-keyed confidential runtime environment: the production shell must
+  load the checked manifest's `confidential_slot_program`, the production
+  kernel must execute slot-based statements / expressions, and the confidential
+  execution state must stay as a fixed slot vector rather than
+  `BTreeMap<String, Value>`
 - the runtime-boundary report now also checks that the production confidential
   object API surface is routed only through `runtime/uo-evm/src/kernel.rs`:
   all direct `.get_cell`, `.set_cell`, `.get_array`, `.set_array`, `.get_map`,
@@ -598,9 +600,10 @@ Status: started.
 The runtime now emits a compact witness stating:
 
 - which kernel ABI was used
-- the exact confidential kernel-op sequence for the admitted function body
-- the exact public kernel-step trace `{ opcode, object_id? }` for the admitted
-  function body
+- the canonical confidential named and slot kernel programs for the admitted
+  entrypoint
+- the exact public kernel-step trace `{ opcode, object_id? }` derived from the
+  stored slot program
 - the exact public resource-event trace used to justify stack/scratch usage
 - that scratch regions stayed within the admitted public bounds
 - that wipe obligations were discharged

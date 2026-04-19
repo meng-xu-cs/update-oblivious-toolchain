@@ -1,4 +1,5 @@
 import Lean.Data.Json
+import UOToolchain.RuntimeKernelDslJson
 
 open Lean
 
@@ -74,6 +75,8 @@ structure ImportedProofRelevantEntrypointView where
   public_gas_budget : Nat
   arena_bytes : Nat
   max_stack_words : Nat
+  confidential_program : Option String
+  confidential_slot_program : Option String
   kernel_steps : List ImportedProofRelevantKernelStepView
   uocell_reads : Nat
   uocell_writes : Nat
@@ -179,9 +182,17 @@ private def lookupFieldAs [FromJson α] (json : Json) (field : String) : Except 
   fromJson? (← lookupFieldJson json field)
 
 private def lookupOptionalFieldJson (json : Json) (field : String) : Except String (Option Json) := do
-  match (← lookupFieldJson json field) with
-  | Json.null => pure none
-  | value => pure (some value)
+  let entries ← objectEntries json
+  match entries.find? (fun entry => entry.fst == field) with
+  | none => pure none
+  | some (_, Json.null) => pure none
+  | some (_, value) => pure (some value)
+
+private def lookupOptionalFieldAs [FromJson α]
+  (json : Json) (field : String) : Except String (Option α) := do
+  match ← lookupOptionalFieldJson json field with
+  | none => pure none
+  | some value => some <$> fromJson? value
 
 private def expectTaggedPayload (json : Json) (tag : String) : Except String Json := do
   let entries ← objectEntries json
@@ -329,6 +340,9 @@ private def parseImportedManifestEntrypointViewFromRawJson
     , public_gas_budget := ← lookupFieldAs json "public_gas_budget"
     , arena_bytes := ← lookupFieldAs json "arena_bytes"
     , max_stack_words := ← lookupFieldAs json "max_stack_words"
+    , confidential_program := (← lookupOptionalFieldJson json "confidential_program").map Json.compress
+    , confidential_slot_program :=
+        (← lookupOptionalFieldJson json "confidential_slot_program").map Json.compress
     , kernel_steps := ← lookupFieldAs json "kernel_steps"
     , uocell_reads := ← lookupFieldAs json "uocell_reads"
     , uocell_writes := ← lookupFieldAs json "uocell_writes"
@@ -691,11 +705,11 @@ private def countBodyStrings (body : List String) : Except String CountSummary :
   body.foldlM (init := ({ } : CountSummary)) fun acc item => do
     pure <| acc.add (← countStatementJson (← parseJsonString item))
 
-private def pathOramScheme : String := "path_oram_local_posmap_v1"
+private def translationPathOramScheme : String := "path_oram_local_posmap_v1"
 
-private def surrogateOramScheme : String := "surrogate_public_schedule_v1"
+private def translationSurrogateOramScheme : String := "surrogate_public_schedule_v1"
 
-private def oramBucketHeaderBytes : Nat := 24
+private def translationOramBucketHeaderBytes : Nat := 24
 
 private def mergeDistinctNatLists (lhs rhs : List Nat) : List Nat :=
   rhs.foldl (init := lhs) fun acc objectId =>
@@ -1039,23 +1053,25 @@ private def validateImportedOramShape
         manifestObject.kind == "map" &&
         manifestObject.backend == "oram" &&
         oram.scheme == stateObject.oram_scheme &&
-        (if accesses > 1 then oram.scheme == pathOramScheme else true) &&
-        (if oram.scheme == surrogateOramScheme then
+        (if accesses > 1 then oram.scheme == translationPathOramScheme else true) &&
+        (if oram.scheme == translationSurrogateOramScheme then
           oram.blocks_per_bucket == 2 &&
-            oram.bucket_size == oramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size &&
+            oram.bucket_size ==
+              translationOramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size &&
             oram.bucket_count > 0 &&
             oram.metadata_pages_per_access == oram.metadata_pages + 1 &&
             oram.buckets_per_access == max (oram.tree_height + 2) 3 &&
             oram.stash_bound == 0 &&
             oram.recursion_depth == 0 &&
             oram.accesses_per_call == 1
-        else if oram.scheme == pathOramScheme then
+        else if oram.scheme == translationPathOramScheme then
           let leafCount := (oram.bucket_count + 1) / 2
           oram.bucket_count > 0 &&
             oram.bucket_count % 2 == 1 &&
             isPowerOfTwo leafCount &&
             oram.blocks_per_bucket == 5 &&
-            oram.bucket_size == oramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size &&
+            oram.bucket_size ==
+              translationOramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size &&
             oram.stash_bound == max (stateObject.capacity.getD 1) 1 &&
             oram.recursion_depth == 0 &&
             oram.tree_height == log2Ceil leafCount &&
@@ -1087,7 +1103,7 @@ private def expectedCommitOpsForFunction
               match manifestObject.oram with
               | some oram =>
                   let perAccess := totalCommitOps oram
-                  if stateObject.oram_scheme == pathOramScheme then
+                  if stateObject.oram_scheme == translationPathOramScheme then
                     pure <| perAccess * lookupPairCount objectId oramAccesses
                   else
                     pure perAccess
@@ -1586,16 +1602,62 @@ private def expectedKernelStepsForConfidentialBodyStrings
       bodySteps ++
       [{ opcode := "Commit", object_id := none }, { opcode := "Wipe", object_id := none }]
 
+private def importedProofRelevantKernelStepViewOfImportedRuntimeKernelStep
+  (step : ImportedRuntimeKernelStep) : ImportedProofRelevantKernelStepView :=
+  { opcode := step.opcode, object_id := step.object_id }
+
+private def importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+  (steps : List ImportedRuntimeKernelStep) : List ImportedProofRelevantKernelStepView :=
+  steps.map importedProofRelevantKernelStepViewOfImportedRuntimeKernelStep
+
+private def parseEntrypointConfidentialProgram
+  (entry : ImportedProofRelevantEntrypointView) :
+  Except String (Option ImportedConfidentialKernelProgram) := do
+  match entry.confidential_program with
+  | none => pure none
+  | some json => some <$> fromJson? (← parseJsonString json)
+
+private def parseEntrypointConfidentialSlotProgram
+  (entry : ImportedProofRelevantEntrypointView) :
+  Except String (Option ImportedConfidentialKernelSlotProgram) := do
+  match entry.confidential_slot_program with
+  | none => pure none
+  | some json => some <$> fromJson? (← parseJsonString json)
+
+private def manifestStoredDslMatchesKernelSchedule
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  match parseEntrypointConfidentialProgram entry, parseEntrypointConfidentialSlotProgram entry with
+  | .ok none, .ok none =>
+      (!fn.confidential) && entry.kernel_steps.isEmpty
+  | .ok (some program), .ok (some slotProgram) =>
+      fn.confidential &&
+        program.entrypoint_id == fn.signature &&
+        slotProgram.entrypoint_id == fn.signature &&
+        program.secret_args == fn.secret_args &&
+        slotProgram.secret_args == fn.secret_args &&
+        importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+            program.expectedRuntimeKernelSteps ==
+          entry.kernel_steps &&
+        importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+            slotProgram.expectedRuntimeKernelSteps ==
+          entry.kernel_steps &&
+        checkImportedConfidentialKernelProgramSlotLowering program slotProgram
+  | _, _ => false
+
 private def functionConfidentialLoweringMatchesManifest
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
   if fn.confidential then
     match expectedKernelStepsForConfidentialBodyStrings fn.body with
     | .ok expectedSteps =>
-        entry.kernel_steps == expectedSteps
+        entry.kernel_steps == expectedSteps &&
+          manifestStoredDslMatchesKernelSchedule fn entry
     | .error _ => false
   else
-    entry.kernel_steps.isEmpty
+    entry.kernel_steps.isEmpty &&
+      entry.confidential_program.isNone &&
+      entry.confidential_slot_program.isNone
 
 private def functionConfidentialLoweringMismatchMessage
   (fn : ImportedProofRelevantFunctionView)
@@ -1605,12 +1667,31 @@ private def functionConfidentialLoweringMismatchMessage
     | .ok expectedSteps =>
         if entry.kernel_steps != expectedSteps then
           s!"{fn.signature}: expected kernel_steps {renderKernelSteps expectedSteps}, manifest has {renderKernelSteps entry.kernel_steps}"
+        else if !(manifestStoredDslMatchesKernelSchedule fn entry) then
+          match parseEntrypointConfidentialProgram entry, parseEntrypointConfidentialSlotProgram entry with
+          | .error err, _
+          | _, .error err =>
+              s!"{fn.signature}: failed to parse stored confidential DSL from manifest: {err}"
+          | .ok none, _ =>
+              s!"{fn.signature}: manifest is missing confidential_program"
+          | _, .ok none =>
+              s!"{fn.signature}: manifest is missing confidential_slot_program"
+          | .ok (some program), .ok (some slotProgram) =>
+              let programSteps :=
+                renderKernelSteps <|
+                  importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+                    program.expectedRuntimeKernelSteps
+              let slotSteps :=
+                renderKernelSteps <|
+                  importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+                    slotProgram.expectedRuntimeKernelSteps
+              s!"{fn.signature}: stored confidential DSL does not align with manifest schedule or slot lowering (program steps {programSteps}, slot steps {slotSteps}, manifest steps {renderKernelSteps entry.kernel_steps})"
         else
-          s!"{fn.signature}: confidential lowering mismatch despite matching kernel_steps"
+          s!"{fn.signature}: confidential lowering mismatch despite matching kernel_steps and stored DSL"
     | .error err =>
         s!"{fn.signature}: confidential lowering rejected body: {err}"
   else
-    s!"{fn.signature}: non-confidential entrypoint should not carry kernel metadata"
+    s!"{fn.signature}: non-confidential entrypoint should not carry kernel metadata or stored confidential DSL"
 
 private def functionsMatchConfidentialLowering :
   List ImportedProofRelevantFunctionView →

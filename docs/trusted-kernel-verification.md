@@ -120,10 +120,13 @@ older trace-field reconstruction path as an internal audit check before
 returning a call result. The public accessor on a runtime-emitted trace is
 therefore no longer a reconstruction routine.
 
-For confidential entrypoints, the runtime kernel now receives the checked
-manifest's exact expected public kernel-step schedule before execution starts
-and rejects any missing, extra, or mismatched step online. The runtime is no
-longer only "emit then compare later" at that kernel boundary.
+For confidential entrypoints, the checked manifest now carries the canonical
+named confidential program, the canonical slot confidential program, and the
+exact expected public kernel-step schedule derived from that slot program. The
+runtime loads that stored slot program before execution starts, rejects any
+manifest drift between program and schedule, and then rejects any missing,
+extra, or mismatched step online. The runtime is no longer only "emit then
+compare later" at that kernel boundary.
 
 The emitted runtime kernel witness now contains:
 
@@ -131,7 +134,9 @@ The emitted runtime kernel witness now contains:
 - the public kernel-step trace over `{ opcode, object_id? }`
 - the public resource-event trace over stack checks, scratch reservations, and
   scratch wipes
-- the checked-manifest expected step trace for confidential entrypoints
+- the checked-manifest expected step trace for confidential entrypoints,
+  aligned to the same stored slot program that the translation checker and the
+  runtime both consume
 - the emitted and expected public object universes used by the kernel witness
 
 The repository now also exposes that smaller object directly via

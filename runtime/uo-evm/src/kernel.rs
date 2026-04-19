@@ -5,8 +5,8 @@ use anyhow::{anyhow, Result};
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
 use uo_core::{
-    BinaryOp, CompiledFunction, ConfidentialKernelSlotExpr, ConfidentialKernelSlotPureExpr,
-    ConfidentialKernelSlotStatement, RuntimeKernelRefinementEventWitness,
+    BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
+    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement, RuntimeKernelRefinementEventWitness,
     RuntimeKernelRefinementWitness, RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
@@ -521,7 +521,7 @@ impl RuntimeKernel {
 
     pub(in crate::runtime) fn run_confidential_call(
         mut self,
-        function: &CompiledFunction,
+        program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
         shadow_load_object_ids: &[u32],
         args: Vec<Value>,
@@ -532,13 +532,13 @@ impl RuntimeKernel {
         let mut shadow = self.shadow_load_objects(committed, shadow_load_object_ids)?;
         self.install_path_oram_fresh_coins(&mut shadow, fresh_coins)?;
         let outcome =
-            self.execute_confidential_call(function, &mut shadow, args, recorder, opcode_trace)?;
+            self.execute_confidential_call(program, &mut shadow, args, recorder, opcode_trace)?;
         if fresh_coins.is_some() {
             self.ensure_path_oram_fresh_coins_consumed(&shadow)?;
         }
         self.commit_objects(&mut shadow, committed, outcome.aborted, recorder)?;
         let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
-            self.finish(&function.signature)?;
+            self.finish(&program.entrypoint_id)?;
         Ok(ConfidentialKernelRunOutcome {
             committed_shadow: shadow,
             runtime_kernel_witness,
@@ -550,14 +550,12 @@ impl RuntimeKernel {
 
     fn execute_confidential_call(
         &mut self,
-        function: &CompiledFunction,
+        program: &ConfidentialKernelSlotProgram,
         objects: &mut RuntimeShadowState,
         args: Vec<Value>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialExecutionOutcome> {
-        debug_assert!(function.confidential);
-        let program = function.confidential_kernel_slot_program()?;
         let mut state = ConfidentialExecState::new(program.slot_count);
         for (slot, arg) in args.into_iter().enumerate() {
             self.store_confidential_slot_value(&mut state, slot, arg)?;

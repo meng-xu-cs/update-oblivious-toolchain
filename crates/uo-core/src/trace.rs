@@ -632,6 +632,9 @@ pub enum KernelWitnessError {
     MissingExpectedKernelSteps {
         entrypoint: String,
     },
+    MissingManifestConfidentialSlotProgram {
+        entrypoint: String,
+    },
     MissingExpectedPublicObjectIds {
         entrypoint: String,
     },
@@ -1046,6 +1049,11 @@ impl fmt::Display for KernelWitnessError {
             Self::MissingExpectedKernelSteps { entrypoint } => write!(
                 f,
                 "confidential runtime kernel witness for {} is missing the artifact-derived expected step trace",
+                entrypoint
+            ),
+            Self::MissingManifestConfidentialSlotProgram { entrypoint } => write!(
+                f,
+                "confidential manifest entrypoint {} is missing confidential_slot_program",
                 entrypoint
             ),
             Self::MissingExpectedPublicObjectIds { entrypoint } => write!(
@@ -1612,7 +1620,20 @@ impl RuntimeKernelWitness {
                 expected: manifest_entry.max_stack_words,
             });
         }
-        let expected_steps = expected_runtime_manifest_kernel_steps_for_confidential(function)?;
+        let manifest_slot_program = manifest_entry
+            .confidential_slot_program
+            .as_ref()
+            .ok_or_else(|| KernelWitnessError::MissingManifestConfidentialSlotProgram {
+                entrypoint: function.signature.clone(),
+            })?;
+        let expected_steps = manifest_slot_program
+            .expected_runtime_steps()
+            .into_iter()
+            .map(|step| RuntimeKernelStepManifest {
+                opcode: step.opcode,
+                object_id: step.object_id,
+            })
+            .collect::<Vec<_>>();
         if manifest_entry.kernel_steps != expected_steps {
             return Err(KernelWitnessError::KernelStepTraceMismatch {
                 expected: manifest_kernel_steps_as_witness(&expected_steps),

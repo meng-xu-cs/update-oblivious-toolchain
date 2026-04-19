@@ -198,16 +198,18 @@ The first implementation step is now present in the codebase:
   vocabulary
 - `uo-allocator` now enforces manifest-derived kernel-op budgets, stack-word
   budgets, bounded scratch regions, and end-of-call wipe checks
-- the emitted manifest now also records both the exact confidential
-  kernel-op sequence and the exact public kernel-step trace
-  `{ opcode, object_id? }`, so checker-side source/artifact validation and
-  `uo-evm` can reject manifest/runtime schedule drift at the artifact boundary
+- the emitted manifest now also records the canonical confidential named DSL
+  object, the canonical confidential slot DSL object, and the exact public
+  kernel-step trace `{ opcode, object_id? }`, so checker-side
+  source/artifact validation and `uo-evm` can reject manifest/runtime drift at
+  the theorem-facing confidential-kernel boundary
 - the runtime kernel now also enforces that admitted public schedule online
   while the confidential call is executing, which narrows the remaining gap to
   proving the kernel/runtime refines the modeled observer rather than merely
   spotting schedule drift after the fact
 - the runtime now emits a compact `RuntimeKernelWitness` and validates it
-  against the admitted confidential function body before returning the trace
+  against the checked manifest's stored confidential slot program and derived
+  public step trace before returning the trace
 - that kernel witness now also carries an explicit public kernel-step trace
   over `{ opcode, object_id? }`, so the proof-grade interface fixes the
   kernel-visible persistent-object schedule rather than only a flat opcode
@@ -312,9 +314,9 @@ The first implementation step is now present in the codebase:
   imported sides rather than opaque `partial def`s, which removes the old
   definitional-opacity blocker; the imported/runtime commutation layer is now
   restored through whole-program lowering, and the runtime-facing kernel-only,
-  confidential-core, shell-boundary, and combined lowering bundles all
-  recompute the runtime slot program from the named DSL object before exposing
-  the theorem surface
+  confidential-core, shell-boundary, and combined lowering bundles now source
+  the canonical named and slot confidential programs directly from the checked
+  manifest entry rather than reconstructing them ad hoc from the IR body
 - the post-call `cold_store_object` / `post_committed_cold_object` tail of
   that phase witness now also gets finalized behind the runtime state
   boundary, so `engine.rs` no longer constructs runtime phase-witness events
@@ -341,9 +343,9 @@ The first implementation step is now present in the codebase:
   no non-branchless select arms, no confidential `StructField`, and no
   confidential `ArrayIndex`
 - `kernel_dsl_validation.json` now bridges the shared confidential-kernel DSL
-  across Rust and Lean: it serializes the exact lowered confidential program
-  that `uo-evm` executes and checks that the DSL-derived kernel schedule
-  matches the proof-grade runtime kernel witness exactly
+  across Rust and Lean: it serializes the exact manifest-carried named
+  confidential program and checks that the DSL-derived kernel schedule matches
+  the proof-grade runtime kernel witness exactly
 - `kernel_slot_dsl_validation.json` now checks the fixed-slot confidential
   program that `RuntimeKernel` actually executes against that same
   proof-grade runtime kernel witness, and
@@ -358,8 +360,8 @@ The first implementation step is now present in the codebase:
   diagnostic summary over the admitted fragment, and the checker now consumes
   one serialized confidential-core bundle
 - `confidential_core_slot_validation.json` ties that same proof-grade
-  runtime/refinement claim directly to the fixed-slot confidential program
-  that `RuntimeKernel` actually executes, while
+  runtime/refinement claim directly to the manifest-carried fixed-slot
+  confidential program that `RuntimeKernel` actually executes, while
   `confidential_core_lowering_validation.json` composes the named and slot
   DSL objects and checks canonical lowering against the same exported witness
 - `confidential_core_shell_boundary_lowering_validation.json` now lifts the
@@ -376,10 +378,10 @@ The first implementation step is now present in the codebase:
   `RuntimeConfidentialCoreShellBoundaryLoweringBundle` all now exist as direct
   theorem objects with corresponding `Valid` predicates, so the imported
   artifact bridge lands on a first-class runtime proof interface rather than
-  stopping at importer-local acceptance lemmas; the imported lowering-bundle
-  interfaces now also recompute the runtime slot program before returning
-  those runtime bundle objects, so the imported slot artifact is no longer the
-  last object that crosses that proof/runtime boundary
+  stopping at importer-local acceptance lemmas; those bundle interfaces now
+  also preserve the manifest-carried named and slot confidential programs all
+  the way through the runtime proof boundary, so the imported slot artifact is
+  no longer silently rederived before crossing that proof/runtime boundary
 - the probe now also runs a source-level anti-drift report,
   `kernel_model_alignment_validation.json`, that checks the Rust kernel
   opcode vocabulary, the confidential-kernel DSL kind tags and struct field

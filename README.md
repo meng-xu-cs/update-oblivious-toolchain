@@ -127,8 +127,9 @@ Current closure status:
    bridge:
    state-object / manifest exactness, secret-arg agreement, arena / stack
    budgets, logical access counts, ORAM access counts and theorem-facing ORAM
-   shape, `max_commit_ops`, confidential-fragment lowering acceptance, and the
-   exact confidential kernel step schedule; proof-grade static checks
+   shape, `max_commit_ops`, the manifest-carried confidential named/slot DSL
+   objects, their canonical lowering relation, and the exact confidential
+   kernel step schedule; proof-grade static checks
    now also report confidential raw artifacts as rejected rather than silently
    accepting them. In the theorem-facing interface, imported proof-grade
    validity now yields not only `source_view = artifact_view`, but also that
@@ -193,25 +194,28 @@ Current closure status:
    `confidential_fragment_validation` now scans the admitted UO benchmark
    artifacts directly and confirms that their confidential entrypoints contain
    no non-branchless select arms, no confidential `StructField`, and no
-   confidential `ArrayIndex`; `kernel_dsl_validation` now serializes the same
-   lowered confidential-kernel DSL object that `uo-evm` interprets, imports it
-   into Lean, and checks that its derived kernel schedule matches the exact
-   proof-grade runtime kernel witness; `kernel_slot_dsl_validation` checks the
-   fixed-slot program that `RuntimeKernel` actually executes against that same
-   witness; `kernel_lowering_validation` then checks the canonical lowering
-   from the named DSL to the slot DSL against that same exported kernel
-   witness; `shell_boundary_validation` now checks
+   confidential `ArrayIndex`; `kernel_dsl_validation` now checks the manifest-
+   carried named confidential-kernel DSL object, imports it into Lean, and
+   checks that its derived kernel schedule matches the exact proof-grade
+   runtime kernel witness; `kernel_slot_dsl_validation` checks the manifest-
+   carried fixed-slot program that `RuntimeKernel` actually executes against
+   that same witness; `kernel_lowering_validation` then checks the canonical
+   lowering from the manifest-carried named DSL to the manifest-carried slot
+   DSL against that same exported kernel witness; `shell_boundary_validation`
+   now checks
    the explicit exported `RuntimeShellContract` / `RuntimeShellTrace` views
    against that same proof-grade kernel witness and lower-level runtime phase
    witness, including the ordered public shell-event trace and its replay
    against the public shell contract; `shell_boundary_lowering_validation`
-   then composes that explicit shell interface with the named and slot
-   confidential programs for the same entrypoint; `confidential_core_validation` now jointly checks each
-   representative proof-grade runtime witness together with that same lowered
+   then composes that explicit shell interface with the manifest-carried named
+   and slot confidential programs for the same entrypoint;
+   `confidential_core_validation` now jointly checks each representative
+   proof-grade runtime witness together with that same manifest-carried named
    confidential program, so the shell-refinement theorem is only reported for
    executions whose embedded kernel witness matches the exact Rust-executed
    confidential body; `confidential_core_slot_validation` ties the same claim
-   to the fixed-slot program that `RuntimeKernel` actually executes;
+   to the manifest-carried fixed-slot program that `RuntimeKernel` actually
+   executes;
    `confidential_core_lowering_validation` joins the named and slot DSL views
    into one exported bundle with checker-visible canonical lowering; and
    `confidential_core_shell_boundary_lowering_validation` lifts the whole
@@ -223,9 +227,9 @@ Current closure status:
    summary over the admitted fragment, and those combined checkers now consume
    serialized confidential-core bundles rather than coordinating separate
    witness files;
-   `runtime_boundary_validation` now also checks that confidential entrypoints
-   are lowered to the shared confidential-kernel DSL only inside
-   `runtime/uo-evm/src/kernel.rs`, that `runtime/uo-evm/src/state.rs`
+   `runtime_boundary_validation` now also checks that `engine.rs` loads the
+   checked manifest's `confidential_slot_program` and routes it into the shared
+   confidential-kernel interpreter, that `runtime/uo-evm/src/state.rs`
    delegates confidential execution through that kernel, that production
    runtime phase-witness events are constructed only in
    `runtime/uo-evm/src/kernel.rs` and `runtime/uo-evm/src/state.rs`, and

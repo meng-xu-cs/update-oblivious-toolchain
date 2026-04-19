@@ -6205,8 +6205,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness");
-    let kernel_lowers_confidential_entrypoint_to_slot_program =
-        kernel_source.contains("let program = function.confidential_kernel_slot_program()?;");
+    let engine_uses_manifest_confidential_slot_program = engine_source
+        .contains(".confidential_slot_program")
+        && engine_source.contains("manifest confidential_slot_program missing");
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
     let kernel_exec_block_uses_confidential_slot_statements = kernel_source
@@ -6422,8 +6423,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         kernel_source.contains("Value::confidential_select(cond, when_true, when_false)");
     let checker_uses_shared_confidential_kernel_lowering =
         checker_source.contains("lower_confidential_kernel_statements(statements, signature)?;");
-    let kernel_witness_validation_uses_lowered_confidential_program = core_trace_source
-        .contains(".confidential_kernel_program()")
+    let kernel_witness_validation_uses_manifest_confidential_slot_program = core_trace_source
+        .contains(".confidential_slot_program")
         && core_trace_source.contains(".expected_runtime_steps()");
     let kernel_witness_validation_tracks_confidential_kernel_lowering_errors = core_trace_source
         .contains("ConfidentialKernelLoweringError::SelectArmOutsideBranchlessFragment")
@@ -6941,8 +6942,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "state_wrapper_present": state_wrapper_present,
         "state_finalizes_runtime_phase_witness": state_finalizes_runtime_phase_witness,
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
-        "kernel_lowers_confidential_entrypoint_to_slot_program":
-            kernel_lowers_confidential_entrypoint_to_slot_program,
+        "engine_uses_manifest_confidential_slot_program":
+            engine_uses_manifest_confidential_slot_program,
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
         "kernel_exec_block_uses_confidential_slot_statements":
@@ -6977,8 +6978,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_confidential_select_uses_branchless_value_select,
         "checker_uses_shared_confidential_kernel_lowering":
             checker_uses_shared_confidential_kernel_lowering,
-        "kernel_witness_validation_uses_lowered_confidential_program":
-            kernel_witness_validation_uses_lowered_confidential_program,
+        "kernel_witness_validation_uses_manifest_confidential_slot_program":
+            kernel_witness_validation_uses_manifest_confidential_slot_program,
         "kernel_witness_validation_tracks_confidential_kernel_lowering_errors":
             kernel_witness_validation_tracks_confidential_kernel_lowering_errors,
         "runtime_phase_event_constructor_files": runtime_phase_event_constructor_files,
@@ -7066,7 +7067,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_wrapper_present
             && state_finalizes_runtime_phase_witness
             && theorem_finalizes_execution_trace
-            && kernel_lowers_confidential_entrypoint_to_slot_program
+            && engine_uses_manifest_confidential_slot_program
             && kernel_executes_program_body_via_shared_dsl
             && kernel_exec_block_uses_confidential_slot_statements
             && kernel_eval_uses_confidential_slot_exprs
@@ -7084,7 +7085,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_does_not_lower_confidential_program_directly
             && kernel_confidential_select_uses_branchless_value_select
             && checker_uses_shared_confidential_kernel_lowering
-            && kernel_witness_validation_uses_lowered_confidential_program
+            && kernel_witness_validation_uses_manifest_confidential_slot_program
             && kernel_witness_validation_tracks_confidential_kernel_lowering_errors
             && runtime_phase_event_constructor_surface_restricted
             && resource_event_constructor_surface_restricted
@@ -8877,12 +8878,12 @@ confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
 commit, and confidential execution are visibility-restricted to
 `crate::runtime`, and that `engine.rs` uses the `PublicRuntimeKernel` facade
 rather than importing the raw `RuntimeKernel`, and that confidential
-entrypoints are lowered to the shared confidential-kernel DSL only inside
-`runtime/uo-evm/src/kernel.rs` while `runtime/uo-evm/src/state.rs` delegates
-confidential execution through that kernel, and that the production kernel
-lowers those entrypoints through `confidential_kernel_slot_program` and keeps
-its confidential execution state as a slot vector rather than a
-string-keyed map, and that the kernel-step witness journal plus the lower-level
+entrypoints are sourced from the checked manifest's
+`confidential_slot_program` in `engine.rs` while `runtime/uo-evm/src/state.rs`
+delegates confidential execution through `runtime/uo-evm/src/kernel.rs`, and
+that the production kernel executes that shared slot DSL with a slot-vector
+confidential state rather than a string-keyed map, and that the kernel-step
+witness journal plus the lower-level
 runtime phase witness journal are both explicit bounded-capacity journals
 derived from public kernel-op/object bounds rather than plain growable
 `Vec::new()` traces, and that the remaining public shell-side commit /
@@ -8960,25 +8961,26 @@ the exact lowered confidential-kernel program that Rust executes, Lean
 re-derives its expected small-kernel step schedule from that DSL, and the
 proof-grade runtime kernel witness must match the imported schedule exactly.
 `kernel_slot_dsl_validation.json` now checks the slot-lowered half of that
-same bridge directly: the probe serializes the fixed-slot confidential program
-that `RuntimeKernel` actually executes, Lean re-derives the same small-kernel
-schedule from the slot DSL, and the proof-grade runtime kernel witness must
-match that slot-derived schedule exactly as well.
+same bridge directly: the probe serializes the manifest-carried fixed-slot
+confidential program that `RuntimeKernel` actually executes, Lean re-derives
+the same small-kernel schedule from the slot DSL, and the proof-grade runtime
+kernel witness must match that slot-derived schedule exactly as well.
 `kernel_lowering_validation.json` now upgrades that bridge to the runtime
 kernel theorem surface: for each representative confidential execution, the
-probe serializes both the source-named confidential program and the
-slot-lowered confidential program, Lean validates the imported lowering
-bundle, re-runs the canonical lowering algorithm over the named DSL, and
-reconstructs the corresponding runtime `RuntimeKernelLoweringBundle` whose
-named and slot schedules are both tied to the same proof-grade kernel
-witness.
+probe serializes both the manifest-carried source-named confidential program
+and the manifest-carried slot confidential program, Lean validates the
+imported lowering bundle, re-runs the canonical lowering algorithm over the
+named DSL, and reconstructs the corresponding runtime
+`RuntimeKernelLoweringBundle` whose named and slot schedules are both tied to
+the same proof-grade kernel witness.
 `confidential_core_validation.json` now closes that loop with a theorem-backed
 joint check: for the same representative proof-grade runtime witnesses, Lean
-checks both the runtime witness and the exact lowered confidential program for
-the invoked entrypoint, so the shell-contract refinement theorem is reported
-only for executions whose embedded kernel witness matches the same DSL body
-that Rust executes. The artifact-derived confidential-fragment witness remains
-in the report as a separate diagnostic summary over the admitted fragment.
+checks both the runtime witness and the exact manifest-carried named
+confidential program for the invoked entrypoint, so the shell-contract
+refinement theorem is reported only for executions whose embedded kernel
+witness matches the same DSL body that Rust executes. The artifact-derived
+confidential-fragment witness remains in the report as a separate diagnostic
+summary over the admitted fragment.
 That combined checker now consumes one serialized confidential-core bundle
 rather than coordinating separate witness files.
 `confidential_core_slot_validation.json` now performs that same joint check

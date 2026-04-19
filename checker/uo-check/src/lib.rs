@@ -3,9 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, Statement};
 use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{
-    expected_runtime_manifest_kernel_steps_for_confidential, lower_confidential_kernel_statements,
-    CompiledArtifact, ContractMetadata, OramManifest, ProofRelevantTranslationBundle,
-    StateObjectManifest,
+    lower_confidential_kernel_statements, CompiledArtifact, ContractMetadata, OramManifest,
+    ProofRelevantTranslationBundle, RuntimeKernelStepManifest, StateObjectManifest,
 };
 
 #[cfg(test)]
@@ -135,8 +134,57 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             );
         }
         let expected_kernel_steps = if function.confidential {
-            expected_runtime_manifest_kernel_steps_for_confidential(function)?
+            let expected_program = function.confidential_kernel_program()?;
+            let witnessed_program =
+                entry
+                    .confidential_program
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!(
+                        "manifest confidential_program missing for entrypoint {}",
+                        function.signature
+                    ))?;
+            if witnessed_program != &expected_program {
+                bail!(
+                    "manifest confidential_program mismatch for entrypoint {}",
+                    function.signature
+                );
+            }
+            let expected_slot_program = expected_program.to_slot_program()?;
+            let witnessed_slot_program =
+                entry
+                    .confidential_slot_program
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!(
+                        "manifest confidential_slot_program missing for entrypoint {}",
+                        function.signature
+                    ))?;
+            if witnessed_slot_program != &expected_slot_program {
+                bail!(
+                    "manifest confidential_slot_program mismatch for entrypoint {}",
+                    function.signature
+                );
+            }
+            expected_slot_program
+                .expected_runtime_steps()
+                .into_iter()
+                .map(|step| RuntimeKernelStepManifest {
+                    opcode: step.opcode,
+                    object_id: step.object_id,
+                })
+                .collect()
         } else {
+            if entry.confidential_program.is_some() {
+                bail!(
+                    "non-confidential entrypoint {} unexpectedly carries confidential_program",
+                    function.signature
+                );
+            }
+            if entry.confidential_slot_program.is_some() {
+                bail!(
+                    "non-confidential entrypoint {} unexpectedly carries confidential_slot_program",
+                    function.signature
+                );
+            }
             Vec::new()
         };
         if entry.kernel_steps != expected_kernel_steps {

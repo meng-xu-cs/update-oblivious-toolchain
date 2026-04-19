@@ -6,11 +6,12 @@ use uo_core::ir::{
     StateObject, Statement, UnaryOp,
 };
 use uo_core::manifest::{
-    EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
+    EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest,
+    StateObjectManifest, PATH_ORAM_SCHEME,
 };
 use uo_core::{
-    expected_runtime_manifest_kernel_steps_for_confidential, CompiledArtifact, ContractMetadata,
-    ProofRelevantTranslationBundle, ScalarType, StateMetadata, StructField, Type, Value,
+    CompiledArtifact, ContractMetadata, ProofRelevantTranslationBundle, ScalarType, StateMetadata,
+    StructField, Type, Value,
 };
 
 use solang_parser::{diagnostics::Diagnostic, parse, pt};
@@ -1062,16 +1063,32 @@ fn build_manifest_entry(
             + counts.expr_count as u64 * 7
             + max_commit_ops as u64 * 29,
     );
-    let kernel_steps = if function.confidential {
-        expected_runtime_manifest_kernel_steps_for_confidential(function)?
+    let (confidential_program, confidential_slot_program, kernel_steps) = if function.confidential {
+        let confidential_program = function.confidential_kernel_program()?;
+        let confidential_slot_program = confidential_program.to_slot_program()?;
+        let kernel_steps = confidential_slot_program
+            .expected_runtime_steps()
+            .into_iter()
+            .map(|step| RuntimeKernelStepManifest {
+                opcode: step.opcode,
+                object_id: step.object_id,
+            })
+            .collect();
+        (
+            Some(confidential_program),
+            Some(confidential_slot_program),
+            kernel_steps,
+        )
     } else {
-        Vec::new()
+        (None, None, Vec::new())
     };
     Ok(EntrypointManifest {
         secret_args: function.secret_args.clone(),
         public_gas_budget: budget,
         arena_bytes: 4096 + counts.local_count * 64,
         max_stack_words: 64 + counts.local_count,
+        confidential_program,
+        confidential_slot_program,
         kernel_steps,
         uocell_reads: counts.cell_reads,
         uocell_writes: counts.cell_writes,

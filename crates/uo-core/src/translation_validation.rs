@@ -1,4 +1,5 @@
 use crate::artifact::CompiledArtifact;
+use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSlotProgram};
 use crate::ir::{BackendKind, ContainerKind, ProgramMode};
 use crate::manifest::{EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest};
 use crate::metadata::ContractMetadata;
@@ -275,6 +276,10 @@ pub struct ProofRelevantEntrypointView {
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidential_program: Option<ConfidentialKernelProgram>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidential_slot_program: Option<ConfidentialKernelSlotProgram>,
     pub kernel_steps: Vec<ProofRelevantKernelStepView>,
     pub uocell_reads: usize,
     pub uocell_writes: usize,
@@ -294,6 +299,8 @@ impl ProofRelevantEntrypointView {
             public_gas_budget: entrypoint.public_gas_budget,
             arena_bytes: entrypoint.arena_bytes,
             max_stack_words: entrypoint.max_stack_words,
+            confidential_program: entrypoint.confidential_program.clone(),
+            confidential_slot_program: entrypoint.confidential_slot_program.clone(),
             kernel_steps: entrypoint
                 .kernel_steps
                 .iter()

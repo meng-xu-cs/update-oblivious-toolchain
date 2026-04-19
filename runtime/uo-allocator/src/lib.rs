@@ -45,7 +45,9 @@ impl AllocatorPlan {
             + entry.uomap_reads
             + entry.uomap_writes;
         let mut plan = Self::for_entrypoint(entry.arena_bytes, entry.max_stack_words);
-        plan.max_kernel_ops = if entry.kernel_steps.is_empty() {
+        plan.max_kernel_ops = if let Some(program) = &entry.confidential_slot_program {
+            program.expected_runtime_steps().len()
+        } else if entry.kernel_steps.is_empty() {
             logical_kernel_ops + 3
         } else {
             entry.kernel_steps.len()
@@ -234,6 +236,8 @@ mod tests {
             public_gas_budget: 4096,
             arena_bytes: 4096,
             max_stack_words: 65,
+            confidential_program: None,
+            confidential_slot_program: None,
             kernel_steps: vec![
                 RuntimeKernelStepManifest { opcode: UoOpcode::Begin, object_id: None },
                 RuntimeKernelStepManifest { opcode: UoOpcode::CellGet, object_id: Some(1) },
