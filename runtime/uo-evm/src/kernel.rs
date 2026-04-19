@@ -5,6 +5,7 @@ use crate::runtime::state::{
     PublicRuntimeShadowState, RuntimeShadowState,
 };
 use anyhow::{anyhow, Result};
+use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
 use uo_core::{
@@ -309,7 +310,6 @@ impl PublicRuntimeKernel {
         self,
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
-        shadow_load_object_ids: &[u32],
         max_hash_part_bytes: usize,
         call_inputs: ConfidentialCallInputs,
         fresh_coins: Option<PathOramFreshCoinPlan>,
@@ -319,7 +319,6 @@ impl PublicRuntimeKernel {
         self.inner.run_confidential_call(
             program,
             committed,
-            shadow_load_object_ids,
             max_hash_part_bytes,
             call_inputs,
             fresh_coins,
@@ -612,7 +611,6 @@ impl RuntimeKernel {
         mut self,
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
-        shadow_load_object_ids: &[u32],
         max_hash_part_bytes: usize,
         call_inputs: ConfidentialCallInputs,
         fresh_coins: Option<PathOramFreshCoinPlan>,
@@ -621,8 +619,9 @@ impl RuntimeKernel {
     ) -> Result<ConfidentialKernelRunOutcome> {
         self.max_hash_part_bytes = max_hash_part_bytes;
         self.bind_expected_kernel_program(program)?;
+        let shadow_load_object_ids = self.expected_shadow_load_object_ids()?;
         let mut shadow =
-            self.shadow_load_confidential_objects(committed, shadow_load_object_ids)?;
+            self.shadow_load_confidential_objects(committed, &shadow_load_object_ids)?;
         let had_injected_fresh_coins = fresh_coins.is_some();
         self.install_path_oram_fresh_coins(&mut shadow, fresh_coins)?;
         let outcome = self.execute_confidential_call(
@@ -670,6 +669,18 @@ impl RuntimeKernel {
         self.expected_kernel_step_index = 1;
         self.expected_kernel_steps = Some(expected_kernel_steps);
         Ok(())
+    }
+
+    fn expected_shadow_load_object_ids(&self) -> Result<Vec<u32>> {
+        let expected_kernel_steps = self.expected_kernel_steps.as_ref().ok_or_else(|| {
+            anyhow!("runtime kernel has no admitted schedule bound when shadow-load set is needed")
+        })?;
+        Ok(expected_kernel_steps
+            .iter()
+            .filter_map(|step| step.object_id)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect())
     }
 
     fn execute_confidential_call(

@@ -4,7 +4,7 @@ use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
 use crate::runtime::RuntimeCallOutcome;
 use anyhow::{anyhow, bail, Result};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
@@ -310,19 +310,11 @@ impl ContractRuntime {
             max_hash_part_bytes,
         } = plan;
         let call_inputs = ConfidentialCallInputs::from_raw_args(args);
-        let shadow_load_object_ids = program
-            .expected_runtime_step_witnesses()
-            .iter()
-            .filter_map(|step| step.object_id)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
         let kernel = PublicRuntimeKernel::begin(allocator, None, public_object_ids.clone())?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
         let outcome = self.committed.run_confidential_call(
             kernel,
             &program,
-            &shadow_load_object_ids,
             max_hash_part_bytes,
             call_inputs,
             fresh_coins,
@@ -472,7 +464,6 @@ impl CommittedRuntimeState {
         &mut self,
         kernel: PublicRuntimeKernel,
         program: &ConfidentialKernelSlotProgram,
-        shadow_load_object_ids: &[u32],
         max_hash_part_bytes: usize,
         call_inputs: ConfidentialCallInputs,
         fresh_coins: Option<PathOramFreshCoinPlan>,
@@ -482,7 +473,6 @@ impl CommittedRuntimeState {
         let outcome = kernel.run_confidential_call(
             program,
             self,
-            shadow_load_object_ids,
             max_hash_part_bytes,
             call_inputs,
             fresh_coins,

@@ -10183,13 +10183,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("if manifest_expected_kernel_steps != program_expected_kernel_steps {")
         && state_source
             .contains("allocator.max_kernel_ops = manifest_expected_kernel_steps.len();")
-        && state_source.contains("let shadow_load_object_ids = program")
-        && state_source.contains("PublicRuntimeKernel::begin(allocator, None, public_object_ids.clone())?")
+        && state_source
+            .contains("PublicRuntimeKernel::begin(allocator, None, public_object_ids.clone())?")
         && !state_source.contains("let expected_kernel_steps =")
         && !state_source.contains("expected_kernel_steps: Vec<RuntimeKernelStepWitness>,")
-        && !state_source.contains("shadow_load_object_ids: Vec<u32>,")
+        && !state_source.contains("shadow_load_object_ids")
         && kernel_source.contains("self.bind_expected_kernel_program(program)?;")
-        && kernel_source.contains("fn bind_expected_kernel_program(");
+        && kernel_source.contains("fn bind_expected_kernel_program(")
+        && kernel_source
+            .contains("let shadow_load_object_ids = self.expected_shadow_load_object_ids()?;")
+        && kernel_source.contains("fn expected_shadow_load_object_ids(&self) -> Result<Vec<u32>>");
     let trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program =
         core_trusted_kernel_source.contains("pub fn runtime_trusted_kernel_slot_bundle(")
             && core_trusted_kernel_source.contains("manifest_entry")
