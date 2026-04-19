@@ -36,6 +36,7 @@ enum ReportKind {
     RuntimeBoundaryValidation,
     KernelModelAlignmentValidation,
     ShellBoundaryValidation,
+    ShellBoundarySlotValidation,
     ShellBoundaryLoweringValidation,
     ConfidentialFragmentValidation,
     KernelDslValidation,
@@ -43,6 +44,7 @@ enum ReportKind {
     KernelLoweringValidation,
     ConfidentialCoreValidation,
     ConfidentialCoreSlotValidation,
+    ConfidentialCoreShellBoundarySlotValidation,
     ConfidentialCoreLoweringValidation,
     ConfidentialCoreShellBoundaryLoweringValidation,
     CanonicalPathoramPairValidation,
@@ -84,7 +86,10 @@ fn write_single_report(
     report: &JsonValue,
 ) -> Result<()> {
     fs::create_dir_all(out_dir)?;
-    fs::write(Path::new(out_dir).join(file_name), serde_json::to_vec_pretty(report)?)?;
+    fs::write(
+        Path::new(out_dir).join(file_name),
+        serde_json::to_vec_pretty(report)?,
+    )?;
     if report_name == "reviewer_summary" {
         mplus_probe::write_reviewer_summary_markdown(out_dir, report)?;
     }
@@ -242,6 +247,15 @@ fn main() -> Result<()> {
                 &report,
             )?;
         }
+        Some(ReportKind::ShellBoundarySlotValidation) => {
+            let report = mplus_probe::run_shell_boundary_slot_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "shell_boundary_slot_validation.json",
+                "shell_boundary_slot_validation",
+                &report,
+            )?;
+        }
         Some(ReportKind::ShellBoundaryLoweringValidation) => {
             let report = mplus_probe::run_shell_boundary_lowering_validation_report()?;
             write_single_report(
@@ -302,6 +316,16 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "confidential_core_slot_validation.json",
                 "confidential_core_slot_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialCoreShellBoundarySlotValidation) => {
+            let report =
+                mplus_probe::run_confidential_core_shell_boundary_slot_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_core_shell_boundary_slot_validation.json",
+                "confidential_core_shell_boundary_slot_validation",
                 &report,
             )?;
         }

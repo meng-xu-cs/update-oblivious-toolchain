@@ -4,33 +4,35 @@
 
 | Report | Milliseconds |
 | --- | ---: |
-| `total_probe_ms` | `140533` |
-| `canonical_pathoram_pair_validation` | `57174` |
-| `fresh_coin_validation` | `13728` |
-| `tamper_validation` | `9982` |
-| `pathoram_pair_validation` | `6076` |
-| `seeded_witness_validation` | `3158` |
-| `kernel_validation` | `2971` |
-| `confidential_core_shell_boundary_lowering_validation` | `2936` |
-| `kernel_dsl_validation` | `2876` |
-| `shell_boundary_validation` | `2830` |
-| `shell_boundary_lowering_validation` | `2827` |
-| `trusted_kernel_validation` | `2825` |
-| `controller_observer_validation` | `2771` |
-| `kernel_lowering_validation` | `2738` |
-| `confidential_core_validation` | `2687` |
-| `kernel_slot_dsl_validation` | `2640` |
-| `trace_equivalence` | `2565` |
-| `confidential_core_lowering_validation` | `2547` |
-| `leakage_auc` | `2546` |
-| `mutual_information` | `2527` |
-| `kernel_refinement_validation` | `2472` |
-| `confidential_core_slot_validation` | `2466` |
-| `pathoram_hidden_validation` | `2066` |
-| `witness_validation` | `1843` |
-| `static_checks` | `1528` |
-| `correctness` | `1212` |
-| `runtime_boundary_validation` | `269` |
+| `total_probe_ms` | `147426` |
+| `canonical_pathoram_pair_validation` | `56560` |
+| `fresh_coin_validation` | `13793` |
+| `tamper_validation` | `10246` |
+| `pathoram_pair_validation` | `6033` |
+| `seeded_witness_validation` | `3116` |
+| `confidential_core_shell_boundary_lowering_validation` | `3008` |
+| `kernel_refinement_validation` | `2972` |
+| `confidential_core_shell_boundary_slot_validation` | `2938` |
+| `trusted_kernel_validation` | `2894` |
+| `kernel_slot_dsl_validation` | `2883` |
+| `confidential_core_slot_validation` | `2865` |
+| `shell_boundary_validation` | `2840` |
+| `confidential_core_validation` | `2820` |
+| `controller_observer_validation` | `2816` |
+| `kernel_dsl_validation` | `2801` |
+| `kernel_lowering_validation` | `2743` |
+| `shell_boundary_lowering_validation` | `2729` |
+| `confidential_core_lowering_validation` | `2721` |
+| `shell_boundary_slot_validation` | `2712` |
+| `trace_equivalence` | `2695` |
+| `kernel_validation` | `2648` |
+| `mutual_information` | `2505` |
+| `leakage_auc` | `2504` |
+| `pathoram_hidden_validation` | `2220` |
+| `witness_validation` | `2081` |
+| `static_checks` | `1524` |
+| `correctness` | `1216` |
+| `runtime_boundary_validation` | `264` |
 | `overheads` | `115` |
 | `kernel_model_alignment_validation` | `3` |
 | `confidential_fragment_validation` | `0` |
@@ -42,23 +44,23 @@
 | `canonical_pathoram_pair_validation.scenarios[1].certificate_json_bytes` | `189305140` |
 | `fresh_coin_validation.scenarios[1].witness_family_json_bytes` | `94647675` |
 | `canonical_pathoram_pair_validation.scenarios[0].certificate_json_bytes` | `8216346` |
-| `tamper_validation.scenarios[20].artifact_json_bytes` | `8216346` |
-| `tamper_validation.scenarios[21].artifact_json_bytes` | `8216346` |
+| `tamper_validation.scenarios[22].artifact_json_bytes` | `8216346` |
+| `tamper_validation.scenarios[23].artifact_json_bytes` | `8216346` |
 | `fresh_coin_validation.scenarios[0].witness_family_json_bytes` | `4105222` |
-| `tamper_validation.scenarios[17].artifact_json_bytes` | `4105222` |
+| `tamper_validation.scenarios[19].artifact_json_bytes` | `4105222` |
 | `pathoram_pair_validation.scenarios[3].certificate_json_bytes` | `1619968` |
 | `seeded_witness_validation.scenarios[3].witness_family_json_bytes` | `768398` |
 | `pathoram_pair_validation.scenarios[2].certificate_json_bytes` | `498341` |
 | `canonical_pathoram_pair_validation.scenarios[3].theorem_input_json_bytes` | `468944` |
 | `pathoram_pair_validation.scenarios[1].certificate_json_bytes` | `379834` |
-| `confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes` | `297461` |
-| `tamper_validation.scenarios[19].artifact_json_bytes` | `262697` |
+| `confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes` | `297485` |
+| `confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes` | `295543` |
+| `tamper_validation.scenarios[21].artifact_json_bytes` | `262697` |
 | `pathoram_pair_validation.scenarios[0].certificate_json_bytes` | `262696` |
 | `seeded_witness_validation.scenarios[2].witness_family_json_bytes` | `237521` |
-| `confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes` | `195534` |
-| `confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes` | `193954` |
-| `confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes` | `193583` |
-| `fresh_coin_validation.scenarios[3].theorem_input_json_bytes` | `192887` |
+| `confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes` | `195527` |
+| `confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes` | `193960` |
+| `confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes` | `193590` |
 
 ## Largest Estimated Artifacts
 
@@ -83,9 +85,9 @@
 
 | Surface | Total Non-Empty LOC |
 | --- | ---: |
-| Trusted Rust runtime surface | `6930` |
+| Trusted Rust runtime surface | `6935` |
 | Outer runtime risk surface | `934` |
-| Lean theorem/checker repo surface | `27495` |
+| Lean theorem/checker repo surface | `27883` |
 
 ## Current TCB Table
 

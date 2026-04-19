@@ -243,6 +243,13 @@ against the fixed-slot confidential program that `RuntimeKernel` executes,
 so the runtime/refinement witness is tied not only to the source-named DSL
 object but also to the slot-lowered kernel body that the concrete runtime
 actually evaluates.
+`confidential_core_shell_boundary_slot_validation.json` then lifts that
+slot-only path across the shell boundary: it serializes the full runtime
+witness together with the explicit shell-boundary bundle and the exact slot
+confidential program for the same entrypoint, and Lean checks that the runtime
+witness, shell-boundary bundle, and slot schedule all share one exact
+proof-grade kernel witness and runtime phase witness without relying on the
+named-to-slot lowering bundle.
 `confidential_core_lowering_validation.json` then joins those two artifacts
 back together: it serializes one runtime witness together with both the named
 and slot confidential programs for the invoked entrypoint, requires the named
@@ -266,9 +273,9 @@ enum, the Rust confidential-kernel DSL enums, the Rust slot-DSL enums, and
 the Rust kernel resource/refinement witness enums and checks that their
 serialized vocabularies and DSL/proof-interface struct field names match the
 explicit Lean opcode, confidential-DSL, slot-DSL, runtime-kernel-lowering,
-runtime-confidential-core-lowering,
+runtime-confidential-core-lowering, runtime-confidential-core-shell-boundary-slot,
 runtime-confidential-core-shell-boundary-lowering, runtime-shell-contract,
-runtime-shell-trace, runtime-shell-boundary,
+runtime-shell-trace, runtime-shell-boundary, runtime-shell-boundary-slot,
 runtime-shell-boundary-lowering, resource-event, scratch-region, and
 refinement-event vocabularies exactly.
 `kernel_refinement_validation.json` checks that lower-level runtime phase
@@ -281,6 +288,11 @@ runtime phase witness, and Lean checks both that those two explicit views are
 exactly the contract/trace reconstructed from the witnesses, that the
 shell-event trace replays the public shell contract, and that the
 exported shell trace refines the exported shell contract, and
+`shell_boundary_slot_validation.json` then ties that same shell-boundary
+bundle directly to the exact fixed-slot confidential program that
+`RuntimeKernel` executes, so Lean checks the shell-boundary refinement claim
+and the slot schedule against one shared proof-grade kernel witness without
+passing through the named DSL bundle, and
 `shell_boundary_lowering_validation.json` then composes that shell interface
 with the shared DSL/interpreter bridge: it serializes the exact shell-boundary
 bundle together with the named and slot confidential programs for the same

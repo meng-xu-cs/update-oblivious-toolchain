@@ -9,8 +9,8 @@ use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
     RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
-    RuntimeKernelWitness, RuntimeOramAccessCounterWitness,
-    RuntimePathOramPositionMapWitness, Value,
+    RuntimeKernelWitness, RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
+    Value,
 };
 
 #[derive(Debug)]

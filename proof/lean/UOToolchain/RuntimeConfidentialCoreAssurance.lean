@@ -220,6 +220,10 @@ structure RuntimeShellBoundaryLoweringBundle where
   confidentialProgram : ConfidentialKernelProgram
   confidentialSlotProgram : ConfidentialKernelSlotProgram
 
+structure RuntimeShellBoundarySlotBundle where
+  shellBoundaryBundle : RuntimeShellBoundaryBundle
+  confidentialSlotProgram : ConfidentialKernelSlotProgram
+
 def RuntimeShellBoundaryLoweringBundle.Valid
   (bundle : RuntimeShellBoundaryLoweringBundle) : Prop :=
   bundle.shellBoundaryBundle.Valid ∧
@@ -259,10 +263,35 @@ theorem runtimeShellBoundaryLoweringBundle_proofGradeAssurance
     ⟨runtimeShellBoundaryBundle_witness_refines hValid.1, hValid.2.1, hValid.2.2.1,
       hSlotExpected, hSlotSteps, hValid.2.2.2⟩
 
+def RuntimeShellBoundarySlotBundle.Valid
+  (bundle : RuntimeShellBoundarySlotBundle) : Prop :=
+  bundle.shellBoundaryBundle.Valid ∧
+    bundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+      some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    bundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+      bundle.confidentialSlotProgram.expectedRuntimeKernelSteps
+
+theorem runtimeShellBoundarySlotBundle_proofGradeAssurance
+  (bundle : RuntimeShellBoundarySlotBundle)
+  (hValid : bundle.Valid) :
+  bundle.shellBoundaryBundle.runtimeKernelRefinementWitness.shellTrace.Refines
+      bundle.shellBoundaryBundle.kernelWitness.shellContract ∧
+    bundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+      some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    bundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+      bundle.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    ⟨runtimeShellBoundaryBundle_witness_refines hValid.1, hValid.2.1, hValid.2.2⟩
+
 structure RuntimeConfidentialCoreShellBoundaryLoweringBundle where
   runtimeWitness : RuntimeRefinementWitness
   shellBoundaryBundle : RuntimeShellBoundaryBundle
   confidentialProgram : ConfidentialKernelProgram
+  confidentialSlotProgram : ConfidentialKernelSlotProgram
+
+structure RuntimeConfidentialCoreShellBoundarySlotBundle where
+  runtimeWitness : RuntimeRefinementWitness
+  shellBoundaryBundle : RuntimeShellBoundaryBundle
   confidentialSlotProgram : ConfidentialKernelSlotProgram
 
 def RuntimeConfidentialCoreShellBoundaryLoweringBundle.Valid
@@ -276,6 +305,21 @@ def RuntimeConfidentialCoreShellBoundaryLoweringBundle.Valid
     RuntimeShellBoundaryLoweringBundle.Valid
       { shellBoundaryBundle := bundle.shellBoundaryBundle
       , confidentialProgram := bundle.confidentialProgram
+      , confidentialSlotProgram := bundle.confidentialSlotProgram
+      } ∧
+    bundle.runtimeWitness.kernelWitness = some bundle.shellBoundaryBundle.kernelWitness ∧
+    bundle.runtimeWitness.runtimeKernelRefinementWitness =
+      some bundle.shellBoundaryBundle.runtimeKernelRefinementWitness
+
+def RuntimeConfidentialCoreShellBoundarySlotBundle.Valid
+  (bundle : RuntimeConfidentialCoreShellBoundarySlotBundle)
+  (modelTags : SGXModelTags) : Prop :=
+  RuntimeConfidentialCoreSlotBundle.Valid
+      { runtimeWitness := bundle.runtimeWitness
+      , confidentialProgram := bundle.confidentialSlotProgram
+      } modelTags ∧
+    RuntimeShellBoundarySlotBundle.Valid
+      { shellBoundaryBundle := bundle.shellBoundaryBundle
       , confidentialSlotProgram := bundle.confidentialSlotProgram
       } ∧
     bundle.runtimeWitness.kernelWitness = some bundle.shellBoundaryBundle.kernelWitness ∧
@@ -350,5 +394,57 @@ theorem runtimeConfidentialCoreShellBoundaryLoweringBundle_proofGradeAssurance
       hShellBoundaryLowering.1, hShellBoundaryLowering.2.1, hShellBoundaryLowering.2.2.1,
       hShellBoundaryLowering.2.2.2.1, hShellBoundaryLowering.2.2.2.2.1,
       hShellBoundaryLowering.2.2.2.2.2⟩
+
+theorem runtimeConfidentialCoreShellBoundarySlotBundle_proofGradeAssurance
+  (bundle : RuntimeConfidentialCoreShellBoundarySlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.runtimeWitness.kernelWitness = some bundle.shellBoundaryBundle.kernelWitness ∧
+    bundle.runtimeWitness.runtimeKernelRefinementWitness =
+      some bundle.shellBoundaryBundle.runtimeKernelRefinementWitness ∧
+    bundle.shellBoundaryBundle.runtimeKernelRefinementWitness.shellTrace.Refines
+      bundle.shellBoundaryBundle.kernelWitness.shellContract ∧
+    bundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+      some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    bundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+      bundle.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  rcases hValid with ⟨hCoreValid, hShellSlotValid, hKernelExact, hRefinementExact⟩
+  have hCore :
+      ∃ kernelWitness runtimeKernelRefinementWitness,
+        bundle.runtimeWitness.kernelWitness = some kernelWitness ∧
+          kernelWitness.expectedKernelSteps =
+            some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+          kernelWitness.kernelSteps = bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+          bundle.runtimeWitness.runtimeKernelRefinementWitness =
+            some runtimeKernelRefinementWitness ∧
+          runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+    exact runtimeConfidentialCoreSlotBundle_proofGradeAssurance
+      { runtimeWitness := bundle.runtimeWitness
+      , confidentialProgram := bundle.confidentialSlotProgram
+      } modelTags hCoreValid
+  have hShell :
+      bundle.shellBoundaryBundle.runtimeKernelRefinementWitness.shellTrace.Refines
+          bundle.shellBoundaryBundle.kernelWitness.shellContract ∧
+        bundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+          some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+        bundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+          bundle.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+    exact runtimeShellBoundarySlotBundle_proofGradeAssurance
+      { shellBoundaryBundle := bundle.shellBoundaryBundle
+      , confidentialSlotProgram := bundle.confidentialSlotProgram
+      } hShellSlotValid
+  rcases hCore with
+    ⟨kernelWitness, runtimeKernelRefinementWitness, hRuntimeKernel, hRuntimeExpected,
+      hRuntimeSteps, hRuntimeRefinement, _hCoreShellRefines⟩
+  have hShellKernelEq : kernelWitness = bundle.shellBoundaryBundle.kernelWitness := by
+    apply Option.some.inj
+    exact hRuntimeKernel.symm.trans hKernelExact
+  have hShellRefinementEq :
+      runtimeKernelRefinementWitness = bundle.shellBoundaryBundle.runtimeKernelRefinementWitness := by
+    apply Option.some.inj
+    exact hRuntimeRefinement.symm.trans hRefinementExact
+  subst hShellKernelEq
+  subst hShellRefinementEq
+  exact ⟨hKernelExact, hRefinementExact, hShell.1, hRuntimeExpected, hRuntimeSteps⟩
 
 end UOToolchain

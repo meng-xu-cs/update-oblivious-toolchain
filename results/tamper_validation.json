@@ -4,6 +4,7 @@
     "proofgrade_runtime_confidential_core_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCore",
     "proofgrade_runtime_confidential_core_lowering_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreLowering",
     "proofgrade_runtime_confidential_core_shell_boundary_lowering_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreShellBoundaryLowering",
+    "proofgrade_runtime_confidential_core_shell_boundary_slot_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreShellBoundarySlot",
     "proofgrade_runtime_confidential_core_slot_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreSlot",
     "proofgrade_runtime_kernel_dsl_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeKernelDsl",
     "proofgrade_runtime_kernel_lowering_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeKernelLowering",
@@ -13,6 +14,7 @@
     "proofgrade_runtime_refinement_witness": "proof/lean/.lake/build/bin/checkProofGradeRuntimeWitness",
     "proofgrade_runtime_shell_boundary_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeShellBoundary",
     "proofgrade_runtime_shell_boundary_lowering_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeShellBoundaryLowering",
+    "proofgrade_runtime_shell_boundary_slot_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeShellBoundarySlot",
     "proofgrade_runtime_trusted_kernel_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeTrustedKernel",
     "proofgrade_translation_artifacts": "proof/lean/.lake/build/bin/checkProofGradeTranslationArtifacts",
     "runtime_canonical_fresh_coin_theorem_input": "proof/lean/.lake/build/bin/checkRuntimeFreshCoinTheoremInput",
@@ -30,7 +32,7 @@
     "page_model": "page_v1",
     "shared_resource_model": "shared_v1"
   },
-  "scenario_count": 23,
+  "scenario_count": 25,
   "scenarios": [
     {
       "accepted": false,
@@ -59,7 +61,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 3278,
+      "artifact_json_bytes": 3277,
       "artifact_kind": "runtime_path_oram_hidden_certificate",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -164,7 +166,21 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16285,
+      "artifact_json_bytes": 10755,
+      "artifact_kind": "proofgrade_runtime_shell_boundary_slot_bundle",
+      "benchmark": "SingleAccessMap/pathoram/put",
+      "entrypoint": "put(bytes32,uint256)",
+      "lean_stderr": "uncaught exception: failed to validate proof-grade runtime shell-boundary slot bundle: imported proof-grade runtime shell-boundary slot bundle does not satisfy Lean validity checks",
+      "lean_stdout": "",
+      "mutation": "remove the final slot confidential-kernel statement while keeping the shell-boundary witness fixed",
+      "rejected": true,
+      "scenario": "shell_boundary_slot/slot_program_body_drift",
+      "statement_count_after": 0,
+      "statement_count_before": 1
+    },
+    {
+      "accepted": false,
+      "artifact_json_bytes": 16284,
       "artifact_kind": "proofgrade_runtime_confidential_core_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -178,7 +194,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16223,
+      "artifact_json_bytes": 16222,
       "artifact_kind": "proofgrade_runtime_confidential_core_slot_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -192,7 +208,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16591,
+      "artifact_json_bytes": 16590,
       "artifact_kind": "proofgrade_runtime_confidential_core_lowering_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -206,7 +222,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 27196,
+      "artifact_json_bytes": 27195,
       "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_lowering_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -220,7 +236,21 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16054,
+      "artifact_json_bytes": 26827,
+      "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_slot_bundle",
+      "benchmark": "SingleAccessMap/pathoram/put",
+      "entrypoint": "put(bytes32,uint256)",
+      "lean_stderr": "uncaught exception: failed to validate proof-grade runtime confidential-core shell-boundary slot bundle: imported proof-grade runtime confidential-core shell-boundary slot bundle does not satisfy Lean validity checks",
+      "lean_stdout": "",
+      "mutation": "remove the final slot confidential-kernel statement while keeping the runtime witness and shell-boundary bundle fixed",
+      "rejected": true,
+      "scenario": "confidential_core_shell_boundary_slot/slot_program_body_drift",
+      "statement_count_after": 0,
+      "statement_count_before": 1
+    },
+    {
+      "accepted": false,
+      "artifact_json_bytes": 16053,
       "artifact_kind": "proofgrade_runtime_refinement_witness",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -232,7 +262,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 15527,
+      "artifact_json_bytes": 15526,
       "artifact_kind": "proofgrade_runtime_trusted_kernel_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",

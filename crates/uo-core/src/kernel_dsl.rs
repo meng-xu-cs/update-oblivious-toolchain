@@ -41,6 +41,14 @@ pub enum RuntimeShellBoundaryLoweringBundleError {
     MissingConfidentialSlotProgram { entrypoint: String },
 }
 
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum RuntimeShellBoundarySlotBundleError {
+    #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
+    MissingEntrypoint { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
+    MissingConfidentialSlotProgram { entrypoint: String },
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelDslBundle {
     pub kernel_witness: RuntimeKernelWitness,
@@ -64,6 +72,12 @@ pub struct RuntimeKernelLoweringBundle {
 pub struct RuntimeShellBoundaryLoweringBundle {
     pub shell_boundary_bundle: RuntimeShellBoundaryBundle,
     pub confidential_program: ConfidentialKernelProgram,
+    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeShellBoundarySlotBundle {
+    pub shell_boundary_bundle: RuntimeShellBoundaryBundle,
     pub confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
@@ -154,6 +168,31 @@ impl RuntimeShellBoundaryLoweringBundle {
     }
 }
 
+impl RuntimeShellBoundarySlotBundle {
+    pub fn entrypoint_id(&self) -> &str {
+        self.shell_boundary_bundle.entrypoint_id()
+    }
+
+    pub fn program_matches_shell_entrypoint(&self) -> bool {
+        self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
+    }
+
+    pub fn from_manifest_entry(
+        shell_boundary_bundle: RuntimeShellBoundaryBundle,
+        entry: &EntrypointManifest,
+    ) -> Result<Self, RuntimeShellBoundarySlotBundleError> {
+        let entrypoint = shell_boundary_bundle.entrypoint_id().to_owned();
+        Ok(Self {
+            shell_boundary_bundle,
+            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
+                || RuntimeShellBoundarySlotBundleError::MissingConfidentialSlotProgram {
+                    entrypoint,
+                },
+            )?,
+        })
+    }
+}
+
 impl CompiledArtifact {
     pub fn runtime_kernel_dsl_bundle_for_entrypoint(
         &self,
@@ -222,5 +261,21 @@ impl CompiledArtifact {
             shell_boundary_bundle,
             manifest_entry,
         )
+    }
+
+    pub fn runtime_shell_boundary_slot_bundle(
+        &self,
+        shell_boundary_bundle: RuntimeShellBoundaryBundle,
+    ) -> Result<RuntimeShellBoundarySlotBundle, RuntimeShellBoundarySlotBundleError> {
+        let entrypoint = shell_boundary_bundle.entrypoint_id().to_owned();
+        let manifest_entry = self
+            .contract
+            .manifest
+            .entrypoints
+            .get(&entrypoint)
+            .ok_or_else(|| RuntimeShellBoundarySlotBundleError::MissingEntrypoint {
+                entrypoint: entrypoint.clone(),
+            })?;
+        RuntimeShellBoundarySlotBundle::from_manifest_entry(shell_boundary_bundle, manifest_entry)
     }
 }

@@ -10,11 +10,13 @@ enum OutputFormat {
     KernelLowering,
     KernelRefinementWitness,
     ShellBoundary,
+    ShellBoundarySlot,
     ShellBoundaryLowering,
     TrustedKernel,
     RefinementWitness,
     ConfidentialCore,
     ConfidentialCoreSlot,
+    ConfidentialCoreShellBoundarySlot,
     ConfidentialCoreLowering,
     ConfidentialCoreShellBoundaryLowering,
 }
@@ -86,6 +88,11 @@ fn main() -> Result<()> {
             let bundle = trace.runtime_shell_boundary_bundle()?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
+        OutputFormat::ShellBoundarySlot => {
+            let shell_boundary_bundle = trace.runtime_shell_boundary_bundle()?;
+            let bundle = artifact.runtime_shell_boundary_slot_bundle(shell_boundary_bundle)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
         OutputFormat::ShellBoundaryLowering => {
             let shell_boundary_bundle = trace.runtime_shell_boundary_bundle()?;
             let bundle = artifact.runtime_shell_boundary_lowering_bundle(shell_boundary_bundle)?;
@@ -105,6 +112,10 @@ fn main() -> Result<()> {
         }
         OutputFormat::ConfidentialCoreSlot => {
             let bundle = trace.runtime_confidential_core_slot_bundle(&artifact)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
+        OutputFormat::ConfidentialCoreShellBoundarySlot => {
+            let bundle = trace.runtime_confidential_core_shell_boundary_slot_bundle(&artifact)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::ConfidentialCoreLowering => {

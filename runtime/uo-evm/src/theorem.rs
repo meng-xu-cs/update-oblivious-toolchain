@@ -72,7 +72,12 @@ pub(crate) struct FinalizedCallTrace {
 
 impl FinalizedCallTrace {
     pub(crate) fn into_engine_result_parts(self) -> (Option<Value>, bool, ExecutionTrace, usize) {
-        (self.return_value, self.aborted, self.trace, self.zero_writes)
+        (
+            self.return_value,
+            self.aborted,
+            self.trace,
+            self.zero_writes,
+        )
     }
 }
 

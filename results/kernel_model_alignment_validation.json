@@ -127,6 +127,11 @@
     "confidential_program",
     "confidential_slot_program"
   ],
+  "lean_runtime_confidential_core_shell_boundary_slot_bundle_field_names": [
+    "runtime_witness",
+    "shell_boundary_bundle",
+    "confidential_slot_program"
+  ],
   "lean_runtime_confidential_core_slot_bundle_field_names": [
     "runtime_witness",
     "confidential_slot_program"
@@ -149,6 +154,10 @@
   "lean_runtime_shell_boundary_lowering_bundle_field_names": [
     "shell_boundary_bundle",
     "confidential_program",
+    "confidential_slot_program"
+  ],
+  "lean_runtime_shell_boundary_slot_bundle_field_names": [
+    "shell_boundary_bundle",
     "confidential_slot_program"
   ],
   "lean_runtime_shell_contract_field_names": [
@@ -177,11 +186,13 @@
   "resource_event_kind_serde_snake_case": true,
   "runtime_confidential_core_lowering_bundle_field_names_match": true,
   "runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match": true,
+  "runtime_confidential_core_shell_boundary_slot_bundle_field_names_match": true,
   "runtime_confidential_core_slot_bundle_field_names_match": true,
   "runtime_kernel_lowering_bundle_field_names_match": true,
   "runtime_kernel_slot_dsl_bundle_field_names_match": true,
   "runtime_shell_boundary_bundle_field_names_match": true,
   "runtime_shell_boundary_lowering_bundle_field_names_match": true,
+  "runtime_shell_boundary_slot_bundle_field_names_match": true,
   "runtime_shell_contract_field_names_match": true,
   "runtime_shell_trace_field_names_match": true,
   "rust_confidential_kernel_expr_kind_names": [
@@ -296,6 +307,11 @@
     "confidential_program",
     "confidential_slot_program"
   ],
+  "rust_runtime_confidential_core_shell_boundary_slot_bundle_field_names": [
+    "runtime_witness",
+    "shell_boundary_bundle",
+    "confidential_slot_program"
+  ],
   "rust_runtime_confidential_core_slot_bundle_field_names": [
     "runtime_witness",
     "confidential_slot_program"
@@ -318,6 +334,10 @@
   "rust_runtime_shell_boundary_lowering_bundle_field_names": [
     "shell_boundary_bundle",
     "confidential_program",
+    "confidential_slot_program"
+  ],
+  "rust_runtime_shell_boundary_slot_bundle_field_names": [
+    "shell_boundary_bundle",
     "confidential_slot_program"
   ],
   "rust_runtime_shell_contract_field_names": [
@@ -344,10 +364,12 @@
   "sources": {
     "lean_runtime_confidential_core": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean",
     "lean_runtime_confidential_core_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean",
+    "lean_runtime_confidential_core_shell_boundary_slot": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundarySlotJson.lean",
     "lean_runtime_kernel_dsl": "proof/lean/UOToolchain/RuntimeKernelDslJson.lean",
     "lean_runtime_refinement": "proof/lean/UOToolchain/RuntimeRefinement.lean",
     "lean_runtime_shell_boundary": "proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean",
     "lean_runtime_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean",
+    "lean_runtime_shell_boundary_slot": "proof/lean/UOToolchain/RuntimeShellBoundarySlotJson.lean",
     "rust_confidential_core": "crates/uo-core/src/confidential_core.rs",
     "rust_confidential_kernel": "crates/uo-core/src/confidential_kernel.rs",
     "rust_core_trace": "crates/uo-core/src/trace.rs",

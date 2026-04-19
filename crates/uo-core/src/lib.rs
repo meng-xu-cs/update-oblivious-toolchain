@@ -16,7 +16,9 @@ pub use confidential_core::{
     RuntimeConfidentialCoreBundle, RuntimeConfidentialCoreBundleError,
     RuntimeConfidentialCoreLoweringBundle, RuntimeConfidentialCoreLoweringBundleError,
     RuntimeConfidentialCoreShellBoundaryLoweringBundle,
-    RuntimeConfidentialCoreShellBoundaryLoweringBundleError, RuntimeConfidentialCoreSlotBundle,
+    RuntimeConfidentialCoreShellBoundaryLoweringBundleError,
+    RuntimeConfidentialCoreShellBoundarySlotBundle,
+    RuntimeConfidentialCoreShellBoundarySlotBundleError, RuntimeConfidentialCoreSlotBundle,
     RuntimeConfidentialCoreSlotBundleError,
 };
 pub use confidential_kernel::{
@@ -38,6 +40,7 @@ pub use kernel_dsl::{
     RuntimeKernelDslBundle, RuntimeKernelDslBundleError, RuntimeKernelLoweringBundle,
     RuntimeKernelLoweringBundleError, RuntimeKernelSlotDslBundle, RuntimeKernelSlotDslBundleError,
     RuntimeShellBoundaryLoweringBundle, RuntimeShellBoundaryLoweringBundleError,
+    RuntimeShellBoundarySlotBundle, RuntimeShellBoundarySlotBundleError,
 };
 pub use manifest::{
     validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeKernelStepManifest,

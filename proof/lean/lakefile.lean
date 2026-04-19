@@ -19,6 +19,10 @@ lean_exe checkProofGradeRuntimeConfidentialCoreSlot where
   root := `CheckProofGradeRuntimeConfidentialCoreSlot
 
 @[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCoreShellBoundarySlot where
+  root := `CheckProofGradeRuntimeConfidentialCoreShellBoundarySlot
+
+@[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCoreLowering where
   root := `CheckProofGradeRuntimeConfidentialCoreLowering
 
@@ -49,6 +53,10 @@ lean_exe checkProofGradeRuntimeKernelRefinementWitness where
 @[default_target]
 lean_exe checkProofGradeRuntimeShellBoundary where
   root := `CheckProofGradeRuntimeShellBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeShellBoundarySlot where
+  root := `CheckProofGradeRuntimeShellBoundarySlot
 
 @[default_target]
 lean_exe checkProofGradeRuntimeShellBoundaryLowering where
