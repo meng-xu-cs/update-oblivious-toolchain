@@ -193,11 +193,14 @@
     "runtime_witness",
     "confidential_slot_program"
   ],
+  "lean_runtime_kernel_dsl_bundle_exactness_present": true,
+  "lean_runtime_kernel_lowering_bundle_exactness_present": true,
   "lean_runtime_kernel_lowering_bundle_field_names": [
     "kernel_witness",
     "confidential_program",
     "confidential_slot_program"
   ],
+  "lean_runtime_kernel_slot_dsl_bundle_exactness_present": true,
   "lean_runtime_kernel_slot_dsl_bundle_field_names": [
     "kernel_witness",
     "confidential_slot_program"
@@ -241,6 +244,9 @@
     "io_scratch"
   ],
   "lean_shell_boundary_bundle_checks_exact_runtime_views": true,
+  "lean_shell_boundary_lowering_bundle_exactness_present": true,
+  "lean_shell_boundary_slot_bundle_exactness_present": true,
+  "lean_trusted_kernel_slot_bundle_proof_grade_exactness_present": true,
   "opcode_names_match": true,
   "refinement_event_kind_names_match": true,
   "refinement_event_kind_serde_snake_case": true,
@@ -250,6 +256,70 @@
   "runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match": true,
   "runtime_confidential_core_shell_boundary_slot_bundle_field_names_match": true,
   "runtime_confidential_core_slot_bundle_field_names_match": true,
+  "runtime_kernel_bundle_bridge_checks": [
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "RuntimeKernelDslBundle::from_manifest_entry(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "RuntimeKernelSlotDslBundle::from_manifest_entry(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "RuntimeKernelLoweringBundle::from_manifest_entry(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "pub fn runtime_kernel_dsl_bundle_for_entrypoint(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "pub fn runtime_kernel_slot_dsl_bundle_for_entrypoint(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "pub fn runtime_kernel_lowering_bundle_for_entrypoint(",
+      "restricted": true
+    }
+  ],
+  "runtime_kernel_bundle_bridge_surface_restricted": true,
+  "runtime_kernel_bundle_uses_manifest_programs": true,
   "runtime_kernel_lowering_bundle_field_names_match": true,
   "runtime_kernel_slot_dsl_bundle_field_names_match": true,
   "runtime_shell_boundary_bundle_field_names_match": true,
@@ -482,6 +552,50 @@
     }
   ],
   "shell_boundary_exact_bridge_surface_restricted": true,
+  "shell_boundary_slot_lowering_bridge_checks": [
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "RuntimeShellBoundaryLoweringBundle::from_manifest_entry(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "RuntimeShellBoundarySlotBundle::from_manifest_entry(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "pub fn runtime_shell_boundary_lowering_bundle(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/kernel_dsl.rs"
+      ],
+      "pattern": "pub fn runtime_shell_boundary_slot_bundle(",
+      "restricted": true
+    }
+  ],
+  "shell_boundary_slot_lowering_bridge_surface_restricted": true,
+  "shell_boundary_slot_lowering_uses_manifest_programs": true,
   "sources": {
     "lean_runtime_confidential_core": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean",
     "lean_runtime_confidential_core_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean",
@@ -499,5 +613,39 @@
     "rust_precompiles": "runtime/uo-precompiles/src/lib.rs",
     "rust_shell_boundary": "crates/uo-core/src/shell_boundary.rs",
     "rust_trusted_kernel": "crates/uo-core/src/trusted_kernel.rs"
-  }
+  },
+  "trusted_kernel_slot_bundle_bridge_checks": [
+    {
+      "expected_files": [
+        "crates/uo-core/src/trusted_kernel.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trusted_kernel.rs"
+      ],
+      "pattern": "pub fn program_matches_trusted_kernel_entrypoint(&self) -> bool {",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trusted_kernel.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trusted_kernel.rs"
+      ],
+      "pattern": "pub fn from_trusted_kernel_bundle(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trusted_kernel.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trusted_kernel.rs"
+      ],
+      "pattern": "pub fn runtime_trusted_kernel_slot_bundle(",
+      "restricted": true
+    }
+  ],
+  "trusted_kernel_slot_bundle_bridge_surface_restricted": true,
+  "trusted_kernel_slot_bundle_uses_manifest_slot_program": true
 }

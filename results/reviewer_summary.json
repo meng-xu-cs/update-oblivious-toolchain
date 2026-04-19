@@ -124,13 +124,13 @@
         "report": "pathoram_pair_validation"
       },
       {
-        "bytes": 297473,
+        "bytes": 297492,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_lowering_validation"
       },
       {
-        "bytes": 295551,
+        "bytes": 295563,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_slot_validation"
@@ -154,19 +154,19 @@
         "report": "seeded_witness_validation"
       },
       {
-        "bytes": 195527,
+        "bytes": 195534,
         "estimated": false,
         "metric": "confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes",
         "report": "confidential_core_lowering_validation"
       },
       {
-        "bytes": 193964,
+        "bytes": 193942,
         "estimated": false,
         "metric": "confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes",
         "report": "confidential_core_validation"
       },
       {
-        "bytes": 193603,
+        "bytes": 193599,
         "estimated": false,
         "metric": "confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes",
         "report": "confidential_core_slot_validation"
@@ -233,38 +233,38 @@
     }
   ],
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 56042,
-    "confidential_core_lowering_validation": 2966,
-    "confidential_core_shell_boundary_lowering_validation": 2748,
-    "confidential_core_shell_boundary_slot_validation": 2761,
-    "confidential_core_slot_validation": 2762,
-    "confidential_core_validation": 2906,
+    "canonical_pathoram_pair_validation": 56653,
+    "confidential_core_lowering_validation": 2937,
+    "confidential_core_shell_boundary_lowering_validation": 2923,
+    "confidential_core_shell_boundary_slot_validation": 2827,
+    "confidential_core_slot_validation": 2909,
+    "confidential_core_validation": 2715,
     "confidential_fragment_validation": 0,
-    "controller_observer_validation": 2907,
-    "correctness": 1206,
-    "fresh_coin_validation": 13753,
-    "kernel_dsl_validation": 2918,
-    "kernel_lowering_validation": 2858,
-    "kernel_model_alignment_validation": 19,
-    "kernel_refinement_validation": 2837,
-    "kernel_slot_dsl_validation": 2708,
-    "kernel_validation": 2824,
-    "leakage_auc": 2505,
-    "mutual_information": 2505,
-    "overheads": 115,
-    "pathoram_hidden_validation": 2119,
-    "pathoram_pair_validation": 6043,
-    "runtime_boundary_validation": 302,
-    "seeded_witness_validation": 3115,
-    "shell_boundary_lowering_validation": 2978,
-    "shell_boundary_slot_validation": 2712,
-    "shell_boundary_validation": 2475,
-    "static_checks": 1573,
-    "tamper_validation": 10696,
-    "total_probe_ms": 147022,
-    "trace_equivalence": 2725,
-    "trusted_kernel_validation": 2939,
-    "witness_validation": 1837
+    "controller_observer_validation": 2868,
+    "correctness": 1204,
+    "fresh_coin_validation": 13754,
+    "kernel_dsl_validation": 2793,
+    "kernel_lowering_validation": 2935,
+    "kernel_model_alignment_validation": 41,
+    "kernel_refinement_validation": 2755,
+    "kernel_slot_dsl_validation": 2831,
+    "kernel_validation": 2807,
+    "leakage_auc": 2523,
+    "mutual_information": 2564,
+    "overheads": 116,
+    "pathoram_hidden_validation": 2150,
+    "pathoram_pair_validation": 6112,
+    "runtime_boundary_validation": 311,
+    "seeded_witness_validation": 3131,
+    "shell_boundary_lowering_validation": 2836,
+    "shell_boundary_slot_validation": 2777,
+    "shell_boundary_validation": 2852,
+    "static_checks": 1730,
+    "tamper_validation": 9889,
+    "total_probe_ms": 147513,
+    "trace_equivalence": 2744,
+    "trusted_kernel_validation": 2832,
+    "witness_validation": 1831
   },
   "runtime_overheads": {
     "cases": [

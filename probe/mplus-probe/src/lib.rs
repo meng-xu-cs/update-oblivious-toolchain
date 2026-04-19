@@ -8214,6 +8214,186 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_confidential_core_shell_boundary_lowering_source.contains(
             "theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_recomputedSlotSchedule_exact",
         );
+    let trusted_kernel_slot_bundle_bridge_checks = [
+        (
+            "pub fn program_matches_trusted_kernel_entrypoint(&self) -> bool {",
+            vec![String::from("crates/uo-core/src/trusted_kernel.rs")],
+        ),
+        (
+            "pub fn from_trusted_kernel_bundle(",
+            vec![String::from("crates/uo-core/src/trusted_kernel.rs")],
+        ),
+        (
+            "pub fn runtime_trusted_kernel_slot_bundle(",
+            vec![String::from("crates/uo-core/src/trusted_kernel.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&core_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let trusted_kernel_slot_bundle_bridge_surface_restricted =
+        trusted_kernel_slot_bundle_bridge_checks
+            .iter()
+            .all(|entry| {
+                entry["restricted"]
+                    .as_bool()
+                    .expect("trusted-kernel slot bridge restriction flag must be boolean")
+            });
+    let trusted_kernel_slot_bundle_uses_manifest_slot_program = trusted_kernel_source
+        .contains("manifest_entry")
+        && trusted_kernel_source.contains(".confidential_slot_program")
+        && !trusted_kernel_source.contains(".confidential_program");
+    let lean_trusted_kernel_slot_bundle_proof_grade_exactness_present =
+        lean_runtime_trusted_kernel_source
+            .contains("theorem importedRuntimeTrustedKernelBundle_proofGradeKernelSchedule_exact")
+            && lean_runtime_trusted_kernel_source
+                .contains("bundle.trusted_kernel_bundle.ProofGradeValid modelTags")
+            && lean_runtime_trusted_kernel_source
+                .contains("def ImportedRuntimeTrustedKernelSlotBundle.Valid")
+            && lean_runtime_trusted_kernel_source
+                .contains("bundle.trusted_kernel_bundle.checkProofGrade modelTags")
+            && lean_runtime_trusted_kernel_source
+                .contains("theorem importedRuntimeTrustedKernelSlotBundle_toRuntimeValid");
+    let shell_boundary_slot_lowering_bridge_checks = [
+        (
+            "RuntimeShellBoundaryLoweringBundle::from_manifest_entry(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeShellBoundarySlotBundle::from_manifest_entry(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "pub fn runtime_shell_boundary_lowering_bundle(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "pub fn runtime_shell_boundary_slot_bundle(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&core_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let shell_boundary_slot_lowering_bridge_surface_restricted =
+        shell_boundary_slot_lowering_bridge_checks
+            .iter()
+            .all(|entry| {
+                entry["restricted"]
+                    .as_bool()
+                    .expect("shell-boundary slot/lowering bridge restriction flag must be boolean")
+            });
+    let shell_boundary_slot_lowering_uses_manifest_programs = kernel_dsl_source
+        .contains("entry.confidential_program")
+        && kernel_dsl_source.contains("entry.confidential_slot_program")
+        && kernel_dsl_source.contains("let manifest_entry = self");
+    let lean_shell_boundary_slot_bundle_exactness_present = lean_runtime_shell_boundary_slot_source
+        .contains("theorem importedRuntimeShellBoundarySlotBundle_shellRefines")
+        && lean_runtime_shell_boundary_slot_source
+            .contains("theorem importedRuntimeShellBoundarySlotBundle_slotSchedule_exact")
+        && lean_runtime_shell_boundary_slot_source
+            .contains("theorem importedRuntimeShellBoundarySlotBundle_toRuntimeValid");
+    let lean_shell_boundary_lowering_bundle_exactness_present =
+        lean_runtime_shell_boundary_lowering_source
+            .contains("theorem importedRuntimeShellBoundaryLoweringBundle_shellRefines")
+            && lean_runtime_shell_boundary_lowering_source
+                .contains("theorem importedRuntimeShellBoundaryLoweringBundle_lowering_exact")
+            && lean_runtime_shell_boundary_lowering_source
+                .contains("theorem importedRuntimeShellBoundaryLoweringBundle_namedSchedule_exact")
+            && lean_runtime_shell_boundary_lowering_source.contains(
+                "theorem importedRuntimeShellBoundaryLoweringBundle_recomputedSlotSchedule_exact",
+            )
+            && lean_runtime_shell_boundary_lowering_source
+                .contains("theorem importedRuntimeShellBoundaryLoweringBundle_toRuntimeValid");
+    let runtime_kernel_bundle_bridge_checks = [
+        (
+            "RuntimeKernelDslBundle::from_manifest_entry(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeKernelSlotDslBundle::from_manifest_entry(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeKernelLoweringBundle::from_manifest_entry(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "pub fn runtime_kernel_dsl_bundle_for_entrypoint(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "pub fn runtime_kernel_slot_dsl_bundle_for_entrypoint(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "pub fn runtime_kernel_lowering_bundle_for_entrypoint(",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&core_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let runtime_kernel_bundle_bridge_surface_restricted =
+        runtime_kernel_bundle_bridge_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("runtime-kernel bundle bridge restriction flag must be boolean")
+        });
+    let runtime_kernel_bundle_uses_manifest_programs = kernel_dsl_source
+        .contains("entry.confidential_program")
+        && kernel_dsl_source.contains("entry.confidential_slot_program")
+        && kernel_dsl_source.contains("let manifest_entry = self");
+    let lean_runtime_kernel_dsl_bundle_exactness_present = lean_runtime_kernel_dsl_source
+        .contains("theorem importedRuntimeKernelDslBundle_schedule_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelDslBundle_toRuntimeSchedule_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelDslBundle_entrypoint_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelDslBundle_toRuntimeEntrypoint_exact");
+    let lean_runtime_kernel_slot_dsl_bundle_exactness_present = lean_runtime_kernel_dsl_source
+        .contains("theorem importedRuntimeKernelSlotDslBundle_schedule_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelSlotDslBundle_entrypoint_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelSlotDslBundle_toRuntimeEntrypoint_exact");
+    let lean_runtime_kernel_lowering_bundle_exactness_present = lean_runtime_kernel_dsl_source
+        .contains("theorem importedRuntimeKernelLoweringBundle_lowering_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelLoweringBundle_namedSchedule_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelLoweringBundle_recomputedSlotSchedule_exact")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelLoweringBundle_toRuntimeValid")
+        && lean_runtime_kernel_dsl_source
+            .contains("theorem importedRuntimeKernelLoweringBundle_toRuntimeBundle_sound");
 
     let resource_event_kind_serde_snake_case =
         rust_enum_has_serde_snake_case(&core_trace_source, "RuntimeKernelResourceEventKindWitness");
@@ -8273,6 +8453,18 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_confidential_core_proof_grade_assurance_present
         && lean_confidential_core_shell_boundary_slot_exactness_present
         && lean_confidential_core_shell_boundary_lowering_exactness_present
+        && trusted_kernel_slot_bundle_bridge_surface_restricted
+        && trusted_kernel_slot_bundle_uses_manifest_slot_program
+        && lean_trusted_kernel_slot_bundle_proof_grade_exactness_present
+        && shell_boundary_slot_lowering_bridge_surface_restricted
+        && shell_boundary_slot_lowering_uses_manifest_programs
+        && lean_shell_boundary_slot_bundle_exactness_present
+        && lean_shell_boundary_lowering_bundle_exactness_present
+        && runtime_kernel_bundle_bridge_surface_restricted
+        && runtime_kernel_bundle_uses_manifest_programs
+        && lean_runtime_kernel_dsl_bundle_exactness_present
+        && lean_runtime_kernel_slot_dsl_bundle_exactness_present
+        && lean_runtime_kernel_lowering_bundle_exactness_present
         && resource_event_kind_serde_snake_case
         && scratch_region_serde_snake_case
         && refinement_event_kind_serde_snake_case
@@ -8469,6 +8661,36 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             lean_confidential_core_shell_boundary_slot_exactness_present,
         "lean_confidential_core_shell_boundary_lowering_exactness_present":
             lean_confidential_core_shell_boundary_lowering_exactness_present,
+        "trusted_kernel_slot_bundle_bridge_checks":
+            trusted_kernel_slot_bundle_bridge_checks,
+        "trusted_kernel_slot_bundle_bridge_surface_restricted":
+            trusted_kernel_slot_bundle_bridge_surface_restricted,
+        "trusted_kernel_slot_bundle_uses_manifest_slot_program":
+            trusted_kernel_slot_bundle_uses_manifest_slot_program,
+        "lean_trusted_kernel_slot_bundle_proof_grade_exactness_present":
+            lean_trusted_kernel_slot_bundle_proof_grade_exactness_present,
+        "shell_boundary_slot_lowering_bridge_checks":
+            shell_boundary_slot_lowering_bridge_checks,
+        "shell_boundary_slot_lowering_bridge_surface_restricted":
+            shell_boundary_slot_lowering_bridge_surface_restricted,
+        "shell_boundary_slot_lowering_uses_manifest_programs":
+            shell_boundary_slot_lowering_uses_manifest_programs,
+        "lean_shell_boundary_slot_bundle_exactness_present":
+            lean_shell_boundary_slot_bundle_exactness_present,
+        "lean_shell_boundary_lowering_bundle_exactness_present":
+            lean_shell_boundary_lowering_bundle_exactness_present,
+        "runtime_kernel_bundle_bridge_checks":
+            runtime_kernel_bundle_bridge_checks,
+        "runtime_kernel_bundle_bridge_surface_restricted":
+            runtime_kernel_bundle_bridge_surface_restricted,
+        "runtime_kernel_bundle_uses_manifest_programs":
+            runtime_kernel_bundle_uses_manifest_programs,
+        "lean_runtime_kernel_dsl_bundle_exactness_present":
+            lean_runtime_kernel_dsl_bundle_exactness_present,
+        "lean_runtime_kernel_slot_dsl_bundle_exactness_present":
+            lean_runtime_kernel_slot_dsl_bundle_exactness_present,
+        "lean_runtime_kernel_lowering_bundle_exactness_present":
+            lean_runtime_kernel_lowering_bundle_exactness_present,
         "resource_event_kind_serde_snake_case": resource_event_kind_serde_snake_case,
         "scratch_region_serde_snake_case": scratch_region_serde_snake_case,
         "refinement_event_kind_serde_snake_case": refinement_event_kind_serde_snake_case,

@@ -450,6 +450,32 @@ The current runtime has a first hardening layer:
   `crates/uo-core/src/confidential_core.rs`, and the anti-drift report now
   also checks that the Lean side still carries the exact proof-grade assurance
   / witness-equality / named-vs-slot exactness theorems for those bundles
+- the trusted-kernel slot bridge is pinned on the same path:
+  `RuntimeTrustedKernelSlotBundle::from_trusted_kernel_bundle(...)`,
+  `ExecutionTrace::runtime_trusted_kernel_slot_bundle(...)`, and the
+  entrypoint-match helper stay confined to `crates/uo-core/src/trusted_kernel.rs`;
+  the anti-drift report now also checks that this bridge still sources the
+  exact manifest-carried slot DSL and that Lean keeps the proof-grade
+  trusted-kernel schedule exactness and slot-bundle validity path intact
+- the shell-boundary slot/lowering bridge family is pinned too:
+  `RuntimeShellBoundaryLoweringBundle::from_manifest_entry(...)`,
+  `RuntimeShellBoundarySlotBundle::from_manifest_entry(...)`,
+  `ExecutionTrace::runtime_shell_boundary_lowering_bundle(...)`, and
+  `runtime_shell_boundary_slot_bundle(...)` stay confined to
+  `crates/uo-core/src/kernel_dsl.rs`; the anti-drift report now also checks
+  that these bridges continue to source the manifest-carried named and slot
+  DSL programs exactly, and that Lean keeps the shell-refinement, slot-
+  schedule exactness, named-vs-slot lowering exactness, and to-runtime
+  validity theorems for those bundles
+- the direct runtime-kernel bundle family in that same module is pinned too:
+  `RuntimeKernelDslBundle::from_manifest_entry(...)`,
+  `RuntimeKernelSlotDslBundle::from_manifest_entry(...)`,
+  `RuntimeKernelLoweringBundle::from_manifest_entry(...)`, and the
+  `runtime_kernel_*_bundle_for_entrypoint(...)` entrypoints stay confined to
+  `crates/uo-core/src/kernel_dsl.rs`; the anti-drift report now also checks
+  that these bundles keep sourcing the manifest-carried named and slot DSL
+  programs and that Lean keeps the exact schedule, exact entrypoint, lowering,
+  and to-runtime soundness theorems for them
 - the hidden traced-call witness staging objects in `state.rs` now also wipe
   their access-counter and position-map vectors on drop unless the theorem
   finalizer explicitly consumes them

@@ -423,8 +423,16 @@ The first implementation step is now present in the codebase:
   confidential-core bundles to reuse `RuntimeShellBoundaryBundle` rather than
   rederive shell summaries, requires the confidential-core theorem bundle
   entrypoints to stay confined to `crates/uo-core/src/confidential_core.rs`,
-  and requires Lean to keep validating exact equality to those witness-induced
-  shell views and confidential-core proof-grade equalities
+  requires the trusted-kernel slot bundle bridge to stay confined to
+  `crates/uo-core/src/trusted_kernel.rs` while continuing to source the exact
+  manifest-carried slot DSL, requires the shell-boundary slot/lowering bundle
+  bridge family to stay confined to `crates/uo-core/src/kernel_dsl.rs` while
+  continuing to source the manifest-carried named and slot DSL programs,
+  requires the direct runtime-kernel DSL / slot-DSL / lowering bridge family
+  in that same `kernel_dsl.rs` module to stay confined and manifest-sourced as
+  well, and requires Lean to keep validating exact equality to those
+  witness-induced shell views plus the runtime-kernel, confidential-core,
+  shell-boundary slot/lowering, and trusted-kernel proof-grade equalities
 - the boundary report now also checks constructor authority for those witness
   alphabets: production runtime phase-witness events are restricted to
   `runtime/uo-evm/src/kernel.rs` plus `runtime/uo-evm/src/state.rs`, and
