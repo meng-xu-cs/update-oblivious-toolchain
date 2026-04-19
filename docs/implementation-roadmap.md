@@ -332,9 +332,12 @@ The first implementation step is now present in the codebase:
   also visibility-restricted to `crate::runtime`, so the generic shell cannot
   call those kernel hooks directly
 - `engine.rs` now delegates public execution to `runtime/uo-evm/src/shell.rs`
-  and confidential-kernel setup to `runtime/uo-evm/src/state.rs`, so the
-  engine no longer imports either the raw `RuntimeKernel` or the public kernel
-  facade directly
+  and both confidential manifest-to-kernel planning plus confidential-kernel
+  setup to `runtime/uo-evm/src/state.rs`, so the engine no longer imports
+  either the raw `RuntimeKernel` or the public kernel facade directly, and it
+  no longer loads the manifest-carried confidential slot program, derives the
+  admitted runtime kernel-step trace, or threads the manifest hash-scratch
+  bound itself
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while checker-side compiler validation and the

@@ -6,9 +6,9 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
-    ir::StateObject, ConfidentialKernelSlotProgram, RuntimeKernelRefinementEventWitness,
-    RuntimeKernelRefinementWitness, RuntimeKernelStepWitness, RuntimeOramAccessCounterWitness,
-    RuntimePathOramPositionMapWitness, Value,
+    ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
+    RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
 };
 
 #[derive(Debug)]
@@ -44,6 +44,16 @@ pub(crate) struct RuntimeShadowState {
 #[derive(Debug)]
 pub(crate) struct PublicRuntimeShadowState {
     shadow: RuntimeShadowState,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ConfidentialEntrypointPlan {
+    allocator: AllocatorPlan,
+    expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+    public_object_ids: Vec<u32>,
+    shadow_load_object_ids: Vec<u32>,
+    program: ConfidentialKernelSlotProgram,
+    max_hash_part_bytes: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -107,49 +117,59 @@ impl ContractRuntime {
             .commit_public_shadow(kernel, shadow, aborted, recorder)
     }
 
+    pub(crate) fn prepare_confidential_entrypoint(
+        &self,
+        entrypoint: &str,
+        manifest_entry: &EntrypointManifest,
+        public_object_ids: Vec<u32>,
+    ) -> Result<ConfidentialEntrypointPlan> {
+        ConfidentialEntrypointPlan::from_manifest_entry(
+            entrypoint,
+            manifest_entry,
+            public_object_ids,
+        )
+    }
+
     pub(crate) fn run_confidential_entrypoint(
         &mut self,
-        allocator: AllocatorPlan,
-        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
-        public_object_ids: Vec<u32>,
-        program: &ConfidentialKernelSlotProgram,
-        max_hash_part_bytes: usize,
+        plan: ConfidentialEntrypointPlan,
         args: Vec<Value>,
         fresh_coins: Option<&PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
     ) -> Result<ConfidentialCommittedCallOutcome> {
+        let ConfidentialEntrypointPlan {
+            allocator,
+            expected_kernel_steps,
+            public_object_ids,
+            shadow_load_object_ids,
+            program,
+            max_hash_part_bytes,
+        } = plan;
         let call_inputs = ConfidentialCallInputs::from_raw_args(args);
-        let shadow_load_object_ids = expected_kernel_steps
-            .iter()
-            .filter_map(|step| step.object_id)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
         let kernel = PublicRuntimeKernel::begin(
             allocator,
             Some(expected_kernel_steps),
             public_object_ids.clone(),
             Some(public_object_ids),
         )?;
-        let mut opcode_trace = Vec::new();
-        self.committed
-            .run_confidential_call(
-                kernel,
-                program,
-                &shadow_load_object_ids,
-                max_hash_part_bytes,
-                call_inputs,
-                fresh_coins,
-                recorder,
-                &mut opcode_trace,
-            )
-            .map(|outcome| ConfidentialCommittedCallOutcome {
-                runtime_kernel_witness: outcome.runtime_kernel_witness,
-                runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
-                aborted: outcome.aborted,
-                return_value: outcome.return_value,
-                opcode_trace,
-            })
+        let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
+        let outcome = self.committed.run_confidential_call(
+            kernel,
+            &program,
+            &shadow_load_object_ids,
+            max_hash_part_bytes,
+            call_inputs,
+            fresh_coins,
+            recorder,
+            &mut opcode_trace,
+        )?;
+        Ok(ConfidentialCommittedCallOutcome {
+            runtime_kernel_witness: outcome.runtime_kernel_witness,
+            runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
+            aborted: outcome.aborted,
+            return_value: outcome.return_value,
+            opcode_trace,
+        })
     }
 
     pub(crate) fn replace_with_cold_public_shadow(&mut self, shadow: PublicRuntimeShadowState) {
@@ -276,7 +296,7 @@ impl CommittedRuntimeState {
         fresh_coins: Option<&PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
-    ) -> Result<ConfidentialCommittedCallOutcome> {
+    ) -> Result<ConfidentialCommittedKernelOutcome> {
         let outcome = kernel.into_inner().run_confidential_call(
             program,
             self,
@@ -288,12 +308,11 @@ impl CommittedRuntimeState {
             opcode_trace,
         )?;
         self.objects = outcome.committed_shadow.into_cold_committed_state().objects;
-        Ok(ConfidentialCommittedCallOutcome {
+        Ok(ConfidentialCommittedKernelOutcome {
             runtime_kernel_witness: outcome.runtime_kernel_witness,
             runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
             aborted: outcome.aborted,
             return_value: outcome.return_value,
-            opcode_trace: Vec::new(),
         })
     }
 
@@ -364,6 +383,63 @@ impl CommittedRuntimeState {
     ) -> Result<RuntimeShadowState> {
         kernel.inner_mut().shadow_load_objects(self, object_ids)
     }
+}
+
+impl ConfidentialEntrypointPlan {
+    fn from_manifest_entry(
+        entrypoint: &str,
+        manifest_entry: &EntrypointManifest,
+        public_object_ids: Vec<u32>,
+    ) -> Result<Self> {
+        let mut allocator = AllocatorPlan::from_manifest(manifest_entry);
+        let manifest_expected_kernel_steps = manifest_entry
+            .kernel_steps
+            .iter()
+            .map(|step| RuntimeKernelStepWitness {
+                opcode: step.opcode,
+                object_id: step.object_id,
+            })
+            .collect::<Vec<_>>();
+        let program = manifest_entry
+            .confidential_slot_program
+            .clone()
+            .ok_or_else(|| {
+                anyhow!("manifest confidential_slot_program missing for {entrypoint}")
+            })?;
+        let expected_kernel_steps = program
+            .expected_runtime_steps()
+            .into_iter()
+            .map(RuntimeKernelStepWitness::from)
+            .collect::<Vec<_>>();
+        if manifest_expected_kernel_steps != expected_kernel_steps {
+            bail!(
+                "manifest kernel step trace drifted from confidential slot program for {entrypoint}"
+            );
+        }
+        allocator.max_kernel_ops = expected_kernel_steps.len();
+        let shadow_load_object_ids = expected_kernel_steps
+            .iter()
+            .filter_map(|step| step.object_id)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        Ok(Self {
+            allocator,
+            expected_kernel_steps,
+            public_object_ids,
+            shadow_load_object_ids,
+            program,
+            max_hash_part_bytes: manifest_entry.max_hash_part_bytes,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub(in crate::runtime) struct ConfidentialCommittedKernelOutcome {
+    pub runtime_kernel_witness: uo_core::RuntimeKernelWitness,
+    pub runtime_kernel_refinement_witness: uo_core::RuntimeKernelRefinementWitness,
+    pub aborted: bool,
+    pub return_value: Option<Value>,
 }
 
 #[derive(Debug)]

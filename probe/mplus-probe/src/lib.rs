@@ -6004,8 +6004,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("fn eval_binary(")
         && !engine_impl_source.contains("fn store_env_value(");
     let engine_delegates_confidential_execution_to_runtime = engine_impl_source
-        .contains("run_confidential_entrypoint(")
+        .contains("prepare_confidential_entrypoint(")
+        && engine_impl_source.contains("run_confidential_entrypoint(")
         && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
+    let engine_confidential_manifest_surface_absent = !engine_impl_source
+        .contains(".confidential_slot_program")
+        && !engine_impl_source.contains("RuntimeKernelStepWitness")
+        && !engine_impl_source.contains("expected_runtime_steps()")
+        && !engine_impl_source.contains("max_hash_part_bytes")
+        && !engine_impl_source.contains("kernel_steps");
     let engine_does_not_import_public_runtime_kernel = !engine_impl_source
         .contains("use crate::runtime::kernel::PublicRuntimeKernel;")
         && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
@@ -6277,14 +6284,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         !theorem_source.contains("CompiledFunction");
     let engine_public_trace_uses_output_shape_only = engine_impl_source
         .contains("let output_shape = output_shape_of(&manifest_entry, &return_value)?;");
-    let engine_uses_manifest_confidential_slot_program = engine_source
-        .contains(".confidential_slot_program")
-        && engine_source.contains("manifest confidential_slot_program missing");
-    let engine_uses_manifest_hash_scratch_bound = engine_source
-        .contains("let max_hash_part_bytes = manifest_entry.max_hash_part_bytes;")
-        && !engine_source.contains("manifest confidential_program missing")
-        && !engine_source
-            .contains("max_keccak_part_canonical_len_for_state(&self.artifact.contract.state)");
+    let state_prepares_confidential_manifest_plan = state_source
+        .contains("struct ConfidentialEntrypointPlan")
+        && state_source.contains("fn prepare_confidential_entrypoint(")
+        && state_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
+        && state_source.contains(".confidential_slot_program")
+        && state_source.contains("expected_runtime_steps()")
+        && state_source.contains("max_hash_part_bytes: manifest_entry.max_hash_part_bytes");
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
     let kernel_confidential_call_inputs_stay_inside_runtime = kernel_source
@@ -6362,6 +6368,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     });
     let state_routes_confidential_calls_through_runtime_kernel =
         state_source.contains("kernel.into_inner().run_confidential_call(");
+    let state_confidential_outcome_layering_is_explicit = state_source
+        .contains("struct ConfidentialCommittedKernelOutcome")
+        && state_source.contains("struct ConfidentialCommittedCallOutcome")
+        && !state_source.contains("opcode_trace: Vec::new()");
     let oram_working_stash_capacity_checks = [
         (
             "fn working_stash_capacity(parameters: &OramParameters) -> Result<usize>",
@@ -7030,6 +7040,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_delegates_public_execution_to_shell": engine_delegates_public_execution_to_shell,
         "engine_delegates_confidential_execution_to_runtime":
             engine_delegates_confidential_execution_to_runtime,
+        "engine_confidential_manifest_surface_absent":
+            engine_confidential_manifest_surface_absent,
         "engine_does_not_import_public_runtime_kernel":
             engine_does_not_import_public_runtime_kernel,
         "shell_uses_shadow_wrapper": shell_uses_shadow_wrapper,
@@ -7081,10 +7093,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             engine_public_trace_uses_output_shape_only,
         "engine_keeps_confidential_call_inputs_inside_runtime":
             engine_keeps_confidential_call_inputs_inside_runtime,
-        "engine_uses_manifest_confidential_slot_program":
-            engine_uses_manifest_confidential_slot_program,
-        "engine_uses_manifest_hash_scratch_bound":
-            engine_uses_manifest_hash_scratch_bound,
+        "state_prepares_confidential_manifest_plan":
+            state_prepares_confidential_manifest_plan,
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
         "kernel_confidential_call_inputs_stay_inside_runtime":
@@ -7107,6 +7117,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "kernel_bounded_journal_restricted": kernel_bounded_journal_restricted,
         "state_routes_confidential_calls_through_runtime_kernel":
             state_routes_confidential_calls_through_runtime_kernel,
+        "state_confidential_outcome_layering_is_explicit":
+            state_confidential_outcome_layering_is_explicit,
         "oram_working_stash_capacity_checks": oram_working_stash_capacity_checks,
         "oram_working_stash_capacity_restricted":
             oram_working_stash_capacity_restricted,
@@ -7198,6 +7210,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_uses_opaque_committed_state
             && engine_delegates_public_execution_to_shell
             && engine_delegates_confidential_execution_to_runtime
+            && engine_confidential_manifest_surface_absent
             && engine_does_not_import_public_runtime_kernel
             && shell_uses_shadow_wrapper
             && shell_uses_public_runtime_kernel
@@ -7230,8 +7243,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && theorem_public_trace_path_avoids_compiled_function
             && engine_public_trace_uses_output_shape_only
             && engine_keeps_confidential_call_inputs_inside_runtime
-            && engine_uses_manifest_confidential_slot_program
-            && engine_uses_manifest_hash_scratch_bound
+            && state_prepares_confidential_manifest_plan
             && kernel_executes_program_body_via_shared_dsl
             && kernel_confidential_call_inputs_stay_inside_runtime
             && kernel_exec_block_uses_confidential_slot_statements
@@ -7243,6 +7255,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && kernel_hash_scratch_uses_public_program_bound
             && kernel_bounded_journal_restricted
             && state_routes_confidential_calls_through_runtime_kernel
+            && state_confidential_outcome_layering_is_explicit
             && oram_working_stash_capacity_restricted
             && oram_working_stash_avoids_midcall_reserve
             && oram_buffer_reuse_restricted
@@ -8918,8 +8931,9 @@ confidential-path `RuntimeKernel` entrypoints that shadow-load committed
 state, run confidential calls, and commit public shadows are now likewise
 visibility-restricted to `crate::runtime`, so the generic shell cannot call
 those kernel hooks directly. `engine.rs` now delegates public execution to
-`shell.rs` and confidential-kernel setup to `state.rs`, so it no longer
-imports either the raw `RuntimeKernel` or the public kernel facade directly.
+`shell.rs` and both confidential manifest-to-kernel planning plus
+confidential-kernel setup to `state.rs`, so it no longer imports either the
+raw `RuntimeKernel` or the public kernel facade directly.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade
@@ -8955,10 +8969,11 @@ also checks that the
 confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
 commit, and confidential execution are visibility-restricted to
 `crate::runtime`, that `shell.rs` owns the public-kernel facade while
-`state.rs` owns confidential-kernel setup, and that confidential
-entrypoints are sourced from the checked manifest's
-`confidential_slot_program` in `engine.rs` while `runtime/uo-evm/src/state.rs`
-delegates confidential execution through `runtime/uo-evm/src/kernel.rs`, and
+`state.rs` owns confidential manifest planning plus confidential-kernel
+setup, and that confidential entrypoints are sourced from the checked
+manifest's `confidential_slot_program` in `runtime/uo-evm/src/state.rs`
+while that module delegates confidential execution through
+`runtime/uo-evm/src/kernel.rs`, and
 that the production kernel executes that shared slot DSL with a slot-vector
 confidential state rather than a string-keyed map, and that the kernel-step
 witness journal plus the lower-level

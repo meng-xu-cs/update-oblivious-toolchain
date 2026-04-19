@@ -7,10 +7,7 @@ use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use uo_allocator::AllocatorPlan;
-use uo_core::{
-    canonical_runtime_public_object_ids, CompiledArtifact, ExecutionTrace,
-    RuntimeKernelStepWitness, Value,
-};
+use uo_core::{canonical_runtime_public_object_ids, CompiledArtifact, ExecutionTrace, Value};
 
 #[derive(Debug)]
 pub struct ContractInstance {
@@ -127,46 +124,16 @@ impl ContractInstance {
             let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
             (public_call, None, Some(args))
         };
-        let mut allocator = AllocatorPlan::from_manifest(&manifest_entry);
-        let manifest_expected_kernel_steps = if function.confidential {
-            Some(
-                manifest_entry
-                    .kernel_steps
-                    .iter()
-                    .map(|step| RuntimeKernelStepWitness {
-                        opcode: step.opcode,
-                        object_id: step.object_id,
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        } else {
-            None
-        };
-        let confidential_slot_program = if function.confidential {
-            let program = manifest_entry
-                .confidential_slot_program
-                .clone()
-                .ok_or_else(|| {
-                    anyhow!("manifest confidential_slot_program missing for {entrypoint}")
-                })?;
-            let expected_kernel_steps = program
-                .expected_runtime_steps()
-                .into_iter()
-                .map(RuntimeKernelStepWitness::from)
-                .collect::<Vec<_>>();
-            if manifest_expected_kernel_steps.as_ref() != Some(&expected_kernel_steps) {
-                bail!("manifest kernel step trace drifted from confidential slot program for {entrypoint}");
-            }
-            allocator.max_kernel_ops = expected_kernel_steps.len();
-            Some((program, expected_kernel_steps))
-        } else {
-            None
-        };
-        let expected_kernel_steps = confidential_slot_program
-            .as_ref()
-            .map(|(_, expected_kernel_steps)| expected_kernel_steps.clone());
-        let max_hash_part_bytes = manifest_entry.max_hash_part_bytes;
         let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
+        let confidential_entrypoint_plan = if function.confidential {
+            Some(self.state.prepare_confidential_entrypoint(
+                entrypoint,
+                &manifest_entry,
+                public_object_ids.clone(),
+            )?)
+        } else {
+            None
+        };
         self.state.ensure_cold(
             &public_object_ids,
             "before executing the next call from committed storage",
@@ -182,19 +149,12 @@ impl ContractInstance {
                 return_value,
                 opcode_trace,
             ) = if function.confidential {
-                let (slot_program, _) = confidential_slot_program
-                    .as_ref()
-                    .expect("confidential entrypoint must carry slot program");
                 let confidential_args = confidential_args
                     .expect("confidential entrypoint must carry confidential call args");
                 let outcome = self.state.run_confidential_entrypoint(
-                    allocator,
-                    expected_kernel_steps
+                    confidential_entrypoint_plan
                         .clone()
-                        .expect("confidential entrypoint must derive expected kernel steps"),
-                    public_object_ids.clone(),
-                    slot_program,
-                    max_hash_part_bytes,
+                        .expect("confidential entrypoint must derive runtime plan"),
                     confidential_args,
                     fresh_coins,
                     &mut recorder,
@@ -214,7 +174,7 @@ impl ContractInstance {
                     &self.artifact.contract,
                     &function,
                     public_args,
-                    allocator,
+                    AllocatorPlan::from_manifest(&manifest_entry),
                     public_object_ids.clone(),
                     &mut recorder,
                 )?;
@@ -385,9 +345,25 @@ mod tests {
             "engine.rs should delegate confidential-kernel setup to ContractRuntime"
         );
         assert!(
+            source.contains("prepare_confidential_entrypoint("),
+            "engine.rs should delegate confidential manifest-to-kernel planning to ContractRuntime"
+        );
+        assert!(
             !source.contains("RuntimeKernelRefinementEventWitness"),
             "engine.rs implementation should not construct runtime phase witness events directly"
         );
+        for forbidden in [
+            ".confidential_slot_program",
+            "RuntimeKernelStepWitness",
+            "expected_runtime_steps()",
+            "max_hash_part_bytes",
+            "kernel_steps",
+        ] {
+            assert!(
+                !source.contains(forbidden),
+                "engine.rs should not derive confidential runtime plan detail `{forbidden}` directly"
+            );
+        }
         for forbidden_type in [
             "RuntimeControllerObserverCertificate",
             "RuntimePathOramHiddenCertificate",
