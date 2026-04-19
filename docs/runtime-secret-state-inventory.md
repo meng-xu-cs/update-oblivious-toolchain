@@ -100,6 +100,12 @@ pins the top-level `ContractRuntime` entrypoints themselves: only
 `runtime/uo-evm/src/shell.rs` may prepare, commit, or replace the public
 shadow wrapper, while only `runtime/uo-evm/src/engine.rs` may invoke
 `runtime.run_confidential_entrypoint(...)` inside the traced-call bridge.
+The same report now also pins the residual raw public-field surface in the
+runtime hot path: after the `MapEntry` / `OramState` / `OramTranscript` /
+`OramCommit` / `OramWrite` / `OramStorage` / `OramBlock` / `OramBucket`
+closures, the only remaining direct `pub` struct fields in those runtime
+modules are the public-shape `OramParameters` fields, and any reintroduction of
+raw secret-bearing public fields is treated as a regression.
 
 This document should be updated whenever a new secret-bearing structure is
 introduced or an existing one is removed.

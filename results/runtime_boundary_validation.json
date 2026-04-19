@@ -238,6 +238,23 @@
     "runtime/uo-evm/src/runtime.rs",
     "runtime/uo-evm/src/state.rs"
   ],
+  "expected_runtime_public_field_lines": [
+    "runtime/uo-evm/src/oram.rs:pub scheme: String,",
+    "runtime/uo-evm/src/oram.rs:pub capacity: usize,",
+    "runtime/uo-evm/src/oram.rs:pub block_size: usize,",
+    "runtime/uo-evm/src/oram.rs:pub bucket_size: usize,",
+    "runtime/uo-evm/src/oram.rs:pub bucket_count: usize,",
+    "runtime/uo-evm/src/oram.rs:pub blocks_per_bucket: usize,",
+    "runtime/uo-evm/src/oram.rs:pub tree_height: usize,",
+    "runtime/uo-evm/src/oram.rs:pub stash_bound: usize,",
+    "runtime/uo-evm/src/oram.rs:pub recursion_depth: usize,",
+    "runtime/uo-evm/src/oram.rs:pub metadata_pages: usize,",
+    "runtime/uo-evm/src/oram.rs:pub metadata_pages_per_access: usize,",
+    "runtime/uo-evm/src/oram.rs:pub accesses_per_call: usize,",
+    "runtime/uo-evm/src/oram.rs:pub buckets_per_access: usize,",
+    "runtime/uo-evm/src/oram.rs:pub directory_page_entries: usize,",
+    "runtime/uo-evm/src/oram.rs:pub directory_page_bytes: usize,"
+  ],
   "expected_theorem_trace_bridge_surface_files": [
     "runtime/uo-evm/src/engine.rs",
     "runtime/uo-evm/src/theorem.rs"
@@ -1120,6 +1137,24 @@
     "runtime/uo-evm/src/state.rs"
   ],
   "runtime_phase_event_constructor_surface_restricted": true,
+  "runtime_public_field_lines": [
+    "runtime/uo-evm/src/oram.rs:pub scheme: String,",
+    "runtime/uo-evm/src/oram.rs:pub capacity: usize,",
+    "runtime/uo-evm/src/oram.rs:pub block_size: usize,",
+    "runtime/uo-evm/src/oram.rs:pub bucket_size: usize,",
+    "runtime/uo-evm/src/oram.rs:pub bucket_count: usize,",
+    "runtime/uo-evm/src/oram.rs:pub blocks_per_bucket: usize,",
+    "runtime/uo-evm/src/oram.rs:pub tree_height: usize,",
+    "runtime/uo-evm/src/oram.rs:pub stash_bound: usize,",
+    "runtime/uo-evm/src/oram.rs:pub recursion_depth: usize,",
+    "runtime/uo-evm/src/oram.rs:pub metadata_pages: usize,",
+    "runtime/uo-evm/src/oram.rs:pub metadata_pages_per_access: usize,",
+    "runtime/uo-evm/src/oram.rs:pub accesses_per_call: usize,",
+    "runtime/uo-evm/src/oram.rs:pub buckets_per_access: usize,",
+    "runtime/uo-evm/src/oram.rs:pub directory_page_entries: usize,",
+    "runtime/uo-evm/src/oram.rs:pub directory_page_bytes: usize,"
+  ],
+  "runtime_public_field_surface_is_public_shape_only": true,
   "runtime_secret_state_inventory": [
     {
       "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime and whose buffered values wipe on drop",

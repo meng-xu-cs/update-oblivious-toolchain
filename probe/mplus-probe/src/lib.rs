@@ -10669,6 +10669,52 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && oram_source.contains("entry.value().clone()")
         && oram_source.contains("entry.set_value(")
         && oram_source.contains("entry.occupy(");
+    let runtime_public_field_lines = [
+        ("runtime/uo-evm/src/kernel.rs", kernel_source.as_str()),
+        (
+            "runtime/uo-evm/src/runtime.rs",
+            runtime_module_source.as_str(),
+        ),
+        ("runtime/uo-evm/src/state.rs", state_source.as_str()),
+        (
+            "runtime/uo-evm/src/controller.rs",
+            controller_source.as_str(),
+        ),
+        ("runtime/uo-evm/src/theorem.rs", theorem_source.as_str()),
+        ("runtime/uo-evm/src/oram.rs", oram_source.as_str()),
+        ("runtime/uo-evm/src/objects.rs", objects_source.as_str()),
+    ]
+    .into_iter()
+    .flat_map(|(path, source)| {
+        source.lines().filter_map(move |line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with("pub ") && trimmed.ends_with(',') && !trimmed.contains(" fn ") {
+                Some(format!("{path}:{trimmed}"))
+            } else {
+                None
+            }
+        })
+    })
+    .collect::<Vec<_>>();
+    let expected_runtime_public_field_lines = vec![
+        String::from("runtime/uo-evm/src/oram.rs:pub scheme: String,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub capacity: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub block_size: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub bucket_size: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub bucket_count: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub blocks_per_bucket: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub tree_height: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub stash_bound: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub recursion_depth: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub metadata_pages: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub metadata_pages_per_access: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub accesses_per_call: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub buckets_per_access: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub directory_page_entries: usize,"),
+        String::from("runtime/uo-evm/src/oram.rs:pub directory_page_bytes: usize,"),
+    ];
+    let runtime_public_field_surface_is_public_shape_only =
+        runtime_public_field_lines == expected_runtime_public_field_lines;
     let oram_storage_fields_private = oram_source.contains("directory_pages: Vec<Vec<u8>>,")
         && oram_source.contains("buckets: Vec<Vec<u8>>,")
         && oram_source.contains("access_counter_slot: Vec<u8>,")
@@ -11338,6 +11384,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             oram_write_trace_projects_to_public_shape,
         "map_entry_fields_private": map_entry_fields_private,
         "map_entry_api_is_explicit": map_entry_api_is_explicit,
+        "runtime_public_field_lines": runtime_public_field_lines,
+        "expected_runtime_public_field_lines": expected_runtime_public_field_lines,
+        "runtime_public_field_surface_is_public_shape_only":
+            runtime_public_field_surface_is_public_shape_only,
         "oram_storage_fields_private": oram_storage_fields_private,
         "oram_state_fields_private": oram_state_fields_private,
         "oram_state_api_is_explicit": oram_state_api_is_explicit,
@@ -11487,6 +11537,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && oram_write_trace_projects_to_public_shape
             && map_entry_fields_private
             && map_entry_api_is_explicit
+            && runtime_public_field_surface_is_public_shape_only
             && oram_storage_fields_private
             && oram_state_fields_private
             && oram_state_api_is_explicit
