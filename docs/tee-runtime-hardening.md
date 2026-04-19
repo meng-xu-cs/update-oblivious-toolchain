@@ -495,7 +495,11 @@ The current runtime has a first hardening layer:
   without exposing raw `inner_mut` / `into_inner` escape hatches on the
   public kernel facade,
   and the confidential shadow-load helper itself stays private to
-  `runtime/uo-evm/src/kernel.rs`
+  `runtime/uo-evm/src/kernel.rs`; the same source-level report now also pins
+  the top-level `ContractRuntime` authority split, so only `shell.rs` may
+  drive `prepare_public_shadow`, `commit_public_shadow`, and
+  `replace_with_cold_public_shadow`, while only `engine.rs` may call
+  `self.state.run_confidential_entrypoint(...)`
 - the boundary report now also checks the low-level store helper layer:
   direct `StoreCipher::seal` / `StoreCipher::open` use must stay inside
   `runtime/uo-store/src/codec.rs`, the public wipe-preserving helper surface

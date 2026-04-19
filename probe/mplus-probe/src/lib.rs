@@ -6860,6 +6860,41 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("state-only kernel helper restriction flag must be boolean")
         });
+    let contract_runtime_entrypoint_surface_checks = [
+        (
+            "runtime.prepare_public_shadow(",
+            vec![String::from("runtime/uo-evm/src/shell.rs")],
+        ),
+        (
+            "runtime.commit_public_shadow(",
+            vec![String::from("runtime/uo-evm/src/shell.rs")],
+        ),
+        (
+            "runtime.replace_with_cold_public_shadow(",
+            vec![String::from("runtime/uo-evm/src/shell.rs")],
+        ),
+        (
+            "self.state.run_confidential_entrypoint(",
+            vec![String::from("runtime/uo-evm/src/engine.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&runtime_evm_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let contract_runtime_entrypoint_surface_restricted =
+        contract_runtime_entrypoint_surface_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("contract-runtime entrypoint restriction flag must be boolean")
+        });
     let confidential_object_api_surface_checks = [
         (
             ".get_cell(",
@@ -7338,6 +7373,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             state_only_kernel_helper_surface_checks,
         "state_only_kernel_helper_surface_restricted":
             state_only_kernel_helper_surface_restricted,
+        "contract_runtime_entrypoint_surface_checks":
+            contract_runtime_entrypoint_surface_checks,
+        "contract_runtime_entrypoint_surface_restricted":
+            contract_runtime_entrypoint_surface_restricted,
         "confidential_object_api_surface_checks":
             confidential_object_api_surface_checks,
         "confidential_object_api_surface_restricted":
@@ -7459,6 +7498,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && theorem_only_runtime_helper_surface_restricted
             && fullscan_buffer_reuse_restricted
             && state_only_kernel_helper_surface_restricted
+            && contract_runtime_entrypoint_surface_restricted
             && confidential_object_api_surface_restricted
             && runtime_state_surface_restricted
             && fresh_coin_plan_surface_restricted
@@ -9185,7 +9225,10 @@ through explicit wrapper operations rather than raw `inner_mut` /
 `into_inner` escape hatches, that `ConfidentialEntrypointPlan` is confined to
 `runtime/uo-evm/src/state.rs`, that `RuntimeShadowState` and
 `ConfidentialRuntimeShadowState` remain runtime-only while the shell-visible
-handle stays `PublicRuntimeShadowState`, and that confidential entrypoints
+handle stays `PublicRuntimeShadowState`, that only `shell.rs` may drive the
+top-level `ContractRuntime` public-shadow entrypoints while only `engine.rs`
+may call `self.state.run_confidential_entrypoint(...)`, and that confidential
+entrypoints
 are sourced from the checked manifest's `confidential_slot_program` in
 `runtime/uo-evm/src/state.rs` while that module delegates confidential
 execution through `runtime/uo-evm/src/kernel.rs`, enforces the

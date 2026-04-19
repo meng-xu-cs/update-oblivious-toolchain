@@ -59,7 +59,11 @@ types while the shell-visible handle stays `PublicRuntimeShadowState`, and
 dedicated state/theorem call-trace handoff. The same report now also pins
 the authority boundary on that handoff by requiring the runtime preflight and
 snapshot helpers to be called only from `runtime/uo-evm/src/theorem.rs` in
-production code.
+production code. It also now pins the top-level `ContractRuntime`
+entrypoints themselves: only `runtime/uo-evm/src/shell.rs` may prepare,
+commit, or replace the public shadow wrapper, while only
+`runtime/uo-evm/src/engine.rs` may invoke
+`self.state.run_confidential_entrypoint(...)`.
 
 This document should be updated whenever a new secret-bearing structure is
 introduced or an existing one is removed.
