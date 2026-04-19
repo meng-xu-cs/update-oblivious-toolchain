@@ -19,6 +19,7 @@ pub(crate) struct RuntimeKernel {
     expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
     public_object_ids: Vec<u32>,
     expected_public_object_ids: Option<Vec<u32>>,
+    max_hash_part_bytes: usize,
     expected_kernel_step_index: usize,
     kernel_steps: BoundedJournal<RuntimeKernelStepWitness>,
     runtime_phase_events: BoundedJournal<RuntimeKernelRefinementEventWitness>,
@@ -294,6 +295,7 @@ impl RuntimeKernel {
             expected_kernel_steps,
             public_object_ids,
             expected_public_object_ids,
+            max_hash_part_bytes: 0,
             expected_kernel_step_index: 0,
             kernel_steps: BoundedJournal::with_capacity(
                 "runtime-kernel-step",
@@ -534,11 +536,13 @@ impl RuntimeKernel {
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
         shadow_load_object_ids: &[u32],
+        max_hash_part_bytes: usize,
         call_inputs: ConfidentialCallInputs,
         fresh_coins: Option<&PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialKernelRunOutcome> {
+        self.max_hash_part_bytes = max_hash_part_bytes;
         let mut shadow = self.shadow_load_objects(committed, shadow_load_object_ids)?;
         self.install_path_oram_fresh_coins(&mut shadow, fresh_coins)?;
         let outcome = self.execute_confidential_call(
@@ -831,8 +835,8 @@ impl RuntimeKernel {
             ConfidentialKernelSlotExpr::Keccak256 { parts } => {
                 let mut hasher = Keccak::v256();
                 for part in parts {
+                    self.note_hash_bytes(self.max_hash_part_bytes)?;
                     let value = self.eval_confidential_expr(part, objects, state, recorder)?;
-                    self.note_hash_bytes(value.canonical_len())?;
                     value.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));
                     self.wipe_hash_scratch();
                 }
@@ -889,8 +893,8 @@ impl RuntimeKernel {
             ConfidentialKernelSlotPureExpr::Keccak256 { parts } => {
                 let mut hasher = Keccak::v256();
                 for part in parts {
+                    self.note_hash_bytes(self.max_hash_part_bytes)?;
                     let value = self.eval_confidential_pure_expr(part, state)?;
-                    self.note_hash_bytes(value.canonical_len())?;
                     value.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));
                     self.wipe_hash_scratch();
                 }

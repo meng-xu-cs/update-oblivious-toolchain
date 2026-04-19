@@ -6246,6 +6246,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_uses_manifest_confidential_slot_program = engine_source
         .contains(".confidential_slot_program")
         && engine_source.contains("manifest confidential_slot_program missing");
+    let engine_derives_hash_scratch_from_manifest_confidential_program = engine_source
+        .contains(".confidential_program")
+        && engine_source.contains("manifest confidential_program missing")
+        && engine_source
+            .contains("max_keccak_part_canonical_len_for_state(&self.artifact.contract.state)");
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
     let kernel_confidential_call_inputs_stay_inside_runtime = kernel_source
@@ -6275,6 +6280,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("reserve_guard(ScratchRegion::IoScratch, committed_value.canonical_len())")
         && !objects_source
             .contains("reserve_guard(ScratchRegion::IoScratch, value.canonical_len())");
+    let kernel_hash_scratch_uses_public_program_bound = kernel_source
+        .contains("max_hash_part_bytes: usize")
+        && kernel_source.contains("self.note_hash_bytes(self.max_hash_part_bytes)?;")
+        && !kernel_source.contains("self.note_hash_bytes(value.canonical_len())?");
     let kernel_bounded_journal_checks = [
         (
             "struct BoundedJournal<T>",
@@ -7025,6 +7034,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             engine_uses_confidential_call_inputs_wrapper,
         "engine_uses_manifest_confidential_slot_program":
             engine_uses_manifest_confidential_slot_program,
+        "engine_derives_hash_scratch_from_manifest_confidential_program":
+            engine_derives_hash_scratch_from_manifest_confidential_program,
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
         "kernel_confidential_call_inputs_stay_inside_runtime":
@@ -7041,6 +7052,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_scratch_accounting_uses_object_type_lengths,
         "object_commit_io_scratch_uses_type_lengths":
             object_commit_io_scratch_uses_type_lengths,
+        "kernel_hash_scratch_uses_public_program_bound":
+            kernel_hash_scratch_uses_public_program_bound,
         "kernel_bounded_journal_checks": kernel_bounded_journal_checks,
         "kernel_bounded_journal_restricted": kernel_bounded_journal_restricted,
         "state_routes_confidential_calls_through_runtime_kernel":
@@ -7164,6 +7177,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_public_trace_uses_output_shape_only
             && engine_uses_confidential_call_inputs_wrapper
             && engine_uses_manifest_confidential_slot_program
+            && engine_derives_hash_scratch_from_manifest_confidential_program
             && kernel_executes_program_body_via_shared_dsl
             && kernel_confidential_call_inputs_stay_inside_runtime
             && kernel_exec_block_uses_confidential_slot_statements
@@ -7172,6 +7186,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && kernel_exec_state_avoids_name_keyed_env
             && kernel_scratch_accounting_uses_object_type_lengths
             && object_commit_io_scratch_uses_type_lengths
+            && kernel_hash_scratch_uses_public_program_bound
             && kernel_bounded_journal_restricted
             && state_routes_confidential_calls_through_runtime_kernel
             && oram_working_stash_capacity_restricted

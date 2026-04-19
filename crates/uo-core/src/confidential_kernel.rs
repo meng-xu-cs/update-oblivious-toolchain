@@ -1,4 +1,4 @@
-use crate::ir::{BinaryOp, CompiledFunction, Expr, Statement, UnaryOp};
+use crate::ir::{BinaryOp, CompiledFunction, Expr, StateObject, Statement, UnaryOp};
 use crate::types::{Type, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -292,6 +292,22 @@ pub enum ConfidentialKernelSlotLoweringError {
     UnknownVariable { entrypoint: String, name: String },
 }
 
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum ConfidentialKernelHashShapeError {
+    #[error("entrypoint {entrypoint} references unknown confidential variable '{name}'")]
+    UnknownVariable { entrypoint: String, name: String },
+    #[error("entrypoint {entrypoint} references unknown state object id {object_id}")]
+    UnknownObjectId { entrypoint: String, object_id: u32 },
+    #[error(
+        "entrypoint {entrypoint} keccak select arms disagree on canonical length: {when_true} != {when_false}"
+    )]
+    SelectArmLengthMismatch {
+        entrypoint: String,
+        when_true: usize,
+        when_false: usize,
+    },
+}
+
 impl CompiledFunction {
     pub fn confidential_kernel_program(
         &self,
@@ -363,6 +379,30 @@ impl ConfidentialKernelProgram {
             slot_count: layout.slot_count(),
             body,
         })
+    }
+
+    pub fn max_keccak_part_canonical_len_for_state(
+        &self,
+        state: &[StateObject],
+    ) -> Result<usize, ConfidentialKernelHashShapeError> {
+        let object_value_lens = state
+            .iter()
+            .map(|object| (object.id, object.value_type.canonical_len()))
+            .collect::<BTreeMap<_, _>>();
+        let mut env = self
+            .params
+            .iter()
+            .map(|param| (param.name.clone(), param.ty.canonical_len()))
+            .collect::<BTreeMap<_, _>>();
+        let mut max_len = 0;
+        for statement in &self.body {
+            max_len = max_len.max(statement.max_keccak_part_canonical_len(
+                self.entrypoint_id.as_str(),
+                &mut env,
+                &object_value_lens,
+            )?);
+        }
+        Ok(max_len)
     }
 }
 
@@ -636,6 +676,282 @@ impl ConfidentialKernelSlotExpr {
                 for part in parts {
                     part.collect_kernel_steps(steps);
                 }
+            }
+        }
+    }
+}
+
+impl ConfidentialKernelStatement {
+    fn max_keccak_part_canonical_len(
+        &self,
+        entrypoint: &str,
+        env: &mut BTreeMap<String, usize>,
+        object_value_lens: &BTreeMap<u32, usize>,
+    ) -> Result<usize, ConfidentialKernelHashShapeError> {
+        match self {
+            Self::Declare { name, ty, value } => {
+                env.insert(name.clone(), ty.canonical_len());
+                value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+            }
+            Self::Assign { value, .. }
+            | Self::Require { cond: value }
+            | Self::AbortIf { cond: value } => {
+                value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+            }
+            Self::CellSet {
+                value, predicate, ..
+            } => {
+                let mut max_len =
+                    value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?;
+                if let Some(predicate) = predicate {
+                    max_len = max_len.max(predicate.max_keccak_part_canonical_len(
+                        entrypoint,
+                        env,
+                        object_value_lens,
+                    )?);
+                }
+                Ok(max_len)
+            }
+            Self::ArraySet {
+                index,
+                value,
+                predicate,
+                ..
+            }
+            | Self::MapPut {
+                key: index,
+                value,
+                predicate,
+                ..
+            } => {
+                let mut max_len =
+                    index.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?;
+                max_len = max_len.max(value.max_keccak_part_canonical_len(
+                    entrypoint,
+                    env,
+                    object_value_lens,
+                )?);
+                if let Some(predicate) = predicate {
+                    max_len = max_len.max(predicate.max_keccak_part_canonical_len(
+                        entrypoint,
+                        env,
+                        object_value_lens,
+                    )?);
+                }
+                Ok(max_len)
+            }
+            Self::Return { value } => value
+                .as_ref()
+                .map(|value| {
+                    value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+                })
+                .transpose()
+                .map(|value| value.unwrap_or(0)),
+        }
+    }
+}
+
+impl ConfidentialKernelExpr {
+    fn max_keccak_part_canonical_len(
+        &self,
+        entrypoint: &str,
+        env: &BTreeMap<String, usize>,
+        object_value_lens: &BTreeMap<u32, usize>,
+    ) -> Result<usize, ConfidentialKernelHashShapeError> {
+        match self {
+            Self::Literal { .. } | Self::Var { .. } | Self::CellGet { .. } => Ok(0),
+            Self::Unary { expr, .. } => {
+                expr.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+            }
+            Self::Binary { lhs, rhs, .. } => Ok(lhs
+                .max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?
+                .max(rhs.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?)),
+            Self::Select {
+                cond,
+                when_true,
+                when_false,
+            } => Ok(cond
+                .max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?
+                .max(when_true.max_keccak_part_canonical_len(entrypoint, env)?)
+                .max(when_false.max_keccak_part_canonical_len(entrypoint, env)?)),
+            Self::ArrayGet { index, .. } => {
+                index.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+            }
+            Self::MapGet { key, .. } => {
+                key.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+            }
+            Self::Keccak256 { parts } => {
+                let mut max_len = 0;
+                for part in parts {
+                    max_len =
+                        max_len.max(part.canonical_len(entrypoint, env, object_value_lens)?);
+                    max_len = max_len.max(part.max_keccak_part_canonical_len(
+                        entrypoint,
+                        env,
+                        object_value_lens,
+                    )?);
+                }
+                Ok(max_len)
+            }
+        }
+    }
+
+    fn canonical_len(
+        &self,
+        entrypoint: &str,
+        env: &BTreeMap<String, usize>,
+        object_value_lens: &BTreeMap<u32, usize>,
+    ) -> Result<usize, ConfidentialKernelHashShapeError> {
+        match self {
+            Self::Literal { value } => Ok(value.canonical_len()),
+            Self::Var { name } => env.get(name).copied().ok_or_else(|| {
+                ConfidentialKernelHashShapeError::UnknownVariable {
+                    entrypoint: entrypoint.into(),
+                    name: name.clone(),
+                }
+            }),
+            Self::Unary { op, .. } => Ok(match op {
+                UnaryOp::Not => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
+                UnaryOp::Neg => Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len(),
+            }),
+            Self::Binary { op, .. } => Ok(match op {
+                BinaryOp::Eq
+                | BinaryOp::Neq
+                | BinaryOp::Lt
+                | BinaryOp::Lte
+                | BinaryOp::Gt
+                | BinaryOp::Gte
+                | BinaryOp::And
+                | BinaryOp::Or => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
+                BinaryOp::Add
+                | BinaryOp::Sub
+                | BinaryOp::Mul
+                | BinaryOp::Div
+                | BinaryOp::Mod
+                | BinaryOp::BitAnd
+                | BinaryOp::BitOr
+                | BinaryOp::BitXor => {
+                    Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len()
+                }
+            }),
+            Self::Select {
+                when_true,
+                when_false,
+                ..
+            } => {
+                let when_true_len = when_true.canonical_len(entrypoint, env)?;
+                let when_false_len = when_false.canonical_len(entrypoint, env)?;
+                if when_true_len != when_false_len {
+                    return Err(ConfidentialKernelHashShapeError::SelectArmLengthMismatch {
+                        entrypoint: entrypoint.into(),
+                        when_true: when_true_len,
+                        when_false: when_false_len,
+                    });
+                }
+                Ok(when_true_len)
+            }
+            Self::CellGet { object_id }
+            | Self::ArrayGet { object_id, .. }
+            | Self::MapGet { object_id, .. } => object_value_lens
+                .get(object_id)
+                .copied()
+                .ok_or_else(|| ConfidentialKernelHashShapeError::UnknownObjectId {
+                    entrypoint: entrypoint.into(),
+                    object_id: *object_id,
+                }),
+            Self::Keccak256 { .. } => {
+                Ok(Type::Scalar(crate::types::ScalarType::Bytes32).canonical_len())
+            }
+        }
+    }
+}
+
+impl ConfidentialKernelPureExpr {
+    fn max_keccak_part_canonical_len(
+        &self,
+        entrypoint: &str,
+        env: &BTreeMap<String, usize>,
+    ) -> Result<usize, ConfidentialKernelHashShapeError> {
+        match self {
+            Self::Literal { .. } | Self::Var { .. } => Ok(0),
+            Self::Unary { expr, .. } => expr.max_keccak_part_canonical_len(entrypoint, env),
+            Self::Binary { lhs, rhs, .. } => Ok(lhs
+                .max_keccak_part_canonical_len(entrypoint, env)?
+                .max(rhs.max_keccak_part_canonical_len(entrypoint, env)?)),
+            Self::Select {
+                cond,
+                when_true,
+                when_false,
+            } => Ok(cond
+                .max_keccak_part_canonical_len(entrypoint, env)?
+                .max(when_true.max_keccak_part_canonical_len(entrypoint, env)?)
+                .max(when_false.max_keccak_part_canonical_len(entrypoint, env)?)),
+            Self::Keccak256 { parts } => {
+                let mut max_len = 0;
+                for part in parts {
+                    max_len = max_len.max(part.canonical_len(entrypoint, env)?);
+                    max_len = max_len.max(part.max_keccak_part_canonical_len(entrypoint, env)?);
+                }
+                Ok(max_len)
+            }
+        }
+    }
+
+    fn canonical_len(
+        &self,
+        entrypoint: &str,
+        env: &BTreeMap<String, usize>,
+    ) -> Result<usize, ConfidentialKernelHashShapeError> {
+        match self {
+            Self::Literal { value } => Ok(value.canonical_len()),
+            Self::Var { name } => env.get(name).copied().ok_or_else(|| {
+                ConfidentialKernelHashShapeError::UnknownVariable {
+                    entrypoint: entrypoint.into(),
+                    name: name.clone(),
+                }
+            }),
+            Self::Unary { op, .. } => Ok(match op {
+                UnaryOp::Not => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
+                UnaryOp::Neg => Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len(),
+            }),
+            Self::Binary { op, .. } => Ok(match op {
+                BinaryOp::Eq
+                | BinaryOp::Neq
+                | BinaryOp::Lt
+                | BinaryOp::Lte
+                | BinaryOp::Gt
+                | BinaryOp::Gte
+                | BinaryOp::And
+                | BinaryOp::Or => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
+                BinaryOp::Add
+                | BinaryOp::Sub
+                | BinaryOp::Mul
+                | BinaryOp::Div
+                | BinaryOp::Mod
+                | BinaryOp::BitAnd
+                | BinaryOp::BitOr
+                | BinaryOp::BitXor => {
+                    Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len()
+                }
+            }),
+            Self::Select {
+                when_true,
+                when_false,
+                ..
+            } => {
+                let when_true_len = when_true.canonical_len(entrypoint, env)?;
+                let when_false_len = when_false.canonical_len(entrypoint, env)?;
+                if when_true_len != when_false_len {
+                    return Err(ConfidentialKernelHashShapeError::SelectArmLengthMismatch {
+                        entrypoint: entrypoint.into(),
+                        when_true: when_true_len,
+                        when_false: when_false_len,
+                    });
+                }
+                Ok(when_true_len)
+            }
+            Self::Keccak256 { .. } => {
+                Ok(Type::Scalar(crate::types::ScalarType::Bytes32).canonical_len())
             }
         }
     }
@@ -1093,7 +1409,10 @@ mod tests {
         ConfidentialKernelSlotExpr, ConfidentialKernelSlotLoweringError,
         ConfidentialKernelSlotStatement,
     };
-    use crate::{BinaryOp, CompiledFunction, Expr, ScalarType, Statement, Type, Value};
+    use crate::{
+        ir::StateObject, BackendKind, BinaryOp, CompiledFunction, ContainerKind, Expr, ScalarType,
+        Statement, Type, Value,
+    };
 
     fn uint_type() -> Type {
         Type::Scalar(ScalarType::Uint(256))
@@ -1132,6 +1451,20 @@ mod tests {
                 },
             ],
             secret_args: vec![0],
+            confidential: true,
+        }
+    }
+
+    fn sample_cell_state_object() -> StateObject {
+        StateObject {
+            id: 7,
+            name: "counter".into(),
+            kind: ContainerKind::Cell,
+            backend: BackendKind::FullScan,
+            oram_scheme: "surrogate_public_schedule_v1".into(),
+            value_type: uint_type(),
+            key_type: None,
+            capacity: None,
             confidential: true,
         }
     }
@@ -1209,5 +1542,40 @@ mod tests {
             err,
             ConfidentialKernelSlotLoweringError::UnknownVariable { .. }
         ));
+    }
+
+    #[test]
+    fn max_keccak_part_canonical_len_tracks_largest_public_shape() {
+        let function = CompiledFunction {
+            signature: "hashy(uint256)".into(),
+            params: vec![("arg".into(), uint_type())],
+            return_type: Some(Type::Scalar(ScalarType::Bytes32)),
+            body: vec![
+                Statement::Declare {
+                    name: "digest".into(),
+                    ty: Type::Scalar(ScalarType::Bytes32),
+                    value: Expr::Keccak256 {
+                        parts: vec![
+                            Expr::Var("arg".into()),
+                            Expr::CellGet { object_id: 7 },
+                            Expr::Literal(Value::Bytes32([1u8; 32])),
+                        ],
+                    },
+                },
+                Statement::Return {
+                    value: Some(Expr::Var("digest".into())),
+                },
+            ],
+            secret_args: vec![0],
+            confidential: true,
+        };
+
+        let program = function.confidential_kernel_program().unwrap();
+        assert_eq!(
+            program
+                .max_keccak_part_canonical_len_for_state(&[sample_cell_state_object()])
+                .unwrap(),
+            32
+        );
     }
 }
