@@ -56,7 +56,10 @@ reductions: `ConfidentialEntrypointPlan` is confined to `state.rs`, and
 `RuntimeShadowState` / `ConfidentialRuntimeShadowState` remain runtime-only
 types while the shell-visible handle stays `PublicRuntimeShadowState`, and
 `CommittedRuntimeWitnessSnapshot` is opaque and captured only through the
-dedicated state/theorem call-trace handoff.
+dedicated state/theorem call-trace handoff. The same report now also pins
+the authority boundary on that handoff by requiring the runtime preflight and
+snapshot helpers to be called only from `runtime/uo-evm/src/theorem.rs` in
+production code.
 
 This document should be updated whenever a new secret-bearing structure is
 introduced or an existing one is removed.

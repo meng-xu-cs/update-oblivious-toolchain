@@ -6758,6 +6758,33 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("kernel-only state helper restriction flag must be boolean")
         });
+    let theorem_only_runtime_helper_surface_checks = [
+        (
+            "runtime.ensure_ready_for_call(\"before executing the next call from committed storage\")?;",
+            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+        ),
+        (
+            "runtime.witness_snapshot()?",
+            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&runtime_evm_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let theorem_only_runtime_helper_surface_restricted =
+        theorem_only_runtime_helper_surface_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("theorem-only runtime helper restriction flag must be boolean")
+        });
     let fullscan_buffer_reuse_checks = [
         (
             "self.values.clear();\n        self.values.resize(\n            self.physical_slots.len(),",
@@ -7301,6 +7328,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_only_state_helper_surface_checks,
         "kernel_only_state_helper_surface_restricted":
             kernel_only_state_helper_surface_restricted,
+        "theorem_only_runtime_helper_surface_checks":
+            theorem_only_runtime_helper_surface_checks,
+        "theorem_only_runtime_helper_surface_restricted":
+            theorem_only_runtime_helper_surface_restricted,
         "fullscan_buffer_reuse_checks": fullscan_buffer_reuse_checks,
         "fullscan_buffer_reuse_restricted": fullscan_buffer_reuse_restricted,
         "state_only_kernel_helper_surface_checks":
@@ -7425,6 +7456,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && resource_event_constructor_surface_restricted
             && state_only_runtime_helper_surface_restricted
             && kernel_only_state_helper_surface_restricted
+            && theorem_only_runtime_helper_surface_restricted
             && fullscan_buffer_reuse_restricted
             && state_only_kernel_helper_surface_restricted
             && confidential_object_api_surface_restricted
@@ -9098,7 +9130,9 @@ than having the engine thread that setup detail in; the theorem-side
 `engine.rs` calling it directly, and the theorem finalizer now consumes the
 whole `RuntimeCallOutcome` directly so the engine no longer unpacks kernel
 witnesses, opcode traces, or return values only to feed them back into the
-same theorem-path finalizer.
+same theorem-path finalizer. The same report now also pins that authority
+boundary directly: the runtime preflight and committed-state snapshot helpers
+must appear only in `runtime/uo-evm/src/theorem.rs` in production code.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade
