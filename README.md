@@ -30,8 +30,8 @@ Current claim boundary:
 - exact-UO for exact backends (`UOCell`, `UOArray`, full-scan `UOMap`) on the
   repository's instrumented abstract machine
 - theorem-facing computational-UO only on the `path_oram_local_posmap_v1`
-  backend path; the legacy surrogate backend remains for benchmarking and
-  compatibility, not for strengthened proof claims
+  backend path; the other benchmark backends are not part of the strengthened
+  proof-grade claim surface
 - Lean-checked observer models, reduction layers, runtime trusted-kernel /
   witness / certificate validators, and a frozen imported standard Path ORAM
   theorem target

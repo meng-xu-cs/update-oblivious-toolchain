@@ -452,7 +452,7 @@ def ImportedRuntimeConfidentialCoreLoweringBundle.toRuntimeConfidentialCoreLower
     ImportedRuntimeConfidentialCoreLoweringBundle.Valid
     ImportedRuntimeConfidentialCoreLoweringBundle.namedBundle
   simp [importedRuntimeConfidentialCoreBundle_checkValid_eq_true_iff,
-    checkImportedConfidentialKernelProgramSlotLowering_eq_true_iff, and_assoc]
+    checkImportedConfidentialKernelProgramSlotLowering_eq_true_iff]
 
 theorem importedRuntimeConfidentialCoreLoweringBundle_lowering_exact
   {bundle : ImportedRuntimeConfidentialCoreLoweringBundle}

@@ -105,7 +105,7 @@ Status labels:
   the proof-grade checker.
 
 - `cleared` Kept the theorem-facing backend on the concrete
-  `path_oram_local_posmap_v1` path and off the legacy surrogate backend.
+  `path_oram_local_posmap_v1` path and off any surrogate backend.
   Evidence:
   `crates/uo-core/src/manifest.rs`,
   `runtime/uo-evm/src/oram.rs`,

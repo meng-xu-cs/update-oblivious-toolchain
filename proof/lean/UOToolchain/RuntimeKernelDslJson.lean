@@ -1389,7 +1389,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
       | ok value =>
-          simp [h, ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr] at hExpr
+          simp [h] at hExpr
           simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
             ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
             ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr, h, hExpr] using
@@ -1415,7 +1415,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
       | ok lhsValue =>
-          simp [hL, ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr] at hLhs
+          simp [hL] at hLhs
           cases hR : importedConfidentialKernelExprToSlotExpr rhs env with
           | error err =>
               simp [hR] at hRhs
@@ -1429,7 +1429,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
                   (importedConfidentialKernelExceptMap_error
                     ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
           | ok rhsValue =>
-              simp [hR, ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr] at hRhs
+              simp [hR] at hRhs
               simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
                 ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr,
@@ -1460,7 +1460,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
       | ok condValue =>
-          simp [hC, ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr] at hCond
+          simp [hC] at hCond
           cases hT : importedConfidentialKernelPureExprToSlotPureExpr whenTrue env with
           | error err =>
               simp [hT] at hWhenTrue
@@ -1477,7 +1477,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
                   (importedConfidentialKernelExceptMap_error
                     ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
           | ok whenTrueValue =>
-              simp [hT, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hWhenTrue
+              simp [hT] at hWhenTrue
               cases hF : importedConfidentialKernelPureExprToSlotPureExpr whenFalse env with
               | error err =>
                   simp [hF] at hWhenFalse
@@ -1494,7 +1494,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
                       (importedConfidentialKernelExceptMap_error
                         ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
               | ok whenFalseValue =>
-                  simp [hF, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hWhenFalse
+                  simp [hF] at hWhenFalse
                   simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
                     confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
                     ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
@@ -1531,7 +1531,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
       | ok value =>
-          simp [h, ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr] at hIndex
+          simp [h] at hIndex
           simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
             ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
             ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr, h, hIndex] using
@@ -1556,7 +1556,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
       | ok value =>
-          simp [h, ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr] at hKey
+          simp [h] at hKey
           simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
             ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
             ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr, h, hKey] using
@@ -1581,7 +1581,7 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
       | ok values =>
-          simp [h, ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr] at hParts
+          simp [h] at hParts
           simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
             ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
             ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr, h, hParts] using
@@ -1621,7 +1621,7 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
       | ok value =>
-          simp [h, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hExpr
+          simp [h] at hExpr
           simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
             ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
             ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr, h, hExpr] using
@@ -1647,7 +1647,7 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
       | ok lhsValue =>
-          simp [hL, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hLhs
+          simp [hL] at hLhs
           cases hR : importedConfidentialKernelPureExprToSlotPureExpr rhs env with
           | error err =>
               simp [hR] at hRhs
@@ -1661,7 +1661,7 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
                   (importedConfidentialKernelExceptMap_error
                     ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
           | ok rhsValue =>
-              simp [hR, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hRhs
+              simp [hR] at hRhs
               simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
                 ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
                 ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr,
@@ -1690,7 +1690,7 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
       | ok condValue =>
-          simp [hC, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hCond
+          simp [hC] at hCond
           cases hT : importedConfidentialKernelPureExprToSlotPureExpr whenTrue env with
           | error err =>
               simp [hT] at hWhenTrue
@@ -1704,7 +1704,7 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
                   (importedConfidentialKernelExceptMap_error
                     ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
           | ok whenTrueValue =>
-              simp [hT, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hWhenTrue
+              simp [hT] at hWhenTrue
               cases hF : importedConfidentialKernelPureExprToSlotPureExpr whenFalse env with
               | error err =>
                   simp [hF] at hWhenFalse
@@ -1718,7 +1718,7 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
                       (importedConfidentialKernelExceptMap_error
                         ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
               | ok whenFalseValue =>
-                  simp [hF, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hWhenFalse
+                  simp [hF] at hWhenFalse
                   simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
                     ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
                     ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr,
@@ -1749,7 +1749,7 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
               (importedConfidentialKernelExceptMap_error
                 ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
       | ok values =>
-          simp [h, ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr] at hParts
+          simp [h] at hParts
           simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
             ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
             ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr, h, hParts] using
@@ -3635,7 +3635,7 @@ def ImportedRuntimeKernelLoweringBundle.toRuntimeKernelLoweringBundle?
     ImportedRuntimeKernelLoweringBundle.Valid
     ImportedRuntimeKernelLoweringBundle.namedBundle
   simp [importedRuntimeKernelDslBundle_checkValid_eq_true_iff,
-    checkImportedConfidentialKernelProgramSlotLowering_eq_true_iff, and_assoc]
+    checkImportedConfidentialKernelProgramSlotLowering_eq_true_iff]
 
 theorem importedRuntimeKernelLoweringBundle_lowering_exact
   {bundle : ImportedRuntimeKernelLoweringBundle}

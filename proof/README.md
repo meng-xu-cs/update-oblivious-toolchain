@@ -71,10 +71,7 @@ The current probe-driven proof-grade path uses:
 These are the executables the probe invokes when it validates emitted runtime
 bundles, witnesses, proof-grade kernel/shell/DSL compositions, seeded
 families, compact theorem-input fallbacks for oversized canonical artifacts,
-and canonical pair artifacts. The legacy `checkRuntimeTrustedKernel` and
-`checkRuntimeWitness` entrypoints still exist for compatibility, but the
-default probe/report path now uses the proof-grade checkers instead of those
-older compatibility binaries.
+and canonical pair artifacts.
 
 ## Current Status
 
@@ -83,8 +80,7 @@ The proof workspace now fixes the following pieces explicitly:
 - the paper-facing SGX observer profile keeps `public_outcome` and
   `boundary_schedule` exact while normalizing only the SGX micro observer
 - the theorem-facing backend path is the concrete
-  `path_oram_local_posmap_v1` candidate; the legacy surrogate path is retained
-  only as a compatibility specialization
+  `path_oram_local_posmap_v1` candidate
 - the runtime bridge is explicit:
   controller certificate, hidden Path-ORAM certificate, trusted-kernel bundle,
   refinement witness, standalone kernel witness, kernel DSL / slot-DSL /

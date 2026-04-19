@@ -37,9 +37,8 @@ What is already established at the frozen interface:
   `reviewer_summary.json` plus `reviewer_summary.md`, covering proof/report
   cost, artifact sizes, runtime overheads, TCB surface, and explicit
   assumptions
-- proof-grade checker entrypoints are pinned to the legacy-free
-  `UOToolchain.ProofGrade` umbrella, while the remaining legacy bridge wrappers
-  live only in `Legacy*` companion modules
+- proof-grade checker entrypoints go through the frozen
+  `UOToolchain.ProofGrade` umbrella
 - runtime enforcement of the admitted public kernel schedule for accepted
   confidential entrypoints
 
@@ -215,7 +214,7 @@ The abstract ORAM theorem boundary is now surfaced explicitly as:
 
 For the proof-grade path candidate, the remaining storage theorem boundary is
 already narrower than `OramAccessLeakage`: `PathOramSecurity.lean` projects
-away the legacy `schedule` field before the admitted storage theorem is used.
+away the schedule field before the admitted storage theorem is used.
 It also no longer treats raw path bucket indices in `logicalAccesses` as exact
 public data: the proof-grade path interface normalizes those logical events to
 a public skeleton before comparing views. On the storage side it now exposes a
@@ -288,10 +287,8 @@ into named endpoints. It now also exposes the explicit import point for an
 external or separately mechanized standard Path ORAM theorem: once that theorem
 is proved at `PathOramLocalPosmapV1StandardStorageBoundary`, the repo’s
 concrete computational-UO, paper-main SGX, and TEE-storage claims follow by
-named projection lemmas without changing the theorem boundary. The legacy
-surrogate theorem remains available as a compatibility specialization, so the
-generic paper-facing aliases below are unchanged. The current seeded runtime
-proof bundle now also instantiates that standard-theorem import boundary
+named projection lemmas without changing the theorem boundary. The current
+seeded runtime proof bundle now also instantiates that standard-theorem import boundary
 directly, including the preferred `PathOramJACMLiteratureTheoremAt` route at
 the runtime-facing `leafRun`, so there is no longer an open backend-theorem
 gap at the concrete repo boundary. The paper route and the artifact route now
