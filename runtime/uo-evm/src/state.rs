@@ -42,6 +42,11 @@ pub(crate) struct RuntimeShadowState {
 }
 
 #[derive(Debug)]
+pub(crate) struct ConfidentialRuntimeShadowState {
+    shadow: RuntimeShadowState,
+}
+
+#[derive(Debug)]
 pub(crate) struct PublicRuntimeShadowState {
     shadow: RuntimeShadowState,
 }
@@ -214,7 +219,7 @@ impl ContractRuntime {
         &self,
         kernel: &mut PublicRuntimeKernel,
         object_ids: &[u32],
-    ) -> Result<RuntimeShadowState> {
+    ) -> Result<ConfidentialRuntimeShadowState> {
         self.committed.shadow_load_for_test(kernel, object_ids)
     }
 }
@@ -277,11 +282,9 @@ impl CommittedRuntimeState {
         kernel: &mut PublicRuntimeKernel,
         public_object_ids: &[u32],
     ) -> Result<PublicRuntimeShadowState> {
-        Ok(PublicRuntimeShadowState {
-            shadow: kernel
-                .inner_mut()
-                .shadow_load_objects(self, public_object_ids)?,
-        })
+        kernel
+            .inner_mut()
+            .shadow_load_public_objects(self, public_object_ids)
     }
 
     pub(crate) fn commit_public_shadow(
@@ -390,8 +393,10 @@ impl CommittedRuntimeState {
         &self,
         kernel: &mut PublicRuntimeKernel,
         object_ids: &[u32],
-    ) -> Result<RuntimeShadowState> {
-        kernel.inner_mut().shadow_load_objects(self, object_ids)
+    ) -> Result<ConfidentialRuntimeShadowState> {
+        kernel
+            .inner_mut()
+            .shadow_load_confidential_objects_for_test(self, object_ids)
     }
 }
 
@@ -539,9 +544,66 @@ impl RuntimeShadowState {
     }
 }
 
+impl ConfidentialRuntimeShadowState {
+    pub(in crate::runtime) fn from_shadow(shadow: RuntimeShadowState) -> Self {
+        Self { shadow }
+    }
+
+    pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
+        self.shadow.object_mut(object_id)
+    }
+
+    pub(in crate::runtime) fn install_path_oram_leaf_coins(
+        &mut self,
+        fresh_coins_by_object: BTreeMap<u32, Vec<usize>>,
+    ) -> Result<()> {
+        self.shadow
+            .install_path_oram_leaf_coins(fresh_coins_by_object)
+    }
+
+    pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed(&self) -> Result<()> {
+        self.shadow.ensure_path_oram_leaf_coins_consumed()
+    }
+
+    pub(in crate::runtime) fn commit_against(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        aborted: bool,
+        recorder: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Vec<u32>> {
+        self.shadow
+            .commit_against(committed, aborted, recorder, allocator)
+    }
+
+    pub(in crate::runtime) fn into_cold_committed_state(self) -> CommittedRuntimeState {
+        self.shadow.into_cold_committed_state()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remove_object_for_test(&mut self, object_id: u32) -> Option<RuntimeObject> {
+        self.shadow.remove_object_for_test(object_id)
+    }
+}
+
 impl PublicRuntimeShadowState {
-    pub(in crate::runtime) fn inner_mut(&mut self) -> &mut RuntimeShadowState {
-        &mut self.shadow
+    pub(in crate::runtime) fn from_shadow(shadow: RuntimeShadowState) -> Self {
+        Self { shadow }
+    }
+
+    pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
+        self.shadow.object_mut(object_id)
+    }
+
+    pub(in crate::runtime) fn commit_against(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        aborted: bool,
+        recorder: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Vec<u32>> {
+        self.shadow
+            .commit_against(committed, aborted, recorder, allocator)
     }
 
     pub(in crate::runtime) fn into_cold_committed_state(self) -> CommittedRuntimeState {

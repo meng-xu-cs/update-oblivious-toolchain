@@ -394,6 +394,8 @@ mod tests {
             "clone_for_tx(",
             "commit(",
             "shadow_load_objects(",
+            "shadow_load_public_objects(",
+            "shadow_load_confidential_objects(",
             "enable_injected_path_oram_leaf_coins(",
             "install_path_oram_leaf_coins(",
             "ensure_path_oram_leaf_coins_consumed(",

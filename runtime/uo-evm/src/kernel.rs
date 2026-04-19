@@ -1,7 +1,8 @@
 use crate::controller::CallRecorder;
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::{
-    CommittedRuntimeState, ConfidentialCallInputs, PublicRuntimeShadowState, RuntimeShadowState,
+    CommittedRuntimeState, ConfidentialCallInputs, ConfidentialRuntimeShadowState,
+    PublicRuntimeShadowState, RuntimeShadowState,
 };
 use anyhow::{anyhow, Result};
 use tiny_keccak::{Hasher, Keccak};
@@ -160,7 +161,7 @@ impl Drop for ConfidentialExecState {
 
 #[derive(Debug)]
 pub(in crate::runtime) struct ConfidentialKernelRunOutcome {
-    pub committed_shadow: RuntimeShadowState,
+    pub committed_shadow: ConfidentialRuntimeShadowState,
     pub runtime_kernel_witness: RuntimeKernelWitness,
     pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
     pub aborted: bool,
@@ -337,7 +338,7 @@ impl RuntimeKernel {
 
     fn cell_get(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         recorder: &mut CallRecorder,
         object_id: u32,
     ) -> Result<Value> {
@@ -351,12 +352,13 @@ impl RuntimeKernel {
         recorder: &mut CallRecorder,
         object_id: u32,
     ) -> Result<Value> {
-        self.cell_get(objects.inner_mut(), recorder, object_id)
+        self.record_kernel_step(UoOpcode::CellGet, Some(object_id))?;
+        objects.object_mut(object_id)?.get_cell(recorder)
     }
 
     fn cell_set(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         recorder: &mut CallRecorder,
         object_id: u32,
         value: Value,
@@ -378,12 +380,17 @@ impl RuntimeKernel {
         value: Value,
         predicate: Option<bool>,
     ) -> Result<()> {
-        self.cell_set(objects.inner_mut(), recorder, object_id, value, predicate)
+        self.record_kernel_step(UoOpcode::CellSet, Some(object_id))?;
+        let value_len = objects.object_mut(object_id)?.value_canonical_len();
+        self.touch_value_scratch(value_len)?;
+        objects
+            .object_mut(object_id)?
+            .set_cell(value, predicate, recorder)
     }
 
     fn array_get(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         recorder: &mut CallRecorder,
         object_id: u32,
         index: usize,
@@ -400,12 +407,14 @@ impl RuntimeKernel {
         object_id: u32,
         index: usize,
     ) -> Result<Value> {
-        self.array_get(objects.inner_mut(), recorder, object_id, index)
+        self.record_kernel_step(UoOpcode::ArrayGet, Some(object_id))?;
+        self.touch_value_scratch(32)?;
+        objects.object_mut(object_id)?.get_array(index, recorder)
     }
 
     fn array_set(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         recorder: &mut CallRecorder,
         object_id: u32,
         index: usize,
@@ -429,19 +438,17 @@ impl RuntimeKernel {
         value: Value,
         predicate: Option<bool>,
     ) -> Result<()> {
-        self.array_set(
-            objects.inner_mut(),
-            recorder,
-            object_id,
-            index,
-            value,
-            predicate,
-        )
+        self.record_kernel_step(UoOpcode::ArraySet, Some(object_id))?;
+        let value_len = objects.object_mut(object_id)?.value_canonical_len();
+        self.touch_value_scratch(value_len.max(32))?;
+        objects
+            .object_mut(object_id)?
+            .set_array(index, value, predicate, recorder)
     }
 
     fn map_get(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         recorder: &mut CallRecorder,
         object_id: u32,
         key: &Value,
@@ -461,12 +468,17 @@ impl RuntimeKernel {
         object_id: u32,
         key: &Value,
     ) -> Result<Value> {
-        self.map_get(objects.inner_mut(), recorder, object_id, key)
+        self.record_kernel_step(UoOpcode::MapGet, Some(object_id))?;
+        let key_len = objects.object_mut(object_id)?.key_canonical_len()?;
+        self.touch_value_scratch(key_len)?;
+        objects
+            .object_mut(object_id)?
+            .get_map(key, recorder, &mut self.allocator)
     }
 
     fn map_put(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         recorder: &mut CallRecorder,
         object_id: u32,
         key: Value,
@@ -493,19 +505,20 @@ impl RuntimeKernel {
         value: Value,
         predicate: Option<bool>,
     ) -> Result<()> {
-        self.map_put(
-            objects.inner_mut(),
-            recorder,
-            object_id,
-            key,
-            value,
-            predicate,
-        )
+        self.record_kernel_step(UoOpcode::MapPut, Some(object_id))?;
+        let (key_len, value_len) = {
+            let object = objects.object_mut(object_id)?;
+            (object.key_canonical_len()?, object.value_canonical_len())
+        };
+        self.touch_value_scratch(key_len.max(value_len))?;
+        objects
+            .object_mut(object_id)?
+            .put_map(key, value, predicate, recorder, &mut self.allocator)
     }
 
     fn commit_objects(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         committed: &CommittedRuntimeState,
         aborted: bool,
         recorder: &mut CallRecorder,
@@ -528,7 +541,15 @@ impl RuntimeKernel {
         aborted: bool,
         recorder: &mut CallRecorder,
     ) -> Result<()> {
-        self.commit_objects(objects.inner_mut(), committed, aborted, recorder)
+        self.record_kernel_step(UoOpcode::Commit, None)?;
+        let committed_object_ids =
+            objects.commit_against(committed, aborted, recorder, &mut self.allocator)?;
+        self.runtime_phase_events.extend(
+            committed_object_ids
+                .into_iter()
+                .map(RuntimeKernelRefinementEventWitness::commit_object),
+        )?;
+        Ok(())
     }
 
     pub(in crate::runtime) fn run_confidential_call(
@@ -543,7 +564,8 @@ impl RuntimeKernel {
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialKernelRunOutcome> {
         self.max_hash_part_bytes = max_hash_part_bytes;
-        let mut shadow = self.shadow_load_objects(committed, shadow_load_object_ids)?;
+        let mut shadow =
+            self.shadow_load_confidential_objects(committed, shadow_load_object_ids)?;
         let had_injected_fresh_coins = fresh_coins.is_some();
         self.install_path_oram_fresh_coins(&mut shadow, fresh_coins)?;
         let outcome = self.execute_confidential_call(
@@ -571,7 +593,7 @@ impl RuntimeKernel {
     fn execute_confidential_call(
         &mut self,
         program: &ConfidentialKernelSlotProgram,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         call_inputs: ConfidentialCallInputs,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
@@ -652,7 +674,7 @@ impl RuntimeKernel {
     fn exec_confidential_block(
         &mut self,
         statements: &[ConfidentialKernelSlotStatement],
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         state: &mut ConfidentialExecState,
         opcode_trace: &mut Vec<String>,
         recorder: &mut CallRecorder,
@@ -669,7 +691,7 @@ impl RuntimeKernel {
     fn exec_confidential_statement(
         &mut self,
         statement: &ConfidentialKernelSlotStatement,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         state: &mut ConfidentialExecState,
         opcode_trace: &mut Vec<String>,
         recorder: &mut CallRecorder,
@@ -776,7 +798,7 @@ impl RuntimeKernel {
     fn eval_confidential_expr(
         &mut self,
         expr: &ConfidentialKernelSlotExpr,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         state: &mut ConfidentialExecState,
         recorder: &mut CallRecorder,
     ) -> Result<Value> {
@@ -959,7 +981,7 @@ impl RuntimeKernel {
         Ok(())
     }
 
-    pub(in crate::runtime) fn shadow_load_objects(
+    fn shadow_load_raw_objects(
         &mut self,
         committed: &CommittedRuntimeState,
         shadow_load_object_ids: &[u32],
@@ -971,9 +993,36 @@ impl RuntimeKernel {
         Ok(shadow)
     }
 
+    pub(in crate::runtime) fn shadow_load_public_objects(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        public_object_ids: &[u32],
+    ) -> Result<PublicRuntimeShadowState> {
+        let shadow = self.shadow_load_raw_objects(committed, public_object_ids)?;
+        Ok(PublicRuntimeShadowState::from_shadow(shadow))
+    }
+
+    fn shadow_load_confidential_objects(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        shadow_load_object_ids: &[u32],
+    ) -> Result<ConfidentialRuntimeShadowState> {
+        let shadow = self.shadow_load_raw_objects(committed, shadow_load_object_ids)?;
+        Ok(ConfidentialRuntimeShadowState::from_shadow(shadow))
+    }
+
+    #[cfg(test)]
+    pub(in crate::runtime) fn shadow_load_confidential_objects_for_test(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        shadow_load_object_ids: &[u32],
+    ) -> Result<ConfidentialRuntimeShadowState> {
+        self.shadow_load_confidential_objects(committed, shadow_load_object_ids)
+    }
+
     fn install_path_oram_fresh_coins(
         &mut self,
-        objects: &mut RuntimeShadowState,
+        objects: &mut ConfidentialRuntimeShadowState,
         fresh_coins: Option<PathOramFreshCoinPlan>,
     ) -> Result<()> {
         let Some(fresh_coins) = fresh_coins else {
@@ -982,7 +1031,10 @@ impl RuntimeKernel {
         objects.install_path_oram_leaf_coins(fresh_coins.into_by_object())
     }
 
-    fn ensure_path_oram_fresh_coins_consumed(&self, objects: &RuntimeShadowState) -> Result<()> {
+    fn ensure_path_oram_fresh_coins_consumed(
+        &self,
+        objects: &ConfidentialRuntimeShadowState,
+    ) -> Result<()> {
         objects.ensure_path_oram_leaf_coins_consumed()
     }
 }

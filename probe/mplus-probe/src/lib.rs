@@ -5969,6 +5969,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "clone_for_tx(",
         "commit(",
         "shadow_load_objects(",
+        "shadow_load_public_objects(",
+        "shadow_load_confidential_objects(",
         "enable_injected_path_oram_leaf_coins(",
         "install_path_oram_leaf_coins(",
         "ensure_path_oram_leaf_coins_consumed(",
@@ -6171,13 +6173,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let state_wrapper_present = state_source.contains("pub(crate) struct ContractRuntime")
         && state_source.contains("pub(in crate::runtime) struct CommittedRuntimeState")
         && state_source.contains("pub(crate) struct RuntimeShadowState")
+        && state_source.contains("pub(crate) struct ConfidentialRuntimeShadowState")
         && state_source.contains("pub(crate) struct PublicRuntimeShadowState");
     let kernel_restricted_signatures = [
         "pub(in crate::runtime) fn inner_mut",
         "pub(in crate::runtime) fn into_inner",
         "pub(in crate::runtime) fn commit_public_objects",
         "pub(in crate::runtime) fn run_confidential_call",
-        "pub(in crate::runtime) fn shadow_load_objects",
+        "pub(in crate::runtime) fn shadow_load_public_objects",
     ];
     let kernel_restricted_signature_checks = kernel_restricted_signatures
         .into_iter()
@@ -6194,6 +6197,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("kernel signature presence must be boolean")
         });
+    let kernel_confidential_shadow_load_private = kernel_source
+        .contains("fn shadow_load_confidential_objects(")
+        && !kernel_source.contains("pub(in crate::runtime) fn shadow_load_confidential_objects(")
+        && !kernel_source.contains("pub(crate) fn shadow_load_confidential_objects(");
     let raw_kernel_private_surface_checks = [
         (
             "struct ConfidentialExecutionOutcome {",
@@ -6241,13 +6248,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let state_restricted_signatures = [
         "pub(in crate::runtime) fn objects",
         "pub(in crate::runtime) fn shadow_load",
+        "pub(in crate::runtime) fn from_shadow(shadow: RuntimeShadowState) -> Self",
         "pub(in crate::runtime) fn object_mut",
         "pub(in crate::runtime) fn enable_injected_path_oram_leaf_coins",
         "pub(in crate::runtime) fn install_path_oram_leaf_coins",
         "pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed",
         "pub(in crate::runtime) fn commit_against",
         "pub(in crate::runtime) fn into_cold_committed_state",
-        "pub(in crate::runtime) fn inner_mut",
     ];
     let state_restricted_signature_checks = state_restricted_signatures
         .into_iter()
@@ -6712,7 +6719,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     });
     let state_only_kernel_helper_surface_checks = [
         (
-            "shadow_load_objects(self, public_object_ids)?",
+            ".shadow_load_public_objects(self, public_object_ids)",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
@@ -6999,9 +7006,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && kernel_source.contains("slots: Vec<Option<Value>>"),
         }),
         json!({
-            "name": "RuntimeShadowState and CommittedRuntimeState",
+            "name": "RuntimeShadowState / ConfidentialRuntimeShadowState / PublicRuntimeShadowState / CommittedRuntimeState",
             "owner": "runtime/uo-evm/src/state.rs",
-            "boundary": "secret-bearing shadow / committed object maps owned by crate::runtime",
+            "boundary": "secret-bearing committed/shadow object maps stay inside crate::runtime, with distinct public and confidential shadow wrappers delimiting the shell boundary",
             "checked": state_wrapper_present
                 && state_only_runtime_helper_surface_restricted
                 && state_only_kernel_helper_surface_restricted,
@@ -7085,6 +7092,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "restricted_signature_checks": restricted_signature_checks,
         "all_kernel_restricted_signatures_present": all_kernel_restricted_signatures_present,
         "kernel_restricted_signature_checks": kernel_restricted_signature_checks,
+        "kernel_confidential_shadow_load_private":
+            kernel_confidential_shadow_load_private,
         "raw_kernel_private_surface_checks": raw_kernel_private_surface_checks,
         "raw_kernel_private_surface_restricted": raw_kernel_private_surface_restricted,
         "all_state_restricted_signatures_present": all_state_restricted_signatures_present,
@@ -7255,6 +7264,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && !engine_owns_raw_runtime_object_map
             && all_restricted_signatures_present
             && all_kernel_restricted_signatures_present
+            && kernel_confidential_shadow_load_private
             && raw_kernel_private_surface_restricted
             && all_state_restricted_signatures_present
             && runtime_object_nonclone
@@ -8979,8 +8989,9 @@ that `ContractInstance::clone` goes through the cold committed-state clone
 path, that `engine.rs` now holds only an opaque `ContractRuntime` wrapper and
 delegates the entire public-call lifecycle to `shell.rs`, that `shell.rs`
 itself stays on the `PublicRuntimeKernel` plus `PublicRuntimeShadowState`
-side of the boundary instead of importing raw runtime objects or confidential
-kernel types, and that `engine.rs` no longer constructs runtime phase-witness
+side of the boundary while the confidential path uses its own
+`ConfidentialRuntimeShadowState` wrapper instead of reusing the public shadow
+handle, and that `engine.rs` no longer constructs runtime phase-witness
 events directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
 certificates directly, no longer assembles `ExecutionTrace` directly
@@ -8996,15 +9007,16 @@ avoid depending on `CompiledFunction` entirely while the public trace path
 sees only the exported `OutputShape` rather than the full return payload. The
 same report
 also checks that the
-confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
-commit, and confidential execution are visibility-restricted to
-`crate::runtime`, that `shell.rs` owns the public-kernel facade while
-`state.rs` owns confidential manifest planning plus confidential-kernel
-setup, and that confidential entrypoints are sourced from the checked
-manifest's `confidential_slot_program` in `runtime/uo-evm/src/state.rs`
-while that module delegates confidential execution through
-`runtime/uo-evm/src/kernel.rs`, enforces the manifest-derived confidential
-commit budget there as well, and
+confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
+public commit, and confidential execution are visibility-restricted to
+`crate::runtime`, that the confidential shadow-load helper itself stays
+private to `runtime/uo-evm/src/kernel.rs`, that `shell.rs` owns the
+public-kernel facade while `state.rs` owns confidential manifest planning
+plus confidential-kernel setup, and that confidential entrypoints are
+sourced from the checked manifest's `confidential_slot_program` in
+`runtime/uo-evm/src/state.rs` while that module delegates confidential
+execution through `runtime/uo-evm/src/kernel.rs`, enforces the
+manifest-derived confidential commit budget there as well, and
 that the production kernel executes that shared slot DSL with a slot-vector
 confidential state rather than a string-keyed map, and that the kernel-step
 witness journal plus the lower-level
@@ -9048,7 +9060,7 @@ the same report now also checks finer helper authority: secret-bearing
 helpers must be used only from `runtime/uo-evm/src/state.rs`, the
 shadow-state helpers that reopen committed state or reconcile committed
 shadows must be used only from `runtime/uo-evm/src/kernel.rs`, and the raw
-kernel hooks `shadow_load_objects`, `commit_public_objects`, and
+kernel hooks `shadow_load_public_objects`, `commit_public_objects`, and
 `run_confidential_call` must be invoked only from
 `runtime/uo-evm/src/state.rs`. The probe-side production-source scan now also
 strips `#[cfg(test)]` items without truncating later production code, so

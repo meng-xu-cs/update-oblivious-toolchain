@@ -275,9 +275,10 @@ The first implementation step is now present in the codebase:
   state are now compile-time restricted to the shared `crate::runtime`
   module, and `RuntimeObject` no longer implements `Clone`, so those
   secret-bearing paths are no longer callable or duplicable from `engine.rs`;
-  the shell now also holds an opaque `CommittedRuntimeState` handle plus a
-  public `PublicRuntimeShadowState` wrapper instead of directly owning raw
-  runtime object maps
+  the runtime boundary now also distinguishes the public-shell
+  `PublicRuntimeShadowState` handle from the confidential-kernel
+  `ConfidentialRuntimeShadowState` handle instead of exposing one generic
+  shadow wrapper across both sides
 - the remaining shadow-load, shadow-commit reconciliation, and injected
   Path-ORAM fresh-coin routing steps now also live in `runtime/uo-evm/src/state.rs`
   rather than being assembled directly in `runtime/uo-evm/src/kernel.rs`, so
@@ -406,9 +407,11 @@ The first implementation step is now present in the codebase:
   cold-store / witness-export / fresh-coin helpers must be used only from
   `runtime/uo-evm/src/state.rs`, the shadow-state helpers that reopen
   committed state or reconcile committed shadows must be used only from
-  `runtime/uo-evm/src/kernel.rs`, and the raw kernel hooks
-  `shadow_load_objects`, `commit_public_objects`, and `run_confidential_call`
-  must be used only from `runtime/uo-evm/src/state.rs`
+  `runtime/uo-evm/src/kernel.rs`, the raw public-kernel hooks
+  `shadow_load_public_objects`, `commit_public_objects`, and
+  `run_confidential_call` must be used only from `runtime/uo-evm/src/state.rs`,
+  and the confidential shadow-load helper itself stays private to
+  `runtime/uo-evm/src/kernel.rs`
 - the same report now also checks the low-level store helper layer:
   direct `StoreCipher::seal` / `StoreCipher::open` use must stay inside
   `runtime/uo-store/src/codec.rs`, the public wipe-preserving helper surface

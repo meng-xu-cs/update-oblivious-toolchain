@@ -108,9 +108,11 @@ The current runtime has a first hardening layer:
   and cold-store committed state are now compile-time restricted to the
   shared `crate::runtime` module, and `RuntimeObject` no longer implements
   `Clone`, so `engine.rs` cannot duplicate or directly invoke those
-  secret-bearing paths; `engine.rs` now also carries an opaque
-  `CommittedRuntimeState` handle plus a public `PublicRuntimeShadowState`
-  wrapper instead of directly owning raw runtime object maps
+  secret-bearing paths; `engine.rs` now also carries only the opaque
+  `ContractRuntime` wrapper, while the runtime boundary itself splits live
+  reopened object state into a public `PublicRuntimeShadowState` shell handle
+  and a distinct `ConfidentialRuntimeShadowState` kernel handle instead of
+  exposing one generic shadow wrapper
 - confidential `keccak256` evaluation now streams canonical bytes directly into
   the hasher under the existing scratch-budget accounting instead of
   materializing per-part heap buffers first
@@ -472,8 +474,11 @@ The current runtime has a first hardening layer:
   helper calls must stay in `runtime/uo-evm/src/state.rs`, the shadow-state
   helpers that reopen committed state, install fresh coins, and reconcile
   committed shadows must be called only from `runtime/uo-evm/src/kernel.rs`,
-  and the raw kernel hooks `shadow_load_objects`, `commit_public_objects`, and
-  `run_confidential_call` must be invoked only from `runtime/uo-evm/src/state.rs`
+  the public shadow-load / public-commit / confidential-execution kernel
+  hooks `shadow_load_public_objects`, `commit_public_objects`, and
+  `run_confidential_call` must be invoked only from `runtime/uo-evm/src/state.rs`,
+  and the confidential shadow-load helper itself stays private to
+  `runtime/uo-evm/src/kernel.rs`
 - the boundary report now also checks the low-level store helper layer:
   direct `StoreCipher::seal` / `StoreCipher::open` use must stay inside
   `runtime/uo-store/src/codec.rs`, the public wipe-preserving helper surface
