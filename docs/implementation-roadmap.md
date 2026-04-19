@@ -493,7 +493,11 @@ The first implementation step is now present in the codebase:
   value and moved into the live shadow state without cloning the per-object
   secret leaf tapes first; the hidden traced-call ORAM witness snapshots in
   `state.rs` now also wipe on drop unless the theorem finalizer explicitly
-  consumes them; the controller/theorem path now also derives output
+  consumes them; the theorem-facing certificate constructors plus final
+  `ExecutionTrace` assembly are now also confined to
+  `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace` construction
+  stays confined to `runtime/uo-evm/src/controller.rs`; the controller/theorem
+  path now also derives output
   length from manifest-stored `return_canonical_len` and consumes only the
   public `OutputShape` summary rather than the full return payload
 - kernel object-operation scratch reservations and UO object commit `io`

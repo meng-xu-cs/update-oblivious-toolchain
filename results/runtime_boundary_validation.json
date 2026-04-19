@@ -148,6 +148,10 @@
   "controller_path": "runtime/uo-evm/src/controller.rs",
   "controller_public_call_summary_uses_manifest_only": true,
   "controller_public_trace_uses_output_shape_only": true,
+  "controller_theorem_trace_constructor_files": [
+    "runtime/uo-evm/src/controller.rs"
+  ],
+  "controller_theorem_trace_constructor_surface_restricted": true,
   "core_trace_path": "crates/uo-core/src/trace.rs",
   "default_call_result_omits_runtime_telemetry": true,
   "diagnostic_api_gated_behind_feature": true,
@@ -195,6 +199,9 @@
   ],
   "expected_confidential_kernel_run_outcome_surface_files": [
     "runtime/uo-evm/src/kernel.rs"
+  ],
+  "expected_controller_theorem_trace_constructor_files": [
+    "runtime/uo-evm/src/controller.rs"
   ],
   "expected_finalized_call_trace_consumption_surface_files": [
     "runtime/uo-evm/src/engine.rs",
@@ -1461,6 +1468,49 @@
   ],
   "store_wipe_helper_surface_restricted": true,
   "store_write_api_uses_mutable_plaintext": true,
+  "theorem_certificate_constructor_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "RuntimeControllerObserverCertificate::new(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "RuntimePathOramHiddenCertificate::new(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "RuntimeTrustedKernelBundle::new_with_kernel_witness(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "ExecutionTrace {",
+      "restricted": true
+    }
+  ],
+  "theorem_certificate_constructor_surface_restricted": true,
   "theorem_finalizer_omits_runtime_telemetry": true,
   "theorem_finalizes_execution_trace": true,
   "theorem_only_runtime_helper_surface_checks": [

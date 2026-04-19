@@ -119,7 +119,14 @@ through the theorem-side `run_traced_call(...)` bridge rather than by
 `engine.rs`, and remains opaque outside the dedicated `state.rs` /
 `theorem.rs` handoff; the same theorem-side context now also owns the public
 `PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer constructs
-those theorem-path objects directly. The same report also checks that the
+those theorem-path objects directly. The same report now also pins the
+theorem-facing constructor surface itself: `RuntimeControllerObserverCertificate::new`,
+`RuntimePathOramHiddenCertificate::new`, and
+`RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus the final
+`ExecutionTrace { ... }` assembly must stay confined to
+`runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
+construction must stay confined to `runtime/uo-evm/src/controller.rs`.
+The same report also checks that the
 proof-grade trusted-kernel path itself stays on the stronger slot-wrapped
 artifact: `crates/uo-core/src/trusted_kernel.rs` must source the admitted
 `confidential_slot_program` from the checked manifest, `uo-evm --format

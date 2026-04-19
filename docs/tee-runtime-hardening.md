@@ -417,6 +417,13 @@ The current runtime has a first hardening layer:
   finalizer now consumes the whole `RuntimeCallOutcome` directly rather than
   having the engine unpack kernel witnesses, opcode traces, and return values
   just to pass them straight back in
+- the theorem-facing constructor surface is now pinned as well:
+  `RuntimeControllerObserverCertificate::new`,
+  `RuntimePathOramHiddenCertificate::new`, and
+  `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus final
+  `ExecutionTrace { ... }` assembly stay confined to
+  `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
+  construction stays confined to `runtime/uo-evm/src/controller.rs`
 - the hidden traced-call witness staging objects in `state.rs` now also wipe
   their access-counter and position-map vectors on drop unless the theorem
   finalizer explicitly consumes them
