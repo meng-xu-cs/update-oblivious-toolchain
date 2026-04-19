@@ -643,6 +643,13 @@ That witness is now in the proof-facing boundary:
   runtime phase witness directly, and
   `checkProofGradeRuntimeKernelRefinementWitness` validates that artifact
   against the exported proof-grade kernel witness
+- `uo-evm --format shell-boundary` and
+  `uo-evm --format shell-boundary-lowering` now expose the public-only shell
+  contract/trace witness and its shared-DSL lowering bridge directly, instead
+  of leaving those proof objects probe-only
+- `uo-evm --format confidential-core-shell-boundary-lowering` now also exposes
+  the combined runtime-witness plus shell-boundary plus named/slot DSL bundle
+  that closes the shared-DSL/shell-refinement loop at one exported artifact
 - `results/kernel_refinement_validation.json` now validates that same
   lower-level runtime phase witness directly on the benchmark-backed proof
   scenarios rather than only through the larger refinement-witness report

@@ -456,8 +456,21 @@ cargo check -p mplus-probe
 cd proof/lean && lake build \
   checkProofGradeTranslationArtifacts \
   checkProofGradeRuntimeKernelWitness \
+  checkProofGradeRuntimeKernelRefinementWitness \
+  checkProofGradeRuntimeWitness \
+  checkProofGradeRuntimeShellBoundary \
+  checkProofGradeRuntimeShellBoundaryLowering \
+  checkProofGradeRuntimeConfidentialCore \
+  checkProofGradeRuntimeConfidentialCoreSlot \
+  checkProofGradeRuntimeConfidentialCoreLowering \
+  checkProofGradeRuntimeConfidentialCoreShellBoundaryLowering \
   checkProofGradeRuntimeTrustedKernel
 cargo run -q -p mplus-probe -- --only static-checks --out-dir /tmp/uo-static
+cargo run -q -p mplus-probe -- --only shell-boundary-validation --out-dir /tmp/uo-shell-boundary
+cargo run -q -p mplus-probe -- --only shell-boundary-lowering-validation --out-dir /tmp/uo-shell-boundary-lowering
+cargo run -q -p mplus-probe -- --only confidential-core-validation --out-dir /tmp/uo-confidential-core
+cargo run -q -p mplus-probe -- --only confidential-core-lowering-validation --out-dir /tmp/uo-confidential-core-lowering
+cargo run -q -p mplus-probe -- --only confidential-core-shell-boundary-lowering-validation --out-dir /tmp/uo-confidential-core-shell-boundary-lowering
 cargo run -q -p mplus-probe -- --only kernel-validation --out-dir /tmp/uo-kernel
 cargo run -q -p mplus-probe -- --only trusted-kernel-validation --out-dir /tmp/uo-tk
 ```

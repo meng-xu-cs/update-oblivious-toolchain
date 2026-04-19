@@ -9,6 +9,7 @@ use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uo_core::{
     canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
@@ -7251,289 +7252,183 @@ fn display_report_path(path: &Path) -> String {
     }
 }
 
-fn lean_proofgrade_witness_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeWitness");
+static BUILT_LEAN_CHECKERS: OnceLock<Mutex<BTreeSet<String>>> = OnceLock::new();
+
+fn ensure_lean_checker(target: &'static str, description: &'static str) -> Result<PathBuf> {
+    let built = BUILT_LEAN_CHECKERS.get_or_init(|| Mutex::new(BTreeSet::new()));
+    let mut built = built
+        .lock()
+        .map_err(|_| anyhow!("failed to lock Lean checker build cache"))?;
+    if !built.contains(target) {
+        let lean_dir = repo_root().join("proof/lean");
+        let output = Command::new("lake")
+            .arg("build")
+            .arg(target)
+            .current_dir(&lean_dir)
+            .output()
+            .with_context(|| format!("building Lean {description} checker `{target}`"))?;
+        if !output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow!(
+                "Lean {description} checker build failed for `{target}` with status {}\nstdout:\n{}\nstderr:\n{}",
+                output.status,
+                stdout,
+                stderr,
+            ));
+        }
+        built.insert(target.to_owned());
+    }
+    drop(built);
+    let path = repo_root().join(format!("proof/lean/.lake/build/bin/{target}"));
     if path.is_file() {
         Ok(path)
     } else {
         Err(anyhow!(
-            "Lean proof-grade witness checker not found at {}; build it with `cd proof/lean && lake build`",
+            "Lean {description} checker not found at {} after `lake build {target}`",
             path.display()
         ))
     }
+}
+
+fn lean_proofgrade_witness_checker_path() -> Result<PathBuf> {
+    ensure_lean_checker("checkProofGradeRuntimeWitness", "proof-grade witness")
 }
 
 fn lean_proofgrade_confidential_core_checker_path() -> Result<PathBuf> {
-    let path =
-        repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCore");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade confidential-core checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeConfidentialCore",
+        "proof-grade confidential-core",
+    )
 }
 
 fn lean_proofgrade_confidential_core_slot_checker_path() -> Result<PathBuf> {
-    let path =
-        repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreSlot");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade confidential-core slot checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeConfidentialCoreSlot",
+        "proof-grade confidential-core slot",
+    )
 }
 
 fn lean_proofgrade_confidential_core_lowering_checker_path() -> Result<PathBuf> {
-    let path = repo_root()
-        .join("proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreLowering");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade confidential-core lowering checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeConfidentialCoreLowering",
+        "proof-grade confidential-core lowering",
+    )
 }
 
 fn lean_proofgrade_confidential_core_shell_boundary_lowering_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join(
-        "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreShellBoundaryLowering",
-    );
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade confidential-core shell-boundary lowering checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeConfidentialCoreShellBoundaryLowering",
+        "proof-grade confidential-core shell-boundary lowering",
+    )
 }
 
 fn lean_proofgrade_kernel_dsl_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeKernelDsl");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade kernel DSL checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker("checkProofGradeRuntimeKernelDsl", "proof-grade kernel DSL")
 }
 
 fn lean_proofgrade_kernel_slot_dsl_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeKernelSlotDsl");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade kernel slot DSL checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeKernelSlotDsl",
+        "proof-grade kernel slot DSL",
+    )
 }
 
 fn lean_proofgrade_kernel_lowering_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeKernelLowering");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade kernel lowering checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeKernelLowering",
+        "proof-grade kernel lowering",
+    )
 }
 
 fn lean_proofgrade_kernel_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeKernelWitness");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade kernel checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker("checkProofGradeRuntimeKernelWitness", "proof-grade kernel")
 }
 
 fn lean_proofgrade_kernel_refinement_checker_path() -> Result<PathBuf> {
-    let path = repo_root()
-        .join("proof/lean/.lake/build/bin/checkProofGradeRuntimeKernelRefinementWitness");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade kernel refinement checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeKernelRefinementWitness",
+        "proof-grade kernel refinement",
+    )
 }
 
 fn lean_proofgrade_shell_boundary_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeShellBoundary");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade shell-boundary checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeShellBoundary",
+        "proof-grade shell-boundary",
+    )
 }
 
 fn lean_proofgrade_shell_boundary_lowering_checker_path() -> Result<PathBuf> {
-    let path =
-        repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeShellBoundaryLowering");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade shell-boundary lowering checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeShellBoundaryLowering",
+        "proof-grade shell-boundary lowering",
+    )
 }
 
 fn lean_proofgrade_trusted_kernel_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeRuntimeTrustedKernel");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade trusted-kernel checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeRuntimeTrustedKernel",
+        "proof-grade trusted-kernel",
+    )
 }
 
 fn lean_proofgrade_translation_artifacts_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkProofGradeTranslationArtifacts");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean proof-grade translation artifacts checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkProofGradeTranslationArtifacts",
+        "proof-grade translation artifacts",
+    )
 }
 
 fn lean_controller_certificate_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeControllerCertificate");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean controller certificate checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkRuntimeControllerCertificate",
+        "controller certificate",
+    )
 }
 
 fn lean_pathoram_hidden_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimePathOramHiddenCertificate");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean path-ORAM hidden checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker("checkRuntimePathOramHiddenCertificate", "path-ORAM hidden")
 }
 
 fn lean_witness_family_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeWitnessFamily");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean witness family checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker("checkRuntimeWitnessFamily", "witness family")
 }
 
 fn lean_fresh_coin_family_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeFreshCoinFamily");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean fresh-coin family checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker("checkRuntimeFreshCoinFamily", "fresh-coin family")
 }
 
 fn lean_fresh_coin_theorem_input_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkRuntimeFreshCoinTheoremInput");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean fresh-coin theorem-input checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkRuntimeFreshCoinTheoremInput",
+        "fresh-coin theorem-input",
+    )
 }
 
 fn lean_pathoram_pair_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkPathOramPairCertificate");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean path-ORAM pair checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker("checkPathOramPairCertificate", "path-ORAM pair")
 }
 
 fn lean_canonical_pathoram_pair_checker_path() -> Result<PathBuf> {
-    let path = repo_root().join("proof/lean/.lake/build/bin/checkCanonicalPathOramPairCertificate");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean canonical path-ORAM pair checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkCanonicalPathOramPairCertificate",
+        "canonical path-ORAM pair",
+    )
 }
 
 fn lean_canonical_pathoram_paper_instantiation_checker_path() -> Result<PathBuf> {
-    let path =
-        repo_root().join("proof/lean/.lake/build/bin/checkCanonicalPathOramPaperInstantiation");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean canonical path-ORAM paper instantiation checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkCanonicalPathOramPaperInstantiation",
+        "canonical path-ORAM paper instantiation",
+    )
 }
 
 fn lean_canonical_pathoram_pair_theorem_input_checker_path() -> Result<PathBuf> {
-    let path =
-        repo_root().join("proof/lean/.lake/build/bin/checkCanonicalPathOramPairTheoremInput");
-    if path.is_file() {
-        Ok(path)
-    } else {
-        Err(anyhow!(
-            "Lean canonical path-ORAM pair theorem-input checker not found at {}; build it with `cd proof/lean && lake build`",
-            path.display()
-        ))
-    }
+    ensure_lean_checker(
+        "checkCanonicalPathOramPairTheoremInput",
+        "canonical path-ORAM pair theorem-input",
+    )
 }
 
 fn temporary_witness_path(case_name: &str) -> PathBuf {

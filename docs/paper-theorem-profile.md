@@ -353,6 +353,10 @@ The runtime-to-Lean witness interface is now fixed in:
 - ordered controller-certificate reconstruction in
   `crates/uo-core/src/trace.rs`
 - `uo-evm --format refinement-witness` in `runtime/uo-evm/src/main.rs`
+- `uo-evm --format shell-boundary`,
+  `shell-boundary-lowering`, and
+  `confidential-core-shell-boundary-lowering` in
+  `runtime/uo-evm/src/main.rs`
 - `RuntimeRefinementWitness` and its projection lemmas in
   `proof/lean/UOToolchain/RuntimeRefinement.lean`
 - `RuntimeRefinementJson.lean` for JSON import, Lean-side witness checking, and
