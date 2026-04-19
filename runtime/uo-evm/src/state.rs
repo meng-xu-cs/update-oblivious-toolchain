@@ -406,25 +406,14 @@ impl ConfidentialEntrypointPlan {
         public_object_ids: Vec<u32>,
     ) -> Result<Self> {
         let mut allocator = AllocatorPlan::from_manifest(manifest_entry);
-        let manifest_expected_kernel_steps = manifest_entry
-            .kernel_steps
-            .iter()
-            .map(|step| RuntimeKernelStepWitness {
-                opcode: step.opcode,
-                object_id: step.object_id,
-            })
-            .collect::<Vec<_>>();
+        let manifest_expected_kernel_steps = manifest_entry.kernel_step_witnesses();
         let program = manifest_entry
             .confidential_slot_program
             .clone()
             .ok_or_else(|| {
                 anyhow!("manifest confidential_slot_program missing for {entrypoint}")
             })?;
-        let expected_kernel_steps = program
-            .expected_runtime_steps()
-            .into_iter()
-            .map(RuntimeKernelStepWitness::from)
-            .collect::<Vec<_>>();
+        let expected_kernel_steps = program.expected_runtime_step_witnesses();
         if manifest_expected_kernel_steps != expected_kernel_steps {
             bail!(
                 "manifest kernel step trace drifted from confidential slot program for {entrypoint}"

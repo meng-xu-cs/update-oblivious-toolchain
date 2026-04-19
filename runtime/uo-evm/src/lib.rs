@@ -20,7 +20,7 @@ mod tests {
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
         ContractMetadata, ExecutionTrace, ProgramMode, RuntimeKernelRefinementEventKindWitness,
-        RuntimeKernelStepWitness, TheoremTrace, Value, WriteClass,
+        TheoremTrace, Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
 
@@ -627,14 +627,7 @@ mod tests {
             .entrypoints
             .get("auth(bytes32)")
             .unwrap();
-        let manifest_expected_kernel_steps = manifest_entry
-            .kernel_steps
-            .iter()
-            .map(|step| RuntimeKernelStepWitness {
-                opcode: step.opcode,
-                object_id: step.object_id,
-            })
-            .collect::<Vec<_>>();
+        let manifest_expected_kernel_steps = manifest_entry.kernel_step_witnesses();
         assert_eq!(
             witness.expected_kernel_steps,
             Some(manifest_expected_kernel_steps)

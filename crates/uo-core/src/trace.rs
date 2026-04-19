@@ -1,4 +1,6 @@
-use crate::confidential_kernel::{ConfidentialKernelLoweringError, ConfidentialKernelStep};
+use crate::confidential_kernel::{
+    ConfidentialKernelLoweringError, ConfidentialKernelSlotProgram, ConfidentialKernelStep,
+};
 use crate::ir::StateObject;
 use crate::manifest::{
     EntrypointManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
@@ -257,6 +259,21 @@ pub struct RuntimeKernelStepWitness {
     pub opcode: UoOpcode,
     #[serde(default)]
     pub object_id: Option<u32>,
+}
+
+impl ConfidentialKernelSlotProgram {
+    pub fn expected_runtime_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
+        self.expected_runtime_steps()
+            .into_iter()
+            .map(RuntimeKernelStepWitness::from)
+            .collect()
+    }
+}
+
+impl EntrypointManifest {
+    pub fn kernel_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
+        manifest_kernel_steps_as_witness(&self.kernel_steps)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -1635,8 +1652,7 @@ impl RuntimeKernelWitness {
                 witnessed: manifest_kernel_steps_as_witness(&manifest_entry.kernel_steps),
             });
         }
-        let manifest_expected_steps =
-            manifest_kernel_steps_as_witness(&manifest_entry.kernel_steps);
+        let manifest_expected_steps = manifest_entry.kernel_step_witnesses();
         let witness_expected_steps = self.expected_kernel_steps.as_ref().ok_or_else(|| {
             KernelWitnessError::MissingExpectedKernelSteps {
                 entrypoint: entrypoint.into(),
@@ -1849,6 +1865,15 @@ impl RuntimeKernelStepWitness {
 
 impl From<ConfidentialKernelStep> for RuntimeKernelStepWitness {
     fn from(step: ConfidentialKernelStep) -> Self {
+        Self {
+            opcode: step.opcode,
+            object_id: step.object_id,
+        }
+    }
+}
+
+impl From<&RuntimeKernelStepManifest> for RuntimeKernelStepWitness {
+    fn from(step: &RuntimeKernelStepManifest) -> Self {
         Self {
             opcode: step.opcode,
             object_id: step.object_id,
@@ -2362,13 +2387,7 @@ pub fn canonical_runtime_public_object_ids(state: &[StateObject]) -> Vec<u32> {
 fn manifest_kernel_steps_as_witness(
     steps: &[RuntimeKernelStepManifest],
 ) -> Vec<RuntimeKernelStepWitness> {
-    steps
-        .iter()
-        .map(|step| RuntimeKernelStepWitness {
-            opcode: step.opcode,
-            object_id: step.object_id,
-        })
-        .collect()
+    steps.iter().map(RuntimeKernelStepWitness::from).collect()
 }
 
 impl RuntimePathOramHiddenCertificate {

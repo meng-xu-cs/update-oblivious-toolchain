@@ -6357,7 +6357,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("fn prepare_confidential_entrypoint(")
         && state_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
         && state_source.contains(".confidential_slot_program")
-        && state_source.contains("expected_runtime_steps()")
+        && state_source.contains(".kernel_step_witnesses()")
+        && state_source.contains(".expected_runtime_step_witnesses()")
+        && !state_source.contains("RuntimeKernelStepWitness {")
         && state_source.contains("max_commit_ops: manifest_entry.max_commit_ops")
         && state_source.contains("max_hash_part_bytes: manifest_entry.max_hash_part_bytes");
     let kernel_executes_program_body_via_shared_dsl =
@@ -6605,7 +6607,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         checker_source.contains("lower_confidential_kernel_statements(statements, signature)?;");
     let kernel_witness_validation_uses_manifest_confidential_slot_program = core_trace_source
         .contains(".confidential_slot_program")
-        && core_trace_source.contains(".expected_runtime_steps()");
+        && core_trace_source.contains(".expected_runtime_step_manifest()")
+        && core_trace_source.contains(".kernel_step_witnesses()");
     let kernel_witness_validation_tracks_confidential_kernel_lowering_errors = core_trace_source
         .contains("ConfidentialKernelLoweringError::SelectArmOutsideBranchlessFragment")
         && core_trace_source.contains("ConfidentialKernelLoweringError::ConfidentialStructField")
