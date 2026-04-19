@@ -1,4 +1,4 @@
-use crate::controller::{CallRecorder, PublicCallSummary};
+use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::state::CommittedRuntimeWitnessSnapshot;
 use anyhow::Result;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
@@ -22,7 +22,30 @@ pub(crate) struct FinalizeExecutionTraceInput<'a> {
     pub runtime_state_after: CommittedRuntimeWitnessSnapshot,
 }
 
-pub fn build_theorem_trace(
+pub(crate) struct FinalizeCallTraceInput<'a> {
+    pub artifact: &'a CompiledArtifact,
+    pub entrypoint: &'a str,
+    pub confidential: bool,
+    pub deploy_seed: u64,
+    pub opcode_trace: Vec<String>,
+    pub recorder: CallRecorder,
+    pub manifest_entry: &'a EntrypointManifest,
+    pub manifest_objects: &'a [StateObjectManifest],
+    pub public_call: PublicCallSummary,
+    pub aborted: bool,
+    pub return_value: &'a Option<uo_core::Value>,
+    pub runtime_kernel_witness: RuntimeKernelWitness,
+    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
+    pub runtime_state_before: CommittedRuntimeWitnessSnapshot,
+    pub runtime_state_after: CommittedRuntimeWitnessSnapshot,
+}
+
+pub(crate) struct FinalizedCallTrace {
+    pub trace: ExecutionTrace,
+    pub zero_writes: usize,
+}
+
+fn build_theorem_trace(
     recorder: CallRecorder,
     manifest_entry: &EntrypointManifest,
     manifest_objects: &[StateObjectManifest],
@@ -41,9 +64,7 @@ pub fn build_theorem_trace(
     )
 }
 
-pub(crate) fn finalize_execution_trace(
-    input: FinalizeExecutionTraceInput<'_>,
-) -> Result<ExecutionTrace> {
+fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<ExecutionTrace> {
     let FinalizeExecutionTraceInput {
         artifact,
         entrypoint,
@@ -133,6 +154,67 @@ pub(crate) fn finalize_execution_trace(
     }
     trace.runtime_trusted_kernel_bundle = Some(direct_bundle);
     Ok(trace)
+}
+
+fn gas_used_of(
+    recorder: &CallRecorder,
+    manifest_entry: &EntrypointManifest,
+    confidential: bool,
+) -> u64 {
+    if confidential {
+        return manifest_entry.public_gas_budget;
+    }
+    let mut gas_used = 0u64;
+    gas_used += recorder.metrics().logical_reads as u64 * 3;
+    gas_used += recorder.metrics().logical_writes as u64 * 5;
+    gas_used += recorder.metrics().physical_writes as u64 * 17;
+    gas_used
+}
+
+pub(crate) fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCallTrace> {
+    let FinalizeCallTraceInput {
+        artifact,
+        entrypoint,
+        confidential,
+        deploy_seed,
+        opcode_trace,
+        recorder,
+        manifest_entry,
+        manifest_objects,
+        public_call,
+        aborted,
+        return_value,
+        runtime_kernel_witness,
+        runtime_kernel_refinement_witness,
+        runtime_state_before,
+        runtime_state_after,
+    } = input;
+    let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
+    let output_shape = output_shape_of(manifest_entry, return_value)?;
+    let trace_bundle = build_theorem_trace(
+        recorder,
+        manifest_entry,
+        manifest_objects,
+        public_call,
+        output_shape,
+        aborted,
+        gas_used,
+    )?;
+    let zero_writes = trace_bundle.metrics.zero_writes;
+    let trace = finalize_execution_trace(FinalizeExecutionTraceInput {
+        artifact,
+        entrypoint,
+        confidential,
+        deploy_seed,
+        opcode_trace,
+        gas_used,
+        trace_bundle,
+        runtime_kernel_witness,
+        runtime_kernel_refinement_witness,
+        runtime_state_before,
+        runtime_state_after,
+    })?;
+    Ok(FinalizedCallTrace { trace, zero_writes })
 }
 
 fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWitness> {

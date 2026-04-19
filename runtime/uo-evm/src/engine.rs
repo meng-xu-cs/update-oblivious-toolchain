@@ -1,8 +1,8 @@
-use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
+use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::ContractRuntime;
 use crate::shell::run_public_entrypoint;
-use crate::theorem::{build_theorem_trace, finalize_execution_trace, FinalizeExecutionTraceInput};
+use crate::theorem::{finalize_call_trace, FinalizeCallTraceInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -145,9 +145,9 @@ impl ContractInstance {
             let (
                 runtime_kernel_witness,
                 runtime_kernel_refinement_witness,
+                opcode_trace,
                 aborted,
                 return_value,
-                opcode_trace,
             ) = if function.confidential {
                 let confidential_args = confidential_args
                     .expect("confidential entrypoint must carry confidential call args");
@@ -162,9 +162,9 @@ impl ContractInstance {
                 (
                     outcome.runtime_kernel_witness,
                     outcome.runtime_kernel_refinement_witness,
+                    outcome.opcode_trace,
                     outcome.aborted,
                     outcome.return_value,
-                    outcome.opcode_trace,
                 )
             } else {
                 let public_args =
@@ -181,61 +181,44 @@ impl ContractInstance {
                 (
                     public_execution.runtime_kernel_witness,
                     public_execution.runtime_kernel_refinement_witness,
+                    public_execution.opcode_trace,
                     public_execution.aborted,
                     public_execution.return_value,
-                    public_execution.opcode_trace,
                 )
             };
-            let mut gas_used = 0u64;
-            gas_used += recorder.metrics().logical_reads as u64 * 3;
-            gas_used += recorder.metrics().logical_writes as u64 * 5;
-            gas_used += recorder.metrics().physical_writes as u64 * 17;
-            let manifest_budget = manifest_entry.public_gas_budget;
-            if function.confidential {
-                gas_used = manifest_budget;
-            }
             Ok((
                 runtime_kernel_witness,
                 runtime_kernel_refinement_witness,
-                gas_used,
                 recorder,
+                opcode_trace,
                 aborted,
                 return_value,
-                opcode_trace,
             ))
         })();
         let (
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
-            gas_used,
             recorder,
+            opcode_trace,
             aborted,
             return_value,
-            opcode_trace,
         ) = match execution {
             Ok(result) => result,
             Err(err) => return Err(err),
         };
         let runtime_state_after = self.state.witness_snapshot()?;
-        let output_shape = output_shape_of(&manifest_entry, &return_value)?;
-        let trace_bundle = build_theorem_trace(
-            recorder,
-            &manifest_entry,
-            &self.artifact.contract.manifest.objects,
-            public_call,
-            output_shape,
-            aborted,
-            gas_used,
-        )?;
-        let zero_writes = trace_bundle.metrics.zero_writes;
-        let trace = finalize_execution_trace(FinalizeExecutionTraceInput {
+        let finalized = finalize_call_trace(FinalizeCallTraceInput {
             artifact: &self.artifact,
             entrypoint: &function.signature,
             confidential: function.confidential,
             deploy_seed: self.deploy_seed,
             opcode_trace,
-            gas_used,
-            trace_bundle,
+            recorder,
+            manifest_entry: &manifest_entry,
+            manifest_objects: &self.artifact.contract.manifest.objects,
+            public_call,
+            aborted,
+            return_value: &return_value,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
             runtime_state_before,
@@ -245,9 +228,9 @@ impl ContractInstance {
             CallResult {
                 return_value,
                 aborted,
-                trace,
+                trace: finalized.trace,
             },
-            zero_writes,
+            finalized.zero_writes,
         ))
     }
 }
@@ -387,6 +370,9 @@ mod tests {
             "commit_public_shadow(",
             "replace_with_cold_public_shadow(",
             "finalize_runtime_kernel_refinement_witness(",
+            "build_theorem_trace(",
+            "finalize_execution_trace(",
+            "output_shape_of(",
             "clone_for_tx(",
             "commit(",
             "shadow_load_objects(",

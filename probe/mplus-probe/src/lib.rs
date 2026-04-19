@@ -5967,6 +5967,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "commit_public_shadow(",
         "replace_with_cold_public_shadow(",
         "finalize_runtime_kernel_refinement_witness(",
+        "build_theorem_trace(",
+        "finalize_execution_trace(",
+        "output_shape_of(",
         "clone_for_tx(",
         "commit(",
         "shadow_load_objects(",
@@ -6288,9 +6291,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("pub(in crate::runtime) fn into_raw_args(self) -> Vec<Value>")
         && !state_source.contains("pub(crate) fn into_raw_args(self) -> Vec<Value>")
         && !state_source.contains("pub(crate) fn from_manifest_entry(");
-    let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_execution_trace")
+    let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_call_trace(")
+        && theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
-        && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness");
+        && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness")
+        && theorem_source
+            .contains("let output_shape = output_shape_of(manifest_entry, return_value)?;");
     let controller_public_call_summary_uses_manifest_only = controller_source
         .contains("fn from_manifest_entry")
         && controller_source.contains("manifest_entry.param_names")
@@ -6308,7 +6314,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_public_trace_path_avoids_compiled_function =
         !theorem_source.contains("CompiledFunction");
     let engine_public_trace_uses_output_shape_only = engine_impl_source
-        .contains("let output_shape = output_shape_of(&manifest_entry, &return_value)?;");
+        .contains("let finalized = finalize_call_trace(")
+        && !engine_impl_source.contains("output_shape_of(")
+        && !engine_impl_source.contains("build_theorem_trace(")
+        && !engine_impl_source.contains("finalize_execution_trace(");
     let state_prepares_confidential_manifest_plan = state_source
         .contains("struct ConfidentialEntrypointPlan")
         && state_source.contains("fn prepare_confidential_entrypoint(")
@@ -6894,8 +6903,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("pub use engine::{CallTelemetry, DiagnosticCallResult};");
     let theorem_finalizer_omits_runtime_telemetry = theorem_source
         .contains("let mut trace = ExecutionTrace {")
-        && !theorem_source.contains("host_proxy_metrics")
-        && !theorem_source.contains("trace_bundle.metrics.zero_writes");
+        && theorem_source.contains("let zero_writes = trace_bundle.metrics.zero_writes;")
+        && theorem_source.contains("Ok(FinalizedCallTrace { trace, zero_writes })")
+        && !theorem_source.contains("host_proxy_metrics");
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
         && extract_metrics_source.contains("let trace = &result.call.trace;")
@@ -9006,17 +9016,22 @@ handle, and that `engine.rs` no longer constructs runtime phase-witness
 events directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
 certificates directly, no longer assembles `ExecutionTrace` directly
-beyond `runtime/uo-evm/src/theorem.rs`, and no longer clones the full call
-argument vector just to recover public theorem-trace fields; instead the
+beyond `runtime/uo-evm/src/theorem.rs`, and no longer performs the
+public output-shape computation or theorem-trace assembly piecemeal; instead
+it delegates the whole theorem-finalization path through
+`finalize_call_trace` in `runtime/uo-evm/src/theorem.rs`. The same boundary
+check also rejects engine-side calls to `output_shape_of`,
+`build_theorem_trace`, and `finalize_execution_trace`, while requiring the
+theorem module to keep deriving the public `OutputShape` from the checked
+manifest's `return_canonical_len`. `engine.rs` also no longer clones the full
+call argument vector just to recover public theorem-trace fields; instead the
 controller path must derive a `PublicCallSummary` from the checked manifest's
 `param_names`, `secret_args`, and manifest-stored `entry_input_len`, and
 `ContractRuntime` must internalize the remaining raw confidential argument
 vector into `ConfidentialCallInputs`, whose unwrap surface stays restricted to
-`crate::runtime`; the public output-shape path must derive return length from
-manifest-stored `return_canonical_len`; the theorem-finalization path must
-avoid depending on `CompiledFunction` entirely while the public trace path
-sees only the exported `OutputShape` rather than the full return payload. The
-same report
+`crate::runtime`; the theorem-finalization path must avoid depending on
+`CompiledFunction` entirely while the public trace path sees only the
+exported `OutputShape` rather than the full return payload. The same report
 also checks that the
 confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to
