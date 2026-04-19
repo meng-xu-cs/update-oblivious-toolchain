@@ -64,10 +64,16 @@ struct FinalizeCallTraceInput<'a> {
 }
 
 pub(crate) struct FinalizedCallTrace {
-    pub trace: ExecutionTrace,
-    pub zero_writes: usize,
-    pub return_value: Option<uo_core::Value>,
-    pub aborted: bool,
+    trace: ExecutionTrace,
+    zero_writes: usize,
+    return_value: Option<uo_core::Value>,
+    aborted: bool,
+}
+
+impl FinalizedCallTrace {
+    pub(crate) fn into_engine_result_parts(self) -> (Option<Value>, bool, ExecutionTrace, usize) {
+        (self.return_value, self.aborted, self.trace, self.zero_writes)
+    }
 }
 
 pub(crate) fn run_traced_call<F>(

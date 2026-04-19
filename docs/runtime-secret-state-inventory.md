@@ -73,7 +73,9 @@ to consume it whole, and `engine.rs` to avoid unpacking it directly. The
 same report now also pins the call-trace bridge itself: `engine.rs` calls
 only `run_traced_call(...)` and no longer imports `begin_call_trace`,
 `FinalizeCallTraceInput`, or `CallTraceContext` directly, and those helper
-types/functions stay private to `runtime/uo-evm/src/theorem.rs`. The same report also
+types/functions stay private to `runtime/uo-evm/src/theorem.rs`; the engine
+also consumes the finalized theorem result only through its explicit
+`into_engine_result_parts()` handoff. The same report also
 pins the top-level `ContractRuntime` entrypoints themselves: only
 `runtime/uo-evm/src/shell.rs` may prepare, commit, or replace the public
 shadow wrapper, while only `runtime/uo-evm/src/engine.rs` may invoke

@@ -8402,10 +8402,38 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         theorem_trace_bridge_surface_files == expected_theorem_trace_bridge_surface_files;
     let theorem_trace_bridge_api_is_compact = !engine_impl_source.contains("RunTracedCallInput")
         && !theorem_source.contains("struct RunTracedCallInput");
+    let finalized_call_trace_fields_private = theorem_source
+        .contains("trace: ExecutionTrace")
+        && theorem_source.contains("zero_writes: usize")
+        && theorem_source.contains("return_value: Option<uo_core::Value>")
+        && theorem_source.contains("aborted: bool")
+        && !theorem_source.contains("pub trace: ExecutionTrace")
+        && !theorem_source.contains("pub zero_writes: usize")
+        && !theorem_source.contains("pub return_value: Option<uo_core::Value>")
+        && !theorem_source.contains("pub aborted: bool");
+    let finalized_call_trace_api_is_explicit = theorem_source
+        .contains("pub(crate) fn into_engine_result_parts(self)")
+        && engine_impl_source.contains("finalized.into_engine_result_parts()")
+        && !engine_impl_source.contains("finalized.return_value")
+        && !engine_impl_source.contains("finalized.aborted")
+        && !engine_impl_source.contains("finalized.trace")
+        && !engine_impl_source.contains("finalized.zero_writes");
+    let finalized_call_trace_consumption_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "into_engine_result_parts(")?;
+    let expected_finalized_call_trace_consumption_surface_files = vec![
+        String::from("runtime/uo-evm/src/engine.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let finalized_call_trace_consumption_surface_restricted =
+        finalized_call_trace_consumption_surface_files
+            == expected_finalized_call_trace_consumption_surface_files;
     let engine_public_trace_uses_output_shape_only = engine_impl_source
         .contains("let finalized = run_traced_call(")
         && theorem_trace_bridge_api_is_compact
         && theorem_private_surface_restricted
+        && finalized_call_trace_fields_private
+        && finalized_call_trace_api_is_explicit
+        && finalized_call_trace_consumption_surface_restricted
         && !engine_impl_source.contains("let mut call_trace_context =")
         && !engine_impl_source.contains("begin_call_trace(")
         && !engine_impl_source.contains("finalize_call_trace(")
@@ -9529,6 +9557,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             theorem_trace_bridge_surface_restricted,
         "theorem_trace_bridge_api_is_compact":
             theorem_trace_bridge_api_is_compact,
+        "finalized_call_trace_fields_private":
+            finalized_call_trace_fields_private,
+        "finalized_call_trace_api_is_explicit":
+            finalized_call_trace_api_is_explicit,
+        "finalized_call_trace_consumption_surface_files":
+            finalized_call_trace_consumption_surface_files,
+        "expected_finalized_call_trace_consumption_surface_files":
+            expected_finalized_call_trace_consumption_surface_files,
+        "finalized_call_trace_consumption_surface_restricted":
+            finalized_call_trace_consumption_surface_restricted,
         "engine_public_trace_uses_output_shape_only":
             engine_public_trace_uses_output_shape_only,
         "engine_keeps_confidential_call_inputs_inside_runtime":

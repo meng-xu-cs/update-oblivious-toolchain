@@ -145,13 +145,14 @@ impl ContractInstance {
                 }
             },
         )?;
+        let (return_value, aborted, trace, zero_writes) = finalized.into_engine_result_parts();
         Ok((
             CallResult {
-                return_value: finalized.return_value,
-                aborted: finalized.aborted,
-                trace: finalized.trace,
+                return_value,
+                aborted,
+                trace,
             },
-            finalized.zero_writes,
+            zero_writes,
         ))
     }
 }
