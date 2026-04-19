@@ -228,6 +228,11 @@ Current closure status:
    summary over the admitted fragment, and those combined checkers now consume
    serialized confidential-core bundles rather than coordinating separate
    witness files;
+   each confidential function in the compiled artifact now also carries the
+   same canonical named and fixed-slot confidential DSL that the manifest
+   carries, and the direct Lean translation checker rejects any drift between
+   the exact function-body lowering, the function-carried DSL, and the
+   manifest-carried DSL before the runtime path is even considered;
    `runtime_boundary_validation` now also checks that `engine.rs` loads the
    checked manifest's `confidential_slot_program` and routes it into the shared
    confidential-kernel interpreter, that `runtime/uo-evm/src/state.rs`

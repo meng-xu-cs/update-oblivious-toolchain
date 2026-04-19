@@ -146,6 +146,10 @@ pub struct ProofRelevantFunctionView {
     pub body: Vec<String>,
     pub secret_args: Vec<usize>,
     pub confidential: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidential_program: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidential_slot_program: Option<String>,
 }
 
 impl ProofRelevantFunctionView {
@@ -174,6 +178,16 @@ impl ProofRelevantFunctionView {
                 .collect::<Result<Vec<_>>>()?,
             secret_args: function.secret_args.clone(),
             confidential: function.confidential,
+            confidential_program: function
+                .confidential_program
+                .as_ref()
+                .map(canonical_json_string)
+                .transpose()?,
+            confidential_slot_program: function
+                .confidential_slot_program
+                .as_ref()
+                .map(canonical_json_string)
+                .transpose()?,
         })
     }
 }
@@ -433,6 +447,8 @@ mod tests {
             }],
             secret_args: vec![],
             confidential: false,
+            confidential_program: None,
+            confidential_slot_program: None,
         };
         let view = ProofRelevantFunctionView::from_compiled_function(&function).unwrap();
         assert_eq!(view.params[0].ty, "{\"Scalar\":{\"Uint\":256}}");

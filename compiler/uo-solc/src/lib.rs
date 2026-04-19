@@ -10,8 +10,8 @@ use uo_core::manifest::{
     StateObjectManifest, PATH_ORAM_SCHEME,
 };
 use uo_core::{
-    CompiledArtifact, ContractMetadata, ProofRelevantTranslationBundle, ScalarType, StateMetadata,
-    StructField, Type, Value,
+    CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram, ContractMetadata,
+    ProofRelevantTranslationBundle, ScalarType, StateMetadata, StructField, Type, Value,
 };
 
 use solang_parser::{diagnostics::Diagnostic, parse, pt};
@@ -339,6 +339,25 @@ fn lower_function(
                 .ok_or_else(|| anyhow!("secret arg {} not found in {}", name, signature))
         })
         .collect::<Result<Vec<_>>>()?;
+    let (confidential_program, confidential_slot_program) = if confidential {
+        let confidential_program = ConfidentialKernelProgram {
+            entrypoint_id: signature.clone(),
+            params: params
+                .iter()
+                .map(|(name, ty)| ConfidentialKernelParam {
+                    name: name.clone(),
+                    ty: ty.clone(),
+                })
+                .collect(),
+            return_type: return_type.clone(),
+            secret_args: secret_args.clone(),
+            body: uo_core::lower_confidential_kernel_statements(&lowered, &signature)?,
+        };
+        let confidential_slot_program = confidential_program.to_slot_program()?;
+        (Some(confidential_program), Some(confidential_slot_program))
+    } else {
+        (None, None)
+    };
     Ok(CompiledFunction {
         signature,
         params,
@@ -346,6 +365,8 @@ fn lower_function(
         body: lowered,
         secret_args,
         confidential,
+        confidential_program,
+        confidential_slot_program,
     })
 }
 

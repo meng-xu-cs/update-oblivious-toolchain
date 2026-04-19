@@ -198,11 +198,12 @@ The first implementation step is now present in the codebase:
   vocabulary
 - `uo-allocator` now enforces manifest-derived kernel-op budgets, stack-word
   budgets, bounded scratch regions, and end-of-call wipe checks
-- the emitted manifest now also records the canonical confidential named DSL
-  object, the canonical confidential slot DSL object, and the exact public
-  kernel-step trace `{ opcode, object_id? }`, so checker-side
-  source/artifact validation and `uo-evm` can reject manifest/runtime drift at
-  the theorem-facing confidential-kernel boundary
+- each confidential compiled function and emitted manifest entry now records
+  the same canonical confidential named DSL object, canonical confidential
+  slot DSL object, and exact public kernel-step trace `{ opcode, object_id? }`
+  so checker-side source/artifact validation and `uo-evm` can reject drift
+  across the exact function body lowering, the stored function metadata, the
+  stored manifest metadata, and the runtime confidential-kernel boundary
 - the runtime kernel now also enforces that admitted public schedule online
   while the confidential call is executing, which narrows the remaining gap to
   proving the kernel/runtime refines the modeled observer rather than merely

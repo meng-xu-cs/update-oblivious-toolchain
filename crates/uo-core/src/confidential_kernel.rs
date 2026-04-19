@@ -317,6 +317,9 @@ impl CompiledFunction {
                 entrypoint: self.signature.clone(),
             });
         }
+        if let Some(program) = &self.confidential_program {
+            return Ok(program.clone());
+        }
         Ok(ConfidentialKernelProgram {
             entrypoint_id: self.signature.clone(),
             params: self
@@ -336,6 +339,12 @@ impl CompiledFunction {
     pub fn confidential_kernel_slot_program(
         &self,
     ) -> Result<ConfidentialKernelSlotProgram, ConfidentialKernelSlotLoweringError> {
+        if let Some(program) = &self.confidential_slot_program {
+            return Ok(program.clone());
+        }
+        if let Some(program) = &self.confidential_program {
+            return program.to_slot_program();
+        }
         self.confidential_kernel_program()?.to_slot_program()
     }
 }
@@ -1452,6 +1461,8 @@ mod tests {
             ],
             secret_args: vec![0],
             confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
         }
     }
 
@@ -1514,6 +1525,8 @@ mod tests {
             }],
             secret_args: vec![0],
             confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
         };
 
         let err = function.confidential_kernel_slot_program().unwrap_err();
@@ -1535,6 +1548,8 @@ mod tests {
             }],
             secret_args: vec![0],
             confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
         };
 
         let err = function.confidential_kernel_slot_program().unwrap_err();
@@ -1568,6 +1583,8 @@ mod tests {
             ],
             secret_args: vec![0],
             confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
         };
 
         let program = function.confidential_kernel_program().unwrap();

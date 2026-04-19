@@ -31,6 +31,8 @@ structure ImportedProofRelevantFunctionView where
   body : List String
   secret_args : List Nat
   confidential : Bool
+  confidential_program : Option String
+  confidential_slot_program : Option String
 deriving Repr, DecidableEq, FromJson, ToJson
 
 structure ImportedProofRelevantOramView where
@@ -457,6 +459,9 @@ private def parseImportedFunctionViewFromRawJson
     , body := bodyJsons.map Json.compress
     , secret_args := ← lookupFieldAs json "secret_args"
     , confidential := ← lookupFieldAs json "confidential"
+    , confidential_program := (← lookupOptionalFieldJson json "confidential_program").map Json.compress
+    , confidential_slot_program :=
+        (← lookupOptionalFieldJson json "confidential_slot_program").map Json.compress
     }
 
 private def parseImportedStateObjectViewFromRawJson
@@ -1699,6 +1704,181 @@ private def expectedKernelStepsForConfidentialBodyStrings
       bodySteps ++
       [{ opcode := "Commit", object_id := none }, { opcode := "Wipe", object_id := none }]
 
+mutual
+
+private partial def lowerConfidentialKernelPureExprJson
+  (json : Json) : Except String ImportedConfidentialKernelPureExpr := do
+  if let some payload := taggedPayload? json "Literal" then
+    pure <| .literal payload
+  else if let some payload := taggedPayload? json "Var" then
+    pure <| .var (← fromJson? payload)
+  else if let some inner := taggedPayload? json "Unary" then
+    pure <| .unary
+      (← lookupFieldJson inner "op")
+      (← lowerConfidentialKernelPureExprJson (← lookupFieldJson inner "expr"))
+  else if let some inner := taggedPayload? json "Binary" then
+    pure <| .binary
+      (← lookupFieldJson inner "op")
+      (← lowerConfidentialKernelPureExprJson (← lookupFieldJson inner "lhs"))
+      (← lowerConfidentialKernelPureExprJson (← lookupFieldJson inner "rhs"))
+  else if let some inner := taggedPayload? json "Select" then
+    pure <| .select
+      (← lowerConfidentialKernelPureExprJson (← lookupFieldJson inner "cond"))
+      (← lowerConfidentialKernelPureExprJson (← lookupFieldJson inner "when_true"))
+      (← lowerConfidentialKernelPureExprJson (← lookupFieldJson inner "when_false"))
+  else if let some inner := taggedPayload? json "Keccak256" then
+    let parts : List Json ← lookupFieldAs inner "parts"
+    pure <| .keccak256 (← parts.mapM lowerConfidentialKernelPureExprJson)
+  else if taggedPayload? json "CellGet" |>.isSome then
+    throw "select arm is outside the branchless fragment"
+  else if taggedPayload? json "ArrayGet" |>.isSome then
+    throw "select arm is outside the branchless fragment"
+  else if taggedPayload? json "MapGet" |>.isSome then
+    throw "select arm is outside the branchless fragment"
+  else if taggedPayload? json "StructField" |>.isSome then
+    throw "confidential struct-field access is not allowed"
+  else if taggedPayload? json "ArrayIndex" |>.isSome then
+    throw "confidential array indexing is not allowed"
+  else
+    throw "unsupported expression shape in translation bundle"
+
+private partial def lowerConfidentialKernelExprJson
+  (json : Json) : Except String ImportedConfidentialKernelExpr := do
+  if let some payload := taggedPayload? json "Literal" then
+    pure <| .literal payload
+  else if let some payload := taggedPayload? json "Var" then
+    pure <| .var (← fromJson? payload)
+  else if let some inner := taggedPayload? json "Unary" then
+    pure <| .unary
+      (← lookupFieldJson inner "op")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "expr"))
+  else if let some inner := taggedPayload? json "Binary" then
+    pure <| .binary
+      (← lookupFieldJson inner "op")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "lhs"))
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "rhs"))
+  else if let some inner := taggedPayload? json "Select" then
+    let whenTrue ← lookupFieldJson inner "when_true"
+    let whenFalse ← lookupFieldJson inner "when_false"
+    if (← exprContainsKernelAccessJson whenTrue) || (← exprContainsKernelAccessJson whenFalse) then
+      throw "select arm contains kernel access"
+    pure <| .select
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "cond"))
+      (← lowerConfidentialKernelPureExprJson whenTrue)
+      (← lowerConfidentialKernelPureExprJson whenFalse)
+  else if let some inner := taggedPayload? json "CellGet" then
+    pure <| .cellGet (← lookupFieldAs inner "object_id")
+  else if let some inner := taggedPayload? json "ArrayGet" then
+    pure <| .arrayGet
+      (← lookupFieldAs inner "object_id")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "index"))
+  else if let some inner := taggedPayload? json "MapGet" then
+    pure <| .mapGet
+      (← lookupFieldAs inner "object_id")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "key"))
+  else if taggedPayload? json "StructField" |>.isSome then
+    throw "confidential struct-field access is not allowed"
+  else if taggedPayload? json "ArrayIndex" |>.isSome then
+    throw "confidential array indexing is not allowed"
+  else if let some inner := taggedPayload? json "Keccak256" then
+    let parts : List Json ← lookupFieldAs inner "parts"
+    pure <| .keccak256 (← parts.mapM lowerConfidentialKernelExprJson)
+  else
+    throw "unsupported expression shape in translation bundle"
+
+end
+
+private def lowerConfidentialKernelStatementJson
+  (json : Json)
+  (index : Nat) : Except String ImportedConfidentialKernelStatement := do
+  if let some inner := taggedPayload? json "Declare" then
+    pure <| .declare
+      (← lookupFieldAs inner "name")
+      (← lookupFieldJson inner "ty")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "value"))
+  else if let some inner := taggedPayload? json "Assign" then
+    pure <| .assign
+      (← lookupFieldAs inner "name")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "value"))
+  else if let some inner := taggedPayload? json "Require" then
+    pure <| .require (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "cond"))
+  else if let some inner := taggedPayload? json "AbortIf" then
+    pure <| .abortIf (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "cond"))
+  else if taggedPayload? json "If" |>.isSome then
+    throw s!"confidential control flow is not allowed at if[{index}]"
+  else if taggedPayload? json "For" |>.isSome then
+    throw s!"confidential control flow is not allowed at for[{index}]"
+  else if let some inner := taggedPayload? json "CellSet" then
+    let predicate ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure none
+      | some predicate => some <$> lowerConfidentialKernelExprJson predicate
+    pure <| .cellSet
+      (← lookupFieldAs inner "object_id")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "value"))
+      predicate
+  else if let some inner := taggedPayload? json "ArraySet" then
+    let predicate ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure none
+      | some predicate => some <$> lowerConfidentialKernelExprJson predicate
+    pure <| .arraySet
+      (← lookupFieldAs inner "object_id")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "index"))
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "value"))
+      predicate
+  else if let some inner := taggedPayload? json "MapPut" then
+    let predicate ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure none
+      | some predicate => some <$> lowerConfidentialKernelExprJson predicate
+    pure <| .mapPut
+      (← lookupFieldAs inner "object_id")
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "key"))
+      (← lowerConfidentialKernelExprJson (← lookupFieldJson inner "value"))
+      predicate
+  else if let some inner := taggedPayload? json "Return" then
+    let value ←
+      match ← lookupOptionalFieldJson inner "value" with
+      | none => pure none
+      | some value => some <$> lowerConfidentialKernelExprJson value
+    pure <| .ret value
+  else
+    throw "unsupported statement shape in translation bundle"
+
+private def lowerConfidentialKernelBodyStringsAux
+  (index : Nat)
+  (body : List String) : Except String (List ImportedConfidentialKernelStatement) :=
+  match body with
+  | [] => pure []
+  | item :: rest => do
+      let stmt ← lowerConfidentialKernelStatementJson (← parseJsonString item) index
+      let tail ← lowerConfidentialKernelBodyStringsAux (index + 1) rest
+      pure (stmt :: tail)
+
+private def lowerConfidentialKernelBodyStrings
+  (body : List String) : Except String (List ImportedConfidentialKernelStatement) :=
+  lowerConfidentialKernelBodyStringsAux 0 body
+
+private def expectedConfidentialKernelProgramForFunction
+  (fn : ImportedProofRelevantFunctionView) : Except String ImportedConfidentialKernelProgram := do
+  let params ← fn.params.mapM fun param => do
+    pure
+      { name := param.name
+      , ty := ← parseJsonString param.ty
+      }
+  let returnType ←
+    match fn.return_type with
+    | none => pure none
+    | some ty => pure <| some (← parseJsonString ty)
+  pure
+    { entrypoint_id := fn.signature
+    , params := params
+    , return_type := returnType
+    , secret_args := fn.secret_args
+    , body := ← lowerConfidentialKernelBodyStrings fn.body
+    }
+
 private def importedProofRelevantKernelStepViewOfImportedRuntimeKernelStep
   (step : ImportedRuntimeKernelStep) : ImportedProofRelevantKernelStepView :=
   { opcode := step.opcode, object_id := step.object_id }
@@ -1718,6 +1898,20 @@ private def parseEntrypointConfidentialSlotProgram
   (entry : ImportedProofRelevantEntrypointView) :
   Except String (Option ImportedConfidentialKernelSlotProgram) := do
   match entry.confidential_slot_program with
+  | none => pure none
+  | some json => some <$> fromJson? (← parseJsonString json)
+
+private def parseFunctionConfidentialProgram
+  (fn : ImportedProofRelevantFunctionView) :
+  Except String (Option ImportedConfidentialKernelProgram) := do
+  match fn.confidential_program with
+  | none => pure none
+  | some json => some <$> fromJson? (← parseJsonString json)
+
+private def parseFunctionConfidentialSlotProgram
+  (fn : ImportedProofRelevantFunctionView) :
+  Except String (Option ImportedConfidentialKernelSlotProgram) := do
+  match fn.confidential_slot_program with
   | none => pure none
   | some json => some <$> fromJson? (← parseJsonString json)
 
@@ -1977,6 +2171,156 @@ private def importedConfidentialKernelProgramMaxHashPartBytes
     pure (Nat.max acc stmtMax, env')
   pure maxLen
 
+private def listPairwiseEq
+  {α β : Type}
+  (eqFn : α → β → Bool) : List α → List β → Bool
+  | [], [] => true
+  | lhsHead :: lhsTail, rhsHead :: rhsTail =>
+      eqFn lhsHead rhsHead && listPairwiseEq eqFn lhsTail rhsTail
+  | _, _ => false
+
+private def importedConfidentialKernelParamEq
+  (lhs rhs : ImportedConfidentialKernelParam) : Bool :=
+  lhs.name == rhs.name && lhs.ty == rhs.ty
+
+private def optionPairwiseEq
+  {α β : Type}
+  (eqFn : α → β → Bool) : Option α → Option β → Bool
+  | some lhs, some rhs => eqFn lhs rhs
+  | none, none => true
+  | _, _ => false
+
+mutual
+
+private partial def importedConfidentialKernelStatementEq
+  (lhs rhs : ImportedConfidentialKernelStatement) : Bool :=
+  match lhs, rhs with
+  | .declare lhsName lhsTy lhsValue, .declare rhsName rhsTy rhsValue =>
+      lhsName == rhsName && lhsTy == rhsTy &&
+        importedConfidentialKernelExprEq lhsValue rhsValue
+  | .assign lhsName lhsValue, .assign rhsName rhsValue =>
+      lhsName == rhsName && importedConfidentialKernelExprEq lhsValue rhsValue
+  | .require lhsCond, .require rhsCond
+  | .abortIf lhsCond, .abortIf rhsCond =>
+      importedConfidentialKernelExprEq lhsCond rhsCond
+  | .cellSet lhsObject lhsValue lhsPredicate, .cellSet rhsObject rhsValue rhsPredicate =>
+      lhsObject == rhsObject &&
+        importedConfidentialKernelExprEq lhsValue rhsValue &&
+        optionPairwiseEq importedConfidentialKernelExprEq lhsPredicate rhsPredicate
+  | .arraySet lhsObject lhsIndex lhsValue lhsPredicate,
+      .arraySet rhsObject rhsIndex rhsValue rhsPredicate =>
+      lhsObject == rhsObject &&
+        importedConfidentialKernelExprEq lhsIndex rhsIndex &&
+        importedConfidentialKernelExprEq lhsValue rhsValue &&
+        optionPairwiseEq importedConfidentialKernelExprEq lhsPredicate rhsPredicate
+  | .mapPut lhsObject lhsKey lhsValue lhsPredicate,
+      .mapPut rhsObject rhsKey rhsValue rhsPredicate =>
+      lhsObject == rhsObject &&
+        importedConfidentialKernelExprEq lhsKey rhsKey &&
+        importedConfidentialKernelExprEq lhsValue rhsValue &&
+        optionPairwiseEq importedConfidentialKernelExprEq lhsPredicate rhsPredicate
+  | .ret lhsValue, .ret rhsValue =>
+      optionPairwiseEq importedConfidentialKernelExprEq lhsValue rhsValue
+  | _, _ => false
+
+private partial def importedConfidentialKernelExprEq
+  (lhs rhs : ImportedConfidentialKernelExpr) : Bool :=
+  match lhs, rhs with
+  | .literal lhsValue, .literal rhsValue =>
+      lhsValue == rhsValue
+  | .var lhsName, .var rhsName =>
+      lhsName == rhsName
+  | .unary lhsOp lhsExpr, .unary rhsOp rhsExpr =>
+      lhsOp == rhsOp && importedConfidentialKernelExprEq lhsExpr rhsExpr
+  | .binary lhsOp lhsLhs lhsRhs, .binary rhsOp rhsLhs rhsRhs =>
+      lhsOp == rhsOp &&
+        importedConfidentialKernelExprEq lhsLhs rhsLhs &&
+        importedConfidentialKernelExprEq lhsRhs rhsRhs
+  | .select lhsCond lhsWhenTrue lhsWhenFalse, .select rhsCond rhsWhenTrue rhsWhenFalse =>
+      importedConfidentialKernelExprEq lhsCond rhsCond &&
+        importedConfidentialKernelPureExprEq lhsWhenTrue rhsWhenTrue &&
+        importedConfidentialKernelPureExprEq lhsWhenFalse rhsWhenFalse
+  | .cellGet lhsObject, .cellGet rhsObject =>
+      lhsObject == rhsObject
+  | .arrayGet lhsObject lhsIndex, .arrayGet rhsObject rhsIndex =>
+      lhsObject == rhsObject && importedConfidentialKernelExprEq lhsIndex rhsIndex
+  | .mapGet lhsObject lhsKey, .mapGet rhsObject rhsKey =>
+      lhsObject == rhsObject && importedConfidentialKernelExprEq lhsKey rhsKey
+  | .keccak256 lhsParts, .keccak256 rhsParts =>
+      listPairwiseEq importedConfidentialKernelExprEq lhsParts rhsParts
+  | _, _ => false
+
+private partial def importedConfidentialKernelPureExprEq
+  (lhs rhs : ImportedConfidentialKernelPureExpr) : Bool :=
+  match lhs, rhs with
+  | .literal lhsValue, .literal rhsValue =>
+      lhsValue == rhsValue
+  | .var lhsName, .var rhsName =>
+      lhsName == rhsName
+  | .unary lhsOp lhsExpr, .unary rhsOp rhsExpr =>
+      lhsOp == rhsOp && importedConfidentialKernelPureExprEq lhsExpr rhsExpr
+  | .binary lhsOp lhsLhs lhsRhs, .binary rhsOp rhsLhs rhsRhs =>
+      lhsOp == rhsOp &&
+        importedConfidentialKernelPureExprEq lhsLhs rhsLhs &&
+        importedConfidentialKernelPureExprEq lhsRhs rhsRhs
+  | .select lhsCond lhsWhenTrue lhsWhenFalse, .select rhsCond rhsWhenTrue rhsWhenFalse =>
+      importedConfidentialKernelPureExprEq lhsCond rhsCond &&
+        importedConfidentialKernelPureExprEq lhsWhenTrue rhsWhenTrue &&
+        importedConfidentialKernelPureExprEq lhsWhenFalse rhsWhenFalse
+  | .keccak256 lhsParts, .keccak256 rhsParts =>
+      listPairwiseEq importedConfidentialKernelPureExprEq lhsParts rhsParts
+  | _, _ => false
+
+end
+
+private def importedConfidentialKernelProgramEq
+  (lhs rhs : ImportedConfidentialKernelProgram) : Bool :=
+  lhs.entrypoint_id == rhs.entrypoint_id &&
+    listPairwiseEq importedConfidentialKernelParamEq lhs.params rhs.params &&
+    lhs.return_type == rhs.return_type &&
+    lhs.secret_args == rhs.secret_args &&
+    listPairwiseEq importedConfidentialKernelStatementEq lhs.body rhs.body
+
+private def functionStoredDslMatchesBody
+  (fn : ImportedProofRelevantFunctionView) : Bool :=
+  if fn.confidential then
+    match
+      expectedConfidentialKernelProgramForFunction fn,
+      parseFunctionConfidentialProgram fn,
+      parseFunctionConfidentialSlotProgram fn with
+    | .ok expectedProgram, .ok (some program), .ok (some slotProgram) =>
+        importedConfidentialKernelProgramEq program expectedProgram &&
+          checkImportedConfidentialKernelProgramSlotLowering program slotProgram
+    | _, _, _ => false
+  else
+    fn.confidential_program.isNone && fn.confidential_slot_program.isNone
+
+private def functionStoredDslMismatchMessage
+  (fn : ImportedProofRelevantFunctionView) : String :=
+  if fn.confidential then
+    match
+      expectedConfidentialKernelProgramForFunction fn,
+      parseFunctionConfidentialProgram fn,
+      parseFunctionConfidentialSlotProgram fn with
+    | .error err, _, _ =>
+        s!"{fn.signature}: confidential lowering rejected body: {err}"
+    | _, .error err, _
+    | _, _, .error err =>
+        s!"{fn.signature}: failed to parse stored confidential DSL from function body metadata: {err}"
+    | _, .ok none, _ =>
+        s!"{fn.signature}: function is missing confidential_program"
+    | _, _, .ok none =>
+        s!"{fn.signature}: function is missing confidential_slot_program"
+    | .ok expectedProgram, .ok (some program), .ok (some slotProgram) =>
+        if !importedConfidentialKernelProgramEq program expectedProgram then
+          s!"{fn.signature}: stored function confidential_program does not match the exact lowering of the function body"
+        else if !checkImportedConfidentialKernelProgramSlotLowering program slotProgram then
+          s!"{fn.signature}: stored function confidential_slot_program does not match the stored function confidential_program"
+        else
+          s!"{fn.signature}: confidential lowering mismatch despite matching stored function DSL"
+  else
+    s!"{fn.signature}: non-confidential function should not carry stored confidential DSL"
+
 private def manifestStoredDslMatchesKernelSchedule
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView)
@@ -2008,57 +2352,86 @@ private def functionConfidentialLoweringMatchesManifest
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
   if fn.confidential then
-    match expectedKernelStepsForConfidentialBodyStrings fn.body with
-    | .ok expectedSteps =>
-        entry.kernel_steps == expectedSteps &&
-          manifestStoredDslMatchesKernelSchedule view fn entry
-    | .error _ => false
+    functionStoredDslMatchesBody fn &&
+      manifestStoredDslMatchesKernelSchedule view fn entry &&
+      match
+        parseFunctionConfidentialProgram fn,
+        parseFunctionConfidentialSlotProgram fn,
+        parseEntrypointConfidentialProgram entry,
+        parseEntrypointConfidentialSlotProgram entry with
+      | .ok (some fnProgram), .ok (some fnSlotProgram), .ok (some entryProgram), .ok (some entrySlotProgram) =>
+          fn.confidential_program == entry.confidential_program &&
+            fn.confidential_slot_program == entry.confidential_slot_program &&
+            importedConfidentialKernelProgramEq fnProgram entryProgram &&
+            checkImportedConfidentialKernelProgramSlotLowering entryProgram entrySlotProgram &&
+            checkImportedConfidentialKernelProgramSlotLowering fnProgram fnSlotProgram
+      | _, _, _, _ => false
   else
     entry.kernel_steps.isEmpty &&
       entry.confidential_program.isNone &&
       entry.confidential_slot_program.isNone &&
-      entry.max_hash_part_bytes == 0
+      entry.max_hash_part_bytes == 0 &&
+      fn.confidential_program.isNone &&
+      fn.confidential_slot_program.isNone
 
 private def functionConfidentialLoweringMismatchMessage
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : String :=
   if fn.confidential then
-    match expectedKernelStepsForConfidentialBodyStrings fn.body with
-    | .ok expectedSteps =>
-        if entry.kernel_steps != expectedSteps then
-          s!"{fn.signature}: expected kernel_steps {renderKernelSteps expectedSteps}, manifest has {renderKernelSteps entry.kernel_steps}"
-        else if !(manifestStoredDslMatchesKernelSchedule view fn entry) then
-          match parseEntrypointConfidentialProgram entry, parseEntrypointConfidentialSlotProgram entry with
-          | .error err, _
-          | _, .error err =>
-              s!"{fn.signature}: failed to parse stored confidential DSL from manifest: {err}"
-          | .ok none, _ =>
-              s!"{fn.signature}: manifest is missing confidential_program"
-          | _, .ok none =>
-              s!"{fn.signature}: manifest is missing confidential_slot_program"
-          | .ok (some program), .ok (some slotProgram) =>
-              let hashPartSummary :=
-                match importedConfidentialKernelProgramMaxHashPartBytes view.state program with
-                | .ok expectedHashPartBytes =>
-                    s!"expected hash bound {expectedHashPartBytes}, manifest has {entry.max_hash_part_bytes}"
-                | .error err =>
-                    s!"failed to compute expected hash bound: {err}"
-              let programSteps :=
-                renderKernelSteps <|
-                  importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
-                    program.expectedRuntimeKernelSteps
-              let slotSteps :=
-                renderKernelSteps <|
-                  importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
-                    slotProgram.expectedRuntimeKernelSteps
-              s!"{fn.signature}: stored confidential DSL does not align with manifest schedule, slot lowering, or hash bound ({hashPartSummary}; program steps {programSteps}, slot steps {slotSteps}, manifest steps {renderKernelSteps entry.kernel_steps})"
-        else
-          s!"{fn.signature}: confidential lowering mismatch despite matching kernel_steps and stored DSL"
-    | .error err =>
-        s!"{fn.signature}: confidential lowering rejected body: {err}"
+    if !functionStoredDslMatchesBody fn then
+      functionStoredDslMismatchMessage fn
+    else
+      match
+        parseFunctionConfidentialProgram fn,
+        parseFunctionConfidentialSlotProgram fn,
+        parseEntrypointConfidentialProgram entry,
+        parseEntrypointConfidentialSlotProgram entry with
+      | .error err, _, _, _
+      | _, .error err, _, _ =>
+          s!"{fn.signature}: failed to parse stored confidential DSL from function body metadata: {err}"
+      | _, _, .error err, _
+      | _, _, _, .error err =>
+          s!"{fn.signature}: failed to parse stored confidential DSL from manifest: {err}"
+      | .ok none, _, _, _ =>
+          s!"{fn.signature}: function is missing confidential_program"
+      | _, .ok none, _, _ =>
+          s!"{fn.signature}: function is missing confidential_slot_program"
+      | _, _, .ok none, _ =>
+          s!"{fn.signature}: manifest is missing confidential_program"
+      | _, _, _, .ok none =>
+          s!"{fn.signature}: manifest is missing confidential_slot_program"
+      | .ok (some fnProgram), .ok (some fnSlotProgram), .ok (some entryProgram), .ok (some entrySlotProgram) =>
+          if fn.confidential_program != entry.confidential_program then
+            s!"{fn.signature}: function confidential_program and manifest confidential_program do not match"
+          else if fn.confidential_slot_program != entry.confidential_slot_program then
+            s!"{fn.signature}: function confidential_slot_program and manifest confidential_slot_program do not match"
+          else if !importedConfidentialKernelProgramEq fnProgram entryProgram then
+            s!"{fn.signature}: function confidential_program and manifest confidential_program do not parse to the same canonical program"
+          else if !checkImportedConfidentialKernelProgramSlotLowering fnProgram fnSlotProgram then
+            s!"{fn.signature}: function confidential_slot_program does not match the function confidential_program"
+          else if !checkImportedConfidentialKernelProgramSlotLowering entryProgram entrySlotProgram then
+            s!"{fn.signature}: manifest confidential_slot_program does not match the manifest confidential_program"
+          else if !(manifestStoredDslMatchesKernelSchedule view fn entry) then
+            let hashPartSummary :=
+              match importedConfidentialKernelProgramMaxHashPartBytes view.state entryProgram with
+              | .ok expectedHashPartBytes =>
+                  s!"expected hash bound {expectedHashPartBytes}, manifest has {entry.max_hash_part_bytes}"
+              | .error err =>
+                  s!"failed to compute expected hash bound: {err}"
+            let programSteps :=
+              renderKernelSteps <|
+                importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+                  entryProgram.expectedRuntimeKernelSteps
+            let slotSteps :=
+              renderKernelSteps <|
+                importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+                  entrySlotProgram.expectedRuntimeKernelSteps
+            s!"{fn.signature}: stored confidential DSL does not align with manifest schedule, slot lowering, or hash bound ({hashPartSummary}; program steps {programSteps}, slot steps {slotSteps}, manifest steps {renderKernelSteps entry.kernel_steps})"
+          else
+            s!"{fn.signature}: confidential lowering mismatch despite matching stored function DSL and manifest DSL"
   else
-    s!"{fn.signature}: non-confidential entrypoint should not carry kernel metadata, stored confidential DSL, or a hash bound"
+    s!"{fn.signature}: non-confidential function or entrypoint should not carry kernel metadata, stored confidential DSL, or a hash bound"
 
 private def functionsMatchConfidentialLowering :
   ImportedProofRelevantContractView →

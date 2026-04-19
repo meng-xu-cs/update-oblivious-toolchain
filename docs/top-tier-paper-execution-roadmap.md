@@ -17,6 +17,10 @@ The repository has already closed several important proof-grade gaps.
   and candidate artifacts
 - `uo-check` is no longer part of that proof-grade acceptance path and is no
   longer in the proof-grade TCB
+- confidential functions now carry the canonical named and slot DSL programs
+  directly, and the direct Lean checker validates exact body-to-function-to-
+  manifest agreement instead of relying on an ad hoc schedule-reconstruction
+  path
 - the theorem-facing backend path is frozen to `path_oram_local_posmap_v1`
 - the runtime exports proof-grade kernel, refinement, and trusted-kernel proof
   objects, and Lean checks those objects with theorem-tight executable checkers

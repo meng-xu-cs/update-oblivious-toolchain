@@ -267,6 +267,8 @@ mod tests {
             }],
             secret_args: vec![0],
             confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
         }]);
         let witness = artifact.confidential_fragment_witness();
         assert!(witness.valid());
@@ -309,6 +311,8 @@ mod tests {
             ],
             secret_args: vec![0],
             confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
         }]);
         let witness = artifact.confidential_fragment_witness();
         let entrypoint = witness.entrypoint("bad()").unwrap();
@@ -336,6 +340,8 @@ mod tests {
             }],
             secret_args: vec![0],
             confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
         }]);
         let witness = artifact.confidential_fragment_witness();
         let entrypoint = witness.entrypoint("badSelect()").unwrap();

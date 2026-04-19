@@ -512,6 +512,12 @@ The current runtime has a first hardening layer:
   kernel must execute slot-based statements / expressions, and the confidential
   execution state must stay as a fixed slot vector rather than
   `BTreeMap<String, Value>`
+- the proof-grade translation checker now also requires every confidential
+  function to carry the same canonical named and slot DSL that the manifest
+  carries, and it rejects any mismatch between the exact function-body
+  lowering, the stored function-level DSL, and the stored manifest-level DSL,
+  so the proof-grade path no longer depends on reconstructing only a public
+  schedule when the full DSL program is already available
 - the runtime-boundary report now also checks that the production confidential
   object API surface is routed only through `runtime/uo-evm/src/kernel.rs`:
   all direct `.get_cell`, `.set_cell`, `.get_array`, `.set_array`, `.get_map`,
