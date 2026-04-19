@@ -121,6 +121,11 @@ Exit gate:
 
 ## Work Package 1: Finish Shrinking To A Tiny Kernel
 
+Status: completed on April 19, 2026. Confidential runtime work is now routed
+through the kernel boundary, the public shell and theorem bridge are internal
+to `crate::runtime`, and the remaining Rust surface is down to the core
+runtime-owned types needed by the proof interface.
+
 Objective: ensure every secret-dependent runtime effect is genuinely routed
 through a tiny, auditable confidential kernel.
 
@@ -161,6 +166,12 @@ Exit gate:
   entire runtime
 
 ## Work Package 2: Converge On A Shared DSL / Interpreter Route
+
+Status: completed on April 19, 2026. The confidential slot DSL is now the
+canonical runtime schedule source, downstream consumers use
+`EntrypointManifest::canonical_kernel_step_manifest()`, and the runtime,
+compiler artifacts, probe checks, and Lean proof-grade path all track the same
+kernel program object.
 
 Objective: have one canonical confidential-kernel program representation and
 one semantics that both Rust and Lean use, rather than two parallel descriptions
@@ -203,6 +214,9 @@ Exit gate:
 
 ## Work Package 3: Prove Runtime-Kernel Refinement And Secret Confinement
 
+Status: active. This is now the next proof-critical work package on the
+critical path.
+
 Objective: upgrade from "the runtime emits accepted proof objects" to "the real
 runtime kernel implementation refines the Lean model, and the rest of the
 runtime is public-only."
@@ -221,18 +235,24 @@ Primary files:
 
 Concrete tasks:
 
-1. Define the formal refinement relation between Rust kernel states and Lean
-   kernel states.
-2. Prove witness honesty by construction, not merely by post hoc checking.
-3. Prove that trusted-kernel bundles and refinement witnesses are exact
-   abstractions of real kernel execution.
-4. Prove that shell-boundary logic outside the kernel is a public function of
-   admitted public data.
-5. Add static confinement checks where possible:
-   visibility restrictions, type wrappers, and compile-time or probe-time
-   assertions that secret-bearing structures are kernel-owned.
-6. Either eliminate non-kernel secret buffers entirely or include them in the
-   kernel model and wipe discipline.
+1. Remaining: define the formal refinement relation between Rust kernel states
+   and Lean kernel states.
+2. Remaining: prove witness honesty by construction, not merely by post hoc
+   checking.
+3. Substantially completed in the current proof-grade path: trusted-kernel
+   bundles and runtime-kernel refinement witnesses already have exactness
+   theorems for schedule, public-object universe, resource state, and boundary
+   projections; the remaining gap is to tie those proof-grade witness objects
+   to a formal Rust-state refinement relation.
+4. Completed in the current proof-grade path: the shell-boundary theorem
+   proves that the non-kernel shell refines a public contract over admitted
+   public data.
+5. Completed for the Rust/static side: visibility restrictions, wrapper
+   elimination, and probe-time confinement assertions now keep secret-bearing
+   runtime structures inside the runtime/kernel boundary.
+6. Mostly completed on the Rust side: non-kernel secret buffers have been
+   aggressively removed or put under wipe discipline; the remaining theorem
+   work is to connect that discipline to the final formal model.
 
 Deliverables:
 
@@ -431,21 +451,23 @@ refinement story.
 
 If implementation resumes immediately, the next concrete sequence should be:
 
-1. Freeze the flagship theorem, observer, assumption table, and TCB table in
-   the paper-facing docs.
-2. Complete the confidential-kernel inventory and remove any remaining
-   secret-bearing helpers outside the kernel boundary.
-3. Make the kernel DSL the sole canonical representation of admitted
-   confidential work across compiler, runtime, and Lean.
-4. Eliminate any proof-grade schedule reconstruction path that duplicates an
-   already available DSL program.
-5. Add static confinement guardrails so only the kernel can own or manipulate
-   secret-bearing runtime structures.
-6. Prove runtime-kernel refinement for the shared DSL/interpreter route.
-7. Prove that the non-kernel shell is public-only.
-8. Prove source-to-kernel compiler correctness.
-9. Minimize `PathOramLocalPosmapV1SecurityAssumptions`.
-10. Close the hostile-host TEE theorem over the frozen observer.
+1. Completed: freeze the flagship theorem, observer, assumption table, and TCB
+   table in the paper-facing docs.
+2. Completed: complete the confidential-kernel inventory and remove any
+   remaining secret-bearing helpers outside the kernel boundary.
+3. Completed: make the kernel DSL the sole canonical representation of
+   admitted confidential work across compiler, runtime, and Lean.
+4. Completed: eliminate proof-grade schedule reconstruction paths that
+   duplicate an already available DSL program.
+5. Completed: add static confinement guardrails so only the kernel can own or
+   manipulate secret-bearing runtime structures.
+6. Active next item: prove runtime-kernel refinement for the shared
+   DSL/interpreter route.
+7. Active next item: prove that the non-kernel shell is public-only.
+8. Remaining after 6-7: prove source-to-kernel compiler correctness.
+9. Remaining after 8: minimize `PathOramLocalPosmapV1SecurityAssumptions`.
+10. Remaining after 9: close the hostile-host TEE theorem over the frozen
+    observer.
 
 ## Validation Gates
 
