@@ -1,4 +1,4 @@
-use crate::controller::CallRecorder;
+use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::state::{CommittedRuntimeState, PublicRuntimeShadowState};
@@ -123,7 +123,6 @@ impl ContractInstance {
                 args.len()
             );
         }
-        let mut call_args = args.clone();
         let manifest_entry = self
             .artifact
             .contract
@@ -132,6 +131,7 @@ impl ContractInstance {
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
+        let public_call = PublicCallSummary::from_call(&function, &manifest_entry, &args);
         let mut allocator = AllocatorPlan::from_manifest(&manifest_entry);
         let manifest_expected_kernel_steps = if function.confidential {
             Some(
@@ -198,7 +198,8 @@ impl ContractInstance {
                 public_object_ids.clone(),
                 Some(public_object_ids.clone()),
             )?;
-            let mut recorder = CallRecorder::begin(entrypoint, &call_args);
+            let mut recorder =
+                CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
             let mut opcode_trace = Vec::new();
             let (runtime_kernel_witness, runtime_kernel_refinement_witness, aborted, return_value) =
                 if function.confidential {
@@ -306,14 +307,11 @@ impl ContractInstance {
             &function,
             &manifest_entry,
             &self.artifact.contract.manifest.objects,
-            &call_args,
+            public_call,
             &return_value,
             aborted,
             gas_used,
         )?;
-        for arg in &mut call_args {
-            arg.wipe_secrets();
-        }
         let zero_writes = trace_bundle.metrics.zero_writes;
         let trace = finalize_execution_trace(FinalizeExecutionTraceInput {
             artifact: &self.artifact,

@@ -57,9 +57,40 @@ pub(crate) struct CallRecorder {
     stash_bound: usize,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PublicCallSummary {
+    pub entry_input_len: usize,
+    pub public_args: Vec<String>,
+}
+
+impl PublicCallSummary {
+    pub(crate) fn from_call(
+        function: &CompiledFunction,
+        manifest_entry: &EntrypointManifest,
+        args: &[Value],
+    ) -> Self {
+        Self {
+            entry_input_len: args.iter().map(Value::canonical_len).sum(),
+            public_args: function
+                .params
+                .iter()
+                .zip(args)
+                .enumerate()
+                .filter(|(index, _)| !manifest_entry.secret_args.contains(index))
+                .map(|(_, ((name, _), value))| format!("{name}={value}"))
+                .collect(),
+        }
+    }
+}
+
 impl CallRecorder {
+    #[cfg(test)]
     pub(crate) fn begin(entrypoint: &str, args: &[Value]) -> Self {
         let total_input_len = args.iter().map(Value::canonical_len).sum();
+        Self::begin_with_input_len(entrypoint, total_input_len)
+    }
+
+    pub(crate) fn begin_with_input_len(entrypoint: &str, total_input_len: usize) -> Self {
         let mut recorder = Self {
             entrypoint: entrypoint.into(),
             ..Self::default()
@@ -221,14 +252,13 @@ impl CallRecorder {
         function: &CompiledFunction,
         manifest_entry: &EntrypointManifest,
         manifest_objects: &[StateObjectManifest],
-        args: &[Value],
+        public_call: PublicCallSummary,
         return_value: &Option<Value>,
         aborted: bool,
         gas_used: u64,
     ) -> Result<CallTraceBundle> {
         self.assert_manifest_exactness(manifest_entry)?;
         self.assert_oram_parameter_exactness(manifest_objects)?;
-        let entry_input_len = args.iter().map(Value::canonical_len).sum();
         let output_shape = output_shape_of(return_value);
         self.controller_phase_order.extend([
             ControllerPhase::SealPersistentState,
@@ -243,13 +273,13 @@ impl CallRecorder {
         let controller_shape = self.controller_shape();
         let public_outcome = PublicOutcomeTrace {
             entrypoint_id: function.signature.clone(),
-            public_args: public_args_of(function, manifest_entry, args),
+            public_args: public_call.public_args,
             termination_status: !aborted,
             output_shape,
             gas_used,
         };
         let controller_certificate =
-            controller_certificate(entry_input_len, &self.observed_oram_schedule);
+            controller_certificate(public_call.entry_input_len, &self.observed_oram_schedule);
         let theorem_trace = TheoremTrace {
             public_outcome: Some(public_outcome.clone()),
             boundary_schedule: self.boundary_schedule,
@@ -474,21 +504,6 @@ fn controller_region_budgets(regions: &BTreeMap<&'static str, usize>) -> Vec<Con
         event_budget: regions.get(region).copied().unwrap_or_default(),
     })
     .collect()
-}
-
-fn public_args_of(
-    function: &CompiledFunction,
-    manifest_entry: &EntrypointManifest,
-    args: &[Value],
-) -> Vec<String> {
-    function
-        .params
-        .iter()
-        .zip(args)
-        .enumerate()
-        .filter(|(index, _)| !manifest_entry.secret_args.contains(index))
-        .map(|(_, ((name, _), value))| format!("{name}={value}"))
-        .collect()
 }
 
 fn output_shape_of(return_value: &Option<Value>) -> OutputShape {

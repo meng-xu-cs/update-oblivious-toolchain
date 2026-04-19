@@ -1,4 +1,4 @@
-use crate::controller::CallRecorder;
+use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::state::CommittedRuntimeWitnessSnapshot;
 use anyhow::Result;
 use uo_core::ir::CompiledFunction;
@@ -27,7 +27,7 @@ pub fn build_theorem_trace(
     function: &CompiledFunction,
     manifest_entry: &EntrypointManifest,
     manifest_objects: &[StateObjectManifest],
-    args: &[Value],
+    public_call: PublicCallSummary,
     return_value: &Option<Value>,
     aborted: bool,
     gas_used: u64,
@@ -36,7 +36,7 @@ pub fn build_theorem_trace(
         function,
         manifest_entry,
         manifest_objects,
-        args,
+        public_call,
         return_value,
         aborted,
         gas_used,

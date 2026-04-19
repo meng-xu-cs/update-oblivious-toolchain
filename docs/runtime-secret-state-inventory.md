@@ -23,7 +23,8 @@ the refinement proof is still being completed.
 These are the invariants this inventory is meant to support.
 
 1. `engine.rs` should not define or inspect secret-bearing runtime maps or
-   witnesses directly.
+   witnesses directly, and it should not keep duplicate secret-bearing call
+   arguments once the public call summary has been projected.
 2. Confidential expression execution should live in `RuntimeKernel`.
 3. Reopen / commit / cold-store / hidden-witness helpers should stay inside
    `crate::runtime`.

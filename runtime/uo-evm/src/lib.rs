@@ -20,8 +20,8 @@ mod tests {
     #[cfg(feature = "diagnostics")]
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
-        expected_runtime_kernel_steps_for_confidential, ContractMetadata, ExecutionTrace,
-        ProgramMode, RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value, WriteClass,
+        ContractMetadata, ExecutionTrace, ProgramMode, RuntimeKernelRefinementEventKindWitness,
+        RuntimeKernelStepWitness, TheoremTrace, Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
 
@@ -622,15 +622,23 @@ mod tests {
                 .kernel_witness,
             Some(witness.clone())
         );
-        let function = artifact
+        let manifest_entry = artifact
             .contract
-            .functions
-            .iter()
-            .find(|function| function.signature == "auth(bytes32)")
+            .manifest
+            .entrypoints
+            .get("auth(bytes32)")
             .unwrap();
+        let manifest_expected_kernel_steps = manifest_entry
+            .kernel_steps
+            .iter()
+            .map(|step| RuntimeKernelStepWitness {
+                opcode: step.opcode,
+                object_id: step.object_id,
+            })
+            .collect::<Vec<_>>();
         assert_eq!(
             witness.expected_kernel_steps,
-            Some(expected_runtime_kernel_steps_for_confidential(function).unwrap())
+            Some(manifest_expected_kernel_steps)
         );
         assert_eq!(
             witness.kernel_steps,

@@ -5990,6 +5990,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         engine_impl_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
     let engine_defines_fresh_coin_plan_directly = engine_source.contains("pub struct PathOramFreshCoinPlan")
         || engine_source.contains("struct PathOramFreshCoinPlan");
+    let engine_clones_call_args_directly =
+        engine_impl_source.contains("let mut call_args = args.clone();")
+            || engine_impl_source.contains("let call_args = args.clone();");
     let engine_peeks_into_fresh_coin_map =
         engine_impl_source.contains(".by_object") || engine_impl_source.contains("fresh_coins_by_object");
     let engine_imports_raw_runtime_kernel =
@@ -6914,6 +6917,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_uses_shadow_wrapper": engine_uses_shadow_wrapper,
         "engine_uses_public_runtime_kernel": engine_uses_public_runtime_kernel,
         "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
+        "engine_clones_call_args_directly": engine_clones_call_args_directly,
         "engine_peeks_into_fresh_coin_map": engine_peeks_into_fresh_coin_map,
         "engine_imports_raw_runtime_kernel": engine_imports_raw_runtime_kernel,
         "engine_imports_runtime_object_directly": engine_imports_runtime_object_directly,
@@ -7050,6 +7054,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_uses_shadow_wrapper
             && engine_uses_public_runtime_kernel
             && !engine_defines_fresh_coin_plan_directly
+            && !engine_clones_call_args_directly
             && !engine_peeks_into_fresh_coin_map
             && !engine_imports_raw_runtime_kernel
             && !engine_imports_runtime_object_directly
@@ -8872,8 +8877,10 @@ public `PublicRuntimeShadowState` wrapper instead of directly owning raw
 runtime object maps, and that `engine.rs` no longer constructs runtime
 phase-witness events directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
-certificates directly, and no longer assembles `ExecutionTrace` directly
-beyond `runtime/uo-evm/src/theorem.rs`; the same report also checks that the
+certificates directly, no longer assembles `ExecutionTrace` directly
+beyond `runtime/uo-evm/src/theorem.rs`, and no longer clones the full call
+argument vector just to recover public theorem-trace fields; the same report
+also checks that the
 confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
 commit, and confidential execution are visibility-restricted to
 `crate::runtime`, and that `engine.rs` uses the `PublicRuntimeKernel` facade

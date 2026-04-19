@@ -1,5 +1,5 @@
 use crate::confidential_kernel::{ConfidentialKernelLoweringError, ConfidentialKernelStep};
-use crate::ir::{CompiledFunction, StateObject};
+use crate::ir::StateObject;
 use crate::manifest::{
     EntrypointManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
 };
@@ -1603,11 +1603,11 @@ impl RuntimeKernelWitness {
 
     pub fn validate_for_confidential(
         &self,
-        function: &CompiledFunction,
+        entrypoint: &str,
         manifest_entry: &EntrypointManifest,
         public_object_ids: &[u32],
     ) -> Result<(), KernelWitnessError> {
-        self.validate_for_entrypoint(&function.signature)?;
+        self.validate_for_entrypoint(entrypoint)?;
         if self.arena_bytes != manifest_entry.arena_bytes {
             return Err(KernelWitnessError::ArenaBudgetMismatch {
                 witnessed: self.arena_bytes,
@@ -1624,7 +1624,7 @@ impl RuntimeKernelWitness {
             .confidential_slot_program
             .as_ref()
             .ok_or_else(|| KernelWitnessError::MissingManifestConfidentialSlotProgram {
-                entrypoint: function.signature.clone(),
+                entrypoint: entrypoint.into(),
             })?;
         let expected_steps = manifest_slot_program
             .expected_runtime_steps()
@@ -1644,7 +1644,7 @@ impl RuntimeKernelWitness {
             manifest_kernel_steps_as_witness(&manifest_entry.kernel_steps);
         let witness_expected_steps = self.expected_kernel_steps.as_ref().ok_or_else(|| {
             KernelWitnessError::MissingExpectedKernelSteps {
-                entrypoint: function.signature.clone(),
+                entrypoint: entrypoint.into(),
             }
         })?;
         if witness_expected_steps != &manifest_expected_steps {
@@ -1663,7 +1663,7 @@ impl RuntimeKernelWitness {
             .expected_public_object_ids
             .as_ref()
             .ok_or_else(|| KernelWitnessError::MissingExpectedPublicObjectIds {
-                entrypoint: function.signature.clone(),
+                entrypoint: entrypoint.into(),
             })?;
         if witness_expected_public_object_ids != public_object_ids {
             return Err(KernelWitnessError::PublicObjectUniverseMismatch {
@@ -2364,15 +2364,6 @@ pub fn canonical_runtime_public_object_ids(state: &[StateObject]) -> Vec<u32> {
         .collect()
 }
 
-fn runtime_kernel_step_witness_to_manifest(
-    step: RuntimeKernelStepWitness,
-) -> RuntimeKernelStepManifest {
-    RuntimeKernelStepManifest {
-        opcode: step.opcode,
-        object_id: step.object_id,
-    }
-}
-
 fn manifest_kernel_steps_as_witness(
     steps: &[RuntimeKernelStepManifest],
 ) -> Vec<RuntimeKernelStepWitness> {
@@ -2383,27 +2374,6 @@ fn manifest_kernel_steps_as_witness(
             object_id: step.object_id,
         })
         .collect()
-}
-
-pub fn expected_runtime_kernel_steps_for_confidential(
-    function: &CompiledFunction,
-) -> Result<Vec<RuntimeKernelStepWitness>, KernelWitnessError> {
-    Ok(function
-        .confidential_kernel_program()
-        .map_err(KernelWitnessError::from)?
-        .expected_runtime_steps()
-        .into_iter()
-        .map(RuntimeKernelStepWitness::from)
-        .collect())
-}
-
-pub fn expected_runtime_manifest_kernel_steps_for_confidential(
-    function: &CompiledFunction,
-) -> Result<Vec<RuntimeKernelStepManifest>, KernelWitnessError> {
-    Ok(expected_runtime_kernel_steps_for_confidential(function)?
-        .into_iter()
-        .map(runtime_kernel_step_witness_to_manifest)
-        .collect())
 }
 
 impl RuntimePathOramHiddenCertificate {
@@ -3857,7 +3827,7 @@ impl ExecutionTrace {
                 entrypoint: entrypoint.into(),
             })?;
         let public_object_ids = canonical_runtime_public_object_ids(&artifact.contract.state);
-        witness.validate_for_confidential(function, manifest_entry, &public_object_ids)?;
+        witness.validate_for_confidential(entrypoint, manifest_entry, &public_object_ids)?;
         Ok(witness)
     }
 }

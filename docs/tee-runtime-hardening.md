@@ -153,9 +153,11 @@ The current runtime has a first hardening layer:
 - per-object runtime RNG state now gets reset on drop for cell/array/map
   objects, reducing the lifetime of old nonce/leaf-generation state in
   transaction-shadow and replaced-object paths
-- the copied call-argument vector used to build the public theorem trace is now
-  scrubbed immediately after trace construction, and injected fresh-coin plans
-  now zero their stored leaf choices on drop
+- `engine.rs` no longer keeps a duplicate secret-bearing call-argument vector
+  just to build the public theorem trace: it now retains only a
+  `PublicCallSummary` containing the total input length plus the already-public
+  argument projection, and injected fresh-coin plans now zero their stored
+  leaf choices on drop
 - ORAM refresh/metadata decode now uses `StoreCipher::with_opened_payload`, so
   decrypted position-map / stash / bucket payload buffers are scrubbed after
   parse instead of lingering as dropped plaintext heap allocations
