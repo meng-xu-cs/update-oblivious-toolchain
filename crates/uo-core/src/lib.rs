@@ -9,6 +9,7 @@ pub mod metadata;
 pub mod shell_boundary;
 pub mod trace;
 pub mod translation_validation;
+pub mod trusted_kernel;
 pub mod types;
 
 pub use artifact::{ArtifactFormat, CompiledArtifact};
@@ -80,4 +81,5 @@ pub use translation_validation::{
     ProofRelevantOramAccessView, ProofRelevantOramView, ProofRelevantParamView,
     ProofRelevantStateObjectView, ProofRelevantTranslationBundle,
 };
+pub use trusted_kernel::{RuntimeTrustedKernelSlotBundle, RuntimeTrustedKernelSlotBundleError};
 pub use types::{ScalarType, StructField, Type, Value};

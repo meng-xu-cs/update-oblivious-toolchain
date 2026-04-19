@@ -20,7 +20,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 3376,
+      "bundle_json_bytes": 3809,
+      "confidential_slot_program": {
+        "entrypoint_id": "classify(uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 1,
+        "secret_arg_count": 1,
+        "slot_count": 2,
+        "statement_count": 2
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
@@ -159,7 +168,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 3376,
+      "bundle_json_bytes": 3809,
+      "confidential_slot_program": {
+        "entrypoint_id": "classify(uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 1,
+        "secret_arg_count": 1,
+        "slot_count": 2,
+        "statement_count": 2
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
@@ -298,7 +316,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 7091,
+      "bundle_json_bytes": 8695,
+      "confidential_slot_program": {
+        "entrypoint_id": "auth(bytes32)",
+        "expected_runtime_step_count": 8,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 1,
+        "secret_arg_count": 1,
+        "slot_count": 2,
+        "statement_count": 7
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
@@ -622,7 +649,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 7091,
+      "bundle_json_bytes": 8695,
+      "confidential_slot_program": {
+        "entrypoint_id": "auth(bytes32)",
+        "expected_runtime_step_count": 8,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 1,
+        "secret_arg_count": 1,
+        "slot_count": 2,
+        "statement_count": 7
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
@@ -946,7 +982,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 6834,
+      "bundle_json_bytes": 7160,
+      "confidential_slot_program": {
+        "entrypoint_id": "upsert(bytes32,uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 2,
+        "statement_count": 1
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
@@ -1253,7 +1298,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 6834,
+      "bundle_json_bytes": 7161,
+      "confidential_slot_program": {
+        "entrypoint_id": "upsert(bytes32,uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 2,
+        "statement_count": 1
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
@@ -1560,7 +1614,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 8961,
+      "bundle_json_bytes": 9650,
+      "confidential_slot_program": {
+        "entrypoint_id": "deposit(bytes32,uint256)",
+        "expected_runtime_step_count": 7,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 3,
+        "statement_count": 3
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -1935,7 +1998,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 8961,
+      "bundle_json_bytes": 9650,
+      "confidential_slot_program": {
+        "entrypoint_id": "deposit(bytes32,uint256)",
+        "expected_runtime_step_count": 7,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 3,
+        "statement_count": 3
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -2310,7 +2382,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 11404,
+      "bundle_json_bytes": 11858,
+      "confidential_slot_program": {
+        "entrypoint_id": "approve(address,address,uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 3,
+        "secret_arg_count": 3,
+        "slot_count": 4,
+        "statement_count": 2
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
@@ -2848,7 +2929,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 11403,
+      "bundle_json_bytes": 11858,
+      "confidential_slot_program": {
+        "entrypoint_id": "approve(address,address,uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 3,
+        "secret_arg_count": 3,
+        "slot_count": 4,
+        "statement_count": 2
+      },
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
@@ -3386,7 +3476,16 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15522,
+      "bundle_json_bytes": 15850,
+      "confidential_slot_program": {
+        "entrypoint_id": "put(bytes32,uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 2,
+        "statement_count": 1
+      },
       "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
@@ -4113,7 +4212,16 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15527,
+      "bundle_json_bytes": 15846,
+      "confidential_slot_program": {
+        "entrypoint_id": "put(bytes32,uint256)",
+        "expected_runtime_step_count": 4,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 2,
+        "statement_count": 1
+      },
       "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
@@ -4840,7 +4948,16 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 22541,
+      "bundle_json_bytes": 23035,
+      "confidential_slot_program": {
+        "entrypoint_id": "add(bytes32,uint256)",
+        "expected_runtime_step_count": 5,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 3,
+        "statement_count": 2
+      },
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
@@ -5768,7 +5885,16 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 22537,
+      "bundle_json_bytes": 23034,
+      "confidential_slot_program": {
+        "entrypoint_id": "add(bytes32,uint256)",
+        "expected_runtime_step_count": 5,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 3,
+        "statement_count": 2
+      },
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
@@ -6696,7 +6822,16 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 58361,
+      "bundle_json_bytes": 59053,
+      "confidential_slot_program": {
+        "entrypoint_id": "deposit(bytes32,uint256)",
+        "expected_runtime_step_count": 7,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "slot_count": 3,
+        "statement_count": 3
+      },
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -9351,7 +9486,16 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "bundle_json_bytes": 190896,
+      "bundle_json_bytes": 192501,
+      "confidential_slot_program": {
+        "entrypoint_id": "transferFrom(address,address,address,uint256)",
+        "expected_runtime_step_count": 9,
+        "matches_trusted_kernel_entrypoint": true,
+        "param_count": 4,
+        "secret_arg_count": 4,
+        "slot_count": 7,
+        "statement_count": 9
+      },
       "controller_accesses": 6,
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",

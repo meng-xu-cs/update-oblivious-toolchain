@@ -124,13 +124,13 @@
         "report": "pathoram_pair_validation"
       },
       {
-        "bytes": 297484,
+        "bytes": 297463,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_lowering_validation"
       },
       {
-        "bytes": 295532,
+        "bytes": 295547,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_slot_validation"
@@ -154,19 +154,19 @@
         "report": "seeded_witness_validation"
       },
       {
-        "bytes": 195519,
+        "bytes": 195534,
         "estimated": false,
         "metric": "confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes",
         "report": "confidential_core_lowering_validation"
       },
       {
-        "bytes": 193961,
+        "bytes": 193967,
         "estimated": false,
         "metric": "confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes",
         "report": "confidential_core_validation"
       },
       {
-        "bytes": 193594,
+        "bytes": 193600,
         "estimated": false,
         "metric": "confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes",
         "report": "confidential_core_slot_validation"
@@ -233,38 +233,38 @@
     }
   ],
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 56573,
-    "confidential_core_lowering_validation": 2625,
-    "confidential_core_shell_boundary_lowering_validation": 2972,
-    "confidential_core_shell_boundary_slot_validation": 3099,
-    "confidential_core_slot_validation": 2879,
-    "confidential_core_validation": 2905,
+    "canonical_pathoram_pair_validation": 56757,
+    "confidential_core_lowering_validation": 2713,
+    "confidential_core_shell_boundary_lowering_validation": 2973,
+    "confidential_core_shell_boundary_slot_validation": 3111,
+    "confidential_core_slot_validation": 2981,
+    "confidential_core_validation": 2713,
     "confidential_fragment_validation": 0,
-    "controller_observer_validation": 2951,
-    "correctness": 1214,
-    "fresh_coin_validation": 13810,
-    "kernel_dsl_validation": 2917,
-    "kernel_lowering_validation": 2724,
-    "kernel_model_alignment_validation": 3,
-    "kernel_refinement_validation": 2693,
-    "kernel_slot_dsl_validation": 2951,
-    "kernel_validation": 2861,
-    "leakage_auc": 2521,
-    "mutual_information": 2521,
+    "controller_observer_validation": 2713,
+    "correctness": 1235,
+    "fresh_coin_validation": 13763,
+    "kernel_dsl_validation": 2994,
+    "kernel_lowering_validation": 2904,
+    "kernel_model_alignment_validation": 4,
+    "kernel_refinement_validation": 2690,
+    "kernel_slot_dsl_validation": 2788,
+    "kernel_validation": 2775,
+    "leakage_auc": 2575,
+    "mutual_information": 2570,
     "overheads": 115,
-    "pathoram_hidden_validation": 1998,
-    "pathoram_pair_validation": 6088,
-    "runtime_boundary_validation": 271,
-    "seeded_witness_validation": 3170,
-    "shell_boundary_lowering_validation": 2931,
-    "shell_boundary_slot_validation": 2991,
-    "shell_boundary_validation": 2686,
-    "static_checks": 1670,
-    "tamper_validation": 10234,
-    "total_probe_ms": 148013,
-    "trace_equivalence": 2653,
-    "trusted_kernel_validation": 2938,
-    "witness_validation": 1873
+    "pathoram_hidden_validation": 2239,
+    "pathoram_pair_validation": 6043,
+    "runtime_boundary_validation": 295,
+    "seeded_witness_validation": 3117,
+    "shell_boundary_lowering_validation": 2646,
+    "shell_boundary_slot_validation": 2868,
+    "shell_boundary_validation": 2867,
+    "static_checks": 1585,
+    "tamper_validation": 10573,
+    "total_probe_ms": 147919,
+    "trace_equivalence": 2567,
+    "trusted_kernel_validation": 2720,
+    "witness_validation": 1839
   },
   "runtime_overheads": {
     "cases": [
@@ -543,11 +543,11 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeTrustedKernel.lean",
-          "nonempty_loc": 347
+          "nonempty_loc": 414
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean",
-          "nonempty_loc": 347
+          "nonempty_loc": 480
         },
         {
           "file": "proof/lean/UOToolchain/SgxBoundary.lean",
@@ -611,7 +611,7 @@
         }
       ],
       "root": "proof/lean",
-      "total_nonempty_loc": 27883
+      "total_nonempty_loc": 28083
     },
     "measurement": "non-empty source lines",
     "outer_runtime_risk_surface": {

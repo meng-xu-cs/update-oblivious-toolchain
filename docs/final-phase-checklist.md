@@ -27,8 +27,11 @@ Status labels:
   `results/pathoram_hidden_validation.json`,
   `proof/lean/CheckRuntimePathOramHiddenCertificate.lean`.
 
-- `cleared` Checked the explicit trusted-kernel bundle exported from emitted
-  traces.
+- `cleared` Checked the explicit trusted-kernel bridge exported from emitted
+  traces: the runtime stores `RuntimeTrustedKernelBundle` on emitted traces,
+  and the proof-grade checker validates the slot-wrapped trusted-kernel
+  artifact built from that bundle plus the admitted confidential slot
+  program.
   Evidence:
   `results/trusted_kernel_validation.json`,
   `proof/lean/CheckProofGradeRuntimeTrustedKernel.lean`.

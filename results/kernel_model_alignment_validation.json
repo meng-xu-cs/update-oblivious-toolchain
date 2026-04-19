@@ -174,6 +174,10 @@
     "cold_store_object_schedule",
     "post_committed_cold_object_schedule"
   ],
+  "lean_runtime_trusted_kernel_slot_bundle_field_names": [
+    "trusted_kernel_bundle",
+    "confidential_slot_program"
+  ],
   "lean_scratch_region_names": [
     "value_scratch",
     "hash_scratch",
@@ -195,6 +199,7 @@
   "runtime_shell_boundary_slot_bundle_field_names_match": true,
   "runtime_shell_contract_field_names_match": true,
   "runtime_shell_trace_field_names_match": true,
+  "runtime_trusted_kernel_slot_bundle_field_names_match": true,
   "rust_confidential_kernel_expr_kind_names": [
     "literal",
     "var",
@@ -354,6 +359,10 @@
     "cold_store_object_schedule",
     "post_committed_cold_object_schedule"
   ],
+  "rust_runtime_trusted_kernel_slot_bundle_field_names": [
+    "trusted_kernel_bundle",
+    "confidential_slot_program"
+  ],
   "rust_scratch_region_names": [
     "value_scratch",
     "hash_scratch",
@@ -370,11 +379,13 @@
     "lean_runtime_shell_boundary": "proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean",
     "lean_runtime_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean",
     "lean_runtime_shell_boundary_slot": "proof/lean/UOToolchain/RuntimeShellBoundarySlotJson.lean",
+    "lean_runtime_trusted_kernel": "proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean",
     "rust_confidential_core": "crates/uo-core/src/confidential_core.rs",
     "rust_confidential_kernel": "crates/uo-core/src/confidential_kernel.rs",
     "rust_core_trace": "crates/uo-core/src/trace.rs",
     "rust_kernel_dsl": "crates/uo-core/src/kernel_dsl.rs",
     "rust_precompiles": "runtime/uo-precompiles/src/lib.rs",
-    "rust_shell_boundary": "crates/uo-core/src/shell_boundary.rs"
+    "rust_shell_boundary": "crates/uo-core/src/shell_boundary.rs",
+    "rust_trusted_kernel": "crates/uo-core/src/trusted_kernel.rs"
   }
 }

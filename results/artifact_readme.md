@@ -277,10 +277,10 @@ the Rust kernel resource/refinement witness enums and checks that their
 serialized vocabularies and DSL/proof-interface struct field names match the
 explicit Lean opcode, confidential-DSL, slot-DSL, runtime-kernel-lowering,
 runtime-confidential-core-lowering, runtime-confidential-core-shell-boundary-slot,
-runtime-confidential-core-shell-boundary-lowering, runtime-shell-contract,
-runtime-shell-trace, runtime-shell-boundary, runtime-shell-boundary-slot,
-runtime-shell-boundary-lowering, resource-event, scratch-region, and
-refinement-event vocabularies exactly.
+runtime-confidential-core-shell-boundary-lowering, runtime-trusted-kernel-slot,
+runtime-shell-contract, runtime-shell-trace, runtime-shell-boundary,
+runtime-shell-boundary-slot, runtime-shell-boundary-lowering, resource-event,
+scratch-region, and refinement-event vocabularies exactly.
 `kernel_refinement_validation.json` checks that lower-level runtime phase
 witness directly against Lean together with the exact exported public kernel
 witness, and
@@ -306,13 +306,15 @@ runtime kernel witness against Lean at that direct small-kernel boundary, and
 `seeded_witness_validation.json`, which checks seeded path-ORAM witness
 families against the Lean-side runtime-coins family validator.
 `trusted_kernel_validation.json` adds the smaller theorem-facing bridge object:
-it checks the explicit runtime trusted-kernel bundle against the proof-grade
-Lean-side validator, requiring the same exact embedded confidential kernel-op
-trace plus exact public kernel-step trace, together with the same successful
-modeled small-kernel replay condition and exact final public object-id
-schedule, while packaging the public controller
-observer certificate plus the hidden Path-ORAM certificate from which the full
-runtime witness is reconstructed.
+it checks the proof-grade runtime trusted-kernel slot bundle against the
+Lean-side validator, requiring the emitted trusted-kernel bundle to be
+packaged together with the admitted fixed-slot confidential program for the
+same entrypoint. Lean then checks the same exact embedded confidential
+kernel-op trace plus exact public kernel-step trace, together with the same
+successful modeled small-kernel replay condition and exact final public
+object-id schedule, while packaging the public controller observer
+certificate plus the hidden Path-ORAM certificate from which the full runtime
+witness is reconstructed.
 The direct kernel validator covers the same proof-grade benchmark family as the
 trusted-kernel and refinement-witness validators, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object

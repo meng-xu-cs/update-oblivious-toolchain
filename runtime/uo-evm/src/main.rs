@@ -99,8 +99,8 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::TrustedKernel => {
-            let bundle = trace.runtime_trusted_kernel_bundle()?;
-            println!("{}", bundle.to_json_pretty());
+            let bundle = trace.runtime_trusted_kernel_slot_bundle(&artifact)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::RefinementWitness => {
             let witness = trace.runtime_refinement_witness()?;

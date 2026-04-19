@@ -250,26 +250,31 @@ The current runtime has a first hardening layer:
   against the checked manifest's exact admitted public `{ opcode, object_id? }`
   step schedule and rejects missing, extra, or mismatched steps online rather
   than only by post-hoc witness comparison
-- the exported `trusted-kernel` bundle and `refinement-witness` JSON now carry
-  that kernel witness directly
+- the exported runtime trusted-kernel bundle and `refinement-witness` JSON now
+  carry that kernel witness directly, and the proof-grade `trusted-kernel`
+  JSON path now also packages the admitted confidential slot program alongside
+  that bundle
 - the proof-facing boundary now also includes a standalone proof-grade kernel
   witness checker, so the small-kernel object can be validated directly rather
   than only through the larger trusted-kernel / refinement bundles
 - the Lean imported trusted-kernel / refinement-witness validators now consume
   that exported kernel witness and check entrypoint alignment, opcode-envelope
   shape, scratch-budget consistency, wipe discipline, kernel-step shape, and
-  exact kernel-step equality, while the
-  proof-grade `checkProofGradeRuntimeWitness` and
-  `checkProofGradeRuntimeTrustedKernel` validators now require the exact
-  expected public kernel-step trace from the checked manifest to be embedded in
-  confidential witnesses
+  exact kernel-step equality, while the proof-grade
+  `checkProofGradeRuntimeWitness` validator still requires the exact expected
+  public kernel-step trace to be embedded in confidential witnesses and
+  `checkProofGradeRuntimeTrustedKernel` now requires the trusted-kernel proof
+  artifact to package the admitted confidential slot program whose derived
+  public schedule must match that embedded witness exactly
 - the core Lean trusted-kernel / refinement-witness structures now also expose
-  theorem-side `ProofGradeValid` predicates, so the "kernel witness is present
-  and exact" condition is available above the JSON importer layer as well
+  theorem-side `ProofGradeValid` predicates, and the trusted-kernel path now
+  also exposes a theorem-side slot-wrapped bundle, so the "kernel witness is
+  present and exact for this admitted slot program" condition is available
+  above the JSON importer layer as well
 - the Lean side now also exposes proof-grade schedule-exactness lemmas for the
-  kernel witness, refinement witness, and trusted-kernel bundle, so a
-  proof-grade accepted artifact carries one exact public kernel schedule rather
-  than only a validator acceptance bit
+  kernel witness, refinement witness, trusted-kernel bundle, and slot-wrapped
+  trusted-kernel proof object, so a proof-grade accepted artifact carries one
+  exact public kernel schedule rather than only a validator acceptance bit
 - the Lean side now also packages that admitted schedule explicitly as a
   `RuntimeKernelSchedule` / `ImportedRuntimeKernelSchedule` object derived from
   the witness, so later refinement statements can target the schedule object

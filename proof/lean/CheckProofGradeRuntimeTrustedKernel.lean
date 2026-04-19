@@ -13,9 +13,9 @@ def main (args : List String) : IO UInt32 := do
         , exitModel := exitModel
         , sharedResourceModel := sharedResourceModel
         }
-      let bundle ← loadAndCheckImportedProofGradeRuntimeTrustedKernelBundle path modelTags
+      let bundle ← loadAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundle path modelTags
       IO.println
-        s!"validated proof-grade runtime trusted kernel bundle for {bundle.controller_observer.public_outcome.entrypoint_id}"
+        s!"validated proof-grade runtime trusted kernel bundle for {bundle.trusted_kernel_bundle.controller_observer.public_outcome.entrypoint_id}"
       pure 0
   | _ =>
       IO.eprintln usage

@@ -1,4 +1,5 @@
 import Lean.Data.Json
+import UOToolchain.RuntimeKernelDslJson
 import UOToolchain.RuntimeTrustedKernel
 import UOToolchain.RuntimeRefinementJson
 
@@ -360,6 +361,151 @@ theorem importedRuntimeTrustedKernelBundle_projects_to_paper_observer
     bundle.toRuntimeTrustedKernelBundle
     modelTags
     hValid.1
+
+def importedRuntimeTrustedKernelSlotBundleFieldNames : List String :=
+  ["trusted_kernel_bundle", "confidential_slot_program"]
+
+structure ImportedRuntimeTrustedKernelSlotBundle where
+  trusted_kernel_bundle : ImportedRuntimeTrustedKernelBundle
+  confidential_slot_program : ImportedConfidentialKernelSlotProgram
+deriving FromJson
+
+def ImportedRuntimeTrustedKernelSlotBundle.slotBundle
+  (bundle : ImportedRuntimeTrustedKernelSlotBundle)
+  (kernelWitness : ImportedRuntimeKernelWitness) : ImportedRuntimeKernelSlotDslBundle :=
+  { kernel_witness := kernelWitness
+  , confidential_slot_program := bundle.confidential_slot_program
+  }
+
+def ImportedRuntimeTrustedKernelSlotBundle.Valid
+  (bundle : ImportedRuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags) : Prop :=
+  bundle.trusted_kernel_bundle.ProofGradeValid modelTags ∧
+    match bundle.trusted_kernel_bundle.kernel_witness with
+    | none => False
+    | some kernelWitness => (bundle.slotBundle kernelWitness).Valid
+
+def ImportedRuntimeTrustedKernelSlotBundle.checkValid
+  (bundle : ImportedRuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags) : Bool :=
+  bundle.trusted_kernel_bundle.checkProofGrade modelTags &&
+    match bundle.trusted_kernel_bundle.kernel_witness with
+    | none => false
+    | some kernelWitness => (bundle.slotBundle kernelWitness).checkValid
+
+def ImportedRuntimeTrustedKernelSlotBundle.toRuntimeTrustedKernelSlotBundle
+  (bundle : ImportedRuntimeTrustedKernelSlotBundle) : RuntimeTrustedKernelSlotBundle :=
+  { trustedKernelBundle := bundle.trusted_kernel_bundle.toRuntimeTrustedKernelBundle
+  , confidentialSlotProgram := bundle.confidential_slot_program.toConfidentialKernelSlotProgram
+  }
+
+@[simp] theorem importedRuntimeTrustedKernelSlotBundle_checkValid_eq_true_iff
+  (bundle : ImportedRuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags) :
+  bundle.checkValid modelTags = true ↔ bundle.Valid modelTags := by
+  cases hKernel : bundle.trusted_kernel_bundle.kernel_witness with
+  | none =>
+      simp [ImportedRuntimeTrustedKernelSlotBundle.checkValid,
+        ImportedRuntimeTrustedKernelSlotBundle.Valid, hKernel]
+  | some kernelWitness =>
+      simp [ImportedRuntimeTrustedKernelSlotBundle.checkValid,
+        ImportedRuntimeTrustedKernelSlotBundle.Valid,
+        ImportedRuntimeTrustedKernelSlotBundle.slotBundle, hKernel,
+        importedRuntimeTrustedKernelBundle_checkProofGrade_eq_true_iff,
+        importedRuntimeKernelSlotDslBundle_checkValid_eq_true_iff]
+
+theorem importedRuntimeTrustedKernelSlotBundle_toRuntimeValid
+  (bundle : ImportedRuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.toRuntimeTrustedKernelSlotBundle.Valid modelTags := by
+  cases hKernel : bundle.trusted_kernel_bundle.kernel_witness with
+  | none =>
+      simp [ImportedRuntimeTrustedKernelSlotBundle.Valid, hKernel] at hValid
+  | some kernelWitness =>
+      have hTrusted :
+          bundle.trusted_kernel_bundle.ProofGradeValid modelTags := hValid.1
+      have hImportedSlot :
+          (bundle.slotBundle kernelWitness).Valid := by
+        simpa [ImportedRuntimeTrustedKernelSlotBundle.Valid, hKernel] using hValid.2
+      have hRuntimeTrusted :
+          bundle.trusted_kernel_bundle.toRuntimeTrustedKernelBundle.ProofGradeValid modelTags := by
+        have hRuntimeKernel :
+            bundle.trusted_kernel_bundle.toRuntimeTrustedKernelBundle.proofGradeKernelWitnessValid := by
+          have hImportedKernel :
+              kernelWitness.ProofGradeValid
+                bundle.trusted_kernel_bundle.controller_observer.public_outcome.entrypoint_id := by
+            simpa [ImportedRuntimeTrustedKernelBundle.proofGradeKernelWitnessValid, hKernel] using
+              hTrusted.2
+          simpa [ImportedRuntimeTrustedKernelBundle.toRuntimeTrustedKernelBundle,
+            RuntimeTrustedKernelBundle.proofGradeKernelWitnessValid, hKernel] using
+            importedRuntimeKernelWitness_toRuntimeKernelWitness_proofGradeValid
+              kernelWitness
+              bundle.trusted_kernel_bundle.controller_observer.public_outcome.entrypoint_id
+              hImportedKernel
+        exact ⟨hTrusted.1, hRuntimeKernel⟩
+      have hRuntimeSlot :
+          RuntimeKernelSlotDslBundle.Valid
+            { kernelWitness := kernelWitness.toRuntimeKernelWitness
+            , confidentialProgram :=
+                bundle.confidential_slot_program.toConfidentialKernelSlotProgram
+            } := by
+        refine
+          ⟨importedRuntimeKernelWitness_toRuntimeKernelWitness_proofGradeValid
+              kernelWitness bundle.confidential_slot_program.entrypoint_id hImportedSlot.1, ?_, ?_⟩
+        exact (importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact hImportedSlot).1
+        exact (importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact hImportedSlot).2
+      unfold ImportedRuntimeTrustedKernelSlotBundle.toRuntimeTrustedKernelSlotBundle
+        RuntimeTrustedKernelSlotBundle.Valid RuntimeTrustedKernelSlotBundle.kernelSlotBundle?
+      simpa [ImportedRuntimeTrustedKernelBundle.toRuntimeTrustedKernelBundle,
+        ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram, hKernel] using
+        (show
+          bundle.trusted_kernel_bundle.toRuntimeTrustedKernelBundle.ProofGradeValid modelTags ∧
+            RuntimeKernelSlotDslBundle.Valid
+              { kernelWitness := kernelWitness.toRuntimeKernelWitness
+              , confidentialProgram :=
+                  bundle.confidential_slot_program.toConfidentialKernelSlotProgram
+              } from
+          ⟨hRuntimeTrusted, hRuntimeSlot⟩)
+
+def parseImportedRuntimeTrustedKernelSlotBundle
+  (input : String) : Except String ImportedRuntimeTrustedKernelSlotBundle := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundle
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedRuntimeTrustedKernelSlotBundle := do
+  let bundle ← parseImportedRuntimeTrustedKernelSlotBundle input
+  if bundle.checkValid modelTags then
+    pure bundle
+  else
+    throw
+      "imported proof-grade runtime trusted-kernel slot bundle does not satisfy Lean validity checks"
+
+def loadImportedRuntimeTrustedKernelSlotBundle
+  (path : System.FilePath) : IO ImportedRuntimeTrustedKernelSlotBundle := do
+  let input ← IO.FS.readFile path
+  match parseImportedRuntimeTrustedKernelSlotBundle input with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <| IO.userError s!"failed to parse runtime trusted-kernel slot bundle: {err}"
+
+def loadAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundle
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedRuntimeTrustedKernelSlotBundle := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundle input modelTags with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate proof-grade runtime trusted-kernel slot bundle: {err}"
+
+def loadAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundleToRuntimeBundle
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO RuntimeTrustedKernelSlotBundle := do
+  let bundle ← loadAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundle path modelTags
+  pure bundle.toRuntimeTrustedKernelSlotBundle
 
 def sampleImportedRuntimeTrustedKernelBundle : ImportedRuntimeTrustedKernelBundle :=
   { runtime_seed := sampleImportedRuntimeRefinementWitness.runtime_seed

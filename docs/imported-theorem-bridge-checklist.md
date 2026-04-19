@@ -18,6 +18,8 @@ The repo path here is:
   checking of separately materialized artifacts
 - runtime-emitted controller and hidden-state certificates
 - an explicit runtime trusted-kernel bundle packaging those certificates
+- a proof-grade trusted-kernel slot bundle packaging that trusted-kernel
+  bundle together with the admitted confidential slot DSL object
 - direct runtime witness reconstruction from that trusted-kernel bundle
 - Lean-checked theorem-facing validation of the resulting witness artifacts
 
@@ -133,9 +135,10 @@ Status labels:
   controller observer certificate, the hidden Path-ORAM certificate, and the
   optional replay seed. That direct bundle is now stored on emitted runtime
   traces, while the older trace-based reconstruction path survives only as an
-  internal audit check. Lean proves what validity of that bundle means and the
-  probe validates the emitted bundle directly on the benchmark-backed runtime
-  scenarios.
+  internal audit check. For the proof-grade bridge, the runtime now also
+  packages that bundle with the admitted confidential slot program in a
+  `RuntimeTrustedKernelSlotBundle`, and the Lean checker validates that
+  stronger artifact directly on the benchmark-backed runtime scenarios.
 
 - `cleared` Validate the theorem-facing bridge artifacts with Lean-backed
   checkers.

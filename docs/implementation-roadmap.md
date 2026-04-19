@@ -131,6 +131,8 @@ The runtime/proof bridge now includes:
 - standalone controller-observer certificates
 - standalone hidden Path-ORAM certificates
 - an explicit `RuntimeTrustedKernelBundle`
+- a proof-grade `RuntimeTrustedKernelSlotBundle` that ties that bundle to the
+  admitted fixed-slot confidential program
 - runtime-enforced refinement-witness extraction
 - Lean JSON import and executable validation for the bundle and witness
 - seeded witness-family and paired-certificate validation

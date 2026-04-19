@@ -2264,7 +2264,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
         trace.runtime_confidential_core_shell_boundary_slot_bundle(&artifact)?;
     let confidential_core_shell_boundary_lowering_bundle =
         trace.runtime_confidential_core_shell_boundary_lowering_bundle(&artifact)?;
-    let trusted_kernel_bundle = trace.runtime_trusted_kernel_bundle()?;
+    let trusted_kernel_bundle = trace.runtime_trusted_kernel_slot_bundle(&artifact)?;
 
     let translation_checker = lean_proofgrade_translation_artifacts_checker_path()?;
     let controller_checker = lean_controller_certificate_checker_path()?;
@@ -2832,6 +2832,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
 
     let mut tampered_trusted_kernel_bundle = trusted_kernel_bundle.clone();
     let trusted_leaf = tampered_trusted_kernel_bundle
+        .trusted_kernel_bundle
         .hidden_certificate
         .oram_position_map_after
         .first_mut()
@@ -2860,7 +2861,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_trusted_kernel_bundle",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "drift first hidden position-map leaf inside the trusted-kernel bundle",
+            "mutation": "drift first hidden position-map leaf inside the trusted-kernel slot bundle",
         }),
     )?);
 
@@ -5782,10 +5783,10 @@ fn validate_trusted_kernel_case(
     checker: &Path,
 ) -> Result<JsonValue> {
     let trace = run_target_call(artifact, setup, target.entrypoint, target.args.clone())?;
-    let bundle = trace.runtime_trusted_kernel_bundle()?;
+    let bundle = trace.runtime_trusted_kernel_slot_bundle(artifact)?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if bundle.kernel_witness != exact_kernel_witness {
+    if bundle.trusted_kernel_bundle.kernel_witness != exact_kernel_witness {
         return Err(anyhow!(
             "runtime trusted-kernel bundle for {} does not preserve the exact kernel witness",
             name
@@ -5811,13 +5812,27 @@ fn validate_trusted_kernel_case(
         "scenario": name,
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
-        "gas_used": bundle.controller_observer.public_outcome.gas_used,
-        "boundary_events": bundle.controller_observer.boundary_schedule.len(),
-        "controller_phase_count": bundle.controller_observer.controller_shape.controller_phase_order.len(),
-        "controller_accesses": bundle.controller_observer.controller_certificate.observed_oram_accesses.len(),
-        "leaf_steps": bundle.hidden_certificate.oram_leaf_schedule.len(),
-        "position_map_objects": bundle.hidden_certificate.oram_position_map_before.len(),
+        "gas_used": bundle.trusted_kernel_bundle.controller_observer.public_outcome.gas_used,
+        "boundary_events": bundle.trusted_kernel_bundle.controller_observer.boundary_schedule.len(),
+        "controller_phase_count":
+            bundle.trusted_kernel_bundle.controller_observer.controller_shape.controller_phase_order.len(),
+        "controller_accesses":
+            bundle.trusted_kernel_bundle.controller_observer.controller_certificate.observed_oram_accesses.len(),
+        "leaf_steps": bundle.trusted_kernel_bundle.hidden_certificate.oram_leaf_schedule.len(),
+        "position_map_objects":
+            bundle.trusted_kernel_bundle.hidden_certificate.oram_position_map_before.len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
+        "confidential_slot_program": {
+            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
+            "param_count": bundle.confidential_slot_program.param_count,
+            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
+            "slot_count": bundle.confidential_slot_program.slot_count,
+            "statement_count": bundle.confidential_slot_program.body.len(),
+            "expected_runtime_step_count":
+                bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "matches_trusted_kernel_entrypoint":
+                bundle.program_matches_trusted_kernel_entrypoint(),
+        },
         "bundle_json_bytes": bundle_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
@@ -7698,9 +7713,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let confidential_kernel_path = repo_root().join("crates/uo-core/src/confidential_kernel.rs");
     let kernel_dsl_path = repo_root().join("crates/uo-core/src/kernel_dsl.rs");
     let confidential_core_path = repo_root().join("crates/uo-core/src/confidential_core.rs");
+    let trusted_kernel_path = repo_root().join("crates/uo-core/src/trusted_kernel.rs");
     let shell_boundary_path = repo_root().join("crates/uo-core/src/shell_boundary.rs");
     let lean_runtime_refinement_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeRefinement.lean");
+    let lean_runtime_trusted_kernel_path =
+        repo_root().join("proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean");
     let lean_runtime_shell_boundary_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean");
     let lean_runtime_shell_boundary_slot_path =
@@ -7726,6 +7744,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&kernel_dsl_path)))?;
     let confidential_core_source = fs::read_to_string(&confidential_core_path)
         .with_context(|| format!("reading {}", display_report_path(&confidential_core_path)))?;
+    let trusted_kernel_source = fs::read_to_string(&trusted_kernel_path)
+        .with_context(|| format!("reading {}", display_report_path(&trusted_kernel_path)))?;
     let shell_boundary_source = fs::read_to_string(&shell_boundary_path)
         .with_context(|| format!("reading {}", display_report_path(&shell_boundary_path)))?;
     let lean_runtime_refinement_source = fs::read_to_string(&lean_runtime_refinement_path)
@@ -7733,6 +7753,13 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_runtime_refinement_path)
+            )
+        })?;
+    let lean_runtime_trusted_kernel_source = fs::read_to_string(&lean_runtime_trusted_kernel_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_runtime_trusted_kernel_path)
             )
         })?;
     let lean_runtime_shell_boundary_source = fs::read_to_string(&lean_runtime_shell_boundary_path)
@@ -8012,6 +8039,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match =
         rust_runtime_confidential_core_shell_boundary_lowering_bundle_field_names
             == lean_runtime_confidential_core_shell_boundary_lowering_bundle_field_names;
+    let rust_runtime_trusted_kernel_slot_bundle_field_names =
+        extract_rust_struct_fields(&trusted_kernel_source, "RuntimeTrustedKernelSlotBundle")?;
+    let lean_runtime_trusted_kernel_slot_bundle_field_names = extract_lean_string_list(
+        &lean_runtime_trusted_kernel_source,
+        "importedRuntimeTrustedKernelSlotBundleFieldNames",
+    )?;
+    let runtime_trusted_kernel_slot_bundle_field_names_match =
+        rust_runtime_trusted_kernel_slot_bundle_field_names
+            == lean_runtime_trusted_kernel_slot_bundle_field_names;
 
     let rust_runtime_shell_contract_field_names =
         extract_rust_struct_fields(&shell_boundary_source, "RuntimeShellContract")?;
@@ -8104,6 +8140,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_confidential_core_slot_bundle_field_names_match
         && runtime_confidential_core_shell_boundary_slot_bundle_field_names_match
         && runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match
+        && runtime_trusted_kernel_slot_bundle_field_names_match
         && runtime_shell_contract_field_names_match
         && runtime_shell_trace_field_names_match
         && runtime_shell_boundary_bundle_field_names_match
@@ -8127,8 +8164,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             "rust_confidential_kernel": display_report_path(&confidential_kernel_path),
             "rust_kernel_dsl": display_report_path(&kernel_dsl_path),
             "rust_confidential_core": display_report_path(&confidential_core_path),
+            "rust_trusted_kernel": display_report_path(&trusted_kernel_path),
             "rust_shell_boundary": display_report_path(&shell_boundary_path),
             "lean_runtime_refinement": display_report_path(&lean_runtime_refinement_path),
+            "lean_runtime_trusted_kernel":
+                display_report_path(&lean_runtime_trusted_kernel_path),
             "lean_runtime_shell_boundary":
                 display_report_path(&lean_runtime_shell_boundary_path),
             "lean_runtime_shell_boundary_slot":
@@ -8247,6 +8287,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             lean_runtime_confidential_core_shell_boundary_lowering_bundle_field_names,
         "runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match":
             runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match,
+        "rust_runtime_trusted_kernel_slot_bundle_field_names":
+            rust_runtime_trusted_kernel_slot_bundle_field_names,
+        "lean_runtime_trusted_kernel_slot_bundle_field_names":
+            lean_runtime_trusted_kernel_slot_bundle_field_names,
+        "runtime_trusted_kernel_slot_bundle_field_names_match":
+            runtime_trusted_kernel_slot_bundle_field_names_match,
         "rust_runtime_shell_contract_field_names":
             rust_runtime_shell_contract_field_names,
         "lean_runtime_shell_contract_field_names":
@@ -12491,10 +12537,10 @@ the Rust kernel resource/refinement witness enums and checks that their
 serialized vocabularies and DSL/proof-interface struct field names match the
 explicit Lean opcode, confidential-DSL, slot-DSL, runtime-kernel-lowering,
 runtime-confidential-core-lowering, runtime-confidential-core-shell-boundary-slot,
-runtime-confidential-core-shell-boundary-lowering, runtime-shell-contract,
-runtime-shell-trace, runtime-shell-boundary, runtime-shell-boundary-slot,
-runtime-shell-boundary-lowering, resource-event, scratch-region, and
-refinement-event vocabularies exactly.
+runtime-confidential-core-shell-boundary-lowering, runtime-trusted-kernel-slot,
+runtime-shell-contract, runtime-shell-trace, runtime-shell-boundary,
+runtime-shell-boundary-slot, runtime-shell-boundary-lowering, resource-event,
+scratch-region, and refinement-event vocabularies exactly.
 `kernel_refinement_validation.json` checks that lower-level runtime phase
 witness directly against Lean together with the exact exported public kernel
 witness, and
@@ -12520,13 +12566,15 @@ runtime kernel witness against Lean at that direct small-kernel boundary, and
 `seeded_witness_validation.json`, which checks seeded path-ORAM witness
 families against the Lean-side runtime-coins family validator.
 `trusted_kernel_validation.json` adds the smaller theorem-facing bridge object:
-it checks the explicit runtime trusted-kernel bundle against the proof-grade
-Lean-side validator, requiring the same exact embedded confidential kernel-op
-trace plus exact public kernel-step trace, together with the same successful
-modeled small-kernel replay condition and exact final public object-id
-schedule, while packaging the public controller
-observer certificate plus the hidden Path-ORAM certificate from which the full
-runtime witness is reconstructed.
+it checks the proof-grade runtime trusted-kernel slot bundle against the
+Lean-side validator, requiring the emitted trusted-kernel bundle to be
+packaged together with the admitted fixed-slot confidential program for the
+same entrypoint. Lean then checks the same exact embedded confidential
+kernel-op trace plus exact public kernel-step trace, together with the same
+successful modeled small-kernel replay condition and exact final public
+object-id schedule, while packaging the public controller observer
+certificate plus the hidden Path-ORAM certificate from which the full runtime
+witness is reconstructed.
 The direct kernel validator covers the same proof-grade benchmark family as the
 trusted-kernel and refinement-witness validators, including the multi-access
 `ConfidentialMixer/pathoram/deposit` run and the multi-object

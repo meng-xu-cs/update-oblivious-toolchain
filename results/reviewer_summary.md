@@ -4,37 +4,37 @@
 
 | Report | Milliseconds |
 | --- | ---: |
-| `total_probe_ms` | `148013` |
-| `canonical_pathoram_pair_validation` | `56573` |
-| `fresh_coin_validation` | `13810` |
-| `tamper_validation` | `10234` |
-| `pathoram_pair_validation` | `6088` |
-| `seeded_witness_validation` | `3170` |
-| `confidential_core_shell_boundary_slot_validation` | `3099` |
-| `shell_boundary_slot_validation` | `2991` |
-| `confidential_core_shell_boundary_lowering_validation` | `2972` |
-| `controller_observer_validation` | `2951` |
-| `kernel_slot_dsl_validation` | `2951` |
-| `trusted_kernel_validation` | `2938` |
-| `shell_boundary_lowering_validation` | `2931` |
-| `kernel_dsl_validation` | `2917` |
-| `confidential_core_validation` | `2905` |
-| `confidential_core_slot_validation` | `2879` |
-| `kernel_validation` | `2861` |
-| `kernel_lowering_validation` | `2724` |
-| `kernel_refinement_validation` | `2693` |
-| `shell_boundary_validation` | `2686` |
-| `trace_equivalence` | `2653` |
-| `confidential_core_lowering_validation` | `2625` |
-| `leakage_auc` | `2521` |
-| `mutual_information` | `2521` |
-| `pathoram_hidden_validation` | `1998` |
-| `witness_validation` | `1873` |
-| `static_checks` | `1670` |
-| `correctness` | `1214` |
-| `runtime_boundary_validation` | `271` |
+| `total_probe_ms` | `147919` |
+| `canonical_pathoram_pair_validation` | `56757` |
+| `fresh_coin_validation` | `13763` |
+| `tamper_validation` | `10573` |
+| `pathoram_pair_validation` | `6043` |
+| `seeded_witness_validation` | `3117` |
+| `confidential_core_shell_boundary_slot_validation` | `3111` |
+| `kernel_dsl_validation` | `2994` |
+| `confidential_core_slot_validation` | `2981` |
+| `confidential_core_shell_boundary_lowering_validation` | `2973` |
+| `kernel_lowering_validation` | `2904` |
+| `shell_boundary_slot_validation` | `2868` |
+| `shell_boundary_validation` | `2867` |
+| `kernel_slot_dsl_validation` | `2788` |
+| `kernel_validation` | `2775` |
+| `trusted_kernel_validation` | `2720` |
+| `confidential_core_lowering_validation` | `2713` |
+| `confidential_core_validation` | `2713` |
+| `controller_observer_validation` | `2713` |
+| `kernel_refinement_validation` | `2690` |
+| `shell_boundary_lowering_validation` | `2646` |
+| `leakage_auc` | `2575` |
+| `mutual_information` | `2570` |
+| `trace_equivalence` | `2567` |
+| `pathoram_hidden_validation` | `2239` |
+| `witness_validation` | `1839` |
+| `static_checks` | `1585` |
+| `correctness` | `1235` |
+| `runtime_boundary_validation` | `295` |
 | `overheads` | `115` |
-| `kernel_model_alignment_validation` | `3` |
+| `kernel_model_alignment_validation` | `4` |
 | `confidential_fragment_validation` | `0` |
 
 ## Largest Materialized Artifacts
@@ -53,14 +53,14 @@
 | `pathoram_pair_validation.scenarios[2].certificate_json_bytes` | `498341` |
 | `canonical_pathoram_pair_validation.scenarios[3].theorem_input_json_bytes` | `468944` |
 | `pathoram_pair_validation.scenarios[1].certificate_json_bytes` | `379834` |
-| `confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes` | `297484` |
-| `confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes` | `295532` |
+| `confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes` | `297463` |
+| `confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes` | `295547` |
 | `tamper_validation.scenarios[21].artifact_json_bytes` | `262697` |
 | `pathoram_pair_validation.scenarios[0].certificate_json_bytes` | `262696` |
 | `seeded_witness_validation.scenarios[2].witness_family_json_bytes` | `237521` |
-| `confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes` | `195519` |
-| `confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes` | `193961` |
-| `confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes` | `193594` |
+| `confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes` | `195534` |
+| `confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes` | `193967` |
+| `confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes` | `193600` |
 
 ## Largest Estimated Artifacts
 
@@ -87,7 +87,7 @@
 | --- | ---: |
 | Trusted Rust runtime surface | `6935` |
 | Outer runtime risk surface | `934` |
-| Lean theorem/checker repo surface | `27883` |
+| Lean theorem/checker repo surface | `28083` |
 
 ## Current TCB Table
 

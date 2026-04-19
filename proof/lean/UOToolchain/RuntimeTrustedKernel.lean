@@ -1,3 +1,4 @@
+import UOToolchain.ConfidentialKernelDsl
 import UOToolchain.RuntimeRefinement
 
 namespace UOToolchain
@@ -372,5 +373,78 @@ theorem runtimeTrustedKernelBundle_projects_to_paper_observer
       bundle.controllerObserver.normalizedMicroTrace := by
   simpa [RuntimeTrustedKernelBundle.toRuntimeWitness] using
     runtimeWitness_projects_to_paper_observer bundle.toRuntimeWitness modelTags hValid
+
+/--
+Proof-grade trusted-kernel theorem surface strengthened with the admitted slot
+DSL object. The trusted-kernel certificate path still exports the direct
+controller/hidden certificates, but the proof-grade interface now also fixes
+the exact confidential slot program that is supposed to explain the kernel
+schedule.
+-/
+structure RuntimeTrustedKernelSlotBundle where
+  trustedKernelBundle : RuntimeTrustedKernelBundle
+  confidentialSlotProgram : ConfidentialKernelSlotProgram
+
+def RuntimeTrustedKernelSlotBundle.kernelSlotBundle?
+  (bundle : RuntimeTrustedKernelSlotBundle) : Option RuntimeKernelSlotDslBundle :=
+  bundle.trustedKernelBundle.kernelWitness.map fun kernelWitness =>
+    { kernelWitness := kernelWitness
+    , confidentialProgram := bundle.confidentialSlotProgram
+    }
+
+def RuntimeTrustedKernelSlotBundle.Valid
+  (bundle : RuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags) : Prop :=
+  bundle.trustedKernelBundle.ProofGradeValid modelTags ∧
+    match bundle.kernelSlotBundle? with
+    | none => False
+    | some slotBundle => slotBundle.Valid
+
+theorem runtimeTrustedKernelSlotBundle_proofGradeTrustedKernel
+  (bundle : RuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.trustedKernelBundle.ProofGradeValid modelTags := by
+  exact hValid.1
+
+theorem runtimeTrustedKernelSlotBundle_schedule_exact
+  (bundle : RuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  ∃ kernelWitness,
+    bundle.trustedKernelBundle.kernelWitness = some kernelWitness ∧
+      kernelWitness.expectedKernelSteps =
+        some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      kernelWitness.kernelSteps =
+        bundle.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  cases hKernel : bundle.trustedKernelBundle.kernelWitness with
+  | none =>
+      simp [RuntimeTrustedKernelSlotBundle.Valid,
+        RuntimeTrustedKernelSlotBundle.kernelSlotBundle?, hKernel] at hValid
+  | some kernelWitness =>
+      have hSlot :
+          RuntimeKernelSlotDslBundle.Valid
+            { kernelWitness := kernelWitness
+            , confidentialProgram := bundle.confidentialSlotProgram
+            } := by
+        simpa [RuntimeTrustedKernelSlotBundle.Valid,
+          RuntimeTrustedKernelSlotBundle.kernelSlotBundle?, hKernel] using hValid.2
+      exact ⟨kernelWitness, rfl, hSlot.2.1, hSlot.2.2⟩
+
+theorem runtimeTrustedKernelSlotBundle_controllerObserver_valid
+  (bundle : RuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.trustedKernelBundle.controllerObserver.Valid modelTags := by
+  exact runtimeTrustedKernelBundle_controllerObserver_valid
+    bundle.trustedKernelBundle modelTags hValid.1.1
+
+theorem runtimeTrustedKernelSlotBundle_hiddenCertificate_valid
+  (bundle : RuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.trustedKernelBundle.hiddenCertificate.Valid := by
+  exact runtimeTrustedKernelBundle_hiddenCertificate_valid
+    bundle.trustedKernelBundle modelTags hValid.1.1
 
 end UOToolchain

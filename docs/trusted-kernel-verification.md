@@ -9,6 +9,12 @@ The trusted runtime boundary is now the explicit
 `RuntimeTrustedKernelBundle` exported from `ExecutionTrace` in
 `crates/uo-core/src/trace.rs`.
 
+The proof-grade trusted-kernel checker is now slightly stronger than that base
+runtime object: it validates a `RuntimeTrustedKernelSlotBundle` from
+`crates/uo-core/src/trusted_kernel.rs`, which packages the emitted
+`RuntimeTrustedKernelBundle` together with the admitted
+`ConfidentialKernelSlotProgram` for the same entrypoint.
+
 That bundle contains exactly:
 
 - the public SGX/controller observer certificate
@@ -27,7 +33,7 @@ The current runtime-side TCB should be read explicitly rather than inferred.
 | --- | --- | --- |
 | Lean kernel plus Lean theorem/checker development | yes | proof checker and theorem body |
 | Explicit backend / cryptographic assumptions | yes | they are the named remaining assumptions |
-| `RuntimeTrustedKernelBundle` acceptance predicate and imported JSON checker | yes | theorem-facing validation boundary |
+| `RuntimeTrustedKernelBundle` / `RuntimeTrustedKernelSlotBundle` acceptance predicates and imported JSON checker | yes | theorem-facing validation boundary |
 | Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | implementation honesty is not yet derived by a full refinement proof |
 | Rust shell/object code outside the tiny kernel | partially | the confidential surface is narrower now, but this code still matters until confinement and refinement are proved end to end |
 | `uo-check` | no | removed from the proof-grade acceptance path |
@@ -58,12 +64,14 @@ The Lean development now contains:
 - `proof/lean/CheckProofGradeRuntimeKernelWitness.lean`
 - `proof/lean/CheckProofGradeRuntimeTrustedKernel.lean`
 
-The main mechanized statement is:
+The main mechanized statements are:
 
 - `RuntimeTrustedKernelBundle.Valid`
+- `RuntimeTrustedKernelSlotBundle.Valid`
 
-This says that the trusted-kernel bundle is sufficient to reconstruct a valid
-`RuntimeRefinementWitness`. Concretely, the theorem-facing obligations are:
+The base statement says that the trusted-kernel bundle is sufficient to
+reconstruct a valid `RuntimeRefinementWitness`. Concretely, the theorem-facing
+obligations are:
 
 - the hidden trace gas matches the public outcome gas
 - the public logical trace reconstructs the ordered observed ORAM accesses
@@ -74,6 +82,12 @@ This says that the trusted-kernel bundle is sufficient to reconstruct a valid
 Lean also proves `checkValid = true ↔ Valid` for the imported JSON form of the
 bundle, so the command-line checker is theorem-tight rather than an
 executable-only predicate.
+
+The proof-grade trusted-kernel statement then adds the admitted slot DSL
+object: once a `RuntimeTrustedKernelSlotBundle` is accepted, the embedded
+trusted-kernel bundle is proof-grade valid and its exact kernel-step schedule
+must match the `expectedRuntimeKernelSteps` derived from that frozen slot
+program.
 
 The core Lean development now also exposes theorem-side proof-grade predicates
 for the kernel witness, refinement witness, and trusted-kernel bundle, so the
@@ -118,6 +132,7 @@ kernel witness summary, plus the kernel-step public object schedule.
 The Rust side now exposes:
 
 - `ExecutionTrace::runtime_trusted_kernel_bundle`
+- `ExecutionTrace::runtime_trusted_kernel_slot_bundle`
 - `RuntimeTrustedKernelBundle::to_witness`
 - `uo-evm --format trusted-kernel`
 
@@ -125,7 +140,11 @@ The runtime engine now materializes the trusted-kernel bundle directly during
 execution, stores it on the emitted `ExecutionTrace`, and only then uses the
 older trace-field reconstruction path as an internal audit check before
 returning a call result. The public accessor on a runtime-emitted trace is
-therefore no longer a reconstruction routine.
+therefore no longer a reconstruction routine. For the proof-grade
+trusted-kernel path, `ExecutionTrace::runtime_trusted_kernel_slot_bundle` then
+packages that stored bundle together with the admitted slot program from the
+artifact manifest, and `uo-evm --format trusted-kernel` emits that stronger
+slot-wrapped artifact.
 
 For confidential entrypoints, the checked manifest now carries the canonical
 named confidential program, the canonical slot confidential program, and the
@@ -181,7 +200,8 @@ explicit bundle.
 
 ## Validation Path
 
-The repository now validates real emitted trusted-kernel bundles with Lean via:
+The repository now validates real emitted trusted-kernel bridge artifacts with
+Lean via:
 
 - `cargo run -q -p mplus-probe -- --only kernel-validation --out-dir results`
 - `results/kernel_validation.json`
@@ -193,13 +213,15 @@ The repository now validates real emitted trusted-kernel bundles with Lean via:
 - `results/tamper_validation.json`
 - `results/bridge_validation.json`
 
-The proof-grade report path uses `checkProofGradeRuntimeTrustedKernel`. The
-new tamper report complements the positive validation reports by mutating
-representative direct controller/hidden certificates, the proof-grade
-translation, kernel, refinement, shell-boundary, confidential-core,
-runtime-witness, and trusted-kernel artifacts, and the seeded/canonical
-witness-family, theorem-input, and pair-certificate artifacts, then checking
-that the corresponding Lean executables reject those drifted artifacts.
+The proof-grade report path uses `checkProofGradeRuntimeTrustedKernel` over
+the slot-wrapped trusted-kernel artifact, not just the bare certificate
+bundle. The new tamper report complements the positive validation reports by
+mutating representative direct controller/hidden certificates, the
+proof-grade translation, kernel, refinement, shell-boundary,
+confidential-core, runtime-witness, and trusted-kernel-slot artifacts, and
+the seeded/canonical witness-family, theorem-input, and pair-certificate
+artifacts, then checking that the corresponding Lean executables reject those
+drifted artifacts.
 
 ## Precise Claim
 

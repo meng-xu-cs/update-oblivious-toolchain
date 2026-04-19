@@ -656,6 +656,53 @@ mod tests {
     }
 
     #[test]
+    fn execution_trace_exports_trusted_kernel_slot_bundle() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
+            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+            )
+            .unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+            )
+            .unwrap();
+        let result = instance
+            .call("auth(bytes32)", vec![Value::Bytes32([1u8; 32])])
+            .unwrap();
+        let bundle = result
+            .trace
+            .runtime_trusted_kernel_slot_bundle(&artifact)
+            .unwrap();
+
+        assert_eq!(bundle.entrypoint_id(), "auth(bytes32)");
+        assert!(bundle.program_matches_trusted_kernel_entrypoint());
+        assert_eq!(
+            bundle.trusted_kernel_bundle.kernel_witness,
+            result.trace.runtime_kernel_witness
+        );
+        assert_eq!(
+            bundle
+                .confidential_slot_program
+                .expected_runtime_step_witnesses(),
+            bundle
+                .trusted_kernel_bundle
+                .kernel_witness
+                .clone()
+                .unwrap()
+                .kernel_steps
+        );
+    }
+
+    #[test]
     fn execution_trace_exports_runtime_phase_refinement_witness() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",

@@ -12,9 +12,9 @@ Components:
   supported subset, lowers to explicit UO IR, and emits theorem-facing
   manifests.
 - `runtime/uo-evm`: executes raw and UO artifacts in-process, emits
-  instrumented `M+` traces, explicit runtime kernel witnesses, and checked
-  trusted-kernel bundles, certificates, and refinement witnesses for the Lean
-  model.
+  instrumented `M+` traces, explicit runtime kernel witnesses, checked
+  trusted-kernel bundles, proof-grade trusted-kernel slot bundles,
+  certificates, and refinement witnesses for the Lean model.
 - `checker/uo-check`: rejects unsupported source programs, validates compiled
   artifacts for CLI/reporting purposes, and exposes debug/compatibility
   translation-bundle tooling outside the proof-grade acceptance path.
@@ -38,8 +38,9 @@ Current claim boundary:
 - the implementation bridge from source/artifact/runtime output into that
   theorem boundary is now explicit and executable under the current
   `PathOramLocalPosmapV1SecurityAssumptions` bundle, with emitted runtime
-  traces carrying the direct trusted-kernel bundle that the Lean checker
-  validates
+  traces carrying the direct trusted-kernel bundle and the proof-grade path
+  validating the slot-wrapped trusted-kernel artifact built from that bundle
+  plus the admitted confidential slot program
 - no current blanket claim that the full Rust compiler/runtime stack or a
   malicious-host SGX deployment already satisfies the final paper theorem
 
@@ -145,8 +146,9 @@ Current closure status:
    supported backend path, and both now carry the kernel witness that Lean
    threads through imported JSON plus theorem-side runtime/trusted-kernel
    validity for envelope / budget / wipe shape, with the proof-grade checker
-   path now also requiring the embedded artifact-side expected public
-   kernel-step schedule; the runtime kernel now
+   path now also packaging the trusted-kernel bundle with the admitted slot
+   confidential program and requiring the embedded artifact-side expected
+   public kernel-step schedule; the runtime kernel now
    also enforces that admitted public schedule online during confidential
    execution, and the repo exposes a direct proof-grade kernel-witness checker
    alongside the larger trusted-kernel / refinement validators; Lean now also

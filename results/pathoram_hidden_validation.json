@@ -4,7 +4,7 @@
   "scenarios": [
     {
       "accepted": true,
-      "certificate_json_bytes": 3274,
+      "certificate_json_bytes": 3280,
       "entrypoint": "put(bytes32,uint256)",
       "leaf_steps": 1,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -15,7 +15,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 3278,
+      "certificate_json_bytes": 3276,
       "entrypoint": "put(bytes32,uint256)",
       "leaf_steps": 1,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 1 leaf steps",
@@ -26,7 +26,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 5644,
+      "certificate_json_bytes": 5639,
       "entrypoint": "add(bytes32,uint256)",
       "leaf_steps": 2,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -37,7 +37,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 5641,
+      "certificate_json_bytes": 5643,
       "entrypoint": "add(bytes32,uint256)",
       "leaf_steps": 2,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -48,7 +48,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 12595,
+      "certificate_json_bytes": 12597,
       "entrypoint": "deposit(bytes32,uint256)",
       "leaf_steps": 2,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",
@@ -59,7 +59,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 44231,
+      "certificate_json_bytes": 44226,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "leaf_steps": 6,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 6 leaf steps",
