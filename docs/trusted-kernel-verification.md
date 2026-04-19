@@ -50,8 +50,9 @@ The final paper target is stricter than the current runtime-side TCB:
   confinement argument
 - shrink the confidential Rust surface to a tiny kernel
 - prove the real kernel implementation refines the Lean kernel model
-- prove the non-kernel shell is public-only with respect to the admitted
-  observer
+- keep the proved non-kernel shell public-only interface aligned with the
+  admitted observer while connecting it to the remaining end-to-end
+  confinement argument
 - keep `uo-check`, `mplus-probe`, and any Rust-side translation convenience
   wrappers outside the TCB
 
@@ -107,6 +108,12 @@ Lean now also exposes proof-grade schedule-exactness lemmas for the kernel
 witness, runtime refinement witness, and trusted-kernel bundle: once a
 proof-grade witness is accepted, there is one exact expected public kernel
 schedule and the emitted kernel steps are provably equal to it.
+The shell-boundary layer now packages those exact schedule facts together with
+the exact public object universe, resource-state replay, runtime-phase
+projection, and shell-refinement claim into one theorem-facing
+runtime/kernel-boundary interface on both the runtime and imported JSON sides,
+so downstream confidential-core theorems no longer have to reassemble those
+facts ad hoc.
 
 That schedule is now also packaged explicitly on the Lean side as a
 `RuntimeKernelSchedule` / `ImportedRuntimeKernelSchedule` object derived from

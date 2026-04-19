@@ -371,6 +371,13 @@ The current runtime has a first hardening layer:
   also includes the ordered public runtime-phase event sequence itself so Rust
   and Lean can both check that the summary schedules are honest projections
   and that the event trace replays the public shell contract
+- the runtime and imported Lean paths now also package those exact shell and
+  kernel-side consequences into one `RuntimeProofGradeKernelBoundaryFacts` /
+  `ImportedRuntimeProofGradeKernelBoundaryFacts` theorem-facing interface, so
+  the confidential-core proof route consumes one accepted runtime witness and
+  derives the exact public kernel schedule, object universe, resource replay,
+  runtime-phase projection, and shell refinement from that single packaged
+  boundary theorem rather than re-deriving those facts separately
 - `uo-core` now also exports that theorem-facing shell/kernel interface as a
   direct `RuntimeShellBoundaryBundle`: the proof-grade kernel witness, the
   runtime phase witness, and the explicit exported `RuntimeShellContract` /

@@ -33,8 +33,14 @@ theorem runtimeWitness_proofGradeConfidentialCoreAssurance
       runtimeWitness.runtimeKernelRefinementWitness = some runtimeKernelRefinementWitness ∧
       runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
   rcases hAssured with ⟨hRuntimeValid, kernelWitness, hKernel, hExpectedSteps, hKernelSteps⟩
-  rcases runtimeWitness_proofGradeShellContractRefinement runtimeWitness modelTags hRuntimeValid with
-    ⟨kernelWitness', runtimeKernelRefinementWitness, hKernel', hRefinement, hShellRefines⟩
+  rcases runtimeWitness_proofGradeKernelBoundaryFacts runtimeWitness modelTags hRuntimeValid with
+    ⟨kernelWitness', runtimeKernelRefinementWitness, _expectedKernelSteps,
+      _expectedPublicObjectIds, _expectedKernelSchedule, hKernel', hRefinement,
+      _hWitnessExpectedSteps, _hWitnessKernelSteps, _hExpectedPublicObjectIds,
+      _hPublicObjectIds, _hResourceState, _hExpectedKernelSchedule,
+      _hEmittedKernelSchedule, _hFinalKernelScheduleState,
+      _hProjectedKernelSchedule, _hPreCommittedColdObjectSchedule,
+      _hPostCommittedColdObjectSchedule, hShellRefines⟩
   have hKernelEq : kernelWitness = kernelWitness' := by
     apply Option.some.inj
     exact hKernel.symm.trans hKernel'
@@ -70,8 +76,14 @@ theorem runtimeWitness_proofGradeConfidentialCoreSlotAssurance
       runtimeWitness.runtimeKernelRefinementWitness = some runtimeKernelRefinementWitness ∧
       runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
   rcases hAssured with ⟨hRuntimeValid, kernelWitness, hKernel, hExpectedSteps, hKernelSteps⟩
-  rcases runtimeWitness_proofGradeShellContractRefinement runtimeWitness modelTags hRuntimeValid with
-    ⟨kernelWitness', runtimeKernelRefinementWitness, hKernel', hRefinement, hShellRefines⟩
+  rcases runtimeWitness_proofGradeKernelBoundaryFacts runtimeWitness modelTags hRuntimeValid with
+    ⟨kernelWitness', runtimeKernelRefinementWitness, _expectedKernelSteps,
+      _expectedPublicObjectIds, _expectedKernelSchedule, hKernel', hRefinement,
+      _hWitnessExpectedSteps, _hWitnessKernelSteps, _hExpectedPublicObjectIds,
+      _hPublicObjectIds, _hResourceState, _hExpectedKernelSchedule,
+      _hEmittedKernelSchedule, _hFinalKernelScheduleState,
+      _hProjectedKernelSchedule, _hPreCommittedColdObjectSchedule,
+      _hPostCommittedColdObjectSchedule, hShellRefines⟩
   have hKernelEq : kernelWitness = kernelWitness' := by
     apply Option.some.inj
     exact hKernel.symm.trans hKernel'

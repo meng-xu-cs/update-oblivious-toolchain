@@ -246,7 +246,9 @@ Concrete tasks:
    to a formal Rust-state refinement relation.
 4. Completed in the current proof-grade path: the shell-boundary theorem
    proves that the non-kernel shell refines a public contract over admitted
-   public data.
+   public data, and the proof stack now packages the exact schedule /
+   public-object / resource / shell facts needed downstream through one
+   theorem-facing runtime-kernel boundary interface.
 5. Completed for the Rust/static side: visibility restrictions, wrapper
    elimination, and probe-time confinement assertions now keep secret-bearing
    runtime structures inside the runtime/kernel boundary.
@@ -463,7 +465,9 @@ If implementation resumes immediately, the next concrete sequence should be:
    manipulate secret-bearing runtime structures.
 6. Active next item: prove runtime-kernel refinement for the shared
    DSL/interpreter route.
-7. Active next item: prove that the non-kernel shell is public-only.
+7. Completed: prove that the non-kernel shell is public-only and package that
+   shell contract together with the exact proof-grade boundary facts needed by
+   the confidential-core argument.
 8. Remaining after 6-7: prove source-to-kernel compiler correctness.
 9. Remaining after 8: minimize `PathOramLocalPosmapV1SecurityAssumptions`.
 10. Remaining after 9: close the hostile-host TEE theorem over the frozen

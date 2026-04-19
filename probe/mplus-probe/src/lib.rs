@@ -8197,6 +8197,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         )
         && lean_runtime_shell_boundary_source
             .contains("bundle.shell_trace.Refines bundle.shell_contract");
+    let lean_imported_shell_boundary_kernel_boundary_facts_present =
+        lean_runtime_shell_boundary_source
+            .contains("ImportedRuntimeProofGradeKernelBoundaryFacts")
+            && lean_runtime_shell_boundary_source
+                .contains("theorem importedWitness_proofGradeKernelBoundaryFacts");
     let lean_confidential_core_proof_grade_assurance_present = lean_runtime_confidential_core_source
         .contains("theorem importedRuntimeConfidentialCoreBundle_proofGradeAssurance")
         && lean_runtime_confidential_core_source.contains("kernelWitness.expected_kernel_steps =")
@@ -8206,6 +8211,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_runtime_confidential_core_source.contains(
             "runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract",
         );
+    let lean_confidential_core_reuses_kernel_boundary_facts = lean_runtime_confidential_core_source
+        .contains("importedWitness_proofGradeKernelBoundaryFacts");
     let lean_confidential_core_shell_boundary_slot_exactness_present =
         lean_runtime_confidential_core_shell_boundary_slot_source.contains(
             "bundle.runtime_witness.kernel_witness = some bundle.shell_boundary_bundle.kernel_witness",
@@ -8544,7 +8551,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && confidential_core_bundle_bridge_surface_restricted
         && confidential_core_reuses_shell_boundary_bundle_only
         && lean_shell_boundary_bundle_checks_exact_runtime_views
+        && lean_imported_shell_boundary_kernel_boundary_facts_present
         && lean_confidential_core_proof_grade_assurance_present
+        && lean_confidential_core_reuses_kernel_boundary_facts
         && lean_confidential_core_shell_boundary_slot_exactness_present
         && lean_confidential_core_shell_boundary_lowering_exactness_present
         && trusted_kernel_slot_bundle_bridge_surface_restricted
@@ -8759,8 +8768,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             confidential_core_reuses_shell_boundary_bundle_only,
         "lean_shell_boundary_bundle_checks_exact_runtime_views":
             lean_shell_boundary_bundle_checks_exact_runtime_views,
+        "lean_imported_shell_boundary_kernel_boundary_facts_present":
+            lean_imported_shell_boundary_kernel_boundary_facts_present,
         "lean_confidential_core_proof_grade_assurance_present":
             lean_confidential_core_proof_grade_assurance_present,
+        "lean_confidential_core_reuses_kernel_boundary_facts":
+            lean_confidential_core_reuses_kernel_boundary_facts,
         "lean_confidential_core_shell_boundary_slot_exactness_present":
             lean_confidential_core_shell_boundary_slot_exactness_present,
         "lean_confidential_core_shell_boundary_lowering_exactness_present":

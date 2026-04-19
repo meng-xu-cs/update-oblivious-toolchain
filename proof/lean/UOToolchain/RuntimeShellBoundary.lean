@@ -355,4 +355,110 @@ theorem runtimeWitness_proofGradeShellContractRefinement
           exact ⟨kernelWitness, runtimeKernelRefinementWitness, rfl, rfl,
             runtimeKernelRefinementWitness_valid_refinesShellContract hWitnessValid⟩
 
+/--
+Packaged proof-grade facts for the runtime/kernel boundary. This bundles the
+exact kernel schedule, public object universe, resource-state replay, runtime
+phase projection, and shell-refinement results that the paper-facing argument
+needs from one accepted runtime witness.
+-/
+def RuntimeProofGradeKernelBoundaryFacts
+  (witness : RuntimeRefinementWitness) : Prop :=
+  ∃ kernelWitness runtimeKernelRefinementWitness
+      expectedKernelSteps expectedPublicObjectIds expectedKernelSchedule,
+    witness.kernelWitness = some kernelWitness ∧
+      witness.runtimeKernelRefinementWitness = some runtimeKernelRefinementWitness ∧
+      kernelWitness.expectedKernelSteps = some expectedKernelSteps ∧
+      kernelWitness.kernelSteps = expectedKernelSteps ∧
+      kernelWitness.expectedPublicObjectIds = some expectedPublicObjectIds ∧
+      kernelWitness.publicObjectIds = expectedPublicObjectIds ∧
+      kernelWitness.replayedResourceState? = some kernelWitness.claimedResourceState ∧
+      kernelWitness.expectedKernelSchedule? = some expectedKernelSchedule ∧
+      kernelWitness.emittedKernelSchedule = expectedKernelSchedule ∧
+      expectedKernelSchedule.finalState? =
+        some
+          { phase := .finished
+          , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
+          } ∧
+      runtimeKernelRefinementWitness.projectedKernelSchedule =
+        kernelWitness.emittedKernelSchedule ∧
+      runtimeKernelRefinementWitness.preCommittedColdObjectSchedule =
+        kernelWitness.publicObjectIds ∧
+      runtimeKernelRefinementWitness.postCommittedColdObjectSchedule =
+        kernelWitness.publicObjectIds ∧
+      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract
+
+theorem runtimeWitness_proofGradeKernelBoundaryFacts
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  RuntimeProofGradeKernelBoundaryFacts witness := by
+  rcases runtimeWitness_proofGradeShellContractRefinement witness modelTags hValid with
+    ⟨kernelWitness, runtimeKernelRefinementWitness, hKernel, hRefinement, hShellRefines⟩
+  rcases runtimeWitness_proofGradeKernelSchedule_exact witness modelTags hValid with
+    ⟨kernelWitnessSteps, expectedKernelSteps, hKernelStepsWitness, hExpectedKernelSteps,
+      hKernelSteps⟩
+  have hKernelEqSteps : kernelWitness = kernelWitnessSteps := by
+    simpa [hKernelStepsWitness] using hKernel.symm
+  subst kernelWitnessSteps
+  rcases runtimeWitness_proofGradePublicObjectUniverse_exact witness modelTags hValid with
+    ⟨kernelWitnessPublic, expectedPublicObjectIds, hKernelPublic,
+      hExpectedPublicObjectIds, hPublicObjectIds⟩
+  have hKernelEqPublic : kernelWitness = kernelWitnessPublic := by
+    simpa [hKernelPublic] using hKernel.symm
+  subst kernelWitnessPublic
+  rcases runtimeWitness_proofGradeKernelResourceState_exact witness modelTags hValid with
+    ⟨kernelWitnessResource, hKernelResource, hResourceState⟩
+  have hKernelEqResource : kernelWitness = kernelWitnessResource := by
+    simpa [hKernelResource] using hKernel.symm
+  subst kernelWitnessResource
+  rcases runtimeWitness_proofGradeKernelScheduleObject_exact witness modelTags hValid with
+    ⟨kernelWitnessSchedule, expectedKernelSchedule, hKernelSchedule,
+      hExpectedKernelSchedule, hEmittedKernelSchedule⟩
+  have hKernelEqSchedule : kernelWitness = kernelWitnessSchedule := by
+    simpa [hKernelSchedule] using hKernel.symm
+  subst kernelWitnessSchedule
+  rcases runtimeWitness_proofGradeKernelScheduleObject_finalState_exact
+      witness modelTags hValid with
+    ⟨kernelWitnessFinal, expectedKernelScheduleFinal, hKernelFinal,
+      hExpectedKernelScheduleFinal, hFinalKernelScheduleState⟩
+  have hKernelEqFinal : kernelWitness = kernelWitnessFinal := by
+    simpa [hKernelFinal] using hKernel.symm
+  subst kernelWitnessFinal
+  have hExpectedKernelScheduleEq :
+      expectedKernelSchedule = expectedKernelScheduleFinal := by
+    apply Option.some.inj
+    rw [← hExpectedKernelSchedule, hExpectedKernelScheduleFinal]
+  subst expectedKernelScheduleFinal
+  rcases runtimeWitness_proofGradeRuntimeKernelRefinementProjection_exact
+      witness modelTags hValid with
+    ⟨kernelWitnessProjected, runtimeKernelRefinementWitnessProjected,
+      hKernelProjected, hRefinementProjected, hProjectedKernelSchedule⟩
+  have hKernelEqProjected : kernelWitness = kernelWitnessProjected := by
+    simpa [hKernelProjected] using hKernel.symm
+  subst kernelWitnessProjected
+  have hRefinementEqProjected :
+      runtimeKernelRefinementWitness = runtimeKernelRefinementWitnessProjected := by
+    simpa [hRefinementProjected] using hRefinement.symm
+  subst runtimeKernelRefinementWitnessProjected
+  rcases runtimeWitness_proofGradeRuntimeKernelRefinementBoundaryExact
+      witness modelTags hValid with
+    ⟨kernelWitnessBoundary, runtimeKernelRefinementWitnessBoundary,
+      hKernelBoundary, hRefinementBoundary,
+      hPreCommittedColdObjectSchedule, hPostCommittedColdObjectSchedule⟩
+  have hKernelEqBoundary : kernelWitness = kernelWitnessBoundary := by
+    simpa [hKernelBoundary] using hKernel.symm
+  subst kernelWitnessBoundary
+  have hRefinementEqBoundary :
+      runtimeKernelRefinementWitness = runtimeKernelRefinementWitnessBoundary := by
+    simpa [hRefinementBoundary] using hRefinement.symm
+  subst runtimeKernelRefinementWitnessBoundary
+  exact
+    ⟨kernelWitness, runtimeKernelRefinementWitness, expectedKernelSteps,
+      expectedPublicObjectIds, expectedKernelSchedule, hKernel, hRefinement,
+      hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds,
+      hPublicObjectIds, hResourceState, hExpectedKernelSchedule,
+      hEmittedKernelSchedule, hFinalKernelScheduleState,
+      hProjectedKernelSchedule, hPreCommittedColdObjectSchedule,
+      hPostCommittedColdObjectSchedule, hShellRefines⟩
+
 end UOToolchain
