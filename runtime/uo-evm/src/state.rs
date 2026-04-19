@@ -265,7 +265,7 @@ impl ContractRuntime {
             .commit_public_shadow(kernel, shadow, aborted, recorder)
     }
 
-    pub(crate) fn run_confidential_entrypoint(
+    pub(in crate::runtime) fn run_confidential_entrypoint(
         &mut self,
         entrypoint: &str,
         manifest_entry: &EntrypointManifest,

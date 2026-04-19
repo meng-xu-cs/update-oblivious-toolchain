@@ -1,5 +1,5 @@
 {
-  "accepted": true,
+  "accepted": false,
   "all_kernel_restricted_signatures_present": true,
   "all_restricted_signatures_present": true,
   "all_state_restricted_signatures_present": true,
@@ -138,10 +138,10 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/engine.rs"
+        "runtime/uo-evm/src/theorem.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/engine.rs"
+        "runtime/uo-evm/src/theorem.rs"
       ],
       "pattern": "runtime.run_confidential_entrypoint(",
       "restricted": true
@@ -174,8 +174,8 @@
   "engine_constructs_runtime_phase_events_directly": false,
   "engine_constructs_theorem_certificates_directly": false,
   "engine_defines_fresh_coin_plan_directly": false,
-  "engine_delegates_confidential_execution_to_runtime": true,
-  "engine_delegates_public_execution_to_shell": true,
+  "engine_delegates_confidential_execution_to_runtime_theorem_bridge": true,
+  "engine_delegates_public_execution_to_runtime_theorem_bridge": true,
   "engine_does_not_import_public_runtime_kernel": true,
   "engine_does_not_lower_confidential_program_directly": true,
   "engine_forbidden_helpers_absent": true,
@@ -1218,25 +1218,25 @@
     },
     {
       "boundary": "runtime-only per-call outcome bundle; construction is pinned to runtime.rs, state.rs, and shell.rs through an explicit constructor, state.rs is the only theorem-packaging consumer of its explicit handoff API, and engine.rs does not unpack it directly",
-      "checked": true,
+      "checked": false,
       "name": "RuntimeCallOutcome",
       "owner": "runtime/uo-evm/src/runtime.rs"
     },
     {
       "boundary": "runtime/theorem post-call handoff bundle capturing the after-call hidden witness snapshot plus RuntimeCallOutcome before final execution-trace packaging",
-      "checked": true,
+      "checked": false,
       "name": "TracedRuntimeCallOutcome",
       "owner": "runtime/uo-evm/src/state.rs"
     },
     {
       "boundary": "runtime/theorem pre-call handoff token carrying the hidden committed-state snapshot without exposing the raw snapshot type outside state.rs",
-      "checked": true,
+      "checked": false,
       "name": "TracedRuntimeCallStart",
       "owner": "runtime/uo-evm/src/state.rs"
     },
     {
       "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers, and wiping those hidden witness vectors on drop",
-      "checked": true,
+      "checked": false,
       "name": "TracedRuntimeCallWitnessState",
       "owner": "runtime/uo-evm/src/state.rs"
     },
@@ -1248,7 +1248,7 @@
     },
     {
       "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs, used only to assemble traced-call start/outcome/witness handoff bundles, and wiping its hidden vectors on drop",
-      "checked": true,
+      "checked": false,
       "name": "CommittedRuntimeWitnessSnapshot",
       "owner": "runtime/uo-evm/src/state.rs"
     },
@@ -1271,7 +1271,7 @@
       "owner": "runtime/uo-store/src/codec.rs and runtime/uo-store/src/store.rs"
     }
   ],
-  "runtime_secret_state_inventory_complete": true,
+  "runtime_secret_state_inventory_complete": false,
   "runtime_state_surface_checks": [
     {
       "expected_files": [
@@ -1658,7 +1658,7 @@
   "theorem_certificate_constructor_surface_restricted": true,
   "theorem_finalize_input_fields_private": true,
   "theorem_finalizer_omits_runtime_telemetry": true,
-  "theorem_finalizes_execution_trace": true,
+  "theorem_finalizes_execution_trace": false,
   "theorem_only_runtime_helper_surface_checks": [
     {
       "expected_files": [
@@ -1749,7 +1749,7 @@
     }
   ],
   "theorem_private_surface_restricted": true,
-  "theorem_public_trace_path_avoids_compiled_function": true,
+  "theorem_public_trace_path_avoids_compiled_function": false,
   "theorem_trace_bridge_api_is_compact": true,
   "theorem_trace_bridge_surface_files": [
     "runtime/uo-evm/src/engine.rs",

@@ -1,5 +1,4 @@
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
-use crate::runtime::shell::run_public_entrypoint;
 use crate::runtime::state::ContractRuntime;
 use crate::runtime::theorem::run_traced_call;
 use anyhow::{anyhow, bail, Result};
@@ -107,43 +106,13 @@ impl ContractInstance {
                 args.len()
             );
         }
-        let manifest_entry = self
-            .artifact
-            .contract
-            .manifest
-            .entrypoints
-            .get(entrypoint)
-            .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
-            .clone();
         let finalized = run_traced_call(
             &mut self.state,
             &self.artifact,
-            &function.signature,
-            function.confidential,
+            &function,
             self.deploy_seed,
-            &manifest_entry,
-            &self.artifact.contract.manifest.objects,
             args,
-            |runtime, args, recorder| {
-                if function.confidential {
-                    runtime.run_confidential_entrypoint(
-                        entrypoint,
-                        &manifest_entry,
-                        args,
-                        fresh_coins,
-                        recorder,
-                    )
-                } else {
-                    run_public_entrypoint(
-                        runtime,
-                        &self.artifact.contract,
-                        &function,
-                        &manifest_entry,
-                        args,
-                        recorder,
-                    )
-                }
-            },
+            fresh_coins,
         )?;
         let (return_value, aborted, trace, zero_writes) = finalized.into_engine_result_parts();
         Ok((
@@ -207,8 +176,12 @@ mod tests {
             "engine.rs should hold an opaque runtime wrapper rather than the raw committed state"
         );
         assert!(
-            source.contains("use crate::runtime::shell::run_public_entrypoint;"),
-            "engine.rs should delegate public execution to the runtime-owned public shell module"
+            source.contains("use crate::runtime::theorem::run_traced_call;"),
+            "engine.rs should delegate call execution through the runtime-owned theorem bridge"
+        );
+        assert!(
+            !source.contains("use crate::runtime::shell::run_public_entrypoint;"),
+            "engine.rs should not import the public shell directly once the theorem bridge owns dispatch"
         );
         assert!(
             !source.contains("ConfidentialCallInputs"),
@@ -231,8 +204,16 @@ mod tests {
             "engine.rs should not import the public kernel facade directly once the public and confidential setup paths are delegated"
         );
         assert!(
-            source.contains("run_confidential_entrypoint("),
-            "engine.rs should delegate confidential entrypoint execution to ContractRuntime"
+            source.contains("run_traced_call("),
+            "engine.rs should delegate call execution through run_traced_call"
+        );
+        assert!(
+            !source.contains("run_confidential_entrypoint("),
+            "engine.rs should not dispatch confidential calls directly once the theorem bridge owns runtime branching"
+        );
+        assert!(
+            !source.contains("run_public_entrypoint("),
+            "engine.rs should not dispatch public calls directly once the theorem bridge owns runtime branching"
         );
         assert!(
             !source.contains("prepare_confidential_entrypoint("),

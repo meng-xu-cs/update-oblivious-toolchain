@@ -25,7 +25,7 @@ struct ExecState {
     return_value: Option<Value>,
 }
 
-pub(crate) fn run_public_entrypoint(
+pub(in crate::runtime) fn run_public_entrypoint(
     runtime: &mut ContractRuntime,
     contract: &CompiledContract,
     function: &CompiledFunction,

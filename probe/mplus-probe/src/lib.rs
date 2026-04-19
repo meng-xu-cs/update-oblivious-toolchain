@@ -8995,9 +8995,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
         && !state_source
             .contains("pub(crate) fn ensure_ready_for_call(&self, context: &str) -> Result<()>");
-    let engine_delegates_public_execution_to_shell = engine_impl_source
-        .contains("use crate::runtime::shell::run_public_entrypoint;")
-        && engine_impl_source.contains("run_public_entrypoint(")
+    let engine_delegates_public_execution_to_runtime_theorem_bridge = engine_impl_source
+        .contains("use crate::runtime::theorem::run_traced_call;")
+        && engine_impl_source.contains("run_traced_call(")
+        && !engine_impl_source.contains("use crate::runtime::shell::run_public_entrypoint;")
+        && !engine_impl_source.contains("run_public_entrypoint(")
         && !engine_impl_source.contains("AllocatorPlan::from_manifest(")
         && shell_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
         && !engine_impl_source.contains("fn exec_block(")
@@ -9005,9 +9007,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("fn eval_expr(")
         && !engine_impl_source.contains("fn eval_binary(")
         && !engine_impl_source.contains("fn store_env_value(");
-    let engine_delegates_confidential_execution_to_runtime = engine_impl_source
-        .contains("run_confidential_entrypoint(")
+    let engine_delegates_confidential_execution_to_runtime_theorem_bridge = engine_impl_source
+        .contains("use crate::runtime::theorem::run_traced_call;")
+        && engine_impl_source.contains("run_traced_call(")
+        && !engine_impl_source.contains("run_confidential_entrypoint(")
         && !engine_impl_source.contains("prepare_confidential_entrypoint(")
+        && theorem_source.contains("runtime.run_confidential_entrypoint(")
         && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
     let engine_confidential_manifest_surface_absent = !engine_impl_source
         .contains(".confidential_slot_program")
@@ -9025,7 +9030,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         shell_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
     let public_shell_is_runtime_owned = runtime_evm_lib_source.contains("mod runtime;")
         && !runtime_evm_lib_source.contains("mod shell;")
-        && engine_impl_source.contains("use crate::runtime::shell::run_public_entrypoint;");
+        && theorem_source.contains("use crate::runtime::shell::run_public_entrypoint;");
     let theorem_bridge_is_runtime_owned = runtime_evm_lib_source.contains("mod runtime;")
         && !runtime_evm_lib_source.contains("mod theorem;")
         && engine_impl_source.contains("use crate::runtime::theorem::run_traced_call;");
@@ -9047,7 +9052,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("PublicCallSummary::from_manifest_entry");
     let engine_keeps_confidential_call_inputs_inside_runtime = !engine_impl_source
         .contains("ConfidentialCallInputs::from_manifest_entry")
-        && engine_impl_source.contains("runtime.run_confidential_entrypoint(")
+        && theorem_source.contains("runtime.run_confidential_entrypoint(")
         && !state_source.contains("ConfidentialCallInputs")
         && kernel_source
             .contains("let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);")
@@ -9796,9 +9801,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let runtime_call_outcome_surface_restricted =
         runtime_call_outcome_surface_files == expected_runtime_call_outcome_surface_files;
     let runtime_call_outcome_runtime_private = runtime_module_source
-        .contains("pub(crate) struct RuntimeCallOutcome")
+        .contains("pub(in crate::runtime) struct RuntimeCallOutcome")
+        && !runtime_module_source.contains("pub(crate) struct RuntimeCallOutcome")
         && !runtime_module_source.contains("pub struct RuntimeCallOutcome");
-    let runtime_call_outcome_decl = "pub(crate) struct RuntimeCallOutcome";
+    let runtime_call_outcome_decl = "pub(in crate::runtime) struct RuntimeCallOutcome";
     let runtime_call_outcome_derive_line = runtime_module_source
         .split(runtime_call_outcome_decl)
         .next()
@@ -9819,8 +9825,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !runtime_module_source.contains("pub return_value:")
         && !runtime_module_source.contains("pub opcode_trace:");
     let runtime_call_outcome_api_is_explicit = runtime_module_source
-        .contains("pub(crate) fn from_runtime_execution(")
-        && runtime_module_source.contains("pub(crate) fn into_theorem_trace_parts(")
+        .contains("pub(in crate::runtime) fn from_runtime_execution(")
+        && runtime_module_source.contains("pub(in crate::runtime) fn into_theorem_trace_parts(")
         && !runtime_module_source.contains("pub fn from_runtime_execution(");
     let runtime_call_outcome_constructor_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "from_runtime_execution(")?;
@@ -10456,7 +10462,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         ),
         (
             "runtime.run_confidential_entrypoint(",
-            vec![String::from("runtime/uo-evm/src/engine.rs")],
+            vec![String::from("runtime/uo-evm/src/theorem.rs")],
         ),
     ]
     .into_iter()
@@ -11008,9 +11014,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_uses_opaque_committed_state": engine_uses_opaque_committed_state,
         "engine_uses_runtime_public_object_universe":
             engine_uses_runtime_public_object_universe,
-        "engine_delegates_public_execution_to_shell": engine_delegates_public_execution_to_shell,
-        "engine_delegates_confidential_execution_to_runtime":
-            engine_delegates_confidential_execution_to_runtime,
+        "engine_delegates_public_execution_to_runtime_theorem_bridge":
+            engine_delegates_public_execution_to_runtime_theorem_bridge,
+        "engine_delegates_confidential_execution_to_runtime_theorem_bridge":
+            engine_delegates_confidential_execution_to_runtime_theorem_bridge,
         "engine_confidential_manifest_surface_absent":
             engine_confidential_manifest_surface_absent,
         "engine_does_not_import_public_runtime_kernel":
@@ -11411,8 +11418,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "accepted": engine_forbidden_helpers_absent
             && engine_uses_opaque_committed_state
             && engine_uses_runtime_public_object_universe
-            && engine_delegates_public_execution_to_shell
-            && engine_delegates_confidential_execution_to_runtime
+            && engine_delegates_public_execution_to_runtime_theorem_bridge
+            && engine_delegates_confidential_execution_to_runtime_theorem_bridge
             && engine_confidential_manifest_surface_absent
             && engine_does_not_import_public_runtime_kernel
             && shell_uses_shadow_wrapper
@@ -13293,8 +13300,10 @@ secret-bearing paths are not directly callable from `engine.rs`. The
 confidential-path `RuntimeKernel` entrypoints that shadow-load committed
 state, run confidential calls, and commit public shadows are now likewise
 visibility-restricted to `crate::runtime`, so the generic shell cannot call
-those kernel hooks directly. `engine.rs` now delegates public execution to
-`shell.rs` and confidential execution to `state.rs`; confidential
+those kernel hooks directly. `engine.rs` now delegates the full traced-call
+execution path to `runtime/uo-evm/src/theorem.rs`, and that theorem bridge in
+turn dispatches public execution to `shell.rs` and confidential execution to
+`state.rs`; confidential
 manifest-to-kernel planning is now fully internal to `ContractRuntime`, so
 `engine.rs` no longer stages a `ConfidentialEntrypointPlan`, imports either
 the raw `RuntimeKernel` or the public kernel facade directly, or threads the
@@ -13324,9 +13333,11 @@ call the low-level runtime object helpers, that those helpers remain
 restricted to `crate::runtime`, that `RuntimeObject` itself is not `Clone`,
 that `ContractInstance::clone` goes through the cold committed-state clone
 path, that `engine.rs` now holds only an opaque `ContractRuntime` wrapper and
-delegates the entire public-call lifecycle to `shell.rs`, that `shell.rs`
-itself stays on the `PublicRuntimeKernel` plus `PublicRuntimeShadowState`
-side of the boundary while the confidential path uses its own
+delegates the entire traced-call lifecycle through
+`runtime/uo-evm/src/theorem.rs`, that the runtime-owned theorem bridge then
+dispatches public execution to `shell.rs` and confidential execution to
+`state.rs`, that `shell.rs` itself stays on the `PublicRuntimeKernel` plus
+`PublicRuntimeShadowState` side of the boundary while the confidential path uses its own
 `ConfidentialRuntimeShadowState` wrapper instead of reusing the public shadow
 handle, and that `engine.rs` no longer constructs runtime phase-witness
 events directly because the post-call phase tail is finalized
@@ -13391,9 +13402,9 @@ through explicit wrapper operations rather than raw `inner_mut` /
 `runtime/uo-evm/src/state.rs`, that `RuntimeShadowState` and
 `ConfidentialRuntimeShadowState` remain runtime-only while the shell-visible
 handle stays `PublicRuntimeShadowState`, that only `shell.rs` may drive the
-top-level `ContractRuntime` public-shadow entrypoints while only `engine.rs`
-may call `runtime.run_confidential_entrypoint(...)`, and that confidential
-entrypoints
+top-level `ContractRuntime` public-shadow entrypoints while only
+`runtime/uo-evm/src/theorem.rs` may call
+`runtime.run_confidential_entrypoint(...)`, and that confidential entrypoints
 are sourced from the checked manifest's `confidential_slot_program` in
 `runtime/uo-evm/src/state.rs` while that module delegates confidential
 execution through `runtime/uo-evm/src/kernel.rs`, enforces the

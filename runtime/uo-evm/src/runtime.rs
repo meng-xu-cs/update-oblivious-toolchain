@@ -19,7 +19,7 @@ pub(crate) mod theorem;
 use uo_core::{RuntimeKernelRefinementWitness, RuntimeKernelWitness, Value};
 
 #[derive(Debug)]
-pub(crate) struct RuntimeCallOutcome {
+pub(in crate::runtime) struct RuntimeCallOutcome {
     runtime_kernel_witness: RuntimeKernelWitness,
     runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
     aborted: bool,
@@ -28,7 +28,7 @@ pub(crate) struct RuntimeCallOutcome {
 }
 
 impl RuntimeCallOutcome {
-    pub(crate) fn from_runtime_execution(
+    pub(in crate::runtime) fn from_runtime_execution(
         runtime_kernel_witness: RuntimeKernelWitness,
         runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
         aborted: bool,
@@ -44,7 +44,7 @@ impl RuntimeCallOutcome {
         }
     }
 
-    pub(crate) fn into_theorem_trace_parts(
+    pub(in crate::runtime) fn into_theorem_trace_parts(
         self,
     ) -> (
         RuntimeKernelWitness,

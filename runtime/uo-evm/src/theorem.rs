@@ -1,10 +1,12 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
+use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
+use crate::runtime::shell::run_public_entrypoint;
 use crate::runtime::state::{
     ContractRuntime, TracedRuntimeCallOutcome, TracedRuntimeCallStart,
     TracedRuntimeCallWitnessState,
 };
-use crate::runtime::RuntimeCallOutcome;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use uo_core::ir::CompiledFunction;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, OutputShape, RuntimeControllerObserverCertificate,
@@ -81,31 +83,48 @@ impl FinalizedCallTrace {
     }
 }
 
-pub(crate) fn run_traced_call<F>(
+pub(crate) fn run_traced_call(
     runtime: &mut ContractRuntime,
     artifact: &CompiledArtifact,
-    entrypoint: &str,
-    confidential: bool,
+    function: &CompiledFunction,
     deploy_seed: u64,
-    manifest_entry: &EntrypointManifest,
-    manifest_objects: &[StateObjectManifest],
     args: Vec<Value>,
-    execute: F,
-) -> Result<FinalizedCallTrace>
-where
-    F: FnOnce(&mut ContractRuntime, Vec<Value>, &mut CallRecorder) -> Result<RuntimeCallOutcome>,
-{
-    let mut context = begin_call_trace(&*runtime, entrypoint, manifest_entry, &args)?;
-    let call_outcome = execute(runtime, args, context.recorder_mut())?;
+    fresh_coins: Option<PathOramFreshCoinPlan>,
+) -> Result<FinalizedCallTrace> {
+    let manifest_entry = artifact
+        .contract
+        .manifest
+        .entrypoints
+        .get(&function.signature)
+        .ok_or_else(|| anyhow!("manifest entry missing for {}", function.signature))?;
+    let mut context = begin_call_trace(&*runtime, &function.signature, manifest_entry, &args)?;
+    let call_outcome = if function.confidential {
+        runtime.run_confidential_entrypoint(
+            &function.signature,
+            manifest_entry,
+            args,
+            fresh_coins,
+            context.recorder_mut(),
+        )?
+    } else {
+        run_public_entrypoint(
+            runtime,
+            &artifact.contract,
+            function,
+            manifest_entry,
+            args,
+            context.recorder_mut(),
+        )?
+    };
     let traced_outcome = runtime.finish_traced_call(call_outcome)?;
     finalize_call_trace(FinalizeCallTraceInput {
         context,
         artifact,
-        entrypoint,
-        confidential,
+        entrypoint: &function.signature,
+        confidential: function.confidential,
         deploy_seed,
         manifest_entry,
-        manifest_objects,
+        manifest_objects: &artifact.contract.manifest.objects,
         traced_outcome,
     })
 }
