@@ -8351,16 +8351,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let state_path = root.join("runtime/uo-evm/src/state.rs");
     let controller_path = root.join("runtime/uo-evm/src/controller.rs");
     let theorem_path = root.join("runtime/uo-evm/src/theorem.rs");
+    let main_path = root.join("runtime/uo-evm/src/main.rs");
     let probe_path = root.join("probe/mplus-probe/src/lib.rs");
     let allocator_path = root.join("runtime/uo-allocator/src/lib.rs");
     let store_codec_path = root.join("runtime/uo-store/src/codec.rs");
     let store_store_path = root.join("runtime/uo-store/src/store.rs");
     let checker_path = root.join("checker/uo-check/src/lib.rs");
     let core_trace_path = root.join("crates/uo-core/src/trace.rs");
+    let core_trusted_kernel_path = root.join("crates/uo-core/src/trusted_kernel.rs");
     let runtime_module_path = root.join("runtime/uo-evm/src/runtime.rs");
     let runtime_evm_lib_path = root.join("runtime/uo-evm/src/lib.rs");
     let runtime_evm_cargo_path = root.join("runtime/uo-evm/Cargo.toml");
     let probe_cargo_path = root.join("probe/mplus-probe/Cargo.toml");
+    let trusted_kernel_checker_path =
+        root.join("proof/lean/CheckProofGradeRuntimeTrustedKernel.lean");
     let runtime_evm_src = root.join("runtime/uo-evm/src");
     let allocator_src = root.join("runtime/uo-allocator/src");
     let store_src = root.join("runtime/uo-store/src");
@@ -8383,10 +8387,21 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&controller_path)))?;
     let theorem_source = fs::read_to_string(&theorem_path)
         .with_context(|| format!("reading {}", display_report_path(&theorem_path)))?;
+    let main_source = fs::read_to_string(&main_path)
+        .with_context(|| format!("reading {}", display_report_path(&main_path)))?;
     let probe_source = fs::read_to_string(&probe_path)
         .with_context(|| format!("reading {}", display_report_path(&probe_path)))?;
     let allocator_source = fs::read_to_string(&allocator_path)
         .with_context(|| format!("reading {}", display_report_path(&allocator_path)))?;
+    let core_trusted_kernel_source = fs::read_to_string(&core_trusted_kernel_path)
+        .with_context(|| format!("reading {}", display_report_path(&core_trusted_kernel_path)))?;
+    let trusted_kernel_checker_source = fs::read_to_string(&trusted_kernel_checker_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&trusted_kernel_checker_path)
+            )
+        })?;
     let extract_metrics_start = probe_source
         .rfind("\nfn extract_metrics(")
         .ok_or_else(|| anyhow!("failed to locate extract_metrics in mplus-probe"))?
@@ -9456,6 +9471,18 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source
             .contains("allocator.max_kernel_ops = manifest_expected_kernel_steps.len();")
         && state_source.contains("expected_kernel_steps: manifest_expected_kernel_steps,");
+    let trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program =
+        core_trusted_kernel_source.contains("pub fn runtime_trusted_kernel_slot_bundle(")
+            && core_trusted_kernel_source.contains("manifest_entry")
+            && core_trusted_kernel_source.contains(".confidential_slot_program");
+    let trusted_kernel_cli_uses_slot_bundle =
+        main_source.contains("trace.runtime_trusted_kernel_slot_bundle(&artifact)?");
+    let trusted_kernel_probe_uses_slot_bundle = probe_source.contains(
+        "let trusted_kernel_bundle = trace.runtime_trusted_kernel_slot_bundle(&artifact)?;",
+    ) && probe_source
+        .contains("let bundle = trace.runtime_trusted_kernel_slot_bundle(artifact)?;");
+    let trusted_kernel_checker_uses_slot_bundle = trusted_kernel_checker_source
+        .contains("loadAndCheckImportedProofGradeRuntimeTrustedKernelSlotBundle");
     let runtime_phase_event_constructor_files =
         collect_production_pattern_hits(&runtime_evm_src, "RuntimeKernelRefinementEventWitness::")?;
     let expected_runtime_phase_event_constructor_files = vec![
@@ -10394,6 +10421,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             allocator_uses_manifest_kernel_step_budget,
         "state_uses_checked_manifest_kernel_schedule":
             state_uses_checked_manifest_kernel_schedule,
+        "trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program":
+            trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program,
+        "trusted_kernel_cli_uses_slot_bundle":
+            trusted_kernel_cli_uses_slot_bundle,
+        "trusted_kernel_probe_uses_slot_bundle":
+            trusted_kernel_probe_uses_slot_bundle,
+        "trusted_kernel_checker_uses_slot_bundle":
+            trusted_kernel_checker_uses_slot_bundle,
         "runtime_phase_event_constructor_files": runtime_phase_event_constructor_files,
         "runtime_phase_event_constructor_surface_restricted":
             runtime_phase_event_constructor_surface_restricted,
@@ -10539,6 +10574,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && kernel_witness_validation_tracks_confidential_kernel_lowering_errors
             && allocator_uses_manifest_kernel_step_budget
             && state_uses_checked_manifest_kernel_schedule
+            && trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program
+            && trusted_kernel_cli_uses_slot_bundle
+            && trusted_kernel_probe_uses_slot_bundle
+            && trusted_kernel_checker_uses_slot_bundle
             && runtime_phase_event_constructor_surface_restricted
             && resource_event_constructor_surface_restricted
             && state_only_runtime_helper_surface_restricted
@@ -12379,6 +12418,14 @@ through the theorem-side `run_traced_call(...)` bridge rather than by
 `theorem.rs` handoff; the same theorem-side context now also owns the public
 `PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer constructs
 those theorem-path objects directly. The same report also checks that the
+proof-grade trusted-kernel path itself stays on the stronger slot-wrapped
+artifact: `crates/uo-core/src/trusted_kernel.rs` must source the admitted
+`confidential_slot_program` from the checked manifest, `uo-evm --format
+trusted-kernel` must emit `runtime_trusted_kernel_slot_bundle`, the probe's
+trusted-kernel validator must validate that same slot-wrapped artifact, and
+`CheckProofGradeRuntimeTrustedKernel.lean` must load the corresponding slot
+bundle checker path rather than the older bare trusted-kernel bundle loader.
+The same report also checks that the
 confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to
 `crate::runtime`, that the confidential shadow-load helper itself stays

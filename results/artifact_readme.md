@@ -119,6 +119,14 @@ through the theorem-side `run_traced_call(...)` bridge rather than by
 `theorem.rs` handoff; the same theorem-side context now also owns the public
 `PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer constructs
 those theorem-path objects directly. The same report also checks that the
+proof-grade trusted-kernel path itself stays on the stronger slot-wrapped
+artifact: `crates/uo-core/src/trusted_kernel.rs` must source the admitted
+`confidential_slot_program` from the checked manifest, `uo-evm --format
+trusted-kernel` must emit `runtime_trusted_kernel_slot_bundle`, the probe's
+trusted-kernel validator must validate that same slot-wrapped artifact, and
+`CheckProofGradeRuntimeTrustedKernel.lean` must load the corresponding slot
+bundle checker path rather than the older bare trusted-kernel bundle loader.
+The same report also checks that the
 confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to
 `crate::runtime`, that the confidential shadow-load helper itself stays

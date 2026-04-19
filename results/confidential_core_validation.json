@@ -20,7 +20,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 4394,
+      "confidential_core_bundle_json_bytes": 4395,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "FixedSlotClassifier",
@@ -440,7 +440,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 9882,
+      "confidential_core_bundle_json_bytes": 9883,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -852,7 +852,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 9882,
+      "confidential_core_bundle_json_bytes": 9883,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -1264,7 +1264,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 7752,
+      "confidential_core_bundle_json_bytes": 7751,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "RegistryCRUD",
@@ -1642,7 +1642,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 7751,
+      "confidential_core_bundle_json_bytes": 7752,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "RegistryCRUD",
@@ -2014,467 +2014,6 @@
         }
       },
       "scenario": "RegistryCRUD/uo/class1",
-      "setup_calls": 0,
-      "shared_resource_events": 3
-    },
-    {
-      "accepted": true,
-      "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 10788,
-      "confidential_fragment_witness": {
-        "accepted": true,
-        "contract": "ConfidentialMixer",
-        "entrypoint": {
-          "accepted": true,
-          "array_index_count": 0,
-          "entrypoint_id": "deposit(bytes32,uint256)",
-          "non_branchless_select_arm_count": 0,
-          "select_count": 0,
-          "struct_field_count": 0
-        },
-        "entrypoint_count": 2
-      },
-      "confidential_program": {
-        "entrypoint_id": "deposit(bytes32,uint256)",
-        "expected_runtime_step_count": 7,
-        "matches_runtime_entrypoint": true,
-        "param_count": 2,
-        "secret_arg_count": 2,
-        "statement_count": 3
-      },
-      "controller_accesses": 0,
-      "controller_phase_count": 3,
-      "entrypoint": "deposit(bytes32,uint256)",
-      "exit_events": 4,
-      "gas_used": 16384,
-      "kernel_witness": {
-        "canonical_loaded_object_schedule": [
-          1,
-          2
-        ],
-        "claimed_resource_state": {
-          "hash_scratch": {
-            "live_bytes": 0,
-            "peak_bytes": 0,
-            "wipe_count": 1
-          },
-          "io_scratch": {
-            "live_bytes": 0,
-            "peak_bytes": 65,
-            "wipe_count": 19
-          },
-          "peak_stack_words": 3,
-          "value_scratch": {
-            "live_bytes": 0,
-            "peak_bytes": 32,
-            "wipe_count": 4
-          }
-        },
-        "entrypoint": "deposit(bytes32,uint256)",
-        "expected_kernel_step_public_object_schedule": [
-          1,
-          1,
-          2,
-          2
-        ],
-        "expected_public_object_universe": [
-          1,
-          2
-        ],
-        "hash_scratch_peak_bytes": 0,
-        "hash_scratch_wipe_count": 1,
-        "io_scratch_peak_bytes": 65,
-        "io_scratch_wipe_count": 19,
-        "kernel_op_count": 7,
-        "kernel_step_public_object_schedule": [
-          1,
-          1,
-          2,
-          2
-        ],
-        "peak_stack_words": 3,
-        "present": true,
-        "public_object_universe": [
-          1,
-          2
-        ],
-        "resource_event_count": 48,
-        "resource_events": [
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 65,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "hash_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          }
-        ],
-        "shell_contract": {
-          "canonical_loaded_object_schedule": [
-            1,
-            2
-          ],
-          "kernel_step_public_object_schedule": [
-            1,
-            1,
-            2,
-            2
-          ],
-          "public_object_universe": [
-            1,
-            2
-          ]
-        },
-        "value_scratch_peak_bytes": 32,
-        "value_scratch_wipe_count": 4
-      },
-      "lean_stdout": "validated proof-grade runtime confidential core for deposit(bytes32,uint256)",
-      "page_trace_events": 0,
-      "runtime_kernel_refinement_witness": {
-        "boundary_cold_object_schedules_complete": true,
-        "canonical_loaded_object_schedule": [
-          1,
-          2
-        ],
-        "cold_store_object_schedule": [
-          1,
-          2
-        ],
-        "commit_object_schedule": [
-          1,
-          2
-        ],
-        "committed_equals_cold_stored": true,
-        "event_count": 17,
-        "loaded_equals_cold_stored": true,
-        "loaded_equals_committed": true,
-        "matches_canonical_kernel_object_schedule": true,
-        "matches_public_object_universe_post_boundary": true,
-        "matches_public_object_universe_pre_boundary": true,
-        "post_committed_cold_object_schedule": [
-          1,
-          2
-        ],
-        "pre_committed_cold_object_schedule": [
-          1,
-          2
-        ],
-        "present": true,
-        "projected_kernel_step_count": 7,
-        "projected_kernel_step_public_object_schedule": [
-          1,
-          1,
-          2,
-          2
-        ],
-        "projection_matches_kernel_witness": true,
-        "public_object_universe": [
-          1,
-          2
-        ],
-        "refines_shell_contract": true,
-        "shadow_load_object_schedule": [
-          1,
-          2
-        ],
-        "shell_contract": {
-          "canonical_loaded_object_schedule": [
-            1,
-            2
-          ],
-          "kernel_step_public_object_schedule": [
-            1,
-            1,
-            2,
-            2
-          ],
-          "public_object_universe": [
-            1,
-            2
-          ]
-        }
-      },
-      "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
       "shared_resource_events": 3
     },
@@ -2935,6 +2474,467 @@
           ]
         }
       },
+      "scenario": "ConfidentialMixer/fullscan/class0",
+      "setup_calls": 0,
+      "shared_resource_events": 3
+    },
+    {
+      "accepted": true,
+      "boundary_events": 2,
+      "confidential_core_bundle_json_bytes": 10788,
+      "confidential_fragment_witness": {
+        "accepted": true,
+        "contract": "ConfidentialMixer",
+        "entrypoint": {
+          "accepted": true,
+          "array_index_count": 0,
+          "entrypoint_id": "deposit(bytes32,uint256)",
+          "non_branchless_select_arm_count": 0,
+          "select_count": 0,
+          "struct_field_count": 0
+        },
+        "entrypoint_count": 2
+      },
+      "confidential_program": {
+        "entrypoint_id": "deposit(bytes32,uint256)",
+        "expected_runtime_step_count": 7,
+        "matches_runtime_entrypoint": true,
+        "param_count": 2,
+        "secret_arg_count": 2,
+        "statement_count": 3
+      },
+      "controller_accesses": 0,
+      "controller_phase_count": 3,
+      "entrypoint": "deposit(bytes32,uint256)",
+      "exit_events": 4,
+      "gas_used": 16384,
+      "kernel_witness": {
+        "canonical_loaded_object_schedule": [
+          1,
+          2
+        ],
+        "claimed_resource_state": {
+          "hash_scratch": {
+            "live_bytes": 0,
+            "peak_bytes": 0,
+            "wipe_count": 1
+          },
+          "io_scratch": {
+            "live_bytes": 0,
+            "peak_bytes": 65,
+            "wipe_count": 19
+          },
+          "peak_stack_words": 3,
+          "value_scratch": {
+            "live_bytes": 0,
+            "peak_bytes": 32,
+            "wipe_count": 4
+          }
+        },
+        "entrypoint": "deposit(bytes32,uint256)",
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "hash_scratch_peak_bytes": 0,
+        "hash_scratch_wipe_count": 1,
+        "io_scratch_peak_bytes": 65,
+        "io_scratch_wipe_count": 19,
+        "kernel_op_count": 7,
+        "kernel_step_public_object_schedule": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "peak_stack_words": 3,
+        "present": true,
+        "public_object_universe": [
+          1,
+          2
+        ],
+        "resource_event_count": 48,
+        "resource_events": [
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 32,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "stack_check",
+            "region": null,
+            "words": 1
+          },
+          {
+            "bytes": null,
+            "kind": "stack_check",
+            "region": null,
+            "words": 2
+          },
+          {
+            "bytes": 32,
+            "kind": "reserve_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "stack_check",
+            "region": null,
+            "words": 3
+          },
+          {
+            "bytes": 32,
+            "kind": "reserve_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": 32,
+            "kind": "reserve_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 65,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 32,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "hash_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          }
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "value_scratch_peak_bytes": 32,
+        "value_scratch_wipe_count": 4
+      },
+      "lean_stdout": "validated proof-grade runtime confidential core for deposit(bytes32,uint256)",
+      "page_trace_events": 0,
+      "runtime_kernel_refinement_witness": {
+        "boundary_cold_object_schedules_complete": true,
+        "canonical_loaded_object_schedule": [
+          1,
+          2
+        ],
+        "cold_store_object_schedule": [
+          1,
+          2
+        ],
+        "commit_object_schedule": [
+          1,
+          2
+        ],
+        "committed_equals_cold_stored": true,
+        "event_count": 17,
+        "loaded_equals_cold_stored": true,
+        "loaded_equals_committed": true,
+        "matches_canonical_kernel_object_schedule": true,
+        "matches_public_object_universe_post_boundary": true,
+        "matches_public_object_universe_pre_boundary": true,
+        "post_committed_cold_object_schedule": [
+          1,
+          2
+        ],
+        "pre_committed_cold_object_schedule": [
+          1,
+          2
+        ],
+        "present": true,
+        "projected_kernel_step_count": 7,
+        "projected_kernel_step_public_object_schedule": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "projection_matches_kernel_witness": true,
+        "public_object_universe": [
+          1,
+          2
+        ],
+        "refines_shell_contract": true,
+        "shadow_load_object_schedule": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "public_object_universe": [
+            1,
+            2
+          ]
+        }
+      },
       "scenario": "ConfidentialMixer/fullscan/class1",
       "setup_calls": 0,
       "shared_resource_events": 3
@@ -2942,7 +2942,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 12671,
+      "confidential_core_bundle_json_bytes": 12672,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -3555,7 +3555,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 12671,
+      "confidential_core_bundle_json_bytes": 12672,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -4168,7 +4168,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_bundle_json_bytes": 16442,
+      "confidential_core_bundle_json_bytes": 16437,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -4966,7 +4966,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_bundle_json_bytes": 16442,
+      "confidential_core_bundle_json_bytes": 16438,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5764,7 +5764,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_bundle_json_bytes": 23725,
+      "confidential_core_bundle_json_bytes": 23724,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -6765,7 +6765,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_bundle_json_bytes": 23725,
+      "confidential_core_bundle_json_bytes": 23726,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -7766,7 +7766,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_bundle_json_bytes": 60188,
+      "confidential_core_bundle_json_bytes": 60196,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -10507,7 +10507,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_bundle_json_bytes": 193967,
+      "confidential_core_bundle_json_bytes": 193963,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",

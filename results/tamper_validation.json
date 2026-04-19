@@ -61,7 +61,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 3277,
+      "artifact_json_bytes": 3279,
       "artifact_kind": "runtime_path_oram_hidden_certificate",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -180,7 +180,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16283,
+      "artifact_json_bytes": 16285,
       "artifact_kind": "proofgrade_runtime_confidential_core_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -194,7 +194,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16221,
+      "artifact_json_bytes": 16223,
       "artifact_kind": "proofgrade_runtime_confidential_core_slot_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -208,7 +208,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16589,
+      "artifact_json_bytes": 16591,
       "artifact_kind": "proofgrade_runtime_confidential_core_lowering_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -222,7 +222,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 27194,
+      "artifact_json_bytes": 27196,
       "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_lowering_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -236,7 +236,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 26826,
+      "artifact_json_bytes": 26828,
       "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_slot_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -250,7 +250,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16052,
+      "artifact_json_bytes": 16054,
       "artifact_kind": "proofgrade_runtime_refinement_witness",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -262,7 +262,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 15849,
+      "artifact_json_bytes": 15851,
       "artifact_kind": "proofgrade_runtime_trusted_kernel_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",

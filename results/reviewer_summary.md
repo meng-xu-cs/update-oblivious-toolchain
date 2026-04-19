@@ -4,37 +4,37 @@
 
 | Report | Milliseconds |
 | --- | ---: |
-| `total_probe_ms` | `147919` |
-| `canonical_pathoram_pair_validation` | `56757` |
-| `fresh_coin_validation` | `13763` |
-| `tamper_validation` | `10573` |
-| `pathoram_pair_validation` | `6043` |
-| `seeded_witness_validation` | `3117` |
-| `confidential_core_shell_boundary_slot_validation` | `3111` |
-| `kernel_dsl_validation` | `2994` |
-| `confidential_core_slot_validation` | `2981` |
-| `confidential_core_shell_boundary_lowering_validation` | `2973` |
-| `kernel_lowering_validation` | `2904` |
-| `shell_boundary_slot_validation` | `2868` |
-| `shell_boundary_validation` | `2867` |
-| `kernel_slot_dsl_validation` | `2788` |
-| `kernel_validation` | `2775` |
-| `trusted_kernel_validation` | `2720` |
-| `confidential_core_lowering_validation` | `2713` |
-| `confidential_core_validation` | `2713` |
-| `controller_observer_validation` | `2713` |
-| `kernel_refinement_validation` | `2690` |
-| `shell_boundary_lowering_validation` | `2646` |
-| `leakage_auc` | `2575` |
-| `mutual_information` | `2570` |
-| `trace_equivalence` | `2567` |
-| `pathoram_hidden_validation` | `2239` |
-| `witness_validation` | `1839` |
-| `static_checks` | `1585` |
-| `correctness` | `1235` |
-| `runtime_boundary_validation` | `295` |
+| `total_probe_ms` | `147469` |
+| `canonical_pathoram_pair_validation` | `56705` |
+| `fresh_coin_validation` | `13681` |
+| `tamper_validation` | `10191` |
+| `pathoram_pair_validation` | `6046` |
+| `seeded_witness_validation` | `3126` |
+| `confidential_core_shell_boundary_lowering_validation` | `3001` |
+| `confidential_core_shell_boundary_slot_validation` | `2943` |
+| `confidential_core_lowering_validation` | `2929` |
+| `kernel_lowering_validation` | `2920` |
+| `trusted_kernel_validation` | `2912` |
+| `kernel_validation` | `2908` |
+| `kernel_refinement_validation` | `2887` |
+| `kernel_dsl_validation` | `2879` |
+| `shell_boundary_validation` | `2848` |
+| `controller_observer_validation` | `2825` |
+| `shell_boundary_lowering_validation` | `2819` |
+| `kernel_slot_dsl_validation` | `2817` |
+| `shell_boundary_slot_validation` | `2732` |
+| `trace_equivalence` | `2723` |
+| `confidential_core_validation` | `2702` |
+| `confidential_core_slot_validation` | `2690` |
+| `leakage_auc` | `2506` |
+| `mutual_information` | `2506` |
+| `pathoram_hidden_validation` | `1956` |
+| `witness_validation` | `1837` |
+| `static_checks` | `1607` |
+| `correctness` | `1212` |
+| `runtime_boundary_validation` | `282` |
 | `overheads` | `115` |
-| `kernel_model_alignment_validation` | `4` |
+| `kernel_model_alignment_validation` | `3` |
 | `confidential_fragment_validation` | `0` |
 
 ## Largest Materialized Artifacts
@@ -53,14 +53,14 @@
 | `pathoram_pair_validation.scenarios[2].certificate_json_bytes` | `498341` |
 | `canonical_pathoram_pair_validation.scenarios[3].theorem_input_json_bytes` | `468944` |
 | `pathoram_pair_validation.scenarios[1].certificate_json_bytes` | `379834` |
-| `confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes` | `297463` |
-| `confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes` | `295547` |
+| `confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes` | `297480` |
+| `confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes` | `295537` |
 | `tamper_validation.scenarios[21].artifact_json_bytes` | `262697` |
 | `pathoram_pair_validation.scenarios[0].certificate_json_bytes` | `262696` |
 | `seeded_witness_validation.scenarios[2].witness_family_json_bytes` | `237521` |
-| `confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes` | `195534` |
-| `confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes` | `193967` |
-| `confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes` | `193600` |
+| `confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes` | `195543` |
+| `confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes` | `193963` |
+| `confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes` | `193605` |
 
 ## Largest Estimated Artifacts
 
