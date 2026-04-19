@@ -144,7 +144,11 @@ Status labels:
   `probe/mplus-probe/src/lib.rs`,
   `scripts/run_validation.sh`.
   The default Lean build materializes the runtime-witness and certificate
-  checkers, and the probe runs the corresponding validation reports.
+  checkers, and the probe runs the corresponding validation reports. The probe
+  now also emits `tamper_validation.json`, which mutates representative direct
+  controller/hidden certificates plus every proof-grade translation/runtime
+  bridge artifact and checks that the shipped Lean executables reject those
+  semantically drifted but still parseable artifacts end to end.
 
 - `cleared` Provide a dedicated bridge-validation report rather than forcing
   users to infer bridge status from the full probe bundle.
@@ -154,7 +158,9 @@ Status labels:
   `scripts/run_bridge_validation.sh`.
   The repo now has a focused `bridge_validation.json` path that runs
   translation validation plus the controller / hidden / kernel /
-  kernel-refinement / trusted-kernel / witness bridge reports.
+  kernel-refinement / trusted-kernel / witness bridge reports, and the
+  companion `tamper_validation.json` report shows that those theorem-facing
+  artifacts are rejected when their key proof-relevant fields are tampered.
 
 - `optional` The paper-main theorem provenance step is tracked separately in
   `docs/paper-main-theorem-checklist.md`: supply or cite an external

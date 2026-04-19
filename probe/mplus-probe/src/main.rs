@@ -27,6 +27,7 @@ enum ReportKind {
     KernelValidation,
     KernelRefinementValidation,
     TrustedKernelValidation,
+    TamperValidation,
     WitnessValidation,
     SeededWitnessValidation,
     PathoramPairValidation,
@@ -165,6 +166,20 @@ fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "trusted_kernel_validation": report,
+                }))?
+            );
+        }
+        Some(ReportKind::TamperValidation) => {
+            let report = mplus_probe::run_tamper_validation_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("tamper_validation.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "tamper_validation": report,
                 }))?
             );
         }

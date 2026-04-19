@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::process::{self, Command};
+use std::process::{self, Command, Output};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uo_core::{
@@ -301,6 +301,7 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         .context("running kernel_refinement_validation report")?;
     let trusted_kernel_validation = run_trusted_kernel_validation(&suite)
         .context("running trusted_kernel_validation report")?;
+    let tamper_validation = run_tamper_validation().context("running tamper_validation report")?;
     let witness_validation =
         run_witness_validation(&suite).context("running witness_validation report")?;
     let seeded_witness_validation =
@@ -331,6 +332,7 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "kernel_validation": kernel_validation,
         "kernel_refinement_validation": kernel_refinement_validation,
         "trusted_kernel_validation": trusted_kernel_validation,
+        "tamper_validation": tamper_validation,
         "witness_validation": witness_validation,
         "seeded_witness_validation": seeded_witness_validation,
     });
@@ -362,6 +364,7 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "kernel_validation": kernel_validation,
         "kernel_refinement_validation": kernel_refinement_validation,
         "trusted_kernel_validation": trusted_kernel_validation,
+        "tamper_validation": tamper_validation,
         "witness_validation": witness_validation,
         "seeded_witness_validation": seeded_witness_validation,
         "fresh_coin_validation": fresh_coin_validation,
@@ -405,6 +408,7 @@ pub fn run_bridge_validation_report() -> Result<JsonValue> {
     let kernel_validation = run_kernel_validation(&suite)?;
     let kernel_refinement_validation = run_kernel_refinement_validation(&suite)?;
     let trusted_kernel_validation = run_trusted_kernel_validation(&suite)?;
+    let tamper_validation = run_tamper_validation()?;
     let witness_validation = run_witness_validation(&suite)?;
     let seeded_witness_validation = run_seeded_witness_validation()?;
     Ok(json!({
@@ -427,6 +431,7 @@ pub fn run_bridge_validation_report() -> Result<JsonValue> {
         "kernel_validation": kernel_validation,
         "kernel_refinement_validation": kernel_refinement_validation,
         "trusted_kernel_validation": trusted_kernel_validation,
+        "tamper_validation": tamper_validation,
         "witness_validation": witness_validation,
         "seeded_witness_validation": seeded_witness_validation,
     }))
@@ -445,6 +450,10 @@ pub fn run_kernel_refinement_validation_report() -> Result<JsonValue> {
 pub fn run_trusted_kernel_validation_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_trusted_kernel_validation(&suite)
+}
+
+pub fn run_tamper_validation_report() -> Result<JsonValue> {
+    run_tamper_validation()
 }
 
 pub fn run_witness_validation_report() -> Result<JsonValue> {
@@ -571,6 +580,7 @@ pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
         "kernel_validation",
         "kernel_refinement_validation",
         "trusted_kernel_validation",
+        "tamper_validation",
         "witness_validation",
         "seeded_witness_validation",
         "fresh_coin_validation",
@@ -907,12 +917,14 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             if !is_checker {
                 continue;
             }
-            let source = fs::read_to_string(&path)
-                .with_context(|| format!("reading {}", path.display()))?;
+            let source =
+                fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
             let uses_proofgrade_umbrella = source
                 .lines()
                 .any(|line| line.trim() == "import UOToolchain.ProofGrade");
-            let uses_legacy_umbrella = source.lines().any(|line| line.trim() == "import UOToolchain");
+            let uses_legacy_umbrella = source
+                .lines()
+                .any(|line| line.trim() == "import UOToolchain");
             checks.push(json!({
                 "file": display_report_path(&path),
                 "uses_proofgrade_umbrella": uses_proofgrade_umbrella,
@@ -932,8 +944,9 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         });
         checks
     };
-    let proofgrade_checker_import_surface_restricted =
-        proofgrade_checker_import_surface_checks.iter().all(|entry| {
+    let proofgrade_checker_import_surface_restricted = proofgrade_checker_import_surface_checks
+        .iter()
+        .all(|entry| {
             entry["restricted"]
                 .as_bool()
                 .expect("checker import-surface restriction flag must be boolean")
@@ -1457,6 +1470,611 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
 
     Ok(json!({
         "checker": display_report_path(&checker),
+        "scenario_count": scenarios.len(),
+        "scenarios": scenarios,
+    }))
+}
+
+fn run_tamper_validation() -> Result<JsonValue> {
+    let source_path = "benches/raw/SingleAccessMap.sol";
+    let metadata_path = "benches/raw/SingleAccessMap.pathoram.yaml";
+    let metadata = load_metadata(metadata_path)?;
+    let source_artifact = uo_solc::compile(
+        workspace_path(source_path).to_str().unwrap(),
+        &metadata,
+        ProgramMode::Uo,
+    )?;
+    let artifact = compile_artifact(source_path, metadata_path, ProgramMode::Uo)?;
+    let target = CallSpec {
+        entrypoint: "put(bytes32,uint256)",
+        args: vec![b32(1), Value::Uint(7)],
+    };
+    let trace = run_target_call(&artifact, &[], target.entrypoint, target.args.clone())?;
+    let controller_certificate = trace.runtime_controller_observer_certificate()?;
+    let hidden_certificate = trace.runtime_path_oram_hidden_certificate()?;
+    let kernel_witness =
+        exact_confidential_kernel_witness(&trace, &artifact, target.entrypoint)?
+            .ok_or_else(|| anyhow!("tamper validation scenario is not confidential"))?;
+    if trace.runtime_kernel_witness.as_ref() != Some(&kernel_witness) {
+        return Err(anyhow!(
+            "tamper validation scenario did not preserve the exact runtime kernel witness"
+        ));
+    }
+    let runtime_kernel_refinement_witness = trace
+        .runtime_kernel_refinement_witness
+        .clone()
+        .ok_or_else(|| {
+            anyhow!("tamper validation scenario is missing runtime kernel refinement witness")
+        })?;
+    runtime_kernel_refinement_witness.validate_with_kernel_witness(&kernel_witness)?;
+    let runtime_witness = trace.runtime_refinement_witness()?;
+    let shell_boundary_bundle = trace.runtime_shell_boundary_bundle()?;
+    let kernel_dsl_bundle = artifact
+        .runtime_kernel_dsl_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
+    let kernel_slot_dsl_bundle = artifact
+        .runtime_kernel_slot_dsl_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
+    let kernel_lowering_bundle = artifact
+        .runtime_kernel_lowering_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
+    let shell_boundary_lowering_bundle =
+        artifact.runtime_shell_boundary_lowering_bundle(shell_boundary_bundle.clone())?;
+    let confidential_core_bundle =
+        RuntimeConfidentialCoreBundle::from_runtime_witness(runtime_witness.clone(), &artifact)?;
+    let confidential_core_slot_bundle = RuntimeConfidentialCoreSlotBundle::from_runtime_witness(
+        runtime_witness.clone(),
+        &artifact,
+    )?;
+    let confidential_core_lowering_bundle =
+        RuntimeConfidentialCoreLoweringBundle::from_runtime_witness(
+            runtime_witness.clone(),
+            &artifact,
+        )?;
+    let confidential_core_shell_boundary_lowering_bundle =
+        trace.runtime_confidential_core_shell_boundary_lowering_bundle(&artifact)?;
+    let trusted_kernel_bundle = trace.runtime_trusted_kernel_bundle()?;
+
+    let translation_checker = lean_proofgrade_translation_artifacts_checker_path()?;
+    let controller_checker = lean_controller_certificate_checker_path()?;
+    let hidden_checker = lean_pathoram_hidden_checker_path()?;
+    let kernel_dsl_checker = lean_proofgrade_kernel_dsl_checker_path()?;
+    let kernel_slot_dsl_checker = lean_proofgrade_kernel_slot_dsl_checker_path()?;
+    let kernel_lowering_checker = lean_proofgrade_kernel_lowering_checker_path()?;
+    let kernel_checker = lean_proofgrade_kernel_checker_path()?;
+    let kernel_refinement_checker = lean_proofgrade_kernel_refinement_checker_path()?;
+    let shell_boundary_checker = lean_proofgrade_shell_boundary_checker_path()?;
+    let shell_boundary_lowering_checker = lean_proofgrade_shell_boundary_lowering_checker_path()?;
+    let confidential_core_checker = lean_proofgrade_confidential_core_checker_path()?;
+    let confidential_core_slot_checker = lean_proofgrade_confidential_core_slot_checker_path()?;
+    let confidential_core_lowering_checker =
+        lean_proofgrade_confidential_core_lowering_checker_path()?;
+    let confidential_core_shell_boundary_lowering_checker =
+        lean_proofgrade_confidential_core_shell_boundary_lowering_checker_path()?;
+    let witness_checker = lean_proofgrade_witness_checker_path()?;
+    let trusted_kernel_checker = lean_proofgrade_trusted_kernel_checker_path()?;
+
+    let mut scenarios = Vec::new();
+
+    let mut tampered_translation_artifact = artifact.clone();
+    let manifest_entry = tampered_translation_artifact
+        .contract
+        .manifest
+        .entrypoints
+        .get_mut(target.entrypoint)
+        .ok_or_else(|| anyhow!("translation tamper scenario missing manifest entrypoint"))?;
+    manifest_entry.public_gas_budget = manifest_entry.public_gas_budget.saturating_add(1);
+    scenarios.push(validate_tampered_json_pair_case(
+        "translation/public_gas_budget_drift",
+        "source_artifact",
+        &source_artifact,
+        "artifact",
+        &tampered_translation_artifact,
+        |source_artifact_path, artifact_path| {
+            Ok(Command::new(&translation_checker)
+                .arg(&metadata.contract)
+                .arg(source_artifact_path)
+                .arg(artifact_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "translation/public_gas_budget_drift",
+            "artifact_kind": "proofgrade_translation_artifacts",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "increment manifest public_gas_budget while keeping source artifact fixed",
+        }),
+    )?);
+
+    let mut tampered_controller_certificate = controller_certificate.clone();
+    let observed_access = tampered_controller_certificate
+        .controller_certificate
+        .observed_oram_accesses
+        .first_mut()
+        .ok_or_else(|| anyhow!("controller tamper scenario missing observed ORAM access"))?;
+    observed_access.recursion_depth = observed_access.recursion_depth.saturating_add(1);
+    scenarios.push(validate_tampered_json_case(
+        "controller/controller_shape_drift",
+        &tampered_controller_certificate,
+        |certificate_path| {
+            Ok(Command::new(&controller_checker)
+                .arg(certificate_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "controller/controller_shape_drift",
+            "artifact_kind": "runtime_controller_observer_certificate",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "increment first observed ORAM access recursion_depth",
+        }),
+    )?);
+
+    let mut tampered_hidden_certificate = hidden_certificate.clone();
+    let first_leaf = tampered_hidden_certificate
+        .oram_position_map_after
+        .first_mut()
+        .and_then(|position_map| position_map.leaves.first_mut())
+        .ok_or_else(|| anyhow!("hidden-state tamper scenario missing position-map leaf"))?;
+    let drifted_leaf = match *first_leaf {
+        Some(leaf) => leaf.saturating_add(1),
+        None => 0,
+    };
+    *first_leaf = Some(drifted_leaf);
+    scenarios.push(validate_tampered_json_case(
+        "hidden/path_oram_leaf_state_drift",
+        &tampered_hidden_certificate,
+        |certificate_path| {
+            Ok(Command::new(&hidden_checker)
+                .arg(certificate_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "hidden/path_oram_leaf_state_drift",
+            "artifact_kind": "runtime_path_oram_hidden_certificate",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "drift first hidden position-map leaf after the call",
+        }),
+    )?);
+
+    let mut tampered_kernel_dsl_bundle = kernel_dsl_bundle.clone();
+    let original_kernel_dsl_statement_count =
+        tampered_kernel_dsl_bundle.confidential_program.body.len();
+    if tampered_kernel_dsl_bundle
+        .confidential_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "kernel DSL tamper scenario missing confidential program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "kernel_dsl/program_body_drift",
+        &tampered_kernel_dsl_bundle,
+        |bundle_path| {
+            Ok(Command::new(&kernel_dsl_checker)
+                .arg(bundle_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "kernel_dsl/program_body_drift",
+            "artifact_kind": "proofgrade_runtime_kernel_dsl_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final named confidential-kernel statement",
+            "statement_count_before": original_kernel_dsl_statement_count,
+            "statement_count_after": tampered_kernel_dsl_bundle.confidential_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_kernel_slot_dsl_bundle = kernel_slot_dsl_bundle.clone();
+    let original_kernel_slot_statement_count = tampered_kernel_slot_dsl_bundle
+        .confidential_slot_program
+        .body
+        .len();
+    if tampered_kernel_slot_dsl_bundle
+        .confidential_slot_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "kernel slot DSL tamper scenario missing confidential slot program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "kernel_slot_dsl/program_body_drift",
+        &tampered_kernel_slot_dsl_bundle,
+        |bundle_path| Ok(Command::new(&kernel_slot_dsl_checker).arg(bundle_path).output()?),
+        json!({
+            "scenario": "kernel_slot_dsl/program_body_drift",
+            "artifact_kind": "proofgrade_runtime_kernel_slot_dsl_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final slot confidential-kernel statement",
+            "statement_count_before": original_kernel_slot_statement_count,
+            "statement_count_after": tampered_kernel_slot_dsl_bundle.confidential_slot_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_kernel_lowering_bundle = kernel_lowering_bundle.clone();
+    let original_kernel_lowering_slot_statement_count = tampered_kernel_lowering_bundle
+        .confidential_slot_program
+        .body
+        .len();
+    if tampered_kernel_lowering_bundle
+        .confidential_slot_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "kernel lowering tamper scenario missing confidential slot program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "kernel_lowering/slot_program_body_drift",
+        &tampered_kernel_lowering_bundle,
+        |bundle_path| Ok(Command::new(&kernel_lowering_checker).arg(bundle_path).output()?),
+        json!({
+            "scenario": "kernel_lowering/slot_program_body_drift",
+            "artifact_kind": "proofgrade_runtime_kernel_lowering_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final slot confidential-kernel statement while keeping the named program fixed",
+            "statement_count_before": original_kernel_lowering_slot_statement_count,
+            "statement_count_after": tampered_kernel_lowering_bundle.confidential_slot_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_kernel_witness = kernel_witness.clone();
+    let object_step = tampered_kernel_witness
+        .kernel_steps
+        .iter_mut()
+        .find(|step| step.object_id.is_some())
+        .ok_or_else(|| anyhow!("kernel tamper scenario missing object-bearing kernel step"))?;
+    object_step.object_id = object_step
+        .object_id
+        .map(|object_id| object_id.saturating_add(1));
+    scenarios.push(validate_tampered_json_case(
+        "kernel/kernel_step_object_drift",
+        &tampered_kernel_witness,
+        |kernel_path| {
+            Ok(Command::new(&kernel_checker)
+                .arg(kernel_path)
+                .arg(target.entrypoint)
+                .output()?)
+        },
+        json!({
+            "scenario": "kernel/kernel_step_object_drift",
+            "artifact_kind": "proofgrade_runtime_kernel_witness",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "drift the first object-bearing kernel step object_id",
+        }),
+    )?);
+
+    let mut tampered_kernel_refinement_witness = runtime_kernel_refinement_witness.clone();
+    let object_event = tampered_kernel_refinement_witness
+        .events
+        .iter_mut()
+        .find(|event| event.object_id.is_some())
+        .ok_or_else(|| anyhow!("kernel refinement tamper scenario missing object-bearing event"))?;
+    object_event.object_id = object_event
+        .object_id
+        .map(|object_id| object_id.saturating_add(1));
+    scenarios.push(validate_tampered_json_pair_case(
+        "kernel_refinement/object_schedule_drift",
+        "kernel_refinement_witness",
+        &tampered_kernel_refinement_witness,
+        "kernel_witness",
+        &kernel_witness,
+        |refinement_path, kernel_path| {
+            Ok(Command::new(&kernel_refinement_checker)
+                .arg(refinement_path)
+                .arg(kernel_path)
+                .arg(target.entrypoint)
+                .output()?)
+        },
+        json!({
+            "scenario": "kernel_refinement/object_schedule_drift",
+            "artifact_kind": "proofgrade_runtime_kernel_refinement_witness",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "drift the first object-bearing runtime-phase event object_id",
+        }),
+    )?);
+
+    let mut tampered_shell_boundary_bundle = shell_boundary_bundle.clone();
+    tampered_shell_boundary_bundle
+        .shell_trace
+        .commit_object_schedule
+        .clear();
+    scenarios.push(validate_tampered_json_case(
+        "shell_boundary/trace_summary_drift",
+        &tampered_shell_boundary_bundle,
+        |bundle_path| Ok(Command::new(&shell_boundary_checker).arg(bundle_path).output()?),
+        json!({
+            "scenario": "shell_boundary/trace_summary_drift",
+            "artifact_kind": "proofgrade_runtime_shell_boundary_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "erase shell-trace commit_object_schedule while leaving the event trace fixed",
+        }),
+    )?);
+
+    let mut tampered_shell_boundary_lowering_bundle = shell_boundary_lowering_bundle.clone();
+    let original_shell_boundary_lowering_slot_statement_count =
+        tampered_shell_boundary_lowering_bundle
+            .confidential_slot_program
+            .body
+            .len();
+    if tampered_shell_boundary_lowering_bundle
+        .confidential_slot_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "shell-boundary lowering tamper scenario missing confidential slot program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "shell_boundary_lowering/slot_program_body_drift",
+        &tampered_shell_boundary_lowering_bundle,
+        |bundle_path| Ok(Command::new(&shell_boundary_lowering_checker).arg(bundle_path).output()?),
+        json!({
+            "scenario": "shell_boundary_lowering/slot_program_body_drift",
+            "artifact_kind": "proofgrade_runtime_shell_boundary_lowering_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final slot confidential-kernel statement while keeping the shell-boundary witness fixed",
+            "statement_count_before": original_shell_boundary_lowering_slot_statement_count,
+            "statement_count_after": tampered_shell_boundary_lowering_bundle.confidential_slot_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_confidential_core_bundle = confidential_core_bundle.clone();
+    let original_confidential_core_statement_count = tampered_confidential_core_bundle
+        .confidential_program
+        .body
+        .len();
+    if tampered_confidential_core_bundle
+        .confidential_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "confidential-core tamper scenario missing confidential program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "confidential_core/program_body_drift",
+        &tampered_confidential_core_bundle,
+        |bundle_path| {
+            Ok(Command::new(&confidential_core_checker)
+                .arg(bundle_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "confidential_core/program_body_drift",
+            "artifact_kind": "proofgrade_runtime_confidential_core_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final named confidential-kernel statement while keeping the runtime witness fixed",
+            "statement_count_before": original_confidential_core_statement_count,
+            "statement_count_after": tampered_confidential_core_bundle.confidential_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_confidential_core_slot_bundle = confidential_core_slot_bundle.clone();
+    let original_confidential_core_slot_statement_count = tampered_confidential_core_slot_bundle
+        .confidential_slot_program
+        .body
+        .len();
+    if tampered_confidential_core_slot_bundle
+        .confidential_slot_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "confidential-core slot tamper scenario missing confidential slot program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "confidential_core_slot/program_body_drift",
+        &tampered_confidential_core_slot_bundle,
+        |bundle_path| {
+            Ok(Command::new(&confidential_core_slot_checker)
+                .arg(bundle_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "confidential_core_slot/program_body_drift",
+            "artifact_kind": "proofgrade_runtime_confidential_core_slot_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final slot confidential-kernel statement while keeping the runtime witness fixed",
+            "statement_count_before": original_confidential_core_slot_statement_count,
+            "statement_count_after": tampered_confidential_core_slot_bundle.confidential_slot_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_confidential_core_lowering_bundle = confidential_core_lowering_bundle.clone();
+    let original_confidential_core_lowering_slot_statement_count =
+        tampered_confidential_core_lowering_bundle
+            .confidential_slot_program
+            .body
+            .len();
+    if tampered_confidential_core_lowering_bundle
+        .confidential_slot_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "confidential-core lowering tamper scenario missing confidential slot program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "confidential_core_lowering/slot_program_body_drift",
+        &tampered_confidential_core_lowering_bundle,
+        |bundle_path| {
+            Ok(Command::new(&confidential_core_lowering_checker)
+                .arg(bundle_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "confidential_core_lowering/slot_program_body_drift",
+            "artifact_kind": "proofgrade_runtime_confidential_core_lowering_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final slot confidential-kernel statement while keeping the named program and runtime witness fixed",
+            "statement_count_before": original_confidential_core_lowering_slot_statement_count,
+            "statement_count_after": tampered_confidential_core_lowering_bundle.confidential_slot_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_confidential_core_shell_boundary_lowering_bundle =
+        confidential_core_shell_boundary_lowering_bundle.clone();
+    let original_confidential_core_shell_boundary_lowering_slot_statement_count =
+        tampered_confidential_core_shell_boundary_lowering_bundle
+            .confidential_slot_program
+            .body
+            .len();
+    if tampered_confidential_core_shell_boundary_lowering_bundle
+        .confidential_slot_program
+        .body
+        .pop()
+        .is_none()
+    {
+        return Err(anyhow!(
+            "confidential-core shell-boundary lowering tamper scenario missing confidential slot program body"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "confidential_core_shell_boundary_lowering/slot_program_body_drift",
+        &tampered_confidential_core_shell_boundary_lowering_bundle,
+        |bundle_path| {
+            Ok(Command::new(&confidential_core_shell_boundary_lowering_checker)
+                .arg(bundle_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "confidential_core_shell_boundary_lowering/slot_program_body_drift",
+            "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_lowering_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove the final slot confidential-kernel statement while keeping the runtime witness and shell-boundary bundle fixed",
+            "statement_count_before": original_confidential_core_shell_boundary_lowering_slot_statement_count,
+            "statement_count_after": tampered_confidential_core_shell_boundary_lowering_bundle.confidential_slot_program.body.len(),
+        }),
+    )?);
+
+    let mut tampered_runtime_witness = runtime_witness.clone();
+    let witnessed_access = tampered_runtime_witness
+        .controller_certificate
+        .observed_oram_accesses
+        .first_mut()
+        .ok_or_else(|| anyhow!("runtime witness tamper scenario missing observed ORAM access"))?;
+    witnessed_access.recursion_depth = witnessed_access.recursion_depth.saturating_add(1);
+    scenarios.push(validate_tampered_json_case(
+        "runtime_witness/controller_certificate_drift",
+        &tampered_runtime_witness,
+        |witness_path| {
+            Ok(Command::new(&witness_checker)
+                .arg(witness_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_witness/controller_certificate_drift",
+            "artifact_kind": "proofgrade_runtime_refinement_witness",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "increment first observed ORAM access recursion_depth inside the embedded controller certificate",
+        }),
+    )?);
+
+    let mut tampered_trusted_kernel_bundle = trusted_kernel_bundle.clone();
+    let trusted_leaf = tampered_trusted_kernel_bundle
+        .hidden_certificate
+        .oram_position_map_after
+        .first_mut()
+        .and_then(|position_map| position_map.leaves.first_mut())
+        .ok_or_else(|| {
+            anyhow!("trusted-kernel tamper scenario missing hidden position-map leaf")
+        })?;
+    let drifted_trusted_leaf = match *trusted_leaf {
+        Some(leaf) => leaf.saturating_add(1),
+        None => 0,
+    };
+    *trusted_leaf = Some(drifted_trusted_leaf);
+    scenarios.push(validate_tampered_json_case(
+        "trusted_kernel/hidden_state_drift",
+        &tampered_trusted_kernel_bundle,
+        |bundle_path| {
+            Ok(Command::new(&trusted_kernel_checker)
+                .arg(bundle_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "trusted_kernel/hidden_state_drift",
+            "artifact_kind": "proofgrade_runtime_trusted_kernel_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "drift first hidden position-map leaf inside the trusted-kernel bundle",
+        }),
+    )?);
+
+    Ok(json!({
+        "benchmark": "SingleAccessMap/pathoram/put",
+        "model_tags": {
+            "page_model": "page_v1",
+            "exit_model": "exit_v1",
+            "shared_resource_model": "shared_v1"
+        },
+        "checkers": {
+            "proofgrade_translation_artifacts": display_report_path(&translation_checker),
+            "runtime_controller_observer_certificate": display_report_path(&controller_checker),
+            "runtime_path_oram_hidden_certificate": display_report_path(&hidden_checker),
+            "proofgrade_runtime_kernel_dsl_bundle": display_report_path(&kernel_dsl_checker),
+            "proofgrade_runtime_kernel_slot_dsl_bundle": display_report_path(&kernel_slot_dsl_checker),
+            "proofgrade_runtime_kernel_lowering_bundle": display_report_path(&kernel_lowering_checker),
+            "proofgrade_runtime_kernel_witness": display_report_path(&kernel_checker),
+            "proofgrade_runtime_kernel_refinement_witness": display_report_path(&kernel_refinement_checker),
+            "proofgrade_runtime_shell_boundary_bundle": display_report_path(&shell_boundary_checker),
+            "proofgrade_runtime_shell_boundary_lowering_bundle": display_report_path(&shell_boundary_lowering_checker),
+            "proofgrade_runtime_confidential_core_bundle": display_report_path(&confidential_core_checker),
+            "proofgrade_runtime_confidential_core_slot_bundle": display_report_path(&confidential_core_slot_checker),
+            "proofgrade_runtime_confidential_core_lowering_bundle": display_report_path(&confidential_core_lowering_checker),
+            "proofgrade_runtime_confidential_core_shell_boundary_lowering_bundle":
+                display_report_path(&confidential_core_shell_boundary_lowering_checker),
+            "proofgrade_runtime_refinement_witness": display_report_path(&witness_checker),
+            "proofgrade_runtime_trusted_kernel_bundle": display_report_path(&trusted_kernel_checker),
+        },
         "scenario_count": scenarios.len(),
         "scenarios": scenarios,
     }))
@@ -7018,8 +7636,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         }))
     })
     .collect::<Result<Vec<_>>>()?;
-    let theorem_only_runtime_helper_surface_restricted =
-        theorem_only_runtime_helper_surface_checks.iter().all(|entry| {
+    let theorem_only_runtime_helper_surface_restricted = theorem_only_runtime_helper_surface_checks
+        .iter()
+        .all(|entry| {
             entry["restricted"]
                 .as_bool()
                 .expect("theorem-only runtime helper restriction flag must be boolean")
@@ -7128,8 +7747,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         }))
     })
     .collect::<Result<Vec<_>>>()?;
-    let contract_runtime_entrypoint_surface_restricted =
-        contract_runtime_entrypoint_surface_checks.iter().all(|entry| {
+    let contract_runtime_entrypoint_surface_restricted = contract_runtime_entrypoint_surface_checks
+        .iter()
+        .all(|entry| {
             entry["restricted"]
                 .as_bool()
                 .expect("contract-runtime entrypoint restriction flag must be boolean")
@@ -7975,6 +8595,82 @@ fn write_temp_json<T: Serialize>(case_name: &str, value: &T) -> Result<(PathBuf,
     writer.flush()?;
     let bytes = fs::metadata(&path)?.len();
     Ok((path, bytes))
+}
+
+fn validate_tampered_json_case<T, F>(
+    case_name: &str,
+    artifact: &T,
+    run_checker: F,
+    mut summary: JsonValue,
+) -> Result<JsonValue>
+where
+    T: Serialize,
+    F: FnOnce(&Path) -> Result<Output>,
+{
+    let (artifact_path, artifact_json_bytes) = write_temp_json(case_name, artifact)?;
+    let output = run_checker(&artifact_path)?;
+    let lean_stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let lean_stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if output.status.success() {
+        return Err(anyhow!(
+            "Lean tamper validation unexpectedly accepted {} (artifact preserved at {})",
+            case_name,
+            artifact_path.display()
+        ));
+    }
+    let _ = fs::remove_file(&artifact_path);
+    let summary_object = summary
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("tamper summary for {} is not a JSON object", case_name))?;
+    summary_object.insert("artifact_json_bytes".into(), json!(artifact_json_bytes));
+    summary_object.insert("lean_stdout".into(), json!(lean_stdout));
+    summary_object.insert("lean_stderr".into(), json!(lean_stderr));
+    summary_object.insert("accepted".into(), json!(false));
+    summary_object.insert("rejected".into(), json!(true));
+    Ok(summary)
+}
+
+fn validate_tampered_json_pair_case<L, R, F>(
+    case_name: &str,
+    left_label: &str,
+    left: &L,
+    right_label: &str,
+    right: &R,
+    run_checker: F,
+    mut summary: JsonValue,
+) -> Result<JsonValue>
+where
+    L: Serialize,
+    R: Serialize,
+    F: FnOnce(&Path, &Path) -> Result<Output>,
+{
+    let left_case_name = format!("{case_name}-{left_label}");
+    let right_case_name = format!("{case_name}-{right_label}");
+    let (left_path, left_json_bytes) = write_temp_json(&left_case_name, left)?;
+    let (right_path, right_json_bytes) = write_temp_json(&right_case_name, right)?;
+    let output = run_checker(&left_path, &right_path)?;
+    let lean_stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let lean_stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if output.status.success() {
+        return Err(anyhow!(
+            "Lean tamper validation unexpectedly accepted {} (artifacts preserved at {} and {})",
+            case_name,
+            left_path.display(),
+            right_path.display()
+        ));
+    }
+    let _ = fs::remove_file(&left_path);
+    let _ = fs::remove_file(&right_path);
+    let summary_object = summary
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("tamper summary for {} is not a JSON object", case_name))?;
+    summary_object.insert(format!("{left_label}_json_bytes"), json!(left_json_bytes));
+    summary_object.insert(format!("{right_label}_json_bytes"), json!(right_json_bytes));
+    summary_object.insert("lean_stdout".into(), json!(lean_stdout));
+    summary_object.insert("lean_stderr".into(), json!(lean_stderr));
+    summary_object.insert("accepted".into(), json!(false));
+    summary_object.insert("rejected".into(), json!(true));
+    Ok(summary)
 }
 
 fn check_classifier_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
@@ -9678,6 +10374,11 @@ witness, direct runtime-phase refinement witness, explicit trusted-kernel
 bundle, runtime refinement witness, and seeded witness-family
 validators so the bridge status can be checked without inferring it from the
 full artifact bundle.
+`tamper_validation.json` complements those positive checks with end-to-end
+negative evidence: it mutates representative direct controller/hidden
+certificates plus every proof-grade translation/runtime bridge artifact and
+checks that the shipped Lean executables reject those semantically drifted but
+still parseable artifacts.
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and

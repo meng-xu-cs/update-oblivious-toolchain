@@ -290,6 +290,7 @@ cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --en
 cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format trusted-kernel
 cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format refinement-witness
 cargo run -q -p mplus-probe -- --only bridge-validation --out-dir results
+cargo run -q -p mplus-probe -- --only tamper-validation --out-dir results
 ```
 
 Artifact modes:

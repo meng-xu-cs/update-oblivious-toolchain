@@ -189,13 +189,19 @@ The repository now validates real emitted trusted-kernel bundles with Lean via:
 - `results/kernel_refinement_validation.json`
 - `cargo run -q -p mplus-probe -- --only trusted-kernel-validation --out-dir results`
 - `results/trusted_kernel_validation.json`
+- `cargo run -q -p mplus-probe -- --only tamper-validation --out-dir results`
+- `results/tamper_validation.json`
 - `results/bridge_validation.json`
 
 The proof-grade report path now uses
 `checkProofGradeRuntimeTrustedKernel`; the older
 `CheckRuntimeTrustedKernel.lean` compatibility checker still exists for
 backward-compatible import paths, but it is no longer the main artifact
-validation route.
+validation route. The new tamper report complements the positive validation
+reports by mutating representative direct controller/hidden certificates plus
+the proof-grade translation, kernel, refinement, shell-boundary,
+confidential-core, runtime-witness, and trusted-kernel artifacts and checking
+that the corresponding Lean executables reject those drifted artifacts.
 
 ## Precise Claim
 
