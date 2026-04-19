@@ -410,6 +410,8 @@ The first implementation step is now present in the codebase:
   `runtime/uo-evm/src/kernel.rs`, the raw public-kernel hooks
   `shadow_load_public_objects`, `commit_public_objects`, and
   `run_confidential_call` must be used only from `runtime/uo-evm/src/state.rs`,
+  without exposing raw `inner_mut` / `into_inner` escape hatches on the
+  public kernel facade,
   and the confidential shadow-load helper itself stays private to
   `runtime/uo-evm/src/kernel.rs`
 - the same report now also checks the low-level store helper layer:

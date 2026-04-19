@@ -6176,11 +6176,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("pub(crate) struct ConfidentialRuntimeShadowState")
         && state_source.contains("pub(crate) struct PublicRuntimeShadowState");
     let kernel_restricted_signatures = [
-        "pub(in crate::runtime) fn inner_mut",
-        "pub(in crate::runtime) fn into_inner",
+        "pub(in crate::runtime) fn shadow_load_public_objects",
         "pub(in crate::runtime) fn commit_public_objects",
         "pub(in crate::runtime) fn run_confidential_call",
-        "pub(in crate::runtime) fn shadow_load_public_objects",
     ];
     let kernel_restricted_signature_checks = kernel_restricted_signatures
         .into_iter()
@@ -6197,6 +6195,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("kernel signature presence must be boolean")
         });
+    let kernel_avoids_raw_escape_hatches = !kernel_source
+        .contains("pub(in crate::runtime) fn inner_mut")
+        && !kernel_source.contains("pub(in crate::runtime) fn into_inner");
     let kernel_confidential_shadow_load_private = kernel_source
         .contains("fn shadow_load_confidential_objects(")
         && !kernel_source.contains("pub(in crate::runtime) fn shadow_load_confidential_objects(")
@@ -6387,7 +6388,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .expect("kernel bounded-journal restriction flag must be boolean")
     });
     let state_routes_confidential_calls_through_runtime_kernel =
-        state_source.contains("kernel.into_inner().run_confidential_call(");
+        state_source.contains("kernel.run_confidential_call(");
     let state_confidential_outcome_layering_is_explicit = state_source
         .contains("struct ConfidentialCommittedKernelOutcome")
         && state_source.contains("struct ConfidentialCommittedCallOutcome")
@@ -6727,7 +6728,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
-            "kernel.into_inner().run_confidential_call(",
+            "kernel.run_confidential_call(",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
     ]
@@ -7092,6 +7093,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "restricted_signature_checks": restricted_signature_checks,
         "all_kernel_restricted_signatures_present": all_kernel_restricted_signatures_present,
         "kernel_restricted_signature_checks": kernel_restricted_signature_checks,
+        "kernel_avoids_raw_escape_hatches": kernel_avoids_raw_escape_hatches,
         "kernel_confidential_shadow_load_private":
             kernel_confidential_shadow_load_private,
         "raw_kernel_private_surface_checks": raw_kernel_private_surface_checks,
@@ -7264,6 +7266,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && !engine_owns_raw_runtime_object_map
             && all_restricted_signatures_present
             && all_kernel_restricted_signatures_present
+            && kernel_avoids_raw_escape_hatches
             && kernel_confidential_shadow_load_private
             && raw_kernel_private_surface_restricted
             && all_state_restricted_signatures_present
@@ -9012,7 +9015,8 @@ public commit, and confidential execution are visibility-restricted to
 `crate::runtime`, that the confidential shadow-load helper itself stays
 private to `runtime/uo-evm/src/kernel.rs`, that `shell.rs` owns the
 public-kernel facade while `state.rs` owns confidential manifest planning
-plus confidential-kernel setup, and that confidential entrypoints are
+plus confidential-kernel setup through explicit wrapper operations rather
+than raw `inner_mut` / `into_inner` escape hatches, and that confidential entrypoints are
 sourced from the checked manifest's `confidential_slot_program` in
 `runtime/uo-evm/src/state.rs` while that module delegates confidential
 execution through `runtime/uo-evm/src/kernel.rs`, enforces the

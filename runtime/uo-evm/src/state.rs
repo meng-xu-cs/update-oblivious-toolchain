@@ -282,9 +282,7 @@ impl CommittedRuntimeState {
         kernel: &mut PublicRuntimeKernel,
         public_object_ids: &[u32],
     ) -> Result<PublicRuntimeShadowState> {
-        kernel
-            .inner_mut()
-            .shadow_load_public_objects(self, public_object_ids)
+        kernel.shadow_load_public_objects(self, public_object_ids)
     }
 
     pub(crate) fn commit_public_shadow(
@@ -294,9 +292,7 @@ impl CommittedRuntimeState {
         aborted: bool,
         recorder: &mut CallRecorder,
     ) -> Result<()> {
-        kernel
-            .inner_mut()
-            .commit_public_objects(shadow, self, aborted, recorder)
+        kernel.commit_public_objects(shadow, self, aborted, recorder)
     }
 
     pub(crate) fn run_confidential_call(
@@ -310,7 +306,7 @@ impl CommittedRuntimeState {
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialCommittedKernelOutcome> {
-        let outcome = kernel.into_inner().run_confidential_call(
+        let outcome = kernel.run_confidential_call(
             program,
             self,
             shadow_load_object_ids,
@@ -394,9 +390,7 @@ impl CommittedRuntimeState {
         kernel: &mut PublicRuntimeKernel,
         object_ids: &[u32],
     ) -> Result<ConfidentialRuntimeShadowState> {
-        kernel
-            .inner_mut()
-            .shadow_load_confidential_objects_for_test(self, object_ids)
+        kernel.shadow_load_confidential_objects_for_test(self, object_ids)
     }
 }
 

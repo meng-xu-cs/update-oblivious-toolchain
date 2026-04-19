@@ -477,6 +477,8 @@ The current runtime has a first hardening layer:
   the public shadow-load / public-commit / confidential-execution kernel
   hooks `shadow_load_public_objects`, `commit_public_objects`, and
   `run_confidential_call` must be invoked only from `runtime/uo-evm/src/state.rs`,
+  without exposing raw `inner_mut` / `into_inner` escape hatches on the
+  public kernel facade,
   and the confidential shadow-load helper itself stays private to
   `runtime/uo-evm/src/kernel.rs`
 - the boundary report now also checks the low-level store helper layer:

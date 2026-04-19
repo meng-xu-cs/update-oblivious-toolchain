@@ -272,12 +272,57 @@ impl PublicRuntimeKernel {
         self.inner.finish(entrypoint_id)
     }
 
-    pub(in crate::runtime) fn inner_mut(&mut self) -> &mut RuntimeKernel {
-        &mut self.inner
+    pub(in crate::runtime) fn shadow_load_public_objects(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        public_object_ids: &[u32],
+    ) -> Result<PublicRuntimeShadowState> {
+        self.inner
+            .shadow_load_public_objects(committed, public_object_ids)
     }
 
-    pub(in crate::runtime) fn into_inner(self) -> RuntimeKernel {
+    pub(in crate::runtime) fn commit_public_objects(
+        &mut self,
+        objects: &mut PublicRuntimeShadowState,
+        committed: &CommittedRuntimeState,
+        aborted: bool,
+        recorder: &mut CallRecorder,
+    ) -> Result<()> {
         self.inner
+            .commit_public_objects(objects, committed, aborted, recorder)
+    }
+
+    pub(in crate::runtime) fn run_confidential_call(
+        self,
+        program: &ConfidentialKernelSlotProgram,
+        committed: &CommittedRuntimeState,
+        shadow_load_object_ids: &[u32],
+        max_hash_part_bytes: usize,
+        call_inputs: ConfidentialCallInputs,
+        fresh_coins: Option<PathOramFreshCoinPlan>,
+        recorder: &mut CallRecorder,
+        opcode_trace: &mut Vec<String>,
+    ) -> Result<ConfidentialKernelRunOutcome> {
+        self.inner.run_confidential_call(
+            program,
+            committed,
+            shadow_load_object_ids,
+            max_hash_part_bytes,
+            call_inputs,
+            fresh_coins,
+            recorder,
+            opcode_trace,
+        )
+    }
+
+    #[cfg(test)]
+    pub(in crate::runtime) fn shadow_load_confidential_objects_for_test(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        shadow_load_object_ids: &[u32],
+    ) -> Result<ConfidentialRuntimeShadowState> {
+        self.inner
+            .shadow_load_confidential_objects_for_test(committed, shadow_load_object_ids)
     }
 }
 
@@ -534,7 +579,7 @@ impl RuntimeKernel {
         Ok(())
     }
 
-    pub(in crate::runtime) fn commit_public_objects(
+    fn commit_public_objects(
         &mut self,
         objects: &mut PublicRuntimeShadowState,
         committed: &CommittedRuntimeState,
@@ -552,7 +597,7 @@ impl RuntimeKernel {
         Ok(())
     }
 
-    pub(in crate::runtime) fn run_confidential_call(
+    fn run_confidential_call(
         mut self,
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
@@ -993,7 +1038,7 @@ impl RuntimeKernel {
         Ok(shadow)
     }
 
-    pub(in crate::runtime) fn shadow_load_public_objects(
+    fn shadow_load_public_objects(
         &mut self,
         committed: &CommittedRuntimeState,
         public_object_ids: &[u32],
@@ -1012,7 +1057,7 @@ impl RuntimeKernel {
     }
 
     #[cfg(test)]
-    pub(in crate::runtime) fn shadow_load_confidential_objects_for_test(
+    fn shadow_load_confidential_objects_for_test(
         &mut self,
         committed: &CommittedRuntimeState,
         shadow_load_object_ids: &[u32],
