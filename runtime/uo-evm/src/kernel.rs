@@ -74,7 +74,7 @@ impl<T> BoundedJournal<T> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct ConfidentialExecState {
     slots: Vec<Option<Value>>,
     initialized_slots: usize,
@@ -83,7 +83,7 @@ struct ConfidentialExecState {
     return_value: Option<Value>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct ConfidentialExecutionOutcome {
     pub aborted: bool,
     pub return_value: Option<Value>,

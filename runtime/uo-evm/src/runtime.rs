@@ -12,7 +12,7 @@ pub(crate) mod state;
 
 use uo_core::{RuntimeKernelRefinementWitness, RuntimeKernelWitness, Value};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct RuntimeCallOutcome {
     pub runtime_kernel_witness: RuntimeKernelWitness,
     pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,

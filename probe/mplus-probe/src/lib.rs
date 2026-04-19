@@ -8439,6 +8439,38 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let runtime_call_outcome_runtime_private = runtime_module_source
         .contains("pub(crate) struct RuntimeCallOutcome")
         && !runtime_module_source.contains("pub struct RuntimeCallOutcome");
+    let runtime_call_outcome_decl = "pub(crate) struct RuntimeCallOutcome";
+    let runtime_call_outcome_derive_line = runtime_module_source
+        .split(runtime_call_outcome_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate RuntimeCallOutcome declaration"))?;
+    let runtime_call_outcome_nonclone = !runtime_call_outcome_derive_line.contains("Clone");
+    let confidential_exec_state_decl = "struct ConfidentialExecState";
+    let confidential_exec_state_derive_line = kernel_source
+        .split(confidential_exec_state_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate ConfidentialExecState declaration"))?;
+    let confidential_exec_state_nonclone =
+        !confidential_exec_state_derive_line.contains("Clone");
+    let confidential_execution_outcome_decl = "struct ConfidentialExecutionOutcome";
+    let confidential_execution_outcome_derive_line = kernel_source
+        .split(confidential_execution_outcome_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate ConfidentialExecutionOutcome declaration"))?;
+    let confidential_execution_outcome_nonclone =
+        !confidential_execution_outcome_derive_line.contains("Clone");
+    let confidential_exec_state_wipes_on_drop = kernel_source
+        .contains("impl Drop for ConfidentialExecState")
+        && kernel_source.contains("for slot in &mut self.slots {")
+        && kernel_source.contains("value.wipe_secrets();")
+        && kernel_source.contains("*slot = None;")
+        && kernel_source.contains("self.return_value = None;");
     let state_enforces_confidential_commit_budget = state_source
         .contains("recorder.physical_write_count() > max_commit_ops")
         && state_source.contains("exceeded manifest commit budget");
@@ -9129,13 +9161,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "owner": "runtime/uo-evm/src/kernel.rs",
             "boundary": "private slot-file state owned by RuntimeKernel",
             "checked": kernel_source.contains("struct ConfidentialExecState")
-                && kernel_source.contains("slots: Vec<Option<Value>>"),
+                && kernel_source.contains("slots: Vec<Option<Value>>")
+                && confidential_exec_state_nonclone
+                && confidential_execution_outcome_nonclone
+                && confidential_exec_state_wipes_on_drop,
         }),
         json!({
             "name": "RuntimeCallOutcome",
             "owner": "runtime/uo-evm/src/runtime.rs",
             "boundary": "runtime-only per-call outcome bundle; state.rs and shell.rs construct it, theorem.rs consumes it whole, and engine.rs does not unpack it directly",
             "checked": runtime_call_outcome_runtime_private
+                && runtime_call_outcome_nonclone
                 && runtime_call_outcome_surface_restricted
                 && state_confidential_outcome_layering_is_explicit
                 && theorem_finalizes_execution_trace
@@ -9312,6 +9348,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             runtime_call_outcome_surface_restricted,
         "runtime_call_outcome_runtime_private":
             runtime_call_outcome_runtime_private,
+        "runtime_call_outcome_derive_line": runtime_call_outcome_derive_line,
+        "runtime_call_outcome_nonclone": runtime_call_outcome_nonclone,
+        "confidential_exec_state_derive_line": confidential_exec_state_derive_line,
+        "confidential_exec_state_nonclone": confidential_exec_state_nonclone,
+        "confidential_execution_outcome_derive_line":
+            confidential_execution_outcome_derive_line,
+        "confidential_execution_outcome_nonclone":
+            confidential_execution_outcome_nonclone,
+        "confidential_exec_state_wipes_on_drop":
+            confidential_exec_state_wipes_on_drop,
         "state_enforces_confidential_commit_budget":
             state_enforces_confidential_commit_budget,
         "oram_working_stash_capacity_checks": oram_working_stash_capacity_checks,
