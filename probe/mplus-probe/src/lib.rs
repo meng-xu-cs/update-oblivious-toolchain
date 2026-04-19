@@ -790,6 +790,108 @@ fn check_source_report(source_path: &str, metadata: &ContractMetadata) -> Result
 
 fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let checker = lean_proofgrade_translation_artifacts_checker_path()?;
+    let proof_lean_root = workspace_path("proof/lean");
+    let proof_lean_uotoolchain = proof_lean_root.join("UOToolchain");
+    let legacy_axiom_definition_checks = [
+        (
+            "axiom legacySgxMicroLocalTheorem",
+            vec![String::from("proof/lean/UOToolchain/SgxMicroGame.lean")],
+        ),
+        (
+            "axiom legacyOramLocalTheorem",
+            vec![String::from("proof/lean/UOToolchain/OramGame.lean")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_lean_pattern_hits(&proof_lean_uotoolchain, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let legacy_axiom_definition_surface_restricted =
+        legacy_axiom_definition_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("legacy axiom restriction flag must be boolean")
+        });
+    let legacy_theorem_symbol_surface_checks = [
+        (
+            "legacySgxMicroLocalTheorem",
+            vec![
+                String::from("proof/lean/UOToolchain/SgxJointProjection.lean"),
+                String::from("proof/lean/UOToolchain/SgxMicroGame.lean"),
+            ],
+        ),
+        (
+            "legacyOramLocalTheorem",
+            vec![
+                String::from("proof/lean/UOToolchain/OramGame.lean"),
+                String::from("proof/lean/UOToolchain/SgxJointProjection.lean"),
+                String::from("proof/lean/UOToolchain/SgxOramProjection.lean"),
+                String::from("proof/lean/UOToolchain/TeeDeployment.lean"),
+            ],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_lean_pattern_hits(&proof_lean_uotoolchain, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let legacy_theorem_symbol_surface_restricted =
+        legacy_theorem_symbol_surface_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("legacy theorem symbol restriction flag must be boolean")
+        });
+    let proofgrade_checker_legacy_symbol_checks =
+        ["legacySgxMicroLocalTheorem", "legacyOramLocalTheorem"]
+            .into_iter()
+            .map(|pattern| {
+                let mut files = Vec::new();
+                for entry in fs::read_dir(&proof_lean_root)
+                    .with_context(|| format!("reading {}", proof_lean_root.display()))?
+                {
+                    let entry = entry?;
+                    let path = entry.path();
+                    let is_checker = path.extension().is_some_and(|ext| ext == "lean")
+                        && path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .is_some_and(|name| name.starts_with("Check"));
+                    if !is_checker {
+                        continue;
+                    }
+                    let source = fs::read_to_string(&path)
+                        .with_context(|| format!("reading {}", path.display()))?;
+                    if source.contains(pattern) {
+                        files.push(display_report_path(&path));
+                    }
+                }
+                files.sort();
+                Ok(json!({
+                    "pattern": pattern,
+                    "files": files,
+                    "absent": files.is_empty(),
+                }))
+            })
+            .collect::<Result<Vec<_>>>()?;
+    let proofgrade_checker_legacy_symbol_mentions_absent =
+        proofgrade_checker_legacy_symbol_checks.iter().all(|entry| {
+            entry["absent"]
+                .as_bool()
+                .expect("checker legacy-symbol absence flag must be boolean")
+        });
     let mut reports = Vec::new();
     for (name, artifacts) in suite {
         let source = format!("benches/raw/{name}.sol");
@@ -858,6 +960,17 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
     }
     Ok(json!({
         "checker": display_report_path(&checker),
+        "legacy_axiom_definition_checks": legacy_axiom_definition_checks,
+        "legacy_axiom_definition_surface_restricted":
+            legacy_axiom_definition_surface_restricted,
+        "legacy_theorem_symbol_surface_checks":
+            legacy_theorem_symbol_surface_checks,
+        "legacy_theorem_symbol_surface_restricted":
+            legacy_theorem_symbol_surface_restricted,
+        "proofgrade_checker_legacy_symbol_checks":
+            proofgrade_checker_legacy_symbol_checks,
+        "proofgrade_checker_legacy_symbol_mentions_absent":
+            proofgrade_checker_legacy_symbol_mentions_absent,
         "reports": reports,
     }))
 }
@@ -5287,6 +5400,19 @@ fn collect_rust_source_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<()
     Ok(())
 }
 
+fn collect_lean_source_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(root).with_context(|| format!("reading {}", root.display()))? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_lean_source_files(&path, files)?;
+        } else if path.extension().is_some_and(|ext| ext == "lean") {
+            files.push(path);
+        }
+    }
+    Ok(())
+}
+
 fn production_source_slice(source: &str) -> String {
     const CFG_TEST_ATTR: &str = "#[cfg(test)]";
 
@@ -5359,6 +5485,21 @@ fn collect_production_pattern_hits(root: &Path, pattern: &str) -> Result<Vec<Str
         let source =
             fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
         if production_source_slice(&source).contains(pattern) {
+            hits.push(display_report_path(&path));
+        }
+    }
+    hits.sort();
+    Ok(hits)
+}
+
+fn collect_lean_pattern_hits(root: &Path, pattern: &str) -> Result<Vec<String>> {
+    let mut files = Vec::new();
+    collect_lean_source_files(root, &mut files)?;
+    let mut hits = Vec::new();
+    for path in files {
+        let source =
+            fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        if source.contains(pattern) {
             hits.push(display_report_path(&path));
         }
     }
@@ -7527,9 +7668,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
 
 fn display_report_path(path: &Path) -> String {
     let root = repo_root();
-    match path.strip_prefix(&root) {
+    let report_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    match report_path.strip_prefix(&root) {
         Ok(relative) => relative.display().to_string(),
-        Err(_) => path.display().to_string(),
+        Err(_) => report_path.display().to_string(),
     }
 }
 

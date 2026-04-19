@@ -52,9 +52,14 @@ Status labels:
   Evidence:
   `proof/lean/UOToolchain/OramGame.lean`,
   `proof/lean/UOToolchain/SgxMicroGame.lean`,
+  `probe/mplus-probe/src/lib.rs`,
   `docs/formal-proof-plan.md`.
   The only remaining Lean `axiom`s are marked legacy, and the proof-grade
   `path_oram_local_posmap_v1` development does not depend on them.
+  The `static-checks` probe also pins the legacy axiom definitions to the
+  legacy game modules, restricts legacy theorem-symbol mentions to the
+  bridge/projection files, and checks that the proof-grade `Check*.lean`
+  entrypoints do not mention those legacy shims directly.
 
 - `cleared` Translation-validate proof-relevant compiler output against source
   and metadata.
