@@ -8290,6 +8290,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .ok_or_else(|| anyhow!("failed to locate CommittedRuntimeWitnessSnapshot declaration"))?;
     let committed_runtime_witness_snapshot_nonclone =
         !committed_runtime_witness_snapshot_derive_line.contains("Clone");
+    let committed_runtime_witness_snapshot_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "CommittedRuntimeWitnessSnapshot")?;
+    let expected_committed_runtime_witness_snapshot_surface_files = vec![
+        String::from("runtime/uo-evm/src/state.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let committed_runtime_witness_snapshot_surface_restricted =
+        committed_runtime_witness_snapshot_surface_files
+            == expected_committed_runtime_witness_snapshot_surface_files;
     let engine_leaves_runtime_phase_tail_inside_runtime = !engine_impl_source
         .contains("finalize_runtime_kernel_refinement_witness(")
         && shell_source.contains("runtime.finalize_runtime_kernel_refinement_witness(")
@@ -8465,6 +8474,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .ok_or_else(|| anyhow!("failed to locate ConfidentialExecState declaration"))?;
     let confidential_exec_state_nonclone =
         !confidential_exec_state_derive_line.contains("Clone");
+    let confidential_exec_state_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "ConfidentialExecState")?;
+    let expected_confidential_exec_state_surface_files =
+        vec![String::from("runtime/uo-evm/src/kernel.rs")];
+    let confidential_exec_state_surface_restricted =
+        confidential_exec_state_surface_files == expected_confidential_exec_state_surface_files;
     let confidential_execution_outcome_decl = "struct ConfidentialExecutionOutcome";
     let confidential_execution_outcome_derive_line = kernel_source
         .split(confidential_execution_outcome_decl)
@@ -9172,6 +9187,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "checked": kernel_source.contains("struct ConfidentialExecState")
                 && kernel_source.contains("slots: Vec<Option<Value>>")
                 && confidential_exec_state_nonclone
+                && confidential_exec_state_surface_restricted
                 && confidential_execution_outcome_nonclone
                 && confidential_exec_state_wipes_on_drop,
         }),
@@ -9200,6 +9216,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "boundary": "opaque hidden ORAM witness snapshot captured in CallTraceContext and projected only through theorem.rs",
             "checked": state_committed_runtime_witness_snapshot_is_opaque
                 && committed_runtime_witness_snapshot_nonclone
+                && committed_runtime_witness_snapshot_surface_restricted
                 && theorem_only_runtime_helper_surface_restricted
                 && theorem_finalizes_execution_trace,
         }),
@@ -9310,6 +9327,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             committed_runtime_witness_snapshot_derive_line,
         "committed_runtime_witness_snapshot_nonclone":
             committed_runtime_witness_snapshot_nonclone,
+        "committed_runtime_witness_snapshot_surface_files":
+            committed_runtime_witness_snapshot_surface_files,
+        "expected_committed_runtime_witness_snapshot_surface_files":
+            expected_committed_runtime_witness_snapshot_surface_files,
+        "committed_runtime_witness_snapshot_surface_restricted":
+            committed_runtime_witness_snapshot_surface_restricted,
         "engine_leaves_runtime_phase_tail_inside_runtime":
             engine_leaves_runtime_phase_tail_inside_runtime,
         "state_confidential_call_inputs_wrapper_restricted":
@@ -9364,6 +9387,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             runtime_call_outcome_runtime_private,
         "runtime_call_outcome_derive_line": runtime_call_outcome_derive_line,
         "runtime_call_outcome_nonclone": runtime_call_outcome_nonclone,
+        "confidential_exec_state_surface_files": confidential_exec_state_surface_files,
+        "expected_confidential_exec_state_surface_files":
+            expected_confidential_exec_state_surface_files,
+        "confidential_exec_state_surface_restricted":
+            confidential_exec_state_surface_restricted,
         "confidential_exec_state_derive_line": confidential_exec_state_derive_line,
         "confidential_exec_state_nonclone": confidential_exec_state_nonclone,
         "confidential_execution_outcome_derive_line":
