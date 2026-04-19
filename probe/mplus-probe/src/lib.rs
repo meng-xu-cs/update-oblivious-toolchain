@@ -8341,6 +8341,41 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains("let RuntimeCallOutcome {")
         && theorem_source
             .contains("let output_shape = output_shape_of(manifest_entry, &return_value)?;");
+    let theorem_private_surface_checks = [
+        (
+            "struct CallTraceContext {",
+            "pub(crate) struct CallTraceContext {",
+        ),
+        (
+            "struct FinalizeExecutionTraceInput<'a> {",
+            "pub(crate) struct FinalizeExecutionTraceInput<'a> {",
+        ),
+        (
+            "struct FinalizeCallTraceInput<'a> {",
+            "pub(crate) struct FinalizeCallTraceInput<'a> {",
+        ),
+        ("fn begin_call_trace(", "pub(crate) fn begin_call_trace("),
+        ("fn finalize_call_trace(", "pub(crate) fn finalize_call_trace("),
+        ("fn recorder_mut(&mut self)", "pub(crate) fn recorder_mut(&mut self)"),
+    ]
+    .into_iter()
+    .map(|(required_private, forbidden_pubcrate)| {
+        let private_present = theorem_source.contains(required_private);
+        let forbidden_present = theorem_source.contains(forbidden_pubcrate);
+        json!({
+            "required_private": required_private,
+            "forbidden_pubcrate": forbidden_pubcrate,
+            "private_present": private_present,
+            "forbidden_present": forbidden_present,
+            "restricted": private_present && !forbidden_present,
+        })
+    })
+    .collect::<Vec<_>>();
+    let theorem_private_surface_restricted = theorem_private_surface_checks.iter().all(|entry| {
+        entry["restricted"]
+            .as_bool()
+            .expect("theorem private-surface restriction flag must be boolean")
+    });
     let controller_public_call_summary_uses_manifest_only = controller_source
         .contains("fn from_manifest_entry")
         && controller_source.contains("manifest_entry.param_names")
@@ -8370,6 +8405,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_public_trace_uses_output_shape_only = engine_impl_source
         .contains("let finalized = run_traced_call(")
         && theorem_trace_bridge_api_is_compact
+        && theorem_private_surface_restricted
         && !engine_impl_source.contains("let mut call_trace_context =")
         && !engine_impl_source.contains("begin_call_trace(")
         && !engine_impl_source.contains("finalize_call_trace(")
@@ -9474,6 +9510,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "state_confidential_call_inputs_wrapper_restricted":
             state_confidential_call_inputs_wrapper_restricted,
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
+        "theorem_private_surface_checks": theorem_private_surface_checks,
+        "theorem_private_surface_restricted":
+            theorem_private_surface_restricted,
         "controller_public_call_summary_uses_manifest_only":
             controller_public_call_summary_uses_manifest_only,
         "controller_public_trace_uses_output_shape_only":
