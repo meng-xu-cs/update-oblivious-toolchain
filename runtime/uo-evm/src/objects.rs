@@ -822,7 +822,15 @@ impl RuntimeObject {
                     &mut object.leaf_coin_source,
                     &mut object.rng,
                 )?;
-                if let Some(leaf) = transcript.path_leaf {
+                let (
+                    logical_accesses,
+                    physical_reads,
+                    physical_writes,
+                    zero_writes,
+                    path_leaf,
+                    path_transition,
+                ) = transcript.into_runtime_trace_parts();
+                if let Some(leaf) = path_leaf {
                     trace.record_path_oram_leaf_access(
                         object.spec.id,
                         &object.spec.name,
@@ -830,19 +838,19 @@ impl RuntimeObject {
                         leaf,
                     );
                 }
-                if let Some(transition) = transcript.path_transition {
+                if let Some(transition) = path_transition {
                     trace.record_path_oram_leaf_state_transition(transition);
                 }
-                for event in transcript.logical_accesses {
+                for event in logical_accesses {
                     trace.logical_read(&event.kind, &event.object, event.detail);
                 }
-                for event in transcript.physical_reads {
+                for event in physical_reads {
                     trace.physical_read(&event.object, event.location, event.len);
                 }
-                for write in transcript.physical_writes {
+                for write in physical_writes {
                     trace.physical_write(write.with_object(&object.spec.name));
                 }
-                trace.add_zero_writes(transcript.zero_writes);
+                trace.add_zero_writes(zero_writes);
                 Ok(value)
             }
             _ => bail!("{} is not a map", self.name()),
@@ -919,7 +927,15 @@ impl RuntimeObject {
                     &mut object.leaf_coin_source,
                     &mut object.rng,
                 )?;
-                if let Some(leaf) = transcript.path_leaf {
+                let (
+                    logical_accesses,
+                    physical_reads,
+                    physical_writes,
+                    zero_writes,
+                    path_leaf,
+                    path_transition,
+                ) = transcript.into_runtime_trace_parts();
+                if let Some(leaf) = path_leaf {
                     trace.record_path_oram_leaf_access(
                         object.spec.id,
                         &object.spec.name,
@@ -927,19 +943,19 @@ impl RuntimeObject {
                         leaf,
                     );
                 }
-                if let Some(transition) = transcript.path_transition {
+                if let Some(transition) = path_transition {
                     trace.record_path_oram_leaf_state_transition(transition);
                 }
-                for event in transcript.logical_accesses {
+                for event in logical_accesses {
                     trace.logical_read(&event.kind, &event.object, event.detail);
                 }
-                for event in transcript.physical_reads {
+                for event in physical_reads {
                     trace.physical_read(&event.object, event.location, event.len);
                 }
-                for write in transcript.physical_writes {
+                for write in physical_writes {
                     trace.physical_write(write.with_object(&object.spec.name));
                 }
-                trace.add_zero_writes(transcript.zero_writes);
+                trace.add_zero_writes(zero_writes);
                 trace.logical_write("uooram_put", &object.spec.name, "oblivious");
                 if apply {
                     object.dirty = true;
@@ -1160,11 +1176,12 @@ impl RuntimeObject {
                             allocator,
                             &mut next.rng,
                         )?;
-                        for write in commit.writes {
+                        let (next_oram, writes, zero_writes) = commit.into_object_commit_parts();
+                        for write in writes {
                             trace.physical_write(write.with_object(&next.spec.name));
                         }
-                        trace.add_zero_writes(commit.zero_writes);
-                        next.oram = commit.next;
+                        trace.add_zero_writes(zero_writes);
+                        next.oram = next_oram;
                     }
                 }
                 next.accessed = false;

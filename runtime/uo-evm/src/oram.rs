@@ -137,26 +137,54 @@ pub(crate) struct OramStorage {
 
 #[derive(Clone, Debug)]
 pub(crate) struct OramTranscript {
-    pub logical_accesses: Vec<LogicalEvent>,
-    pub physical_reads: Vec<PhysicalReadEvent>,
-    pub physical_writes: Vec<OramWrite>,
-    pub zero_writes: usize,
-    pub path_leaf: Option<usize>,
-    pub path_transition: Option<RuntimePathOramTransitionWitness>,
+    logical_accesses: Vec<LogicalEvent>,
+    physical_reads: Vec<PhysicalReadEvent>,
+    physical_writes: Vec<OramWrite>,
+    zero_writes: usize,
+    path_leaf: Option<usize>,
+    path_transition: Option<RuntimePathOramTransitionWitness>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct OramWrite {
-    pub location: String,
-    pub len: usize,
-    pub class: WriteClass,
+    location: String,
+    len: usize,
+    class: WriteClass,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct OramCommit {
-    pub next: OramState,
-    pub writes: Vec<OramWrite>,
-    pub zero_writes: usize,
+    next: OramState,
+    writes: Vec<OramWrite>,
+    zero_writes: usize,
+}
+
+impl OramTranscript {
+    pub(crate) fn into_runtime_trace_parts(
+        self,
+    ) -> (
+        Vec<LogicalEvent>,
+        Vec<PhysicalReadEvent>,
+        Vec<OramWrite>,
+        usize,
+        Option<usize>,
+        Option<RuntimePathOramTransitionWitness>,
+    ) {
+        (
+            self.logical_accesses,
+            self.physical_reads,
+            self.physical_writes,
+            self.zero_writes,
+            self.path_leaf,
+            self.path_transition,
+        )
+    }
+}
+
+impl OramCommit {
+    pub(crate) fn into_object_commit_parts(self) -> (OramState, Vec<OramWrite>, usize) {
+        (self.next, self.writes, self.zero_writes)
+    }
 }
 
 impl OramWrite {

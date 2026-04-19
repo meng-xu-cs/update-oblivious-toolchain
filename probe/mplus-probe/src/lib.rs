@@ -10638,11 +10638,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("len: new.len(),")
         && core_trace_source.contains("class: classify_write(old, new),");
     let oram_write_trace_is_shape_only = oram_source.contains("pub(crate) struct OramWrite {")
-        && oram_source.contains("pub len: usize,")
-        && oram_source.contains("pub class: WriteClass,")
+        && oram_source.contains("len: usize,")
+        && oram_source.contains("class: WriteClass,")
         && !oram_source.contains("pub old: Vec<u8>")
         && !oram_source.contains("pub new: Vec<u8>")
         && !oram_source.contains("pub new_zero: bool,");
+    let oram_write_fields_private = oram_source.contains("location: String,")
+        && oram_source.contains("len: usize,")
+        && oram_source.contains("class: WriteClass,")
+        && !oram_source.contains("pub location: String,")
+        && !oram_source.contains("pub len: usize,")
+        && !oram_source.contains("pub class: WriteClass,");
     let oram_write_trace_projects_to_public_shape = oram_source.contains(
         "pub(crate) fn from_buffers(location: impl Into<String>, old: &[u8], new: &[u8]) -> Self",
     ) && oram_source
@@ -10650,6 +10656,32 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && oram_source.contains(
             "PhysicalWriteEvent::from_shape(object, self.location, self.len, self.class)",
         );
+    let oram_transcript_fields_private = oram_source
+        .contains("logical_accesses: Vec<LogicalEvent>,")
+        && oram_source.contains("physical_reads: Vec<PhysicalReadEvent>,")
+        && oram_source.contains("physical_writes: Vec<OramWrite>,")
+        && oram_source.contains("zero_writes: usize,")
+        && oram_source.contains("path_leaf: Option<usize>,")
+        && oram_source.contains("path_transition: Option<RuntimePathOramTransitionWitness>,")
+        && !oram_source.contains("pub logical_accesses: Vec<LogicalEvent>,")
+        && !oram_source.contains("pub physical_reads: Vec<PhysicalReadEvent>,")
+        && !oram_source.contains("pub physical_writes: Vec<OramWrite>,")
+        && !oram_source.contains("pub zero_writes: usize,")
+        && !oram_source.contains("pub path_leaf: Option<usize>,")
+        && !oram_source.contains("pub path_transition: Option<RuntimePathOramTransitionWitness>,");
+    let oram_transcript_api_is_explicit = oram_source
+        .contains("pub(crate) fn into_runtime_trace_parts(")
+        && objects_source.contains("transcript.into_runtime_trace_parts();");
+    let oram_commit_fields_private = oram_source
+        .contains("next: OramState,")
+        && oram_source.contains("writes: Vec<OramWrite>,")
+        && oram_source.contains("zero_writes: usize,")
+        && !oram_source.contains("pub next: OramState,")
+        && !oram_source.contains("pub writes: Vec<OramWrite>,")
+        && !oram_source.contains("pub zero_writes: usize,");
+    let oram_commit_api_is_explicit = oram_source
+        .contains("pub(crate) fn into_object_commit_parts(self)")
+        && objects_source.contains("commit.into_object_commit_parts();");
     let store_write_api_uses_mutable_plaintext = store_store_source
         .contains("fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()>")
         && store_store_source
@@ -11263,8 +11295,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "physical_write_event_builders_are_shape_only":
             physical_write_event_builders_are_shape_only,
         "oram_write_trace_is_shape_only": oram_write_trace_is_shape_only,
+        "oram_write_fields_private": oram_write_fields_private,
         "oram_write_trace_projects_to_public_shape":
             oram_write_trace_projects_to_public_shape,
+        "oram_transcript_fields_private": oram_transcript_fields_private,
+        "oram_transcript_api_is_explicit": oram_transcript_api_is_explicit,
+        "oram_commit_fields_private": oram_commit_fields_private,
+        "oram_commit_api_is_explicit": oram_commit_api_is_explicit,
         "store_write_api_uses_mutable_plaintext": store_write_api_uses_mutable_plaintext,
         "direct_store_seal_surface_files": direct_store_seal_surface_files,
         "direct_store_seal_surface_restricted": direct_store_seal_surface_restricted,
@@ -11401,7 +11438,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && physical_write_event_is_shape_only
             && physical_write_event_builders_are_shape_only
             && oram_write_trace_is_shape_only
+            && oram_write_fields_private
             && oram_write_trace_projects_to_public_shape
+            && oram_transcript_fields_private
+            && oram_transcript_api_is_explicit
+            && oram_commit_fields_private
+            && oram_commit_api_is_explicit
             && store_write_api_uses_mutable_plaintext
             && direct_store_seal_surface_restricted
             && direct_store_open_surface_restricted
