@@ -198,10 +198,12 @@ The proof-grade report path now uses
 `CheckRuntimeTrustedKernel.lean` compatibility checker still exists for
 backward-compatible import paths, but it is no longer the main artifact
 validation route. The new tamper report complements the positive validation
-reports by mutating representative direct controller/hidden certificates plus
-the proof-grade translation, kernel, refinement, shell-boundary,
-confidential-core, runtime-witness, and trusted-kernel artifacts and checking
-that the corresponding Lean executables reject those drifted artifacts.
+reports by mutating representative direct controller/hidden certificates, the
+proof-grade translation, kernel, refinement, shell-boundary,
+confidential-core, runtime-witness, and trusted-kernel artifacts, and the
+seeded/canonical witness-family, theorem-input, and pair-certificate
+artifacts, then checking that the corresponding Lean executables reject those
+drifted artifacts.
 
 ## Precise Claim
 

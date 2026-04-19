@@ -146,9 +146,11 @@ Status labels:
   The default Lean build materializes the runtime-witness and certificate
   checkers, and the probe runs the corresponding validation reports. The probe
   now also emits `tamper_validation.json`, which mutates representative direct
-  controller/hidden certificates plus every proof-grade translation/runtime
-  bridge artifact and checks that the shipped Lean executables reject those
-  semantically drifted but still parseable artifacts end to end.
+  controller/hidden certificates, every proof-grade translation/runtime bridge
+  artifact, and the theorem-facing seeded/canonical witness-family,
+  theorem-input, and pair-certificate artifacts, then checks that the shipped
+  Lean executables reject those semantically drifted but still parseable
+  artifacts end to end.
 
 - `cleared` Provide a dedicated bridge-validation report rather than forcing
   users to infer bridge status from the full probe bundle.
@@ -159,8 +161,9 @@ Status labels:
   The repo now has a focused `bridge_validation.json` path that runs
   translation validation plus the controller / hidden / kernel /
   kernel-refinement / trusted-kernel / witness bridge reports, and the
-  companion `tamper_validation.json` report shows that those theorem-facing
-  artifacts are rejected when their key proof-relevant fields are tampered.
+  companion `tamper_validation.json` report extends the negative testing to
+  those bridge artifacts plus the seeded/canonical witness-family,
+  theorem-input, and pair-certificate interfaces.
 
 - `optional` The paper-main theorem provenance step is tracked separately in
   `docs/paper-main-theorem-checklist.md`: supply or cite an external

@@ -293,6 +293,13 @@ cargo run -q -p mplus-probe -- --only bridge-validation --out-dir results
 cargo run -q -p mplus-probe -- --only tamper-validation --out-dir results
 ```
 
+`bridge_validation.json` is the focused direct imported-theorem bridge report.
+`tamper_validation.json` is the negative companion: it mutates the direct
+controller/hidden and proof-grade bridge artifacts together with the
+seeded/canonical witness-family, theorem-input, and pair-certificate artifacts
+and checks that the shipped Lean validators reject those drifted but still
+parseable artifacts.
+
 Artifact modes:
 
 - `./scripts/run_validation.sh` keeps the default compact artifact profile. Oversized canonical Path-ORAM families and pair certificates stay validated through compact theorem-input certificates.

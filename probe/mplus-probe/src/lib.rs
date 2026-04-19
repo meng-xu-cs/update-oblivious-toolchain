@@ -1489,6 +1489,10 @@ fn run_tamper_validation() -> Result<JsonValue> {
         entrypoint: "put(bytes32,uint256)",
         args: vec![b32(1), Value::Uint(7)],
     };
+    let pair_target = CallSpec {
+        entrypoint: "put(bytes32,uint256)",
+        args: vec![b32(9), Value::Uint(7)],
+    };
     let trace = run_target_call(&artifact, &[], target.entrypoint, target.args.clone())?;
     let controller_certificate = trace.runtime_controller_observer_certificate()?;
     let hidden_certificate = trace.runtime_path_oram_hidden_certificate()?;
@@ -1550,6 +1554,15 @@ fn run_tamper_validation() -> Result<JsonValue> {
         lean_proofgrade_confidential_core_shell_boundary_lowering_checker_path()?;
     let witness_checker = lean_proofgrade_witness_checker_path()?;
     let trusted_kernel_checker = lean_proofgrade_trusted_kernel_checker_path()?;
+    let witness_family_checker = lean_witness_family_checker_path()?;
+    let fresh_coin_family_checker = lean_fresh_coin_family_checker_path()?;
+    let fresh_coin_theorem_input_checker = lean_fresh_coin_theorem_input_checker_path()?;
+    let pathoram_pair_checker = lean_pathoram_pair_checker_path()?;
+    let canonical_pathoram_pair_checker = lean_canonical_pathoram_pair_checker_path()?;
+    let canonical_pathoram_paper_instantiation_checker =
+        lean_canonical_pathoram_paper_instantiation_checker_path()?;
+    let canonical_pathoram_pair_theorem_input_checker =
+        lean_canonical_pathoram_pair_theorem_input_checker_path()?;
 
     let mut scenarios = Vec::new();
 
@@ -2049,6 +2062,219 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
+    let mut tampered_seeded_family = collect_seeded_pathoram_family(
+        &artifact,
+        &[],
+        target.entrypoint,
+        target.args.clone(),
+        8,
+    )?
+    .family;
+    let second_seeded_witness = tampered_seeded_family
+        .witnesses
+        .get_mut(1)
+        .ok_or_else(|| anyhow!("seeded family tamper scenario needs at least two witnesses"))?;
+    second_seeded_witness.runtime_seed = Some(99);
+    scenarios.push(validate_tampered_json_case(
+        "seeded_witness_family/seed_tag_drift",
+        &tampered_seeded_family,
+        |family_path| {
+            Ok(Command::new(&witness_family_checker)
+                .arg(family_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "seeded_witness_family/seed_tag_drift",
+            "artifact_kind": "runtime_seeded_pathoram_witness_family",
+            "benchmark": "SingleAccessMap/pathoram/put-seeded",
+            "entrypoint": target.entrypoint,
+            "mutation": "change the second witness runtime_seed tag without changing its witness contents",
+        }),
+    )?);
+
+    let mut tampered_fresh_coin_family =
+        collect_canonical_fresh_coin_family_case(
+            "SingleAccessMap/pathoram/put-fresh-coins-tamper",
+            &artifact,
+            &[],
+            &target,
+        )?
+        .family;
+    if tampered_fresh_coin_family.seed_count == 0 {
+        return Err(anyhow!("fresh-coin family tamper scenario has empty seed space"));
+    }
+    tampered_fresh_coin_family.seed_count -= 1;
+    scenarios.push(validate_tampered_json_case(
+        "fresh_coin_family/seed_count_drift",
+        &tampered_fresh_coin_family,
+        |family_path| {
+            Ok(Command::new(&fresh_coin_family_checker)
+                .arg(family_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "fresh_coin_family/seed_count_drift",
+            "artifact_kind": "runtime_canonical_fresh_coin_witness_family",
+            "benchmark": "SingleAccessMap/pathoram/put-fresh-coins",
+            "entrypoint": target.entrypoint,
+            "mutation": "decrement the canonical fresh-coin family seed_count while leaving the witness list fixed",
+        }),
+    )?);
+
+    let mut tampered_fresh_coin_theorem_input =
+        collect_canonical_fresh_coin_theorem_input_case(
+            "SingleAccessMap/pathoram/put-fresh-coins-theorem-input-tamper",
+            &artifact,
+            &[],
+            &target,
+        )?
+        .input;
+    tampered_fresh_coin_theorem_input.representative_seed =
+        tampered_fresh_coin_theorem_input.seed_count;
+    scenarios.push(validate_tampered_json_case(
+        "fresh_coin_theorem_input/representative_seed_drift",
+        &tampered_fresh_coin_theorem_input,
+        |theorem_input_path| {
+            Ok(Command::new(&fresh_coin_theorem_input_checker)
+                .arg(theorem_input_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "fresh_coin_theorem_input/representative_seed_drift",
+            "artifact_kind": "runtime_canonical_fresh_coin_theorem_input",
+            "benchmark": "SingleAccessMap/pathoram/put-fresh-coins",
+            "entrypoint": target.entrypoint,
+            "mutation": "set representative_seed just outside the canonical seed space",
+        }),
+    )?);
+
+    let mut tampered_pathoram_pair_certificate = build_seeded_pathoram_pair_certificate(
+        "SingleAccessMap/pathoram/put-pair-tamper",
+        &artifact,
+        &[],
+        &target,
+        &pair_target,
+        8,
+    )?;
+    let rhs_seeded_pair_witness = tampered_pathoram_pair_certificate
+        .rhs_family
+        .witnesses
+        .get_mut(1)
+        .ok_or_else(|| anyhow!("path-ORAM pair tamper scenario needs at least two rhs witnesses"))?;
+    rhs_seeded_pair_witness.runtime_seed = Some(99);
+    scenarios.push(validate_tampered_json_case(
+        "pathoram_pair/seed_tag_drift",
+        &tampered_pathoram_pair_certificate,
+        |certificate_path| {
+            Ok(Command::new(&pathoram_pair_checker)
+                .arg(certificate_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "pathoram_pair/seed_tag_drift",
+            "artifact_kind": "runtime_seeded_pathoram_pair_certificate",
+            "benchmark": "SingleAccessMap/pathoram/put-pair",
+            "entrypoint": target.entrypoint,
+            "mutation": "change the second rhs witness runtime_seed tag without changing the witness contents",
+        }),
+    )?);
+
+    let mut tampered_canonical_pathoram_pair_certificate =
+        build_canonical_pathoram_pair_certificate(
+            "SingleAccessMap/pathoram/put-canonical-pair-tamper",
+            &artifact,
+            &[],
+            &target,
+            &pair_target,
+        )?;
+    if tampered_canonical_pathoram_pair_certificate.rhs_family.seed_count == 0 {
+        return Err(anyhow!(
+            "canonical path-ORAM pair tamper scenario has empty rhs canonical seed space"
+        ));
+    }
+    tampered_canonical_pathoram_pair_certificate.rhs_family.seed_count -= 1;
+    scenarios.push(validate_tampered_json_case(
+        "canonical_pathoram_pair/seed_count_drift",
+        &tampered_canonical_pathoram_pair_certificate,
+        |certificate_path| {
+            Ok(Command::new(&canonical_pathoram_pair_checker)
+                .arg(certificate_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "canonical_pathoram_pair/seed_count_drift",
+            "artifact_kind": "runtime_canonical_pathoram_pair_certificate",
+            "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
+            "entrypoint": target.entrypoint,
+            "mutation": "decrement rhs canonical family seed_count while leaving the witness list fixed",
+        }),
+    )?);
+
+    scenarios.push(validate_tampered_json_case(
+        "canonical_pathoram_paper_instantiation/seed_count_drift",
+        &tampered_canonical_pathoram_pair_certificate,
+        |certificate_path| {
+            Ok(Command::new(&canonical_pathoram_paper_instantiation_checker)
+                .arg(certificate_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "canonical_pathoram_paper_instantiation/seed_count_drift",
+            "artifact_kind": "runtime_canonical_pathoram_paper_pair_certificate",
+            "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
+            "entrypoint": target.entrypoint,
+            "mutation": "decrement rhs canonical family seed_count before the paper-instantiation checker replays the certificate",
+        }),
+    )?);
+
+    let mut tampered_canonical_pathoram_pair_theorem_input =
+        build_canonical_pathoram_pair_theorem_input(
+            "SingleAccessMap/pathoram/put-canonical-pair-theorem-input-tamper",
+            &artifact,
+            &[],
+            &target,
+            &pair_target,
+        )?;
+    tampered_canonical_pathoram_pair_theorem_input.rhs_input.representative_seed =
+        tampered_canonical_pathoram_pair_theorem_input.rhs_input.seed_count;
+    scenarios.push(validate_tampered_json_case(
+        "canonical_pathoram_pair_theorem_input/representative_seed_drift",
+        &tampered_canonical_pathoram_pair_theorem_input,
+        |theorem_input_path| {
+            Ok(Command::new(&canonical_pathoram_pair_theorem_input_checker)
+                .arg(theorem_input_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "canonical_pathoram_pair_theorem_input/representative_seed_drift",
+            "artifact_kind": "runtime_canonical_pathoram_pair_theorem_input",
+            "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
+            "entrypoint": target.entrypoint,
+            "mutation": "set rhs representative_seed just outside the canonical seed space",
+        }),
+    )?);
+
     Ok(json!({
         "benchmark": "SingleAccessMap/pathoram/put",
         "model_tags": {
@@ -2074,6 +2300,18 @@ fn run_tamper_validation() -> Result<JsonValue> {
                 display_report_path(&confidential_core_shell_boundary_lowering_checker),
             "proofgrade_runtime_refinement_witness": display_report_path(&witness_checker),
             "proofgrade_runtime_trusted_kernel_bundle": display_report_path(&trusted_kernel_checker),
+            "runtime_seeded_pathoram_witness_family": display_report_path(&witness_family_checker),
+            "runtime_canonical_fresh_coin_witness_family":
+                display_report_path(&fresh_coin_family_checker),
+            "runtime_canonical_fresh_coin_theorem_input":
+                display_report_path(&fresh_coin_theorem_input_checker),
+            "runtime_seeded_pathoram_pair_certificate": display_report_path(&pathoram_pair_checker),
+            "runtime_canonical_pathoram_pair_certificate":
+                display_report_path(&canonical_pathoram_pair_checker),
+            "runtime_canonical_pathoram_paper_pair_certificate":
+                display_report_path(&canonical_pathoram_paper_instantiation_checker),
+            "runtime_canonical_pathoram_pair_theorem_input":
+                display_report_path(&canonical_pathoram_pair_theorem_input_checker),
         },
         "scenario_count": scenarios.len(),
         "scenarios": scenarios,
@@ -5917,6 +6155,189 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
         "lean_validated": true,
         "accepted": true,
     }))
+}
+
+fn build_seeded_pathoram_pair_certificate(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    lhs: &CallSpec,
+    rhs: &CallSpec,
+    seed_count: usize,
+) -> Result<ImportedSeededRuntimePathOramPairCertificate> {
+    let lhs_collected = collect_seeded_pathoram_family(
+        artifact,
+        setup,
+        lhs.entrypoint,
+        lhs.args.clone(),
+        seed_count,
+    )?;
+    let rhs_collected = collect_seeded_pathoram_family(
+        artifact,
+        setup,
+        rhs.entrypoint,
+        rhs.args.clone(),
+        seed_count,
+    )?;
+
+    let lhs_first = lhs_collected
+        .family
+        .witnesses
+        .first()
+        .ok_or_else(|| anyhow!("left seeded family is empty for {}", name))?;
+    let rhs_first = rhs_collected
+        .family
+        .witnesses
+        .first()
+        .ok_or_else(|| anyhow!("right seeded family is empty for {}", name))?;
+
+    let cfg = imported_oram_config(
+        artifact,
+        lhs.entrypoint,
+        lhs_first,
+        &lhs_collected.access_counters_before,
+    )?;
+    let rhs_cfg = imported_oram_config(
+        artifact,
+        rhs.entrypoint,
+        rhs_first,
+        &rhs_collected.access_counters_before,
+    )?;
+    if serde_json::to_string(&cfg)? != serde_json::to_string(&rhs_cfg)? {
+        return Err(anyhow!(
+            "path-ORAM pair {} does not share a common public configuration",
+            name
+        ));
+    }
+
+    let public_view = imported_oram_public_view(lhs_first);
+    let public_location = imported_path_oram_public_location(lhs_first);
+    let storage_shape = imported_path_oram_storage_shape(lhs_first);
+    let public_outcome = lhs_first.public_outcome.clone();
+    let boundary_schedule = lhs_first.boundary_schedule.clone();
+    let controller_shape = lhs_first.controller_shape.clone();
+    let normalized_micro_trace = lhs_first.normalized_micro_trace.clone();
+
+    Ok(ImportedSeededRuntimePathOramPairCertificate {
+        cfg,
+        lhs_family: lhs_collected.family,
+        rhs_family: rhs_collected.family,
+        public_view,
+        public_location,
+        storage_shape,
+        public_outcome,
+        boundary_schedule,
+        controller_shape,
+        normalized_micro_trace,
+    })
+}
+
+fn build_canonical_pathoram_pair_certificate(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    lhs: &CallSpec,
+    rhs: &CallSpec,
+) -> Result<ImportedCanonicalFreshCoinRuntimePathOramPairCertificate> {
+    let lhs_collected = collect_canonical_fresh_coin_family_case(name, artifact, setup, lhs)?;
+    let rhs_collected = collect_canonical_fresh_coin_family_case(name, artifact, setup, rhs)?;
+
+    let lhs_first = &lhs_collected.first_witness;
+    let rhs_first = &rhs_collected.first_witness;
+    let cfg = imported_oram_config(
+        artifact,
+        lhs.entrypoint,
+        lhs_first,
+        &lhs_collected.access_counters_before,
+    )?;
+    let rhs_cfg = imported_oram_config(
+        artifact,
+        rhs.entrypoint,
+        rhs_first,
+        &rhs_collected.access_counters_before,
+    )?;
+    if serde_json::to_string(&cfg)? != serde_json::to_string(&rhs_cfg)? {
+        return Err(anyhow!(
+            "canonical path-ORAM pair {} does not share a common public configuration",
+            name
+        ));
+    }
+
+    let public_view = imported_oram_public_view(lhs_first);
+    let public_location = imported_path_oram_public_location(lhs_first);
+    let storage_shape = imported_path_oram_storage_shape(lhs_first);
+    let public_outcome = lhs_first.public_outcome.clone();
+    let boundary_schedule = lhs_first.boundary_schedule.clone();
+    let controller_shape = lhs_first.controller_shape.clone();
+    let normalized_micro_trace = lhs_first.normalized_micro_trace.clone();
+
+    Ok(ImportedCanonicalFreshCoinRuntimePathOramPairCertificate {
+        cfg,
+        lhs_family: lhs_collected.family,
+        rhs_family: rhs_collected.family,
+        public_view,
+        public_location,
+        storage_shape,
+        public_outcome,
+        boundary_schedule,
+        controller_shape,
+        normalized_micro_trace,
+    })
+}
+
+fn build_canonical_pathoram_pair_theorem_input(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    lhs: &CallSpec,
+    rhs: &CallSpec,
+) -> Result<ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput> {
+    let lhs_collected =
+        collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, lhs)?;
+    let rhs_collected =
+        collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, rhs)?;
+
+    let lhs_witness = &lhs_collected.input.representative_witness;
+    let rhs_witness = &rhs_collected.input.representative_witness;
+    let cfg = imported_oram_config(
+        artifact,
+        lhs.entrypoint,
+        lhs_witness,
+        &lhs_collected.access_counters_before,
+    )?;
+    let rhs_cfg = imported_oram_config(
+        artifact,
+        rhs.entrypoint,
+        rhs_witness,
+        &rhs_collected.access_counters_before,
+    )?;
+    if serde_json::to_string(&cfg)? != serde_json::to_string(&rhs_cfg)? {
+        return Err(anyhow!(
+            "canonical path-ORAM pair {} does not share a common public configuration",
+            name
+        ));
+    }
+
+    let public_view = imported_oram_public_view(lhs_witness);
+    let public_location = imported_path_oram_public_location(lhs_witness);
+    let storage_shape = imported_path_oram_storage_shape(lhs_witness);
+    let public_outcome = lhs_witness.public_outcome.clone();
+    let boundary_schedule = lhs_witness.boundary_schedule.clone();
+    let controller_shape = lhs_witness.controller_shape.clone();
+    let normalized_micro_trace = lhs_witness.normalized_micro_trace.clone();
+
+    Ok(ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput {
+        cfg,
+        lhs_input: lhs_collected.input,
+        rhs_input: rhs_collected.input,
+        public_view,
+        public_location,
+        storage_shape,
+        public_outcome,
+        boundary_schedule,
+        controller_shape,
+        normalized_micro_trace,
+    })
 }
 
 fn repo_root() -> PathBuf {
@@ -10376,9 +10797,10 @@ validators so the bridge status can be checked without inferring it from the
 full artifact bundle.
 `tamper_validation.json` complements those positive checks with end-to-end
 negative evidence: it mutates representative direct controller/hidden
-certificates plus every proof-grade translation/runtime bridge artifact and
-checks that the shipped Lean executables reject those semantically drifted but
-still parseable artifacts.
+certificates, every proof-grade translation/runtime bridge artifact, and the
+theorem-facing seeded/canonical witness-family, theorem-input, and
+pair-certificate artifacts, then checks that the shipped Lean executables
+reject those semantically drifted but still parseable artifacts.
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and
