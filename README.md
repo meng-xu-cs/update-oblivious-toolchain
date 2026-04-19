@@ -20,7 +20,7 @@ Components:
   translation-bundle tooling outside the proof-grade acceptance path.
 - `probe/mplus-probe`: runs paired leakage experiments, correctness checks,
   witness/certificate validation, and writes the reproducible `results/`
-  bundle.
+  bundle together with `reproducibility_manifest.json`.
 - `benches/raw`: the benchmark suite plus raw/UO metadata.
 - `benches/uo`: generated UO artifacts.
 
@@ -299,11 +299,17 @@ controller/hidden and proof-grade bridge artifacts together with the
 seeded/canonical witness-family, theorem-input, and pair-certificate artifacts
 and checks that the shipped Lean validators reject those drifted but still
 parseable artifacts.
+Every results directory now also carries `reproducibility_manifest.json`,
+which records bundle-relative output paths, byte sizes, and SHA-256 digests so
+two runs can be compared byte-for-byte even when they were written to
+different output directories.
 
 Artifact modes:
 
 - `./scripts/run_validation.sh` keeps the default compact artifact profile. Oversized canonical Path-ORAM families and pair certificates stay validated through compact theorem-input certificates.
 - `./scripts/run_heavy_artifact.sh` switches the probe into explicit heavy-artifact mode and writes a separate `results-heavy/` bundle with `heavy_artifacts/` materializations for the large feasible canonical families/pairs that exceed the default compact budget.
+- `./scripts/check_probe_reproducibility.sh --only static-checks` reruns a compact probe report twice and checks that the emitted directories are byte-for-byte identical.
+- `./scripts/check_probe_reproducibility.sh --only fresh-coin-validation --artifact-mode heavy --compact-budget-bytes 1 --heavy-budget-bytes 200000000` exercises the same byte-for-byte check on the heavy-artifact path.
 
 If you want to keep heavy-mode runs bounded on a smaller machine, set
 `UO_CANONICAL_CERT_BUDGET_BYTES` and `UO_HEAVY_ARTIFACT_BUDGET_BYTES`

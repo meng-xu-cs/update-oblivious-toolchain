@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use rayon::prelude::*;
 use serde::Serialize;
 use serde_json::{json, Value as JsonValue};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{BufWriter, Write};
@@ -193,6 +194,20 @@ pub struct ProbeRunOptions {
     pub heavy_budget_bytes: u64,
 }
 
+#[derive(Serialize)]
+struct ReproducibilityManifestEntry {
+    path: String,
+    bytes: u64,
+    sha256: String,
+}
+
+#[derive(Serialize)]
+struct ReproducibilityManifest {
+    format_version: u32,
+    file_count: usize,
+    files: Vec<ReproducibilityManifestEntry>,
+}
+
 impl Default for ProbeRunOptions {
     fn default() -> Self {
         Self {
@@ -212,7 +227,7 @@ impl ProbeRunOptions {
             "heavy_budget_bytes": self.heavy_budget_bytes,
             "heavy_artifact_dir": self
                 .heavy_artifact_dir()
-                .map(|path| display_report_path(&path)),
+                .map(|path| display_output_bundle_path(self, &path)),
         })
     }
 
@@ -596,6 +611,68 @@ pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
             .as_str()
             .ok_or_else(|| anyhow!("artifact_readme missing"))?,
     )?;
+    write_reproducibility_manifest(out_dir)?;
+    Ok(())
+}
+
+pub fn write_reproducibility_manifest(out_dir: &str) -> Result<()> {
+    let root = Path::new(out_dir);
+    fs::create_dir_all(root)?;
+    let mut files = Vec::new();
+    collect_bundle_files(root, root, &mut files)?;
+    let entries = files
+        .into_iter()
+        .filter(|path| {
+            path.file_name().and_then(|name| name.to_str()) != Some("reproducibility_manifest.json")
+        })
+        .map(|path| {
+            let bytes =
+                fs::read(&path).with_context(|| format!("reading output file {}", path.display()))?;
+            let relative = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            Ok(ReproducibilityManifestEntry {
+                path: relative,
+                bytes: bytes.len() as u64,
+                sha256: hex::encode(Sha256::digest(&bytes)),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let manifest = ReproducibilityManifest {
+        format_version: 1,
+        file_count: entries.len(),
+        files: entries,
+    };
+    fs::write(
+        root.join("reproducibility_manifest.json"),
+        serde_json::to_vec_pretty(&manifest)?,
+    )?;
+    Ok(())
+}
+
+fn collect_bundle_files(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+    let mut entries = fs::read_dir(dir)
+        .with_context(|| format!("reading output directory {}", dir.display()))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    entries.sort_by(|lhs, rhs| lhs.path().cmp(&rhs.path()));
+    for entry in entries {
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("reading file type for {}", path.display()))?;
+        if file_type.is_dir() {
+            collect_bundle_files(root, &path, files)?;
+        } else if file_type.is_file() {
+            files.push(path);
+        }
+    }
+    files.sort_by(|lhs, rhs| {
+        lhs.strip_prefix(root)
+            .unwrap_or(lhs)
+            .cmp(rhs.strip_prefix(root).unwrap_or(rhs))
+    });
     Ok(())
 }
 
@@ -5568,7 +5645,7 @@ fn persist_heavy_artifact_json<T: Serialize>(
     serde_json::to_writer(&mut writer, value)?;
     writer.flush()?;
     let bytes = fs::metadata(&path)?.len();
-    Ok(Some((display_report_path(&path), bytes)))
+    Ok(Some((display_output_bundle_path(options, &path), bytes)))
 }
 
 fn validate_fresh_coin_heavy_case(
@@ -5635,7 +5712,8 @@ fn validate_fresh_coin_heavy_case(
         "canonical_fresh_coin_seed_space_size": Some(summary.seed_count),
         "canonical_fresh_coin_values_match_index": true,
         "witness_family_json_bytes": artifact_json_bytes,
-        "heavy_artifact_path": preserve_path.then(|| display_report_path(&artifact_path)),
+        "heavy_artifact_path": preserve_path
+            .then(|| display_output_bundle_path(options, &artifact_path)),
         "heavy_artifact_json_bytes": preserve_path.then_some(artifact_json_bytes),
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "lean_validated": true,
@@ -5787,7 +5865,8 @@ fn validate_canonical_pathoram_pair_heavy_case(
         "controller_shape_equal": controller_shape_equal,
         "normalized_micro_trace_equal": normalized_micro_trace_equal,
         "certificate_json_bytes": artifact_json_bytes,
-        "heavy_artifact_path": preserve_path.then(|| display_report_path(&artifact_path)),
+        "heavy_artifact_path": preserve_path
+            .then(|| display_output_bundle_path(options, &artifact_path)),
         "heavy_artifact_json_bytes": preserve_path.then_some(artifact_json_bytes),
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "paper_instantiation_status": "validated",
@@ -8815,6 +8894,22 @@ fn display_report_path(path: &Path) -> String {
     }
 }
 
+fn display_output_bundle_path(options: &ProbeRunOptions, path: &Path) -> String {
+    if let Some(out_dir) = &options.out_dir {
+        let output_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let output_root = out_dir
+            .canonicalize()
+            .unwrap_or_else(|_| out_dir.to_path_buf());
+        if let Ok(relative) = output_path.strip_prefix(&output_root) {
+            return relative.display().to_string();
+        }
+        if let Ok(relative) = path.strip_prefix(out_dir) {
+            return relative.display().to_string();
+        }
+    }
+    display_report_path(path)
+}
+
 static BUILT_LEAN_CHECKERS: OnceLock<Mutex<BTreeSet<String>>> = OnceLock::new();
 
 fn ensure_lean_checker(target: &'static str, description: &'static str) -> Result<PathBuf> {
@@ -10862,10 +10957,16 @@ Prototype assumptions:
     ));
     if let Some(dir) = options.heavy_artifact_dir() {
         readme.push_str(&format!(
-            "- Heavy artifacts are written under `{}` when heavy mode is selected.\n",
-            dir.display()
+            "- Heavy artifacts are written under bundle-relative `{}` when heavy mode is selected.\n",
+            display_output_bundle_path(options, &dir)
         ));
     }
+    readme.push_str(
+        "- `reproducibility_manifest.json` records every emitted file with its bundle-relative path, byte size, and SHA-256 digest.\n",
+    );
+    readme.push_str(
+        "- `./scripts/check_probe_reproducibility.sh` reruns `mplus-probe` twice and checks that the two output directories are byte-for-byte identical.\n",
+    );
     readme
 }
 

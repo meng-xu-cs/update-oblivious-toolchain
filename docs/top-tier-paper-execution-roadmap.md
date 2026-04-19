@@ -473,6 +473,7 @@ cargo run -q -p mplus-probe -- --only confidential-core-shell-boundary-lowering-
 cargo run -q -p mplus-probe -- --only kernel-validation --out-dir /tmp/uo-kernel
 cargo run -q -p mplus-probe -- --only trusted-kernel-validation --out-dir /tmp/uo-tk
 cargo run -q -p mplus-probe -- --only tamper-validation --out-dir /tmp/uo-tamper
+./scripts/check_probe_reproducibility.sh --only static-checks
 ```
 
 Any phase that broadens the theorem, observer, or TCB must update the paper
