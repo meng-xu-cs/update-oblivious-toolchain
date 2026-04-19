@@ -8281,6 +8281,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !state_source.contains("pub runtime_oram_position_maps:")
         && state_source.contains("fn into_hidden_oram_state(")
         && theorem_source.contains(".into_hidden_oram_state()");
+    let committed_runtime_witness_snapshot_decl = "pub(crate) struct CommittedRuntimeWitnessSnapshot";
+    let committed_runtime_witness_snapshot_derive_line = state_source
+        .split(committed_runtime_witness_snapshot_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate CommittedRuntimeWitnessSnapshot declaration"))?;
+    let committed_runtime_witness_snapshot_nonclone =
+        !committed_runtime_witness_snapshot_derive_line.contains("Clone");
     let engine_leaves_runtime_phase_tail_inside_runtime = !engine_impl_source
         .contains("finalize_runtime_kernel_refinement_witness(")
         && shell_source.contains("runtime.finalize_runtime_kernel_refinement_witness(")
@@ -9190,6 +9199,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "owner": "runtime/uo-evm/src/state.rs",
             "boundary": "opaque hidden ORAM witness snapshot captured in CallTraceContext and projected only through theorem.rs",
             "checked": state_committed_runtime_witness_snapshot_is_opaque
+                && committed_runtime_witness_snapshot_nonclone
                 && theorem_only_runtime_helper_surface_restricted
                 && theorem_finalizes_execution_trace,
         }),
@@ -9296,6 +9306,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "state_finalizes_runtime_phase_witness": state_finalizes_runtime_phase_witness,
         "state_committed_runtime_witness_snapshot_is_opaque":
             state_committed_runtime_witness_snapshot_is_opaque,
+        "committed_runtime_witness_snapshot_derive_line":
+            committed_runtime_witness_snapshot_derive_line,
+        "committed_runtime_witness_snapshot_nonclone":
+            committed_runtime_witness_snapshot_nonclone,
         "engine_leaves_runtime_phase_tail_inside_runtime":
             engine_leaves_runtime_phase_tail_inside_runtime,
         "state_confidential_call_inputs_wrapper_restricted":

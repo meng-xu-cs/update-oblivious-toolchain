@@ -63,7 +63,7 @@ struct ConfidentialEntrypointPlan {
     max_hash_part_bytes: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct CommittedRuntimeWitnessSnapshot {
     runtime_oram_access_counters: Vec<RuntimeOramAccessCounterWitness>,
     runtime_oram_position_maps: Vec<RuntimePathOramPositionMapWitness>,
