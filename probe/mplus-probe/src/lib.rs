@@ -6012,7 +6012,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("RuntimeKernelStepWitness")
         && !engine_impl_source.contains("expected_runtime_steps()")
         && !engine_impl_source.contains("max_hash_part_bytes")
-        && !engine_impl_source.contains("kernel_steps");
+        && !engine_impl_source.contains("kernel_steps")
+        && !engine_impl_source.contains("max_commit_ops");
     let engine_does_not_import_public_runtime_kernel = !engine_impl_source
         .contains("use crate::runtime::kernel::PublicRuntimeKernel;")
         && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
@@ -6290,6 +6291,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
         && state_source.contains(".confidential_slot_program")
         && state_source.contains("expected_runtime_steps()")
+        && state_source.contains("max_commit_ops: manifest_entry.max_commit_ops")
         && state_source.contains("max_hash_part_bytes: manifest_entry.max_hash_part_bytes");
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
@@ -6372,6 +6374,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("struct ConfidentialCommittedKernelOutcome")
         && state_source.contains("struct ConfidentialCommittedCallOutcome")
         && !state_source.contains("opcode_trace: Vec::new()");
+    let state_enforces_confidential_commit_budget = state_source
+        .contains("recorder.physical_write_count() > max_commit_ops")
+        && state_source.contains("exceeded manifest commit budget");
     let oram_working_stash_capacity_checks = [
         (
             "fn working_stash_capacity(parameters: &OramParameters) -> Result<usize>",
@@ -7119,6 +7124,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             state_routes_confidential_calls_through_runtime_kernel,
         "state_confidential_outcome_layering_is_explicit":
             state_confidential_outcome_layering_is_explicit,
+        "state_enforces_confidential_commit_budget":
+            state_enforces_confidential_commit_budget,
         "oram_working_stash_capacity_checks": oram_working_stash_capacity_checks,
         "oram_working_stash_capacity_restricted":
             oram_working_stash_capacity_restricted,
@@ -7256,6 +7263,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && kernel_bounded_journal_restricted
             && state_routes_confidential_calls_through_runtime_kernel
             && state_confidential_outcome_layering_is_explicit
+            && state_enforces_confidential_commit_budget
             && oram_working_stash_capacity_restricted
             && oram_working_stash_avoids_midcall_reserve
             && oram_buffer_reuse_restricted
@@ -8933,7 +8941,8 @@ visibility-restricted to `crate::runtime`, so the generic shell cannot call
 those kernel hooks directly. `engine.rs` now delegates public execution to
 `shell.rs` and both confidential manifest-to-kernel planning plus
 confidential-kernel setup to `state.rs`, so it no longer imports either the
-raw `RuntimeKernel` or the public kernel facade directly.
+raw `RuntimeKernel` or the public kernel facade directly, or threads the
+manifest hash-scratch bound or confidential commit budget itself.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade
@@ -8973,7 +8982,8 @@ commit, and confidential execution are visibility-restricted to
 setup, and that confidential entrypoints are sourced from the checked
 manifest's `confidential_slot_program` in `runtime/uo-evm/src/state.rs`
 while that module delegates confidential execution through
-`runtime/uo-evm/src/kernel.rs`, and
+`runtime/uo-evm/src/kernel.rs`, enforces the manifest-derived confidential
+commit budget there as well, and
 that the production kernel executes that shared slot DSL with a slot-vector
 confidential state rather than a string-keyed map, and that the kernel-step
 witness journal plus the lower-level

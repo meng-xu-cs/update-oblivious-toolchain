@@ -52,6 +52,7 @@ pub(crate) struct ConfidentialEntrypointPlan {
     expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
     public_object_ids: Vec<u32>,
     shadow_load_object_ids: Vec<u32>,
+    max_commit_ops: usize,
     program: ConfidentialKernelSlotProgram,
     max_hash_part_bytes: usize,
 }
@@ -142,6 +143,7 @@ impl ContractRuntime {
             expected_kernel_steps,
             public_object_ids,
             shadow_load_object_ids,
+            max_commit_ops,
             program,
             max_hash_part_bytes,
         } = plan;
@@ -163,6 +165,14 @@ impl ContractRuntime {
             recorder,
             &mut opcode_trace,
         )?;
+        if recorder.physical_write_count() > max_commit_ops {
+            bail!(
+                "entrypoint {} exceeded manifest commit budget: {} > {}",
+                program.entrypoint_id,
+                recorder.physical_write_count(),
+                max_commit_ops
+            );
+        }
         Ok(ConfidentialCommittedCallOutcome {
             runtime_kernel_witness: outcome.runtime_kernel_witness,
             runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
@@ -428,6 +438,7 @@ impl ConfidentialEntrypointPlan {
             expected_kernel_steps,
             public_object_ids,
             shadow_load_object_ids,
+            max_commit_ops: manifest_entry.max_commit_ops,
             program,
             max_hash_part_bytes: manifest_entry.max_hash_part_bytes,
         })

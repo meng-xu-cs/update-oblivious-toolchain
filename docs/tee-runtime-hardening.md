@@ -400,7 +400,7 @@ The current runtime has a first hardening layer:
   either the raw `RuntimeKernel` or the public kernel facade directly, and it
   no longer loads the manifest-carried confidential slot program, recomputes
   the admitted runtime kernel-step schedule, or threads the manifest
-  hash-scratch bound itself
+  hash-scratch bound or confidential commit budget itself
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while the proof-grade translation checker, the

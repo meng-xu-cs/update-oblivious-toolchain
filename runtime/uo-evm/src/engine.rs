@@ -192,14 +192,6 @@ impl ContractInstance {
             gas_used += recorder.metrics().physical_writes as u64 * 17;
             let manifest_budget = manifest_entry.public_gas_budget;
             if function.confidential {
-                if recorder.physical_write_count() > manifest_entry.max_commit_ops {
-                    bail!(
-                        "entrypoint {} exceeded manifest commit budget: {} > {}",
-                        entrypoint,
-                        recorder.physical_write_count(),
-                        manifest_entry.max_commit_ops
-                    );
-                }
                 gas_used = manifest_budget;
             }
             Ok((
@@ -358,6 +350,7 @@ mod tests {
             "expected_runtime_steps()",
             "max_hash_part_bytes",
             "kernel_steps",
+            "max_commit_ops",
         ] {
             assert!(
                 !source.contains(forbidden),

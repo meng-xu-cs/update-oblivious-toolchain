@@ -337,7 +337,7 @@ The first implementation step is now present in the codebase:
   either the raw `RuntimeKernel` or the public kernel facade directly, and it
   no longer loads the manifest-carried confidential slot program, derives the
   admitted runtime kernel-step trace, or threads the manifest hash-scratch
-  bound itself
+  bound or confidential commit budget itself
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while checker-side compiler validation and the
