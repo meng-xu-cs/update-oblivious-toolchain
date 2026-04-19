@@ -451,7 +451,9 @@ The first implementation step is now present in the codebase:
   and per-object runtime RNG state now scrub themselves more aggressively, and
   `engine.rs` now keeps only a public `PublicCallSummary` derived from the
   checked manifest's `param_names` plus `secret_args` during theorem-trace
-  construction instead of cloning the full secret-bearing call-argument vector
+  construction instead of cloning the full secret-bearing call-argument
+  vector; the controller/theorem path now also consumes only the public
+  `OutputShape` summary rather than the full return payload
 - ORAM refresh/metadata decode now wipes decrypted payload buffers after parse
   rather than dropping them as ordinary plaintext heap allocations, and it now
   streams decoded position-map / stash pages directly into bounded live ORAM

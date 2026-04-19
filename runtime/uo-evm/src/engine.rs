@@ -1,4 +1,4 @@
-use crate::controller::{CallRecorder, PublicCallSummary};
+use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::state::{CommittedRuntimeState, PublicRuntimeShadowState};
@@ -302,12 +302,13 @@ impl ContractInstance {
             "after completing the call and returning to committed storage",
         )?;
         let runtime_state_after = self.state.witness_snapshot()?;
+        let output_shape = output_shape_of(&return_value);
         let trace_bundle = build_theorem_trace(
             recorder,
             &manifest_entry,
             &self.artifact.contract.manifest.objects,
             public_call,
-            &return_value,
+            output_shape,
             aborted,
             gas_used,
         )?;

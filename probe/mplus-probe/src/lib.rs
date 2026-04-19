@@ -6217,8 +6217,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         controller_source.contains("fn from_manifest_entry")
             && controller_source.contains("manifest_entry.param_names")
             && !controller_source.contains("CompiledFunction");
+    let controller_public_trace_uses_output_shape_only =
+        controller_source.contains("public_call: PublicCallSummary,\n        output_shape: OutputShape,")
+            && !controller_source.contains(
+                "public_call: PublicCallSummary,\n        return_value: &Option<Value>,",
+            );
     let theorem_public_trace_path_avoids_compiled_function =
         !theorem_source.contains("CompiledFunction");
+    let engine_public_trace_uses_output_shape_only =
+        engine_impl_source.contains("let output_shape = output_shape_of(&return_value);");
     let engine_uses_manifest_confidential_slot_program = engine_source
         .contains(".confidential_slot_program")
         && engine_source.contains("manifest confidential_slot_program missing");
@@ -6961,8 +6968,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
         "controller_public_call_summary_uses_manifest_only":
             controller_public_call_summary_uses_manifest_only,
+        "controller_public_trace_uses_output_shape_only":
+            controller_public_trace_uses_output_shape_only,
         "theorem_public_trace_path_avoids_compiled_function":
             theorem_public_trace_path_avoids_compiled_function,
+        "engine_public_trace_uses_output_shape_only":
+            engine_public_trace_uses_output_shape_only,
         "engine_uses_manifest_confidential_slot_program":
             engine_uses_manifest_confidential_slot_program,
         "kernel_executes_program_body_via_shared_dsl":
@@ -7091,7 +7102,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_finalizes_runtime_phase_witness
             && theorem_finalizes_execution_trace
             && controller_public_call_summary_uses_manifest_only
+            && controller_public_trace_uses_output_shape_only
             && theorem_public_trace_path_avoids_compiled_function
+            && engine_public_trace_uses_output_shape_only
             && engine_uses_manifest_confidential_slot_program
             && kernel_executes_program_body_via_shared_dsl
             && kernel_exec_block_uses_confidential_slot_statements
@@ -8902,7 +8915,9 @@ beyond `runtime/uo-evm/src/theorem.rs`, and no longer clones the full call
 argument vector just to recover public theorem-trace fields; instead the
 controller path must derive a `PublicCallSummary` from the checked manifest's
 `param_names` plus `secret_args`, and the theorem-finalization path must avoid
-depending on `CompiledFunction` entirely. The same report also checks that the
+depending on `CompiledFunction` entirely while the public trace path sees only
+the exported `OutputShape` rather than the full return payload. The same report
+also checks that the
 confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
 commit, and confidential execution are visibility-restricted to
 `crate::runtime`, and that `engine.rs` uses the `PublicRuntimeKernel` facade

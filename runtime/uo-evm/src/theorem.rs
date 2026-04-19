@@ -5,7 +5,7 @@ use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, RuntimeControllerObserverCertificate,
     RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness,
-    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, Value,
+    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, OutputShape,
 };
 
 pub(crate) struct FinalizeExecutionTraceInput<'a> {
@@ -27,7 +27,7 @@ pub fn build_theorem_trace(
     manifest_entry: &EntrypointManifest,
     manifest_objects: &[StateObjectManifest],
     public_call: PublicCallSummary,
-    return_value: &Option<Value>,
+    output_shape: OutputShape,
     aborted: bool,
     gas_used: u64,
 ) -> Result<crate::controller::CallTraceBundle> {
@@ -35,7 +35,7 @@ pub fn build_theorem_trace(
         manifest_entry,
         manifest_objects,
         public_call,
-        return_value,
+        output_shape,
         aborted,
         gas_used,
     )

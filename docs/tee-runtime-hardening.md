@@ -157,8 +157,9 @@ The current runtime has a first hardening layer:
   just to build the public theorem trace: it now retains only a
   `PublicCallSummary` derived from the checked manifest's `param_names` plus
   `secret_args`, containing the total input length plus the already-public
-  argument projection, and injected fresh-coin plans now zero their stored
-  leaf choices on drop
+  argument projection, and the controller/theorem path now receives only the
+  public `OutputShape` summary rather than the full return payload; injected
+  fresh-coin plans now zero their stored leaf choices on drop
 - ORAM refresh/metadata decode now uses `StoreCipher::with_opened_payload`, so
   decrypted position-map / stash / bucket payload buffers are scrubbed after
   parse instead of lingering as dropped plaintext heap allocations

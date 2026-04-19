@@ -257,13 +257,12 @@ impl CallRecorder {
         manifest_entry: &EntrypointManifest,
         manifest_objects: &[StateObjectManifest],
         public_call: PublicCallSummary,
-        return_value: &Option<Value>,
+        output_shape: OutputShape,
         aborted: bool,
         gas_used: u64,
     ) -> Result<CallTraceBundle> {
         self.assert_manifest_exactness(manifest_entry)?;
         self.assert_oram_parameter_exactness(manifest_objects)?;
-        let output_shape = output_shape_of(return_value);
         self.controller_phase_order.extend([
             ControllerPhase::SealPersistentState,
             ControllerPhase::EnclaveExit,
@@ -510,7 +509,7 @@ fn controller_region_budgets(regions: &BTreeMap<&'static str, usize>) -> Vec<Con
     .collect()
 }
 
-fn output_shape_of(return_value: &Option<Value>) -> OutputShape {
+pub(crate) fn output_shape_of(return_value: &Option<Value>) -> OutputShape {
     match return_value {
         Some(value) => OutputShape {
             return_present: true,
