@@ -9049,9 +9049,10 @@ confidential-path `RuntimeKernel` entrypoints that shadow-load committed
 state, run confidential calls, and commit public shadows are now likewise
 visibility-restricted to `crate::runtime`, so the generic shell cannot call
 those kernel hooks directly. `engine.rs` now delegates public execution to
-`shell.rs` and both confidential manifest-to-kernel planning plus
-confidential-kernel setup to `state.rs`, so it no longer imports either the
-raw `RuntimeKernel` or the public kernel facade directly, or threads the
+`shell.rs` and confidential execution to `state.rs`; confidential
+manifest-to-kernel planning is now fully internal to `ContractRuntime`, so
+`engine.rs` no longer stages a `ConfidentialEntrypointPlan`, imports either
+the raw `RuntimeKernel` or the public kernel facade directly, or threads the
 manifest hash-scratch bound or confidential commit budget itself.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
@@ -9095,10 +9096,13 @@ confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to
 `crate::runtime`, that the confidential shadow-load helper itself stays
 private to `runtime/uo-evm/src/kernel.rs`, that `shell.rs` owns the
-public-kernel facade while `state.rs` owns confidential manifest planning
-plus confidential-kernel setup through explicit wrapper operations rather
-than raw `inner_mut` / `into_inner` escape hatches, and that confidential entrypoints are
-sourced from the checked manifest's `confidential_slot_program` in
+public-kernel facade while `state.rs` owns confidential execution setup
+through explicit wrapper operations rather than raw `inner_mut` /
+`into_inner` escape hatches, that `ConfidentialEntrypointPlan` is confined to
+`runtime/uo-evm/src/state.rs`, that `RuntimeShadowState` and
+`ConfidentialRuntimeShadowState` remain runtime-only while the shell-visible
+handle stays `PublicRuntimeShadowState`, and that confidential entrypoints
+are sourced from the checked manifest's `confidential_slot_program` in
 `runtime/uo-evm/src/state.rs` while that module delegates confidential
 execution through `runtime/uo-evm/src/kernel.rs`, enforces the
 manifest-derived confidential commit budget there as well, and

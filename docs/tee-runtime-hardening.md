@@ -112,7 +112,9 @@ The current runtime has a first hardening layer:
   `ContractRuntime` wrapper, while the runtime boundary itself splits live
   reopened object state into a public `PublicRuntimeShadowState` shell handle
   and a distinct `ConfidentialRuntimeShadowState` kernel handle instead of
-  exposing one generic shadow wrapper
+  exposing one generic shadow wrapper, and the raw `RuntimeShadowState` plus
+  confidential shadow wrapper are now visibility-restricted to
+  `crate::runtime`
 - confidential `keccak256` evaluation now streams canonical bytes directly into
   the hasher under the existing scratch-budget accounting instead of
   materializing per-part heap buffers first
@@ -399,12 +401,13 @@ The current runtime has a first hardening layer:
   also visibility-restricted to `crate::runtime`, so the generic shell cannot
   call those kernel hooks directly
 - `engine.rs` now delegates public execution to `runtime/uo-evm/src/shell.rs`
-  and both confidential manifest-to-kernel planning plus confidential-kernel
-  setup to `runtime/uo-evm/src/state.rs`, so the engine no longer imports
-  either the raw `RuntimeKernel` or the public kernel facade directly, and it
-  no longer loads the manifest-carried confidential slot program, recomputes
-  the admitted runtime kernel-step schedule, or threads the manifest
-  hash-scratch bound or confidential commit budget itself
+  and confidential execution to `runtime/uo-evm/src/state.rs`; confidential
+  manifest-to-kernel planning is now fully internal to `ContractRuntime`, so
+  the engine no longer stages a `ConfidentialEntrypointPlan`, imports either
+  the raw `RuntimeKernel` or the public kernel facade directly, loads the
+  manifest-carried confidential slot program, recomputes the admitted runtime
+  kernel-step schedule, or threads the manifest hash-scratch bound or
+  confidential commit budget itself
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while the proof-grade translation checker, the

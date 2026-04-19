@@ -29,12 +29,15 @@ The current runtime-side TCB should be read explicitly rather than inferred.
 | Explicit backend / cryptographic assumptions | yes | they are the named remaining assumptions |
 | `RuntimeTrustedKernelBundle` acceptance predicate and imported JSON checker | yes | theorem-facing validation boundary |
 | Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | implementation honesty is not yet derived by a full refinement proof |
-| Rust shell/object code outside the tiny kernel | partially | still relevant until confinement and refinement are proved end to end |
+| Rust shell/object code outside the tiny kernel | partially | the confidential surface is narrower now, but this code still matters until confinement and refinement are proved end to end |
 | `uo-check` | no | removed from the proof-grade acceptance path |
 | `mplus-probe` | no | validation/reporting only |
 
 The final paper target is stricter than the current runtime-side TCB:
 
+- keep shrinking the non-kernel Rust surface; currently `engine.rs` no longer
+  stages confidential entrypoint plans and raw/confidential shadow wrappers are
+  runtime-only, but this still needs a theorem-level confinement argument
 - shrink the confidential Rust surface to a tiny kernel
 - prove the real kernel implementation refines the Lean kernel model
 - prove the non-kernel shell is public-only with respect to the admitted
