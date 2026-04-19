@@ -11,7 +11,7 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Output};
 use std::sync::{Mutex, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use uo_core::{
     canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
     BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
@@ -270,63 +270,122 @@ pub fn run_probe() -> Result<JsonValue> {
     run_probe_with_options(&ProbeRunOptions::default())
 }
 
+fn timed_report<T, F>(run: F) -> Result<(T, u128)>
+where
+    F: FnOnce() -> Result<T>,
+{
+    let started = Instant::now();
+    let report = run()?;
+    Ok((report, started.elapsed().as_millis()))
+}
+
 pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
+    let probe_started = Instant::now();
     let suite = compile_suite().context("compiling probe benchmark suite")?;
-    let correctness = run_correctness(&suite).context("running correctness report")?;
-    let static_checks = run_static_checks(&suite).context("running static_checks report")?;
-    let trace_equivalence =
-        run_trace_equivalence(&suite).context("running trace_equivalence report")?;
-    let leakage_auc = run_auc_reports(&suite).context("running leakage_auc report")?;
-    let mutual_information =
-        run_mutual_information_reports(&suite).context("running mutual_information report")?;
-    let overheads = run_overheads(&suite).context("running overheads report")?;
-    let controller_observer_validation = run_controller_observer_validation(&suite)
-        .context("running controller_observer_validation report")?;
-    let pathoram_hidden_validation =
-        run_pathoram_hidden_validation().context("running pathoram_hidden_validation report")?;
-    let runtime_boundary_validation =
-        run_runtime_boundary_validation().context("running runtime_boundary_validation report")?;
-    let kernel_model_alignment_validation = run_kernel_model_alignment_validation()
-        .context("running kernel_model_alignment_validation report")?;
-    let shell_boundary_validation = run_shell_boundary_validation(&suite)
-        .context("running shell_boundary_validation report")?;
-    let shell_boundary_lowering_validation = run_shell_boundary_lowering_validation(&suite)
-        .context("running shell_boundary_lowering_validation report")?;
-    let confidential_fragment_validation = run_confidential_fragment_validation(&suite)
-        .context("running confidential_fragment_validation report")?;
-    let kernel_dsl_validation =
-        run_kernel_dsl_validation(&suite).context("running kernel_dsl_validation report")?;
-    let kernel_slot_dsl_validation = run_kernel_slot_dsl_validation(&suite)
-        .context("running kernel_slot_dsl_validation report")?;
-    let kernel_lowering_validation = run_kernel_lowering_validation(&suite)
-        .context("running kernel_lowering_validation report")?;
-    let confidential_core_validation = run_confidential_core_validation(&suite)
-        .context("running confidential_core_validation report")?;
-    let confidential_core_slot_validation = run_confidential_core_slot_validation(&suite)
-        .context("running confidential_core_slot_validation report")?;
-    let confidential_core_lowering_validation =
-        run_confidential_core_lowering_validation(&suite)
-            .context("running confidential_core_lowering_validation report")?;
-    let confidential_core_shell_boundary_lowering_validation =
+    let (correctness, correctness_ms) =
+        timed_report(|| run_correctness(&suite).context("running correctness report"))?;
+    let (static_checks, static_checks_ms) =
+        timed_report(|| run_static_checks(&suite).context("running static_checks report"))?;
+    let (trace_equivalence, trace_equivalence_ms) = timed_report(|| {
+        run_trace_equivalence(&suite).context("running trace_equivalence report")
+    })?;
+    let (leakage_auc, leakage_auc_ms) =
+        timed_report(|| run_auc_reports(&suite).context("running leakage_auc report"))?;
+    let (mutual_information, mutual_information_ms) = timed_report(|| {
+        run_mutual_information_reports(&suite).context("running mutual_information report")
+    })?;
+    let (overheads, overheads_ms) =
+        timed_report(|| run_overheads(&suite).context("running overheads report"))?;
+    let (controller_observer_validation, controller_observer_validation_ms) = timed_report(|| {
+        run_controller_observer_validation(&suite)
+            .context("running controller_observer_validation report")
+    })?;
+    let (pathoram_hidden_validation, pathoram_hidden_validation_ms) = timed_report(|| {
+        run_pathoram_hidden_validation().context("running pathoram_hidden_validation report")
+    })?;
+    let (runtime_boundary_validation, runtime_boundary_validation_ms) = timed_report(|| {
+        run_runtime_boundary_validation().context("running runtime_boundary_validation report")
+    })?;
+    let (kernel_model_alignment_validation, kernel_model_alignment_validation_ms) =
+        timed_report(|| {
+            run_kernel_model_alignment_validation()
+                .context("running kernel_model_alignment_validation report")
+        })?;
+    let (shell_boundary_validation, shell_boundary_validation_ms) = timed_report(|| {
+        run_shell_boundary_validation(&suite).context("running shell_boundary_validation report")
+    })?;
+    let (shell_boundary_lowering_validation, shell_boundary_lowering_validation_ms) =
+        timed_report(|| {
+            run_shell_boundary_lowering_validation(&suite)
+                .context("running shell_boundary_lowering_validation report")
+        })?;
+    let (confidential_fragment_validation, confidential_fragment_validation_ms) =
+        timed_report(|| {
+            run_confidential_fragment_validation(&suite)
+                .context("running confidential_fragment_validation report")
+        })?;
+    let (kernel_dsl_validation, kernel_dsl_validation_ms) = timed_report(|| {
+        run_kernel_dsl_validation(&suite).context("running kernel_dsl_validation report")
+    })?;
+    let (kernel_slot_dsl_validation, kernel_slot_dsl_validation_ms) = timed_report(|| {
+        run_kernel_slot_dsl_validation(&suite)
+            .context("running kernel_slot_dsl_validation report")
+    })?;
+    let (kernel_lowering_validation, kernel_lowering_validation_ms) = timed_report(|| {
+        run_kernel_lowering_validation(&suite).context("running kernel_lowering_validation report")
+    })?;
+    let (confidential_core_validation, confidential_core_validation_ms) = timed_report(|| {
+        run_confidential_core_validation(&suite)
+            .context("running confidential_core_validation report")
+    })?;
+    let (confidential_core_slot_validation, confidential_core_slot_validation_ms) =
+        timed_report(|| {
+            run_confidential_core_slot_validation(&suite)
+                .context("running confidential_core_slot_validation report")
+        })?;
+    let (confidential_core_lowering_validation, confidential_core_lowering_validation_ms) =
+        timed_report(|| {
+            run_confidential_core_lowering_validation(&suite)
+                .context("running confidential_core_lowering_validation report")
+        })?;
+    let (
+        confidential_core_shell_boundary_lowering_validation,
+        confidential_core_shell_boundary_lowering_validation_ms,
+    ) = timed_report(|| {
         run_confidential_core_shell_boundary_lowering_validation(&suite)
-            .context("running confidential_core_shell_boundary_lowering_validation report")?;
-    let kernel_validation =
-        run_kernel_validation(&suite).context("running kernel_validation report")?;
-    let kernel_refinement_validation = run_kernel_refinement_validation(&suite)
-        .context("running kernel_refinement_validation report")?;
-    let trusted_kernel_validation = run_trusted_kernel_validation(&suite)
-        .context("running trusted_kernel_validation report")?;
-    let tamper_validation = run_tamper_validation().context("running tamper_validation report")?;
-    let witness_validation =
-        run_witness_validation(&suite).context("running witness_validation report")?;
-    let seeded_witness_validation =
-        run_seeded_witness_validation().context("running seeded_witness_validation report")?;
-    let fresh_coin_validation =
-        run_fresh_coin_validation(options).context("running fresh_coin_validation report")?;
-    let pathoram_pair_validation =
-        run_pathoram_pair_validation().context("running pathoram_pair_validation report")?;
-    let canonical_pathoram_pair_validation = run_canonical_pathoram_pair_validation(options)
-        .context("running canonical_pathoram_pair_validation report")?;
+            .context("running confidential_core_shell_boundary_lowering_validation report")
+    })?;
+    let (kernel_validation, kernel_validation_ms) = timed_report(|| {
+        run_kernel_validation(&suite).context("running kernel_validation report")
+    })?;
+    let (kernel_refinement_validation, kernel_refinement_validation_ms) = timed_report(|| {
+        run_kernel_refinement_validation(&suite)
+            .context("running kernel_refinement_validation report")
+    })?;
+    let (trusted_kernel_validation, trusted_kernel_validation_ms) = timed_report(|| {
+        run_trusted_kernel_validation(&suite).context("running trusted_kernel_validation report")
+    })?;
+    let (tamper_validation, tamper_validation_ms) =
+        timed_report(|| run_tamper_validation().context("running tamper_validation report"))?;
+    let (witness_validation, witness_validation_ms) = timed_report(|| {
+        run_witness_validation(&suite).context("running witness_validation report")
+    })?;
+    let (seeded_witness_validation, seeded_witness_validation_ms) = timed_report(|| {
+        run_seeded_witness_validation().context("running seeded_witness_validation report")
+    })?;
+    let (fresh_coin_validation, fresh_coin_validation_ms) = timed_report(|| {
+        run_fresh_coin_validation(options).context("running fresh_coin_validation report")
+    })?;
+    let (pathoram_pair_validation, pathoram_pair_validation_ms) = timed_report(|| {
+        run_pathoram_pair_validation().context("running pathoram_pair_validation report")
+    })?;
+    let (
+        canonical_pathoram_pair_validation,
+        canonical_pathoram_pair_validation_ms,
+    ) = timed_report(|| {
+        run_canonical_pathoram_pair_validation(options)
+            .context("running canonical_pathoram_pair_validation report")
+    })?;
     let bridge_validation = json!({
         "static_checks": static_checks,
         "controller_observer_validation": controller_observer_validation,
@@ -351,6 +410,70 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "witness_validation": witness_validation,
         "seeded_witness_validation": seeded_witness_validation,
     });
+    let reviewer_summary = build_reviewer_summary(
+        &correctness,
+        &static_checks,
+        &trace_equivalence,
+        &leakage_auc,
+        &mutual_information,
+        &overheads,
+        &controller_observer_validation,
+        &pathoram_hidden_validation,
+        &runtime_boundary_validation,
+        &kernel_model_alignment_validation,
+        &shell_boundary_validation,
+        &shell_boundary_lowering_validation,
+        &confidential_fragment_validation,
+        &kernel_dsl_validation,
+        &kernel_slot_dsl_validation,
+        &kernel_lowering_validation,
+        &confidential_core_validation,
+        &confidential_core_slot_validation,
+        &confidential_core_lowering_validation,
+        &confidential_core_shell_boundary_lowering_validation,
+        &kernel_validation,
+        &kernel_refinement_validation,
+        &trusted_kernel_validation,
+        &tamper_validation,
+        &witness_validation,
+        &seeded_witness_validation,
+        &fresh_coin_validation,
+        &pathoram_pair_validation,
+        &canonical_pathoram_pair_validation,
+        &json!({
+            "correctness": correctness_ms,
+            "static_checks": static_checks_ms,
+            "trace_equivalence": trace_equivalence_ms,
+            "leakage_auc": leakage_auc_ms,
+            "mutual_information": mutual_information_ms,
+            "overheads": overheads_ms,
+            "controller_observer_validation": controller_observer_validation_ms,
+            "pathoram_hidden_validation": pathoram_hidden_validation_ms,
+            "runtime_boundary_validation": runtime_boundary_validation_ms,
+            "kernel_model_alignment_validation": kernel_model_alignment_validation_ms,
+            "shell_boundary_validation": shell_boundary_validation_ms,
+            "shell_boundary_lowering_validation": shell_boundary_lowering_validation_ms,
+            "confidential_fragment_validation": confidential_fragment_validation_ms,
+            "kernel_dsl_validation": kernel_dsl_validation_ms,
+            "kernel_slot_dsl_validation": kernel_slot_dsl_validation_ms,
+            "kernel_lowering_validation": kernel_lowering_validation_ms,
+            "confidential_core_validation": confidential_core_validation_ms,
+            "confidential_core_slot_validation": confidential_core_slot_validation_ms,
+            "confidential_core_lowering_validation": confidential_core_lowering_validation_ms,
+            "confidential_core_shell_boundary_lowering_validation":
+                confidential_core_shell_boundary_lowering_validation_ms,
+            "kernel_validation": kernel_validation_ms,
+            "kernel_refinement_validation": kernel_refinement_validation_ms,
+            "trusted_kernel_validation": trusted_kernel_validation_ms,
+            "tamper_validation": tamper_validation_ms,
+            "witness_validation": witness_validation_ms,
+            "seeded_witness_validation": seeded_witness_validation_ms,
+            "fresh_coin_validation": fresh_coin_validation_ms,
+            "pathoram_pair_validation": pathoram_pair_validation_ms,
+            "canonical_pathoram_pair_validation": canonical_pathoram_pair_validation_ms,
+            "total_probe_ms": probe_started.elapsed().as_millis(),
+        }),
+    )?;
     let artifact_readme = artifact_readme(options);
     Ok(json!({
         "artifact_configuration": options.artifact_configuration_json(),
@@ -385,6 +508,7 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "fresh_coin_validation": fresh_coin_validation,
         "pathoram_pair_validation": pathoram_pair_validation,
         "canonical_pathoram_pair_validation": canonical_pathoram_pair_validation,
+        "reviewer_summary": reviewer_summary,
         "artifact_readme": artifact_readme,
     }))
 }
@@ -551,6 +675,14 @@ pub fn run_confidential_core_shell_boundary_lowering_validation_report() -> Resu
     run_confidential_core_shell_boundary_lowering_validation(&suite)
 }
 
+pub fn run_reviewer_summary_report(options: &ProbeRunOptions) -> Result<JsonValue> {
+    let report = run_probe_with_options(options)?;
+    report
+        .get("reviewer_summary")
+        .cloned()
+        .ok_or_else(|| anyhow!("reviewer_summary missing from probe bundle"))
+}
+
 pub fn run_canonical_pathoram_pair_validation_report() -> Result<JsonValue> {
     run_canonical_pathoram_pair_validation_with_options(&ProbeRunOptions::default())
 }
@@ -601,6 +733,7 @@ pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
         "fresh_coin_validation",
         "pathoram_pair_validation",
         "canonical_pathoram_pair_validation",
+        "reviewer_summary",
     ] {
         let path = Path::new(out_dir).join(format!("{key}.json"));
         fs::write(path, serde_json::to_vec_pretty(&results[key])?)?;
@@ -674,6 +807,325 @@ fn collect_bundle_files(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Re
             .cmp(rhs.strip_prefix(root).unwrap_or(rhs))
     });
     Ok(())
+}
+
+fn build_reviewer_summary(
+    correctness: &JsonValue,
+    static_checks: &JsonValue,
+    trace_equivalence: &JsonValue,
+    leakage_auc: &JsonValue,
+    mutual_information: &JsonValue,
+    overheads: &JsonValue,
+    controller_observer_validation: &JsonValue,
+    pathoram_hidden_validation: &JsonValue,
+    runtime_boundary_validation: &JsonValue,
+    kernel_model_alignment_validation: &JsonValue,
+    shell_boundary_validation: &JsonValue,
+    shell_boundary_lowering_validation: &JsonValue,
+    confidential_fragment_validation: &JsonValue,
+    kernel_dsl_validation: &JsonValue,
+    kernel_slot_dsl_validation: &JsonValue,
+    kernel_lowering_validation: &JsonValue,
+    confidential_core_validation: &JsonValue,
+    confidential_core_slot_validation: &JsonValue,
+    confidential_core_lowering_validation: &JsonValue,
+    confidential_core_shell_boundary_lowering_validation: &JsonValue,
+    kernel_validation: &JsonValue,
+    kernel_refinement_validation: &JsonValue,
+    trusted_kernel_validation: &JsonValue,
+    tamper_validation: &JsonValue,
+    witness_validation: &JsonValue,
+    seeded_witness_validation: &JsonValue,
+    fresh_coin_validation: &JsonValue,
+    pathoram_pair_validation: &JsonValue,
+    canonical_pathoram_pair_validation: &JsonValue,
+    report_timings_ms: &JsonValue,
+) -> Result<JsonValue> {
+    let mut artifact_size_metrics = Vec::new();
+    for (report_name, report) in [
+        ("correctness", correctness),
+        ("static_checks", static_checks),
+        ("trace_equivalence", trace_equivalence),
+        ("leakage_auc", leakage_auc),
+        ("mutual_information", mutual_information),
+        ("overheads", overheads),
+        (
+            "controller_observer_validation",
+            controller_observer_validation,
+        ),
+        ("pathoram_hidden_validation", pathoram_hidden_validation),
+        ("runtime_boundary_validation", runtime_boundary_validation),
+        (
+            "kernel_model_alignment_validation",
+            kernel_model_alignment_validation,
+        ),
+        ("shell_boundary_validation", shell_boundary_validation),
+        (
+            "shell_boundary_lowering_validation",
+            shell_boundary_lowering_validation,
+        ),
+        (
+            "confidential_fragment_validation",
+            confidential_fragment_validation,
+        ),
+        ("kernel_dsl_validation", kernel_dsl_validation),
+        ("kernel_slot_dsl_validation", kernel_slot_dsl_validation),
+        ("kernel_lowering_validation", kernel_lowering_validation),
+        ("confidential_core_validation", confidential_core_validation),
+        (
+            "confidential_core_slot_validation",
+            confidential_core_slot_validation,
+        ),
+        (
+            "confidential_core_lowering_validation",
+            confidential_core_lowering_validation,
+        ),
+        (
+            "confidential_core_shell_boundary_lowering_validation",
+            confidential_core_shell_boundary_lowering_validation,
+        ),
+        ("kernel_validation", kernel_validation),
+        ("kernel_refinement_validation", kernel_refinement_validation),
+        ("trusted_kernel_validation", trusted_kernel_validation),
+        ("tamper_validation", tamper_validation),
+        ("witness_validation", witness_validation),
+        ("seeded_witness_validation", seeded_witness_validation),
+        ("fresh_coin_validation", fresh_coin_validation),
+        ("pathoram_pair_validation", pathoram_pair_validation),
+        (
+            "canonical_pathoram_pair_validation",
+            canonical_pathoram_pair_validation,
+        ),
+    ] {
+        collect_json_byte_metrics(report_name, report, &mut artifact_size_metrics);
+    }
+    artifact_size_metrics.sort_by(|lhs, rhs| {
+        rhs["bytes"]
+            .as_u64()
+            .cmp(&lhs["bytes"].as_u64())
+            .then_with(|| lhs["metric"].as_str().cmp(&rhs["metric"].as_str()))
+    });
+    let (mut estimated_size_metrics, mut materialized_size_metrics): (Vec<_>, Vec<_>) =
+        artifact_size_metrics
+            .into_iter()
+            .partition(|entry| entry["estimated"].as_bool().unwrap_or(false));
+    estimated_size_metrics.sort_by(|lhs, rhs| {
+        rhs["bytes"]
+            .as_u64()
+            .cmp(&lhs["bytes"].as_u64())
+            .then_with(|| lhs["metric"].as_str().cmp(&rhs["metric"].as_str()))
+    });
+    materialized_size_metrics.sort_by(|lhs, rhs| {
+        rhs["bytes"]
+            .as_u64()
+            .cmp(&lhs["bytes"].as_u64())
+            .then_with(|| lhs["metric"].as_str().cmp(&rhs["metric"].as_str()))
+    });
+    estimated_size_metrics.truncate(10);
+    materialized_size_metrics.truncate(20);
+
+    Ok(json!({
+        "proof_checking_cost_ms": report_timings_ms,
+        "artifact_size_bytes": {
+            "top_materialized_report_fields": materialized_size_metrics,
+            "top_estimated_report_fields": estimated_size_metrics,
+        },
+        "runtime_overheads": overheads,
+        "tcb_size": trusted_surface_loc_summary()?,
+        "current_tcb": current_tcb_summary(),
+        "explicit_assumptions": explicit_assumption_summary(),
+    }))
+}
+
+fn collect_json_byte_metrics(report_name: &str, value: &JsonValue, out: &mut Vec<JsonValue>) {
+    collect_json_byte_metrics_at(report_name, report_name, value, out);
+}
+
+fn collect_json_byte_metrics_at(
+    report_name: &str,
+    path: &str,
+    value: &JsonValue,
+    out: &mut Vec<JsonValue>,
+) {
+    match value {
+        JsonValue::Object(map) => {
+            for (key, nested) in map {
+                let nested_path = format!("{path}.{key}");
+                if key.ends_with("_json_bytes") {
+                    if let Some(bytes) = nested.as_u64() {
+                        out.push(json!({
+                            "report": report_name,
+                            "metric": nested_path,
+                            "bytes": bytes,
+                            "estimated": key.starts_with("estimated_")
+                                || nested_path.contains(".estimated_"),
+                        }));
+                    }
+                }
+                collect_json_byte_metrics_at(report_name, &nested_path, nested, out);
+            }
+        }
+        JsonValue::Array(items) => {
+            for (idx, nested) in items.iter().enumerate() {
+                let nested_path = format!("{path}[{idx}]");
+                collect_json_byte_metrics_at(report_name, &nested_path, nested, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn trusted_surface_loc_summary() -> Result<JsonValue> {
+    const TRUSTED_RUNTIME_FILES: [&str; 4] = [
+        "runtime/uo-evm/src/kernel.rs",
+        "runtime/uo-evm/src/state.rs",
+        "runtime/uo-evm/src/theorem.rs",
+        "crates/uo-core/src/trace.rs",
+    ];
+    const OUTER_RUNTIME_RISK_FILES: [&str; 2] = [
+        "runtime/uo-evm/src/engine.rs",
+        "runtime/uo-evm/src/shell.rs",
+    ];
+
+    let trusted_runtime = loc_summary_for_files(&TRUSTED_RUNTIME_FILES)?;
+    let outer_runtime = loc_summary_for_files(&OUTER_RUNTIME_RISK_FILES)?;
+    let lean_root = repo_root().join("proof/lean");
+    let lean_repo_surface = loc_summary_for_tree(&lean_root, "proof/lean", collect_lean_source_files)?;
+
+    Ok(json!({
+        "measurement": "non-empty source lines",
+        "trusted_runtime_surface": trusted_runtime,
+        "outer_runtime_risk_surface": outer_runtime,
+        "lean_theorem_checker_repo_surface": lean_repo_surface,
+    }))
+}
+
+fn loc_summary_for_files(files: &[&str]) -> Result<JsonValue> {
+    let entries = files
+        .iter()
+        .map(|relative| {
+            let path = repo_root().join(relative);
+            Ok(json!({
+                "file": relative,
+                "nonempty_loc": count_nonempty_lines(&path)?,
+            }))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let total_nonempty_loc = entries
+        .iter()
+        .filter_map(|entry| entry["nonempty_loc"].as_u64())
+        .sum::<u64>();
+    Ok(json!({
+        "file_count": entries.len(),
+        "total_nonempty_loc": total_nonempty_loc,
+        "files": entries,
+    }))
+}
+
+fn loc_summary_for_tree(
+    root: &Path,
+    display_root: &str,
+    collect: fn(&Path, &mut Vec<PathBuf>) -> Result<()>,
+) -> Result<JsonValue> {
+    let mut files = Vec::new();
+    collect(root, &mut files)?;
+    files.sort();
+    let entries = files
+        .into_iter()
+        .map(|path| {
+            Ok(json!({
+                "file": path
+                    .strip_prefix(repo_root())
+                    .unwrap_or(&path)
+                    .display()
+                    .to_string(),
+                "nonempty_loc": count_nonempty_lines(&path)?,
+            }))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let total_nonempty_loc = entries
+        .iter()
+        .filter_map(|entry| entry["nonempty_loc"].as_u64())
+        .sum::<u64>();
+    Ok(json!({
+        "root": display_root,
+        "file_count": entries.len(),
+        "total_nonempty_loc": total_nonempty_loc,
+        "files": entries,
+    }))
+}
+
+fn count_nonempty_lines(path: &Path) -> Result<u64> {
+    Ok(fs::read_to_string(path)
+        .with_context(|| format!("reading {}", path.display()))?
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count() as u64)
+}
+
+fn current_tcb_summary() -> JsonValue {
+    json!([
+        {
+            "component": "Lean kernel plus Lean theorem/checker development",
+            "role": "trusted proof checker and theorem body",
+            "in_current_proofgrade_tcb": true,
+        },
+        {
+            "component": "Explicit backend / cryptographic / deployment assumptions",
+            "role": "trusted assumptions",
+            "in_current_proofgrade_tcb": true,
+        },
+        {
+            "component": "Rust runtime kernel plus witness / certificate / bundle extraction and serialization",
+            "role": "currently trusted for implementation honesty",
+            "in_current_proofgrade_tcb": true,
+        },
+        {
+            "component": "Rust code outside the tiny kernel",
+            "role": "still part of the implementation risk until confinement and refinement are proved",
+            "in_current_proofgrade_tcb": true,
+        },
+        {
+            "component": "uo-check",
+            "role": "not in the proof-grade TCB",
+            "in_current_proofgrade_tcb": false,
+        },
+        {
+            "component": "mplus-probe",
+            "role": "validation/reporting only",
+            "in_current_proofgrade_tcb": false,
+        },
+        {
+            "component": "uo-solc",
+            "role": "not trusted for the current artifact-level acceptance claim; still unverified for the final source-level compiler theorem",
+            "in_current_proofgrade_tcb": false,
+        }
+    ])
+}
+
+fn explicit_assumption_summary() -> JsonValue {
+    json!([
+        {
+            "assumption": "bucketEncryptionINDCPA",
+            "meaning": "hides bucket/path ciphertext contents for the concrete local-posmap backend",
+            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; not yet discharged in-repo",
+        },
+        {
+            "assumption": "metadataEncryptionINDCPA",
+            "meaning": "hides encrypted position-map metadata pages",
+            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; not yet discharged in-repo",
+        },
+        {
+            "assumption": "stashOverflowBounded",
+            "meaning": "bounds stash-overflow failure for the deployed parameters",
+            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; not yet fully discharged in-repo",
+        },
+        {
+            "assumption": "TEE deployment assumptions",
+            "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model",
+            "status": "required by the final malicious-host deployment theorem; not yet fully closed in Lean",
+        }
+    ])
 }
 
 fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
@@ -10917,6 +11369,12 @@ canonical pairs directly, and validates both
 `ConfidentialMixer/pathoram/deposit-canonical-pair` and
 `ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
 theorem-input path with their concrete explicit-size estimates attached.
+`reviewer_summary.json` condenses the current paper-facing metrics into one
+machine-generated table: it records per-report wall-clock cost, the largest
+materialized and estimated artifact-size fields, the runtime overhead report,
+the current TCB table, explicit assumptions, and non-empty source-line counts
+for the trusted Rust runtime surface plus the repo-side Lean theorem/checker
+surface.
 
 Security tiers:
 

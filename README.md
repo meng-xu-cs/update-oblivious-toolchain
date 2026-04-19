@@ -20,7 +20,8 @@ Components:
   translation-bundle tooling outside the proof-grade acceptance path.
 - `probe/mplus-probe`: runs paired leakage experiments, correctness checks,
   witness/certificate validation, and writes the reproducible `results/`
-  bundle together with `reproducibility_manifest.json`.
+  bundle together with `reproducibility_manifest.json` and
+  `reviewer_summary.json`.
 - `benches/raw`: the benchmark suite plus raw/UO metadata.
 - `benches/uo`: generated UO artifacts.
 
@@ -291,6 +292,7 @@ cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --en
 cargo run -q -p uo-evm -- --artifact benches/uo/FixedSlotClassifier.uo.json --entrypoint 'peek()' --format refinement-witness
 cargo run -q -p mplus-probe -- --only bridge-validation --out-dir results
 cargo run -q -p mplus-probe -- --only tamper-validation --out-dir results
+cargo run -q -p mplus-probe -- --only reviewer-summary --out-dir results
 ```
 
 `bridge_validation.json` is the focused direct imported-theorem bridge report.
@@ -303,6 +305,10 @@ Every results directory now also carries `reproducibility_manifest.json`,
 which records bundle-relative output paths, byte sizes, and SHA-256 digests so
 two runs can be compared byte-for-byte even when they were written to
 different output directories.
+The full bundle also emits `reviewer_summary.json`, which condenses proof/report
+costs, the largest materialized and estimated artifact sizes, runtime
+overheads, current TCB components, TCB source-line counts, and the explicit
+assumption table into one machine-generated reviewer-facing summary.
 
 Artifact modes:
 

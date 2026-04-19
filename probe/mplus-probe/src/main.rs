@@ -47,6 +47,7 @@ enum ReportKind {
     ConfidentialCoreShellBoundaryLoweringValidation,
     CanonicalPathoramPairValidation,
     FreshCoinValidation,
+    ReviewerSummary,
 }
 
 #[derive(Debug, Parser)]
@@ -336,6 +337,15 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "fresh_coin_validation.json",
                 "fresh_coin_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ReviewerSummary) => {
+            let report = mplus_probe::run_reviewer_summary_report(&options)?;
+            write_single_report(
+                &cli.out_dir,
+                "reviewer_summary.json",
+                "reviewer_summary",
                 &report,
             )?;
         }
