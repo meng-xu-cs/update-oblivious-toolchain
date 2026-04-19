@@ -251,7 +251,11 @@ Current closure status:
    runtime phase-witness events are constructed only in
    `runtime/uo-evm/src/kernel.rs` and `runtime/uo-evm/src/state.rs`, and
    that production resource-event witnesses are constructed only in
-   `runtime/uo-allocator/src/lib.rs`; the same report now also fixes the
+   `runtime/uo-allocator/src/lib.rs`; the same runtime path now validates the
+   manifest-carried slot program against the manifest `kernel_steps` exactly
+   once and then carries that checked manifest schedule forward as the
+   canonical public budget / witness schedule, rather than repeatedly
+   re-deriving it from the slot DSL; the same report now also fixes the
    public write-evidence surface by rejecting regressions from shape-only
    `PhysicalWriteEvent` / ORAM-write traces back to retained `old` / `new`
    ciphertext snapshots, and it now checks that theorem-facing

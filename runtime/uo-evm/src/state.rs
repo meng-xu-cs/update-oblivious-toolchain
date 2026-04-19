@@ -543,14 +543,14 @@ impl ConfidentialEntrypointPlan {
             .ok_or_else(|| {
                 anyhow!("manifest confidential_slot_program missing for {entrypoint}")
             })?;
-        let expected_kernel_steps = program.expected_runtime_step_witnesses();
-        if manifest_expected_kernel_steps != expected_kernel_steps {
+        let program_expected_kernel_steps = program.expected_runtime_step_witnesses();
+        if manifest_expected_kernel_steps != program_expected_kernel_steps {
             bail!(
                 "manifest kernel step trace drifted from confidential slot program for {entrypoint}"
             );
         }
-        allocator.max_kernel_ops = expected_kernel_steps.len();
-        let shadow_load_object_ids = expected_kernel_steps
+        allocator.max_kernel_ops = manifest_expected_kernel_steps.len();
+        let shadow_load_object_ids = manifest_expected_kernel_steps
             .iter()
             .filter_map(|step| step.object_id)
             .collect::<BTreeSet<_>>()
@@ -558,7 +558,7 @@ impl ConfidentialEntrypointPlan {
             .collect::<Vec<_>>();
         Ok(Self {
             allocator,
-            expected_kernel_steps,
+            expected_kernel_steps: manifest_expected_kernel_steps,
             public_object_ids,
             shadow_load_object_ids,
             max_commit_ops: manifest_entry.max_commit_ops,

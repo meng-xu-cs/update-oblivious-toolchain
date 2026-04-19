@@ -45,9 +45,7 @@ impl AllocatorPlan {
             + entry.uomap_reads
             + entry.uomap_writes;
         let mut plan = Self::for_entrypoint(entry.arena_bytes, entry.max_stack_words);
-        plan.max_kernel_ops = if let Some(program) = &entry.confidential_slot_program {
-            program.expected_runtime_steps().len()
-        } else if entry.kernel_steps.is_empty() {
+        plan.max_kernel_ops = if entry.kernel_steps.is_empty() {
             logical_kernel_ops + 3
         } else {
             entry.kernel_steps.len()

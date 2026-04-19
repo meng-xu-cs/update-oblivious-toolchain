@@ -4,7 +4,7 @@ use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, St
 use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{
     lower_confidential_kernel_statements, CompiledArtifact, ContractMetadata, OramManifest,
-    ProofRelevantTranslationBundle, RuntimeKernelStepManifest, StateObjectManifest, Type,
+    ProofRelevantTranslationBundle, StateObjectManifest, Type,
 };
 
 #[cfg(test)]
@@ -214,14 +214,7 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                     function.signature
                 );
             }
-            expected_slot_program
-                .expected_runtime_steps()
-                .into_iter()
-                .map(|step| RuntimeKernelStepManifest {
-                    opcode: step.opcode,
-                    object_id: step.object_id,
-                })
-                .collect()
+            witnessed_slot_program.expected_runtime_step_manifest()
         } else {
             if entry.confidential_program.is_some() {
                 bail!(

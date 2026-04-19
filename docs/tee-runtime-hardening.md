@@ -426,7 +426,9 @@ The current runtime has a first hardening layer:
   universe itself, threads the public-shell allocator plan, or threads the
   manifest hash-scratch bound or confidential commit budget itself; the
   theorem-side `begin_call_trace` path now triggers that runtime preflight
-  instead
+  instead, and the runtime now validates the slot program against
+  `manifest.kernel_steps` once but then carries the checked manifest schedule
+  itself forward as the canonical public budget / witness schedule
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while the proof-grade translation checker, the
