@@ -1628,14 +1628,7 @@ impl RuntimeKernelWitness {
                     entrypoint: entrypoint.into(),
                 },
             )?;
-        let expected_steps = manifest_slot_program
-            .expected_runtime_steps()
-            .into_iter()
-            .map(|step| RuntimeKernelStepManifest {
-                opcode: step.opcode,
-                object_id: step.object_id,
-            })
-            .collect::<Vec<_>>();
+        let expected_steps = manifest_slot_program.expected_runtime_step_manifest();
         if manifest_entry.kernel_steps != expected_steps {
             return Err(KernelWitnessError::KernelStepTraceMismatch {
                 expected: manifest_kernel_steps_as_witness(&expected_steps),

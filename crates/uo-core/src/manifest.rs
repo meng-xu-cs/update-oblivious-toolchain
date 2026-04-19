@@ -88,6 +88,18 @@ pub struct OramManifest {
     pub accesses_per_call: usize,
 }
 
+impl ConfidentialKernelSlotProgram {
+    pub fn expected_runtime_step_manifest(&self) -> Vec<RuntimeKernelStepManifest> {
+        self.expected_runtime_steps()
+            .into_iter()
+            .map(|step| RuntimeKernelStepManifest {
+                opcode: step.opcode,
+                object_id: step.object_id,
+            })
+            .collect()
+    }
+}
+
 impl OramManifest {
     pub fn path_leaf_count(&self) -> Result<usize> {
         if self.scheme != PATH_ORAM_SCHEME {
@@ -300,9 +312,11 @@ fn state_object_by_id(state: &[StateObject], object_id: u32) -> Result<&StateObj
 
 #[cfg(test)]
 mod tests {
-    use super::{OramManifest, PATH_ORAM_SCHEME};
+    use super::{OramManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME};
+    use crate::confidential_kernel::ConfidentialKernelSlotProgram;
     use crate::ir::{BackendKind, ContainerKind, StateObject};
     use crate::types::{ScalarType, Type};
+    use uo_precompiles::UoOpcode;
 
     fn path_oram_object(capacity: usize) -> StateObject {
         StateObject {
@@ -340,5 +354,35 @@ mod tests {
         assert!(err
             .to_string()
             .contains("path ORAM leaf count must be a power of two"));
+    }
+
+    #[test]
+    fn confidential_slot_program_projects_runtime_step_manifest() {
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "ping(uint256)".into(),
+            param_count: 1,
+            return_type: None,
+            secret_args: vec![0],
+            slot_count: 1,
+            body: Vec::new(),
+        };
+
+        assert_eq!(
+            program.expected_runtime_step_manifest(),
+            vec![
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::Begin,
+                    object_id: None,
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::Commit,
+                    object_id: None,
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::Wipe,
+                    object_id: None,
+                },
+            ]
+        );
     }
 }

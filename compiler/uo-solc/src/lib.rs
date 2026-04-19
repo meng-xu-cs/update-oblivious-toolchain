@@ -6,8 +6,7 @@ use uo_core::ir::{
     StateObject, Statement, UnaryOp,
 };
 use uo_core::manifest::{
-    EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest,
-    StateObjectManifest, PATH_ORAM_SCHEME,
+    EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
 };
 use uo_core::{
     CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram, ContractMetadata,
@@ -1087,14 +1086,7 @@ fn build_manifest_entry(
     let (confidential_program, confidential_slot_program, kernel_steps) = if function.confidential {
         let confidential_program = function.confidential_kernel_program()?;
         let confidential_slot_program = confidential_program.to_slot_program()?;
-        let kernel_steps = confidential_slot_program
-            .expected_runtime_steps()
-            .into_iter()
-            .map(|step| RuntimeKernelStepManifest {
-                opcode: step.opcode,
-                object_id: step.object_id,
-            })
-            .collect();
+        let kernel_steps = confidential_slot_program.expected_runtime_step_manifest();
         (
             Some(confidential_program),
             Some(confidential_slot_program),
