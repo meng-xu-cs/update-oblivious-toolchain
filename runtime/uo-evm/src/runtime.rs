@@ -1,22 +1,62 @@
 #[path = "fresh_coins.rs"]
-pub(crate) mod fresh_coins;
+mod fresh_coins;
 
 #[path = "kernel.rs"]
-pub(crate) mod kernel;
+mod kernel;
 
 #[path = "objects.rs"]
 pub(crate) mod objects;
 
 #[path = "shell.rs"]
-pub(crate) mod shell;
+mod shell;
 
 #[path = "state.rs"]
-pub(crate) mod state;
+mod state;
 
 #[path = "theorem.rs"]
-pub(crate) mod theorem;
+mod theorem;
 
+use anyhow::Result;
+pub use fresh_coins::PathOramFreshCoinPlan;
+pub(crate) use state::ContractRuntime;
+use uo_core::ir::StateObject;
+use uo_core::{CompiledArtifact, CompiledFunction, ExecutionTrace};
 use uo_core::{RuntimeKernelRefinementWitness, RuntimeKernelWitness, Value};
+
+pub(crate) fn deploy_contract_runtime(
+    contract_state: &[StateObject],
+    deploy_seed: u64,
+) -> Result<ContractRuntime> {
+    state::ContractRuntime::deploy(contract_state, deploy_seed)
+}
+
+#[cfg(test)]
+pub(crate) fn ensure_contract_runtime_cold(
+    runtime: &ContractRuntime,
+    expected_object_ids: &[u32],
+    context: &str,
+) -> Result<()> {
+    runtime.ensure_cold(expected_object_ids, context)
+}
+
+pub(crate) fn run_contract_call(
+    runtime: &mut ContractRuntime,
+    artifact: &CompiledArtifact,
+    function: &CompiledFunction,
+    deploy_seed: u64,
+    args: Vec<Value>,
+    fresh_coins: Option<PathOramFreshCoinPlan>,
+) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
+    theorem::run_traced_call(
+        runtime,
+        artifact,
+        &function.signature,
+        function.confidential,
+        deploy_seed,
+        args,
+        fresh_coins,
+    )
+}
 
 #[derive(Debug)]
 pub(in crate::runtime) struct RuntimeCallOutcome {

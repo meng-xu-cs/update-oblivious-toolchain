@@ -208,10 +208,7 @@
   "expected_controller_theorem_trace_constructor_files": [
     "runtime/uo-evm/src/controller.rs"
   ],
-  "expected_finalized_call_trace_consumption_surface_files": [
-    "runtime/uo-evm/src/engine.rs",
-    "runtime/uo-evm/src/theorem.rs"
-  ],
+  "expected_finalized_call_trace_consumption_surface_files": [],
   "expected_runtime_call_outcome_constructor_surface_files": [
     "runtime/uo-evm/src/runtime.rs",
     "runtime/uo-evm/src/shell.rs",
@@ -245,7 +242,7 @@
     "runtime/uo-evm/src/oram.rs:pub directory_page_bytes: usize,"
   ],
   "expected_theorem_trace_bridge_surface_files": [
-    "runtime/uo-evm/src/engine.rs",
+    "runtime/uo-evm/src/runtime.rs",
     "runtime/uo-evm/src/theorem.rs"
   ],
   "expected_traced_runtime_call_outcome_constructor_surface_files": [
@@ -271,10 +268,7 @@
     "runtime/uo-evm/src/theorem.rs"
   ],
   "finalized_call_trace_api_is_explicit": true,
-  "finalized_call_trace_consumption_surface_files": [
-    "runtime/uo-evm/src/engine.rs",
-    "runtime/uo-evm/src/theorem.rs"
-  ],
+  "finalized_call_trace_consumption_surface_files": [],
   "finalized_call_trace_consumption_surface_restricted": true,
   "finalized_call_trace_fields_private": true,
   "forbidden_engine_helper_checks": [
@@ -1218,25 +1212,25 @@
     },
     {
       "boundary": "runtime-only per-call outcome bundle; construction is pinned to runtime.rs, state.rs, and shell.rs through an explicit constructor, state.rs is the only theorem-packaging consumer of its explicit handoff API, and engine.rs does not unpack it directly",
-      "checked": false,
+      "checked": true,
       "name": "RuntimeCallOutcome",
       "owner": "runtime/uo-evm/src/runtime.rs"
     },
     {
       "boundary": "runtime/theorem post-call handoff bundle capturing the after-call hidden witness snapshot plus RuntimeCallOutcome before final execution-trace packaging",
-      "checked": false,
+      "checked": true,
       "name": "TracedRuntimeCallOutcome",
       "owner": "runtime/uo-evm/src/state.rs"
     },
     {
       "boundary": "runtime/theorem pre-call handoff token carrying the hidden committed-state snapshot without exposing the raw snapshot type outside state.rs",
-      "checked": false,
+      "checked": true,
       "name": "TracedRuntimeCallStart",
       "owner": "runtime/uo-evm/src/state.rs"
     },
     {
       "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers, and wiping those hidden witness vectors on drop",
-      "checked": false,
+      "checked": true,
       "name": "TracedRuntimeCallWitnessState",
       "owner": "runtime/uo-evm/src/state.rs"
     },
@@ -1248,7 +1242,7 @@
     },
     {
       "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs, used only to assemble traced-call start/outcome/witness handoff bundles, and wiping its hidden vectors on drop",
-      "checked": false,
+      "checked": true,
       "name": "CommittedRuntimeWitnessSnapshot",
       "owner": "runtime/uo-evm/src/state.rs"
     },
@@ -1271,7 +1265,7 @@
       "owner": "runtime/uo-store/src/codec.rs and runtime/uo-store/src/store.rs"
     }
   ],
-  "runtime_secret_state_inventory_complete": false,
+  "runtime_secret_state_inventory_complete": true,
   "runtime_state_surface_checks": [
     {
       "expected_files": [
@@ -1292,12 +1286,13 @@
       ],
       "files": [
         "runtime/uo-evm/src/engine.rs",
+        "runtime/uo-evm/src/runtime.rs",
         "runtime/uo-evm/src/shell.rs",
         "runtime/uo-evm/src/state.rs",
         "runtime/uo-evm/src/theorem.rs"
       ],
       "pattern": "ContractRuntime",
-      "restricted": true
+      "restricted": false
     },
     {
       "expected_files": [
@@ -1364,7 +1359,7 @@
       "restricted": true
     }
   ],
-  "runtime_state_surface_restricted": true,
+  "runtime_state_surface_restricted": false,
   "shell_confidential_surface_absent": true,
   "shell_path": "runtime/uo-evm/src/shell.rs",
   "shell_uses_public_runtime_kernel": true,
@@ -1503,7 +1498,7 @@
   "state_owns_path_oram_fresh_coin_routing": true,
   "state_owns_shadow_loading": true,
   "state_path": "runtime/uo-evm/src/state.rs",
-  "state_prepares_confidential_manifest_plan": true,
+  "state_prepares_confidential_manifest_plan": false,
   "state_restricted_signature_checks": [
     {
       "present": true,
@@ -1657,8 +1652,8 @@
   ],
   "theorem_certificate_constructor_surface_restricted": true,
   "theorem_finalize_input_fields_private": true,
-  "theorem_finalizer_omits_runtime_telemetry": true,
-  "theorem_finalizes_execution_trace": false,
+  "theorem_finalizer_omits_runtime_telemetry": false,
+  "theorem_finalizes_execution_trace": true,
   "theorem_only_runtime_helper_surface_checks": [
     {
       "expected_files": [
@@ -1749,10 +1744,10 @@
     }
   ],
   "theorem_private_surface_restricted": true,
-  "theorem_public_trace_path_avoids_compiled_function": false,
+  "theorem_public_trace_path_avoids_compiled_function": true,
   "theorem_trace_bridge_api_is_compact": true,
   "theorem_trace_bridge_surface_files": [
-    "runtime/uo-evm/src/engine.rs",
+    "runtime/uo-evm/src/runtime.rs",
     "runtime/uo-evm/src/theorem.rs"
   ],
   "theorem_trace_bridge_surface_restricted": true,

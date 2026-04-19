@@ -96,11 +96,13 @@ internal committed-state snapshot and the finalized traced-call witness bundle
 now also wipe their hidden ORAM witness vectors on drop. The old
 direct snapshot-type handling path is gone. The
 same report now also pins the call-trace bridge itself: `engine.rs` calls
-only `run_traced_call(...)` and no longer imports `begin_call_trace`,
-`FinalizeCallTraceInput`, or `CallTraceContext` directly, and those helper
-types/functions stay private to `runtime/uo-evm/src/theorem.rs`; the engine
-also consumes the finalized theorem result only through its explicit
-`into_engine_result_parts()` handoff. The same report also
+only `run_contract_call(...)` from `runtime/uo-evm/src/runtime.rs` and no
+longer imports `begin_call_trace`, `FinalizeCallTraceInput`, or
+`CallTraceContext` directly; `runtime.rs` is now the only non-theorem caller
+of `run_traced_call(...)`, those helper types/functions stay private to
+`runtime/uo-evm/src/theorem.rs`, and the old `FinalizedCallTrace` wrapper is
+gone in favor of one explicit `(return_value, aborted, trace, zero_writes)`
+handoff tuple. The same report also
 pins the top-level `ContractRuntime` entrypoints themselves: only
 `runtime/uo-evm/src/shell.rs` may prepare, commit, or replace the public
 shadow wrapper, that shell module now lives under `crate::runtime` rather than

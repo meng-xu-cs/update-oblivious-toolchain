@@ -44,11 +44,12 @@ impl AllocatorPlan {
             + entry.uoarray_writes
             + entry.uomap_reads
             + entry.uomap_writes;
+        let canonical_kernel_steps = entry.canonical_kernel_step_manifest();
         let mut plan = Self::for_entrypoint(entry.arena_bytes, entry.max_stack_words);
-        plan.max_kernel_ops = if entry.kernel_steps.is_empty() {
+        plan.max_kernel_ops = if canonical_kernel_steps.is_empty() {
             logical_kernel_ops + 3
         } else {
-            entry.kernel_steps.len()
+            canonical_kernel_steps.len()
         };
         plan
     }
@@ -328,7 +329,31 @@ mod tests {
     #[test]
     fn manifest_plan_sets_exact_kernel_budget() {
         let plan = AllocatorPlan::from_manifest(&sample_manifest());
-        assert_eq!(plan.max_kernel_ops, sample_manifest().kernel_steps.len());
+        assert_eq!(
+            plan.max_kernel_ops,
+            sample_manifest().canonical_kernel_step_manifest().len()
+        );
+    }
+
+    #[test]
+    fn manifest_plan_prefers_canonical_slot_program_budget() {
+        let mut manifest = sample_manifest();
+        manifest.kernel_steps.clear();
+        manifest.confidential_slot_program = Some(uo_core::ConfidentialKernelSlotProgram {
+            entrypoint_id: "touch(uint256)".into(),
+            param_count: 1,
+            return_type: None,
+            secret_args: vec![0],
+            slot_count: 1,
+            body: Vec::new(),
+        });
+
+        let plan = AllocatorPlan::from_manifest(&manifest);
+
+        assert_eq!(
+            plan.max_kernel_ops,
+            manifest.canonical_kernel_step_manifest().len()
+        );
     }
 
     #[test]

@@ -28,11 +28,16 @@ struct ExecState {
 pub(in crate::runtime) fn run_public_entrypoint(
     runtime: &mut ContractRuntime,
     contract: &CompiledContract,
-    function: &CompiledFunction,
+    entrypoint: &str,
     manifest_entry: &EntrypointManifest,
     public_args: Vec<Value>,
     recorder: &mut CallRecorder,
 ) -> Result<RuntimeCallOutcome> {
+    let function = contract
+        .functions
+        .iter()
+        .find(|function| function.signature == entrypoint)
+        .ok_or_else(|| anyhow!("unknown public entrypoint: {entrypoint}"))?;
     let allocator = AllocatorPlan::from_manifest(manifest_entry);
     let public_object_ids = runtime.public_object_ids();
     let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.clone())?;

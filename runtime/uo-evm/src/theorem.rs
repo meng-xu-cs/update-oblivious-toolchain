@@ -6,7 +6,6 @@ use crate::runtime::state::{
     TracedRuntimeCallWitnessState,
 };
 use anyhow::{anyhow, Result};
-use uo_core::ir::CompiledFunction;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, OutputShape, RuntimeControllerObserverCertificate,
@@ -65,42 +64,25 @@ struct FinalizeCallTraceInput<'a> {
     traced_outcome: TracedRuntimeCallOutcome,
 }
 
-pub(crate) struct FinalizedCallTrace {
-    trace: ExecutionTrace,
-    zero_writes: usize,
-    return_value: Option<uo_core::Value>,
-    aborted: bool,
-}
-
-impl FinalizedCallTrace {
-    pub(crate) fn into_engine_result_parts(self) -> (Option<Value>, bool, ExecutionTrace, usize) {
-        (
-            self.return_value,
-            self.aborted,
-            self.trace,
-            self.zero_writes,
-        )
-    }
-}
-
-pub(crate) fn run_traced_call(
+pub(in crate::runtime) fn run_traced_call(
     runtime: &mut ContractRuntime,
     artifact: &CompiledArtifact,
-    function: &CompiledFunction,
+    entrypoint: &str,
+    confidential: bool,
     deploy_seed: u64,
     args: Vec<Value>,
     fresh_coins: Option<PathOramFreshCoinPlan>,
-) -> Result<FinalizedCallTrace> {
+) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
     let manifest_entry = artifact
         .contract
         .manifest
         .entrypoints
-        .get(&function.signature)
-        .ok_or_else(|| anyhow!("manifest entry missing for {}", function.signature))?;
-    let mut context = begin_call_trace(&*runtime, &function.signature, manifest_entry, &args)?;
-    let call_outcome = if function.confidential {
+        .get(entrypoint)
+        .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
+    let mut context = begin_call_trace(&*runtime, entrypoint, manifest_entry, &args)?;
+    let call_outcome = if confidential {
         runtime.run_confidential_entrypoint(
-            &function.signature,
+            entrypoint,
             manifest_entry,
             args,
             fresh_coins,
@@ -110,7 +92,7 @@ pub(crate) fn run_traced_call(
         run_public_entrypoint(
             runtime,
             &artifact.contract,
-            function,
+            entrypoint,
             manifest_entry,
             args,
             context.recorder_mut(),
@@ -120,8 +102,8 @@ pub(crate) fn run_traced_call(
     finalize_call_trace(FinalizeCallTraceInput {
         context,
         artifact,
-        entrypoint: &function.signature,
-        confidential: function.confidential,
+        entrypoint,
+        confidential,
         deploy_seed,
         manifest_entry,
         manifest_objects: &artifact.contract.manifest.objects,
@@ -265,7 +247,9 @@ fn gas_used_of(
     gas_used
 }
 
-fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCallTrace> {
+fn finalize_call_trace(
+    input: FinalizeCallTraceInput<'_>,
+) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
     let FinalizeCallTraceInput {
         context,
         artifact,
@@ -313,12 +297,7 @@ fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCal
         runtime_kernel_refinement_witness,
         runtime_witness_state,
     })?;
-    Ok(FinalizedCallTrace {
-        trace,
-        zero_writes,
-        return_value,
-        aborted,
-    })
+    Ok((return_value, aborted, trace, zero_writes))
 }
 
 fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWitness> {

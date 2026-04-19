@@ -350,8 +350,10 @@ The first implementation step is now present in the codebase:
   admitted runtime kernel-step trace, or threads the manifest hash-scratch
   bound or confidential commit budget itself; the runtime now validates the
   slot program against `manifest.kernel_steps` once and then carries the
-  checked manifest schedule itself forward as the canonical public budget /
-  witness schedule
+  checked slot program forward as the canonical public budget / witness
+  schedule, with downstream consumers reading that schedule through
+  `EntrypointManifest::canonical_kernel_step_manifest()` instead of directly
+  from the duplicated raw manifest field
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while checker-side compiler validation and the

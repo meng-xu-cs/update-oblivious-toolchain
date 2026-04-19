@@ -8996,11 +8996,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !state_source
             .contains("pub(crate) fn ensure_ready_for_call(&self, context: &str) -> Result<()>");
     let engine_delegates_public_execution_to_runtime_theorem_bridge = engine_impl_source
-        .contains("use crate::runtime::theorem::run_traced_call;")
-        && engine_impl_source.contains("run_traced_call(")
+        .contains("run_contract_call(")
+        && engine_impl_source.contains("use crate::runtime::{")
+        && !engine_impl_source.contains("use crate::runtime::theorem::run_traced_call;")
+        && !engine_impl_source.contains("run_traced_call(")
         && !engine_impl_source.contains("use crate::runtime::shell::run_public_entrypoint;")
         && !engine_impl_source.contains("run_public_entrypoint(")
         && !engine_impl_source.contains("AllocatorPlan::from_manifest(")
+        && runtime_module_source.contains("pub(crate) fn run_contract_call(")
+        && runtime_module_source.contains("theorem::run_traced_call(")
         && shell_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
         && !engine_impl_source.contains("fn exec_block(")
         && !engine_impl_source.contains("fn exec_statement(")
@@ -9008,11 +9012,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("fn eval_binary(")
         && !engine_impl_source.contains("fn store_env_value(");
     let engine_delegates_confidential_execution_to_runtime_theorem_bridge = engine_impl_source
-        .contains("use crate::runtime::theorem::run_traced_call;")
-        && engine_impl_source.contains("run_traced_call(")
+        .contains("run_contract_call(")
+        && !engine_impl_source.contains("run_traced_call(")
         && !engine_impl_source.contains("run_confidential_entrypoint(")
         && !engine_impl_source.contains("prepare_confidential_entrypoint(")
         && theorem_source.contains("runtime.run_confidential_entrypoint(")
+        && runtime_module_source.contains("theorem::run_traced_call(")
         && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
     let engine_confidential_manifest_surface_absent = !engine_impl_source
         .contains(".confidential_slot_program")
@@ -9033,7 +9038,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("use crate::runtime::shell::run_public_entrypoint;");
     let theorem_bridge_is_runtime_owned = runtime_evm_lib_source.contains("mod runtime;")
         && !runtime_evm_lib_source.contains("mod theorem;")
-        && engine_impl_source.contains("use crate::runtime::theorem::run_traced_call;");
+        && runtime_module_source.contains("mod theorem;")
+        && runtime_module_source.contains("pub(crate) fn run_contract_call(")
+        && !runtime_module_source.contains("pub(crate) mod theorem;");
     let state_uses_public_runtime_kernel = state_source
         .contains("use crate::runtime::kernel::PublicRuntimeKernel;")
         && state_source.contains("PublicRuntimeKernel::begin(");
@@ -9189,7 +9196,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("pub(in crate::runtime) struct CommittedRuntimeState")
         && state_source.contains("pub(in crate::runtime) struct RuntimeShadowState")
         && state_source.contains("pub(in crate::runtime) struct ConfidentialRuntimeShadowState")
-        && state_source.contains("pub(crate) struct PublicRuntimeShadowState");
+        && state_source.contains("pub(in crate::runtime) struct PublicRuntimeShadowState");
     let kernel_restricted_signatures = [
         "pub(in crate::runtime) fn begin(",
         "pub(in crate::runtime) fn note_hash_bytes",
@@ -9405,9 +9412,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && kernel_source.contains("value.wipe_secrets();");
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_call_trace(")
         && theorem_source.contains("fn begin_call_trace(")
-        && theorem_source.contains("pub(crate) fn run_traced_call<F>(")
+        && theorem_source.contains("pub(in crate::runtime) fn run_traced_call(")
         && theorem_source.contains("let mut context = begin_call_trace(")
-        && theorem_source.contains("execute(runtime, args, context.recorder_mut())")
+        && theorem_source.contains("runtime.run_confidential_entrypoint(")
+        && theorem_source.contains("run_public_entrypoint(")
         && theorem_source.contains("runtime.begin_traced_call(")
         && theorem_source.contains("runtime.finish_traced_call(call_outcome)?;")
         && !theorem_source.contains("runtime.witness_snapshot()?;")
@@ -9635,39 +9643,33 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_trace_bridge_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "run_traced_call")?;
     let expected_theorem_trace_bridge_surface_files = vec![
-        String::from("runtime/uo-evm/src/engine.rs"),
+        String::from("runtime/uo-evm/src/runtime.rs"),
         String::from("runtime/uo-evm/src/theorem.rs"),
     ];
     let theorem_trace_bridge_surface_restricted =
         theorem_trace_bridge_surface_files == expected_theorem_trace_bridge_surface_files;
-    let theorem_trace_bridge_api_is_compact = !engine_impl_source.contains("RunTracedCallInput")
+    let theorem_trace_bridge_api_is_compact = !engine_impl_source.contains("RunContractCallInput")
+        && !runtime_module_source.contains("struct RunContractCallInput")
         && !theorem_source.contains("struct RunTracedCallInput");
-    let finalized_call_trace_fields_private = theorem_source.contains("trace: ExecutionTrace")
-        && theorem_source.contains("zero_writes: usize")
-        && theorem_source.contains("return_value: Option<uo_core::Value>")
-        && theorem_source.contains("aborted: bool")
-        && !theorem_source.contains("pub trace: ExecutionTrace")
-        && !theorem_source.contains("pub zero_writes: usize")
-        && !theorem_source.contains("pub return_value: Option<uo_core::Value>")
-        && !theorem_source.contains("pub aborted: bool");
-    let finalized_call_trace_api_is_explicit = theorem_source
-        .contains("pub(crate) fn into_engine_result_parts(self)")
-        && engine_impl_source.contains("finalized.into_engine_result_parts()")
-        && !engine_impl_source.contains("finalized.return_value")
-        && !engine_impl_source.contains("finalized.aborted")
-        && !engine_impl_source.contains("finalized.trace")
-        && !engine_impl_source.contains("finalized.zero_writes");
+    let finalized_call_trace_fields_private = !theorem_source.contains("struct FinalizedCallTrace")
+        && !theorem_source.contains("pub(crate) struct FinalizedCallTrace")
+        && !theorem_source.contains("pub(in crate::runtime) struct FinalizedCallTrace");
+    let finalized_call_trace_api_is_explicit = runtime_module_source
+        .contains("pub(crate) fn run_contract_call(")
+        && runtime_module_source
+            .contains("-> Result<(Option<Value>, bool, ExecutionTrace, usize)> {")
+        && engine_impl_source
+            .contains("let (return_value, aborted, trace, zero_writes) = run_contract_call(")
+        && !engine_impl_source.contains("finalized.into_engine_result_parts()")
+        && !theorem_source.contains("into_engine_result_parts(");
     let finalized_call_trace_consumption_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "into_engine_result_parts(")?;
-    let expected_finalized_call_trace_consumption_surface_files = vec![
-        String::from("runtime/uo-evm/src/engine.rs"),
-        String::from("runtime/uo-evm/src/theorem.rs"),
-    ];
+    let expected_finalized_call_trace_consumption_surface_files = Vec::<String>::new();
     let finalized_call_trace_consumption_surface_restricted =
         finalized_call_trace_consumption_surface_files
             == expected_finalized_call_trace_consumption_surface_files;
     let engine_public_trace_uses_output_shape_only = engine_impl_source
-        .contains("let finalized = run_traced_call(")
+        .contains("let (return_value, aborted, trace, zero_writes) = run_contract_call(")
         && theorem_trace_bridge_api_is_compact
         && theorem_private_surface_restricted
         && finalized_call_trace_fields_private
@@ -10190,8 +10192,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("ConfidentialKernelLoweringError::ConfidentialStructField")
         && core_trace_source.contains("ConfidentialKernelLoweringError::ConfidentialArrayIndex");
     let allocator_uses_manifest_kernel_step_budget = allocator_source
-        .contains("plan.max_kernel_ops = if entry.kernel_steps.is_empty()")
-        && allocator_source.contains("entry.kernel_steps.len()")
+        .contains("let canonical_kernel_steps = entry.canonical_kernel_step_manifest();")
+        && allocator_source.contains("plan.max_kernel_ops = if canonical_kernel_steps.is_empty()")
+        && allocator_source.contains("canonical_kernel_steps.len()")
+        && !allocator_source.contains("entry.kernel_steps.is_empty()")
+        && !allocator_source.contains("entry.kernel_steps.len()")
         && !allocator_source.contains("program.expected_runtime_steps().len()");
     let state_uses_checked_manifest_kernel_schedule = state_source
         .contains("let program_expected_kernel_steps = program.expected_runtime_step_witnesses();")
@@ -10624,7 +10629,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("#[cfg(feature = \"diagnostics\")]")
         && engine_source.contains("pub fn call_with_path_oram_fresh_coins(")
         && runtime_evm_lib_source.contains("#[cfg(feature = \"diagnostics\")]")
-        && runtime_evm_lib_source.contains("pub use runtime::fresh_coins::PathOramFreshCoinPlan;");
+        && runtime_evm_lib_source.contains("pub use runtime::PathOramFreshCoinPlan;");
     let diagnostic_api_gated_behind_feature = engine_source
         .contains("#[cfg(feature = \"diagnostics\")]")
         && engine_source.contains("pub fn call_with_diagnostics(")
@@ -13333,10 +13338,11 @@ call the low-level runtime object helpers, that those helpers remain
 restricted to `crate::runtime`, that `RuntimeObject` itself is not `Clone`,
 that `ContractInstance::clone` goes through the cold committed-state clone
 path, that `engine.rs` now holds only an opaque `ContractRuntime` wrapper and
-delegates the entire traced-call lifecycle through
-`runtime/uo-evm/src/theorem.rs`, that the runtime-owned theorem bridge then
-dispatches public execution to `shell.rs` and confidential execution to
-`state.rs`, that `shell.rs` itself stays on the `PublicRuntimeKernel` plus
+delegates the entire traced-call lifecycle through the
+`runtime/uo-evm/src/runtime.rs` bridge, that the runtime-owned theorem bridge
+inside `runtime/uo-evm/src/theorem.rs` then dispatches public execution to
+`shell.rs` and confidential execution to `state.rs`, that `shell.rs` itself
+stays on the `PublicRuntimeKernel` plus
 `PublicRuntimeShadowState` side of the boundary while the confidential path uses its own
 `ConfidentialRuntimeShadowState` wrapper instead of reusing the public shadow
 handle, and that `engine.rs` no longer constructs runtime phase-witness
@@ -13346,8 +13352,9 @@ certificates directly, no longer assembles `ExecutionTrace` directly
 beyond `runtime/uo-evm/src/theorem.rs`, and no longer performs the
 public output-shape computation or theorem-trace assembly piecemeal; instead
 it delegates the whole theorem-finalization path through
-`run_traced_call(...)` in `runtime/uo-evm/src/theorem.rs`. The same boundary
-check also rejects engine-side calls to `output_shape_of`,
+`run_contract_call(...)` in `runtime/uo-evm/src/runtime.rs`, whose only
+non-theorem call into that bridge is `run_traced_call(...)`. The same
+boundary check also rejects engine-side calls to `output_shape_of`,
 `build_theorem_trace`, and `finalize_execution_trace`, while requiring the
 theorem module to keep deriving the public `OutputShape` from the checked
 manifest's `return_canonical_len`. `engine.rs` also no longer clones the full
@@ -13365,7 +13372,9 @@ before/after ORAM witness snapshot consumed by `theorem.rs` is now captured
 through the theorem-side `run_traced_call(...)` bridge rather than by
 `engine.rs`, and remains opaque outside the dedicated `state.rs` /
 `theorem.rs` handoff; the same theorem-side context now also owns the public
-`PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer constructs
+`PublicCallSummary` and `CallRecorder`, and `shell.rs` resolves public
+entrypoints from `(CompiledContract, signature)` so `theorem.rs` no longer
+needs the raw `CompiledFunction`; `engine.rs` therefore no longer constructs
 those theorem-path objects directly. The same report now also pins the
 theorem-facing constructor surface itself: `RuntimeControllerObserverCertificate::new`,
 `RuntimePathOramHiddenCertificate::new`, and

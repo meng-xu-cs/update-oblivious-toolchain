@@ -329,7 +329,7 @@ impl ProofRelevantEntrypointView {
             confidential_program: entrypoint.confidential_program.clone(),
             confidential_slot_program: entrypoint.confidential_slot_program.clone(),
             kernel_steps: entrypoint
-                .kernel_steps
+                .canonical_kernel_step_manifest()
                 .iter()
                 .map(ProofRelevantKernelStepView::from_kernel_step)
                 .collect::<Result<Vec<_>>>()?,

@@ -271,8 +271,12 @@ impl ConfidentialKernelSlotProgram {
 }
 
 impl EntrypointManifest {
-    pub fn kernel_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
+    pub fn stored_kernel_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
         manifest_kernel_steps_as_witness(&self.kernel_steps)
+    }
+
+    pub fn kernel_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
+        manifest_kernel_steps_as_witness(&self.canonical_kernel_step_manifest())
     }
 }
 

@@ -72,6 +72,15 @@ pub struct EntrypointManifest {
     pub oram_accesses: BTreeMap<u32, usize>,
 }
 
+impl EntrypointManifest {
+    pub fn canonical_kernel_step_manifest(&self) -> Vec<RuntimeKernelStepManifest> {
+        self.confidential_slot_program
+            .as_ref()
+            .map(ConfidentialKernelSlotProgram::expected_runtime_step_manifest)
+            .unwrap_or_else(|| self.kernel_steps.clone())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OramManifest {
     pub scheme: String,
@@ -312,10 +321,11 @@ fn state_object_by_id(state: &[StateObject], object_id: u32) -> Result<&StateObj
 
 #[cfg(test)]
 mod tests {
-    use super::{OramManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME};
+    use super::{EntrypointManifest, OramManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME};
     use crate::confidential_kernel::ConfidentialKernelSlotProgram;
     use crate::ir::{BackendKind, ContainerKind, StateObject};
     use crate::types::{ScalarType, Type};
+    use std::collections::BTreeMap;
     use uo_precompiles::UoOpcode;
 
     fn path_oram_object(capacity: usize) -> StateObject {
@@ -383,6 +393,47 @@ mod tests {
                     object_id: None,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn entrypoint_manifest_prefers_slot_program_for_canonical_kernel_steps() {
+        let slot_program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "ping(uint256)".into(),
+            param_count: 1,
+            return_type: None,
+            secret_args: vec![0],
+            slot_count: 1,
+            body: Vec::new(),
+        };
+        let manifest = EntrypointManifest {
+            secret_args: vec![0],
+            param_names: vec!["secret".into()],
+            entry_input_len: 32,
+            public_gas_budget: 4096,
+            arena_bytes: 4096,
+            max_stack_words: 64,
+            max_hash_part_bytes: 0,
+            return_canonical_len: None,
+            confidential_program: None,
+            confidential_slot_program: Some(slot_program.clone()),
+            kernel_steps: vec![RuntimeKernelStepManifest {
+                opcode: UoOpcode::MapPut,
+                object_id: Some(99),
+            }],
+            uocell_reads: 0,
+            uocell_writes: 0,
+            uoarray_reads: 0,
+            uoarray_writes: 0,
+            uomap_reads: 0,
+            uomap_writes: 0,
+            max_commit_ops: 0,
+            oram_accesses: BTreeMap::new(),
+        };
+
+        assert_eq!(
+            manifest.canonical_kernel_step_manifest(),
+            slot_program.expected_runtime_step_manifest()
         );
     }
 }

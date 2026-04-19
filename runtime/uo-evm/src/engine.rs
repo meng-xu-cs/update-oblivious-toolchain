@@ -1,6 +1,6 @@
-use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
-use crate::runtime::state::ContractRuntime;
-use crate::runtime::theorem::run_traced_call;
+use crate::runtime::{
+    deploy_contract_runtime, run_contract_call, ContractRuntime, PathOramFreshCoinPlan,
+};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -51,7 +51,7 @@ impl ContractInstance {
 
     pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
         Ok(Self {
-            state: ContractRuntime::deploy(&artifact.contract.state, deploy_seed)?,
+            state: deploy_contract_runtime(&artifact.contract.state, deploy_seed)?,
             artifact,
             deploy_seed,
         })
@@ -106,7 +106,7 @@ impl ContractInstance {
                 args.len()
             );
         }
-        let finalized = run_traced_call(
+        let (return_value, aborted, trace, zero_writes) = run_contract_call(
             &mut self.state,
             &self.artifact,
             &function,
@@ -114,7 +114,6 @@ impl ContractInstance {
             args,
             fresh_coins,
         )?;
-        let (return_value, aborted, trace, zero_writes) = finalized.into_engine_result_parts();
         Ok((
             CallResult {
                 return_value,
@@ -143,6 +142,7 @@ pub fn run_artifact_with_seed(
 #[cfg(test)]
 mod tests {
     use super::ContractInstance;
+    use crate::runtime::ensure_contract_runtime_cold;
     use crate::runtime::objects::RuntimeObject;
     use uo_core::{canonical_runtime_public_object_ids, ContractMetadata, ProgramMode, Value};
 
@@ -156,13 +156,12 @@ mod tests {
     }
 
     fn assert_objects_are_cold(instance: &ContractInstance) {
-        instance
-            .state
-            .ensure_cold(
-                &canonical_runtime_public_object_ids(&instance.artifact.contract.state),
-                "in engine test",
-            )
-            .unwrap();
+        ensure_contract_runtime_cold(
+            &instance.state,
+            &canonical_runtime_public_object_ids(&instance.artifact.contract.state),
+            "in engine test",
+        )
+        .unwrap();
     }
 
     #[test]
@@ -176,12 +175,16 @@ mod tests {
             "engine.rs should hold an opaque runtime wrapper rather than the raw committed state"
         );
         assert!(
-            source.contains("use crate::runtime::theorem::run_traced_call;"),
-            "engine.rs should delegate call execution through the runtime-owned theorem bridge"
+            source.contains("run_contract_call"),
+            "engine.rs should delegate call execution through the runtime-owned call bridge"
+        );
+        assert!(
+            !source.contains("use crate::runtime::theorem::run_traced_call;"),
+            "engine.rs should not import the theorem bridge module directly once runtime.rs owns that boundary"
         );
         assert!(
             !source.contains("use crate::runtime::shell::run_public_entrypoint;"),
-            "engine.rs should not import the public shell directly once the theorem bridge owns dispatch"
+            "engine.rs should not import the public shell directly once the runtime bridge owns dispatch"
         );
         assert!(
             !source.contains("ConfidentialCallInputs"),
@@ -204,8 +207,8 @@ mod tests {
             "engine.rs should not import the public kernel facade directly once the public and confidential setup paths are delegated"
         );
         assert!(
-            source.contains("run_traced_call("),
-            "engine.rs should delegate call execution through run_traced_call"
+            source.contains("run_contract_call("),
+            "engine.rs should delegate call execution through run_contract_call"
         );
         assert!(
             !source.contains("run_confidential_entrypoint("),

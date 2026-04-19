@@ -33,7 +33,7 @@ pub(in crate::runtime) struct ConfidentialRuntimeShadowState {
 }
 
 #[derive(Debug)]
-pub(crate) struct PublicRuntimeShadowState {
+pub(in crate::runtime) struct PublicRuntimeShadowState {
     shadow: RuntimeShadowState,
 }
 
@@ -193,17 +193,24 @@ impl Clone for ContractRuntime {
 }
 
 impl ContractRuntime {
-    pub(crate) fn deploy(contract_state: &[StateObject], deploy_seed: u64) -> Result<Self> {
+    pub(in crate::runtime) fn deploy(
+        contract_state: &[StateObject],
+        deploy_seed: u64,
+    ) -> Result<Self> {
         Ok(Self {
             committed: CommittedRuntimeState::deploy(contract_state, deploy_seed)?,
         })
     }
 
-    pub(crate) fn ensure_cold(&self, expected_object_ids: &[u32], context: &str) -> Result<()> {
+    pub(in crate::runtime) fn ensure_cold(
+        &self,
+        expected_object_ids: &[u32],
+        context: &str,
+    ) -> Result<()> {
         self.committed.ensure_cold(expected_object_ids, context)
     }
 
-    pub(crate) fn public_object_ids(&self) -> Vec<u32> {
+    pub(in crate::runtime) fn public_object_ids(&self) -> Vec<u32> {
         self.committed.public_object_ids()
     }
 
@@ -371,7 +378,7 @@ impl ContractRuntime {
 }
 
 impl CommittedRuntimeState {
-    pub(crate) fn deploy(contract_state: &[StateObject], deploy_seed: u64) -> Result<Self> {
+    fn deploy(contract_state: &[StateObject], deploy_seed: u64) -> Result<Self> {
         let mut objects = BTreeMap::new();
         let mut master_seed = deploy_seed;
         for spec in contract_state {
@@ -386,7 +393,7 @@ impl CommittedRuntimeState {
         Ok(Self { objects })
     }
 
-    pub(crate) fn ensure_cold(&self, expected_object_ids: &[u32], context: &str) -> Result<()> {
+    fn ensure_cold(&self, expected_object_ids: &[u32], context: &str) -> Result<()> {
         let witnessed_object_ids = self.objects.keys().copied().collect::<Vec<_>>();
         if witnessed_object_ids != expected_object_ids {
             bail!(
@@ -406,7 +413,7 @@ impl CommittedRuntimeState {
         Ok(())
     }
 
-    pub(crate) fn public_object_ids(&self) -> Vec<u32> {
+    fn public_object_ids(&self) -> Vec<u32> {
         self.objects.keys().copied().collect()
     }
 
@@ -445,7 +452,7 @@ impl CommittedRuntimeState {
         kernel.commit_public_objects(shadow, self, aborted, recorder)
     }
 
-    pub(crate) fn run_confidential_call(
+    fn run_confidential_call(
         &mut self,
         kernel: PublicRuntimeKernel,
         program: &ConfidentialKernelSlotProgram,
@@ -564,7 +571,7 @@ impl ConfidentialEntrypointPlan {
         public_object_ids: Vec<u32>,
     ) -> Result<Self> {
         let mut allocator = AllocatorPlan::from_manifest(manifest_entry);
-        let manifest_expected_kernel_steps = manifest_entry.kernel_step_witnesses();
+        let manifest_expected_kernel_steps = manifest_entry.stored_kernel_step_witnesses();
         let program = manifest_entry
             .confidential_slot_program
             .clone()

@@ -162,14 +162,18 @@ The current runtime has a first hardening layer:
   `PublicCallSummary` derived from the checked manifest's `param_names`,
   `secret_args`, and manifest-stored `entry_input_len`, containing the
   already-public argument projection plus a type-derived total input length;
-  the shell now holds an opaque `ContractRuntime` wrapper rather than the raw
-  committed confidential state, and that wrapper internalizes the remaining
-  raw confidential argument vector into `ConfidentialCallInputs`, whose unwrap
-  surface is restricted to `crate::runtime` and whose buffered `Value`s wipe
-  on drop,
+  `engine.rs` now delegates the traced-call lifecycle through the
+  `runtime/uo-evm/src/runtime.rs` facade rather than importing theorem helpers
+  directly, the shell now holds an opaque `ContractRuntime` wrapper rather
+  than the raw committed confidential state, and that wrapper internalizes the
+  remaining raw confidential argument vector into `ConfidentialCallInputs`,
+  whose unwrap surface is restricted to `crate::runtime` and whose buffered
+  `Value`s wipe on drop,
   and the controller/theorem path now derives public return length from
   manifest-stored `return_canonical_len` and receives only the public
-  `OutputShape` summary rather than the full return payload; injected
+  `OutputShape` summary rather than the full return payload; `theorem.rs` also
+  no longer depends on `CompiledFunction` and instead routes public execution
+  by `(contract, entrypoint signature)` through `shell.rs`; injected
   fresh-coin plans now zero their stored leaf choices on drop, are consumed
   by value at the diagnostic runtime entrypoint, and move those per-object
   secret leaf tapes into the live shadow state without cloning them first
@@ -522,13 +526,16 @@ The current runtime has a first hardening layer:
   universe itself, threads the public-shell allocator plan, or threads the
   manifest hash-scratch bound or confidential commit budget itself; the
   theorem-side `begin_call_trace` path now triggers that runtime preflight
-  instead, and the runtime now validates the slot program against
+  instead, and the runtime now validates the slot program against the stored
   `manifest.kernel_steps` once but then carries the checked slot program
-  itself forward, deriving both the public kernel-step witness list and the
-  confidential shadow-load object set from that canonical DSL object at the
-  kernel boundary instead of caching duplicate schedule-derived vectors in the
-  runtime plan, with `PublicRuntimeKernel::begin(...)` now taking only the
-  allocator plan plus the public object universe, and with
+  itself forward; downstream consumers read the canonical schedule through
+  `EntrypointManifest::canonical_kernel_step_manifest()`, which derives from
+  the slot program when present and falls back to the stored field only when
+  no confidential slot program exists, so both the public kernel-step witness
+  list and the confidential shadow-load object set now come from that
+  canonical DSL object at the runtime boundary instead of from ad hoc
+  duplicate schedule reads, with `PublicRuntimeKernel::begin(...)` now taking
+  only the allocator plan plus the public object universe, and with
   `run_confidential_call(...)` binding the admitted runtime schedule from the
   canonical slot DSL program itself, while `PublicRuntimeKernel::begin(...)`
   also internalizes the exact public object universe (`expected_public_object_ids =
