@@ -6035,8 +6035,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     });
     let engine_uses_opaque_committed_state = engine_impl_source.contains("state: ContractRuntime")
         && !engine_impl_source.contains("state: CommittedRuntimeState");
-    let engine_uses_runtime_public_object_universe =
-        !engine_impl_source.contains(".ensure_ready_for_call(")
+    let engine_uses_runtime_public_object_universe = !engine_impl_source
+        .contains(".ensure_ready_for_call(")
         && !engine_impl_source.contains("let public_object_ids = self.state.public_object_ids();")
         && !engine_impl_source.contains("canonical_runtime_public_object_ids(")
         && theorem_source.contains("runtime.ensure_ready_for_call(")
@@ -6369,11 +6369,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_public_trace_uses_output_shape_only = engine_impl_source
         .contains("let mut call_trace_context =")
         && engine_impl_source.contains("let finalized = finalize_call_trace(")
+        && engine_impl_source.contains("call_outcome: execution,")
         && !engine_impl_source.contains("output_shape_of(")
         && !engine_impl_source.contains("build_theorem_trace(")
         && !engine_impl_source.contains("finalize_execution_trace(")
         && !engine_impl_source.contains("witness_snapshot()")
-        && !engine_impl_source.contains("CallRecorder::begin_with_input_len(");
+        && !engine_impl_source.contains("CallRecorder::begin_with_input_len(")
+        && !engine_impl_source.contains("runtime_kernel_witness,")
+        && !engine_impl_source.contains("runtime_kernel_refinement_witness,")
+        && !engine_impl_source.contains("opcode_trace,")
+        && !engine_impl_source.contains("return_value,");
     let state_prepares_confidential_manifest_plan = state_source
         .contains("struct ConfidentialEntrypointPlan")
         && state_source.contains("ConfidentialEntrypointPlan::from_manifest_entry(")
@@ -9090,7 +9095,10 @@ now owns the ready-for-call coldness preflight over that universe as well,
 and `shell.rs` now derives the public allocator plan from the manifest rather
 than having the engine thread that setup detail in; the theorem-side
 `begin_call_trace` path now triggers that runtime preflight rather than
-`engine.rs` calling it directly.
+`engine.rs` calling it directly, and the theorem finalizer now consumes the
+whole `RuntimeCallOutcome` directly so the engine no longer unpacks kernel
+witnesses, opcode traces, or return values only to feed them back into the
+same theorem-path finalizer.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade

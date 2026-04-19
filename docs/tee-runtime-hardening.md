@@ -400,7 +400,10 @@ The current runtime has a first hardening layer:
   `CallTraceContext`; that same theorem-side context now also owns the public
   `PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer calls
   `witness_snapshot()`, `PublicCallSummary::from_manifest_entry`, or
-  `CallRecorder::begin_with_input_len` for the theorem path
+  `CallRecorder::begin_with_input_len` for the theorem path, and the theorem
+  finalizer now consumes the whole `RuntimeCallOutcome` directly rather than
+  having the engine unpack kernel witnesses, opcode traces, and return values
+  just to pass them straight back in
 - the confidential-path `RuntimeKernel` entrypoints that shadow-load
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot

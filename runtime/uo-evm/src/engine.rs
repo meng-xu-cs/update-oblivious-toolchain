@@ -123,63 +123,31 @@ impl ContractInstance {
             (None, Some(args))
         };
         let execution = (|| -> Result<_> {
-            let (
-                runtime_kernel_witness,
-                runtime_kernel_refinement_witness,
-                opcode_trace,
-                aborted,
-                return_value,
-            ) = if function.confidential {
+            let execution = if function.confidential {
                 let confidential_args = confidential_args
                     .expect("confidential entrypoint must carry confidential call args");
-                let outcome = self.state.run_confidential_entrypoint(
+                self.state.run_confidential_entrypoint(
                     entrypoint,
                     &manifest_entry,
                     confidential_args,
                     fresh_coins,
                     call_trace_context.recorder_mut(),
-                )?;
-                (
-                    outcome.runtime_kernel_witness,
-                    outcome.runtime_kernel_refinement_witness,
-                    outcome.opcode_trace,
-                    outcome.aborted,
-                    outcome.return_value,
                 )
             } else {
                 let public_args =
                     public_args.expect("public entrypoint must keep raw argument vector");
-                let public_execution = run_public_entrypoint(
+                run_public_entrypoint(
                     &mut self.state,
                     &self.artifact.contract,
                     &function,
                     &manifest_entry,
                     public_args,
                     call_trace_context.recorder_mut(),
-                )?;
-                (
-                    public_execution.runtime_kernel_witness,
-                    public_execution.runtime_kernel_refinement_witness,
-                    public_execution.opcode_trace,
-                    public_execution.aborted,
-                    public_execution.return_value,
                 )
             };
-            Ok((
-                runtime_kernel_witness,
-                runtime_kernel_refinement_witness,
-                opcode_trace,
-                aborted,
-                return_value,
-            ))
+            execution
         })();
-        let (
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            opcode_trace,
-            aborted,
-            return_value,
-        ) = match execution {
+        let execution = match execution {
             Ok(result) => result,
             Err(err) => return Err(err),
         };
@@ -190,18 +158,14 @@ impl ContractInstance {
             entrypoint: &function.signature,
             confidential: function.confidential,
             deploy_seed: self.deploy_seed,
-            opcode_trace,
             manifest_entry: &manifest_entry,
             manifest_objects: &self.artifact.contract.manifest.objects,
-            aborted,
-            return_value: &return_value,
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
+            call_outcome: execution,
         })?;
         Ok((
             CallResult {
-                return_value,
-                aborted,
+                return_value: finalized.return_value,
+                aborted: finalized.aborted,
                 trace: finalized.trace,
             },
             finalized.zero_writes,
