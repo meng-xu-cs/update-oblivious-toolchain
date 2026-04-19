@@ -37,9 +37,9 @@ The final paper target is stricter than the current runtime-side TCB:
 
 - keep shrinking the non-kernel Rust surface; currently `engine.rs` no longer
   stages confidential entrypoint plans and raw/confidential shadow wrappers are
-  runtime-only, and the theorem-facing committed ORAM snapshot is now opaque
-  outside the `state.rs` / `theorem.rs` handoff, but this still needs a
-  theorem-level confinement argument
+  runtime-only, and the theorem-facing committed ORAM snapshot is now captured
+  through the `state.rs` / `theorem.rs` call-trace handoff rather than by the
+  engine, but this still needs a theorem-level confinement argument
 - shrink the confidential Rust surface to a tiny kernel
 - prove the real kernel implementation refines the Lean kernel model
 - prove the non-kernel shell is public-only with respect to the admitted

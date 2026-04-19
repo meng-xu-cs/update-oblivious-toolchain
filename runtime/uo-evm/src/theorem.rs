@@ -1,5 +1,5 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
-use crate::runtime::state::CommittedRuntimeWitnessSnapshot;
+use crate::runtime::state::{CommittedRuntimeWitnessSnapshot, ContractRuntime};
 use anyhow::Result;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
@@ -7,6 +7,16 @@ use uo_core::{
     RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness,
     RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle,
 };
+
+pub(crate) struct CallTraceContext {
+    runtime_state_before: CommittedRuntimeWitnessSnapshot,
+}
+
+pub(crate) fn begin_call_trace(runtime: &ContractRuntime) -> Result<CallTraceContext> {
+    Ok(CallTraceContext {
+        runtime_state_before: runtime.witness_snapshot()?,
+    })
+}
 
 pub(crate) struct FinalizeExecutionTraceInput<'a> {
     pub artifact: &'a CompiledArtifact,
@@ -23,6 +33,8 @@ pub(crate) struct FinalizeExecutionTraceInput<'a> {
 }
 
 pub(crate) struct FinalizeCallTraceInput<'a> {
+    pub runtime: &'a ContractRuntime,
+    pub context: CallTraceContext,
     pub artifact: &'a CompiledArtifact,
     pub entrypoint: &'a str,
     pub confidential: bool,
@@ -36,8 +48,6 @@ pub(crate) struct FinalizeCallTraceInput<'a> {
     pub return_value: &'a Option<uo_core::Value>,
     pub runtime_kernel_witness: RuntimeKernelWitness,
     pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    pub runtime_state_before: CommittedRuntimeWitnessSnapshot,
-    pub runtime_state_after: CommittedRuntimeWitnessSnapshot,
 }
 
 pub(crate) struct FinalizedCallTrace {
@@ -177,6 +187,8 @@ fn gas_used_of(
 
 pub(crate) fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCallTrace> {
     let FinalizeCallTraceInput {
+        runtime,
+        context,
         artifact,
         entrypoint,
         confidential,
@@ -190,9 +202,11 @@ pub(crate) fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<F
         return_value,
         runtime_kernel_witness,
         runtime_kernel_refinement_witness,
-        runtime_state_before,
-        runtime_state_after,
     } = input;
+    let CallTraceContext {
+        runtime_state_before,
+    } = context;
+    let runtime_state_after = runtime.witness_snapshot()?;
     let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
     let output_shape = output_shape_of(manifest_entry, return_value)?;
     let trace_bundle = build_theorem_trace(

@@ -2,7 +2,7 @@ use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::ContractRuntime;
 use crate::shell::run_public_entrypoint;
-use crate::theorem::{finalize_call_trace, FinalizeCallTraceInput};
+use crate::theorem::{begin_call_trace, finalize_call_trace, FinalizeCallTraceInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -129,7 +129,7 @@ impl ContractInstance {
             &public_object_ids,
             "before executing the next call from committed storage",
         )?;
-        let runtime_state_before = self.state.witness_snapshot()?;
+        let call_trace_context = begin_call_trace(&self.state)?;
         let execution = (|| -> Result<_> {
             let mut recorder =
                 CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
@@ -197,8 +197,9 @@ impl ContractInstance {
             Ok(result) => result,
             Err(err) => return Err(err),
         };
-        let runtime_state_after = self.state.witness_snapshot()?;
         let finalized = finalize_call_trace(FinalizeCallTraceInput {
+            runtime: &self.state,
+            context: call_trace_context,
             artifact: &self.artifact,
             entrypoint: &function.signature,
             confidential: function.confidential,
@@ -212,8 +213,6 @@ impl ContractInstance {
             return_value: &return_value,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
-            runtime_state_before,
-            runtime_state_after,
         })?;
         Ok((
             CallResult {
