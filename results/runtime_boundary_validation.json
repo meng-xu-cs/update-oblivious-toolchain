@@ -22,14 +22,6 @@
   "committed_runtime_witness_snapshot_surface_restricted": true,
   "committed_runtime_witness_snapshot_wipes_on_drop": true,
   "confidential_call_inputs_wipe_on_drop": true,
-  "confidential_committed_kernel_outcome_api_is_explicit": true,
-  "confidential_committed_kernel_outcome_derive_line": "#[derive(Debug)]",
-  "confidential_committed_kernel_outcome_fields_private": true,
-  "confidential_committed_kernel_outcome_nonclone": true,
-  "confidential_committed_kernel_outcome_surface_files": [
-    "runtime/uo-evm/src/state.rs"
-  ],
-  "confidential_committed_kernel_outcome_surface_restricted": true,
   "confidential_entrypoint_plan_surface_restricted": true,
   "confidential_exec_state_derive_line": "#[derive(Debug)]",
   "confidential_exec_state_nonclone": true,
@@ -205,9 +197,6 @@
     "runtime/uo-evm/src/theorem.rs"
   ],
   "expected_committed_runtime_witness_snapshot_surface_files": [
-    "runtime/uo-evm/src/state.rs"
-  ],
-  "expected_confidential_committed_kernel_outcome_surface_files": [
     "runtime/uo-evm/src/state.rs"
   ],
   "expected_confidential_exec_state_surface_files": [
@@ -1226,12 +1215,6 @@
       "checked": true,
       "name": "ConfidentialKernelRunOutcome",
       "owner": "runtime/uo-evm/src/kernel.rs"
-    },
-    {
-      "boundary": "runtime-only state-local post-commit confidential outcome bundle before packaging into RuntimeCallOutcome",
-      "checked": true,
-      "name": "ConfidentialCommittedKernelOutcome",
-      "owner": "runtime/uo-evm/src/state.rs"
     },
     {
       "boundary": "runtime-only per-call outcome bundle; construction is pinned to runtime.rs, state.rs, and shell.rs through an explicit constructor, state.rs is the only theorem-packaging consumer of its explicit handoff API, and engine.rs does not unpack it directly",

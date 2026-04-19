@@ -288,15 +288,16 @@ impl ContractRuntime {
         } = plan;
         let kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.clone())?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
-        let outcome = self.committed.run_confidential_call(
-            kernel,
-            &program,
-            max_hash_part_bytes,
-            args,
-            fresh_coins,
-            recorder,
-            &mut opcode_trace,
-        )?;
+        let (runtime_kernel_witness, mut runtime_kernel_refinement_witness, aborted, return_value) =
+            self.committed.run_confidential_call(
+                kernel,
+                &program,
+                max_hash_part_bytes,
+                args,
+                fresh_coins,
+                recorder,
+                &mut opcode_trace,
+            )?;
         if recorder.physical_write_count() > max_commit_ops {
             bail!(
                 "entrypoint {} exceeded manifest commit budget: {} > {}",
@@ -305,8 +306,6 @@ impl ContractRuntime {
                 max_commit_ops
             );
         }
-        let (runtime_kernel_witness, mut runtime_kernel_refinement_witness, aborted, return_value) =
-            outcome.into_runtime_execution_parts();
         self.finalize_runtime_kernel_refinement_witness(
             &mut runtime_kernel_refinement_witness,
             &public_object_ids,
@@ -455,7 +454,12 @@ impl CommittedRuntimeState {
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
-    ) -> Result<ConfidentialCommittedKernelOutcome> {
+    ) -> Result<(
+        RuntimeKernelWitness,
+        RuntimeKernelRefinementWitness,
+        bool,
+        Option<Value>,
+    )> {
         let outcome = kernel.run_confidential_call(
             program,
             self,
@@ -473,12 +477,12 @@ impl CommittedRuntimeState {
             return_value,
         ) = outcome.into_committed_outcome_parts();
         self.objects = committed_shadow.into_cold_committed_state().objects;
-        Ok(ConfidentialCommittedKernelOutcome {
+        Ok((
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
             aborted,
             return_value,
-        })
+        ))
     }
 
     pub(in crate::runtime) fn replace_with_cold_public_shadow(
@@ -581,32 +585,6 @@ impl ConfidentialEntrypointPlan {
             program,
             max_hash_part_bytes: manifest_entry.max_hash_part_bytes,
         })
-    }
-}
-
-#[derive(Debug)]
-pub(in crate::runtime) struct ConfidentialCommittedKernelOutcome {
-    runtime_kernel_witness: uo_core::RuntimeKernelWitness,
-    runtime_kernel_refinement_witness: uo_core::RuntimeKernelRefinementWitness,
-    aborted: bool,
-    return_value: Option<Value>,
-}
-
-impl ConfidentialCommittedKernelOutcome {
-    pub(crate) fn into_runtime_execution_parts(
-        self,
-    ) -> (
-        uo_core::RuntimeKernelWitness,
-        uo_core::RuntimeKernelRefinementWitness,
-        bool,
-        Option<Value>,
-    ) {
-        (
-            self.runtime_kernel_witness,
-            self.runtime_kernel_refinement_witness,
-            self.aborted,
-            self.return_value,
-        )
     }
 }
 
