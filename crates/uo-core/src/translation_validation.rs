@@ -273,6 +273,7 @@ impl ProofRelevantOramView {
 pub struct ProofRelevantEntrypointView {
     pub signature: String,
     pub secret_args: Vec<usize>,
+    pub param_names: Vec<String>,
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
@@ -296,6 +297,7 @@ impl ProofRelevantEntrypointView {
         Ok(Self {
             signature: signature.into(),
             secret_args: entrypoint.secret_args.clone(),
+            param_names: entrypoint.param_names.clone(),
             public_gas_budget: entrypoint.public_gas_budget,
             arena_bytes: entrypoint.arena_bytes,
             max_stack_words: entrypoint.max_stack_words,

@@ -1,7 +1,6 @@
 use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::state::CommittedRuntimeWitnessSnapshot;
 use anyhow::Result;
-use uo_core::ir::CompiledFunction;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, RuntimeControllerObserverCertificate,
@@ -11,7 +10,8 @@ use uo_core::{
 
 pub(crate) struct FinalizeExecutionTraceInput<'a> {
     pub artifact: &'a CompiledArtifact,
-    pub function: &'a CompiledFunction,
+    pub entrypoint: &'a str,
+    pub confidential: bool,
     pub deploy_seed: u64,
     pub opcode_trace: Vec<String>,
     pub gas_used: u64,
@@ -24,7 +24,6 @@ pub(crate) struct FinalizeExecutionTraceInput<'a> {
 
 pub fn build_theorem_trace(
     recorder: CallRecorder,
-    function: &CompiledFunction,
     manifest_entry: &EntrypointManifest,
     manifest_objects: &[StateObjectManifest],
     public_call: PublicCallSummary,
@@ -33,7 +32,6 @@ pub fn build_theorem_trace(
     gas_used: u64,
 ) -> Result<crate::controller::CallTraceBundle> {
     recorder.finish(
-        function,
         manifest_entry,
         manifest_objects,
         public_call,
@@ -48,7 +46,8 @@ pub(crate) fn finalize_execution_trace(
 ) -> Result<ExecutionTrace> {
     let FinalizeExecutionTraceInput {
         artifact,
-        function,
+        entrypoint,
+        confidential,
         deploy_seed,
         opcode_trace,
         gas_used,
@@ -80,9 +79,9 @@ pub(crate) fn finalize_execution_trace(
         runtime_oram_position_map_after: runtime_state_after.runtime_oram_position_maps,
         runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
     };
-    if function.confidential {
+    if confidential {
         trace
-            .runtime_kernel_witness_for_confidential(artifact, &function.signature)
+            .runtime_kernel_witness_for_confidential(artifact, entrypoint)
             .map_err(|err| {
                 anyhow::anyhow!("runtime kernel witness drifted from admitted artifact: {err}")
             })?;

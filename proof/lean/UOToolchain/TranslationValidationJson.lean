@@ -72,6 +72,7 @@ deriving Repr, DecidableEq, FromJson, ToJson
 structure ImportedProofRelevantEntrypointView where
   signature : String
   secret_args : List Nat
+  param_names : List String
   public_gas_budget : Nat
   arena_bytes : Nat
   max_stack_words : Nat
@@ -142,6 +143,7 @@ private def functionsMatchManifestSecrets :
       | none => false
       | some entry =>
           (entry.secret_args == fn.secret_args) &&
+            (entry.param_names == fn.params.map ImportedProofRelevantParamView.name) &&
             functionsMatchManifestSecrets rest entrypoints
 
 private structure CountSummary where
@@ -337,6 +339,7 @@ private def parseImportedManifestEntrypointViewFromRawJson
   pure
     { signature := signature
     , secret_args := ← lookupFieldAs json "secret_args"
+    , param_names := ← lookupFieldAs json "param_names"
     , public_gas_budget := ← lookupFieldAs json "public_gas_budget"
     , arena_bytes := ← lookupFieldAs json "arena_bytes"
     , max_stack_words := ← lookupFieldAs json "max_stack_words"
@@ -1807,7 +1810,7 @@ def ImportedProofRelevantContractView.validationErrors
     else
       []) ++
     (if !(functionsMatchManifestSecrets view.functions view.manifest.entrypoints) then
-      ["manifest secret_args do not match function secret_args"]
+      ["manifest secret_args/param_names do not match function metadata"]
     else
       []) ++
     (if !(functionsMatchManifestCounts view.functions view.manifest.entrypoints) then

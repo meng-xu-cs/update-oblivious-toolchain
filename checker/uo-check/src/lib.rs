@@ -116,6 +116,22 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 function.signature
             );
         }
+        let expected_param_names = function
+            .params
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect::<Vec<_>>();
+        let witnessed_param_names = entry
+            .param_names
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        if witnessed_param_names != expected_param_names {
+            bail!(
+                "manifest param_names mismatch for entrypoint {}",
+                function.signature
+            );
+        }
         let counts = count_body(&function.body);
         if entry.arena_bytes != 4096 + counts.local_count * 64 {
             bail!(

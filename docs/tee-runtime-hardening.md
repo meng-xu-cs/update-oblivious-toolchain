@@ -155,7 +155,8 @@ The current runtime has a first hardening layer:
   transaction-shadow and replaced-object paths
 - `engine.rs` no longer keeps a duplicate secret-bearing call-argument vector
   just to build the public theorem trace: it now retains only a
-  `PublicCallSummary` containing the total input length plus the already-public
+  `PublicCallSummary` derived from the checked manifest's `param_names` plus
+  `secret_args`, containing the total input length plus the already-public
   argument projection, and injected fresh-coin plans now zero their stored
   leaf choices on drop
 - ORAM refresh/metadata decode now uses `StoreCipher::with_opened_payload`, so

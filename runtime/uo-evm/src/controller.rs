@@ -1,7 +1,6 @@
 use crate::oram::OramParameters;
 use anyhow::{bail, Result};
 use std::collections::BTreeMap;
-use uo_core::ir::CompiledFunction;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
 use uo_core::{
@@ -64,22 +63,28 @@ pub(crate) struct PublicCallSummary {
 }
 
 impl PublicCallSummary {
-    pub(crate) fn from_call(
-        function: &CompiledFunction,
+    pub(crate) fn from_manifest_entry(
         manifest_entry: &EntrypointManifest,
         args: &[Value],
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        if manifest_entry.param_names.len() != args.len() {
+            bail!(
+                "manifest param_names length mismatch: {} != {}",
+                manifest_entry.param_names.len(),
+                args.len()
+            );
+        }
+        Ok(Self {
             entry_input_len: args.iter().map(Value::canonical_len).sum(),
-            public_args: function
-                .params
+            public_args: manifest_entry
+                .param_names
                 .iter()
-                .zip(args)
+                .zip(args.iter())
                 .enumerate()
                 .filter(|(index, _)| !manifest_entry.secret_args.contains(index))
-                .map(|(_, ((name, _), value))| format!("{name}={value}"))
+                .map(|(_, (name, value))| format!("{name}={value}"))
                 .collect(),
-        }
+        })
     }
 }
 
@@ -249,7 +254,6 @@ impl CallRecorder {
 
     pub(crate) fn finish(
         mut self,
-        function: &CompiledFunction,
         manifest_entry: &EntrypointManifest,
         manifest_objects: &[StateObjectManifest],
         public_call: PublicCallSummary,
@@ -272,7 +276,7 @@ impl CallRecorder {
         });
         let controller_shape = self.controller_shape();
         let public_outcome = PublicOutcomeTrace {
-            entrypoint_id: function.signature.clone(),
+            entrypoint_id: self.entrypoint.clone(),
             public_args: public_call.public_args,
             termination_status: !aborted,
             output_shape,

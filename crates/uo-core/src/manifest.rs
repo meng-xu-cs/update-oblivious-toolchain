@@ -44,6 +44,8 @@ pub struct RuntimeKernelStepManifest {
 pub struct EntrypointManifest {
     #[serde(default)]
     pub secret_args: Vec<usize>,
+    #[serde(default)]
+    pub param_names: Vec<String>,
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,

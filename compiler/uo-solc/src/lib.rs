@@ -1084,6 +1084,11 @@ fn build_manifest_entry(
     };
     Ok(EntrypointManifest {
         secret_args: function.secret_args.clone(),
+        param_names: function
+            .params
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect(),
         public_gas_budget: budget,
         arena_bytes: 4096 + counts.local_count * 64,
         max_stack_words: 64 + counts.local_count,

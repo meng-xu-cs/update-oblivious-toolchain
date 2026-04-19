@@ -233,6 +233,7 @@ mod tests {
     fn sample_manifest() -> EntrypointManifest {
         EntrypointManifest {
             secret_args: vec![0],
+            param_names: vec!["secret".into()],
             public_gas_budget: 4096,
             arena_bytes: 4096,
             max_stack_words: 65,

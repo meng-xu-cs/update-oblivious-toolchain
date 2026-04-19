@@ -131,7 +131,7 @@ impl ContractInstance {
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
-        let public_call = PublicCallSummary::from_call(&function, &manifest_entry, &args);
+        let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
         let mut allocator = AllocatorPlan::from_manifest(&manifest_entry);
         let manifest_expected_kernel_steps = if function.confidential {
             Some(
@@ -304,7 +304,6 @@ impl ContractInstance {
         let runtime_state_after = self.state.witness_snapshot()?;
         let trace_bundle = build_theorem_trace(
             recorder,
-            &function,
             &manifest_entry,
             &self.artifact.contract.manifest.objects,
             public_call,
@@ -315,7 +314,8 @@ impl ContractInstance {
         let zero_writes = trace_bundle.metrics.zero_writes;
         let trace = finalize_execution_trace(FinalizeExecutionTraceInput {
             artifact: &self.artifact,
-            function: &function,
+            entrypoint: &function.signature,
+            confidential: function.confidential,
             deploy_seed: self.deploy_seed,
             opcode_trace,
             gas_used,

@@ -449,7 +449,8 @@ The first implementation step is now present in the codebase:
   removes one remaining borrowed-slice crypto path from the helper surface
 - dropped logical `Value` trees, hidden ORAM state, injected fresh-coin queues,
   and per-object runtime RNG state now scrub themselves more aggressively, and
-  `engine.rs` now keeps only a public `PublicCallSummary` during theorem-trace
+  `engine.rs` now keeps only a public `PublicCallSummary` derived from the
+  checked manifest's `param_names` plus `secret_args` during theorem-trace
   construction instead of cloning the full secret-bearing call-argument vector
 - ORAM refresh/metadata decode now wipes decrypted payload buffers after parse
   rather than dropping them as ordinary plaintext heap allocations, and it now

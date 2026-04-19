@@ -125,11 +125,12 @@ Current closure status:
    from those artifacts,
    while independently replaying the theorem-facing fields consumed by the
    bridge:
-   state-object / manifest exactness, secret-arg agreement, arena / stack
-   budgets, logical access counts, ORAM access counts and theorem-facing ORAM
-   shape, `max_commit_ops`, the manifest-carried confidential named/slot DSL
-   objects, their canonical lowering relation, and the exact confidential
-   kernel step schedule; proof-grade static checks
+   state-object / manifest exactness, secret-arg agreement, manifest-carried
+   parameter-name agreement, arena / stack budgets, logical access counts,
+   ORAM access counts and theorem-facing ORAM shape, `max_commit_ops`, the
+   manifest-carried confidential named/slot DSL objects, their canonical
+   lowering relation, and the exact confidential kernel step schedule;
+   proof-grade static checks
    now also report confidential raw artifacts as rejected rather than silently
    accepting them. In the theorem-facing interface, imported proof-grade
    validity now yields not only `source_view = artifact_view`, but also that
