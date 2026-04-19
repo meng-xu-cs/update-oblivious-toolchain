@@ -523,8 +523,10 @@ The current runtime has a first hardening layer:
   manifest hash-scratch bound or confidential commit budget itself; the
   theorem-side `begin_call_trace` path now triggers that runtime preflight
   instead, and the runtime now validates the slot program against
-  `manifest.kernel_steps` once but then carries the checked manifest schedule
-  itself forward as the canonical public budget / witness schedule
+  `manifest.kernel_steps` once but then carries the checked slot program
+  itself forward, deriving the public kernel-step witness list from that
+  canonical DSL object at the kernel boundary instead of caching a duplicate
+  expected-step vector in the runtime plan
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while the proof-grade translation checker, the

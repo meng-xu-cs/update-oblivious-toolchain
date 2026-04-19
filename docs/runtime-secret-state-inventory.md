@@ -64,7 +64,9 @@ The source-level confinement checks in
 `probe/mplus-probe/src/lib.rs` now report this inventory through
 `runtime_boundary_validation.json` and reject regressions when the checked
 ownership rules drift. Those checks now also pin the newer boundary
-reductions: `ConfidentialEntrypointPlan` is confined to `state.rs`, and
+reductions: `ConfidentialEntrypointPlan` is confined to `state.rs` and now
+threads only the canonical confidential slot program rather than caching a
+duplicate expected-kernel-step vector, and
 `RuntimeShadowState` / `ConfidentialRuntimeShadowState` remain runtime-only
 types while the shell-visible handle stays `PublicRuntimeShadowState`, and
 `CommittedRuntimeWitnessSnapshot` is now fully internal to `state.rs`, and the

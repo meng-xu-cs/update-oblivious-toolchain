@@ -10183,7 +10183,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("if manifest_expected_kernel_steps != program_expected_kernel_steps {")
         && state_source
             .contains("allocator.max_kernel_ops = manifest_expected_kernel_steps.len();")
-        && state_source.contains("expected_kernel_steps: manifest_expected_kernel_steps,");
+        && state_source.contains("Some(program.expected_runtime_step_witnesses())")
+        && !state_source.contains("expected_kernel_steps:");
     let trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program =
         core_trusted_kernel_source.contains("pub fn runtime_trusted_kernel_slot_bundle(")
             && core_trusted_kernel_source.contains("manifest_entry")

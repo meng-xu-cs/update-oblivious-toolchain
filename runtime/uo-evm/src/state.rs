@@ -8,9 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
-    RuntimeKernelWitness, RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
-    Value,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
+    RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
 };
 
 #[derive(Debug)]
@@ -64,7 +63,6 @@ pub(crate) struct PublicRuntimeShadowState {
 #[derive(Clone, Debug)]
 struct ConfidentialEntrypointPlan {
     allocator: AllocatorPlan,
-    expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
     public_object_ids: Vec<u32>,
     shadow_load_object_ids: Vec<u32>,
     max_commit_ops: usize,
@@ -307,7 +305,6 @@ impl ContractRuntime {
         )?;
         let ConfidentialEntrypointPlan {
             allocator,
-            expected_kernel_steps,
             public_object_ids,
             shadow_load_object_ids,
             max_commit_ops,
@@ -317,7 +314,7 @@ impl ContractRuntime {
         let call_inputs = ConfidentialCallInputs::from_raw_args(args);
         let kernel = PublicRuntimeKernel::begin(
             allocator,
-            Some(expected_kernel_steps),
+            Some(program.expected_runtime_step_witnesses()),
             public_object_ids.clone(),
             Some(public_object_ids.clone()),
         )?;
@@ -606,7 +603,6 @@ impl ConfidentialEntrypointPlan {
             .collect::<Vec<_>>();
         Ok(Self {
             allocator,
-            expected_kernel_steps: manifest_expected_kernel_steps,
             public_object_ids,
             shadow_load_object_ids,
             max_commit_ops: manifest_entry.max_commit_ops,
