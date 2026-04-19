@@ -20,7 +20,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 3807,
+      "bundle_json_bytes": 3808,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -982,7 +982,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 7160,
+      "bundle_json_bytes": 7161,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1998,7 +1998,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 9649,
+      "bundle_json_bytes": 9650,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2382,7 +2382,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 11859,
+      "bundle_json_bytes": 11858,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3476,7 +3476,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15849,
+      "bundle_json_bytes": 15848,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4212,7 +4212,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15849,
+      "bundle_json_bytes": 15853,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4948,7 +4948,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 23028,
+      "bundle_json_bytes": 23033,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -5885,7 +5885,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 23027,
+      "bundle_json_bytes": 23028,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6822,7 +6822,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 59052,
+      "bundle_json_bytes": 59054,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -9486,7 +9486,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "bundle_json_bytes": 192502,
+      "bundle_json_bytes": 192505,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,

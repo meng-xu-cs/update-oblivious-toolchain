@@ -873,6 +873,41 @@
   "probe_enables_runtime_diagnostics_feature": true,
   "probe_path": "probe/mplus-probe/src/lib.rs",
   "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
+  "public_trace_helper_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "PublicCallSummary::from_manifest_entry(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "CallRecorder::begin_with_input_len(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/controller.rs",
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/controller.rs",
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "output_shape_of(",
+      "restricted": true
+    }
+  ],
+  "public_trace_helper_surface_restricted": true,
   "raw_kernel_private_surface_checks": [
     {
       "forbidden_present": false,

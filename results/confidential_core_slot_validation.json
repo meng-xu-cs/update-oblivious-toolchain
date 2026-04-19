@@ -20,7 +20,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 4331,
+      "confidential_core_slot_bundle_json_bytes": 4330,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "FixedSlotClassifier",
@@ -442,7 +442,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 9744,
+      "confidential_core_slot_bundle_json_bytes": 9745,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -3564,7 +3564,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 12511,
+      "confidential_core_slot_bundle_json_bytes": 12510,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -4178,7 +4178,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_slot_bundle_json_bytes": 16372,
+      "confidential_core_slot_bundle_json_bytes": 16368,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -4977,7 +4977,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_slot_bundle_json_bytes": 16370,
+      "confidential_core_slot_bundle_json_bytes": 16372,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5776,7 +5776,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_slot_bundle_json_bytes": 23607,
+      "confidential_core_slot_bundle_json_bytes": 23608,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -10522,7 +10522,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_slot_bundle_json_bytes": 193607,
+      "confidential_core_slot_bundle_json_bytes": 193606,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",

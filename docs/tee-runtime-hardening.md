@@ -424,6 +424,11 @@ The current runtime has a first hardening layer:
   `ExecutionTrace { ... }` assembly stay confined to
   `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
   construction stays confined to `runtime/uo-evm/src/controller.rs`
+- the public-trace helper surface is pinned too:
+  `PublicCallSummary::from_manifest_entry(...)` and
+  `CallRecorder::begin_with_input_len(...)` stay confined to
+  `runtime/uo-evm/src/state.rs`, while `output_shape_of(...)` stays confined
+  to `runtime/uo-evm/src/controller.rs` and `runtime/uo-evm/src/theorem.rs`
 - the hidden traced-call witness staging objects in `state.rs` now also wipe
   their access-counter and position-map vectors on drop unless the theorem
   finalizer explicitly consumes them

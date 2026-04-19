@@ -496,8 +496,10 @@ The first implementation step is now present in the codebase:
   consumes them; the theorem-facing certificate constructors plus final
   `ExecutionTrace` assembly are now also confined to
   `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace` construction
-  stays confined to `runtime/uo-evm/src/controller.rs`; the controller/theorem
-  path now also derives output
+  stays confined to `runtime/uo-evm/src/controller.rs`; the public-trace
+  helper surface is now also pinned, with `PublicCallSummary`/`CallRecorder`
+  creation staying in `state.rs` and `output_shape_of(...)` staying in
+  `controller.rs` plus `theorem.rs`; the controller/theorem path now also derives output
   length from manifest-stored `return_canonical_len` and consumes only the
   public `OutputShape` summary rather than the full return payload
 - kernel object-operation scratch reservations and UO object commit `io`

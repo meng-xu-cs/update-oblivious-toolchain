@@ -8965,6 +8965,40 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let controller_theorem_trace_constructor_surface_restricted =
         controller_theorem_trace_constructor_files
             == expected_controller_theorem_trace_constructor_files;
+    let public_trace_helper_surface_checks = [
+        (
+            "PublicCallSummary::from_manifest_entry(",
+            vec![String::from("runtime/uo-evm/src/state.rs")],
+        ),
+        (
+            "CallRecorder::begin_with_input_len(",
+            vec![String::from("runtime/uo-evm/src/state.rs")],
+        ),
+        (
+            "output_shape_of(",
+            vec![
+                String::from("runtime/uo-evm/src/controller.rs"),
+                String::from("runtime/uo-evm/src/theorem.rs"),
+            ],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&runtime_evm_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let public_trace_helper_surface_restricted =
+        public_trace_helper_surface_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("public trace helper restriction flag must be boolean")
+        });
     let controller_public_call_summary_uses_manifest_only = controller_source
         .contains("fn from_manifest_entry")
         && controller_source.contains("manifest_entry.param_names")
@@ -10306,6 +10340,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             expected_controller_theorem_trace_constructor_files,
         "controller_theorem_trace_constructor_surface_restricted":
             controller_theorem_trace_constructor_surface_restricted,
+        "public_trace_helper_surface_checks":
+            public_trace_helper_surface_checks,
+        "public_trace_helper_surface_restricted":
+            public_trace_helper_surface_restricted,
         "controller_public_call_summary_uses_manifest_only":
             controller_public_call_summary_uses_manifest_only,
         "controller_public_trace_uses_output_shape_only":
@@ -10628,6 +10666,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && theorem_private_surface_restricted
             && theorem_certificate_constructor_surface_restricted
             && controller_theorem_trace_constructor_surface_restricted
+            && public_trace_helper_surface_restricted
             && controller_public_call_summary_uses_manifest_only
             && controller_public_trace_uses_output_shape_only
             && controller_output_shape_uses_manifest_return_len
@@ -12514,7 +12553,12 @@ theorem-facing constructor surface itself: `RuntimeControllerObserverCertificate
 `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus the final
 `ExecutionTrace { ... }` assembly must stay confined to
 `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
-construction must stay confined to `runtime/uo-evm/src/controller.rs`.
+construction must stay confined to `runtime/uo-evm/src/controller.rs`. The
+same boundary report now also pins the public-trace helper surface:
+`PublicCallSummary::from_manifest_entry(...)` and
+`CallRecorder::begin_with_input_len(...)` must stay confined to
+`runtime/uo-evm/src/state.rs`, while `output_shape_of(...)` must stay confined
+to `runtime/uo-evm/src/controller.rs` and `runtime/uo-evm/src/theorem.rs`.
 The same report also checks that the
 proof-grade trusted-kernel path itself stays on the stronger slot-wrapped
 artifact: `crates/uo-core/src/trusted_kernel.rs` must source the admitted

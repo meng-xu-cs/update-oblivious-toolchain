@@ -125,7 +125,12 @@ theorem-facing constructor surface itself: `RuntimeControllerObserverCertificate
 `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus the final
 `ExecutionTrace { ... }` assembly must stay confined to
 `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
-construction must stay confined to `runtime/uo-evm/src/controller.rs`.
+construction must stay confined to `runtime/uo-evm/src/controller.rs`. The
+same boundary report now also pins the public-trace helper surface:
+`PublicCallSummary::from_manifest_entry(...)` and
+`CallRecorder::begin_with_input_len(...)` must stay confined to
+`runtime/uo-evm/src/state.rs`, while `output_shape_of(...)` must stay confined
+to `runtime/uo-evm/src/controller.rs` and `runtime/uo-evm/src/theorem.rs`.
 The same report also checks that the
 proof-grade trusted-kernel path itself stays on the stronger slot-wrapped
 artifact: `crates/uo-core/src/trusted_kernel.rs` must source the admitted
