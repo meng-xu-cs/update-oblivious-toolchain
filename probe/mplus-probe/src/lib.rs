@@ -938,6 +938,51 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
                 .as_bool()
                 .expect("checker import-surface restriction flag must be boolean")
         });
+    let forbidden_legacy_imports = [
+        "import UOToolchain",
+        "import UOToolchain.OramGame",
+        "import UOToolchain.SgxMicroGame",
+        "import UOToolchain.LegacyComposition",
+        "import UOToolchain.LegacyTeeDeployment",
+        "import UOToolchain.LegacySgxOramProjection",
+        "import UOToolchain.LegacySgxJointProjection",
+    ];
+    let proofgrade_core_module_import_surface_checks = [
+        "proof/lean/UOToolchain/ProofGrade.lean",
+        "proof/lean/UOToolchain/Composition.lean",
+        "proof/lean/UOToolchain/TeeDeployment.lean",
+        "proof/lean/UOToolchain/SgxOramProjection.lean",
+        "proof/lean/UOToolchain/SgxJointProjection.lean",
+        "proof/lean/UOToolchain/StandardOramReduction.lean",
+        "proof/lean/UOToolchain/RuntimeRefinement.lean",
+        "proof/lean/UOToolchain/RuntimeCoins.lean",
+        "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+    ]
+    .into_iter()
+    .map(|relative_path| {
+        let path = workspace_path(relative_path);
+        let source =
+            fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        let forbidden_import_hits = forbidden_legacy_imports
+            .iter()
+            .filter(|pattern| source.lines().any(|line| line.trim() == **pattern))
+            .map(|pattern| String::from(*pattern))
+            .collect::<Vec<_>>();
+        Ok(json!({
+            "file": relative_path,
+            "forbidden_import_hits": forbidden_import_hits,
+            "restricted": forbidden_import_hits.is_empty(),
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let proofgrade_core_module_import_surface_restricted =
+        proofgrade_core_module_import_surface_checks
+            .iter()
+            .all(|entry| {
+                entry["restricted"]
+                    .as_bool()
+                    .expect("core module import-surface restriction flag must be boolean")
+            });
     let mut reports = Vec::new();
     for (name, artifacts) in suite {
         let source = format!("benches/raw/{name}.sol");
@@ -1021,6 +1066,10 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             proofgrade_checker_import_surface_checks,
         "proofgrade_checker_import_surface_restricted":
             proofgrade_checker_import_surface_restricted,
+        "proofgrade_core_module_import_surface_checks":
+            proofgrade_core_module_import_surface_checks,
+        "proofgrade_core_module_import_surface_restricted":
+            proofgrade_core_module_import_surface_restricted,
         "reports": reports,
     }))
 }

@@ -849,7 +849,9 @@ proof-grade Path-ORAM theorem boundary under explicit assumptions:
   confidential kernel schedule metadata, and the theorem-facing
   `Check*.lean` roots now import the legacy-free `UOToolchain.ProofGrade`
   umbrella while the remaining legacy bridge wrappers live in `Legacy*`
-  companion modules outside that proof-grade checker surface
+  companion modules outside that proof-grade checker surface; the probe also
+  pins the `ProofGrade` umbrella and the generic theorem-core modules away from
+  legacy imports
 - the results bundle is regenerated against that transcript model
 
 What still should not be claimed without further work is stronger provenance or

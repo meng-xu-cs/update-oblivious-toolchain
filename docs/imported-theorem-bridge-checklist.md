@@ -64,7 +64,9 @@ Status labels:
   legacy game modules, restricts legacy theorem-symbol mentions to the
   `Legacy*` bridge/projection companions, and checks that every top-level
   `Check*.lean` entrypoint imports `UOToolchain.ProofGrade` instead of the
-  legacy umbrella and does not mention those legacy shims directly.
+  legacy umbrella, that the `ProofGrade` umbrella plus the generic theorem
+  modules do not import the legacy surface, and that those checker entrypoints
+  do not mention the legacy shims directly.
 
 - `cleared` Translation-validate proof-relevant compiler output against source
   and metadata.
