@@ -5876,6 +5876,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
 fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let root = repo_root();
     let engine_path = root.join("runtime/uo-evm/src/engine.rs");
+    let shell_path = root.join("runtime/uo-evm/src/shell.rs");
     let fresh_coins_path = root.join("runtime/uo-evm/src/fresh_coins.rs");
     let kernel_path = root.join("runtime/uo-evm/src/kernel.rs");
     let objects_path = root.join("runtime/uo-evm/src/objects.rs");
@@ -5900,6 +5901,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&kernel_path)))?;
     let engine_source = fs::read_to_string(&engine_path)
         .with_context(|| format!("reading {}", display_report_path(&engine_path)))?;
+    let shell_source = fs::read_to_string(&shell_path)
+        .with_context(|| format!("reading {}", display_report_path(&shell_path)))?;
     let fresh_coins_source = fs::read_to_string(&fresh_coins_path)
         .with_context(|| format!("reading {}", display_report_path(&fresh_coins_path)))?;
     let objects_source = fs::read_to_string(&objects_path)
@@ -5958,6 +5961,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&runtime_module_path)))?;
 
     let engine_impl_source = production_source_slice(&engine_source);
+    let shell_impl_source = production_source_slice(&shell_source);
     let forbidden_engine_helpers = [
         "clone_for_tx(",
         "commit(",
@@ -5988,10 +5992,26 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     });
     let engine_uses_opaque_committed_state = engine_impl_source.contains("state: ContractRuntime")
         && !engine_impl_source.contains("state: CommittedRuntimeState");
-    let engine_uses_shadow_wrapper =
-        engine_impl_source.contains("objects: &mut PublicRuntimeShadowState");
+    let engine_delegates_public_execution_to_shell = engine_impl_source
+        .contains("use crate::shell::run_public_entrypoint;")
+        && engine_impl_source.contains("let public_execution = run_public_entrypoint(")
+        && !engine_impl_source.contains("fn exec_block(")
+        && !engine_impl_source.contains("fn exec_statement(")
+        && !engine_impl_source.contains("fn eval_expr(")
+        && !engine_impl_source.contains("fn eval_binary(")
+        && !engine_impl_source.contains("fn store_env_value(");
     let engine_uses_public_runtime_kernel =
         engine_impl_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
+    let shell_uses_shadow_wrapper =
+        shell_impl_source.contains("objects: &mut PublicRuntimeShadowState");
+    let shell_uses_public_runtime_kernel =
+        shell_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
+    let shell_confidential_surface_absent = !shell_impl_source.contains("ConfidentialCallInputs")
+        && !shell_impl_source.contains("use crate::runtime::kernel::RuntimeKernel;")
+        && !shell_impl_source.contains("use crate::runtime::objects::RuntimeObject;")
+        && !shell_impl_source.contains("RuntimeKernelRefinementEventWitness")
+        && !shell_impl_source.contains("RuntimeTrustedKernelBundle")
+        && !shell_impl_source.contains("ConfidentialKernelSlotProgram");
     let engine_defines_fresh_coin_plan_directly = engine_source
         .contains("pub struct PathOramFreshCoinPlan")
         || engine_source.contains("struct PathOramFreshCoinPlan");
@@ -6978,6 +6998,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
 
     Ok(json!({
         "engine_path": display_report_path(&engine_path),
+        "shell_path": display_report_path(&shell_path),
         "fresh_coins_path": display_report_path(&fresh_coins_path),
         "kernel_path": display_report_path(&kernel_path),
         "objects_path": display_report_path(&objects_path),
@@ -6994,8 +7015,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_forbidden_helpers_absent": engine_forbidden_helpers_absent,
         "forbidden_engine_helper_checks": forbidden_engine_helper_checks,
         "engine_uses_opaque_committed_state": engine_uses_opaque_committed_state,
-        "engine_uses_shadow_wrapper": engine_uses_shadow_wrapper,
+        "engine_delegates_public_execution_to_shell": engine_delegates_public_execution_to_shell,
         "engine_uses_public_runtime_kernel": engine_uses_public_runtime_kernel,
+        "shell_uses_shadow_wrapper": shell_uses_shadow_wrapper,
+        "shell_uses_public_runtime_kernel": shell_uses_public_runtime_kernel,
+        "shell_confidential_surface_absent": shell_confidential_surface_absent,
         "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
         "engine_uses_manifest_public_call_summary": engine_uses_manifest_public_call_summary,
         "engine_clones_call_args_directly": engine_clones_call_args_directly,
@@ -7156,8 +7180,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             runtime_secret_state_inventory_complete,
         "accepted": engine_forbidden_helpers_absent
             && engine_uses_opaque_committed_state
-            && engine_uses_shadow_wrapper
+            && engine_delegates_public_execution_to_shell
             && engine_uses_public_runtime_kernel
+            && shell_uses_shadow_wrapper
+            && shell_uses_public_runtime_kernel
+            && shell_confidential_surface_absent
             && !engine_defines_fresh_coin_plan_directly
             && engine_uses_manifest_public_call_summary
             && !engine_clones_call_args_directly
@@ -8856,8 +8883,10 @@ also lives in `runtime/uo-evm/src/theorem.rs`, so `engine.rs` no longer
 constructs the controller-observer certificate, hidden Path-ORAM certificate,
 or trusted-kernel bundle directly. Confidential expression and
 statement interpretation for admitted entrypoints now also runs inside
-`RuntimeKernel`, so the generic engine interpreter is public-only and the
-secret-bearing execution state sits behind the smaller kernel boundary. That
+`RuntimeKernel`, while the non-confidential interpreter now lives in the
+explicit `runtime/uo-evm/src/shell.rs` module, so `engine.rs` is reduced to
+public orchestration and the secret-bearing execution state sits behind the
+smaller kernel boundary. That
 confidential interpreter now also executes a slot-lowered kernel DSL rather
 than a string-keyed env: admitted entrypoints are lowered to fixed slots in
 `uo-core`, and `RuntimeKernel` stores live confidential values in a bounded
@@ -8884,11 +8913,12 @@ directly by reading the runtime sources: it verifies that `engine.rs` does not
 call the low-level runtime object helpers, that those helpers remain
 restricted to `crate::runtime`, that `RuntimeObject` itself is not `Clone`,
 that `ContractInstance::clone` goes through the cold committed-state clone
-path, that the shell now holds an opaque `ContractRuntime` wrapper plus a
-public `PublicRuntimeShadowState` wrapper instead of directly owning raw
-runtime object maps or the raw committed confidential state handle, and that
-`engine.rs` no longer constructs runtime
-phase-witness events directly because the post-call phase tail is finalized
+path, that `engine.rs` now holds only an opaque `ContractRuntime` wrapper and
+delegates the public interpreter to `shell.rs`, that `shell.rs` itself stays
+on the `PublicRuntimeKernel` plus `PublicRuntimeShadowState` side of the
+boundary instead of importing raw runtime objects or confidential kernel
+types, and that `engine.rs` no longer constructs runtime phase-witness events
+directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
 certificates directly, no longer assembles `ExecutionTrace` directly
 beyond `runtime/uo-evm/src/theorem.rs`, and no longer clones the full call

@@ -2,6 +2,7 @@ mod controller;
 mod engine;
 mod oram;
 mod runtime;
+mod shell;
 mod theorem;
 
 pub use engine::{run_artifact, run_artifact_with_seed, CallResult, ContractInstance};

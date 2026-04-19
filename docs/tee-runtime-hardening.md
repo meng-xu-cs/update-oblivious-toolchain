@@ -292,9 +292,10 @@ The current runtime has a first hardening layer:
   remains the small kernel ABI while the runtime-to-kernel bridge gains a more
   concrete internal certificate
 - confidential expression / statement interpretation for admitted entrypoints
-  now also runs inside `RuntimeKernel` rather than in the generic engine
-  interpreter, so the engine-side interpreter is public-only and the
-  secret-bearing env / return-value machine is kernel-owned
+  now also runs inside `RuntimeKernel`, while the non-confidential interpreter
+  has been split into the explicit `runtime/uo-evm/src/shell.rs` public-shell
+  module, so the engine is public orchestration only and the secret-bearing
+  env / return-value machine is kernel-owned
 - that confidential interpreter now executes a slot-lowered kernel DSL rather
   than the earlier name-keyed environment form: `uo-core` lowers admitted
   confidential entrypoints to a fixed-slot program, `RuntimeKernel` stores

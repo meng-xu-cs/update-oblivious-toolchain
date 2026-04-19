@@ -240,9 +240,10 @@ The first implementation step is now present in the codebase:
   projects exactly to the emitted public kernel-step schedule and reaches the
   modeled final phase
 - confidential expression / statement interpretation for admitted entrypoints
-  now also runs inside `RuntimeKernel`, so the generic `engine.rs`
-  interpreter is public-only and the remaining secret-bearing execution state
-  sits behind the smaller kernel boundary
+  now also runs inside `RuntimeKernel`, while the non-confidential interpreter
+  has been split into the explicit `runtime/uo-evm/src/shell.rs` public-shell
+  module, so the engine is public orchestration only and the remaining
+  secret-bearing execution state sits behind the smaller kernel boundary
 - that confidential execution state is now also slot-lowered and fixed-width:
   `uo-core` lowers admitted confidential entrypoints to a slot program, and
   `RuntimeKernel` executes that form with a bounded `Vec<Option<Value>>`
