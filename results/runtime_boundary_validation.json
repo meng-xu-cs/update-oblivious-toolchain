@@ -1557,6 +1557,22 @@
     {
       "present": true,
       "signature": "pub(in crate::runtime) fn into_cold_committed_state"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn prepare_public_shadow("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn commit_public_shadow("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn replace_with_cold_public_shadow("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn finalize_runtime_kernel_refinement_witness("
     }
   ],
   "state_routes_confidential_calls_through_runtime_kernel": true,

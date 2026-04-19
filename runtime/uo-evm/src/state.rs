@@ -345,11 +345,14 @@ impl ContractRuntime {
         ))
     }
 
-    pub(crate) fn replace_with_cold_public_shadow(&mut self, shadow: PublicRuntimeShadowState) {
+    pub(in crate::runtime) fn replace_with_cold_public_shadow(
+        &mut self,
+        shadow: PublicRuntimeShadowState,
+    ) {
         self.committed.replace_with_cold_public_shadow(shadow);
     }
 
-    pub(crate) fn finalize_runtime_kernel_refinement_witness(
+    pub(in crate::runtime) fn finalize_runtime_kernel_refinement_witness(
         &self,
         runtime_kernel_refinement_witness: &mut RuntimeKernelRefinementWitness,
         public_object_ids: &[u32],
@@ -502,11 +505,14 @@ impl CommittedRuntimeState {
         })
     }
 
-    pub(crate) fn replace_with_cold_public_shadow(&mut self, shadow: PublicRuntimeShadowState) {
+    pub(in crate::runtime) fn replace_with_cold_public_shadow(
+        &mut self,
+        shadow: PublicRuntimeShadowState,
+    ) {
         self.objects = shadow.into_cold_committed_state().objects;
     }
 
-    pub(crate) fn finalize_runtime_kernel_refinement_witness(
+    pub(in crate::runtime) fn finalize_runtime_kernel_refinement_witness(
         &self,
         runtime_kernel_refinement_witness: &mut RuntimeKernelRefinementWitness,
         public_object_ids: &[u32],

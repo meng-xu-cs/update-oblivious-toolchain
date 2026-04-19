@@ -9286,6 +9286,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed",
         "pub(in crate::runtime) fn commit_against",
         "pub(in crate::runtime) fn into_cold_committed_state",
+        "pub(in crate::runtime) fn prepare_public_shadow(",
+        "pub(in crate::runtime) fn commit_public_shadow(",
+        "pub(in crate::runtime) fn replace_with_cold_public_shadow(",
+        "pub(in crate::runtime) fn finalize_runtime_kernel_refinement_witness(",
     ];
     let state_restricted_signature_checks = state_restricted_signatures
         .into_iter()
