@@ -449,11 +449,10 @@ mod tests {
                 Some(vec![]),
             )
             .unwrap();
-            let mut shadow = instance
+            let hot_cell = instance
                 .state
-                .shadow_load_for_test(&mut kernel, &[cell_id])
+                .shadow_remove_object_for_test(&mut kernel, cell_id)
                 .unwrap();
-            let hot_cell = shadow.remove_object_for_test(cell_id).unwrap();
             (cell_id, hot_cell)
         };
         instance.state.insert_object_for_test(cell_id, hot_cell);

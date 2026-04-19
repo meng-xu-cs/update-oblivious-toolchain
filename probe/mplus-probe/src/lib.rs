@@ -6210,8 +6210,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && fresh_coins_source.contains("*coin = 0;");
     let state_wrapper_present = state_source.contains("pub(crate) struct ContractRuntime")
         && state_source.contains("pub(in crate::runtime) struct CommittedRuntimeState")
-        && state_source.contains("pub(crate) struct RuntimeShadowState")
-        && state_source.contains("pub(crate) struct ConfidentialRuntimeShadowState")
+        && state_source.contains("pub(in crate::runtime) struct RuntimeShadowState")
+        && state_source.contains("pub(in crate::runtime) struct ConfidentialRuntimeShadowState")
         && state_source.contains("pub(crate) struct PublicRuntimeShadowState");
     let kernel_restricted_signatures = [
         "pub(in crate::runtime) fn shadow_load_public_objects",
@@ -6862,6 +6862,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         ),
         (
             "CommittedRuntimeState",
+            vec![
+                String::from("runtime/uo-evm/src/kernel.rs"),
+                String::from("runtime/uo-evm/src/state.rs"),
+            ],
+        ),
+        (
+            "RuntimeShadowState",
+            vec![
+                String::from("runtime/uo-evm/src/kernel.rs"),
+                String::from("runtime/uo-evm/src/state.rs"),
+            ],
+        ),
+        (
+            "ConfidentialRuntimeShadowState",
             vec![
                 String::from("runtime/uo-evm/src/kernel.rs"),
                 String::from("runtime/uo-evm/src/state.rs"),

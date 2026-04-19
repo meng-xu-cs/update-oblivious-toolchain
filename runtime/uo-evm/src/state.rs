@@ -37,12 +37,12 @@ pub(crate) struct ContractRuntime {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct RuntimeShadowState {
+pub(in crate::runtime) struct RuntimeShadowState {
     objects: BTreeMap<u32, RuntimeObject>,
 }
 
 #[derive(Debug)]
-pub(crate) struct ConfidentialRuntimeShadowState {
+pub(in crate::runtime) struct ConfidentialRuntimeShadowState {
     shadow: RuntimeShadowState,
 }
 
@@ -214,12 +214,15 @@ impl ContractRuntime {
     }
 
     #[cfg(test)]
-    pub(crate) fn shadow_load_for_test(
+    pub(crate) fn shadow_remove_object_for_test(
         &self,
         kernel: &mut PublicRuntimeKernel,
-        object_ids: &[u32],
-    ) -> Result<ConfidentialRuntimeShadowState> {
-        self.committed.shadow_load_for_test(kernel, object_ids)
+        object_id: u32,
+    ) -> Result<RuntimeObject> {
+        let mut shadow = self.committed.shadow_load_for_test(kernel, &[object_id])?;
+        shadow
+            .remove_object_for_test(object_id)
+            .ok_or_else(|| anyhow!("shadow object {object_id} missing after test shadow load"))
     }
 }
 
@@ -384,7 +387,7 @@ impl CommittedRuntimeState {
     }
 
     #[cfg(test)]
-    pub(crate) fn shadow_load_for_test(
+    pub(in crate::runtime) fn shadow_load_for_test(
         &self,
         kernel: &mut PublicRuntimeKernel,
         object_ids: &[u32],
@@ -521,7 +524,7 @@ impl RuntimeShadowState {
     }
 
     #[cfg(test)]
-    pub(crate) fn remove_object_for_test(&mut self, object_id: u32) -> Option<RuntimeObject> {
+    fn remove_object_for_test(&mut self, object_id: u32) -> Option<RuntimeObject> {
         self.objects.remove(&object_id)
     }
 }
@@ -563,7 +566,7 @@ impl ConfidentialRuntimeShadowState {
     }
 
     #[cfg(test)]
-    pub(crate) fn remove_object_for_test(&mut self, object_id: u32) -> Option<RuntimeObject> {
+    fn remove_object_for_test(&mut self, object_id: u32) -> Option<RuntimeObject> {
         self.shadow.remove_object_for_test(object_id)
     }
 }
