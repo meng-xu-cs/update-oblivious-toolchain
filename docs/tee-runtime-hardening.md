@@ -416,7 +416,11 @@ The current runtime has a first hardening layer:
   `CallRecorder::begin_with_input_len` for the theorem path, and the theorem
   finalizer now consumes the whole `RuntimeCallOutcome` directly rather than
   having the engine unpack kernel witnesses, opcode traces, and return values
-  just to pass them straight back in
+  just to pass them straight back in; the kernel/state confidential outcome
+  handoff is now explicit too, with `ConfidentialKernelRunOutcome` and
+  `ConfidentialCommittedKernelOutcome` keeping private fields and exposing only
+  the by-value `into_committed_outcome_parts(...)` /
+  `into_runtime_execution_parts(...)` transitions
 - the theorem-facing constructor surface is now pinned as well:
   `RuntimeControllerObserverCertificate::new`,
   `RuntimePathOramHiddenCertificate::new`, and

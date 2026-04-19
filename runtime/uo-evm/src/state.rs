@@ -321,7 +321,7 @@ impl ContractRuntime {
             Some(public_object_ids.clone()),
         )?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
-        let mut outcome = self.committed.run_confidential_call(
+        let outcome = self.committed.run_confidential_call(
             kernel,
             &program,
             &shadow_load_object_ids,
@@ -339,16 +339,18 @@ impl ContractRuntime {
                 max_commit_ops
             );
         }
+        let (runtime_kernel_witness, mut runtime_kernel_refinement_witness, aborted, return_value) =
+            outcome.into_runtime_execution_parts();
         self.finalize_runtime_kernel_refinement_witness(
-            &mut outcome.runtime_kernel_refinement_witness,
+            &mut runtime_kernel_refinement_witness,
             &public_object_ids,
             "after completing the call and returning to committed storage",
         )?;
         Ok(RuntimeCallOutcome::from_runtime_execution(
-            outcome.runtime_kernel_witness,
-            outcome.runtime_kernel_refinement_witness,
-            outcome.aborted,
-            outcome.return_value,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            aborted,
+            return_value,
             opcode_trace,
         ))
     }
@@ -489,12 +491,19 @@ impl CommittedRuntimeState {
             recorder,
             opcode_trace,
         )?;
-        self.objects = outcome.committed_shadow.into_cold_committed_state().objects;
+        let (
+            committed_shadow,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            aborted,
+            return_value,
+        ) = outcome.into_committed_outcome_parts();
+        self.objects = committed_shadow.into_cold_committed_state().objects;
         Ok(ConfidentialCommittedKernelOutcome {
-            runtime_kernel_witness: outcome.runtime_kernel_witness,
-            runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
-            aborted: outcome.aborted,
-            return_value: outcome.return_value,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            aborted,
+            return_value,
         })
     }
 
@@ -608,10 +617,28 @@ impl ConfidentialEntrypointPlan {
 
 #[derive(Debug)]
 pub(in crate::runtime) struct ConfidentialCommittedKernelOutcome {
-    pub runtime_kernel_witness: uo_core::RuntimeKernelWitness,
-    pub runtime_kernel_refinement_witness: uo_core::RuntimeKernelRefinementWitness,
-    pub aborted: bool,
-    pub return_value: Option<Value>,
+    runtime_kernel_witness: uo_core::RuntimeKernelWitness,
+    runtime_kernel_refinement_witness: uo_core::RuntimeKernelRefinementWitness,
+    aborted: bool,
+    return_value: Option<Value>,
+}
+
+impl ConfidentialCommittedKernelOutcome {
+    pub(crate) fn into_runtime_execution_parts(
+        self,
+    ) -> (
+        uo_core::RuntimeKernelWitness,
+        uo_core::RuntimeKernelRefinementWitness,
+        bool,
+        Option<Value>,
+    ) {
+        (
+            self.runtime_kernel_witness,
+            self.runtime_kernel_refinement_witness,
+            self.aborted,
+            self.return_value,
+        )
+    }
 }
 
 impl RuntimeShadowState {

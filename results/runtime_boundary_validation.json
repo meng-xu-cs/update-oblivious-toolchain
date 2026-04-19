@@ -15,7 +15,9 @@
   "committed_runtime_witness_snapshot_surface_restricted": true,
   "committed_runtime_witness_snapshot_wipes_on_drop": true,
   "confidential_call_inputs_wipe_on_drop": true,
+  "confidential_committed_kernel_outcome_api_is_explicit": true,
   "confidential_committed_kernel_outcome_derive_line": "#[derive(Debug)]",
+  "confidential_committed_kernel_outcome_fields_private": true,
   "confidential_committed_kernel_outcome_nonclone": true,
   "confidential_committed_kernel_outcome_surface_files": [
     "runtime/uo-evm/src/state.rs"
@@ -31,7 +33,9 @@
   "confidential_exec_state_wipes_on_drop": true,
   "confidential_execution_outcome_derive_line": "#[derive(Debug)]",
   "confidential_execution_outcome_nonclone": true,
+  "confidential_kernel_run_outcome_api_is_explicit": true,
   "confidential_kernel_run_outcome_derive_line": "#[derive(Debug)]",
+  "confidential_kernel_run_outcome_fields_private": true,
   "confidential_kernel_run_outcome_nonclone": true,
   "confidential_kernel_run_outcome_surface_files": [
     "runtime/uo-evm/src/kernel.rs"
@@ -1541,7 +1545,7 @@
       "files": [
         "runtime/uo-evm/src/theorem.rs"
       ],
-      "pattern": "ExecutionTrace {",
+      "pattern": "ExecutionTrace::from_runtime_trace_parts(",
       "restricted": true
     }
   ],

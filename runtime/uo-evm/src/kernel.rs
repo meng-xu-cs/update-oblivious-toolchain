@@ -161,11 +161,31 @@ impl Drop for ConfidentialExecState {
 
 #[derive(Debug)]
 pub(in crate::runtime) struct ConfidentialKernelRunOutcome {
-    pub committed_shadow: ConfidentialRuntimeShadowState,
-    pub runtime_kernel_witness: RuntimeKernelWitness,
-    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    pub aborted: bool,
-    pub return_value: Option<Value>,
+    committed_shadow: ConfidentialRuntimeShadowState,
+    runtime_kernel_witness: RuntimeKernelWitness,
+    runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
+    aborted: bool,
+    return_value: Option<Value>,
+}
+
+impl ConfidentialKernelRunOutcome {
+    pub(in crate::runtime) fn into_committed_outcome_parts(
+        self,
+    ) -> (
+        ConfidentialRuntimeShadowState,
+        RuntimeKernelWitness,
+        RuntimeKernelRefinementWitness,
+        bool,
+        Option<Value>,
+    ) {
+        (
+            self.committed_shadow,
+            self.runtime_kernel_witness,
+            self.runtime_kernel_refinement_witness,
+            self.aborted,
+            self.return_value,
+        )
+    }
 }
 
 impl PublicRuntimeKernel {
