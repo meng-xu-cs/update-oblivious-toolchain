@@ -310,18 +310,14 @@ impl ContractRuntime {
             max_hash_part_bytes,
         } = plan;
         let call_inputs = ConfidentialCallInputs::from_raw_args(args);
-        let expected_kernel_steps = program.expected_runtime_step_witnesses();
-        let shadow_load_object_ids = expected_kernel_steps
+        let shadow_load_object_ids = program
+            .expected_runtime_step_witnesses()
             .iter()
             .filter_map(|step| step.object_id)
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        let kernel = PublicRuntimeKernel::begin(
-            allocator,
-            Some(expected_kernel_steps),
-            public_object_ids.clone(),
-        )?;
+        let kernel = PublicRuntimeKernel::begin(allocator, None, public_object_ids.clone())?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
         let outcome = self.committed.run_confidential_call(
             kernel,

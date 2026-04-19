@@ -620,6 +620,7 @@ impl RuntimeKernel {
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialKernelRunOutcome> {
         self.max_hash_part_bytes = max_hash_part_bytes;
+        self.bind_expected_kernel_program(program)?;
         let mut shadow =
             self.shadow_load_confidential_objects(committed, shadow_load_object_ids)?;
         let had_injected_fresh_coins = fresh_coins.is_some();
@@ -644,6 +645,31 @@ impl RuntimeKernel {
             aborted: outcome.aborted,
             return_value: outcome.return_value,
         })
+    }
+
+    fn bind_expected_kernel_program(
+        &mut self,
+        program: &ConfidentialKernelSlotProgram,
+    ) -> Result<()> {
+        if self.expected_kernel_steps.is_some() {
+            return Ok(());
+        }
+        let expected_kernel_steps = program.expected_runtime_step_witnesses();
+        let Some(begin_step) = expected_kernel_steps.first() else {
+            return Err(anyhow!(
+                "confidential kernel program {} emitted no admitted runtime steps",
+                program.entrypoint_id
+            ));
+        };
+        if begin_step.opcode != UoOpcode::Begin || begin_step.object_id.is_some() {
+            return Err(anyhow!(
+                "confidential kernel program {} does not begin with the admitted Begin step",
+                program.entrypoint_id
+            ));
+        }
+        self.expected_kernel_step_index = 1;
+        self.expected_kernel_steps = Some(expected_kernel_steps);
+        Ok(())
     }
 
     fn execute_confidential_call(
