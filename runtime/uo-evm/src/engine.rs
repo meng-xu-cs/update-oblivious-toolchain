@@ -206,7 +206,7 @@ impl ContractInstance {
         })();
         let (
             runtime_kernel_witness,
-            mut runtime_kernel_refinement_witness,
+            runtime_kernel_refinement_witness,
             gas_used,
             recorder,
             aborted,
@@ -216,11 +216,6 @@ impl ContractInstance {
             Ok(result) => result,
             Err(err) => return Err(err),
         };
-        self.state.finalize_runtime_kernel_refinement_witness(
-            &mut runtime_kernel_refinement_witness,
-            &public_object_ids,
-            "after completing the call and returning to committed storage",
-        )?;
         let runtime_state_after = self.state.witness_snapshot()?;
         let output_shape = output_shape_of(&manifest_entry, &return_value)?;
         let trace_bundle = build_theorem_trace(
@@ -391,6 +386,7 @@ mod tests {
             "prepare_public_shadow(",
             "commit_public_shadow(",
             "replace_with_cold_public_shadow(",
+            "finalize_runtime_kernel_refinement_witness(",
             "clone_for_tx(",
             "commit(",
             "shadow_load_objects(",

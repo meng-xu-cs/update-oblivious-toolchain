@@ -5966,6 +5966,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "prepare_public_shadow(",
         "commit_public_shadow(",
         "replace_with_cold_public_shadow(",
+        "finalize_runtime_kernel_refinement_witness(",
         "clone_for_tx(",
         "commit(",
         "shadow_load_objects(",
@@ -6276,6 +6277,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("fn finalize_runtime_kernel_refinement_witness")
         && state_source.contains("RuntimeKernelRefinementEventWitness::cold_store_object")
         && state_source.contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
+    let engine_leaves_runtime_phase_tail_inside_runtime = !engine_impl_source
+        .contains("finalize_runtime_kernel_refinement_witness(")
+        && shell_source.contains("runtime.finalize_runtime_kernel_refinement_witness(")
+        && state_source.contains("self.finalize_runtime_kernel_refinement_witness(");
     let state_confidential_call_inputs_wrapper_restricted = state_source
         .contains("pub(in crate::runtime) struct ConfidentialCallInputs")
         && state_source.contains("raw_args: Vec<Value>")
@@ -7113,6 +7118,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "fresh_coin_plan_zeroizes_on_drop": fresh_coin_plan_zeroizes_on_drop,
         "state_wrapper_present": state_wrapper_present,
         "state_finalizes_runtime_phase_witness": state_finalizes_runtime_phase_witness,
+        "engine_leaves_runtime_phase_tail_inside_runtime":
+            engine_leaves_runtime_phase_tail_inside_runtime,
         "state_confidential_call_inputs_wrapper_restricted":
             state_confidential_call_inputs_wrapper_restricted,
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
@@ -7276,6 +7283,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && contract_instance_clone_uses_cold_runtime_clone
             && state_wrapper_present
             && state_finalizes_runtime_phase_witness
+            && engine_leaves_runtime_phase_tail_inside_runtime
             && state_confidential_call_inputs_wrapper_restricted
             && theorem_finalizes_execution_trace
             && controller_public_call_summary_uses_manifest_only

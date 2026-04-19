@@ -157,10 +157,10 @@ impl ContractRuntime {
             allocator,
             Some(expected_kernel_steps),
             public_object_ids.clone(),
-            Some(public_object_ids),
+            Some(public_object_ids.clone()),
         )?;
         let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
-        let outcome = self.committed.run_confidential_call(
+        let mut outcome = self.committed.run_confidential_call(
             kernel,
             &program,
             &shadow_load_object_ids,
@@ -178,6 +178,11 @@ impl ContractRuntime {
                 max_commit_ops
             );
         }
+        self.finalize_runtime_kernel_refinement_witness(
+            &mut outcome.runtime_kernel_refinement_witness,
+            &public_object_ids,
+            "after completing the call and returning to committed storage",
+        )?;
         Ok(ConfidentialCommittedCallOutcome {
             runtime_kernel_witness: outcome.runtime_kernel_witness,
             runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
