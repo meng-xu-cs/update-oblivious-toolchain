@@ -1,7 +1,51 @@
 # Paper Theorem Profile
 
-This note records the paper-facing theorem profile currently implemented by the
-Lean scaffold.
+This note freezes the paper-facing theorem target, the exact observer shape,
+the explicit assumption profile, and the current trusted-surface statement.
+It also records what the current repository already proves at that frozen
+interface and what still remains open.
+
+## Frozen Theorem Box
+
+The final paper should aim at exactly one theorem:
+
+> For every admitted Solidity source program `P`, if `uo-solc` compiles `P`
+> to artifact `A`, the direct Lean source/artifact checker accepts that pair,
+> the real runtime executes `A` and emits runtime proof objects accepted by
+> Lean, and the explicit concrete backend / cryptographic / TEE assumptions
+> hold, then the real host-visible execution satisfies the paper's
+> update-obliviousness theorem against the stated hostile-host observer.
+
+This theorem is now frozen as the paper target. The current repository fixes
+its interface, observer, and assumption surface, but does not yet prove the
+full end-to-end statement.
+
+## Current Status
+
+What is already established at the frozen interface:
+
+- exact-UO for exact backends on the repository's instrumented abstract
+  machine
+- theorem-facing computational-UO only on
+  `path_oram_local_posmap_v1`
+- a direct Lean proof-grade source/artifact checker,
+  `checkProofGradeTranslationArtifacts`
+- Lean-side proof-grade predicates and executable checkers for the runtime
+  kernel witness, runtime refinement witness, and runtime trusted-kernel
+  bundle
+- runtime enforcement of the admitted public kernel schedule for accepted
+  confidential entrypoints
+
+What is still open:
+
+- a machine-checked source-to-kernel compiler correctness theorem
+- a machine-checked refinement proof from the real Rust kernel to the Lean
+  kernel model
+- a machine-checked proof that secret-dependent runtime behavior is confined to
+  that kernel
+- full discharge of the concrete
+  `PathOramLocalPosmapV1SecurityAssumptions` bundle
+- the final malicious-host SGX / TEE deployment theorem for the real runtime
 
 ## Main Choice
 
@@ -15,6 +59,31 @@ The main theorem keeps the enclave boundary exact and public:
 
 This is the intended headline claim for the repository. A boundary-normalized
 variant is future work, not the main theorem profile.
+
+## Explicit Assumption Profile
+
+The paper should state the assumptions explicitly rather than leave them
+implicit in prose.
+
+| Assumption | Role | Current status |
+| --- | --- | --- |
+| `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents in the concrete `path_oram_local_posmap_v1` backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
+| `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages in the local-posmap wrapper | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
+| `freshLeafResampling` | connects runtime leaf-remapping coins to the theorem-side fresh-leaf distribution | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; runtime bridge fixed, full proof still open |
+| `stashOverflowBounded` | bounds stash-overflow failure for the deployed local-posmap parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet fully discharged in-repo |
+| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model | required by the final malicious-host theorem; not yet fully closed in Lean |
+
+## Current And Target TCB
+
+| Component | Current status | Final target |
+| --- | --- | --- |
+| Lean kernel plus Lean theorem/checker development | trusted | trusted |
+| Explicit backend / cryptographic / deployment assumptions | trusted assumptions | keep explicit and minimize |
+| `uo-check` | not in the proof-grade TCB | not in the TCB |
+| `mplus-probe` | not in the proof-grade TCB | not in the TCB |
+| `uo-solc` | not trusted for current artifact-level acceptance, but source-level compiler correctness is still unproved | remove from TCB by proving compiler correctness |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for implementation honesty | shrink to the smallest kernel and prove it refines the Lean model |
+| Rust code outside the tiny kernel | still part of the implementation risk until confinement and refinement are proved | prove public-only or remove from the confidential path |
 
 ## Observer Shape
 

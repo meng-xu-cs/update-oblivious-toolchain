@@ -42,6 +42,56 @@ Current claim boundary:
 - no current blanket claim that the full Rust compiler/runtime stack or a
   malicious-host SGX deployment already satisfies the final paper theorem
 
+Frozen paper claim surface:
+
+> For every admitted Solidity source program `P`, if `uo-solc` compiles `P`
+> to artifact `A`, the direct Lean source/artifact checker accepts that pair,
+> the real runtime executes `A` and emits runtime proof objects accepted by
+> Lean, and the explicit concrete backend / cryptographic / TEE assumptions
+> hold, then the real host-visible execution satisfies the paper's
+> update-obliviousness theorem against the stated hostile-host observer.
+
+The exact frozen observer is:
+
+```text
+View_SGX(c) =
+  ( public_outcome(c),
+    boundary_schedule(c),
+    storage_trace(c),
+    micro_trace(c) )
+```
+
+where:
+
+- `public_outcome` is exact
+- `boundary_schedule` is exact
+- `storage_trace` is exact for exact backends and ORAM-related for
+  `path_oram_local_posmap_v1`
+- only the SGX-specific `micro_trace` is normalized and simulated from
+  `L_sgx_micro`
+
+Explicit assumption profile:
+
+| Assumption | Role | Current status |
+| --- | --- | --- |
+| `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents for the concrete local-posmap backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
+| `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
+| `freshLeafResampling` | connects the runtime leaf-remapping coins to the theorem-side fresh-leaf distribution | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; runtime bridge fixed, full proof still open |
+| `stashOverflowBounded` | bounds stash-overflow failure for the deployed parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet fully discharged in-repo |
+| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model | required by the final malicious-host deployment theorem; not yet fully closed in Lean |
+
+Current proof-grade TCB:
+
+| Component | Current role |
+| --- | --- |
+| Lean kernel plus the Lean theorem/checker development | trusted proof checker and theorem body |
+| Explicit backend / cryptographic / deployment assumptions | trusted assumptions |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for implementation honesty |
+| Rust code outside the tiny kernel | still part of the implementation risk until confinement and refinement are proved |
+| `uo-check` | not in the proof-grade TCB |
+| `mplus-probe` | not in the proof-grade TCB |
+| `uo-solc` | not trusted for the current artifact-level acceptance claim, but still unverified for the final source-level compiler theorem |
+
 Paper-main theorem strategy:
 
 - theorem-boundary fact: the paper route and the appendix / artifact route use

@@ -19,6 +19,29 @@ That bundle contains exactly:
 The full theorem-facing runtime witness is reconstructed from that bundle; it
 is no longer the primitive trusted object.
 
+## Current TCB Statement
+
+The current runtime-side TCB should be read explicitly rather than inferred.
+
+| Component | In current runtime-side TCB? | Reason |
+| --- | --- | --- |
+| Lean kernel plus Lean theorem/checker development | yes | proof checker and theorem body |
+| Explicit backend / cryptographic assumptions | yes | they are the named remaining assumptions |
+| `RuntimeTrustedKernelBundle` acceptance predicate and imported JSON checker | yes | theorem-facing validation boundary |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | implementation honesty is not yet derived by a full refinement proof |
+| Rust shell/object code outside the tiny kernel | partially | still relevant until confinement and refinement are proved end to end |
+| `uo-check` | no | removed from the proof-grade acceptance path |
+| `mplus-probe` | no | validation/reporting only |
+
+The final paper target is stricter than the current runtime-side TCB:
+
+- shrink the confidential Rust surface to a tiny kernel
+- prove the real kernel implementation refines the Lean kernel model
+- prove the non-kernel shell is public-only with respect to the admitted
+  observer
+- keep `uo-check`, `mplus-probe`, and any Rust-side translation convenience
+  wrappers outside the TCB
+
 ## What Lean Proves
 
 The Lean development now contains:

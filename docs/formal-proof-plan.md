@@ -1,13 +1,43 @@
 # Formal Proof Plan
 
 This document defines the next proof-oriented milestone for the UO Toolchain.
+It now also freezes the final theorem target and distinguishes that target
+from the current mechanized boundary.
 
 The goal is not to overclaim. The current repository can realistically target a
 mechanized proof for the instrumented abstract machine used by this workspace,
 plus a narrowly stated TEE deployment theorem that reuses the same normalized
 storage trace under explicit enclave assumptions. It cannot honestly target a
 universal theorem over all downstream Rust machine code, host runtime effects,
-or microarchitectural observers.
+or microarchitectural observers without additional refinement work.
+
+## 0. Frozen Final Theorem Target
+
+The final paper target is:
+
+> For every admitted Solidity source program `P`, if `uo-solc` compiles `P`
+> to artifact `A`, the direct Lean source/artifact checker accepts that pair,
+> the real runtime executes `A` and emits runtime proof objects accepted by
+> Lean, and the explicit concrete backend / cryptographic / TEE assumptions
+> hold, then the real host-visible execution satisfies the paper's
+> update-obliviousness theorem against the stated hostile-host observer.
+
+The repository has already frozen:
+
+- the observer shape
+- the concrete backend path: `path_oram_local_posmap_v1`
+- the proof-grade translation boundary: direct Lean checking of separately
+  materialized source/candidate artifacts
+- the runtime proof boundary: the emitted kernel / refinement /
+  trusted-kernel proof objects
+
+The repository has not yet closed:
+
+- source-to-kernel compiler correctness
+- runtime-kernel refinement for the real Rust implementation
+- secret confinement outside the kernel
+- full discharge of the concrete backend assumption bundle
+- the final malicious-host deployment theorem for the real runtime
 
 ## 1. Claim Boundary
 
@@ -72,8 +102,9 @@ modeled explicitly, including at least:
 Physical side channels such as power or electromagnetic leakage remain outside
 the claim boundary, following the same exclusion style used by ZeroTrace.
 
-The current repository does not define that observer and does not prove against
-it.
+The current repository now fixes that observer shape in the paper-facing docs
+and Lean-facing interfaces, but it does not yet prove the final malicious-host
+theorem against it.
 
 ### 1.5 Explicit non-claims
 

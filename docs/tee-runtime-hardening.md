@@ -29,6 +29,34 @@ What it still does not claim is:
 That gap matters if the deployment story is "run `uo-evm` inside a TEE and
 claim the runtime itself is aligned with the admitted observer."
 
+## Frozen Observer For This Track
+
+This hardening track now works against one fixed observer rather than an
+informal "TEE leakage" story:
+
+```text
+View_SGX(c) =
+  ( public_outcome(c),
+    boundary_schedule(c),
+    storage_trace(c),
+    micro_trace(c) )
+```
+
+with:
+
+- exact `public_outcome`
+- exact `boundary_schedule`
+- backend-handled `storage_trace`
+- SGX-specific `micro_trace` normalized and simulated from `L_sgx_micro`
+
+This means the runtime-hardening task is not "emit some witness that looks
+reasonable." It is:
+
+1. reduce the real secret-dependent runtime to a tiny confidential kernel
+2. prove the real kernel implementation refines the Lean kernel model
+3. prove the rest of the runtime is public-only with respect to this observer
+4. then close the hostile-host deployment theorem at exactly this observer
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:
