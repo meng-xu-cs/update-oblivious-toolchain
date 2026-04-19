@@ -6035,10 +6035,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     });
     let engine_uses_opaque_committed_state = engine_impl_source.contains("state: ContractRuntime")
         && !engine_impl_source.contains("state: CommittedRuntimeState");
-    let engine_uses_runtime_public_object_universe = engine_impl_source
-        .contains(".ensure_ready_for_call(")
+    let engine_uses_runtime_public_object_universe =
+        !engine_impl_source.contains(".ensure_ready_for_call(")
         && !engine_impl_source.contains("let public_object_ids = self.state.public_object_ids();")
         && !engine_impl_source.contains("canonical_runtime_public_object_ids(")
+        && theorem_source.contains("runtime.ensure_ready_for_call(")
         && state_source.contains("fn public_object_ids(&self) -> Vec<u32>")
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>");
     let engine_delegates_public_execution_to_shell = engine_impl_source
@@ -9087,7 +9088,9 @@ derives the canonical public object universe from `ContractRuntime` rather
 than the artifact-side state list while the same `ContractRuntime` boundary
 now owns the ready-for-call coldness preflight over that universe as well,
 and `shell.rs` now derives the public allocator plan from the manifest rather
-than having the engine thread that setup detail in.
+than having the engine thread that setup detail in; the theorem-side
+`begin_call_trace` path now triggers that runtime preflight rather than
+`engine.rs` calling it directly.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade

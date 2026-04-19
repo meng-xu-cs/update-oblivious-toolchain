@@ -122,8 +122,6 @@ impl ContractInstance {
         } else {
             (None, Some(args))
         };
-        self.state
-            .ensure_ready_for_call("before executing the next call from committed storage")?;
         let execution = (|| -> Result<_> {
             let (
                 runtime_kernel_witness,

@@ -20,6 +20,7 @@ pub(crate) fn begin_call_trace(
     manifest_entry: &EntrypointManifest,
     args: &[Value],
 ) -> Result<CallTraceContext> {
+    runtime.ensure_ready_for_call("before executing the next call from committed storage")?;
     let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, args)?;
     let recorder = CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
     Ok(CallTraceContext {
