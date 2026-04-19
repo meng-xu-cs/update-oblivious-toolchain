@@ -20,7 +20,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 3377,
+      "bundle_json_bytes": 3376,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
@@ -159,7 +159,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 3377,
+      "bundle_json_bytes": 3376,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
@@ -298,7 +298,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 7090,
+      "bundle_json_bytes": 7091,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
@@ -946,7 +946,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 6833,
+      "bundle_json_bytes": 6834,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
@@ -1935,7 +1935,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 8960,
+      "bundle_json_bytes": 8961,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -2310,7 +2310,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 11402,
+      "bundle_json_bytes": 11404,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
@@ -3386,7 +3386,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15527,
+      "bundle_json_bytes": 15522,
       "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
@@ -4113,7 +4113,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15526,
+      "bundle_json_bytes": 15527,
       "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
@@ -4840,7 +4840,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 22542,
+      "bundle_json_bytes": 22541,
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
@@ -5768,7 +5768,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 22546,
+      "bundle_json_bytes": 22537,
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
@@ -6696,7 +6696,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 58365,
+      "bundle_json_bytes": 58361,
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -9351,7 +9351,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "bundle_json_bytes": 190900,
+      "bundle_json_bytes": 190896,
       "controller_accesses": 6,
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",

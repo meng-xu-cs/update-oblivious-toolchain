@@ -8306,6 +8306,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let controller_path = root.join("runtime/uo-evm/src/controller.rs");
     let theorem_path = root.join("runtime/uo-evm/src/theorem.rs");
     let probe_path = root.join("probe/mplus-probe/src/lib.rs");
+    let allocator_path = root.join("runtime/uo-allocator/src/lib.rs");
     let store_codec_path = root.join("runtime/uo-store/src/codec.rs");
     let store_store_path = root.join("runtime/uo-store/src/store.rs");
     let checker_path = root.join("checker/uo-check/src/lib.rs");
@@ -8338,6 +8339,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&theorem_path)))?;
     let probe_source = fs::read_to_string(&probe_path)
         .with_context(|| format!("reading {}", display_report_path(&probe_path)))?;
+    let allocator_source = fs::read_to_string(&allocator_path)
+        .with_context(|| format!("reading {}", display_report_path(&allocator_path)))?;
     let extract_metrics_start = probe_source
         .rfind("\nfn extract_metrics(")
         .ok_or_else(|| anyhow!("failed to locate extract_metrics in mplus-probe"))?
@@ -9384,6 +9387,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         kernel_source.contains("Value::confidential_select(cond, when_true, when_false)");
     let checker_uses_shared_confidential_kernel_lowering =
         checker_source.contains("lower_confidential_kernel_statements(statements, signature)?;");
+    let checker_uses_manifest_slot_schedule_directly = checker_source
+        .contains("witnessed_slot_program.expected_runtime_step_manifest()")
+        && !checker_source
+            .contains("expected_slot_program\n                .expected_runtime_steps()");
     let kernel_witness_validation_uses_manifest_confidential_slot_program = core_trace_source
         .contains(".confidential_slot_program")
         && core_trace_source.contains(".expected_runtime_step_manifest()")
@@ -9392,6 +9399,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("ConfidentialKernelLoweringError::SelectArmOutsideBranchlessFragment")
         && core_trace_source.contains("ConfidentialKernelLoweringError::ConfidentialStructField")
         && core_trace_source.contains("ConfidentialKernelLoweringError::ConfidentialArrayIndex");
+    let allocator_uses_manifest_kernel_step_budget = allocator_source
+        .contains("plan.max_kernel_ops = if entry.kernel_steps.is_empty()")
+        && allocator_source.contains("entry.kernel_steps.len()")
+        && !allocator_source.contains("program.expected_runtime_steps().len()");
+    let state_uses_checked_manifest_kernel_schedule = state_source
+        .contains("let program_expected_kernel_steps = program.expected_runtime_step_witnesses();")
+        && state_source
+            .contains("if manifest_expected_kernel_steps != program_expected_kernel_steps {")
+        && state_source
+            .contains("allocator.max_kernel_ops = manifest_expected_kernel_steps.len();")
+        && state_source.contains("expected_kernel_steps: manifest_expected_kernel_steps,");
     let runtime_phase_event_constructor_files =
         collect_production_pattern_hits(&runtime_evm_src, "RuntimeKernelRefinementEventWitness::")?;
     let expected_runtime_phase_event_constructor_files = vec![
@@ -10320,10 +10338,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_confidential_select_uses_branchless_value_select,
         "checker_uses_shared_confidential_kernel_lowering":
             checker_uses_shared_confidential_kernel_lowering,
+        "checker_uses_manifest_slot_schedule_directly":
+            checker_uses_manifest_slot_schedule_directly,
         "kernel_witness_validation_uses_manifest_confidential_slot_program":
             kernel_witness_validation_uses_manifest_confidential_slot_program,
         "kernel_witness_validation_tracks_confidential_kernel_lowering_errors":
             kernel_witness_validation_tracks_confidential_kernel_lowering_errors,
+        "allocator_uses_manifest_kernel_step_budget":
+            allocator_uses_manifest_kernel_step_budget,
+        "state_uses_checked_manifest_kernel_schedule":
+            state_uses_checked_manifest_kernel_schedule,
         "runtime_phase_event_constructor_files": runtime_phase_event_constructor_files,
         "runtime_phase_event_constructor_surface_restricted":
             runtime_phase_event_constructor_surface_restricted,
@@ -10464,8 +10488,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_does_not_lower_confidential_program_directly
             && kernel_confidential_select_uses_branchless_value_select
             && checker_uses_shared_confidential_kernel_lowering
+            && checker_uses_manifest_slot_schedule_directly
             && kernel_witness_validation_uses_manifest_confidential_slot_program
             && kernel_witness_validation_tracks_confidential_kernel_lowering_errors
+            && allocator_uses_manifest_kernel_step_budget
+            && state_uses_checked_manifest_kernel_schedule
             && runtime_phase_event_constructor_surface_restricted
             && resource_event_constructor_surface_restricted
             && state_only_runtime_helper_surface_restricted
@@ -12322,7 +12349,10 @@ entrypoints
 are sourced from the checked manifest's `confidential_slot_program` in
 `runtime/uo-evm/src/state.rs` while that module delegates confidential
 execution through `runtime/uo-evm/src/kernel.rs`, enforces the
-manifest-derived confidential commit budget there as well, and
+manifest-derived confidential commit budget there as well, validates the slot
+program against the manifest `kernel_steps` exactly once, and then carries
+that checked manifest schedule forward as the canonical public budget /
+witness schedule in both the runtime and `uo-check`, and
 that the production kernel executes that shared slot DSL with a slot-vector
 confidential state rather than a string-keyed map, and that the kernel-step
 witness journal plus the lower-level

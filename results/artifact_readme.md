@@ -135,7 +135,10 @@ entrypoints
 are sourced from the checked manifest's `confidential_slot_program` in
 `runtime/uo-evm/src/state.rs` while that module delegates confidential
 execution through `runtime/uo-evm/src/kernel.rs`, enforces the
-manifest-derived confidential commit budget there as well, and
+manifest-derived confidential commit budget there as well, validates the slot
+program against the manifest `kernel_steps` exactly once, and then carries
+that checked manifest schedule forward as the canonical public budget /
+witness schedule in both the runtime and `uo-check`, and
 that the production kernel executes that shared slot DSL with a slot-vector
 confidential state rather than a string-keyed map, and that the kernel-step
 witness journal plus the lower-level

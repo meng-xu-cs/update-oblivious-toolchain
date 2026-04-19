@@ -3,7 +3,9 @@
   "all_kernel_restricted_signatures_present": true,
   "all_restricted_signatures_present": true,
   "all_state_restricted_signatures_present": true,
+  "allocator_uses_manifest_kernel_step_budget": true,
   "checker_path": "checker/uo-check/src/lib.rs",
+  "checker_uses_manifest_slot_schedule_directly": true,
   "checker_uses_shared_confidential_kernel_lowering": true,
   "committed_runtime_witness_snapshot_derive_line": "#[derive(Debug)]",
   "committed_runtime_witness_snapshot_nonclone": true,
@@ -1404,6 +1406,7 @@
     }
   ],
   "state_routes_confidential_calls_through_runtime_kernel": true,
+  "state_uses_checked_manifest_kernel_schedule": true,
   "state_uses_public_runtime_kernel": true,
   "state_wrapper_present": true,
   "store_cipher_exposes_wipe_helpers": true,
