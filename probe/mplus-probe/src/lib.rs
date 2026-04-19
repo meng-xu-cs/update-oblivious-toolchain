@@ -9808,6 +9808,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("kernel bounded-journal restriction flag must be boolean")
     });
+    let kernel_runtime_phase_helper_path_restricted = kernel_source
+        .contains("self.runtime_phase_events.push_pre_committed_cold_object(object_id)?;")
+        && kernel_source.contains("self.runtime_phase_events.push_shadow_load_object(object_id)")
+        && kernel_source.contains("self.runtime_phase_events.push_kernel_step(opcode, object_id)?;")
+        && kernel_source.contains("self.runtime_phase_events.append_commit_object_schedule(committed_object_ids)?;")
+        && kernel_source.contains("witness.append_commit_object_schedule(object_ids.clone())?;");
     let state_routes_confidential_calls_through_runtime_kernel =
         state_source.contains("kernel.run_confidential_call(");
     let state_confidential_outcome_layering_is_explicit = state_source
@@ -11187,6 +11193,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_hash_scratch_uses_public_program_bound,
         "kernel_bounded_journal_checks": kernel_bounded_journal_checks,
         "kernel_bounded_journal_restricted": kernel_bounded_journal_restricted,
+        "kernel_runtime_phase_helper_path_restricted":
+            kernel_runtime_phase_helper_path_restricted,
         "state_routes_confidential_calls_through_runtime_kernel":
             state_routes_confidential_calls_through_runtime_kernel,
         "state_confidential_outcome_layering_is_explicit":
@@ -11497,6 +11505,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && object_commit_io_scratch_uses_type_lengths
             && kernel_hash_scratch_uses_public_program_bound
             && kernel_bounded_journal_restricted
+            && kernel_runtime_phase_helper_path_restricted
             && state_routes_confidential_calls_through_runtime_kernel
             && state_confidential_outcome_layering_is_explicit
             && confidential_kernel_run_outcome_fields_private
@@ -13438,7 +13447,10 @@ confidential state rather than a string-keyed map, and that the kernel-step
 witness journal plus the lower-level
 runtime phase witness journal are both explicit bounded-capacity journals
 derived from public kernel-op/object bounds rather than plain growable
-`Vec::new()` traces, and that the remaining public shell-side commit /
+`Vec::new()` traces, that the kernel-side runtime phase journal routes
+pre-boundary, kernel-step, and commit-object appends through explicit helper
+methods instead of raw witness-vector mutation, and that the remaining public
+shell-side commit /
 witness lists now also start from explicit `Vec::with_capacity(...)` bounds,
 and that live Path-ORAM stash state is rebuilt with public
 `working_stash_capacity(...)` headroom up front, preserved across cold commits
