@@ -6073,8 +6073,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_defines_fresh_coin_plan_directly = engine_source
         .contains("pub struct PathOramFreshCoinPlan")
         || engine_source.contains("struct PathOramFreshCoinPlan");
-    let engine_uses_manifest_public_call_summary =
-        engine_impl_source.contains("PublicCallSummary::from_manifest_entry");
+    let engine_uses_manifest_public_call_summary = !engine_impl_source
+        .contains("PublicCallSummary::from_manifest_entry")
+        && theorem_source.contains("PublicCallSummary::from_manifest_entry");
     let engine_keeps_confidential_call_inputs_inside_runtime = !engine_impl_source
         .contains("ConfidentialCallInputs::from_manifest_entry")
         && engine_impl_source.contains("self.state.run_confidential_entrypoint(")
@@ -6334,6 +6335,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_call_trace(")
         && theorem_source.contains("fn begin_call_trace(")
         && theorem_source.contains("runtime.witness_snapshot()?;")
+        && theorem_source.contains("CallRecorder::begin_with_input_len(")
         && theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness")
@@ -6356,12 +6358,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_public_trace_path_avoids_compiled_function =
         !theorem_source.contains("CompiledFunction");
     let engine_public_trace_uses_output_shape_only = engine_impl_source
-        .contains("let call_trace_context = begin_call_trace(&self.state)?;")
+        .contains("let mut call_trace_context =")
         && engine_impl_source.contains("let finalized = finalize_call_trace(")
         && !engine_impl_source.contains("output_shape_of(")
         && !engine_impl_source.contains("build_theorem_trace(")
         && !engine_impl_source.contains("finalize_execution_trace(")
-        && !engine_impl_source.contains("witness_snapshot()");
+        && !engine_impl_source.contains("witness_snapshot()")
+        && !engine_impl_source.contains("CallRecorder::begin_with_input_len(");
     let state_prepares_confidential_manifest_plan = state_source
         .contains("struct ConfidentialEntrypointPlan")
         && state_source.contains("ConfidentialEntrypointPlan::from_manifest_entry(")
@@ -9109,7 +9112,9 @@ exported `OutputShape` rather than the full return payload, and the committed
 before/after ORAM witness snapshot consumed by `theorem.rs` is now captured
 through the theorem-side `begin_call_trace` / `finalize_call_trace` path
 rather than by `engine.rs`, and remains opaque outside the dedicated
-`state.rs` / `theorem.rs` handoff. The same report also checks that the
+`state.rs` / `theorem.rs` handoff; the same theorem-side context now also owns
+the public `PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer
+constructs those theorem-path objects directly. The same report also checks that the
 confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to
 `crate::runtime`, that the confidential shadow-load helper itself stays

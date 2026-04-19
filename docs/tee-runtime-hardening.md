@@ -397,8 +397,10 @@ The current runtime has a first hardening layer:
   controller-observer certificate, hidden Path-ORAM certificate, or
   trusted-kernel bundle directly, and the committed ORAM before/after snapshot
   used by that theorem packaging path is now captured through the theorem-side
-  `CallTraceContext`, so `engine.rs` no longer calls `witness_snapshot()` or
-  sees public fields for the hidden snapshot data
+  `CallTraceContext`; that same theorem-side context now also owns the public
+  `PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer calls
+  `witness_snapshot()`, `PublicCallSummary::from_manifest_entry`, or
+  `CallRecorder::begin_with_input_len` for the theorem path
 - the confidential-path `RuntimeKernel` entrypoints that shadow-load
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot

@@ -1,4 +1,3 @@
-use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::ContractRuntime;
 use crate::shell::run_public_entrypoint;
@@ -117,22 +116,19 @@ impl ContractInstance {
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
-        let (public_call, confidential_args, public_args) = if function.confidential {
-            let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
-            (public_call, Some(args), None)
+        let mut call_trace_context =
+            begin_call_trace(&self.state, entrypoint, &manifest_entry, &args)?;
+        let (confidential_args, public_args) = if function.confidential {
+            (Some(args), None)
         } else {
-            let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
-            (public_call, None, Some(args))
+            (None, Some(args))
         };
         let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
         self.state.ensure_cold(
             &public_object_ids,
             "before executing the next call from committed storage",
         )?;
-        let call_trace_context = begin_call_trace(&self.state)?;
         let execution = (|| -> Result<_> {
-            let mut recorder =
-                CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
             let (
                 runtime_kernel_witness,
                 runtime_kernel_refinement_witness,
@@ -148,7 +144,7 @@ impl ContractInstance {
                     public_object_ids.clone(),
                     confidential_args,
                     fresh_coins,
-                    &mut recorder,
+                    call_trace_context.recorder_mut(),
                 )?;
                 (
                     outcome.runtime_kernel_witness,
@@ -167,7 +163,7 @@ impl ContractInstance {
                     public_args,
                     AllocatorPlan::from_manifest(&manifest_entry),
                     public_object_ids.clone(),
-                    &mut recorder,
+                    call_trace_context.recorder_mut(),
                 )?;
                 (
                     public_execution.runtime_kernel_witness,
@@ -180,7 +176,6 @@ impl ContractInstance {
             Ok((
                 runtime_kernel_witness,
                 runtime_kernel_refinement_witness,
-                recorder,
                 opcode_trace,
                 aborted,
                 return_value,
@@ -189,7 +184,6 @@ impl ContractInstance {
         let (
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
-            recorder,
             opcode_trace,
             aborted,
             return_value,
@@ -205,10 +199,8 @@ impl ContractInstance {
             confidential: function.confidential,
             deploy_seed: self.deploy_seed,
             opcode_trace,
-            recorder,
             manifest_entry: &manifest_entry,
             manifest_objects: &self.artifact.contract.manifest.objects,
-            public_call,
             aborted,
             return_value: &return_value,
             runtime_kernel_witness,

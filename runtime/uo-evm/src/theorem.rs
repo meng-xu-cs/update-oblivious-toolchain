@@ -5,17 +5,34 @@ use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, OutputShape, RuntimeControllerObserverCertificate,
     RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness,
-    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle,
+    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, Value,
 };
 
 pub(crate) struct CallTraceContext {
     runtime_state_before: CommittedRuntimeWitnessSnapshot,
+    public_call: PublicCallSummary,
+    recorder: CallRecorder,
 }
 
-pub(crate) fn begin_call_trace(runtime: &ContractRuntime) -> Result<CallTraceContext> {
+pub(crate) fn begin_call_trace(
+    runtime: &ContractRuntime,
+    entrypoint: &str,
+    manifest_entry: &EntrypointManifest,
+    args: &[Value],
+) -> Result<CallTraceContext> {
+    let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, args)?;
+    let recorder = CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
     Ok(CallTraceContext {
         runtime_state_before: runtime.witness_snapshot()?,
+        public_call,
+        recorder,
     })
+}
+
+impl CallTraceContext {
+    pub(crate) fn recorder_mut(&mut self) -> &mut CallRecorder {
+        &mut self.recorder
+    }
 }
 
 pub(crate) struct FinalizeExecutionTraceInput<'a> {
@@ -40,10 +57,8 @@ pub(crate) struct FinalizeCallTraceInput<'a> {
     pub confidential: bool,
     pub deploy_seed: u64,
     pub opcode_trace: Vec<String>,
-    pub recorder: CallRecorder,
     pub manifest_entry: &'a EntrypointManifest,
     pub manifest_objects: &'a [StateObjectManifest],
-    pub public_call: PublicCallSummary,
     pub aborted: bool,
     pub return_value: &'a Option<uo_core::Value>,
     pub runtime_kernel_witness: RuntimeKernelWitness,
@@ -194,10 +209,8 @@ pub(crate) fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<F
         confidential,
         deploy_seed,
         opcode_trace,
-        recorder,
         manifest_entry,
         manifest_objects,
-        public_call,
         aborted,
         return_value,
         runtime_kernel_witness,
@@ -205,6 +218,8 @@ pub(crate) fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<F
     } = input;
     let CallTraceContext {
         runtime_state_before,
+        public_call,
+        recorder,
     } = context;
     let runtime_state_after = runtime.witness_snapshot()?;
     let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
