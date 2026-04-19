@@ -7992,7 +7992,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("canonical_runtime_public_object_ids(")
         && theorem_source.contains("runtime.ensure_ready_for_call(")
         && state_source.contains("fn public_object_ids(&self) -> Vec<u32>")
-        && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>");
+        && state_source
+            .contains("pub(crate) fn ensure_ready_for_call(&self, context: &str) -> Result<()>");
     let engine_delegates_public_execution_to_shell = engine_impl_source
         .contains("use crate::shell::run_public_entrypoint;")
         && engine_impl_source.contains("run_public_entrypoint(")
@@ -8279,8 +8280,24 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("struct CommittedRuntimeWitnessSnapshot")
         && !state_source.contains("pub runtime_oram_access_counters:")
         && !state_source.contains("pub runtime_oram_position_maps:")
-        && state_source.contains("fn into_hidden_oram_state(")
+        && state_source.contains("pub(crate) fn into_hidden_oram_state(")
         && theorem_source.contains(".into_hidden_oram_state()");
+    let theorem_only_runtime_helper_visibility_restricted = state_source
+        .contains("pub(crate) fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
+        && state_source
+            .contains("pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot>")
+        && state_source.contains("pub(crate) fn into_hidden_oram_state(")
+        && state_source.contains(
+            "fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        let mut runtime_oram_position_maps = Vec::with_capacity(self.objects.len());",
+        )
+        && !state_source
+            .contains("pub fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
+        && !state_source
+            .contains("pub fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot>")
+        && !state_source.contains("pub fn into_hidden_oram_state(")
+        && !state_source.contains(
+            "pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        let mut runtime_oram_position_maps = Vec::with_capacity(self.objects.len());",
+        );
     let committed_runtime_witness_snapshot_decl = "pub(crate) struct CommittedRuntimeWitnessSnapshot";
     let committed_runtime_witness_snapshot_derive_line = state_source
         .split(committed_runtime_witness_snapshot_decl)
@@ -8859,6 +8876,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "runtime.witness_snapshot()?",
             vec![String::from("runtime/uo-evm/src/theorem.rs")],
         ),
+        (
+            ".into_hidden_oram_state()",
+            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+        ),
     ]
     .into_iter()
     .map(|(pattern, expected_files)| {
@@ -9311,6 +9332,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "checked": state_committed_runtime_witness_snapshot_is_opaque
                 && committed_runtime_witness_snapshot_nonclone
                 && committed_runtime_witness_snapshot_surface_restricted
+                && theorem_only_runtime_helper_visibility_restricted
                 && theorem_only_runtime_helper_surface_restricted
                 && theorem_finalizes_execution_trace,
         }),
@@ -9427,6 +9449,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             expected_committed_runtime_witness_snapshot_surface_files,
         "committed_runtime_witness_snapshot_surface_restricted":
             committed_runtime_witness_snapshot_surface_restricted,
+        "theorem_only_runtime_helper_visibility_restricted":
+            theorem_only_runtime_helper_visibility_restricted,
         "engine_leaves_runtime_phase_tail_inside_runtime":
             engine_leaves_runtime_phase_tail_inside_runtime,
         "state_confidential_call_inputs_wrapper_restricted":

@@ -290,7 +290,7 @@ impl CommittedRuntimeState {
         self.objects.keys().copied().collect()
     }
 
-    pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
+    fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
         let mut runtime_oram_position_maps = Vec::with_capacity(self.objects.len());
         for object in self.objects.values() {
             if let Some(state) = object.path_oram_position_map_witness()? {
