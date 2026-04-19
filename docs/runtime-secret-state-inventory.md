@@ -69,11 +69,14 @@ the authority boundary on that handoff by requiring the runtime preflight and
 snapshot helpers to be called only from `runtime/uo-evm/src/theorem.rs` in
 production code. It also pins `RuntimeCallOutcome` to the runtime/theorem
 handoff by requiring `state.rs` and `shell.rs` to construct it, `theorem.rs`
-to consume it whole, and `engine.rs` to avoid unpacking it directly. The same
-report also pins the top-level `ContractRuntime` entrypoints themselves: only
+to consume it whole, and `engine.rs` to avoid unpacking it directly. The
+same report now also pins the call-trace bridge itself: `engine.rs` calls
+only `run_traced_call(...)` and no longer imports `begin_call_trace`,
+`FinalizeCallTraceInput`, or `CallTraceContext` directly. The same report also
+pins the top-level `ContractRuntime` entrypoints themselves: only
 `runtime/uo-evm/src/shell.rs` may prepare, commit, or replace the public
 shadow wrapper, while only `runtime/uo-evm/src/engine.rs` may invoke
-`self.state.run_confidential_entrypoint(...)`.
+`runtime.run_confidential_entrypoint(...)` inside the traced-call bridge.
 
 This document should be updated whenever a new secret-bearing structure is
 introduced or an existing one is removed.

@@ -1,7 +1,7 @@
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::ContractRuntime;
 use crate::shell::run_public_entrypoint;
-use crate::theorem::{begin_call_trace, finalize_call_trace, FinalizeCallTraceInput};
+use crate::theorem::{run_traced_call, RunTracedCallInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -115,53 +115,38 @@ impl ContractInstance {
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
-        let mut call_trace_context =
-            begin_call_trace(&self.state, entrypoint, &manifest_entry, &args)?;
-        let (confidential_args, public_args) = if function.confidential {
-            (Some(args), None)
-        } else {
-            (None, Some(args))
-        };
-        let execution = (|| -> Result<_> {
-            let execution = if function.confidential {
-                let confidential_args = confidential_args
-                    .expect("confidential entrypoint must carry confidential call args");
-                self.state.run_confidential_entrypoint(
-                    entrypoint,
-                    &manifest_entry,
-                    confidential_args,
-                    fresh_coins,
-                    call_trace_context.recorder_mut(),
-                )
-            } else {
-                let public_args =
-                    public_args.expect("public entrypoint must keep raw argument vector");
-                run_public_entrypoint(
-                    &mut self.state,
-                    &self.artifact.contract,
-                    &function,
-                    &manifest_entry,
-                    public_args,
-                    call_trace_context.recorder_mut(),
-                )
-            };
-            execution
-        })();
-        let execution = match execution {
-            Ok(result) => result,
-            Err(err) => return Err(err),
-        };
-        let finalized = finalize_call_trace(FinalizeCallTraceInput {
-            runtime: &self.state,
-            context: call_trace_context,
-            artifact: &self.artifact,
-            entrypoint: &function.signature,
-            confidential: function.confidential,
-            deploy_seed: self.deploy_seed,
-            manifest_entry: &manifest_entry,
-            manifest_objects: &self.artifact.contract.manifest.objects,
-            call_outcome: execution,
-        })?;
+        let finalized = run_traced_call(
+            RunTracedCallInput {
+                runtime: &mut self.state,
+                artifact: &self.artifact,
+                entrypoint: &function.signature,
+                confidential: function.confidential,
+                deploy_seed: self.deploy_seed,
+                manifest_entry: &manifest_entry,
+                manifest_objects: &self.artifact.contract.manifest.objects,
+                args,
+            },
+            |runtime, args, recorder| {
+                if function.confidential {
+                    runtime.run_confidential_entrypoint(
+                        entrypoint,
+                        &manifest_entry,
+                        args,
+                        fresh_coins,
+                        recorder,
+                    )
+                } else {
+                    run_public_entrypoint(
+                        runtime,
+                        &self.artifact.contract,
+                        &function,
+                        &manifest_entry,
+                        args,
+                        recorder,
+                    )
+                }
+            },
+        )?;
         Ok((
             CallResult {
                 return_value: finalized.return_value,

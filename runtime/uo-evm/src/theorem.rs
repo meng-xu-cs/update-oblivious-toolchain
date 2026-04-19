@@ -9,13 +9,13 @@ use uo_core::{
     RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, Value,
 };
 
-pub(crate) struct CallTraceContext {
+struct CallTraceContext {
     runtime_state_before: CommittedRuntimeWitnessSnapshot,
     public_call: PublicCallSummary,
     recorder: CallRecorder,
 }
 
-pub(crate) fn begin_call_trace(
+fn begin_call_trace(
     runtime: &ContractRuntime,
     entrypoint: &str,
     manifest_entry: &EntrypointManifest,
@@ -32,12 +32,12 @@ pub(crate) fn begin_call_trace(
 }
 
 impl CallTraceContext {
-    pub(crate) fn recorder_mut(&mut self) -> &mut CallRecorder {
+    fn recorder_mut(&mut self) -> &mut CallRecorder {
         &mut self.recorder
     }
 }
 
-pub(crate) struct FinalizeExecutionTraceInput<'a> {
+struct FinalizeExecutionTraceInput<'a> {
     pub artifact: &'a CompiledArtifact,
     pub entrypoint: &'a str,
     pub confidential: bool,
@@ -51,7 +51,7 @@ pub(crate) struct FinalizeExecutionTraceInput<'a> {
     pub runtime_state_after: CommittedRuntimeWitnessSnapshot,
 }
 
-pub(crate) struct FinalizeCallTraceInput<'a> {
+struct FinalizeCallTraceInput<'a> {
     pub runtime: &'a ContractRuntime,
     pub context: CallTraceContext,
     pub artifact: &'a CompiledArtifact,
@@ -63,11 +63,54 @@ pub(crate) struct FinalizeCallTraceInput<'a> {
     pub call_outcome: RuntimeCallOutcome,
 }
 
+pub(crate) struct RunTracedCallInput<'a> {
+    pub runtime: &'a mut ContractRuntime,
+    pub artifact: &'a CompiledArtifact,
+    pub entrypoint: &'a str,
+    pub confidential: bool,
+    pub deploy_seed: u64,
+    pub manifest_entry: &'a EntrypointManifest,
+    pub manifest_objects: &'a [StateObjectManifest],
+    pub args: Vec<Value>,
+}
+
 pub(crate) struct FinalizedCallTrace {
     pub trace: ExecutionTrace,
     pub zero_writes: usize,
     pub return_value: Option<uo_core::Value>,
     pub aborted: bool,
+}
+
+pub(crate) fn run_traced_call<F>(
+    input: RunTracedCallInput<'_>,
+    execute: F,
+) -> Result<FinalizedCallTrace>
+where
+    F: FnOnce(&mut ContractRuntime, Vec<Value>, &mut CallRecorder) -> Result<RuntimeCallOutcome>,
+{
+    let RunTracedCallInput {
+        runtime,
+        artifact,
+        entrypoint,
+        confidential,
+        deploy_seed,
+        manifest_entry,
+        manifest_objects,
+        args,
+    } = input;
+    let mut context = begin_call_trace(&*runtime, entrypoint, manifest_entry, &args)?;
+    let call_outcome = execute(runtime, args, context.recorder_mut())?;
+    finalize_call_trace(FinalizeCallTraceInput {
+        runtime: &*runtime,
+        context,
+        artifact,
+        entrypoint,
+        confidential,
+        deploy_seed,
+        manifest_entry,
+        manifest_objects,
+        call_outcome,
+    })
 }
 
 fn build_theorem_trace(
@@ -200,7 +243,7 @@ fn gas_used_of(
     gas_used
 }
 
-pub(crate) fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCallTrace> {
+fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCallTrace> {
     let FinalizeCallTraceInput {
         runtime,
         context,
