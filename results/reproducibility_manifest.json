@@ -134,8 +134,8 @@
     },
     {
       "path": "runtime_boundary_validation.json",
-      "bytes": 53992,
-      "sha256": "d6e875c8701702045fe1785a858221eab91e2721f541d35ad10311e4a9ca48ff"
+      "bytes": 55129,
+      "sha256": "c3e766e0a8fa985be8640fbaa628c0cbaa15b63c27b2d67554a518161b20fd08"
     },
     {
       "path": "seeded_witness_validation.json",

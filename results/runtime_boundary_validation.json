@@ -629,6 +629,50 @@
   "kernel_restricted_signature_checks": [
     {
       "present": true,
+      "signature": "pub(in crate::runtime) fn begin("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn note_hash_bytes"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn enforce_stack_words"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn wipe_hash_scratch"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn cell_get("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn cell_set("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn array_get("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn array_set("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn map_get("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn map_put("
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn finish("
+    },
+    {
+      "present": true,
       "signature": "pub(in crate::runtime) fn shadow_load_public_objects"
     },
     {
@@ -919,6 +963,8 @@
   "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
   "public_call_summary_api_is_explicit": true,
   "public_call_summary_fields_private": true,
+  "public_kernel_facade_restricted_to_runtime": true,
+  "public_shell_is_runtime_owned": true,
   "public_trace_helper_surface_checks": [
     {
       "expected_files": [
