@@ -60,13 +60,13 @@ pub(crate) fn run_public_entrypoint(
         &public_object_ids,
         "after completing the call and returning to committed storage",
     )?;
-    Ok(RuntimeCallOutcome {
+    Ok(RuntimeCallOutcome::from_runtime_execution(
         runtime_kernel_witness,
         runtime_kernel_refinement_witness,
-        aborted: execution.aborted,
-        return_value: execution.return_value,
-        opcode_trace: execution.opcode_trace,
-    })
+        execution.aborted,
+        execution.return_value,
+        execution.opcode_trace,
+    ))
 }
 
 fn interpret_public_entrypoint(

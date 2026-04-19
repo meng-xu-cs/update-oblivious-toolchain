@@ -201,13 +201,13 @@ impl ContractRuntime {
             &public_object_ids,
             "after completing the call and returning to committed storage",
         )?;
-        Ok(RuntimeCallOutcome {
-            runtime_kernel_witness: outcome.runtime_kernel_witness,
-            runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
-            aborted: outcome.aborted,
-            return_value: outcome.return_value,
+        Ok(RuntimeCallOutcome::from_runtime_execution(
+            outcome.runtime_kernel_witness,
+            outcome.runtime_kernel_refinement_witness,
+            outcome.aborted,
+            outcome.return_value,
             opcode_trace,
-        })
+        ))
     }
 
     pub(crate) fn replace_with_cold_public_shadow(&mut self, shadow: PublicRuntimeShadowState) {

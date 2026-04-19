@@ -212,13 +212,13 @@ pub(crate) fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<F
         manifest_objects,
         call_outcome,
     } = input;
-    let RuntimeCallOutcome {
+    let (
         runtime_kernel_witness,
         runtime_kernel_refinement_witness,
         aborted,
         return_value,
         opcode_trace,
-    } = call_outcome;
+    ) = call_outcome.into_theorem_trace_parts();
     let CallTraceContext {
         runtime_state_before,
         public_call,

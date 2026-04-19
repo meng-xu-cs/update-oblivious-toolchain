@@ -8317,6 +8317,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness")
+        && theorem_source.contains("call_outcome.into_theorem_trace_parts()")
+        && !theorem_source.contains("let RuntimeCallOutcome {")
         && theorem_source
             .contains("let output_shape = output_shape_of(manifest_entry, &return_value)?;");
     let controller_public_call_summary_uses_manifest_only = controller_source
@@ -8484,6 +8486,41 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .map(str::trim)
         .ok_or_else(|| anyhow!("failed to locate RuntimeCallOutcome declaration"))?;
     let runtime_call_outcome_nonclone = !runtime_call_outcome_derive_line.contains("Clone");
+    let runtime_call_outcome_fields_private = runtime_module_source
+        .contains("runtime_kernel_witness: RuntimeKernelWitness")
+        && runtime_module_source
+            .contains("runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness")
+        && runtime_module_source.contains("aborted: bool")
+        && runtime_module_source.contains("return_value: Option<Value>")
+        && runtime_module_source.contains("opcode_trace: Vec<String>")
+        && !runtime_module_source.contains("pub runtime_kernel_witness:")
+        && !runtime_module_source.contains("pub runtime_kernel_refinement_witness:")
+        && !runtime_module_source.contains("pub aborted:")
+        && !runtime_module_source.contains("pub return_value:")
+        && !runtime_module_source.contains("pub opcode_trace:");
+    let runtime_call_outcome_api_is_explicit = runtime_module_source
+        .contains("pub(crate) fn from_runtime_execution(")
+        && runtime_module_source.contains("pub(crate) fn into_theorem_trace_parts(")
+        && !runtime_module_source.contains("pub fn from_runtime_execution(");
+    let runtime_call_outcome_constructor_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "from_runtime_execution(")?;
+    let expected_runtime_call_outcome_constructor_surface_files = vec![
+        String::from("runtime/uo-evm/src/runtime.rs"),
+        String::from("runtime/uo-evm/src/shell.rs"),
+        String::from("runtime/uo-evm/src/state.rs"),
+    ];
+    let runtime_call_outcome_constructor_surface_restricted =
+        runtime_call_outcome_constructor_surface_files
+            == expected_runtime_call_outcome_constructor_surface_files;
+    let runtime_call_outcome_theorem_consumer_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "into_theorem_trace_parts(")?;
+    let expected_runtime_call_outcome_theorem_consumer_surface_files = vec![
+        String::from("runtime/uo-evm/src/runtime.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let runtime_call_outcome_theorem_consumer_surface_restricted =
+        runtime_call_outcome_theorem_consumer_surface_files
+            == expected_runtime_call_outcome_theorem_consumer_surface_files;
     let confidential_exec_state_decl = "struct ConfidentialExecState";
     let confidential_exec_state_derive_line = kernel_source
         .split(confidential_exec_state_decl)
@@ -9247,10 +9284,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "RuntimeCallOutcome",
             "owner": "runtime/uo-evm/src/runtime.rs",
-            "boundary": "runtime-only per-call outcome bundle; state.rs and shell.rs construct it, theorem.rs consumes it whole, and engine.rs does not unpack it directly",
+            "boundary": "runtime-only per-call outcome bundle; construction is pinned to runtime.rs, state.rs, and shell.rs through an explicit constructor, theorem.rs consumes it through an explicit theorem handoff, and engine.rs does not unpack it directly",
             "checked": runtime_call_outcome_runtime_private
                 && runtime_call_outcome_nonclone
+                && runtime_call_outcome_fields_private
+                && runtime_call_outcome_api_is_explicit
                 && runtime_call_outcome_surface_restricted
+                && runtime_call_outcome_constructor_surface_restricted
+                && runtime_call_outcome_theorem_consumer_surface_restricted
                 && state_confidential_outcome_layering_is_explicit
                 && theorem_finalizes_execution_trace
                 && engine_public_trace_uses_output_shape_only,
@@ -9440,6 +9481,22 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             runtime_call_outcome_runtime_private,
         "runtime_call_outcome_derive_line": runtime_call_outcome_derive_line,
         "runtime_call_outcome_nonclone": runtime_call_outcome_nonclone,
+        "runtime_call_outcome_fields_private":
+            runtime_call_outcome_fields_private,
+        "runtime_call_outcome_api_is_explicit":
+            runtime_call_outcome_api_is_explicit,
+        "runtime_call_outcome_constructor_surface_files":
+            runtime_call_outcome_constructor_surface_files,
+        "expected_runtime_call_outcome_constructor_surface_files":
+            expected_runtime_call_outcome_constructor_surface_files,
+        "runtime_call_outcome_constructor_surface_restricted":
+            runtime_call_outcome_constructor_surface_restricted,
+        "runtime_call_outcome_theorem_consumer_surface_files":
+            runtime_call_outcome_theorem_consumer_surface_files,
+        "expected_runtime_call_outcome_theorem_consumer_surface_files":
+            expected_runtime_call_outcome_theorem_consumer_surface_files,
+        "runtime_call_outcome_theorem_consumer_surface_restricted":
+            runtime_call_outcome_theorem_consumer_surface_restricted,
         "confidential_exec_state_surface_files": confidential_exec_state_surface_files,
         "expected_confidential_exec_state_surface_files":
             expected_confidential_exec_state_surface_files,
