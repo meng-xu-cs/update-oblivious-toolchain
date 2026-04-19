@@ -11,6 +11,7 @@ the refinement proof is still being completed.
 
 | Structure | Location | Intended owner | Why it is confidential | Current boundary |
 | --- | --- | --- | --- | --- |
+| `ConfidentialCallInputs` | `runtime/uo-evm/src/state.rs` | shell projects public summary, then `crate::runtime` consumes the raw payload | confidential entrypoint arguments may contain secrets before the kernel slot file is initialized | `engine.rs` can read only the projected `PublicCallSummary`; raw args unwrap is restricted to `crate::runtime` |
 | `PathOramFreshCoinPlan` | `runtime/uo-evm/src/fresh_coins.rs` | `crate::runtime` plus a diagnostics-gated opaque public API handle | injected fresh-leaf choices determine hidden ORAM randomness | `engine.rs` passes the handle through but does not touch the internal per-object coin map, and the public injection API is absent from the default surface |
 | `ConfidentialExecState` | `runtime/uo-evm/src/kernel.rs` | `RuntimeKernel` | live confidential slot values, abort/return flags, and confidential return value | private to `kernel.rs`; wiped on drop |
 | `RuntimeShadowState` | `runtime/uo-evm/src/state.rs` | `crate::runtime` | live reopened confidential object state for one call | hidden behind `CommittedRuntimeState` / `PublicRuntimeShadowState` wrappers |

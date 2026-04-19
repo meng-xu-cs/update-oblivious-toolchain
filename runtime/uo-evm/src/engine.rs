@@ -1,7 +1,7 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
-use crate::runtime::state::{CommittedRuntimeState, PublicRuntimeShadowState};
+use crate::runtime::state::{CommittedRuntimeState, ConfidentialCallInputs, PublicRuntimeShadowState};
 use crate::theorem::{build_theorem_trace, finalize_execution_trace, FinalizeExecutionTraceInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
@@ -131,7 +131,13 @@ impl ContractInstance {
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
-        let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
+        let (public_call, confidential_call_inputs, public_args) = if function.confidential {
+            let call_inputs = ConfidentialCallInputs::from_manifest_entry(&manifest_entry, args)?;
+            (call_inputs.public_call().clone(), Some(call_inputs), None)
+        } else {
+            let public_call = PublicCallSummary::from_manifest_entry(&manifest_entry, &args)?;
+            (public_call, None, Some(args))
+        };
         let mut allocator = AllocatorPlan::from_manifest(&manifest_entry);
         let manifest_expected_kernel_steps = if function.confidential {
             Some(
@@ -206,11 +212,13 @@ impl ContractInstance {
                     let (slot_program, _) = confidential_slot_program
                         .as_ref()
                         .expect("confidential entrypoint must carry slot program");
+                    let confidential_call_inputs = confidential_call_inputs
+                        .expect("confidential entrypoint must carry confidential call inputs");
                     let outcome = self.state.run_confidential_call(
                         kernel,
                         slot_program,
                         &shadow_load_object_ids,
-                        args,
+                        confidential_call_inputs,
                         fresh_coins,
                         &mut recorder,
                         &mut opcode_trace,
@@ -226,8 +234,11 @@ impl ContractInstance {
                     let mut shadow = self
                         .state
                         .prepare_public_shadow(&mut kernel, &shadow_load_object_ids)?;
+                    let public_args =
+                        public_args.expect("public entrypoint must keep raw argument vector");
                     let mut state = ExecState::default();
-                    for ((param_name, _), arg) in function.params.iter().zip(args.into_iter()) {
+                    for ((param_name, _), arg) in function.params.iter().zip(public_args.into_iter())
+                    {
                         store_env_value(&mut state, &mut kernel, param_name, arg)?;
                     }
                     exec_block(

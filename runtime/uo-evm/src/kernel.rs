@@ -1,6 +1,8 @@
 use crate::controller::CallRecorder;
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
-use crate::runtime::state::{CommittedRuntimeState, PublicRuntimeShadowState, RuntimeShadowState};
+use crate::runtime::state::{
+    CommittedRuntimeState, ConfidentialCallInputs, PublicRuntimeShadowState, RuntimeShadowState,
+};
 use anyhow::{anyhow, Result};
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
@@ -524,15 +526,20 @@ impl RuntimeKernel {
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
         shadow_load_object_ids: &[u32],
-        args: Vec<Value>,
+        call_inputs: ConfidentialCallInputs,
         fresh_coins: Option<&PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialKernelRunOutcome> {
         let mut shadow = self.shadow_load_objects(committed, shadow_load_object_ids)?;
         self.install_path_oram_fresh_coins(&mut shadow, fresh_coins)?;
-        let outcome =
-            self.execute_confidential_call(program, &mut shadow, args, recorder, opcode_trace)?;
+        let outcome = self.execute_confidential_call(
+            program,
+            &mut shadow,
+            call_inputs,
+            recorder,
+            opcode_trace,
+        )?;
         if fresh_coins.is_some() {
             self.ensure_path_oram_fresh_coins_consumed(&shadow)?;
         }
@@ -552,12 +559,12 @@ impl RuntimeKernel {
         &mut self,
         program: &ConfidentialKernelSlotProgram,
         objects: &mut RuntimeShadowState,
-        args: Vec<Value>,
+        call_inputs: ConfidentialCallInputs,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialExecutionOutcome> {
         let mut state = ConfidentialExecState::new(program.slot_count);
-        for (slot, arg) in args.into_iter().enumerate() {
+        for (slot, arg) in call_inputs.into_raw_args().into_iter().enumerate() {
             self.store_confidential_slot_value(&mut state, slot, arg)?;
         }
         self.exec_confidential_block(&program.body, objects, &mut state, opcode_trace, recorder)?;

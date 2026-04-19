@@ -1,4 +1,4 @@
-use crate::controller::CallRecorder;
+use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
@@ -7,10 +7,38 @@ use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
 use uo_core::{
     ir::StateObject,
+    manifest::EntrypointManifest,
     ConfidentialKernelSlotProgram,
     RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
     RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
 };
+
+#[derive(Debug)]
+pub(crate) struct ConfidentialCallInputs {
+    public_call: PublicCallSummary,
+    raw_args: Vec<Value>,
+}
+
+impl ConfidentialCallInputs {
+    pub(crate) fn from_manifest_entry(
+        manifest_entry: &EntrypointManifest,
+        args: Vec<Value>,
+    ) -> Result<Self> {
+        let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, &args)?;
+        Ok(Self {
+            public_call,
+            raw_args: args,
+        })
+    }
+
+    pub(crate) fn public_call(&self) -> &PublicCallSummary {
+        &self.public_call
+    }
+
+    pub(in crate::runtime) fn into_raw_args(self) -> Vec<Value> {
+        self.raw_args
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct CommittedRuntimeState {
@@ -127,7 +155,7 @@ impl CommittedRuntimeState {
         kernel: PublicRuntimeKernel,
         program: &ConfidentialKernelSlotProgram,
         shadow_load_object_ids: &[u32],
-        args: Vec<Value>,
+        call_inputs: ConfidentialCallInputs,
         fresh_coins: Option<&PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
@@ -136,7 +164,7 @@ impl CommittedRuntimeState {
             program,
             self,
             shadow_load_object_ids,
-            args,
+            call_inputs,
             fresh_coins,
             recorder,
             opcode_trace,
