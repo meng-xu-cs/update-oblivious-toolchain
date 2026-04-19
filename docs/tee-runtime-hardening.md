@@ -434,8 +434,11 @@ The current runtime has a first hardening layer:
 - the public-trace helper surface is pinned too:
   `PublicCallSummary::from_manifest_entry(...)` and
   `CallRecorder::begin_with_input_len(...)` stay confined to
-  `runtime/uo-evm/src/state.rs`, while `output_shape_of(...)` stays confined
-  to `runtime/uo-evm/src/controller.rs` and `runtime/uo-evm/src/theorem.rs`
+  `runtime/uo-evm/src/state.rs`, `PublicCallSummary` now crosses the
+  state/controller boundary only through the explicit
+  `entry_input_len()` / `into_public_args()` API rather than raw field reads,
+  while `output_shape_of(...)` stays confined to `runtime/uo-evm/src/controller.rs`
+  and `runtime/uo-evm/src/theorem.rs`
 - the shell-boundary bridge is now pinned in the same style:
   `RuntimeKernelWitness::shell_contract(...)`,
   `RuntimeKernelRefinementWitness::shell_trace(...)`, the exact

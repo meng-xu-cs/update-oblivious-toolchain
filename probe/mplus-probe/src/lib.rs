@@ -9576,6 +9576,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !controller_source
             .contains("entry_input_len: args.iter().map(Value::canonical_len).sum(),")
         && !controller_source.contains("CompiledFunction");
+    let public_call_summary_fields_private = controller_source
+        .contains("entry_input_len: usize")
+        && controller_source.contains("public_args: Vec<String>")
+        && !controller_source.contains("pub entry_input_len: usize")
+        && !controller_source.contains("pub public_args: Vec<String>");
+    let public_call_summary_api_is_explicit = controller_source
+        .contains("pub(crate) fn entry_input_len(&self)")
+        && controller_source.contains("pub(crate) fn into_public_args(self)")
+        && state_source.contains("public_call.entry_input_len()")
+        && controller_source.contains("let entry_input_len = public_call.entry_input_len();")
+        && controller_source.contains("public_args: public_call.into_public_args(),");
     let controller_public_trace_uses_output_shape_only = controller_source
         .contains("public_call: PublicCallSummary,\n        output_shape: OutputShape,")
         && !controller_source
@@ -10971,6 +10982,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             public_trace_helper_surface_restricted,
         "controller_public_call_summary_uses_manifest_only":
             controller_public_call_summary_uses_manifest_only,
+        "public_call_summary_fields_private":
+            public_call_summary_fields_private,
+        "public_call_summary_api_is_explicit":
+            public_call_summary_api_is_explicit,
         "controller_public_trace_uses_output_shape_only":
             controller_public_trace_uses_output_shape_only,
         "controller_output_shape_uses_manifest_return_len":
@@ -11307,6 +11322,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && controller_theorem_trace_constructor_surface_restricted
             && public_trace_helper_surface_restricted
             && controller_public_call_summary_uses_manifest_only
+            && public_call_summary_fields_private
+            && public_call_summary_api_is_explicit
             && controller_public_trace_uses_output_shape_only
             && controller_output_shape_uses_manifest_return_len
             && theorem_public_trace_path_avoids_compiled_function

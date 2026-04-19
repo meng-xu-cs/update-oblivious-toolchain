@@ -88,8 +88,8 @@ pub(crate) struct CallRecorder {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PublicCallSummary {
-    pub entry_input_len: usize,
-    pub public_args: Vec<String>,
+    entry_input_len: usize,
+    public_args: Vec<String>,
 }
 
 impl PublicCallSummary {
@@ -115,6 +115,14 @@ impl PublicCallSummary {
                 .map(|(_, (name, value))| format!("{name}={value}"))
                 .collect(),
         })
+    }
+
+    pub(crate) fn entry_input_len(&self) -> usize {
+        self.entry_input_len
+    }
+
+    pub(crate) fn into_public_args(self) -> Vec<String> {
+        self.public_args
     }
 }
 
@@ -304,15 +312,16 @@ impl CallRecorder {
             output_len: output_shape.return_length,
         });
         let controller_shape = self.controller_shape();
+        let entry_input_len = public_call.entry_input_len();
         let public_outcome = PublicOutcomeTrace {
             entrypoint_id: self.entrypoint.clone(),
-            public_args: public_call.public_args,
+            public_args: public_call.into_public_args(),
             termination_status: !aborted,
             output_shape,
             gas_used,
         };
         let controller_certificate =
-            controller_certificate(public_call.entry_input_len, &self.observed_oram_schedule);
+            controller_certificate(entry_input_len, &self.observed_oram_schedule);
         let theorem_trace = TheoremTrace {
             public_outcome: Some(public_outcome.clone()),
             boundary_schedule: self.boundary_schedule,

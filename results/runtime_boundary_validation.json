@@ -888,6 +888,8 @@
   "probe_enables_runtime_diagnostics_feature": true,
   "probe_path": "probe/mplus-probe/src/lib.rs",
   "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
+  "public_call_summary_api_is_explicit": true,
+  "public_call_summary_fields_private": true,
   "public_trace_helper_surface_checks": [
     {
       "expected_files": [
