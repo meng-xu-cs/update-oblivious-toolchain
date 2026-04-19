@@ -10350,7 +10350,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/objects.rs")],
         ),
         (
-            "self.entries.clear();\n        self.entries.resize(\n            self.physical_slots.len(),\n            MapEntry {",
+            "self.entries.clear();\n        self.entries.resize(\n            self.physical_slots.len(),\n            MapEntry::new(",
             vec![String::from("runtime/uo-evm/src/objects.rs")],
         ),
         (
@@ -10648,6 +10648,27 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && oram_source.contains(
             "PhysicalWriteEvent::from_shape(object, self.location, self.len, self.class)",
         );
+    let map_entry_fields_private = oram_source.contains(
+        "pub(crate) struct MapEntry {\n    occupied: bool,\n    key: Value,\n    value: Value,\n}",
+    );
+    let map_entry_api_is_explicit = oram_source.contains("pub(crate) fn new(")
+        && oram_source.contains("pub(crate) fn is_occupied(&self) -> bool {")
+        && oram_source.contains("pub(crate) fn key(&self) -> &Value {")
+        && oram_source.contains("pub(crate) fn value(&self) -> &Value {")
+        && oram_source.contains("pub(crate) fn matches_key(&self, key: &Value) -> bool {")
+        && oram_source.contains("pub(crate) fn set_value(&mut self, value: Value) {")
+        && oram_source.contains("pub(crate) fn set_vacant(&mut self, zero_value: Value) {")
+        && oram_source.contains("pub(crate) fn occupy(&mut self, key: Value, value: Value) {")
+        && objects_source.contains("entry.matches_key(key)")
+        && objects_source.contains("!entry.is_occupied()")
+        && objects_source.contains("entry.value().clone()")
+        && objects_source.contains("entry.set_vacant(")
+        && objects_source.contains("entry.set_value(")
+        && objects_source.contains("entry.occupy(")
+        && oram_source.contains("entry.matches_key(key)")
+        && oram_source.contains("entry.value().clone()")
+        && oram_source.contains("entry.set_value(")
+        && oram_source.contains("entry.occupy(");
     let oram_storage_fields_private = oram_source.contains("directory_pages: Vec<Vec<u8>>,")
         && oram_source.contains("buckets: Vec<Vec<u8>>,")
         && oram_source.contains("access_counter_slot: Vec<u8>,")
@@ -11315,6 +11336,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "oram_write_fields_private": oram_write_fields_private,
         "oram_write_trace_projects_to_public_shape":
             oram_write_trace_projects_to_public_shape,
+        "map_entry_fields_private": map_entry_fields_private,
+        "map_entry_api_is_explicit": map_entry_api_is_explicit,
         "oram_storage_fields_private": oram_storage_fields_private,
         "oram_state_fields_private": oram_state_fields_private,
         "oram_state_api_is_explicit": oram_state_api_is_explicit,
@@ -11462,6 +11485,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && oram_write_trace_is_shape_only
             && oram_write_fields_private
             && oram_write_trace_projects_to_public_shape
+            && map_entry_fields_private
+            && map_entry_api_is_explicit
             && oram_storage_fields_private
             && oram_state_fields_private
             && oram_state_api_is_explicit

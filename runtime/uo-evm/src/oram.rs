@@ -21,12 +21,51 @@ const ORAM_LEAF_LABEL_BYTES: usize = 8;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct MapEntry {
-    pub occupied: bool,
-    pub key: Value,
-    pub value: Value,
+    occupied: bool,
+    key: Value,
+    value: Value,
 }
 
 impl MapEntry {
+    pub(crate) fn new(occupied: bool, key: Value, value: Value) -> Self {
+        Self {
+            occupied,
+            key,
+            value,
+        }
+    }
+
+    pub(crate) fn is_occupied(&self) -> bool {
+        self.occupied
+    }
+
+    pub(crate) fn key(&self) -> &Value {
+        &self.key
+    }
+
+    pub(crate) fn value(&self) -> &Value {
+        &self.value
+    }
+
+    pub(crate) fn matches_key(&self, key: &Value) -> bool {
+        self.occupied && self.key == *key
+    }
+
+    pub(crate) fn set_value(&mut self, value: Value) {
+        self.value = value;
+    }
+
+    pub(crate) fn set_vacant(&mut self, zero_value: Value) {
+        self.occupied = false;
+        self.value = zero_value;
+    }
+
+    pub(crate) fn occupy(&mut self, key: Value, value: Value) {
+        self.occupied = true;
+        self.key = key;
+        self.value = value;
+    }
+
     pub(crate) fn wipe_secrets(&mut self) {
         self.occupied = false;
         self.key.wipe_secrets();
@@ -784,8 +823,8 @@ impl OramState {
             let value = self
                 .entries
                 .iter()
-                .find(|entry| entry.occupied && entry.key == *key)
-                .map(|entry| entry.value.clone())
+                .find(|entry| entry.matches_key(key))
+                .map(|entry| entry.value().clone())
                 .unwrap_or_else(|| Value::zero_for_type(&spec.value_type));
             Ok((value, self.surrogate_access_transcript(spec)))
         } else {
@@ -810,22 +849,20 @@ impl OramState {
                 if let Some(entry) = self
                     .entries
                     .iter_mut()
-                    .find(|entry| entry.occupied && entry.key == key)
+                    .find(|entry| entry.matches_key(&key))
                 {
                     if value_is_zero {
                         *entry = empty_map_entry(spec)?;
                     } else {
-                        entry.value = value;
+                        entry.set_value(value);
                     }
                 } else if !value_is_zero {
                     let entry = self
                         .entries
                         .iter_mut()
-                        .find(|entry| !entry.occupied)
+                        .find(|entry| !entry.is_occupied())
                         .ok_or_else(|| anyhow!("map {} exceeded public capacity", spec.name))?;
-                    entry.occupied = true;
-                    entry.key = key;
-                    entry.value = value;
+                    entry.occupy(key, value);
                 }
             }
             Ok(transcript)
@@ -1046,9 +1083,7 @@ impl OramState {
     }
 
     fn find_slot(&self, key: &Value) -> Option<usize> {
-        self.entries
-            .iter()
-            .position(|entry| entry.occupied && entry.key == *key)
+        self.entries.iter().position(|entry| entry.matches_key(key))
     }
 
     fn path_access_transcript(&self, spec: &StateObject, leaf: usize) -> OramTranscript {
@@ -1134,11 +1169,8 @@ impl OramState {
                     &mut live_slots,
                     block,
                 )?;
-                self.entries[block.slot_index] = MapEntry {
-                    occupied: true,
-                    key: block.key.clone(),
-                    value: block.value.clone(),
-                };
+                self.entries[block.slot_index] =
+                    MapEntry::new(true, block.key.clone(), block.value.clone());
             }
         }
         for index in 0..self.parameters.bucket_count {
@@ -1169,17 +1201,14 @@ impl OramState {
                                 &block,
                             )?;
                             let mut block = block;
-                            self.entries[block.slot_index] = MapEntry {
-                                occupied: true,
-                                key: std::mem::replace(
-                                    &mut block.key,
-                                    Value::zero_for_type(key_type),
-                                ),
-                                value: std::mem::replace(
+                            self.entries[block.slot_index] = MapEntry::new(
+                                true,
+                                std::mem::replace(&mut block.key, Value::zero_for_type(key_type)),
+                                std::mem::replace(
                                     &mut block.value,
                                     Value::zero_for_type(&spec.value_type),
                                 ),
-                            };
+                            );
                             Ok(())
                         })
                     },
@@ -1220,8 +1249,8 @@ impl OramState {
         let return_value = self
             .entries
             .iter()
-            .find(|entry| entry.occupied && entry.key == *key)
-            .map(|entry| entry.value.clone())
+            .find(|entry| entry.matches_key(key))
+            .map(|entry| entry.value().clone())
             .unwrap_or_else(|| Value::zero_for_type(&spec.value_type));
         let (writes, zero_writes) = self.rewrite_path_for_access(
             spec,
@@ -1356,7 +1385,7 @@ impl OramState {
                             block.value = value.clone();
                             let new_leaf = next_leaf.expect("write update precomputes next leaf");
                             block.leaf = new_leaf;
-                            entries[slot_index].value = value.clone();
+                            entries[slot_index].set_value(value.clone());
                             position_map[slot_index] = Some(new_leaf);
                         }
                     }
@@ -1366,11 +1395,7 @@ impl OramState {
                             if slot_index >= entries.len() {
                                 bail!("map {} exceeded public capacity", spec.name);
                             }
-                            entries[slot_index] = MapEntry {
-                                occupied: true,
-                                key: key.clone(),
-                                value: value.clone(),
-                            };
+                            entries[slot_index] = MapEntry::new(true, key.clone(), value.clone());
                             position_map[slot_index] = Some(new_leaf);
                             stash.push(OramBlock {
                                 occupied: true,
@@ -2084,13 +2109,11 @@ fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {
 }
 
 fn slot_for_key(entries: &[MapEntry], key: &Value) -> Option<usize> {
-    entries
-        .iter()
-        .position(|entry| entry.occupied && entry.key == *key)
+    entries.iter().position(|entry| entry.matches_key(key))
 }
 
 fn allocate_slot(entries: &[MapEntry]) -> Option<usize> {
-    entries.iter().position(|entry| !entry.occupied)
+    entries.iter().position(|entry| !entry.is_occupied())
 }
 
 fn find_stash_block_mut(stash: &mut [OramBlock], slot: usize) -> Result<&mut OramBlock> {
@@ -2167,11 +2190,11 @@ impl OramBlock {
 
     fn from_entry(entry: &MapEntry) -> Self {
         Self {
-            occupied: entry.occupied,
+            occupied: entry.is_occupied(),
             slot_index: 0,
             leaf: 0,
-            key: entry.key.clone(),
-            value: entry.value.clone(),
+            key: entry.key().clone(),
+            value: entry.value().clone(),
         }
     }
 
@@ -2295,10 +2318,10 @@ impl OramBucket {
         Ok(Self {
             access_counter,
             bucket_index,
-            live_entry_count: entries.iter().filter(|entry| entry.occupied).count(),
+            live_entry_count: entries.iter().filter(|entry| entry.is_occupied()).count(),
             blocks: entries
                 .iter()
-                .filter(|entry| entry.occupied)
+                .filter(|entry| entry.is_occupied())
                 .take(parameters.blocks_per_bucket)
                 .map(OramBlock::from_entry)
                 .collect(),
@@ -2382,7 +2405,8 @@ impl OramBucket {
 }
 
 pub(crate) fn map_record_bytes(entry: &MapEntry) -> Vec<u8> {
-    let mut out = Vec::with_capacity(1 + entry.key.canonical_len() + entry.value.canonical_len());
+    let mut out =
+        Vec::with_capacity(1 + entry.key().canonical_len() + entry.value().canonical_len());
     append_map_record_bytes(&mut out, entry);
     out
 }
@@ -2413,33 +2437,29 @@ pub(crate) fn decode_map_record(spec: &StateObject, bytes: &[u8]) -> Result<MapE
         &spec.value_type,
         &bytes[1 + key_len..1 + key_len + value_len],
     )?;
-    Ok(MapEntry {
-        occupied,
-        key,
-        value,
-    })
+    Ok(MapEntry::new(occupied, key, value))
 }
 
 fn append_map_record_bytes(out: &mut Vec<u8>, entry: &MapEntry) {
-    out.push(if entry.occupied { 0x7d } else { 0x53 });
+    out.push(if entry.is_occupied() { 0x7d } else { 0x53 });
     entry
-        .key
+        .key()
         .visit_canonical_chunks(&mut |chunk| out.extend_from_slice(chunk));
     entry
-        .value
+        .value()
         .visit_canonical_chunks(&mut |chunk| out.extend_from_slice(chunk));
 }
 
 pub(crate) fn empty_map_entry(spec: &StateObject) -> Result<MapEntry> {
-    Ok(MapEntry {
-        occupied: false,
-        key: Value::zero_for_type(
+    Ok(MapEntry::new(
+        false,
+        Value::zero_for_type(
             spec.key_type
                 .as_ref()
                 .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?,
         ),
-        value: Value::zero_for_type(&spec.value_type),
-    })
+        Value::zero_for_type(&spec.value_type),
+    ))
 }
 
 fn oram_directory_page_count(capacity: usize) -> usize {
@@ -2449,7 +2469,7 @@ fn oram_directory_page_count(capacity: usize) -> usize {
 fn encode_oram_directory_page(entries: &[MapEntry], empty_entry: &MapEntry) -> Vec<u8> {
     let mut out = Vec::with_capacity(
         ORAM_DIRECTORY_PAGE_ENTRIES
-            * (1 + empty_entry.key.canonical_len() + empty_entry.value.canonical_len()),
+            * (1 + empty_entry.key().canonical_len() + empty_entry.value().canonical_len()),
     );
     for index in 0..ORAM_DIRECTORY_PAGE_ENTRIES {
         let entry = entries.get(index).unwrap_or(empty_entry);

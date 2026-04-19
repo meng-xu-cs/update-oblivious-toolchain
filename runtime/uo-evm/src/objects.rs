@@ -274,11 +274,7 @@ impl SmallMapObject {
         self.entries.clear();
         self.entries.resize(
             self.physical_slots.len(),
-            MapEntry {
-                occupied: false,
-                key: zero_key.clone(),
-                value: zero_value.clone(),
-            },
+            MapEntry::new(false, zero_key.clone(), zero_value.clone()),
         );
         self.accessed = false;
         self.dirty = false;
@@ -454,17 +450,9 @@ impl RuntimeObject {
                 );
                 let zero_value = Value::zero_for_type(&spec.value_type);
                 let entries = (0..capacity)
-                    .map(|_| MapEntry {
-                        occupied: false,
-                        key: zero_key.clone(),
-                        value: zero_value.clone(),
-                    })
+                    .map(|_| MapEntry::new(false, zero_key.clone(), zero_value.clone()))
                     .collect::<Vec<_>>();
-                let zero_record = map_record_bytes(&MapEntry {
-                    occupied: false,
-                    key: zero_key,
-                    value: zero_value,
-                });
+                let zero_record = map_record_bytes(&MapEntry::new(false, zero_key, zero_value));
                 let cipher = StoreCipher::from_rng(&mut rng);
                 let physical_slots = (0..capacity)
                     .map(|index| {
@@ -570,7 +558,7 @@ impl RuntimeObject {
                     && object.written_indices.is_empty()
             }
             Self::UoSmallMap(object) => {
-                object.entries.iter().all(|entry| !entry.occupied)
+                object.entries.iter().all(|entry| !entry.is_occupied())
                     && !object.accessed
                     && !object.dirty
             }
@@ -789,8 +777,8 @@ impl RuntimeObject {
                 Ok(object
                     .entries
                     .iter()
-                    .find(|entry| entry.occupied && entry.key == *key)
-                    .map(|entry| entry.value.clone())
+                    .find(|entry| entry.matches_key(key))
+                    .map(|entry| entry.value().clone())
                     .unwrap_or_else(|| Value::zero_for_type(&object.spec.value_type)))
             }
             Self::UoOramMap(object) => {
@@ -872,25 +860,22 @@ impl RuntimeObject {
                     if let Some(entry) = object
                         .entries
                         .iter_mut()
-                        .find(|entry| entry.occupied && entry.key == key)
+                        .find(|entry| entry.matches_key(&key))
                     {
                         if value_is_zero {
-                            entry.occupied = false;
-                            entry.value = Value::zero_for_type(&object.spec.value_type);
+                            entry.set_vacant(Value::zero_for_type(&object.spec.value_type));
                         } else {
-                            entry.value = value;
+                            entry.set_value(value);
                         }
                     } else if !value_is_zero {
                         let entry = object
                             .entries
                             .iter_mut()
-                            .find(|entry| !entry.occupied)
+                            .find(|entry| !entry.is_occupied())
                             .ok_or_else(|| {
                                 anyhow!("map {} exceeded public capacity", object.spec.name)
                             })?;
-                        entry.occupied = true;
-                        entry.key = key;
-                        entry.value = value;
+                        entry.occupy(key, value);
                     }
                     object.dirty = true;
                 }
@@ -1504,28 +1489,28 @@ mod tests {
 
         match &mut object {
             RuntimeObject::UoSmallMap(map) => {
-                map.entries[0] = MapEntry {
-                    occupied: true,
-                    key: Value::Struct(vec![
+                map.entries[0] = MapEntry::new(
+                    true,
+                    Value::Struct(vec![
                         ("owner".into(), Value::Address([0x44; 20])),
                         ("nonce".into(), Value::Uint(1)),
                     ]),
-                    value: nested_nonzero_value(),
-                };
-                map.entries[1] = MapEntry {
-                    occupied: true,
-                    key: Value::Struct(vec![
+                    nested_nonzero_value(),
+                );
+                map.entries[1] = MapEntry::new(
+                    true,
+                    Value::Struct(vec![
                         ("owner".into(), Value::Address([0x55; 20])),
                         ("nonce".into(), Value::Uint(2)),
                     ]),
-                    value: Value::Struct(vec![
+                    Value::Struct(vec![
                         ("flag".into(), Value::Bool(true)),
                         (
                             "items".into(),
                             Value::Array(vec![Value::Uint(11), Value::Uint(13)]),
                         ),
                     ]),
-                };
+                );
                 map.accessed = true;
                 map.dirty = true;
             }
@@ -1541,16 +1526,8 @@ mod tests {
                 assert_eq!(
                     map.entries,
                     vec![
-                        MapEntry {
-                            occupied: false,
-                            key: zero_key.clone(),
-                            value: zero_value.clone(),
-                        },
-                        MapEntry {
-                            occupied: false,
-                            key: zero_key,
-                            value: zero_value,
-                        },
+                        MapEntry::new(false, zero_key.clone(), zero_value.clone()),
+                        MapEntry::new(false, zero_key, zero_value),
                     ]
                 );
                 assert_eq!(map.physical_slots, original_slots);
@@ -1780,14 +1757,14 @@ mod tests {
         let mut old = RuntimeObject::instantiate_with_seed(&spec, 0x5C01).unwrap();
         match &mut old {
             RuntimeObject::UoSmallMap(map) => {
-                map.entries[0] = MapEntry {
-                    occupied: true,
-                    key: Value::Struct(vec![
+                map.entries[0] = MapEntry::new(
+                    true,
+                    Value::Struct(vec![
                         ("owner".into(), Value::Address([0x77; 20])),
                         ("nonce".into(), Value::Uint(4)),
                     ]),
-                    value: nested_nonzero_value(),
-                };
+                    nested_nonzero_value(),
+                );
             }
             _ => unreachable!(),
         }
@@ -1797,20 +1774,20 @@ mod tests {
         shadow_allocator.finish().unwrap();
         match &mut new {
             RuntimeObject::UoSmallMap(map) => {
-                map.entries[0] = MapEntry {
-                    occupied: true,
-                    key: Value::Struct(vec![
+                map.entries[0] = MapEntry::new(
+                    true,
+                    Value::Struct(vec![
                         ("owner".into(), Value::Address([0x88; 20])),
                         ("nonce".into(), Value::Uint(5)),
                     ]),
-                    value: Value::Struct(vec![
+                    Value::Struct(vec![
                         ("flag".into(), Value::Bool(true)),
                         (
                             "items".into(),
                             Value::Array(vec![Value::Uint(15), Value::Uint(16)]),
                         ),
                     ]),
-                };
+                );
                 map.accessed = true;
                 map.dirty = true;
             }
@@ -1833,16 +1810,8 @@ mod tests {
                 assert_eq!(
                     map.entries,
                     vec![
-                        MapEntry {
-                            occupied: false,
-                            key: zero_key.clone(),
-                            value: zero_value.clone(),
-                        },
-                        MapEntry {
-                            occupied: false,
-                            key: zero_key,
-                            value: zero_value,
-                        },
+                        MapEntry::new(false, zero_key.clone(), zero_value.clone()),
+                        MapEntry::new(false, zero_key, zero_value),
                     ]
                 );
                 assert_eq!(map.entries.as_ptr(), entries_ptr);
@@ -1866,14 +1835,14 @@ mod tests {
             RuntimeObject::UoSmallMap(map) => map.physical_slots[0].as_ptr(),
             _ => unreachable!(),
         };
-        let committed_entry = MapEntry {
-            occupied: true,
-            key: Value::Struct(vec![
+        let committed_entry = MapEntry::new(
+            true,
+            Value::Struct(vec![
                 ("owner".into(), Value::Address([0x99; 20])),
                 ("nonce".into(), Value::Uint(6)),
             ]),
-            value: nested_nonzero_value(),
-        };
+            nested_nonzero_value(),
+        );
         match &mut new {
             RuntimeObject::UoSmallMap(map) => {
                 map.entries[0] = committed_entry.clone();
@@ -1924,11 +1893,7 @@ mod tests {
             RuntimeObject::UoOramMap(map) => {
                 map.oram.install_slot_for_test(
                     0,
-                    MapEntry {
-                        occupied: true,
-                        key: Value::Address([0x66; 20]),
-                        value: Value::Uint(19),
-                    },
+                    MapEntry::new(true, Value::Address([0x66; 20]), Value::Uint(19)),
                     Some(0),
                 );
             }
@@ -2037,11 +2002,7 @@ mod tests {
             RuntimeObject::UoOramMap(map) => {
                 map.oram.install_slot_for_test(
                     0,
-                    MapEntry {
-                        occupied: true,
-                        key: Value::Address([0x77; 20]),
-                        value: Value::Uint(23),
-                    },
+                    MapEntry::new(true, Value::Address([0x77; 20]), Value::Uint(23)),
                     Some(0),
                 );
                 map.oram.corrupt_storage_for_test();

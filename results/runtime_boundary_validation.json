@@ -423,7 +423,7 @@
       "files": [
         "runtime/uo-evm/src/objects.rs"
       ],
-      "pattern": "self.entries.clear();\n        self.entries.resize(\n            self.physical_slots.len(),\n            MapEntry {",
+      "pattern": "self.entries.clear();\n        self.entries.resize(\n            self.physical_slots.len(),\n            MapEntry::new(",
       "restricted": true
     },
     {
@@ -626,6 +626,8 @@
   "kernel_scratch_accounting_uses_object_type_lengths": true,
   "kernel_witness_validation_tracks_confidential_kernel_lowering_errors": true,
   "kernel_witness_validation_uses_manifest_confidential_slot_program": true,
+  "map_entry_api_is_explicit": true,
+  "map_entry_fields_private": true,
   "object_commit_io_scratch_uses_type_lengths": true,
   "objects_path": "runtime/uo-evm/src/objects.rs",
   "oram_block_fields_private": true,
