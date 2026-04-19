@@ -628,6 +628,8 @@
   "kernel_witness_validation_uses_manifest_confidential_slot_program": true,
   "object_commit_io_scratch_uses_type_lengths": true,
   "objects_path": "runtime/uo-evm/src/objects.rs",
+  "oram_block_fields_private": true,
+  "oram_bucket_fields_private": true,
   "oram_buffer_reuse_checks": [
     {
       "expected_files": [
@@ -818,6 +820,7 @@
   "oram_path": "runtime/uo-evm/src/oram.rs",
   "oram_state_derive_line": "#[derive(Debug)]",
   "oram_state_nonderive_clone": true,
+  "oram_storage_fields_private": true,
   "oram_transcript_api_is_explicit": true,
   "oram_transcript_fields_private": true,
   "oram_working_stash_avoids_midcall_reserve": true,

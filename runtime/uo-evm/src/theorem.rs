@@ -9,8 +9,7 @@ use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, OutputShape, RuntimeControllerObserverCertificate,
     RuntimeExecutionTraceParts, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
-    RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle,
-    Value,
+    RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, Value,
 };
 
 struct CallTraceContext {

@@ -19,9 +19,8 @@ mod tests {
     #[cfg(feature = "diagnostics")]
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
-        ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode,
-        RefinementWitnessError, RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value,
-        WriteClass,
+        ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, RefinementWitnessError,
+        RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
 

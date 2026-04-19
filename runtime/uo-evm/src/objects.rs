@@ -2011,14 +2011,17 @@ mod tests {
             expected_buckets,
             expected_counter_slot,
         ) = match &old {
-            RuntimeObject::UoOramMap(map) => (
-                map.oram.entries.clone(),
-                map.oram.position_map.clone(),
-                map.oram.stash.clone(),
-                map.oram.storage.directory_pages.clone(),
-                map.oram.storage.buckets.clone(),
-                map.oram.storage.access_counter_slot.clone(),
-            ),
+            RuntimeObject::UoOramMap(map) => {
+                let (directory_pages, buckets, counter_slot) = map.oram.storage_snapshot_for_test();
+                (
+                    map.oram.entries.clone(),
+                    map.oram.position_map.clone(),
+                    map.oram.stash.clone(),
+                    directory_pages,
+                    buckets,
+                    counter_slot,
+                )
+            }
             _ => unreachable!(),
         };
 
@@ -2033,14 +2036,18 @@ mod tests {
             buckets_ptr,
             counter_ptr,
         ) = match &new {
-            RuntimeObject::UoOramMap(map) => (
-                map.oram.entries.as_ptr(),
-                map.oram.position_map.as_ptr(),
-                map.oram.stash.as_ptr(),
-                map.oram.storage.directory_pages.as_ptr(),
-                map.oram.storage.buckets.as_ptr(),
-                map.oram.storage.access_counter_slot.as_ptr(),
-            ),
+            RuntimeObject::UoOramMap(map) => {
+                let (directory_pages_ptr, buckets_ptr, counter_ptr) =
+                    map.oram.storage_ptrs_for_test();
+                (
+                    map.oram.entries.as_ptr(),
+                    map.oram.position_map.as_ptr(),
+                    map.oram.stash.as_ptr(),
+                    directory_pages_ptr,
+                    buckets_ptr,
+                    counter_ptr,
+                )
+            }
             _ => unreachable!(),
         };
 
@@ -2052,13 +2059,7 @@ mod tests {
                     value: Value::Uint(23),
                 };
                 map.oram.position_map[0] = Some(0);
-                if let Some(page) = map.oram.storage.directory_pages.first_mut() {
-                    page[0] ^= 0x01;
-                }
-                if let Some(bucket) = map.oram.storage.buckets.first_mut() {
-                    bucket[0] ^= 0x01;
-                }
-                map.oram.storage.access_counter_slot[0] ^= 0x01;
+                map.oram.corrupt_storage_for_test();
                 map.accessed = true;
                 map.dirty = true;
             }
@@ -2077,18 +2078,18 @@ mod tests {
                 assert_eq!(map.oram.entries, expected_entries);
                 assert_eq!(map.oram.position_map, expected_position_map);
                 assert_eq!(map.oram.stash, expected_stash);
-                assert_eq!(map.oram.storage.directory_pages, expected_directory_pages);
-                assert_eq!(map.oram.storage.buckets, expected_buckets);
-                assert_eq!(map.oram.storage.access_counter_slot, expected_counter_slot);
+                let (directory_pages, buckets, counter_slot) = map.oram.storage_snapshot_for_test();
+                assert_eq!(directory_pages, expected_directory_pages);
+                assert_eq!(buckets, expected_buckets);
+                assert_eq!(counter_slot, expected_counter_slot);
                 assert_eq!(map.oram.entries.as_ptr(), entries_ptr);
                 assert_eq!(map.oram.position_map.as_ptr(), position_map_ptr);
                 assert_eq!(map.oram.stash.as_ptr(), stash_ptr);
-                assert_eq!(
-                    map.oram.storage.directory_pages.as_ptr(),
-                    directory_pages_ptr
-                );
-                assert_eq!(map.oram.storage.buckets.as_ptr(), buckets_ptr);
-                assert_eq!(map.oram.storage.access_counter_slot.as_ptr(), counter_ptr);
+                let (current_directory_pages_ptr, current_buckets_ptr, current_counter_ptr) =
+                    map.oram.storage_ptrs_for_test();
+                assert_eq!(current_directory_pages_ptr, directory_pages_ptr);
+                assert_eq!(current_buckets_ptr, buckets_ptr);
+                assert_eq!(current_counter_ptr, counter_ptr);
                 assert!(!map.accessed);
                 assert!(!map.dirty);
             }

@@ -130,9 +130,9 @@ fn working_stash_capacity(parameters: &OramParameters) -> Result<usize> {
 
 #[derive(Clone, Debug)]
 pub(crate) struct OramStorage {
-    pub directory_pages: Vec<Vec<u8>>,
-    pub buckets: Vec<Vec<u8>>,
-    pub access_counter_slot: Vec<u8>,
+    directory_pages: Vec<Vec<u8>>,
+    buckets: Vec<Vec<u8>>,
+    access_counter_slot: Vec<u8>,
 }
 
 #[derive(Clone, Debug)]
@@ -625,6 +625,35 @@ impl OramState {
             self.reconstruct_path_entries_into(spec, allocator)?;
         }
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn storage_snapshot_for_test(&self) -> (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<u8>) {
+        (
+            self.storage.directory_pages.clone(),
+            self.storage.buckets.clone(),
+            self.storage.access_counter_slot.clone(),
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn storage_ptrs_for_test(&self) -> (*const Vec<u8>, *const Vec<u8>, *const u8) {
+        (
+            self.storage.directory_pages.as_ptr(),
+            self.storage.buckets.as_ptr(),
+            self.storage.access_counter_slot.as_ptr(),
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn corrupt_storage_for_test(&mut self) {
+        if let Some(page) = self.storage.directory_pages.first_mut() {
+            page[0] ^= 0x01;
+        }
+        if let Some(bucket) = self.storage.buckets.first_mut() {
+            bucket[0] ^= 0x01;
+        }
+        self.storage.access_counter_slot[0] ^= 0x01;
     }
 
     fn decode_surrogate_entries_from_storage_into(
@@ -2029,11 +2058,11 @@ fn build_path_bucket(
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct OramBlock {
-    pub occupied: bool,
-    pub slot_index: usize,
-    pub leaf: usize,
-    pub key: Value,
-    pub value: Value,
+    occupied: bool,
+    slot_index: usize,
+    leaf: usize,
+    key: Value,
+    value: Value,
 }
 
 impl OramBlock {
@@ -2163,10 +2192,10 @@ impl Drop for OramBlock {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct OramBucket {
-    pub access_counter: u64,
-    pub bucket_index: usize,
-    pub live_entry_count: usize,
-    pub blocks: Vec<OramBlock>,
+    access_counter: u64,
+    bucket_index: usize,
+    live_entry_count: usize,
+    blocks: Vec<OramBlock>,
 }
 
 impl OramBucket {

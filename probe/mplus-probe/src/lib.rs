@@ -8449,10 +8449,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let runtime_trusted_kernel_bundle_storage_surface_restricted =
         runtime_trusted_kernel_bundle_storage_surface_files
             == expected_runtime_trusted_kernel_bundle_storage_surface_files;
-    let runtime_trusted_kernel_bundle_field_assignment_files = collect_production_pattern_hits(
-        &core_src,
-        "runtime_trusted_kernel_bundle = Some(",
-    )?;
+    let runtime_trusted_kernel_bundle_field_assignment_files =
+        collect_production_pattern_hits(&core_src, "runtime_trusted_kernel_bundle = Some(")?;
     let expected_runtime_trusted_kernel_bundle_field_assignment_files =
         vec![String::from("crates/uo-core/src/trace.rs")];
     let runtime_trusted_kernel_bundle_field_assignment_restricted =
@@ -9432,9 +9430,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("gas_used: u64")
         && theorem_source.contains("trace_bundle: crate::controller::CallTraceBundle")
         && theorem_source.contains("runtime_kernel_witness: RuntimeKernelWitness")
-        && theorem_source.contains(
-            "runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness",
-        )
+        && theorem_source
+            .contains("runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness")
         && theorem_source.contains("runtime_witness_state: TracedRuntimeCallWitnessState")
         && theorem_source.contains("context: CallTraceContext")
         && theorem_source.contains("manifest_entry: &'a EntrypointManifest")
@@ -9448,9 +9445,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains("pub gas_used: u64")
         && !theorem_source.contains("pub trace_bundle: crate::controller::CallTraceBundle")
         && !theorem_source.contains("pub runtime_kernel_witness: RuntimeKernelWitness")
-        && !theorem_source.contains(
-            "pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness",
-        )
+        && !theorem_source
+            .contains("pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness")
         && !theorem_source.contains("pub runtime_witness_state: TracedRuntimeCallWitnessState")
         && !theorem_source.contains("pub context: CallTraceContext")
         && !theorem_source.contains("pub manifest_entry: &'a EntrypointManifest")
@@ -9516,13 +9512,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !controller_source.contains("pub physical_writes: Vec<PhysicalWriteEvent>")
         && !controller_source.contains("pub metrics: StoreExecutionMetrics")
         && !controller_source.contains("pub theorem_trace: TheoremTrace")
-        && !controller_source.contains(
-            "pub controller_certificate: RuntimeControllerCertificate",
-        )
+        && !controller_source.contains("pub controller_certificate: RuntimeControllerCertificate")
         && !controller_source.contains("pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>")
-        && !controller_source.contains(
-            "pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>",
-        );
+        && !controller_source
+            .contains("pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>");
     let call_trace_bundle_api_is_explicit = controller_source
         .contains("pub(crate) fn zero_writes(&self)")
         && controller_source.contains("pub(crate) fn into_execution_trace_parts(")
@@ -9576,8 +9569,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !controller_source
             .contains("entry_input_len: args.iter().map(Value::canonical_len).sum(),")
         && !controller_source.contains("CompiledFunction");
-    let public_call_summary_fields_private = controller_source
-        .contains("entry_input_len: usize")
+    let public_call_summary_fields_private = controller_source.contains("entry_input_len: usize")
         && controller_source.contains("public_args: Vec<String>")
         && !controller_source.contains("pub entry_input_len: usize")
         && !controller_source.contains("pub public_args: Vec<String>");
@@ -9931,8 +9923,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let traced_runtime_call_outcome_consumer_surface_restricted =
         traced_runtime_call_outcome_consumer_surface_files
             == expected_traced_runtime_call_outcome_consumer_surface_files;
-    let traced_runtime_call_witness_state_consumer_surface_files =
-        collect_production_pattern_hits(&runtime_evm_src, "runtime_witness_state.into_execution_trace_parts()")?;
+    let traced_runtime_call_witness_state_consumer_surface_files = collect_production_pattern_hits(
+        &runtime_evm_src,
+        "runtime_witness_state.into_execution_trace_parts()",
+    )?;
     let expected_traced_runtime_call_witness_state_consumer_surface_files =
         vec![String::from("runtime/uo-evm/src/theorem.rs")];
     let traced_runtime_call_witness_state_consumer_surface_restricted =
@@ -9972,16 +9966,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let confidential_kernel_run_outcome_fields_private = kernel_source
         .contains("committed_shadow: ConfidentialRuntimeShadowState")
         && kernel_source.contains("runtime_kernel_witness: RuntimeKernelWitness")
-        && kernel_source.contains(
-            "runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness",
-        )
+        && kernel_source
+            .contains("runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness")
         && kernel_source.contains("aborted: bool")
         && kernel_source.contains("return_value: Option<Value>")
         && !kernel_source.contains("pub committed_shadow: ConfidentialRuntimeShadowState")
         && !kernel_source.contains("pub runtime_kernel_witness: RuntimeKernelWitness")
-        && !kernel_source.contains(
-            "pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness",
-        );
+        && !kernel_source
+            .contains("pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness");
     let confidential_kernel_run_outcome_api_is_explicit = kernel_source
         .contains("pub(in crate::runtime) fn into_committed_outcome_parts(")
         && !kernel_source.contains("pub(crate) fn into_committed_outcome_parts(")
@@ -10656,6 +10648,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && oram_source.contains(
             "PhysicalWriteEvent::from_shape(object, self.location, self.len, self.class)",
         );
+    let oram_storage_fields_private = oram_source.contains("directory_pages: Vec<Vec<u8>>,")
+        && oram_source.contains("buckets: Vec<Vec<u8>>,")
+        && oram_source.contains("access_counter_slot: Vec<u8>,")
+        && !oram_source.contains("pub directory_pages: Vec<Vec<u8>>,")
+        && !oram_source.contains("pub buckets: Vec<Vec<u8>>,")
+        && !oram_source.contains("pub access_counter_slot: Vec<u8>,");
     let oram_transcript_fields_private = oram_source
         .contains("logical_accesses: Vec<LogicalEvent>,")
         && oram_source.contains("physical_reads: Vec<PhysicalReadEvent>,")
@@ -10672,8 +10670,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let oram_transcript_api_is_explicit = oram_source
         .contains("pub(crate) fn into_runtime_trace_parts(")
         && objects_source.contains("transcript.into_runtime_trace_parts();");
-    let oram_commit_fields_private = oram_source
-        .contains("next: OramState,")
+    let oram_commit_fields_private = oram_source.contains("next: OramState,")
         && oram_source.contains("writes: Vec<OramWrite>,")
         && oram_source.contains("zero_writes: usize,")
         && !oram_source.contains("pub next: OramState,")
@@ -10682,6 +10679,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let oram_commit_api_is_explicit = oram_source
         .contains("pub(crate) fn into_object_commit_parts(self)")
         && objects_source.contains("commit.into_object_commit_parts();");
+    let oram_block_fields_private = oram_source.contains(
+        "pub(crate) struct OramBlock {\n    occupied: bool,\n    slot_index: usize,\n    leaf: usize,\n    key: Value,\n    value: Value,\n}",
+    );
+    let oram_bucket_fields_private = oram_source.contains(
+        "pub(crate) struct OramBucket {\n    access_counter: u64,\n    bucket_index: usize,\n    live_entry_count: usize,\n    blocks: Vec<OramBlock>,\n}",
+    );
     let store_write_api_uses_mutable_plaintext = store_store_source
         .contains("fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()>")
         && store_store_source
@@ -11298,10 +11301,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "oram_write_fields_private": oram_write_fields_private,
         "oram_write_trace_projects_to_public_shape":
             oram_write_trace_projects_to_public_shape,
+        "oram_storage_fields_private": oram_storage_fields_private,
         "oram_transcript_fields_private": oram_transcript_fields_private,
         "oram_transcript_api_is_explicit": oram_transcript_api_is_explicit,
         "oram_commit_fields_private": oram_commit_fields_private,
         "oram_commit_api_is_explicit": oram_commit_api_is_explicit,
+        "oram_block_fields_private": oram_block_fields_private,
+        "oram_bucket_fields_private": oram_bucket_fields_private,
         "store_write_api_uses_mutable_plaintext": store_write_api_uses_mutable_plaintext,
         "direct_store_seal_surface_files": direct_store_seal_surface_files,
         "direct_store_seal_surface_restricted": direct_store_seal_surface_restricted,
@@ -11440,10 +11446,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && oram_write_trace_is_shape_only
             && oram_write_fields_private
             && oram_write_trace_projects_to_public_shape
+            && oram_storage_fields_private
             && oram_transcript_fields_private
             && oram_transcript_api_is_explicit
             && oram_commit_fields_private
             && oram_commit_api_is_explicit
+            && oram_block_fields_private
+            && oram_bucket_fields_private
             && store_write_api_uses_mutable_plaintext
             && direct_store_seal_surface_restricted
             && direct_store_open_surface_restricted
