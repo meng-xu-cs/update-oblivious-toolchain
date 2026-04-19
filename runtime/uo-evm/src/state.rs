@@ -65,13 +65,13 @@ struct ConfidentialEntrypointPlan {
 }
 
 #[derive(Debug)]
-pub(crate) struct CommittedRuntimeWitnessSnapshot {
+struct CommittedRuntimeWitnessSnapshot {
     runtime_oram_access_counters: Vec<RuntimeOramAccessCounterWitness>,
     runtime_oram_position_maps: Vec<RuntimePathOramPositionMapWitness>,
 }
 
 impl CommittedRuntimeWitnessSnapshot {
-    pub(crate) fn into_hidden_oram_state(
+    fn into_hidden_oram_state(
         self,
     ) -> (
         Vec<RuntimeOramAccessCounterWitness>,
@@ -85,6 +85,37 @@ impl CommittedRuntimeWitnessSnapshot {
 }
 
 #[derive(Debug)]
+pub(crate) struct TracedRuntimeCallStart {
+    runtime_state_before: CommittedRuntimeWitnessSnapshot,
+}
+
+#[derive(Debug)]
+pub(crate) struct TracedRuntimeCallWitnessState {
+    runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+}
+
+impl TracedRuntimeCallWitnessState {
+    pub(crate) fn into_execution_trace_parts(
+        self,
+    ) -> (
+        Vec<RuntimeOramAccessCounterWitness>,
+        Vec<RuntimeOramAccessCounterWitness>,
+        Vec<RuntimePathOramPositionMapWitness>,
+        Vec<RuntimePathOramPositionMapWitness>,
+    ) {
+        (
+            self.runtime_oram_access_counters_before,
+            self.runtime_oram_access_counters_after,
+            self.runtime_oram_position_map_before,
+            self.runtime_oram_position_map_after,
+        )
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct TracedRuntimeCallOutcome {
     call_outcome: RuntimeCallOutcome,
     runtime_state_after: CommittedRuntimeWitnessSnapshot,
@@ -93,14 +124,19 @@ pub(crate) struct TracedRuntimeCallOutcome {
 impl TracedRuntimeCallOutcome {
     pub(crate) fn into_finalized_call_trace_parts(
         self,
+        call_start: TracedRuntimeCallStart,
     ) -> (
         RuntimeKernelWitness,
         RuntimeKernelRefinementWitness,
         bool,
         Option<Value>,
         Vec<String>,
-        CommittedRuntimeWitnessSnapshot,
+        TracedRuntimeCallWitnessState,
     ) {
+        let (runtime_oram_access_counters_before, runtime_oram_position_map_before) =
+            call_start.runtime_state_before.into_hidden_oram_state();
+        let (runtime_oram_access_counters_after, runtime_oram_position_map_after) =
+            self.runtime_state_after.into_hidden_oram_state();
         let (
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
@@ -114,7 +150,12 @@ impl TracedRuntimeCallOutcome {
             aborted,
             return_value,
             opcode_trace,
-            self.runtime_state_after,
+            TracedRuntimeCallWitnessState {
+                runtime_oram_access_counters_before,
+                runtime_oram_access_counters_after,
+                runtime_oram_position_map_before,
+                runtime_oram_position_map_after,
+            },
         )
     }
 }
@@ -159,15 +200,17 @@ impl ContractRuntime {
         entrypoint: &str,
         manifest_entry: &EntrypointManifest,
         args: &[Value],
-    ) -> Result<(
-        CommittedRuntimeWitnessSnapshot,
-        PublicCallSummary,
-        CallRecorder,
-    )> {
+    ) -> Result<(TracedRuntimeCallStart, PublicCallSummary, CallRecorder)> {
         self.ensure_ready_for_call("before executing the next call from committed storage")?;
         let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, args)?;
         let recorder = CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
-        Ok((self.witness_snapshot()?, public_call, recorder))
+        Ok((
+            TracedRuntimeCallStart {
+                runtime_state_before: self.witness_snapshot()?,
+            },
+            public_call,
+            recorder,
+        ))
     }
 
     fn ensure_ready_for_call(&self, context: &str) -> Result<()> {

@@ -8283,22 +8283,28 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
     let state_committed_runtime_witness_snapshot_is_opaque = state_source
         .contains("struct CommittedRuntimeWitnessSnapshot")
+        && !state_source.contains("pub(crate) struct CommittedRuntimeWitnessSnapshot")
         && !state_source.contains("pub runtime_oram_access_counters:")
         && !state_source.contains("pub runtime_oram_position_maps:")
-        && state_source.contains("pub(crate) fn into_hidden_oram_state(")
-        && theorem_source.contains(".into_hidden_oram_state()");
+        && state_source.contains("fn into_hidden_oram_state(")
+        && !state_source.contains("pub(crate) fn into_hidden_oram_state(")
+        && !theorem_source.contains(".into_hidden_oram_state()");
     let theorem_only_runtime_helper_visibility_restricted = state_source
         .contains(
-            "pub(crate) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(",
+            "pub(crate) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(TracedRuntimeCallStart, PublicCallSummary, CallRecorder)>",
         )
         && state_source.contains(
             "pub(crate) fn finish_traced_call(\n        &self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome>",
         )
+        && state_source.contains("pub(crate) struct TracedRuntimeCallStart {")
+        && state_source.contains("pub(crate) struct TracedRuntimeCallWitnessState {")
+        && state_source.contains("pub(crate) fn into_finalized_call_trace_parts(")
+        && state_source.contains("pub(crate) fn into_execution_trace_parts(")
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
         && state_source.contains(
             "fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        self.committed.witness_snapshot()\n    }",
         )
-        && state_source.contains("pub(crate) fn into_hidden_oram_state(")
+        && state_source.contains("fn into_hidden_oram_state(")
         && state_source.contains(
             "fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        let mut runtime_oram_position_maps = Vec::with_capacity(self.objects.len());",
         )
@@ -8313,10 +8319,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !state_source
             .contains("pub fn finish_traced_call(\n        &self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome>")
         && !state_source.contains("pub fn into_hidden_oram_state(")
+        && !state_source.contains("pub(crate) fn into_hidden_oram_state(")
         && !state_source.contains(
             "pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        let mut runtime_oram_position_maps = Vec::with_capacity(self.objects.len());",
         );
-    let committed_runtime_witness_snapshot_decl = "pub(crate) struct CommittedRuntimeWitnessSnapshot";
+    let committed_runtime_witness_snapshot_decl = "struct CommittedRuntimeWitnessSnapshot";
     let committed_runtime_witness_snapshot_derive_line = state_source
         .split(committed_runtime_witness_snapshot_decl)
         .next()
@@ -8327,10 +8334,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         !committed_runtime_witness_snapshot_derive_line.contains("Clone");
     let committed_runtime_witness_snapshot_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "CommittedRuntimeWitnessSnapshot")?;
-    let expected_committed_runtime_witness_snapshot_surface_files = vec![
-        String::from("runtime/uo-evm/src/state.rs"),
-        String::from("runtime/uo-evm/src/theorem.rs"),
-    ];
+    let expected_committed_runtime_witness_snapshot_surface_files =
+        vec![String::from("runtime/uo-evm/src/state.rs")];
     let committed_runtime_witness_snapshot_surface_restricted =
         committed_runtime_witness_snapshot_surface_files
             == expected_committed_runtime_witness_snapshot_surface_files;
@@ -8357,8 +8362,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness")
-        && theorem_source.contains("traced_outcome.into_finalized_call_trace_parts()")
+        && theorem_source.contains("traced_outcome.into_finalized_call_trace_parts(runtime_call_start)")
+        && theorem_source.contains("runtime_witness_state.into_execution_trace_parts()")
         && !theorem_source.contains("call_outcome.into_theorem_trace_parts()")
+        && !theorem_source.contains(".into_hidden_oram_state()")
         && !theorem_source.contains("let RuntimeCallOutcome {")
         && theorem_source
             .contains("let output_shape = output_shape_of(manifest_entry, &return_value)?;");
@@ -8659,11 +8666,51 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let traced_runtime_call_outcome_surface_restricted =
         traced_runtime_call_outcome_surface_files
             == expected_traced_runtime_call_outcome_surface_files;
+    let traced_runtime_call_start_decl = "pub(crate) struct TracedRuntimeCallStart";
+    let traced_runtime_call_start_derive_line = state_source
+        .split(traced_runtime_call_start_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate TracedRuntimeCallStart declaration"))?;
+    let traced_runtime_call_start_nonclone =
+        !traced_runtime_call_start_derive_line.contains("Clone");
+    let traced_runtime_call_start_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "TracedRuntimeCallStart")?;
+    let expected_traced_runtime_call_start_surface_files = vec![
+        String::from("runtime/uo-evm/src/state.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let traced_runtime_call_start_surface_restricted =
+        traced_runtime_call_start_surface_files
+            == expected_traced_runtime_call_start_surface_files;
+    let traced_runtime_call_witness_state_decl =
+        "pub(crate) struct TracedRuntimeCallWitnessState";
+    let traced_runtime_call_witness_state_derive_line = state_source
+        .split(traced_runtime_call_witness_state_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate TracedRuntimeCallWitnessState declaration"))?;
+    let traced_runtime_call_witness_state_nonclone =
+        !traced_runtime_call_witness_state_derive_line.contains("Clone");
+    let traced_runtime_call_witness_state_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "TracedRuntimeCallWitnessState")?;
+    let expected_traced_runtime_call_witness_state_surface_files = vec![
+        String::from("runtime/uo-evm/src/state.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let traced_runtime_call_witness_state_surface_restricted =
+        traced_runtime_call_witness_state_surface_files
+            == expected_traced_runtime_call_witness_state_surface_files;
+    let traced_runtime_call_witness_state_api_is_explicit = state_source
+        .contains("pub(crate) fn into_execution_trace_parts(")
+        && theorem_source.contains("runtime_witness_state.into_execution_trace_parts()");
     let traced_runtime_call_outcome_api_is_explicit = state_source
         .contains("pub(crate) fn finish_traced_call(")
         && state_source.contains("pub(crate) fn into_finalized_call_trace_parts(")
         && theorem_source.contains("runtime.finish_traced_call(call_outcome)?;")
-        && theorem_source.contains("traced_outcome.into_finalized_call_trace_parts()");
+        && theorem_source.contains("traced_outcome.into_finalized_call_trace_parts(runtime_call_start)");
     let traced_runtime_call_outcome_constructor_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "TracedRuntimeCallOutcome {")?;
     let expected_traced_runtime_call_outcome_constructor_surface_files =
@@ -8680,6 +8727,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let traced_runtime_call_outcome_consumer_surface_restricted =
         traced_runtime_call_outcome_consumer_surface_files
             == expected_traced_runtime_call_outcome_consumer_surface_files;
+    let traced_runtime_call_witness_state_consumer_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "into_execution_trace_parts(")?;
+    let expected_traced_runtime_call_witness_state_consumer_surface_files = vec![
+        String::from("runtime/uo-evm/src/state.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let traced_runtime_call_witness_state_consumer_surface_restricted =
+        traced_runtime_call_witness_state_consumer_surface_files
+            == expected_traced_runtime_call_witness_state_consumer_surface_files;
     let confidential_exec_state_decl = "struct ConfidentialExecState";
     let confidential_exec_state_derive_line = kernel_source
         .split(confidential_exec_state_decl)
@@ -9019,7 +9075,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/theorem.rs")],
         ),
         (
-            ".into_hidden_oram_state()",
+            ".into_finalized_call_trace_parts(",
+            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+        ),
+        (
+            ".into_execution_trace_parts()",
             vec![String::from("runtime/uo-evm/src/theorem.rs")],
         ),
     ]
@@ -9472,6 +9532,25 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && theorem_only_runtime_helper_visibility_restricted,
         }),
         json!({
+            "name": "TracedRuntimeCallStart",
+            "owner": "runtime/uo-evm/src/state.rs",
+            "boundary": "runtime/theorem pre-call handoff token carrying the hidden committed-state snapshot without exposing the raw snapshot type outside state.rs",
+            "checked": traced_runtime_call_start_nonclone
+                && traced_runtime_call_start_surface_restricted
+                && theorem_finalizes_execution_trace
+                && theorem_only_runtime_helper_visibility_restricted,
+        }),
+        json!({
+            "name": "TracedRuntimeCallWitnessState",
+            "owner": "runtime/uo-evm/src/state.rs",
+            "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers",
+            "checked": traced_runtime_call_witness_state_nonclone
+                && traced_runtime_call_witness_state_surface_restricted
+                && traced_runtime_call_witness_state_api_is_explicit
+                && traced_runtime_call_witness_state_consumer_surface_restricted
+                && theorem_finalizes_execution_trace,
+        }),
+        json!({
             "name": "RuntimeShadowState / ConfidentialRuntimeShadowState / PublicRuntimeShadowState / CommittedRuntimeState",
             "owner": "runtime/uo-evm/src/state.rs",
             "boundary": "secret-bearing committed/shadow object maps stay inside crate::runtime, with distinct public and confidential shadow wrappers delimiting the shell boundary",
@@ -9482,12 +9561,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "CommittedRuntimeWitnessSnapshot",
             "owner": "runtime/uo-evm/src/state.rs",
-            "boundary": "opaque hidden ORAM witness snapshot captured in CallTraceContext and projected only through theorem.rs",
+            "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs and used only to assemble traced-call start/outcome/witness handoff bundles",
             "checked": state_committed_runtime_witness_snapshot_is_opaque
                 && committed_runtime_witness_snapshot_nonclone
                 && committed_runtime_witness_snapshot_surface_restricted
                 && theorem_only_runtime_helper_visibility_restricted
-                && theorem_only_runtime_helper_surface_restricted
                 && theorem_finalizes_execution_trace,
         }),
         json!({
@@ -9720,6 +9798,34 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             expected_traced_runtime_call_outcome_consumer_surface_files,
         "traced_runtime_call_outcome_consumer_surface_restricted":
             traced_runtime_call_outcome_consumer_surface_restricted,
+        "traced_runtime_call_start_derive_line":
+            traced_runtime_call_start_derive_line,
+        "traced_runtime_call_start_nonclone":
+            traced_runtime_call_start_nonclone,
+        "traced_runtime_call_start_surface_files":
+            traced_runtime_call_start_surface_files,
+        "expected_traced_runtime_call_start_surface_files":
+            expected_traced_runtime_call_start_surface_files,
+        "traced_runtime_call_start_surface_restricted":
+            traced_runtime_call_start_surface_restricted,
+        "traced_runtime_call_witness_state_derive_line":
+            traced_runtime_call_witness_state_derive_line,
+        "traced_runtime_call_witness_state_nonclone":
+            traced_runtime_call_witness_state_nonclone,
+        "traced_runtime_call_witness_state_surface_files":
+            traced_runtime_call_witness_state_surface_files,
+        "expected_traced_runtime_call_witness_state_surface_files":
+            expected_traced_runtime_call_witness_state_surface_files,
+        "traced_runtime_call_witness_state_surface_restricted":
+            traced_runtime_call_witness_state_surface_restricted,
+        "traced_runtime_call_witness_state_api_is_explicit":
+            traced_runtime_call_witness_state_api_is_explicit,
+        "traced_runtime_call_witness_state_consumer_surface_files":
+            traced_runtime_call_witness_state_consumer_surface_files,
+        "expected_traced_runtime_call_witness_state_consumer_surface_files":
+            expected_traced_runtime_call_witness_state_consumer_surface_files,
+        "traced_runtime_call_witness_state_consumer_surface_restricted":
+            traced_runtime_call_witness_state_consumer_surface_restricted,
         "confidential_exec_state_surface_files": confidential_exec_state_surface_files,
         "expected_confidential_exec_state_surface_files":
             expected_confidential_exec_state_surface_files,
@@ -9930,6 +10036,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && traced_runtime_call_outcome_api_is_explicit
             && traced_runtime_call_outcome_constructor_surface_restricted
             && traced_runtime_call_outcome_consumer_surface_restricted
+            && traced_runtime_call_start_surface_restricted
+            && traced_runtime_call_witness_state_surface_restricted
+            && traced_runtime_call_witness_state_api_is_explicit
+            && traced_runtime_call_witness_state_consumer_surface_restricted
             && fullscan_buffer_reuse_restricted
             && state_only_kernel_helper_surface_restricted
             && contract_runtime_entrypoint_surface_restricted

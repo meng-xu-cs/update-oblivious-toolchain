@@ -1,6 +1,7 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::state::{
-    CommittedRuntimeWitnessSnapshot, ContractRuntime, TracedRuntimeCallOutcome,
+    ContractRuntime, TracedRuntimeCallOutcome, TracedRuntimeCallStart,
+    TracedRuntimeCallWitnessState,
 };
 use crate::runtime::RuntimeCallOutcome;
 use anyhow::Result;
@@ -12,7 +13,7 @@ use uo_core::{
 };
 
 struct CallTraceContext {
-    runtime_state_before: CommittedRuntimeWitnessSnapshot,
+    runtime_call_start: TracedRuntimeCallStart,
     public_call: PublicCallSummary,
     recorder: CallRecorder,
 }
@@ -23,10 +24,10 @@ fn begin_call_trace(
     manifest_entry: &EntrypointManifest,
     args: &[Value],
 ) -> Result<CallTraceContext> {
-    let (runtime_state_before, public_call, recorder) =
+    let (runtime_call_start, public_call, recorder) =
         runtime.begin_traced_call(entrypoint, manifest_entry, args)?;
     Ok(CallTraceContext {
-        runtime_state_before,
+        runtime_call_start,
         public_call,
         recorder,
     })
@@ -48,8 +49,7 @@ struct FinalizeExecutionTraceInput<'a> {
     pub trace_bundle: crate::controller::CallTraceBundle,
     pub runtime_kernel_witness: RuntimeKernelWitness,
     pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    pub runtime_state_before: CommittedRuntimeWitnessSnapshot,
-    pub runtime_state_after: CommittedRuntimeWitnessSnapshot,
+    pub runtime_witness_state: TracedRuntimeCallWitnessState,
 }
 
 struct FinalizeCallTraceInput<'a> {
@@ -135,13 +135,14 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         trace_bundle,
         runtime_kernel_witness,
         runtime_kernel_refinement_witness,
-        runtime_state_before,
-        runtime_state_after,
+        runtime_witness_state,
     } = input;
-    let (runtime_oram_access_counters_before, runtime_oram_position_map_before) =
-        runtime_state_before.into_hidden_oram_state();
-    let (runtime_oram_access_counters_after, runtime_oram_position_map_after) =
-        runtime_state_after.into_hidden_oram_state();
+    let (
+        runtime_oram_access_counters_before,
+        runtime_oram_access_counters_after,
+        runtime_oram_position_map_before,
+        runtime_oram_position_map_after,
+    ) = runtime_witness_state.into_execution_trace_parts();
 
     let mut trace = ExecutionTrace {
         opcode_trace,
@@ -246,19 +247,19 @@ fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCal
         manifest_objects,
         traced_outcome,
     } = input;
+    let CallTraceContext {
+        runtime_call_start,
+        public_call,
+        recorder,
+    } = context;
     let (
         runtime_kernel_witness,
         runtime_kernel_refinement_witness,
         aborted,
         return_value,
         opcode_trace,
-        runtime_state_after,
-    ) = traced_outcome.into_finalized_call_trace_parts();
-    let CallTraceContext {
-        runtime_state_before,
-        public_call,
-        recorder,
-    } = context;
+        runtime_witness_state,
+    ) = traced_outcome.into_finalized_call_trace_parts(runtime_call_start);
     let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
     let output_shape = output_shape_of(manifest_entry, &return_value)?;
     let trace_bundle = build_theorem_trace(
@@ -281,8 +282,7 @@ fn finalize_call_trace(input: FinalizeCallTraceInput<'_>) -> Result<FinalizedCal
         trace_bundle,
         runtime_kernel_witness,
         runtime_kernel_refinement_witness,
-        runtime_state_before,
-        runtime_state_after,
+        runtime_witness_state,
     })?;
     Ok(FinalizedCallTrace {
         trace,

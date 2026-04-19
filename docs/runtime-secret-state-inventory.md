@@ -17,9 +17,11 @@ the refinement proof is still being completed.
 | `ConfidentialKernelRunOutcome` | `runtime/uo-evm/src/kernel.rs` | `RuntimeKernel` / `crate::runtime` | kernel-owned confidential shadow state, runtime witnesses, abort bit, and live return value at the kernel-to-state handoff | runtime-only type; non-`Clone`; confined to `kernel.rs` |
 | `ConfidentialCommittedKernelOutcome` | `runtime/uo-evm/src/state.rs` | `crate::runtime` | committed-state confidential outcome bundle after shadow commit and before packaging into the runtime/theorem handoff | runtime-only type; non-`Clone`; confined to `state.rs` |
 | `RuntimeCallOutcome` | `runtime/uo-evm/src/runtime.rs` | `crate::runtime` | per-call runtime witnesses plus the live return value remain bundled until the state-owned theorem handoff is assembled | runtime-only type; non-`Clone`; construction is pinned to `runtime.rs`, `state.rs`, and `shell.rs` through the explicit `from_runtime_execution` boundary, `state.rs` is the only consumer of `into_theorem_trace_parts()`, and `engine.rs` does not unpack or own it directly |
-| `TracedRuntimeCallOutcome` | `runtime/uo-evm/src/state.rs` | `state.rs` / `theorem.rs` | post-call hidden witness snapshot plus the bundled runtime outcome remain secret-bearing until final execution-trace packaging | runtime/theorem handoff type; non-`Clone`; constructed only by `ContractRuntime::finish_traced_call(...)`, consumed in `theorem.rs` only through `into_finalized_call_trace_parts()`, and absent from `engine.rs` |
+| `TracedRuntimeCallStart` | `runtime/uo-evm/src/state.rs` | `state.rs` / `theorem.rs` | theorem-facing pre-call token that carries the hidden committed-state snapshot without exposing the raw snapshot type | runtime/theorem handoff type; non-`Clone`; produced only by `ContractRuntime::begin_traced_call(...)`, stored only in theorem-local call-trace context, and absent from `engine.rs` |
+| `TracedRuntimeCallOutcome` | `runtime/uo-evm/src/state.rs` | `state.rs` / `theorem.rs` | post-call hidden witness snapshot plus the bundled runtime outcome remain secret-bearing until final execution-trace packaging | runtime/theorem handoff type; non-`Clone`; constructed only by `ContractRuntime::finish_traced_call(...)`, consumed in `theorem.rs` only through `into_finalized_call_trace_parts(...)`, and absent from `engine.rs` |
+| `TracedRuntimeCallWitnessState` | `runtime/uo-evm/src/state.rs` | `state.rs` / `theorem.rs` | finalized before/after hidden ORAM witness bundle for execution-trace packaging | runtime/theorem handoff type; non-`Clone`; produced only by `TracedRuntimeCallOutcome::into_finalized_call_trace_parts(...)`, consumed in `theorem.rs` only through `into_execution_trace_parts()`, and absent from `engine.rs` |
 | `RuntimeShadowState`, `ConfidentialRuntimeShadowState`, `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | `crate::runtime` | live reopened confidential object state for one call, with separate wrappers for the confidential kernel path and the public shell path | raw shadow state and the confidential shadow wrapper are now visibility-restricted to `crate::runtime`; the shell sees only `PublicRuntimeShadowState`, while confidential execution uses `ConfidentialRuntimeShadowState` only behind `ContractRuntime` |
-| `CommittedRuntimeWitnessSnapshot` | `runtime/uo-evm/src/state.rs` | `state.rs` / `theorem.rs` | theorem-facing hidden ORAM access-counter and position-map witness state from committed storage before and after a call | the snapshot fields are private; the type is non-`Clone`; the helper surface remains crate-private, both `CommittedRuntimeState::witness_snapshot` and `ContractRuntime::witness_snapshot` are now fully internal to `state.rs`, the theorem-facing bridges are `ContractRuntime::begin_traced_call(...)` and `ContractRuntime::finish_traced_call(...)`, the internal readiness check stays private to `state.rs`, and the production calls to those bridges plus `into_hidden_oram_state()` are pinned to `theorem.rs`, so `engine.rs` no longer sees the hidden snapshot type or calls snapshot helpers directly |
+| `CommittedRuntimeWitnessSnapshot` | `runtime/uo-evm/src/state.rs` | `state.rs` | hidden ORAM access-counter and position-map witness state from committed storage before and after a call | the snapshot fields are private; the type is non-`Clone`; the type and its projection helper are now fully internal to `state.rs`, both `CommittedRuntimeState::witness_snapshot` and `ContractRuntime::witness_snapshot` are internal, and theorem-facing code now sees only the traced-call handoff bundles rather than the raw snapshot type |
 | `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | `crate::runtime` | object-local confidential logical state and commit/restore paths | non-`Clone`; low-level helpers restricted to `crate::runtime` |
 | `OramState` | `runtime/uo-evm/src/oram.rs` | `crate::runtime` | live ORAM entries, position map, stash, access counter, and leaf-coin source | helper use restricted through runtime state/kernel paths |
 | `StoreCipher` key and plaintext staging buffers | `runtime/uo-store/src/codec.rs`, `runtime/uo-store/src/store.rs` | store/codec layer | sealing keys and temporary plaintext buffers | direct `seal` / `open` stay in codec; wipe-preserving helpers are the intended public surface |
@@ -39,7 +41,7 @@ These are the invariants this inventory is meant to support.
    state without cloning them first.
 3. Confidential expression execution should live in `RuntimeKernel`.
 4. Intermediate per-call outcome bundles that still carry runtime witnesses,
-   live shadow state, a hidden post-call witness snapshot, or a live return
+   live shadow state, hidden before/after witness snapshots, or a live return
    value should stay runtime-only or theorem-handoff-only across the
    kernel-to-state, state-to-runtime, and runtime-to-theorem boundaries.
 5. The final runtime/theorem outcome bundle should be consumed as a whole
@@ -65,20 +67,27 @@ ownership rules drift. Those checks now also pin the newer boundary
 reductions: `ConfidentialEntrypointPlan` is confined to `state.rs`, and
 `RuntimeShadowState` / `ConfidentialRuntimeShadowState` remain runtime-only
 types while the shell-visible handle stays `PublicRuntimeShadowState`, and
-`CommittedRuntimeWitnessSnapshot` is opaque and captured only through the
-dedicated state/theorem call-trace handoff. The same report now also pins
-the authority boundary on that handoff by requiring the theorem pre-call
-bridge (`ContractRuntime::begin_traced_call(...)`) and the remaining snapshot
-helpers to be called only from `runtime/uo-evm/src/theorem.rs` in production
-code, while the lower-level readiness check stays internal to `state.rs`. It
+`CommittedRuntimeWitnessSnapshot` is now fully internal to `state.rs`, and the
+dedicated state/theorem call-trace handoff is carried instead by
+`TracedRuntimeCallStart`, `TracedRuntimeCallOutcome`, and
+`TracedRuntimeCallWitnessState`. The same report now also pins
+the authority boundary on that handoff by requiring the theorem pre/post-call
+bridges (`ContractRuntime::begin_traced_call(...)` and
+`ContractRuntime::finish_traced_call(...)`) to be called only from
+`runtime/uo-evm/src/theorem.rs` in production code, while the lower-level
+readiness and raw snapshot helpers stay internal to `state.rs`. It
 also pins `RuntimeCallOutcome` to the runtime/theorem
 handoff by requiring `state.rs` and `shell.rs` to construct it, `state.rs`
 to be the only production consumer of its explicit theorem-packaging API, and
 `engine.rs` to avoid unpacking it directly. The same report now also pins the
-new post-call handoff bundle: `ContractRuntime::finish_traced_call(...)`
-constructs `TracedRuntimeCallOutcome` inside `state.rs`, `theorem.rs`
-consumes it only through `into_finalized_call_trace_parts()`, and the old
-direct post-call snapshot capture path is gone. The
+new traced-call handoff bundles:
+`ContractRuntime::begin_traced_call(...)` constructs
+`TracedRuntimeCallStart`, `ContractRuntime::finish_traced_call(...)`
+constructs `TracedRuntimeCallOutcome`, and `theorem.rs` consumes the finalized
+hidden witness bundle only through
+`TracedRuntimeCallOutcome::into_finalized_call_trace_parts(...)` followed by
+`TracedRuntimeCallWitnessState::into_execution_trace_parts()`. The old
+direct snapshot-type handling path is gone. The
 same report now also pins the call-trace bridge itself: `engine.rs` calls
 only `run_traced_call(...)` and no longer imports `begin_call_trace`,
 `FinalizeCallTraceInput`, or `CallTraceContext` directly, and those helper
