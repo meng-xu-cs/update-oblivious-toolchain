@@ -165,7 +165,9 @@ The current runtime has a first hardening layer:
   and the controller/theorem path now derives public return length from
   manifest-stored `return_canonical_len` and receives only the public
   `OutputShape` summary rather than the full return payload; injected
-  fresh-coin plans now zero their stored leaf choices on drop
+  fresh-coin plans now zero their stored leaf choices on drop, are consumed
+  by value at the diagnostic runtime entrypoint, and move those per-object
+  secret leaf tapes into the live shadow state without cloning them first
 - kernel object-operation scratch reservations and UO object commit `io`
   scratch reservations now derive from admitted object/type metadata instead
   of live confidential value lengths wherever the runtime already knows the

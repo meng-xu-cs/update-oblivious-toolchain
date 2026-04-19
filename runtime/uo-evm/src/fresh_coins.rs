@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 #[cfg(feature = "diagnostics")]
 use uo_core::RuntimeOramLeafScaffoldWitness;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct PathOramFreshCoinPlan {
     by_object: BTreeMap<u32, Vec<usize>>,
 }
@@ -54,7 +54,7 @@ impl PathOramFreshCoinPlan {
         Ok(plan)
     }
 
-    pub(in crate::runtime) fn by_object(&self) -> &BTreeMap<u32, Vec<usize>> {
-        &self.by_object
+    pub(in crate::runtime) fn into_by_object(mut self) -> BTreeMap<u32, Vec<usize>> {
+        std::mem::take(&mut self.by_object)
     }
 }

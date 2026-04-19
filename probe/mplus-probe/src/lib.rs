@@ -4112,7 +4112,7 @@ fn collect_canonical_fresh_coin_family_case(
                 .call_with_path_oram_fresh_coins(
                     target.entrypoint,
                     target.args.clone(),
-                    &fresh_coin_plan,
+                    fresh_coin_plan,
                 )?
                 .trace;
             let witness = trace.runtime_refinement_witness()?;
@@ -4170,7 +4170,7 @@ fn collect_canonical_fresh_coin_theorem_input_case(
         PathOramFreshCoinPlan::from_scaffold_and_values(&fresh_coin_scaffold, &fresh_coin_values)?;
     let mut representative_instance = prepared.clone();
     let representative_trace = representative_instance
-        .call_with_path_oram_fresh_coins(target.entrypoint, target.args.clone(), &fresh_coin_plan)?
+        .call_with_path_oram_fresh_coins(target.entrypoint, target.args.clone(), fresh_coin_plan)?
         .trace;
     let representative_witness = representative_trace.runtime_refinement_witness()?;
     let extracted_scaffold = representative_witness
@@ -4249,7 +4249,7 @@ fn estimate_canonical_fresh_coin_family_size(
             .call_with_path_oram_fresh_coins(
                 target.entrypoint,
                 target.args.clone(),
-                &fresh_coin_plan,
+                fresh_coin_plan,
             )?
             .trace;
         let witness = trace.runtime_refinement_witness()?;
@@ -4379,7 +4379,7 @@ fn materialize_canonical_fresh_coin_family_object<W: Write>(
             .call_with_path_oram_fresh_coins(
                 target.entrypoint,
                 target.args.clone(),
-                &fresh_coin_plan,
+                fresh_coin_plan,
             )?
             .trace;
         let witness = trace.runtime_refinement_witness()?;
@@ -6043,6 +6043,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_clones_call_args_directly = engine_impl_source
         .contains("let mut call_args = args.clone();")
         || engine_impl_source.contains("let call_args = args.clone();");
+    let engine_fresh_coin_api_consumes_plan = engine_source
+        .contains("fresh_coins: PathOramFreshCoinPlan")
+        && !engine_source.contains("fresh_coins: &PathOramFreshCoinPlan");
     let engine_peeks_into_fresh_coin_map = engine_impl_source.contains(".by_object")
         || engine_impl_source.contains("fresh_coins_by_object");
     let engine_imports_raw_runtime_kernel =
@@ -6118,6 +6121,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .map(str::trim)
         .ok_or_else(|| anyhow!("failed to locate OramState declaration in oram.rs"))?;
     let oram_state_nonderive_clone = !oram_state_derive_line.contains("Clone");
+    let fresh_coin_plan_decl = "pub struct PathOramFreshCoinPlan";
+    let fresh_coin_plan_derive_line = fresh_coins_source
+        .split(fresh_coin_plan_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate PathOramFreshCoinPlan declaration"))?;
+    let fresh_coin_plan_nonclone = !fresh_coin_plan_derive_line.contains("Clone");
     let contract_instance_clone_uses_cold_runtime_clone =
         engine_source.contains("state: self.state.clone()");
     let fresh_coin_plan_surface_checks = [
@@ -6134,7 +6145,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
         ),
         (
-            "pub(in crate::runtime) fn by_object(&self)",
+            "pub(in crate::runtime) fn into_by_object(mut self)",
             vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
         ),
     ]
@@ -6587,7 +6598,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
-            ".install_path_oram_leaf_coins(coins.clone())?;",
+            ".install_path_oram_leaf_coins(coins)?;",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
@@ -6620,10 +6631,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         ),
         (
             ".object_mut(object_id)?",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
+            vec![
+                String::from("runtime/uo-evm/src/kernel.rs"),
+                String::from("runtime/uo-evm/src/state.rs"),
+            ],
         ),
         (
-            "objects.install_path_oram_leaf_coins(fresh_coins.by_object())",
+            "objects.install_path_oram_leaf_coins(fresh_coins.into_by_object())",
             vec![String::from("runtime/uo-evm/src/kernel.rs")],
         ),
         (
@@ -7056,6 +7070,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
         "engine_uses_manifest_public_call_summary": engine_uses_manifest_public_call_summary,
         "engine_clones_call_args_directly": engine_clones_call_args_directly,
+        "engine_fresh_coin_api_consumes_plan": engine_fresh_coin_api_consumes_plan,
         "engine_peeks_into_fresh_coin_map": engine_peeks_into_fresh_coin_map,
         "engine_imports_raw_runtime_kernel": engine_imports_raw_runtime_kernel,
         "engine_imports_runtime_object_directly": engine_imports_runtime_object_directly,
@@ -7076,6 +7091,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "runtime_object_nonclone": runtime_object_nonclone,
         "oram_state_derive_line": oram_state_derive_line,
         "oram_state_nonderive_clone": oram_state_nonderive_clone,
+        "fresh_coin_plan_derive_line": fresh_coin_plan_derive_line,
+        "fresh_coin_plan_nonclone": fresh_coin_plan_nonclone,
         "contract_instance_clone_uses_cold_runtime_clone":
             contract_instance_clone_uses_cold_runtime_clone,
         "fresh_coin_plan_surface_checks": fresh_coin_plan_surface_checks,
@@ -7226,6 +7243,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && !engine_defines_fresh_coin_plan_directly
             && engine_uses_manifest_public_call_summary
             && !engine_clones_call_args_directly
+            && engine_fresh_coin_api_consumes_plan
             && !engine_peeks_into_fresh_coin_map
             && !engine_imports_raw_runtime_kernel
             && !engine_imports_runtime_object_directly
@@ -7239,6 +7257,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && all_state_restricted_signatures_present
             && runtime_object_nonclone
             && oram_state_nonderive_clone
+            && fresh_coin_plan_nonclone
             && contract_instance_clone_uses_cold_runtime_clone
             && state_wrapper_present
             && state_finalizes_runtime_phase_witness

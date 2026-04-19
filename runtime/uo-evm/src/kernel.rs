@@ -538,12 +538,13 @@ impl RuntimeKernel {
         shadow_load_object_ids: &[u32],
         max_hash_part_bytes: usize,
         call_inputs: ConfidentialCallInputs,
-        fresh_coins: Option<&PathOramFreshCoinPlan>,
+        fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialKernelRunOutcome> {
         self.max_hash_part_bytes = max_hash_part_bytes;
         let mut shadow = self.shadow_load_objects(committed, shadow_load_object_ids)?;
+        let had_injected_fresh_coins = fresh_coins.is_some();
         self.install_path_oram_fresh_coins(&mut shadow, fresh_coins)?;
         let outcome = self.execute_confidential_call(
             program,
@@ -552,7 +553,7 @@ impl RuntimeKernel {
             recorder,
             opcode_trace,
         )?;
-        if fresh_coins.is_some() {
+        if had_injected_fresh_coins {
             self.ensure_path_oram_fresh_coins_consumed(&shadow)?;
         }
         self.commit_objects(&mut shadow, committed, outcome.aborted, recorder)?;
@@ -973,12 +974,12 @@ impl RuntimeKernel {
     fn install_path_oram_fresh_coins(
         &mut self,
         objects: &mut RuntimeShadowState,
-        fresh_coins: Option<&PathOramFreshCoinPlan>,
+        fresh_coins: Option<PathOramFreshCoinPlan>,
     ) -> Result<()> {
         let Some(fresh_coins) = fresh_coins else {
             return Ok(());
         };
-        objects.install_path_oram_leaf_coins(fresh_coins.by_object())
+        objects.install_path_oram_leaf_coins(fresh_coins.into_by_object())
     }
 
     fn ensure_path_oram_fresh_coins_consumed(&self, objects: &RuntimeShadowState) -> Result<()> {

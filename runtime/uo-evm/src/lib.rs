@@ -820,7 +820,7 @@ mod tests {
             .call_with_path_oram_fresh_coins(
                 "add(bytes32,uint256)",
                 vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
-                &fresh_coin_plan,
+                fresh_coin_plan,
             )
             .unwrap();
         let injected_witness = injected_result.trace.runtime_refinement_witness().unwrap();
@@ -862,7 +862,7 @@ mod tests {
             .call_with_path_oram_fresh_coins(
                 "add(bytes32,uint256)",
                 vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
-                &short_plan,
+                short_plan,
             )
             .unwrap_err();
         assert!(err

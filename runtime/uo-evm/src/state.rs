@@ -135,7 +135,7 @@ impl ContractRuntime {
         &mut self,
         plan: ConfidentialEntrypointPlan,
         args: Vec<Value>,
-        fresh_coins: Option<&PathOramFreshCoinPlan>,
+        fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
     ) -> Result<ConfidentialCommittedCallOutcome> {
         let ConfidentialEntrypointPlan {
@@ -303,7 +303,7 @@ impl CommittedRuntimeState {
         shadow_load_object_ids: &[u32],
         max_hash_part_bytes: usize,
         call_inputs: ConfidentialCallInputs,
-        fresh_coins: Option<&PathOramFreshCoinPlan>,
+        fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialCommittedKernelOutcome> {
@@ -477,12 +477,12 @@ impl RuntimeShadowState {
 
     pub(in crate::runtime) fn install_path_oram_leaf_coins(
         &mut self,
-        fresh_coins_by_object: &BTreeMap<u32, Vec<usize>>,
+        fresh_coins_by_object: BTreeMap<u32, Vec<usize>>,
     ) -> Result<()> {
         self.enable_injected_path_oram_leaf_coins();
         for (object_id, coins) in fresh_coins_by_object {
-            self.object_mut(*object_id)?
-                .install_path_oram_leaf_coins(coins.clone())?;
+            self.object_mut(object_id)?
+                .install_path_oram_leaf_coins(coins)?;
         }
         Ok(())
     }

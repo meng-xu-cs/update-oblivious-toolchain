@@ -69,7 +69,7 @@ impl ContractInstance {
         &mut self,
         entrypoint: &str,
         args: Vec<Value>,
-        fresh_coins: &PathOramFreshCoinPlan,
+        fresh_coins: PathOramFreshCoinPlan,
     ) -> Result<CallResult> {
         Ok(self.call_impl(entrypoint, args, Some(fresh_coins))?.0)
     }
@@ -91,7 +91,7 @@ impl ContractInstance {
         &mut self,
         entrypoint: &str,
         args: Vec<Value>,
-        fresh_coins: Option<&PathOramFreshCoinPlan>,
+        fresh_coins: Option<PathOramFreshCoinPlan>,
     ) -> Result<(CallResult, usize)> {
         let function = self
             .artifact

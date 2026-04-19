@@ -464,7 +464,9 @@ The first implementation step is now present in the codebase:
   rather than the raw committed confidential state, and that wrapper
   internalizes the remaining raw confidential argument vector into
   `ConfidentialCallInputs`, whose unwrap surface is restricted to
-  `crate::runtime`; the controller/theorem path now also derives output
+  `crate::runtime`; diagnostic fresh-coin plans are now also consumed by
+  value and moved into the live shadow state without cloning the per-object
+  secret leaf tapes first; the controller/theorem path now also derives output
   length from manifest-stored `return_canonical_len` and consumes only the
   public `OutputShape` summary rather than the full return payload
 - kernel object-operation scratch reservations and UO object commit `io`
