@@ -8426,6 +8426,19 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && runtime_module_source.contains("struct RuntimeCallOutcome")
         && shell_source.contains("RuntimeCallOutcome")
         && !state_source.contains("opcode_trace: Vec::new()");
+    let runtime_call_outcome_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "RuntimeCallOutcome")?;
+    let expected_runtime_call_outcome_surface_files = vec![
+        String::from("runtime/uo-evm/src/runtime.rs"),
+        String::from("runtime/uo-evm/src/shell.rs"),
+        String::from("runtime/uo-evm/src/state.rs"),
+        String::from("runtime/uo-evm/src/theorem.rs"),
+    ];
+    let runtime_call_outcome_surface_restricted =
+        runtime_call_outcome_surface_files == expected_runtime_call_outcome_surface_files;
+    let runtime_call_outcome_runtime_private = runtime_module_source
+        .contains("pub(crate) struct RuntimeCallOutcome")
+        && !runtime_module_source.contains("pub struct RuntimeCallOutcome");
     let state_enforces_confidential_commit_budget = state_source
         .contains("recorder.physical_write_count() > max_commit_ops")
         && state_source.contains("exceeded manifest commit budget");
@@ -9119,12 +9132,30 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && kernel_source.contains("slots: Vec<Option<Value>>"),
         }),
         json!({
+            "name": "RuntimeCallOutcome",
+            "owner": "runtime/uo-evm/src/runtime.rs",
+            "boundary": "runtime-only per-call outcome bundle; state.rs and shell.rs construct it, theorem.rs consumes it whole, and engine.rs does not unpack it directly",
+            "checked": runtime_call_outcome_runtime_private
+                && runtime_call_outcome_surface_restricted
+                && state_confidential_outcome_layering_is_explicit
+                && theorem_finalizes_execution_trace
+                && engine_public_trace_uses_output_shape_only,
+        }),
+        json!({
             "name": "RuntimeShadowState / ConfidentialRuntimeShadowState / PublicRuntimeShadowState / CommittedRuntimeState",
             "owner": "runtime/uo-evm/src/state.rs",
             "boundary": "secret-bearing committed/shadow object maps stay inside crate::runtime, with distinct public and confidential shadow wrappers delimiting the shell boundary",
             "checked": state_wrapper_present
                 && state_only_runtime_helper_surface_restricted
                 && state_only_kernel_helper_surface_restricted,
+        }),
+        json!({
+            "name": "CommittedRuntimeWitnessSnapshot",
+            "owner": "runtime/uo-evm/src/state.rs",
+            "boundary": "opaque hidden ORAM witness snapshot captured in CallTraceContext and projected only through theorem.rs",
+            "checked": state_committed_runtime_witness_snapshot_is_opaque
+                && theorem_only_runtime_helper_surface_restricted
+                && theorem_finalizes_execution_trace,
         }),
         json!({
             "name": "RuntimeObject graph",
@@ -9274,6 +9305,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             state_routes_confidential_calls_through_runtime_kernel,
         "state_confidential_outcome_layering_is_explicit":
             state_confidential_outcome_layering_is_explicit,
+        "runtime_call_outcome_surface_files": runtime_call_outcome_surface_files,
+        "expected_runtime_call_outcome_surface_files":
+            expected_runtime_call_outcome_surface_files,
+        "runtime_call_outcome_surface_restricted":
+            runtime_call_outcome_surface_restricted,
+        "runtime_call_outcome_runtime_private":
+            runtime_call_outcome_runtime_private,
         "state_enforces_confidential_commit_budget":
             state_enforces_confidential_commit_budget,
         "oram_working_stash_capacity_checks": oram_working_stash_capacity_checks,
