@@ -32,6 +32,7 @@
   "confidential_exec_state_surface_restricted": true,
   "confidential_exec_state_wipes_on_drop": true,
   "confidential_execution_outcome_derive_line": "#[derive(Debug)]",
+  "confidential_execution_outcome_fields_private": true,
   "confidential_execution_outcome_nonclone": true,
   "confidential_kernel_run_outcome_api_is_explicit": true,
   "confidential_kernel_run_outcome_derive_line": "#[derive(Debug)]",
@@ -1550,6 +1551,7 @@
     }
   ],
   "theorem_certificate_constructor_surface_restricted": true,
+  "theorem_finalize_input_fields_private": true,
   "theorem_finalizer_omits_runtime_telemetry": true,
   "theorem_finalizes_execution_trace": true,
   "theorem_only_runtime_helper_surface_checks": [

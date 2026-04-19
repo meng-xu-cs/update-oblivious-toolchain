@@ -85,8 +85,8 @@ struct ConfidentialExecState {
 
 #[derive(Debug)]
 struct ConfidentialExecutionOutcome {
-    pub aborted: bool,
-    pub return_value: Option<Value>,
+    aborted: bool,
+    return_value: Option<Value>,
 }
 
 impl ConfidentialExecState {

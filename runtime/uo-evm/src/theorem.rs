@@ -41,27 +41,27 @@ impl CallTraceContext {
 }
 
 struct FinalizeExecutionTraceInput<'a> {
-    pub artifact: &'a CompiledArtifact,
-    pub entrypoint: &'a str,
-    pub confidential: bool,
-    pub deploy_seed: u64,
-    pub opcode_trace: Vec<String>,
-    pub gas_used: u64,
-    pub trace_bundle: crate::controller::CallTraceBundle,
-    pub runtime_kernel_witness: RuntimeKernelWitness,
-    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    pub runtime_witness_state: TracedRuntimeCallWitnessState,
+    artifact: &'a CompiledArtifact,
+    entrypoint: &'a str,
+    confidential: bool,
+    deploy_seed: u64,
+    opcode_trace: Vec<String>,
+    gas_used: u64,
+    trace_bundle: crate::controller::CallTraceBundle,
+    runtime_kernel_witness: RuntimeKernelWitness,
+    runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
+    runtime_witness_state: TracedRuntimeCallWitnessState,
 }
 
 struct FinalizeCallTraceInput<'a> {
-    pub context: CallTraceContext,
-    pub artifact: &'a CompiledArtifact,
-    pub entrypoint: &'a str,
-    pub confidential: bool,
-    pub deploy_seed: u64,
-    pub manifest_entry: &'a EntrypointManifest,
-    pub manifest_objects: &'a [StateObjectManifest],
-    pub traced_outcome: TracedRuntimeCallOutcome,
+    context: CallTraceContext,
+    artifact: &'a CompiledArtifact,
+    entrypoint: &'a str,
+    confidential: bool,
+    deploy_seed: u64,
+    manifest_entry: &'a EntrypointManifest,
+    manifest_objects: &'a [StateObjectManifest],
+    traced_outcome: TracedRuntimeCallOutcome,
 }
 
 pub(crate) struct FinalizedCallTrace {

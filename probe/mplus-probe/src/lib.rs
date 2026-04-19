@@ -9423,6 +9423,39 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("theorem private-surface restriction flag must be boolean")
     });
+    let theorem_finalize_input_fields_private = theorem_source
+        .contains("artifact: &'a CompiledArtifact")
+        && theorem_source.contains("entrypoint: &'a str")
+        && theorem_source.contains("confidential: bool")
+        && theorem_source.contains("deploy_seed: u64")
+        && theorem_source.contains("opcode_trace: Vec<String>")
+        && theorem_source.contains("gas_used: u64")
+        && theorem_source.contains("trace_bundle: crate::controller::CallTraceBundle")
+        && theorem_source.contains("runtime_kernel_witness: RuntimeKernelWitness")
+        && theorem_source.contains(
+            "runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness",
+        )
+        && theorem_source.contains("runtime_witness_state: TracedRuntimeCallWitnessState")
+        && theorem_source.contains("context: CallTraceContext")
+        && theorem_source.contains("manifest_entry: &'a EntrypointManifest")
+        && theorem_source.contains("manifest_objects: &'a [StateObjectManifest]")
+        && theorem_source.contains("traced_outcome: TracedRuntimeCallOutcome")
+        && !theorem_source.contains("pub artifact: &'a CompiledArtifact")
+        && !theorem_source.contains("pub entrypoint: &'a str")
+        && !theorem_source.contains("pub confidential: bool")
+        && !theorem_source.contains("pub deploy_seed: u64")
+        && !theorem_source.contains("pub opcode_trace: Vec<String>")
+        && !theorem_source.contains("pub gas_used: u64")
+        && !theorem_source.contains("pub trace_bundle: crate::controller::CallTraceBundle")
+        && !theorem_source.contains("pub runtime_kernel_witness: RuntimeKernelWitness")
+        && !theorem_source.contains(
+            "pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness",
+        )
+        && !theorem_source.contains("pub runtime_witness_state: TracedRuntimeCallWitnessState")
+        && !theorem_source.contains("pub context: CallTraceContext")
+        && !theorem_source.contains("pub manifest_entry: &'a EntrypointManifest")
+        && !theorem_source.contains("pub manifest_objects: &'a [StateObjectManifest]")
+        && !theorem_source.contains("pub traced_outcome: TracedRuntimeCallOutcome");
     let theorem_certificate_constructor_checks = [
         (
             "RuntimeControllerObserverCertificate::new(",
@@ -9916,6 +9949,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .ok_or_else(|| anyhow!("failed to locate ConfidentialExecutionOutcome declaration"))?;
     let confidential_execution_outcome_nonclone =
         !confidential_execution_outcome_derive_line.contains("Clone");
+    let confidential_execution_outcome_fields_private = kernel_source
+        .contains("struct ConfidentialExecutionOutcome")
+        && kernel_source.contains("aborted: bool")
+        && kernel_source.contains("return_value: Option<Value>")
+        && !kernel_source.contains("pub aborted: bool")
+        && !kernel_source.contains("pub return_value: Option<Value>");
     let confidential_exec_state_wipes_on_drop = kernel_source
         .contains("impl Drop for ConfidentialExecState")
         && kernel_source.contains("for slot in &mut self.slots {")
@@ -10652,6 +10691,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && confidential_exec_state_nonclone
                 && confidential_exec_state_surface_restricted
                 && confidential_execution_outcome_nonclone
+                && confidential_execution_outcome_fields_private
                 && confidential_exec_state_wipes_on_drop,
         }),
         json!({
@@ -10868,6 +10908,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "theorem_private_surface_checks": theorem_private_surface_checks,
         "theorem_private_surface_restricted":
             theorem_private_surface_restricted,
+        "theorem_finalize_input_fields_private":
+            theorem_finalize_input_fields_private,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -11044,6 +11086,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             confidential_execution_outcome_derive_line,
         "confidential_execution_outcome_nonclone":
             confidential_execution_outcome_nonclone,
+        "confidential_execution_outcome_fields_private":
+            confidential_execution_outcome_fields_private,
         "confidential_exec_state_wipes_on_drop":
             confidential_exec_state_wipes_on_drop,
         "confidential_committed_kernel_outcome_derive_line":
@@ -11210,6 +11254,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_confidential_call_inputs_wrapper_restricted
             && theorem_finalizes_execution_trace
             && theorem_private_surface_restricted
+            && theorem_finalize_input_fields_private
             && theorem_certificate_constructor_surface_restricted
             && controller_theorem_trace_constructor_surface_restricted
             && public_trace_helper_surface_restricted
