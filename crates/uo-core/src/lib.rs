@@ -71,7 +71,7 @@ pub use trace::{
     RuntimeOramLeafWitness, RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate,
     RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
     RuntimePathOramTransitionWitness, RuntimeRefinementWitness, RuntimeTrustedKernelBundle,
-    SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
+    RuntimeExecutionTraceParts, SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
     SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace, TheoremTrace, TraceHashBundle,
     WriteClass,
 };

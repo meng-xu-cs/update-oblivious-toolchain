@@ -8410,6 +8410,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             vec![String::from("crates/uo-core/src/trace.rs")],
         ),
         (
+            "pub fn from_runtime_trace_parts(",
+            vec![String::from("crates/uo-core/src/trace.rs")],
+        ),
+        (
             "pub fn runtime_trusted_kernel_bundle(",
             vec![String::from("crates/uo-core/src/trace.rs")],
         ),
@@ -9367,7 +9371,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains("runtime.witness_snapshot()?;")
         && !theorem_source.contains("CallRecorder::begin_with_input_len(")
         && theorem_source.contains("fn finalize_execution_trace")
-        && theorem_source.contains("ExecutionTrace {")
+        && theorem_source.contains("ExecutionTrace::from_runtime_trace_parts(")
+        && !theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness")
         && theorem_source
             .contains("traced_outcome.into_finalized_call_trace_parts(runtime_call_start)")
@@ -9432,7 +9437,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/theorem.rs")],
         ),
         (
-            "ExecutionTrace {",
+            "ExecutionTrace::from_runtime_trace_parts(",
             vec![String::from("runtime/uo-evm/src/theorem.rs")],
         ),
     ]
@@ -10490,7 +10495,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && runtime_evm_lib_source
             .contains("pub use engine::{CallTelemetry, DiagnosticCallResult};");
     let theorem_finalizer_omits_runtime_telemetry = theorem_source
-        .contains("let mut trace = ExecutionTrace {")
+        .contains("let mut trace = ExecutionTrace::from_runtime_trace_parts(")
         && theorem_source.contains("let zero_writes = trace_bundle.metrics.zero_writes;")
         && theorem_source.contains("Ok(FinalizedCallTrace {")
         && theorem_source.contains("zero_writes,")
@@ -13045,8 +13050,8 @@ through the theorem-side `run_traced_call(...)` bridge rather than by
 those theorem-path objects directly. The same report now also pins the
 theorem-facing constructor surface itself: `RuntimeControllerObserverCertificate::new`,
 `RuntimePathOramHiddenCertificate::new`, and
-`RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus the final
-`ExecutionTrace { ... }` assembly must stay confined to
+`RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus
+`ExecutionTrace::from_runtime_trace_parts(...)` must stay confined to
 `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
 construction must stay confined to `runtime/uo-evm/src/controller.rs`. The
 same boundary report now also pins the public-trace helper surface:

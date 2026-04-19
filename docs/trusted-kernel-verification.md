@@ -193,10 +193,14 @@ phase witness's pre/post boundary schedules.
 
 That direct bundle is also serialized with the trace. After a
 serialize/deserialize round trip, `ExecutionTrace::runtime_trusted_kernel_bundle`
-and `ExecutionTrace::runtime_refinement_witness` still use the stored bundle
-rather than falling back to theorem-trace sidecars. The reconstruction path now
-exists only for backward compatibility with traces that do not yet carry the
-explicit bundle.
+and `ExecutionTrace::runtime_refinement_witness` still accept the stored bundle
+only if it revalidates against the surrounding execution-trace fields; a stored
+bundle is no longer authoritative by itself after those fields are scrubbed or
+drift. The standalone confidential kernel witness is likewise exported only
+through the dedicated `runtime_kernel_witness` field rather than being
+recovered from the stored bundle. The reconstruction path now exists only for
+traces that genuinely still carry the matching theorem/controller/hidden trace
+state needed to rebuild the bundle exactly.
 
 ## Validation Path
 

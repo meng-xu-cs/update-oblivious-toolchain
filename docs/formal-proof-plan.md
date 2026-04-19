@@ -723,8 +723,9 @@ Current status:
   proof-grade `checkProofGradeRuntimeTrustedKernel` checker
 - the full runtime witness is now reconstructed from that explicit trusted
   kernel bundle rather than treated as the primitive bridge object, and
-  runtime-emitted traces now store that direct bundle so witness extraction on
-  emitted artifacts no longer depends on theorem-trace-side reconstruction
+  runtime-emitted traces now store that direct bundle under an exactness check
+  against the surrounding execution-trace fields rather than treating the
+  stored bundle as authoritative by itself
 
 Remaining change:
 
@@ -814,11 +815,12 @@ missing bridge engineering:
 1. keep the surrogate backend explicitly marked as legacy/benchmark-only in the
    proof-facing docs and claim surface
 2. preserve the small trusted kernel boundary around emitted certificates,
-   the trusted-kernel bundle, witnesses reconstructed from that bundle, and
-   the direct Lean-checked translation boundary; the proof-grade path now
-   already accepts separately materialized artifacts directly, so the remaining
-   work is to keep any residual Rust-side convenience/debug emission fully out
-   of that proof-facing path
+   the trusted-kernel bundle, witnesses reconstructed from that bundle only
+   after exact trace-field revalidation, and the direct Lean-checked
+   translation boundary; the proof-grade path now already accepts separately
+   materialized artifacts directly, so the remaining work is to keep any
+   residual Rust-side convenience/debug emission fully out of that
+   proof-facing path
 3. cite the external Path ORAM theorem source at
    `PathOramLocalPosmapV1StandardTheoremTarget`
 4. keep the stronger theorem-provenance swap isolated from the theorem

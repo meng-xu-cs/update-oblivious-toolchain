@@ -420,8 +420,8 @@ The current runtime has a first hardening layer:
 - the theorem-facing constructor surface is now pinned as well:
   `RuntimeControllerObserverCertificate::new`,
   `RuntimePathOramHiddenCertificate::new`, and
-  `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus final
-  `ExecutionTrace { ... }` assembly stay confined to
+  `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus
+  `ExecutionTrace::from_runtime_trace_parts(...)` stay confined to
   `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
   construction stays confined to `runtime/uo-evm/src/controller.rs`
 - the public-trace helper surface is pinned too:

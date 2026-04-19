@@ -8,8 +8,9 @@ use anyhow::Result;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, OutputShape, RuntimeControllerObserverCertificate,
-    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness,
-    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, Value,
+    RuntimeExecutionTraceParts, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
+    RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle,
+    Value,
 };
 
 struct CallTraceContext {
@@ -149,7 +150,7 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         runtime_oram_position_map_after,
     ) = runtime_witness_state.into_execution_trace_parts();
 
-    let mut trace = ExecutionTrace {
+    let mut trace = ExecutionTrace::from_runtime_trace_parts(RuntimeExecutionTraceParts {
         opcode_trace,
         logical_accesses: trace_bundle.logical_accesses,
         logical_writes: trace_bundle.logical_writes,
@@ -160,7 +161,6 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         runtime_seed: Some(deploy_seed),
         runtime_kernel_witness: Some(runtime_kernel_witness.clone()),
         runtime_kernel_refinement_witness: Some(runtime_kernel_refinement_witness),
-        runtime_trusted_kernel_bundle: None,
         runtime_controller_certificate: Some(trace_bundle.controller_certificate),
         runtime_oram_objects: runtime_oram_objects(artifact),
         runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
@@ -169,7 +169,7 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         runtime_oram_position_map_before,
         runtime_oram_position_map_after,
         runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
-    };
+    });
     if confidential {
         trace
             .runtime_kernel_witness_for_confidential(artifact, entrypoint)

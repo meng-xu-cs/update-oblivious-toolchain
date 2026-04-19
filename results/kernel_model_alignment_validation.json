@@ -355,6 +355,16 @@
       "files": [
         "crates/uo-core/src/trace.rs"
       ],
+      "pattern": "pub fn from_runtime_trace_parts(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
       "pattern": "pub fn runtime_trusted_kernel_bundle(",
       "restricted": true
     },

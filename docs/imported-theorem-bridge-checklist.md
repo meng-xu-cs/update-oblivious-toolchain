@@ -20,7 +20,10 @@ The repo path here is:
 - an explicit runtime trusted-kernel bundle packaging those certificates
 - a proof-grade trusted-kernel slot bundle packaging that trusted-kernel
   bundle together with the admitted confidential slot DSL object
-- direct runtime witness reconstruction from that trusted-kernel bundle
+- direct runtime witness reconstruction from that trusted-kernel bundle after
+  revalidating it against the surrounding execution trace, while the
+  standalone confidential kernel witness remains sourced from the dedicated
+  `runtime_kernel_witness` field
 - Lean-checked theorem-facing validation of the resulting witness artifacts
 
 Status labels:

@@ -3683,7 +3683,73 @@ pub struct ExecutionTrace {
     pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct RuntimeExecutionTraceParts {
+    pub opcode_trace: Vec<String>,
+    pub logical_accesses: Vec<LogicalEvent>,
+    pub logical_writes: Vec<LogicalEvent>,
+    pub physical_reads: Vec<PhysicalReadEvent>,
+    pub physical_writes: Vec<PhysicalWriteEvent>,
+    pub gas_used: u64,
+    pub theorem_trace: TheoremTrace,
+    pub runtime_seed: Option<u64>,
+    pub runtime_kernel_witness: Option<RuntimeKernelWitness>,
+    pub runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,
+    pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
+    pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
+    pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+}
+
 impl ExecutionTrace {
+    pub fn from_runtime_trace_parts(parts: RuntimeExecutionTraceParts) -> Self {
+        let RuntimeExecutionTraceParts {
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            gas_used,
+            theorem_trace,
+            runtime_seed,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            runtime_controller_certificate,
+            runtime_oram_objects,
+            runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions,
+        } = parts;
+        Self {
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            gas_used,
+            theorem_trace,
+            runtime_seed,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            runtime_trusted_kernel_bundle: None,
+            runtime_controller_certificate,
+            runtime_oram_objects,
+            runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions,
+        }
+    }
+
     pub fn hashes(&self) -> TraceHashBundle {
         let normalized_physical = self
             .physical_writes
