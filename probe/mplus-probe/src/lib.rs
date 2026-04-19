@@ -7708,6 +7708,7 @@ fn collect_lean_pattern_hits(root: &Path, pattern: &str) -> Result<Vec<String>> 
 }
 
 fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
+    let core_src = repo_root().join("crates/uo-core/src");
     let precompiles_path = repo_root().join("runtime/uo-precompiles/src/lib.rs");
     let core_trace_path = repo_root().join("crates/uo-core/src/trace.rs");
     let confidential_kernel_path = repo_root().join("crates/uo-core/src/confidential_kernel.rs");
@@ -8095,6 +8096,124 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let runtime_shell_boundary_lowering_bundle_field_names_match =
         rust_runtime_shell_boundary_lowering_bundle_field_names
             == lean_runtime_shell_boundary_lowering_bundle_field_names;
+    let shell_boundary_exact_bridge_checks = [
+        (
+            "pub fn shell_contract(&self) -> RuntimeShellContract {",
+            vec![String::from("crates/uo-core/src/shell_boundary.rs")],
+        ),
+        (
+            "pub fn shell_trace(&self) -> RuntimeShellTrace {",
+            vec![String::from("crates/uo-core/src/shell_boundary.rs")],
+        ),
+        (
+            "let shell_contract = kernel_witness.shell_contract();",
+            vec![String::from("crates/uo-core/src/shell_boundary.rs")],
+        ),
+        (
+            "let shell_trace = runtime_kernel_refinement_witness.shell_trace();",
+            vec![String::from("crates/uo-core/src/shell_boundary.rs")],
+        ),
+        (
+            "pub fn runtime_shell_boundary_bundle(",
+            vec![String::from("crates/uo-core/src/shell_boundary.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&core_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let shell_boundary_exact_bridge_surface_restricted =
+        shell_boundary_exact_bridge_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("shell-boundary exact bridge restriction flag must be boolean")
+        });
+    let shell_boundary_bundle_refinement_guard_present =
+        shell_boundary_source.contains("if !shell_trace.refines_contract(&shell_contract) {");
+    let confidential_core_bundle_bridge_checks = [
+        (
+            "pub fn runtime_confidential_core_bundle(",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "pub fn runtime_confidential_core_slot_bundle(",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "pub fn runtime_confidential_core_lowering_bundle(",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "pub fn runtime_confidential_core_shell_boundary_lowering_bundle(",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "pub fn runtime_confidential_core_shell_boundary_slot_bundle(",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&core_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let confidential_core_bundle_bridge_surface_restricted =
+        confidential_core_bundle_bridge_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("confidential-core bridge restriction flag must be boolean")
+        });
+    let confidential_core_reuses_shell_boundary_bundle_only = confidential_core_source
+        .contains("RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness.clone())?;")
+        && !confidential_core_source.contains(".shell_contract()")
+        && !confidential_core_source.contains(".shell_trace()");
+    let lean_shell_boundary_bundle_checks_exact_runtime_views = lean_runtime_shell_boundary_source
+        .contains("bundle.shell_contract = bundle.kernel_witness.importedShellContract")
+        && lean_runtime_shell_boundary_source.contains(
+            "bundle.shell_trace = bundle.runtime_kernel_refinement_witness.importedShellTrace",
+        )
+        && lean_runtime_shell_boundary_source
+            .contains("bundle.shell_trace.Refines bundle.shell_contract");
+    let lean_confidential_core_proof_grade_assurance_present = lean_runtime_confidential_core_source
+        .contains("theorem importedRuntimeConfidentialCoreBundle_proofGradeAssurance")
+        && lean_runtime_confidential_core_source.contains("kernelWitness.expected_kernel_steps =")
+        && lean_runtime_confidential_core_source.contains(
+            "kernelWitness.kernel_steps = bundle.confidential_program.expectedRuntimeKernelSteps",
+        )
+        && lean_runtime_confidential_core_source.contains(
+            "runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract",
+        );
+    let lean_confidential_core_shell_boundary_slot_exactness_present =
+        lean_runtime_confidential_core_shell_boundary_slot_source.contains(
+            "bundle.runtime_witness.kernel_witness = some bundle.shell_boundary_bundle.kernel_witness",
+        ) && lean_runtime_confidential_core_shell_boundary_slot_source.contains(
+            "bundle.runtime_witness.runtime_kernel_refinement_witness =",
+        ) && lean_runtime_confidential_core_shell_boundary_slot_source.contains(
+            "some bundle.shell_boundary_bundle.runtime_kernel_refinement_witness",
+        );
+    let lean_confidential_core_shell_boundary_lowering_exactness_present =
+        lean_runtime_confidential_core_shell_boundary_lowering_source.contains(
+            "theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_kernelWitness_exact",
+        ) && lean_runtime_confidential_core_shell_boundary_lowering_source.contains(
+            "theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_runtimeKernelRefinementWitness_exact",
+        ) && lean_runtime_confidential_core_shell_boundary_lowering_source.contains(
+            "theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_namedSchedule_exact",
+        ) && lean_runtime_confidential_core_shell_boundary_lowering_source.contains(
+            "theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_recomputedSlotSchedule_exact",
+        );
 
     let resource_event_kind_serde_snake_case =
         rust_enum_has_serde_snake_case(&core_trace_source, "RuntimeKernelResourceEventKindWitness");
@@ -8146,6 +8265,14 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_shell_boundary_bundle_field_names_match
         && runtime_shell_boundary_slot_bundle_field_names_match
         && runtime_shell_boundary_lowering_bundle_field_names_match
+        && shell_boundary_exact_bridge_surface_restricted
+        && shell_boundary_bundle_refinement_guard_present
+        && confidential_core_bundle_bridge_surface_restricted
+        && confidential_core_reuses_shell_boundary_bundle_only
+        && lean_shell_boundary_bundle_checks_exact_runtime_views
+        && lean_confidential_core_proof_grade_assurance_present
+        && lean_confidential_core_shell_boundary_slot_exactness_present
+        && lean_confidential_core_shell_boundary_lowering_exactness_present
         && resource_event_kind_serde_snake_case
         && scratch_region_serde_snake_case
         && refinement_event_kind_serde_snake_case
@@ -8323,6 +8450,25 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             lean_runtime_shell_boundary_lowering_bundle_field_names,
         "runtime_shell_boundary_lowering_bundle_field_names_match":
             runtime_shell_boundary_lowering_bundle_field_names_match,
+        "shell_boundary_exact_bridge_checks": shell_boundary_exact_bridge_checks,
+        "shell_boundary_exact_bridge_surface_restricted":
+            shell_boundary_exact_bridge_surface_restricted,
+        "shell_boundary_bundle_refinement_guard_present":
+            shell_boundary_bundle_refinement_guard_present,
+        "confidential_core_bundle_bridge_checks":
+            confidential_core_bundle_bridge_checks,
+        "confidential_core_bundle_bridge_surface_restricted":
+            confidential_core_bundle_bridge_surface_restricted,
+        "confidential_core_reuses_shell_boundary_bundle_only":
+            confidential_core_reuses_shell_boundary_bundle_only,
+        "lean_shell_boundary_bundle_checks_exact_runtime_views":
+            lean_shell_boundary_bundle_checks_exact_runtime_views,
+        "lean_confidential_core_proof_grade_assurance_present":
+            lean_confidential_core_proof_grade_assurance_present,
+        "lean_confidential_core_shell_boundary_slot_exactness_present":
+            lean_confidential_core_shell_boundary_slot_exactness_present,
+        "lean_confidential_core_shell_boundary_lowering_exactness_present":
+            lean_confidential_core_shell_boundary_lowering_exactness_present,
         "resource_event_kind_serde_snake_case": resource_event_kind_serde_snake_case,
         "scratch_region_serde_snake_case": scratch_region_serde_snake_case,
         "refinement_event_kind_serde_snake_case": refinement_event_kind_serde_snake_case,

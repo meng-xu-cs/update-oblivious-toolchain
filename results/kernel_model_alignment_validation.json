@@ -1,5 +1,59 @@
 {
   "accepted": true,
+  "confidential_core_bundle_bridge_checks": [
+    {
+      "expected_files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "pattern": "pub fn runtime_confidential_core_bundle(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "pattern": "pub fn runtime_confidential_core_slot_bundle(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "pattern": "pub fn runtime_confidential_core_lowering_bundle(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "pattern": "pub fn runtime_confidential_core_shell_boundary_lowering_bundle(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/confidential_core.rs"
+      ],
+      "pattern": "pub fn runtime_confidential_core_shell_boundary_slot_bundle(",
+      "restricted": true
+    }
+  ],
+  "confidential_core_bundle_bridge_surface_restricted": true,
+  "confidential_core_reuses_shell_boundary_bundle_only": true,
   "confidential_kernel_expr_kind_names_match": true,
   "confidential_kernel_expr_serde_snake_case": true,
   "confidential_kernel_param_field_names_match": true,
@@ -15,6 +69,9 @@
   "confidential_kernel_slot_statement_serde_snake_case": true,
   "confidential_kernel_statement_kind_names_match": true,
   "confidential_kernel_statement_serde_snake_case": true,
+  "lean_confidential_core_proof_grade_assurance_present": true,
+  "lean_confidential_core_shell_boundary_lowering_exactness_present": true,
+  "lean_confidential_core_shell_boundary_slot_exactness_present": true,
   "lean_confidential_kernel_expr_kind_names": [
     "literal",
     "var",
@@ -183,6 +240,7 @@
     "hash_scratch",
     "io_scratch"
   ],
+  "lean_shell_boundary_bundle_checks_exact_runtime_views": true,
   "opcode_names_match": true,
   "refinement_event_kind_names_match": true,
   "refinement_event_kind_serde_snake_case": true,
@@ -370,6 +428,60 @@
   ],
   "scratch_region_names_match": true,
   "scratch_region_serde_snake_case": true,
+  "shell_boundary_bundle_refinement_guard_present": true,
+  "shell_boundary_exact_bridge_checks": [
+    {
+      "expected_files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "pattern": "pub fn shell_contract(&self) -> RuntimeShellContract {",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "pattern": "pub fn shell_trace(&self) -> RuntimeShellTrace {",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "pattern": "let shell_contract = kernel_witness.shell_contract();",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "pattern": "let shell_trace = runtime_kernel_refinement_witness.shell_trace();",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/shell_boundary.rs"
+      ],
+      "pattern": "pub fn runtime_shell_boundary_bundle(",
+      "restricted": true
+    }
+  ],
+  "shell_boundary_exact_bridge_surface_restricted": true,
   "sources": {
     "lean_runtime_confidential_core": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean",
     "lean_runtime_confidential_core_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean",

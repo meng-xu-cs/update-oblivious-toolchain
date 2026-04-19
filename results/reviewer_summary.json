@@ -124,13 +124,13 @@
         "report": "pathoram_pair_validation"
       },
       {
-        "bytes": 297474,
+        "bytes": 297473,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_lowering_validation"
       },
       {
-        "bytes": 295540,
+        "bytes": 295551,
         "estimated": false,
         "metric": "confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes",
         "report": "confidential_core_shell_boundary_slot_validation"
@@ -154,19 +154,19 @@
         "report": "seeded_witness_validation"
       },
       {
-        "bytes": 195526,
+        "bytes": 195527,
         "estimated": false,
         "metric": "confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes",
         "report": "confidential_core_lowering_validation"
       },
       {
-        "bytes": 193955,
+        "bytes": 193964,
         "estimated": false,
         "metric": "confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes",
         "report": "confidential_core_validation"
       },
       {
-        "bytes": 193606,
+        "bytes": 193603,
         "estimated": false,
         "metric": "confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes",
         "report": "confidential_core_slot_validation"
@@ -233,38 +233,38 @@
     }
   ],
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 56673,
-    "confidential_core_lowering_validation": 2801,
-    "confidential_core_shell_boundary_lowering_validation": 2793,
+    "canonical_pathoram_pair_validation": 56042,
+    "confidential_core_lowering_validation": 2966,
+    "confidential_core_shell_boundary_lowering_validation": 2748,
     "confidential_core_shell_boundary_slot_validation": 2761,
-    "confidential_core_slot_validation": 2656,
-    "confidential_core_validation": 2987,
+    "confidential_core_slot_validation": 2762,
+    "confidential_core_validation": 2906,
     "confidential_fragment_validation": 0,
-    "controller_observer_validation": 2916,
-    "correctness": 1207,
-    "fresh_coin_validation": 13817,
-    "kernel_dsl_validation": 2757,
-    "kernel_lowering_validation": 2831,
-    "kernel_model_alignment_validation": 3,
-    "kernel_refinement_validation": 2645,
-    "kernel_slot_dsl_validation": 2885,
-    "kernel_validation": 2757,
-    "leakage_auc": 2504,
-    "mutual_information": 2503,
+    "controller_observer_validation": 2907,
+    "correctness": 1206,
+    "fresh_coin_validation": 13753,
+    "kernel_dsl_validation": 2918,
+    "kernel_lowering_validation": 2858,
+    "kernel_model_alignment_validation": 19,
+    "kernel_refinement_validation": 2837,
+    "kernel_slot_dsl_validation": 2708,
+    "kernel_validation": 2824,
+    "leakage_auc": 2505,
+    "mutual_information": 2505,
     "overheads": 115,
-    "pathoram_hidden_validation": 2121,
-    "pathoram_pair_validation": 6045,
-    "runtime_boundary_validation": 301,
-    "seeded_witness_validation": 3127,
-    "shell_boundary_lowering_validation": 2857,
-    "shell_boundary_slot_validation": 2989,
-    "shell_boundary_validation": 2914,
-    "static_checks": 1641,
-    "tamper_validation": 10031,
-    "total_probe_ms": 147077,
-    "trace_equivalence": 2730,
-    "trusted_kernel_validation": 2705,
-    "witness_validation": 1835
+    "pathoram_hidden_validation": 2119,
+    "pathoram_pair_validation": 6043,
+    "runtime_boundary_validation": 302,
+    "seeded_witness_validation": 3115,
+    "shell_boundary_lowering_validation": 2978,
+    "shell_boundary_slot_validation": 2712,
+    "shell_boundary_validation": 2475,
+    "static_checks": 1573,
+    "tamper_validation": 10696,
+    "total_probe_ms": 147022,
+    "trace_equivalence": 2725,
+    "trusted_kernel_validation": 2939,
+    "witness_validation": 1837
   },
   "runtime_overheads": {
     "cases": [

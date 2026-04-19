@@ -429,6 +429,27 @@ The current runtime has a first hardening layer:
   `CallRecorder::begin_with_input_len(...)` stay confined to
   `runtime/uo-evm/src/state.rs`, while `output_shape_of(...)` stays confined
   to `runtime/uo-evm/src/controller.rs` and `runtime/uo-evm/src/theorem.rs`
+- the shell-boundary bridge is now pinned in the same style:
+  `RuntimeKernelWitness::shell_contract(...)`,
+  `RuntimeKernelRefinementWitness::shell_trace(...)`, the exact
+  `shell_contract` / `shell_trace` packaging inside
+  `RuntimeShellBoundaryBundle::from_witnesses(...)`, and
+  `ExecutionTrace::runtime_shell_boundary_bundle(...)` all stay confined to
+  `crates/uo-core/src/shell_boundary.rs`; the anti-drift report also requires
+  that downstream confidential-core bundles reuse that explicit
+  `RuntimeShellBoundaryBundle` rather than rederive shell summaries, and that
+  Lean keeps checking exact equality between the exported shell bundle and the
+  witness-induced shell views before accepting the public shell-refinement
+  claim
+- the confidential-core theorem bundle family is pinned too:
+  `ExecutionTrace::runtime_confidential_core_bundle(...)`,
+  `runtime_confidential_core_slot_bundle(...)`,
+  `runtime_confidential_core_lowering_bundle(...)`,
+  `runtime_confidential_core_shell_boundary_lowering_bundle(...)`, and
+  `runtime_confidential_core_shell_boundary_slot_bundle(...)` stay confined to
+  `crates/uo-core/src/confidential_core.rs`, and the anti-drift report now
+  also checks that the Lean side still carries the exact proof-grade assurance
+  / witness-equality / named-vs-slot exactness theorems for those bundles
 - the hidden traced-call witness staging objects in `state.rs` now also wipe
   their access-counter and position-map vectors on drop unless the theorem
   finalizer explicitly consumes them

@@ -415,7 +415,16 @@ The first implementation step is now present in the codebase:
   names, and the Rust witness event alphabets against the explicit Lean
   vocabularies for opcodes, DSL variants and fields, runtime shell-contract /
   shell-trace / shell-boundary / shell-boundary-lowering field names,
-  resource-event kinds, scratch regions, and refinement-event kinds
+  resource-event kinds, scratch regions, and refinement-event kinds; that same
+  report now also pins the exact shell-boundary bridge surface to
+  `crates/uo-core/src/shell_boundary.rs`, requires the Rust bridge to derive
+  `shell_contract` and `shell_trace` only from the kernel/refinement witness
+  views plus an explicit `refines_contract` guard, requires downstream
+  confidential-core bundles to reuse `RuntimeShellBoundaryBundle` rather than
+  rederive shell summaries, requires the confidential-core theorem bundle
+  entrypoints to stay confined to `crates/uo-core/src/confidential_core.rs`,
+  and requires Lean to keep validating exact equality to those witness-induced
+  shell views and confidential-core proof-grade equalities
 - the boundary report now also checks constructor authority for those witness
   alphabets: production runtime phase-witness events are restricted to
   `runtime/uo-evm/src/kernel.rs` plus `runtime/uo-evm/src/state.rs`, and
