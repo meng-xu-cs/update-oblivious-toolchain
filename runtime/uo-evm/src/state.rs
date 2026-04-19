@@ -467,7 +467,13 @@ impl CommittedRuntimeState {
         bool,
         Option<Value>,
     )> {
-        let outcome = kernel.run_confidential_call(
+        let (
+            committed_shadow,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            aborted,
+            return_value,
+        ) = kernel.run_confidential_call(
             program,
             self,
             max_hash_part_bytes,
@@ -476,13 +482,6 @@ impl CommittedRuntimeState {
             recorder,
             opcode_trace,
         )?;
-        let (
-            committed_shadow,
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            aborted,
-            return_value,
-        ) = outcome.into_committed_outcome_parts();
         self.objects = committed_shadow.into_cold_committed_state().objects;
         Ok((
             runtime_kernel_witness,

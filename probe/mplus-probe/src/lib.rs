@@ -8855,6 +8855,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let store_store_path = root.join("runtime/uo-store/src/store.rs");
     let checker_path = root.join("checker/uo-check/src/lib.rs");
     let core_trace_path = root.join("crates/uo-core/src/trace.rs");
+    let translation_validation_path = root.join("crates/uo-core/src/translation_validation.rs");
     let core_trusted_kernel_path = root.join("crates/uo-core/src/trusted_kernel.rs");
     let runtime_module_path = root.join("runtime/uo-evm/src/runtime.rs");
     let runtime_evm_lib_path = root.join("runtime/uo-evm/src/lib.rs");
@@ -8933,6 +8934,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&checker_path)))?;
     let core_trace_source = fs::read_to_string(&core_trace_path)
         .with_context(|| format!("reading {}", display_report_path(&core_trace_path)))?;
+    let translation_validation_source = fs::read_to_string(&translation_validation_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&translation_validation_path)
+            )
+        })?;
     let runtime_evm_lib_source = fs::read_to_string(&runtime_evm_lib_path)
         .with_context(|| format!("reading {}", display_report_path(&runtime_evm_lib_path)))?;
     let runtime_evm_cargo_source = fs::read_to_string(&runtime_evm_cargo_path)
@@ -9253,10 +9261,6 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         (
             "struct ConfidentialExecutionOutcome {",
             "pub(crate) struct ConfidentialExecutionOutcome {",
-        ),
-        (
-            "pub(in crate::runtime) struct ConfidentialKernelRunOutcome {",
-            "pub(crate) struct ConfidentialKernelRunOutcome {",
         ),
         (
             "fn record_shadow_load_object(",
@@ -9787,10 +9791,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("self.committed.run_confidential_call(")
         && !state_source.contains("struct ConfidentialCommittedKernelOutcome")
         && !state_source.contains("struct ConfidentialCommittedCallOutcome")
+        && !state_source.contains("ConfidentialKernelRunOutcome")
         && runtime_module_source.contains("struct RuntimeCallOutcome")
         && shell_source.contains("RuntimeCallOutcome")
-        && state_source.contains("outcome.into_committed_outcome_parts();")
+        && state_source.contains("let (\n            committed_shadow,")
         && !state_source.contains("into_runtime_execution_parts(")
+        && !state_source.contains("into_committed_outcome_parts();")
         && !state_source.contains("opcode_trace: Vec::new()");
     let runtime_call_outcome_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "RuntimeCallOutcome")?;
@@ -9964,38 +9970,24 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         vec![String::from("runtime/uo-evm/src/kernel.rs")];
     let confidential_exec_state_surface_restricted =
         confidential_exec_state_surface_files == expected_confidential_exec_state_surface_files;
-    let confidential_kernel_run_outcome_decl =
-        "pub(in crate::runtime) struct ConfidentialKernelRunOutcome";
-    let confidential_kernel_run_outcome_derive_line = kernel_source
-        .split(confidential_kernel_run_outcome_decl)
-        .next()
-        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
-        .map(str::trim)
-        .ok_or_else(|| anyhow!("failed to locate ConfidentialKernelRunOutcome declaration"))?;
+    let confidential_kernel_run_outcome_decl = "ConfidentialKernelRunOutcome";
+    let confidential_kernel_run_outcome_derive_line = String::new();
     let confidential_kernel_run_outcome_nonclone =
-        !confidential_kernel_run_outcome_derive_line.contains("Clone");
+        !kernel_source.contains(confidential_kernel_run_outcome_decl);
     let confidential_kernel_run_outcome_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "ConfidentialKernelRunOutcome")?;
-    let expected_confidential_kernel_run_outcome_surface_files =
-        vec![String::from("runtime/uo-evm/src/kernel.rs")];
+    let expected_confidential_kernel_run_outcome_surface_files = Vec::<String>::new();
     let confidential_kernel_run_outcome_surface_restricted =
         confidential_kernel_run_outcome_surface_files
             == expected_confidential_kernel_run_outcome_surface_files;
-    let confidential_kernel_run_outcome_fields_private = kernel_source
+    let confidential_kernel_run_outcome_fields_private = !kernel_source
         .contains("committed_shadow: ConfidentialRuntimeShadowState")
-        && kernel_source.contains("runtime_kernel_witness: RuntimeKernelWitness")
-        && kernel_source
-            .contains("runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness")
-        && kernel_source.contains("aborted: bool")
-        && kernel_source.contains("return_value: Option<Value>")
-        && !kernel_source.contains("pub committed_shadow: ConfidentialRuntimeShadowState")
-        && !kernel_source.contains("pub runtime_kernel_witness: RuntimeKernelWitness")
+        && !kernel_source.contains("runtime_kernel_witness: RuntimeKernelWitness")
         && !kernel_source
-            .contains("pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness");
-    let confidential_kernel_run_outcome_api_is_explicit = kernel_source
-        .contains("pub(in crate::runtime) fn into_committed_outcome_parts(")
-        && !kernel_source.contains("pub(crate) fn into_committed_outcome_parts(")
-        && !kernel_source.contains("pub fn into_committed_outcome_parts(");
+            .contains("runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness")
+        && !kernel_source.contains("return_value: Option<Value>");
+    let confidential_kernel_run_outcome_api_is_explicit =
+        !kernel_source.contains("into_committed_outcome_parts(");
     let confidential_execution_outcome_decl = "struct ConfidentialExecutionOutcome";
     let confidential_execution_outcome_derive_line = kernel_source
         .split(confidential_execution_outcome_decl)
@@ -10198,6 +10190,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !allocator_source.contains("entry.kernel_steps.is_empty()")
         && !allocator_source.contains("entry.kernel_steps.len()")
         && !allocator_source.contains("program.expected_runtime_steps().len()");
+    let translation_validation_uses_canonical_kernel_step_manifest = translation_validation_source
+        .contains("entrypoint.canonical_kernel_step_manifest()")
+        && !translation_validation_source.contains("entrypoint\n                .kernel_steps");
     let state_uses_checked_manifest_kernel_schedule = state_source
         .contains("let program_expected_kernel_steps = program.expected_runtime_step_witnesses();")
         && state_source
@@ -10890,16 +10885,6 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && confidential_exec_state_wipes_on_drop,
         }),
         json!({
-            "name": "ConfidentialKernelRunOutcome",
-            "owner": "runtime/uo-evm/src/kernel.rs",
-            "boundary": "runtime-only kernel-to-state handoff bundle carrying committed confidential shadow state, witnesses, and the live return value",
-            "checked": kernel_source.contains(confidential_kernel_run_outcome_decl)
-                && confidential_kernel_run_outcome_nonclone
-                && confidential_kernel_run_outcome_surface_restricted
-                && confidential_kernel_run_outcome_fields_private
-                && confidential_kernel_run_outcome_api_is_explicit,
-        }),
-        json!({
             "name": "RuntimeCallOutcome",
             "owner": "runtime/uo-evm/src/runtime.rs",
             "boundary": "runtime-only per-call outcome bundle; construction is pinned to runtime.rs, state.rs, and shell.rs through an explicit constructor, state.rs is the only theorem-packaging consumer of its explicit handoff API, and engine.rs does not unpack it directly",
@@ -11323,6 +11308,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_witness_validation_tracks_confidential_kernel_lowering_errors,
         "allocator_uses_manifest_kernel_step_budget":
             allocator_uses_manifest_kernel_step_budget,
+        "translation_validation_uses_canonical_kernel_step_manifest":
+            translation_validation_uses_canonical_kernel_step_manifest,
         "state_uses_checked_manifest_kernel_schedule":
             state_uses_checked_manifest_kernel_schedule,
         "trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program":
@@ -11508,6 +11495,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && kernel_witness_validation_uses_manifest_confidential_slot_program
             && kernel_witness_validation_tracks_confidential_kernel_lowering_errors
             && allocator_uses_manifest_kernel_step_budget
+            && translation_validation_uses_canonical_kernel_step_manifest
             && state_uses_checked_manifest_kernel_schedule
             && trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program
             && trusted_kernel_cli_uses_slot_bundle
@@ -13376,6 +13364,9 @@ through the theorem-side `run_traced_call(...)` bridge rather than by
 entrypoints from `(CompiledContract, signature)` so `theorem.rs` no longer
 needs the raw `CompiledFunction`; `engine.rs` therefore no longer constructs
 those theorem-path objects directly. The same report now also pins the
+proof-artifact export path: `translation_validation.rs` must project
+kernel-step views through `EntrypointManifest::canonical_kernel_step_manifest()`
+instead of reading the duplicated raw manifest field directly. The same report now also pins the
 theorem-facing constructor surface itself: `RuntimeControllerObserverCertificate::new`,
 `RuntimePathOramHiddenCertificate::new`, and
 `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus

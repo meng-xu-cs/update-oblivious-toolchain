@@ -34,12 +34,10 @@
   "confidential_execution_outcome_fields_private": true,
   "confidential_execution_outcome_nonclone": true,
   "confidential_kernel_run_outcome_api_is_explicit": true,
-  "confidential_kernel_run_outcome_derive_line": "#[derive(Debug)]",
-  "confidential_kernel_run_outcome_fields_private": true,
+  "confidential_kernel_run_outcome_derive_line": "",
+  "confidential_kernel_run_outcome_fields_private": false,
   "confidential_kernel_run_outcome_nonclone": true,
-  "confidential_kernel_run_outcome_surface_files": [
-    "runtime/uo-evm/src/kernel.rs"
-  ],
+  "confidential_kernel_run_outcome_surface_files": [],
   "confidential_kernel_run_outcome_surface_restricted": true,
   "confidential_object_api_surface_checks": [
     {
@@ -202,9 +200,7 @@
   "expected_confidential_exec_state_surface_files": [
     "runtime/uo-evm/src/kernel.rs"
   ],
-  "expected_confidential_kernel_run_outcome_surface_files": [
-    "runtime/uo-evm/src/kernel.rs"
-  ],
+  "expected_confidential_kernel_run_outcome_surface_files": [],
   "expected_controller_theorem_trace_constructor_files": [
     "runtime/uo-evm/src/controller.rs"
   ],
@@ -994,13 +990,6 @@
     },
     {
       "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) struct ConfidentialKernelRunOutcome {",
-      "private_present": true,
-      "required_private": "pub(in crate::runtime) struct ConfidentialKernelRunOutcome {",
-      "restricted": true
-    },
-    {
-      "forbidden_present": false,
       "forbidden_pubcrate": "pub(crate) fn record_shadow_load_object(",
       "private_present": true,
       "required_private": "fn record_shadow_load_object(",
@@ -1202,12 +1191,6 @@
       "boundary": "private slot-file state owned by RuntimeKernel",
       "checked": true,
       "name": "ConfidentialExecState",
-      "owner": "runtime/uo-evm/src/kernel.rs"
-    },
-    {
-      "boundary": "runtime-only kernel-to-state handoff bundle carrying committed confidential shadow state, witnesses, and the live return value",
-      "checked": true,
-      "name": "ConfidentialKernelRunOutcome",
       "owner": "runtime/uo-evm/src/kernel.rs"
     },
     {
@@ -1788,6 +1771,7 @@
   ],
   "traced_runtime_call_witness_state_surface_restricted": true,
   "traced_runtime_call_witness_state_wipes_on_drop": true,
+  "translation_validation_uses_canonical_kernel_step_manifest": false,
   "trusted_kernel_checker_uses_slot_bundle": true,
   "trusted_kernel_cli_uses_slot_bundle": true,
   "trusted_kernel_probe_uses_slot_bundle": true,

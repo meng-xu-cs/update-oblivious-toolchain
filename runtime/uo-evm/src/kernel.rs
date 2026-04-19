@@ -182,35 +182,6 @@ impl Drop for ConfidentialExecState {
     }
 }
 
-#[derive(Debug)]
-pub(in crate::runtime) struct ConfidentialKernelRunOutcome {
-    committed_shadow: ConfidentialRuntimeShadowState,
-    runtime_kernel_witness: RuntimeKernelWitness,
-    runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    aborted: bool,
-    return_value: Option<Value>,
-}
-
-impl ConfidentialKernelRunOutcome {
-    pub(in crate::runtime) fn into_committed_outcome_parts(
-        self,
-    ) -> (
-        ConfidentialRuntimeShadowState,
-        RuntimeKernelWitness,
-        RuntimeKernelRefinementWitness,
-        bool,
-        Option<Value>,
-    ) {
-        (
-            self.committed_shadow,
-            self.runtime_kernel_witness,
-            self.runtime_kernel_refinement_witness,
-            self.aborted,
-            self.return_value,
-        )
-    }
-}
-
 impl PublicRuntimeKernel {
     pub(in crate::runtime) fn begin(
         plan: AllocatorPlan,
@@ -337,7 +308,13 @@ impl PublicRuntimeKernel {
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
-    ) -> Result<ConfidentialKernelRunOutcome> {
+    ) -> Result<(
+        ConfidentialRuntimeShadowState,
+        RuntimeKernelWitness,
+        RuntimeKernelRefinementWitness,
+        bool,
+        Option<Value>,
+    )> {
         self.inner.run_confidential_call(
             program,
             committed,
@@ -666,7 +643,13 @@ impl RuntimeKernel {
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
-    ) -> Result<ConfidentialKernelRunOutcome> {
+    ) -> Result<(
+        ConfidentialRuntimeShadowState,
+        RuntimeKernelWitness,
+        RuntimeKernelRefinementWitness,
+        bool,
+        Option<Value>,
+    )> {
         let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);
         self.max_hash_part_bytes = max_hash_part_bytes;
         self.bind_expected_kernel_program(program)?;
@@ -688,13 +671,13 @@ impl RuntimeKernel {
         self.commit_objects(&mut shadow, committed, outcome.aborted, recorder)?;
         let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
             self.finish(&program.entrypoint_id)?;
-        Ok(ConfidentialKernelRunOutcome {
-            committed_shadow: shadow,
+        Ok((
+            shadow,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
-            aborted: outcome.aborted,
-            return_value: outcome.return_value,
-        })
+            outcome.aborted,
+            outcome.return_value,
+        ))
     }
 
     fn bind_expected_kernel_program(
