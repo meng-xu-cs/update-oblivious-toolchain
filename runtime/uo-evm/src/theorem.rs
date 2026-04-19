@@ -63,17 +63,6 @@ struct FinalizeCallTraceInput<'a> {
     pub call_outcome: RuntimeCallOutcome,
 }
 
-pub(crate) struct RunTracedCallInput<'a> {
-    pub runtime: &'a mut ContractRuntime,
-    pub artifact: &'a CompiledArtifact,
-    pub entrypoint: &'a str,
-    pub confidential: bool,
-    pub deploy_seed: u64,
-    pub manifest_entry: &'a EntrypointManifest,
-    pub manifest_objects: &'a [StateObjectManifest],
-    pub args: Vec<Value>,
-}
-
 pub(crate) struct FinalizedCallTrace {
     pub trace: ExecutionTrace,
     pub zero_writes: usize,
@@ -82,22 +71,19 @@ pub(crate) struct FinalizedCallTrace {
 }
 
 pub(crate) fn run_traced_call<F>(
-    input: RunTracedCallInput<'_>,
+    runtime: &mut ContractRuntime,
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    confidential: bool,
+    deploy_seed: u64,
+    manifest_entry: &EntrypointManifest,
+    manifest_objects: &[StateObjectManifest],
+    args: Vec<Value>,
     execute: F,
 ) -> Result<FinalizedCallTrace>
 where
     F: FnOnce(&mut ContractRuntime, Vec<Value>, &mut CallRecorder) -> Result<RuntimeCallOutcome>,
 {
-    let RunTracedCallInput {
-        runtime,
-        artifact,
-        entrypoint,
-        confidential,
-        deploy_seed,
-        manifest_entry,
-        manifest_objects,
-        args,
-    } = input;
     let mut context = begin_call_trace(&*runtime, entrypoint, manifest_entry, &args)?;
     let call_outcome = execute(runtime, args, context.recorder_mut())?;
     finalize_call_trace(FinalizeCallTraceInput {

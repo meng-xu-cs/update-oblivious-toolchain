@@ -1,7 +1,7 @@
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::ContractRuntime;
 use crate::shell::run_public_entrypoint;
-use crate::theorem::{run_traced_call, RunTracedCallInput};
+use crate::theorem::run_traced_call;
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -116,16 +116,14 @@ impl ContractInstance {
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?
             .clone();
         let finalized = run_traced_call(
-            RunTracedCallInput {
-                runtime: &mut self.state,
-                artifact: &self.artifact,
-                entrypoint: &function.signature,
-                confidential: function.confidential,
-                deploy_seed: self.deploy_seed,
-                manifest_entry: &manifest_entry,
-                manifest_objects: &self.artifact.contract.manifest.objects,
-                args,
-            },
+            &mut self.state,
+            &self.artifact,
+            &function.signature,
+            function.confidential,
+            self.deploy_seed,
+            &manifest_entry,
+            &self.artifact.contract.manifest.objects,
+            args,
             |runtime, args, recorder| {
                 if function.confidential {
                     runtime.run_confidential_entrypoint(

@@ -8365,17 +8365,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     ];
     let theorem_trace_bridge_surface_restricted =
         theorem_trace_bridge_surface_files == expected_theorem_trace_bridge_surface_files;
-    let theorem_trace_input_surface_files =
-        collect_production_pattern_hits(&runtime_evm_src, "RunTracedCallInput")?;
-    let expected_theorem_trace_input_surface_files = vec![
-        String::from("runtime/uo-evm/src/engine.rs"),
-        String::from("runtime/uo-evm/src/theorem.rs"),
-    ];
-    let theorem_trace_input_surface_restricted =
-        theorem_trace_input_surface_files == expected_theorem_trace_input_surface_files;
+    let theorem_trace_bridge_api_is_compact = !engine_impl_source.contains("RunTracedCallInput")
+        && !theorem_source.contains("struct RunTracedCallInput");
     let engine_public_trace_uses_output_shape_only = engine_impl_source
         .contains("let finalized = run_traced_call(")
-        && engine_impl_source.contains("RunTracedCallInput {")
+        && theorem_trace_bridge_api_is_compact
         && !engine_impl_source.contains("let mut call_trace_context =")
         && !engine_impl_source.contains("begin_call_trace(")
         && !engine_impl_source.contains("finalize_call_trace(")
@@ -9494,12 +9488,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             expected_theorem_trace_bridge_surface_files,
         "theorem_trace_bridge_surface_restricted":
             theorem_trace_bridge_surface_restricted,
-        "theorem_trace_input_surface_files":
-            theorem_trace_input_surface_files,
-        "expected_theorem_trace_input_surface_files":
-            expected_theorem_trace_input_surface_files,
-        "theorem_trace_input_surface_restricted":
-            theorem_trace_input_surface_restricted,
+        "theorem_trace_bridge_api_is_compact":
+            theorem_trace_bridge_api_is_compact,
         "engine_public_trace_uses_output_shape_only":
             engine_public_trace_uses_output_shape_only,
         "engine_keeps_confidential_call_inputs_inside_runtime":
