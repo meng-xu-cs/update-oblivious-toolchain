@@ -66,7 +66,8 @@ The source-level confinement checks in
 ownership rules drift. Those checks now also pin the newer boundary
 reductions: `ConfidentialEntrypointPlan` is confined to `state.rs` and now
 threads only the canonical confidential slot program rather than caching a
-duplicate expected-kernel-step vector, and
+duplicate expected-kernel-step vector or a second schedule-derived
+shadow-load object list, and
 `RuntimeShadowState` / `ConfidentialRuntimeShadowState` remain runtime-only
 types while the shell-visible handle stays `PublicRuntimeShadowState`, and
 `CommittedRuntimeWitnessSnapshot` is now fully internal to `state.rs`, and the

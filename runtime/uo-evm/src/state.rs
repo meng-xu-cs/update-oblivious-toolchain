@@ -64,7 +64,6 @@ pub(crate) struct PublicRuntimeShadowState {
 struct ConfidentialEntrypointPlan {
     allocator: AllocatorPlan,
     public_object_ids: Vec<u32>,
-    shadow_load_object_ids: Vec<u32>,
     max_commit_ops: usize,
     program: ConfidentialKernelSlotProgram,
     max_hash_part_bytes: usize,
@@ -306,15 +305,21 @@ impl ContractRuntime {
         let ConfidentialEntrypointPlan {
             allocator,
             public_object_ids,
-            shadow_load_object_ids,
             max_commit_ops,
             program,
             max_hash_part_bytes,
         } = plan;
         let call_inputs = ConfidentialCallInputs::from_raw_args(args);
+        let expected_kernel_steps = program.expected_runtime_step_witnesses();
+        let shadow_load_object_ids = expected_kernel_steps
+            .iter()
+            .filter_map(|step| step.object_id)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
         let kernel = PublicRuntimeKernel::begin(
             allocator,
-            Some(program.expected_runtime_step_witnesses()),
+            Some(expected_kernel_steps),
             public_object_ids.clone(),
             Some(public_object_ids.clone()),
         )?;
@@ -595,16 +600,9 @@ impl ConfidentialEntrypointPlan {
             );
         }
         allocator.max_kernel_ops = manifest_expected_kernel_steps.len();
-        let shadow_load_object_ids = manifest_expected_kernel_steps
-            .iter()
-            .filter_map(|step| step.object_id)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
         Ok(Self {
             allocator,
             public_object_ids,
-            shadow_load_object_ids,
             max_commit_ops: manifest_entry.max_commit_ops,
             program,
             max_hash_part_bytes: manifest_entry.max_hash_part_bytes,
