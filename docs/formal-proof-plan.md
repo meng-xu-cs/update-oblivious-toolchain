@@ -6,10 +6,12 @@ from the current mechanized boundary.
 
 The goal is not to overclaim. The current repository can realistically target a
 mechanized proof for the instrumented abstract machine used by this workspace,
-plus a narrowly stated TEE deployment theorem that reuses the same normalized
-storage trace under explicit enclave assumptions. It cannot honestly target a
-universal theorem over all downstream Rust machine code, host runtime effects,
-or microarchitectural observers without additional refinement work.
+and it has already frozen the hostile-host `View_SGX` observer that the final
+deployment theorem must use. What it still lacks is the refinement and
+confinement work needed to justify that final theorem from the real Rust
+implementation. It cannot honestly target a universal theorem over all
+downstream Rust machine code, host runtime effects, or microarchitectural
+observers without that additional refinement work.
 
 ## 0. Frozen Final Theorem Target
 
@@ -41,7 +43,7 @@ The repository has not yet closed:
 
 ## 1. Claim Boundary
 
-The proof target should be split into three claims.
+The proof target should be split into three layers.
 
 ### 1.1 Artifact-level exact-UO claim
 
@@ -56,39 +58,19 @@ prove that the normalized `M+`-visible trace distribution is computationally
 indistinguishable across secret variations, up to an explicitly declared
 leakage function.
 
-### 1.3 TEE-backed storage-oblivious deployment claim
+### 1.3 Frozen hostile-host deployment claim
 
-For deployments where the confidential EVM runs inside a trusted TEE that keeps
-plaintext enclave memory confidential and integral, and where persistent state
-leaving the enclave is cryptographically protected, the repository may target a
-deployment-facing theorem only about the host-visible storage boundary.
+At the paper boundary there is exactly one deployment observer:
+`View_SGX`. The final theorem must speak directly about that observer, not
+about a weaker storage-only boundary.
 
-More precisely, if the host observer is restricted to:
-
-- public call identity and public arguments
-- public output shape
-- normalized reads from encrypted/sealed persistent state
-- normalized writes to encrypted/sealed persistent state
-- public gas and public termination status
-
-then the induced host-visible trace should be exact-UO or computational-UO
-according to the backend theorem already proved at the artifact level.
-
-This is a theorem about an idealized TEE storage observer. It is not yet a
-theorem about a malicious SGX host observing enclave execution itself.
-
-### 1.4 SGX execution-oblivious theorem boundary
-
-The stronger target statement discussed for SGX should be written down
-separately:
+Concretely, the deployment theorem target is:
 
 > for any two executions with the same public inputs and public initial state,
-> SGX execution is oblivious against a malicious host
+> the induced hostile-host SGX views satisfy the mixed `View_SGX` relation
 
-This stronger claim is outside the current repository theorem boundary.
-
-To make that claim meaningful, the host-visible SGX observer would need to be
-modeled explicitly, including at least:
+To make that claim meaningful, the host-visible SGX observer must be modeled
+explicitly, including at least:
 
 - the enclave call and return interface
 - public output shape
@@ -105,6 +87,21 @@ the claim boundary, following the same exclusion style used by ZeroTrace.
 The current repository now fixes that observer shape in the paper-facing docs
 and Lean-facing interfaces, but it does not yet prove the final malicious-host
 theorem against it.
+
+### 1.4 Current storage-side sub-boundary
+
+For proof engineering it is still useful to project `View_SGX` down to a
+storage-facing subobserver that keeps only:
+
+- public call identity and public arguments
+- public output shape
+- normalized reads from encrypted/sealed persistent state
+- normalized writes to encrypted/sealed persistent state
+- public gas and public termination status
+
+This storage-side view is useful for backend lifting lemmas and for isolating
+the ORAM/storage theorem interface. It is not a separate paper theorem target
+and it is not the deployment observer claimed by the paper.
 
 ### 1.5 Explicit non-claims
 
@@ -182,10 +179,9 @@ For exact-UO objects, equality is literal equality of `View_M+`.
 For ORAM-backed objects, the theorem should instead quantify over the
 distribution of `View_M+` induced by the runtime coins.
 
-### 2.5 Idealized TEE storage observer
+### 2.5 Storage-side subprojection of `View_SGX`
 
-For the deployment-facing TEE claim in Section 1.3, define the idealized
-host-visible view as:
+For backend lifting arguments, define the storage-facing subprojection:
 
 ```text
 View_TEE-Store(trace) =
@@ -198,16 +194,14 @@ View_TEE-Store(trace) =
     gas_used )
 ```
 
-This observer is intentionally stronger than the sealed-storage backend alone,
-because it also includes public API shape and public gas, but it is weaker than
-an actual malicious SGX host because it does not include enclave-internal page,
-cache, interrupt, or OCALL side channels.
+This subprojection is intentionally stronger than the sealed-storage backend
+alone, because it also includes public API shape and public gas, but it is
+only a derived component of the frozen hostile-host observer.
 
-### 2.6 Future SGX host observer
+### 2.6 Frozen hostile-host SGX observer
 
-If the project later targets the stronger SGX claim in Section 1.4, the proof
-must define a different observer. Following the channel split made explicit in
-ZeroTrace, the current recommended boundary is:
+Following the channel split made explicit in ZeroTrace, the frozen deployment
+observer is:
 
 ```text
 View_SGX(call) =
@@ -240,8 +234,8 @@ Where:
 - raw wall-clock timing is intentionally not a component of `View_SGX`; the
   only timing-like public quantity currently modeled is `gas_used`
 
-This document now fixes `View_SGX` concretely enough for future mechanization.
-What remains open is not the observer shape, but the theorem and simulator that
+This document now fixes `View_SGX` concretely enough for mechanization. What
+remains open is not the observer shape, but the theorem and simulator that
 must justify it.
 
 ## 3. Leakage Functions
@@ -285,9 +279,10 @@ L_oram(A, f, pub_state, pub_in) =
 
 If the implementation leaks anything else, it is outside the theorem.
 
-### 3.3 Idealized TEE deployment leakage
+### 3.3 Storage-side subprojection leakage
 
-For the TEE-backed storage-oblivious deployment claim, the permitted leakage is:
+For the storage-facing subprojection from Section 1.4, the permitted leakage
+is:
 
 - everything already permitted by the artifact-level theorem for the relevant
   backend
@@ -296,12 +291,14 @@ For the TEE-backed storage-oblivious deployment claim, the permitted leakage is:
 - public termination status
 
 No further dependence on plaintext enclave memory is permitted, because that is
-hidden by the TEE assumption in Section 1.3.
+hidden by the TEE assumptions carried into the frozen hostile-host deployment
+claim.
 
-### 3.4 Future SGX execution leakage
+### 3.4 Hostile-host SGX execution leakage
 
-For the stronger SGX claim in Section 1.4, the permitted leakage must be stated
-separately and cannot be imported from the artifact-level theorem unchanged.
+For the frozen deployment claim in Section 1.3, the permitted leakage must be
+stated separately and cannot be imported from the artifact-level theorem
+unchanged.
 
 At minimum it would need to specify whether the proof allows leakage through:
 
@@ -569,28 +566,27 @@ If each confidential object backend satisfies its local theorem and the
 compiler emits only approved object operations, then the whole-entrypoint
 execution satisfies the top-level exact-UO or computational-UO theorem.
 
-### Theorem G: TEE-backed storage theorem
+### Theorem G: Storage-subprojection lifting lemma
 
 Assume:
 
 - the artifact satisfies Theorem F
 - plaintext enclave memory is confidential and integral
-- the host sees only `View_TEE-Store`
+- the argument is projected to `View_TEE-Store`
 - persistent state leaving the enclave is cryptographically protected
 
 Then two executions with the same public projection induce equal or
 computationally indistinguishable `View_TEE-Store` distributions, according to
 the backend theorem used by the artifact.
 
-This theorem is a boundary statement for a deployment theorem. It is not a
-theorem about SGX page faults, caches, interrupts, or host scheduling.
+This is a lemma used by the final hostile-host deployment theorem. It is not,
+by itself, the paper's deployment claim.
 
-### Theorem H: Future SGX execution-oblivious theorem
+### Theorem H: Hostile-host SGX deployment theorem
 
-If the project later implements a standard ORAM backend, an oblivious enclave
-controller, a fixed enclave boundary, and an explicit SGX leakage model, then a
-separate theorem should target the mixed relation from Section 3.5 on
-`View_SGX`.
+If the project closes the remaining runtime-refinement, secret-confinement,
+backend-assumption, and deployment-model obligations, then the final theorem
+should target the mixed relation from Section 3.5 on `View_SGX`.
 
 Concretely, the theorem should prove:
 
@@ -599,7 +595,8 @@ Concretely, the theorem should prove:
 - the chosen `R_store` relation on `storage_trace`
 - the chosen `R_micro` relation on `micro_trace`
 
-The current repository does not satisfy the prerequisites for this theorem.
+The current repository does not yet satisfy the prerequisites for this
+theorem.
 
 ### Theorem I: SGX envelope lifting theorem
 
@@ -785,12 +782,12 @@ Remaining change:
 
 Current status:
 
-- the repo has an idealized TEE storage theorem boundary and a paper-facing SGX
-  observer profile
+- the repo has a frozen hostile-host `View_SGX` observer and a derived
+  storage-side `View_TEE-Store` subprojection used for backend lifting
 
 Remaining change:
 
-- do not upgrade those into a malicious-host SGX execution claim until the
+- do not claim the malicious-host SGX theorem until the
   enclave-side controller, host boundary, and admitted SGX micro observer are
   all connected to the real implementation by the same refinement discipline
 
@@ -874,5 +871,6 @@ The correct current description of the repository is:
   `path_oram_local_posmap_v1` under the explicit
   `PathOramLocalPosmapV1SecurityAssumptions` bundle and the frozen standard
   Path-ORAM theorem interface
-- an idealized TEE-backed storage theorem boundary under enclave assumptions
+- a storage-side lifting lemma inside the frozen hostile-host deployment story,
+  under explicit enclave assumptions
 - no current SGX execution-oblivious theorem against a malicious host

@@ -19,7 +19,8 @@ The implementation target remains:
 
 The theorem-facing backend path is
 `path_oram_local_posmap_v1`. The legacy surrogate backend remains in the
-repository only for compatibility and benchmark continuity.
+repository only as a non-proof-grade benchmark surface; it is outside the
+paper-facing and proof-grade claim set.
 
 ## Theorem-Preserving Principles
 
