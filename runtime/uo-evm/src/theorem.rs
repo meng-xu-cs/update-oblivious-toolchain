@@ -78,6 +78,10 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         runtime_state_before,
         runtime_state_after,
     } = input;
+    let (runtime_oram_access_counters_before, runtime_oram_position_map_before) =
+        runtime_state_before.into_hidden_oram_state();
+    let (runtime_oram_access_counters_after, runtime_oram_position_map_after) =
+        runtime_state_after.into_hidden_oram_state();
 
     let mut trace = ExecutionTrace {
         opcode_trace,
@@ -94,10 +98,10 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         runtime_controller_certificate: Some(trace_bundle.controller_certificate),
         runtime_oram_objects: runtime_oram_objects(artifact),
         runtime_oram_leaf_schedule: trace_bundle.oram_leaf_schedule,
-        runtime_oram_access_counters_before: runtime_state_before.runtime_oram_access_counters,
-        runtime_oram_access_counters_after: runtime_state_after.runtime_oram_access_counters,
-        runtime_oram_position_map_before: runtime_state_before.runtime_oram_position_maps,
-        runtime_oram_position_map_after: runtime_state_after.runtime_oram_position_maps,
+        runtime_oram_access_counters_before,
+        runtime_oram_access_counters_after,
+        runtime_oram_position_map_before,
+        runtime_oram_position_map_after,
         runtime_oram_leaf_state_transitions: trace_bundle.oram_leaf_state_transitions,
     };
     if confidential {

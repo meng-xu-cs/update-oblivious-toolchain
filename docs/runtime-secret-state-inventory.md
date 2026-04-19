@@ -15,6 +15,7 @@ the refinement proof is still being completed.
 | `PathOramFreshCoinPlan` | `runtime/uo-evm/src/fresh_coins.rs` | `crate::runtime` plus a diagnostics-gated opaque public API handle | injected fresh-leaf choices determine hidden ORAM randomness | `engine.rs` passes the opaque handle through but does not touch the internal per-object coin map; the handle is non-`Clone`, consumed by value, and moved into the live shadow state without cloning the per-object tapes first; the public injection API is absent from the default surface |
 | `ConfidentialExecState` | `runtime/uo-evm/src/kernel.rs` | `RuntimeKernel` | live confidential slot values, abort/return flags, and confidential return value | private to `kernel.rs`; wiped on drop |
 | `RuntimeShadowState`, `ConfidentialRuntimeShadowState`, `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | `crate::runtime` | live reopened confidential object state for one call, with separate wrappers for the confidential kernel path and the public shell path | raw shadow state and the confidential shadow wrapper are now visibility-restricted to `crate::runtime`; the shell sees only `PublicRuntimeShadowState`, while confidential execution uses `ConfidentialRuntimeShadowState` only behind `ContractRuntime` |
+| `CommittedRuntimeWitnessSnapshot` | `runtime/uo-evm/src/state.rs` | `state.rs` / `theorem.rs` | theorem-facing hidden ORAM access-counter and position-map witness state from committed storage before and after a call | the snapshot fields are private; only `into_hidden_oram_state()` exposes the hidden theorem inputs, so `engine.rs` can carry the opaque snapshot value but cannot inspect its contents directly |
 | `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | `crate::runtime` | object-local confidential logical state and commit/restore paths | non-`Clone`; low-level helpers restricted to `crate::runtime` |
 | `OramState` | `runtime/uo-evm/src/oram.rs` | `crate::runtime` | live ORAM entries, position map, stash, access counter, and leaf-coin source | helper use restricted through runtime state/kernel paths |
 | `StoreCipher` key and plaintext staging buffers | `runtime/uo-store/src/codec.rs`, `runtime/uo-store/src/store.rs` | store/codec layer | sealing keys and temporary plaintext buffers | direct `seal` / `open` stay in codec; wipe-preserving helpers are the intended public surface |
@@ -27,7 +28,8 @@ These are the invariants this inventory is meant to support.
    witnesses directly, and it should not keep duplicate secret-bearing call
    arguments once the public call summary has been projected from manifest
    metadata; it also should not stage confidential manifest-to-kernel plans or
-   confidential shadow wrappers outside `ContractRuntime`.
+   confidential shadow wrappers outside `ContractRuntime`, or inspect the
+   hidden ORAM snapshot fields used only for theorem packaging.
 2. Diagnostic fresh-coin plans should stay opaque to `engine.rs`, be
    non-`Clone`, and move their per-object secret tapes into runtime-owned
    state without cloning them first.
@@ -52,7 +54,9 @@ The source-level confinement checks in
 ownership rules drift. Those checks now also pin the newer boundary
 reductions: `ConfidentialEntrypointPlan` is confined to `state.rs`, and
 `RuntimeShadowState` / `ConfidentialRuntimeShadowState` remain runtime-only
-types while the shell-visible handle stays `PublicRuntimeShadowState`.
+types while the shell-visible handle stays `PublicRuntimeShadowState`, and
+`CommittedRuntimeWitnessSnapshot` is opaque outside the dedicated
+state/theorem handoff.
 
 This document should be updated whenever a new secret-bearing structure is
 introduced or an existing one is removed.

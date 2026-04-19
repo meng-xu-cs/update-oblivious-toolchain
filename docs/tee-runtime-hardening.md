@@ -395,7 +395,10 @@ The current runtime has a first hardening layer:
 - the post-call proof-facing `ExecutionTrace` packaging now also lives in
   `runtime/uo-evm/src/theorem.rs`, so `engine.rs` no longer constructs the
   controller-observer certificate, hidden Path-ORAM certificate, or
-  trusted-kernel bundle directly
+  trusted-kernel bundle directly, and the committed ORAM before/after snapshot
+  passed into that theorem packaging path is now opaque outside the dedicated
+  `state.rs` / `theorem.rs` handoff rather than exposing public fields to the
+  engine
 - the confidential-path `RuntimeKernel` entrypoints that shadow-load
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot

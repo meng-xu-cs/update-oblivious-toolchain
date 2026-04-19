@@ -6314,6 +6314,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("fn finalize_runtime_kernel_refinement_witness")
         && state_source.contains("RuntimeKernelRefinementEventWitness::cold_store_object")
         && state_source.contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
+    let state_committed_runtime_witness_snapshot_is_opaque = state_source
+        .contains("struct CommittedRuntimeWitnessSnapshot")
+        && !state_source.contains("pub runtime_oram_access_counters:")
+        && !state_source.contains("pub runtime_oram_position_maps:")
+        && state_source.contains("fn into_hidden_oram_state(")
+        && theorem_source.contains(".into_hidden_oram_state()");
     let engine_leaves_runtime_phase_tail_inside_runtime = !engine_impl_source
         .contains("finalize_runtime_kernel_refinement_witness(")
         && shell_source.contains("runtime.finalize_runtime_kernel_refinement_witness(")
@@ -7185,6 +7191,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "fresh_coin_plan_zeroizes_on_drop": fresh_coin_plan_zeroizes_on_drop,
         "state_wrapper_present": state_wrapper_present,
         "state_finalizes_runtime_phase_witness": state_finalizes_runtime_phase_witness,
+        "state_committed_runtime_witness_snapshot_is_opaque":
+            state_committed_runtime_witness_snapshot_is_opaque,
         "engine_leaves_runtime_phase_tail_inside_runtime":
             engine_leaves_runtime_phase_tail_inside_runtime,
         "state_confidential_call_inputs_wrapper_restricted":
@@ -7352,6 +7360,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && contract_instance_clone_uses_cold_runtime_clone
             && state_wrapper_present
             && state_finalizes_runtime_phase_witness
+            && state_committed_runtime_witness_snapshot_is_opaque
             && engine_leaves_runtime_phase_tail_inside_runtime
             && state_confidential_call_inputs_wrapper_restricted
             && theorem_finalizes_execution_trace
@@ -9092,8 +9101,10 @@ controller path must derive a `PublicCallSummary` from the checked manifest's
 vector into `ConfidentialCallInputs`, whose unwrap surface stays restricted to
 `crate::runtime`; the theorem-finalization path must avoid depending on
 `CompiledFunction` entirely while the public trace path sees only the
-exported `OutputShape` rather than the full return payload. The same report
-also checks that the
+exported `OutputShape` rather than the full return payload, and the committed
+before/after ORAM witness snapshot consumed by `theorem.rs` is now opaque
+outside the dedicated `state.rs` / `theorem.rs` handoff. The same report also
+checks that the
 confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
 public commit, and confidential execution are visibility-restricted to
 `crate::runtime`, that the confidential shadow-load helper itself stays

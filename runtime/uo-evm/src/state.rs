@@ -65,8 +65,22 @@ struct ConfidentialEntrypointPlan {
 
 #[derive(Clone, Debug)]
 pub(crate) struct CommittedRuntimeWitnessSnapshot {
-    pub runtime_oram_access_counters: Vec<RuntimeOramAccessCounterWitness>,
-    pub runtime_oram_position_maps: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_access_counters: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_position_maps: Vec<RuntimePathOramPositionMapWitness>,
+}
+
+impl CommittedRuntimeWitnessSnapshot {
+    pub(crate) fn into_hidden_oram_state(
+        self,
+    ) -> (
+        Vec<RuntimeOramAccessCounterWitness>,
+        Vec<RuntimePathOramPositionMapWitness>,
+    ) {
+        (
+            self.runtime_oram_access_counters,
+            self.runtime_oram_position_maps,
+        )
+    }
 }
 
 impl Clone for CommittedRuntimeState {
