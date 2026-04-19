@@ -1612,6 +1612,7 @@
   ],
   "store_wipe_helper_surface_restricted": true,
   "store_write_api_uses_mutable_plaintext": true,
+  "theorem_bridge_is_runtime_owned": true,
   "theorem_certificate_constructor_checks": [
     {
       "expected_files": [

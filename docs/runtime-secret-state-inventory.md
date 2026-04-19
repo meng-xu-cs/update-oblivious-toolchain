@@ -76,7 +76,10 @@ dedicated state/theorem call-trace handoff is carried instead by
 the authority boundary on that handoff by requiring the theorem pre/post-call
 bridges (`ContractRuntime::begin_traced_call(...)` and
 `ContractRuntime::finish_traced_call(...)`) to be called only from
-`runtime/uo-evm/src/theorem.rs` in production code, while the lower-level
+`runtime/uo-evm/src/theorem.rs` in production code, that theorem bridge now
+also lives under `crate::runtime` rather than as a top-level crate module, and
+the traced-call handoff types and helper methods are correspondingly restricted
+to `pub(in crate::runtime)`, while the lower-level
 readiness and raw snapshot helpers stay internal to `state.rs`. It
 also pins `RuntimeCallOutcome` to the runtime/theorem
 handoff by requiring `state.rs` and `shell.rs` to construct it, `state.rs`

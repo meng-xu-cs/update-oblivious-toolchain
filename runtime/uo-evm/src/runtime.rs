@@ -13,6 +13,9 @@ pub(crate) mod shell;
 #[path = "state.rs"]
 pub(crate) mod state;
 
+#[path = "theorem.rs"]
+pub(crate) mod theorem;
+
 use uo_core::{RuntimeKernelRefinementWitness, RuntimeKernelWitness, Value};
 
 #[derive(Debug)]

@@ -8990,7 +8990,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("runtime.begin_traced_call(")
         && state_source.contains("fn public_object_ids(&self) -> Vec<u32>")
         && state_source.contains(
-            "pub(crate) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(",
+            "pub(in crate::runtime) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(",
         )
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
         && !state_source
@@ -9026,6 +9026,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let public_shell_is_runtime_owned = runtime_evm_lib_source.contains("mod runtime;")
         && !runtime_evm_lib_source.contains("mod shell;")
         && engine_impl_source.contains("use crate::runtime::shell::run_public_entrypoint;");
+    let theorem_bridge_is_runtime_owned = runtime_evm_lib_source.contains("mod runtime;")
+        && !runtime_evm_lib_source.contains("mod theorem;")
+        && engine_impl_source.contains("use crate::runtime::theorem::run_traced_call;");
     let state_uses_public_runtime_kernel = state_source
         .contains("use crate::runtime::kernel::PublicRuntimeKernel;")
         && state_source.contains("PublicRuntimeKernel::begin(");
@@ -9322,15 +9325,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains(".into_hidden_oram_state()");
     let theorem_only_runtime_helper_visibility_restricted = state_source
         .contains(
-            "pub(crate) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(TracedRuntimeCallStart, PublicCallSummary, CallRecorder)>",
+            "pub(in crate::runtime) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(TracedRuntimeCallStart, PublicCallSummary, CallRecorder)>",
         )
         && state_source.contains(
-            "pub(crate) fn finish_traced_call(\n        &self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome>",
+            "pub(in crate::runtime) fn finish_traced_call(\n        &self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome>",
         )
-        && state_source.contains("pub(crate) struct TracedRuntimeCallStart {")
-        && state_source.contains("pub(crate) struct TracedRuntimeCallWitnessState {")
-        && state_source.contains("pub(crate) fn into_finalized_call_trace_parts(")
-        && state_source.contains("pub(crate) fn into_execution_trace_parts(")
+        && state_source.contains("pub(in crate::runtime) struct TracedRuntimeCallStart {")
+        && state_source.contains("pub(in crate::runtime) struct TracedRuntimeCallWitnessState {")
+        && state_source.contains("pub(in crate::runtime) fn into_finalized_call_trace_parts(")
+        && state_source.contains("pub(in crate::runtime) fn into_execution_trace_parts(")
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
         && state_source.contains(
             "fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        self.committed.witness_snapshot()\n    }",
@@ -9838,7 +9841,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let runtime_call_outcome_theorem_consumer_surface_restricted =
         runtime_call_outcome_theorem_consumer_surface_files
             == expected_runtime_call_outcome_theorem_consumer_surface_files;
-    let traced_runtime_call_outcome_decl = "pub(crate) struct TracedRuntimeCallOutcome";
+    let traced_runtime_call_outcome_decl = "pub(in crate::runtime) struct TracedRuntimeCallOutcome";
     let traced_runtime_call_outcome_derive_line = state_source
         .split(traced_runtime_call_outcome_decl)
         .next()
@@ -9855,7 +9858,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     ];
     let traced_runtime_call_outcome_surface_restricted = traced_runtime_call_outcome_surface_files
         == expected_traced_runtime_call_outcome_surface_files;
-    let traced_runtime_call_start_decl = "pub(crate) struct TracedRuntimeCallStart";
+    let traced_runtime_call_start_decl = "pub(in crate::runtime) struct TracedRuntimeCallStart";
     let traced_runtime_call_start_derive_line = state_source
         .split(traced_runtime_call_start_decl)
         .next()
@@ -9872,7 +9875,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     ];
     let traced_runtime_call_start_surface_restricted =
         traced_runtime_call_start_surface_files == expected_traced_runtime_call_start_surface_files;
-    let traced_runtime_call_witness_state_decl = "pub(crate) struct TracedRuntimeCallWitnessState";
+    let traced_runtime_call_witness_state_decl =
+        "pub(in crate::runtime) struct TracedRuntimeCallWitnessState";
     let traced_runtime_call_witness_state_derive_line = state_source
         .split(traced_runtime_call_witness_state_decl)
         .next()
@@ -9905,11 +9909,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         traced_runtime_call_witness_state_surface_files
             == expected_traced_runtime_call_witness_state_surface_files;
     let traced_runtime_call_witness_state_api_is_explicit = state_source
-        .contains("pub(crate) fn into_execution_trace_parts(")
+        .contains("pub(in crate::runtime) fn into_execution_trace_parts(")
         && theorem_source.contains("runtime_witness_state.into_execution_trace_parts()");
     let traced_runtime_call_outcome_api_is_explicit = state_source
-        .contains("pub(crate) fn finish_traced_call(")
-        && state_source.contains("pub(crate) fn into_finalized_call_trace_parts(")
+        .contains("pub(in crate::runtime) fn finish_traced_call(")
+        && state_source.contains("pub(in crate::runtime) fn into_finalized_call_trace_parts(")
         && theorem_source.contains("runtime.finish_traced_call(call_outcome)?;")
         && theorem_source
             .contains("traced_outcome.into_finalized_call_trace_parts(runtime_call_start)");
@@ -11014,6 +11018,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "shell_uses_shadow_wrapper": shell_uses_shadow_wrapper,
         "shell_uses_public_runtime_kernel": shell_uses_public_runtime_kernel,
         "public_shell_is_runtime_owned": public_shell_is_runtime_owned,
+        "theorem_bridge_is_runtime_owned": theorem_bridge_is_runtime_owned,
         "state_uses_public_runtime_kernel": state_uses_public_runtime_kernel,
         "shell_confidential_surface_absent": shell_confidential_surface_absent,
         "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
@@ -11442,6 +11447,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_committed_runtime_witness_snapshot_is_opaque
             && engine_leaves_runtime_phase_tail_inside_runtime
             && kernel_confidential_call_inputs_wrapper_restricted
+            && theorem_bridge_is_runtime_owned
             && theorem_finalizes_execution_trace
             && theorem_private_surface_restricted
             && theorem_finalize_input_fields_private

@@ -1,7 +1,7 @@
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::shell::run_public_entrypoint;
 use crate::runtime::state::ContractRuntime;
-use crate::theorem::run_traced_call;
+use crate::runtime::theorem::run_traced_call;
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;

@@ -88,12 +88,12 @@ impl Drop for CommittedRuntimeWitnessSnapshot {
 }
 
 #[derive(Debug)]
-pub(crate) struct TracedRuntimeCallStart {
+pub(in crate::runtime) struct TracedRuntimeCallStart {
     runtime_state_before: CommittedRuntimeWitnessSnapshot,
 }
 
 #[derive(Debug)]
-pub(crate) struct TracedRuntimeCallWitnessState {
+pub(in crate::runtime) struct TracedRuntimeCallWitnessState {
     runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
     runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
     runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
@@ -101,7 +101,7 @@ pub(crate) struct TracedRuntimeCallWitnessState {
 }
 
 impl TracedRuntimeCallWitnessState {
-    pub(crate) fn into_execution_trace_parts(
+    pub(in crate::runtime) fn into_execution_trace_parts(
         mut self,
     ) -> (
         Vec<RuntimeOramAccessCounterWitness>,
@@ -128,13 +128,13 @@ impl Drop for TracedRuntimeCallWitnessState {
 }
 
 #[derive(Debug)]
-pub(crate) struct TracedRuntimeCallOutcome {
+pub(in crate::runtime) struct TracedRuntimeCallOutcome {
     call_outcome: RuntimeCallOutcome,
     runtime_state_after: CommittedRuntimeWitnessSnapshot,
 }
 
 impl TracedRuntimeCallOutcome {
-    pub(crate) fn into_finalized_call_trace_parts(
+    pub(in crate::runtime) fn into_finalized_call_trace_parts(
         self,
         call_start: TracedRuntimeCallStart,
     ) -> (
@@ -207,7 +207,7 @@ impl ContractRuntime {
         self.committed.public_object_ids()
     }
 
-    pub(crate) fn begin_traced_call(
+    pub(in crate::runtime) fn begin_traced_call(
         &self,
         entrypoint: &str,
         manifest_entry: &EntrypointManifest,
@@ -231,7 +231,7 @@ impl ContractRuntime {
         self.ensure_cold(&public_object_ids, context)
     }
 
-    pub(crate) fn finish_traced_call(
+    pub(in crate::runtime) fn finish_traced_call(
         &self,
         call_outcome: RuntimeCallOutcome,
     ) -> Result<TracedRuntimeCallOutcome> {
