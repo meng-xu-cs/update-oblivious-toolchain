@@ -118,6 +118,11 @@ impl ContractRuntime {
         self.committed.public_object_ids()
     }
 
+    pub(crate) fn ensure_ready_for_call(&self, context: &str) -> Result<()> {
+        let public_object_ids = self.public_object_ids();
+        self.ensure_cold(&public_object_ids, context)
+    }
+
     pub(crate) fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
         self.committed.witness_snapshot()
     }

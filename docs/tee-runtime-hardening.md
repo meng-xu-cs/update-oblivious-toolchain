@@ -412,8 +412,9 @@ The current runtime has a first hardening layer:
   the raw `RuntimeKernel` or the public kernel facade directly, loads the
   manifest-carried confidential slot program, recomputes the admitted runtime
   kernel-step schedule, derives the canonical public object universe from the
-  artifact state directly, or threads the manifest hash-scratch bound or
-  confidential commit budget itself
+  artifact state directly, performs the ready-for-call coldness check over that
+  universe itself, or threads the manifest hash-scratch bound or confidential
+  commit budget itself
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while the proof-grade translation checker, the

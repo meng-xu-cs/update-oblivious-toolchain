@@ -123,11 +123,8 @@ impl ContractInstance {
         } else {
             (None, Some(args))
         };
-        let public_object_ids = self.state.public_object_ids();
-        self.state.ensure_cold(
-            &public_object_ids,
-            "before executing the next call from committed storage",
-        )?;
+        self.state
+            .ensure_ready_for_call("before executing the next call from committed storage")?;
         let execution = (|| -> Result<_> {
             let (
                 runtime_kernel_witness,
