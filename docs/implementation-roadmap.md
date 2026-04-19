@@ -458,6 +458,11 @@ The first implementation step is now present in the codebase:
   to `crate::runtime`; the controller/theorem path now also derives output
   length from manifest-stored `return_canonical_len` and consumes only the
   public `OutputShape` summary rather than the full return payload
+- kernel object-operation scratch reservations and UO object commit `io`
+  scratch reservations now derive from admitted object/type metadata instead
+  of live confidential value lengths wherever the runtime already knows the
+  canonical shape statically, which removes another residual secret-to-budget
+  dependency from cell/array/map mutation and commit paths
 - ORAM refresh/metadata decode now wipes decrypted payload buffers after parse
   rather than dropping them as ordinary plaintext heap allocations, and it now
   streams decoded position-map / stash pages directly into bounded live ORAM

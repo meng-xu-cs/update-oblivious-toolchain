@@ -3,9 +3,9 @@ use crate::runtime::state::CommittedRuntimeWitnessSnapshot;
 use anyhow::Result;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
-    CompiledArtifact, ExecutionTrace, RuntimeControllerObserverCertificate,
+    CompiledArtifact, ExecutionTrace, OutputShape, RuntimeControllerObserverCertificate,
     RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness,
-    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, OutputShape,
+    RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle,
 };
 
 pub(crate) struct FinalizeExecutionTraceInput<'a> {

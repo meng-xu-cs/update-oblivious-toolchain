@@ -33,6 +33,9 @@ These are the invariants this inventory is meant to support.
 4. Direct cryptographic open/seal calls should stay inside the codec layer.
 5. Secret-bearing transient buffers should either be wiped on drop or confined
    to an explicitly modeled kernel/state object.
+6. Where object/type metadata already fixes a confidential buffer shape,
+   kernel and commit scratch accounting should use that public shape rather
+   than deriving sizes from live secret values.
 
 ## Enforcement
 

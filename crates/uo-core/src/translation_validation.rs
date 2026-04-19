@@ -1,7 +1,9 @@
 use crate::artifact::CompiledArtifact;
 use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSlotProgram};
 use crate::ir::{BackendKind, ContainerKind, ProgramMode};
-use crate::manifest::{EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest};
+use crate::manifest::{
+    EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest,
+};
 use crate::metadata::ContractMetadata;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -9,7 +11,9 @@ use serde_json::{Map, Value};
 
 fn canonicalize_json_value(value: Value) -> Value {
     match value {
-        Value::Array(items) => Value::Array(items.into_iter().map(canonicalize_json_value).collect()),
+        Value::Array(items) => {
+            Value::Array(items.into_iter().map(canonicalize_json_value).collect())
+        }
         Value::Object(object) => {
             let mut entries = object.into_iter().collect::<Vec<_>>();
             entries.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
@@ -392,9 +396,7 @@ fn opcode_tag(opcode: &uo_precompiles::UoOpcode) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        canonical_json_string, ProofRelevantFunctionView, ProofRelevantStateObjectView,
-    };
+    use super::{canonical_json_string, ProofRelevantFunctionView, ProofRelevantStateObjectView};
     use crate::ir::{BackendKind, CompiledFunction, ContainerKind, Expr, StateObject, Statement};
     use crate::{ScalarType, Type};
 
@@ -432,7 +434,10 @@ mod tests {
         };
         let view = ProofRelevantFunctionView::from_compiled_function(&function).unwrap();
         assert_eq!(view.params[0].ty, "{\"Scalar\":{\"Uint\":256}}");
-        assert_eq!(view.return_type.as_deref(), Some("{\"Scalar\":{\"Uint\":256}}"));
+        assert_eq!(
+            view.return_type.as_deref(),
+            Some("{\"Scalar\":{\"Uint\":256}}")
+        );
         assert_eq!(
             view.body[0],
             "{\"ArraySet\":{\"index\":{\"Var\":\"x\"},\"object_id\":7,\"predicate\":null,\"value\":{\"Literal\":{\"Uint\":1}}}}"
@@ -453,7 +458,10 @@ mod tests {
             confidential: true,
         };
         let view = ProofRelevantStateObjectView::from_state_object(&object).unwrap();
-        assert_eq!(view.value_type, "{\"Array\":[{\"Scalar\":{\"Uint\":256}},4]}");
+        assert_eq!(
+            view.value_type,
+            "{\"Array\":[{\"Scalar\":{\"Uint\":256}},4]}"
+        );
         assert_eq!(view.value_type_short_name, "uint256[4]");
         assert_eq!(view.key_type.as_deref(), Some("{\"Scalar\":\"Bytes32\"}"));
         assert_eq!(view.key_type_short_name.as_deref(), Some("bytes32"));

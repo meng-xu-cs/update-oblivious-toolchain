@@ -1,7 +1,9 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
-use crate::runtime::state::{CommittedRuntimeState, ConfidentialCallInputs, PublicRuntimeShadowState};
+use crate::runtime::state::{
+    CommittedRuntimeState, ConfidentialCallInputs, PublicRuntimeShadowState,
+};
 use crate::theorem::{build_theorem_trace, finalize_execution_trace, FinalizeExecutionTraceInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
@@ -157,7 +159,9 @@ impl ContractInstance {
             let program = manifest_entry
                 .confidential_slot_program
                 .clone()
-                .ok_or_else(|| anyhow!("manifest confidential_slot_program missing for {entrypoint}"))?;
+                .ok_or_else(|| {
+                    anyhow!("manifest confidential_slot_program missing for {entrypoint}")
+                })?;
             let expected_kernel_steps = program
                 .expected_runtime_steps()
                 .into_iter()
@@ -237,7 +241,8 @@ impl ContractInstance {
                     let public_args =
                         public_args.expect("public entrypoint must keep raw argument vector");
                     let mut state = ExecState::default();
-                    for ((param_name, _), arg) in function.params.iter().zip(public_args.into_iter())
+                    for ((param_name, _), arg) in
+                        function.params.iter().zip(public_args.into_iter())
                     {
                         store_env_value(&mut state, &mut kernel, param_name, arg)?;
                     }

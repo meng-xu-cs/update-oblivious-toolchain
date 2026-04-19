@@ -334,6 +334,40 @@ pub(crate) enum RuntimeObject {
 }
 
 impl RuntimeObject {
+    pub(in crate::runtime) fn value_canonical_len(&self) -> usize {
+        match self {
+            Self::RawCell(object) | Self::UoCell(object) => object.spec.value_type.canonical_len(),
+            Self::RawArray(object) | Self::UoArray(object) => {
+                object.spec.value_type.canonical_len()
+            }
+            Self::RawMap(object) => object.spec.value_type.canonical_len(),
+            Self::UoSmallMap(object) => object.spec.value_type.canonical_len(),
+            Self::UoOramMap(object) => object.spec.value_type.canonical_len(),
+        }
+    }
+
+    pub(in crate::runtime) fn key_canonical_len(&self) -> Result<usize> {
+        let key_type = match self {
+            Self::RawMap(object) => object
+                .spec
+                .key_type
+                .as_ref()
+                .ok_or_else(|| anyhow!("map {} missing key type", object.spec.name))?,
+            Self::UoSmallMap(object) => object
+                .spec
+                .key_type
+                .as_ref()
+                .ok_or_else(|| anyhow!("map {} missing key type", object.spec.name))?,
+            Self::UoOramMap(object) => object
+                .spec
+                .key_type
+                .as_ref()
+                .ok_or_else(|| anyhow!("map {} missing key type", object.spec.name))?,
+            _ => bail!("key_canonical_len is only defined for map objects"),
+        };
+        Ok(key_type.canonical_len())
+    }
+
     fn instantiate_from_rng(spec: &StateObject, master_rng: &mut ChaCha20Rng) -> Result<Self> {
         let mut rng = ChaCha20Rng::seed_from_u64(master_rng.next_u64());
         match (&spec.kind, &spec.backend) {
@@ -950,8 +984,10 @@ impl RuntimeObject {
                 };
                 if next.accessed {
                     let aad = cell_slot_aad(&next.spec.name);
-                    let _io_guard = allocator
-                        .reserve_guard(ScratchRegion::IoScratch, committed_value.canonical_len())?;
+                    let _io_guard = allocator.reserve_guard(
+                        ScratchRegion::IoScratch,
+                        next.spec.value_type.canonical_len(),
+                    )?;
                     let mut payload = committed_value.canonical_bytes();
                     if !next.cipher.seal_and_wipe_into(
                         aad.as_bytes(),
@@ -1006,8 +1042,10 @@ impl RuntimeObject {
                     for index in 0..next.values.len() {
                         let value = next.values[index].clone();
                         let aad = array_slot_aad(&next.spec.name, index);
-                        let _io_guard = allocator
-                            .reserve_guard(ScratchRegion::IoScratch, value.canonical_len())?;
+                        let _io_guard = allocator.reserve_guard(
+                            ScratchRegion::IoScratch,
+                            next.spec.value_type.canonical_len(),
+                        )?;
                         let mut payload = value.canonical_bytes();
                         if !next.cipher.seal_and_wipe_into(
                             aad.as_bytes(),
@@ -1076,10 +1114,8 @@ impl RuntimeObject {
                     for index in 0..next.entries.len() {
                         let entry = next.entries[index].clone();
                         let aad = small_map_slot_aad(&next.spec.name, index);
-                        let _io_guard = allocator.reserve_guard(
-                            ScratchRegion::IoScratch,
-                            1 + entry.key.canonical_len() + entry.value.canonical_len(),
-                        )?;
+                        let _io_guard = allocator
+                            .reserve_guard(ScratchRegion::IoScratch, map_record_len(&next.spec)?)?;
                         let mut payload = map_record_bytes(&entry);
                         if !next.cipher.seal_and_wipe_into(
                             aad.as_bytes(),

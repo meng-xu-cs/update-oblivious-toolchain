@@ -5991,7 +5991,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         engine_impl_source.contains("objects: &mut PublicRuntimeShadowState");
     let engine_uses_public_runtime_kernel =
         engine_impl_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
-    let engine_defines_fresh_coin_plan_directly = engine_source.contains("pub struct PathOramFreshCoinPlan")
+    let engine_defines_fresh_coin_plan_directly = engine_source
+        .contains("pub struct PathOramFreshCoinPlan")
         || engine_source.contains("struct PathOramFreshCoinPlan");
     let engine_uses_manifest_public_call_summary =
         engine_impl_source.contains("PublicCallSummary::from_manifest_entry");
@@ -5999,11 +6000,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("ConfidentialCallInputs::from_manifest_entry(&manifest_entry, args)?")
         && engine_impl_source
             .contains("confidential entrypoint must carry confidential call inputs");
-    let engine_clones_call_args_directly =
-        engine_impl_source.contains("let mut call_args = args.clone();")
-            || engine_impl_source.contains("let call_args = args.clone();");
-    let engine_peeks_into_fresh_coin_map =
-        engine_impl_source.contains(".by_object") || engine_impl_source.contains("fresh_coins_by_object");
+    let engine_clones_call_args_directly = engine_impl_source
+        .contains("let mut call_args = args.clone();")
+        || engine_impl_source.contains("let call_args = args.clone();");
+    let engine_peeks_into_fresh_coin_map = engine_impl_source.contains(".by_object")
+        || engine_impl_source.contains("fresh_coins_by_object");
     let engine_imports_raw_runtime_kernel =
         engine_impl_source.contains("use crate::runtime::kernel::RuntimeKernel;");
     let engine_imports_runtime_object_directly =
@@ -6113,7 +6114,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("fresh-coin surface restriction flag must be boolean")
     });
-    let fresh_coin_plan_zeroizes_on_drop = fresh_coins_source.contains("impl Drop for PathOramFreshCoinPlan")
+    let fresh_coin_plan_zeroizes_on_drop = fresh_coins_source
+        .contains("impl Drop for PathOramFreshCoinPlan")
         && fresh_coins_source.contains("*coin = 0;");
     let state_wrapper_present = state_source.contains("pub(crate) struct CommittedRuntimeState")
         && state_source.contains("pub(crate) struct RuntimeShadowState")
@@ -6223,32 +6225,32 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_finalizes_execution_trace = theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace {")
         && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness");
-    let controller_public_call_summary_uses_manifest_only =
-        controller_source.contains("fn from_manifest_entry")
-            && controller_source.contains("manifest_entry.param_names")
-            && controller_source.contains("entry_input_len: manifest_entry.entry_input_len")
-            && !controller_source.contains("entry_input_len: args.iter().map(Value::canonical_len).sum(),")
-            && !controller_source.contains("CompiledFunction");
-    let controller_public_trace_uses_output_shape_only =
-        controller_source.contains("public_call: PublicCallSummary,\n        output_shape: OutputShape,")
-            && !controller_source.contains(
-                "public_call: PublicCallSummary,\n        return_value: &Option<Value>,",
-            );
-    let controller_output_shape_uses_manifest_return_len =
-        controller_source.contains("return_length: manifest_entry.return_canonical_len")
-            && !controller_source.contains("return_length: value.canonical_len(),");
+    let controller_public_call_summary_uses_manifest_only = controller_source
+        .contains("fn from_manifest_entry")
+        && controller_source.contains("manifest_entry.param_names")
+        && controller_source.contains("entry_input_len: manifest_entry.entry_input_len")
+        && !controller_source
+            .contains("entry_input_len: args.iter().map(Value::canonical_len).sum(),")
+        && !controller_source.contains("CompiledFunction");
+    let controller_public_trace_uses_output_shape_only = controller_source
+        .contains("public_call: PublicCallSummary,\n        output_shape: OutputShape,")
+        && !controller_source
+            .contains("public_call: PublicCallSummary,\n        return_value: &Option<Value>,");
+    let controller_output_shape_uses_manifest_return_len = controller_source
+        .contains("return_length: manifest_entry.return_canonical_len")
+        && !controller_source.contains("return_length: value.canonical_len(),");
     let theorem_public_trace_path_avoids_compiled_function =
         !theorem_source.contains("CompiledFunction");
-    let engine_public_trace_uses_output_shape_only =
-        engine_impl_source.contains("let output_shape = output_shape_of(&manifest_entry, &return_value)?;");
+    let engine_public_trace_uses_output_shape_only = engine_impl_source
+        .contains("let output_shape = output_shape_of(&manifest_entry, &return_value)?;");
     let engine_uses_manifest_confidential_slot_program = engine_source
         .contains(".confidential_slot_program")
         && engine_source.contains("manifest confidential_slot_program missing");
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
-    let kernel_confidential_call_inputs_stay_inside_runtime =
-        kernel_source.contains("call_inputs: ConfidentialCallInputs")
-            && kernel_source.contains("call_inputs.into_raw_args().into_iter()");
+    let kernel_confidential_call_inputs_stay_inside_runtime = kernel_source
+        .contains("call_inputs: ConfidentialCallInputs")
+        && kernel_source.contains("call_inputs.into_raw_args().into_iter()");
     let kernel_exec_block_uses_confidential_slot_statements = kernel_source
         .contains("statements: &[ConfidentialKernelSlotStatement]")
         && kernel_source.contains("statement: &ConfidentialKernelSlotStatement");
@@ -6259,6 +6261,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && kernel_source.contains("initialized_slots: usize");
     let kernel_exec_state_avoids_name_keyed_env =
         !kernel_source.contains("env: BTreeMap<String, Value>");
+    let kernel_scratch_accounting_uses_object_type_lengths = kernel_source
+        .contains("value_canonical_len()")
+        && kernel_source.contains("key_canonical_len()")
+        && !kernel_source.contains("touch_value_scratch(value.canonical_len())?")
+        && !kernel_source.contains("touch_value_scratch(key.canonical_len())?")
+        && !kernel_source
+            .contains("touch_value_scratch(key.canonical_len().max(value.canonical_len()))?");
+    let object_commit_io_scratch_uses_type_lengths = objects_source
+        .contains("next.spec.value_type.canonical_len()")
+        && objects_source.contains("map_record_len(&next.spec)?")
+        && !objects_source
+            .contains("reserve_guard(ScratchRegion::IoScratch, committed_value.canonical_len())")
+        && !objects_source
+            .contains("reserve_guard(ScratchRegion::IoScratch, value.canonical_len())");
     let kernel_bounded_journal_checks = [
         (
             "struct BoundedJournal<T>",
@@ -6738,7 +6754,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("runtime state restriction flag must be boolean")
     });
-    let runtime_module_layout_present = runtime_module_source.contains("#[path = \"fresh_coins.rs\"]")
+    let runtime_module_layout_present = runtime_module_source
+        .contains("#[path = \"fresh_coins.rs\"]")
         && runtime_module_source.contains("#[path = \"kernel.rs\"]")
         && runtime_module_source.contains("#[path = \"objects.rs\"]")
         && runtime_module_source.contains("#[path = \"state.rs\"]");
@@ -7020,6 +7037,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_exec_state_uses_slot_vector,
         "kernel_exec_state_avoids_name_keyed_env":
             kernel_exec_state_avoids_name_keyed_env,
+        "kernel_scratch_accounting_uses_object_type_lengths":
+            kernel_scratch_accounting_uses_object_type_lengths,
+        "object_commit_io_scratch_uses_type_lengths":
+            object_commit_io_scratch_uses_type_lengths,
         "kernel_bounded_journal_checks": kernel_bounded_journal_checks,
         "kernel_bounded_journal_restricted": kernel_bounded_journal_restricted,
         "state_routes_confidential_calls_through_runtime_kernel":
@@ -7149,6 +7170,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && kernel_eval_uses_confidential_slot_exprs
             && kernel_exec_state_uses_slot_vector
             && kernel_exec_state_avoids_name_keyed_env
+            && kernel_scratch_accounting_uses_object_type_lengths
+            && object_commit_io_scratch_uses_type_lengths
             && kernel_bounded_journal_restricted
             && state_routes_confidential_calls_through_runtime_kernel
             && oram_working_stash_capacity_restricted

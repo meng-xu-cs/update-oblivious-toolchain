@@ -114,11 +114,11 @@ impl RuntimeKernelLoweringBundle {
                     entrypoint: entrypoint.into(),
                 }
             })?,
-            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(|| {
-                RuntimeKernelLoweringBundleError::MissingConfidentialSlotProgram {
+            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
+                || RuntimeKernelLoweringBundleError::MissingConfidentialSlotProgram {
                     entrypoint: entrypoint.into(),
-                }
-            })?,
+                },
+            )?,
         })
     }
 }
@@ -145,11 +145,11 @@ impl RuntimeShellBoundaryLoweringBundle {
                     entrypoint: entrypoint.clone(),
                 }
             })?,
-            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(|| {
-                RuntimeShellBoundaryLoweringBundleError::MissingConfidentialSlotProgram {
+            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
+                || RuntimeShellBoundaryLoweringBundleError::MissingConfidentialSlotProgram {
                     entrypoint,
-                }
-            })?,
+                },
+            )?,
         })
     }
 }
@@ -184,11 +184,7 @@ impl CompiledArtifact {
             .ok_or_else(|| RuntimeKernelSlotDslBundleError::MissingEntrypoint {
                 entrypoint: entrypoint.into(),
             })?;
-        RuntimeKernelSlotDslBundle::from_manifest_entry(
-            kernel_witness,
-            entrypoint,
-            manifest_entry,
-        )
+        RuntimeKernelSlotDslBundle::from_manifest_entry(kernel_witness, entrypoint, manifest_entry)
     }
 
     pub fn runtime_kernel_lowering_bundle_for_entrypoint(
@@ -204,11 +200,7 @@ impl CompiledArtifact {
             .ok_or_else(|| RuntimeKernelLoweringBundleError::MissingEntrypoint {
                 entrypoint: entrypoint.into(),
             })?;
-        RuntimeKernelLoweringBundle::from_manifest_entry(
-            kernel_witness,
-            entrypoint,
-            manifest_entry,
-        )
+        RuntimeKernelLoweringBundle::from_manifest_entry(kernel_witness, entrypoint, manifest_entry)
     }
 
     pub fn runtime_shell_boundary_lowering_bundle(

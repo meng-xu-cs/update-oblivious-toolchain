@@ -8,8 +8,9 @@ use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
 use uo_core::{
     BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
-    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement, RuntimeKernelRefinementEventWitness,
-    RuntimeKernelRefinementWitness, RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
+    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
+    RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
 
@@ -360,7 +361,8 @@ impl RuntimeKernel {
         predicate: Option<bool>,
     ) -> Result<()> {
         self.record_kernel_step(UoOpcode::CellSet, Some(object_id))?;
-        self.touch_value_scratch(value.canonical_len())?;
+        let value_len = objects.object_mut(object_id)?.value_canonical_len();
+        self.touch_value_scratch(value_len)?;
         objects
             .object_mut(object_id)?
             .set_cell(value, predicate, recorder)
@@ -409,7 +411,8 @@ impl RuntimeKernel {
         predicate: Option<bool>,
     ) -> Result<()> {
         self.record_kernel_step(UoOpcode::ArraySet, Some(object_id))?;
-        self.touch_value_scratch(value.canonical_len().max(32))?;
+        let value_len = objects.object_mut(object_id)?.value_canonical_len();
+        self.touch_value_scratch(value_len.max(32))?;
         objects
             .object_mut(object_id)?
             .set_array(index, value, predicate, recorder)
@@ -442,7 +445,8 @@ impl RuntimeKernel {
         key: &Value,
     ) -> Result<Value> {
         self.record_kernel_step(UoOpcode::MapGet, Some(object_id))?;
-        self.touch_value_scratch(key.canonical_len())?;
+        let key_len = objects.object_mut(object_id)?.key_canonical_len()?;
+        self.touch_value_scratch(key_len)?;
         objects
             .object_mut(object_id)?
             .get_map(key, recorder, &mut self.allocator)
@@ -468,7 +472,11 @@ impl RuntimeKernel {
         predicate: Option<bool>,
     ) -> Result<()> {
         self.record_kernel_step(UoOpcode::MapPut, Some(object_id))?;
-        self.touch_value_scratch(key.canonical_len().max(value.canonical_len()))?;
+        let (key_len, value_len) = {
+            let object = objects.object_mut(object_id)?;
+            (object.key_canonical_len()?, object.value_canonical_len())
+        };
+        self.touch_value_scratch(key_len.max(value_len))?;
         objects
             .object_mut(object_id)?
             .put_map(key, value, predicate, recorder, &mut self.allocator)

@@ -1623,9 +1623,11 @@ impl RuntimeKernelWitness {
         let manifest_slot_program = manifest_entry
             .confidential_slot_program
             .as_ref()
-            .ok_or_else(|| KernelWitnessError::MissingManifestConfidentialSlotProgram {
-                entrypoint: entrypoint.into(),
-            })?;
+            .ok_or_else(
+                || KernelWitnessError::MissingManifestConfidentialSlotProgram {
+                    entrypoint: entrypoint.into(),
+                },
+            )?;
         let expected_steps = manifest_slot_program
             .expected_runtime_steps()
             .into_iter()

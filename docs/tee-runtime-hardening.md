@@ -165,6 +165,11 @@ The current runtime has a first hardening layer:
   manifest-stored `return_canonical_len` and receives only the public
   `OutputShape` summary rather than the full return payload; injected
   fresh-coin plans now zero their stored leaf choices on drop
+- kernel object-operation scratch reservations and UO object commit `io`
+  scratch reservations now derive from admitted object/type metadata instead
+  of live confidential value lengths wherever the runtime already knows the
+  canonical shape statically, which removes another residual secret-to-budget
+  dependency from cell/array/map mutation and commit paths
 - ORAM refresh/metadata decode now uses `StoreCipher::with_opened_payload`, so
   decrypted position-map / stash / bucket payload buffers are scrubbed after
   parse instead of lingering as dropped plaintext heap allocations

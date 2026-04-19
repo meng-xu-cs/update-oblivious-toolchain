@@ -6,9 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
 use uo_core::{
-    ir::StateObject,
-    manifest::EntrypointManifest,
-    ConfidentialKernelSlotProgram,
+    ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
     RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
     RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness, Value,
 };

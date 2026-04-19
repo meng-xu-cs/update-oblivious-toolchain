@@ -4,13 +4,11 @@ mod oram;
 mod runtime;
 mod theorem;
 
-pub use engine::{
-    run_artifact, run_artifact_with_seed, CallResult, ContractInstance,
-};
-#[cfg(feature = "diagnostics")]
-pub use runtime::fresh_coins::PathOramFreshCoinPlan;
+pub use engine::{run_artifact, run_artifact_with_seed, CallResult, ContractInstance};
 #[cfg(feature = "diagnostics")]
 pub use engine::{CallTelemetry, DiagnosticCallResult};
+#[cfg(feature = "diagnostics")]
+pub use runtime::fresh_coins::PathOramFreshCoinPlan;
 
 #[cfg(test)]
 mod tests {

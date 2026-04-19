@@ -145,8 +145,7 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 expected_entry_input_len
             );
         }
-        let expected_return_canonical_len =
-            function.return_type.as_ref().map(Type::canonical_len);
+        let expected_return_canonical_len = function.return_type.as_ref().map(Type::canonical_len);
         if entry.return_canonical_len != expected_return_canonical_len {
             bail!(
                 "manifest return_canonical_len mismatch for entrypoint {}: {:?} != {:?}",
@@ -174,14 +173,12 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
         }
         let expected_kernel_steps = if function.confidential {
             let expected_program = function.confidential_kernel_program()?;
-            let witnessed_program =
-                entry
-                    .confidential_program
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!(
-                        "manifest confidential_program missing for entrypoint {}",
-                        function.signature
-                    ))?;
+            let witnessed_program = entry.confidential_program.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "manifest confidential_program missing for entrypoint {}",
+                    function.signature
+                )
+            })?;
             if witnessed_program != &expected_program {
                 bail!(
                     "manifest confidential_program mismatch for entrypoint {}",
@@ -190,13 +187,12 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             }
             let expected_slot_program = expected_program.to_slot_program()?;
             let witnessed_slot_program =
-                entry
-                    .confidential_slot_program
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!(
+                entry.confidential_slot_program.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!(
                         "manifest confidential_slot_program missing for entrypoint {}",
                         function.signature
-                    ))?;
+                    )
+                })?;
             if witnessed_slot_program != &expected_slot_program {
                 bail!(
                     "manifest confidential_slot_program mismatch for entrypoint {}",
@@ -1207,9 +1203,12 @@ bounds:
     #[test]
     fn debug_translation_bundle_includes_projection_views() {
         let (source, metadata, artifact) = sample_artifact();
-        let debug_bundle =
-            translation_validation_bundle_against_source(source.to_str().unwrap(), &metadata, &artifact)
-                .unwrap();
+        let debug_bundle = translation_validation_bundle_against_source(
+            source.to_str().unwrap(),
+            &metadata,
+            &artifact,
+        )
+        .unwrap();
         let debug_json = serde_json::to_value(&debug_bundle).unwrap();
         let debug_obj = debug_json.as_object().unwrap();
         assert!(debug_obj.contains_key("source_path"));

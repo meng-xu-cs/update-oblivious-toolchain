@@ -242,24 +242,78 @@ mod tests {
             confidential_program: None,
             confidential_slot_program: None,
             kernel_steps: vec![
-                RuntimeKernelStepManifest { opcode: UoOpcode::Begin, object_id: None },
-                RuntimeKernelStepManifest { opcode: UoOpcode::CellGet, object_id: Some(1) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::CellSet, object_id: Some(1) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::CellSet, object_id: Some(1) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::ArrayGet, object_id: Some(2) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::ArrayGet, object_id: Some(2) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::ArrayGet, object_id: Some(2) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
-                RuntimeKernelStepManifest { opcode: UoOpcode::Commit, object_id: None },
-                RuntimeKernelStepManifest { opcode: UoOpcode::Wipe, object_id: None },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::Begin,
+                    object_id: None,
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::CellGet,
+                    object_id: Some(1),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::CellSet,
+                    object_id: Some(1),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::CellSet,
+                    object_id: Some(1),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::ArrayGet,
+                    object_id: Some(2),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::ArrayGet,
+                    object_id: Some(2),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::ArrayGet,
+                    object_id: Some(2),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapGet,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapGet,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapGet,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapGet,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapPut,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapPut,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapPut,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapPut,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::MapPut,
+                    object_id: Some(3),
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::Commit,
+                    object_id: None,
+                },
+                RuntimeKernelStepManifest {
+                    opcode: UoOpcode::Wipe,
+                    object_id: None,
+                },
             ],
             uocell_reads: 1,
             uocell_writes: 2,
