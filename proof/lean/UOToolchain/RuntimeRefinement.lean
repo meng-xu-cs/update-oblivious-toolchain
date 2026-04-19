@@ -1,5 +1,5 @@
 import UOToolchain.PathOramSecurity
-import UOToolchain.SgxMicroGame
+import UOToolchain.SgxMicroModel
 
 namespace UOToolchain
 

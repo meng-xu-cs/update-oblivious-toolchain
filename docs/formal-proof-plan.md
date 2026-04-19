@@ -846,7 +846,10 @@ proof-grade Path-ORAM theorem boundary under explicit assumptions:
   materialized source and candidate artifacts; the Lean checker reconstructs
   the proof-relevant fields itself and then checks exact replay of
   state-object manifests, resource budgets, ORAM access/budget metadata, and
-  confidential kernel schedule metadata
+  confidential kernel schedule metadata, and the theorem-facing
+  `Check*.lean` roots now import the legacy-free `UOToolchain.ProofGrade`
+  umbrella while the remaining legacy bridge wrappers live in `Legacy*`
+  companion modules outside that proof-grade checker surface
 - the results bundle is regenerated against that transcript model
 
 What still should not be claimed without further work is stronger provenance or

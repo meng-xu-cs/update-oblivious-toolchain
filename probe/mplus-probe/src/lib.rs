@@ -823,17 +823,17 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         (
             "legacySgxMicroLocalTheorem",
             vec![
-                String::from("proof/lean/UOToolchain/SgxJointProjection.lean"),
+                String::from("proof/lean/UOToolchain/LegacySgxJointProjection.lean"),
                 String::from("proof/lean/UOToolchain/SgxMicroGame.lean"),
             ],
         ),
         (
             "legacyOramLocalTheorem",
             vec![
+                String::from("proof/lean/UOToolchain/LegacySgxJointProjection.lean"),
+                String::from("proof/lean/UOToolchain/LegacySgxOramProjection.lean"),
+                String::from("proof/lean/UOToolchain/LegacyTeeDeployment.lean"),
                 String::from("proof/lean/UOToolchain/OramGame.lean"),
-                String::from("proof/lean/UOToolchain/SgxJointProjection.lean"),
-                String::from("proof/lean/UOToolchain/SgxOramProjection.lean"),
-                String::from("proof/lean/UOToolchain/TeeDeployment.lean"),
             ],
         ),
     ]
@@ -891,6 +891,52 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             entry["absent"]
                 .as_bool()
                 .expect("checker legacy-symbol absence flag must be boolean")
+        });
+    let proofgrade_checker_import_surface_checks = {
+        let mut checks = Vec::new();
+        for entry in fs::read_dir(&proof_lean_root)
+            .with_context(|| format!("reading {}", proof_lean_root.display()))?
+        {
+            let entry = entry?;
+            let path = entry.path();
+            let is_checker = path.extension().is_some_and(|ext| ext == "lean")
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("Check"));
+            if !is_checker {
+                continue;
+            }
+            let source = fs::read_to_string(&path)
+                .with_context(|| format!("reading {}", path.display()))?;
+            let uses_proofgrade_umbrella = source
+                .lines()
+                .any(|line| line.trim() == "import UOToolchain.ProofGrade");
+            let uses_legacy_umbrella = source.lines().any(|line| line.trim() == "import UOToolchain");
+            checks.push(json!({
+                "file": display_report_path(&path),
+                "uses_proofgrade_umbrella": uses_proofgrade_umbrella,
+                "uses_legacy_umbrella": uses_legacy_umbrella,
+                "restricted": uses_proofgrade_umbrella && !uses_legacy_umbrella,
+            }));
+        }
+        checks.sort_by(|lhs, rhs| {
+            lhs["file"]
+                .as_str()
+                .expect("checker import-surface file must be string")
+                .cmp(
+                    rhs["file"]
+                        .as_str()
+                        .expect("checker import-surface file must be string"),
+                )
+        });
+        checks
+    };
+    let proofgrade_checker_import_surface_restricted =
+        proofgrade_checker_import_surface_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("checker import-surface restriction flag must be boolean")
         });
     let mut reports = Vec::new();
     for (name, artifacts) in suite {
@@ -971,6 +1017,10 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             proofgrade_checker_legacy_symbol_checks,
         "proofgrade_checker_legacy_symbol_mentions_absent":
             proofgrade_checker_legacy_symbol_mentions_absent,
+        "proofgrade_checker_import_surface_checks":
+            proofgrade_checker_import_surface_checks,
+        "proofgrade_checker_import_surface_restricted":
+            proofgrade_checker_import_surface_restricted,
         "reports": reports,
     }))
 }

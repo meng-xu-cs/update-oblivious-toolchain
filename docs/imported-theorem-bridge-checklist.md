@@ -51,6 +51,10 @@ Status labels:
   proof-grade dependency path.
   Evidence:
   `proof/lean/UOToolchain/OramGame.lean`,
+  `proof/lean/UOToolchain/LegacySgxOramProjection.lean`,
+  `proof/lean/UOToolchain/LegacySgxJointProjection.lean`,
+  `proof/lean/UOToolchain/LegacyTeeDeployment.lean`,
+  `proof/lean/UOToolchain/ProofGrade.lean`,
   `proof/lean/UOToolchain/SgxMicroGame.lean`,
   `probe/mplus-probe/src/lib.rs`,
   `docs/formal-proof-plan.md`.
@@ -58,8 +62,9 @@ Status labels:
   `path_oram_local_posmap_v1` development does not depend on them.
   The `static-checks` probe also pins the legacy axiom definitions to the
   legacy game modules, restricts legacy theorem-symbol mentions to the
-  bridge/projection files, and checks that the proof-grade `Check*.lean`
-  entrypoints do not mention those legacy shims directly.
+  `Legacy*` bridge/projection companions, and checks that every top-level
+  `Check*.lean` entrypoint imports `UOToolchain.ProofGrade` instead of the
+  legacy umbrella and does not mention those legacy shims directly.
 
 - `cleared` Translation-validate proof-relevant compiler output against source
   and metadata.

@@ -1,4 +1,4 @@
-import UOToolchain
+import UOToolchain.ProofGrade
 
 open UOToolchain
 

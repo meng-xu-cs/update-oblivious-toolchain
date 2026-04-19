@@ -3,15 +3,19 @@ import UOToolchain.FiniteDistribution
 import UOToolchain.IRSemantics
 import UOToolchain.ExactObjects
 import UOToolchain.CompilerInvariant
+import UOToolchain.OramModel
 import UOToolchain.Composition
 import UOToolchain.OramGame
+import UOToolchain.LegacyComposition
 import UOToolchain.StandardOramReduction
 import UOToolchain.PathOramSecurity
 import UOToolchain.TeeDeployment
+import UOToolchain.LegacyTeeDeployment
 import UOToolchain.SgxBoundary
 import UOToolchain.SgxRelation
 import UOToolchain.SgxController
 import UOToolchain.SgxControllerTrace
+import UOToolchain.SgxMicroModel
 import UOToolchain.SgxMicroGame
 import UOToolchain.RuntimeRefinement
 import UOToolchain.RuntimeTrustedKernel
@@ -39,5 +43,7 @@ import UOToolchain.RuntimeCanonicalPathOramPairJson
 import UOToolchain.TranslationValidationJson
 import UOToolchain.RuntimePaperInstantiation
 import UOToolchain.SgxOramProjection
+import UOToolchain.LegacySgxOramProjection
 import UOToolchain.SgxExactProjection
 import UOToolchain.SgxJointProjection
+import UOToolchain.LegacySgxJointProjection

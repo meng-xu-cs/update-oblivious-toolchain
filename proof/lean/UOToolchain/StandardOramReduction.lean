@@ -1,4 +1,4 @@
-import UOToolchain.OramGame
+import UOToolchain.OramModel
 
 namespace UOToolchain
 

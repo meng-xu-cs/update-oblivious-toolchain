@@ -33,6 +33,9 @@ What is already established at the frozen interface:
 - Lean-side proof-grade predicates and executable checkers for the runtime
   kernel witness, runtime refinement witness, and runtime trusted-kernel
   bundle
+- proof-grade checker entrypoints are pinned to the legacy-free
+  `UOToolchain.ProofGrade` umbrella, while the remaining legacy bridge wrappers
+  live only in `Legacy*` companion modules
 - runtime enforcement of the admitted public kernel schedule for accepted
   confidential entrypoints
 

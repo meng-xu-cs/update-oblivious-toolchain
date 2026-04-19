@@ -1,6 +1,6 @@
 import UOToolchain.ExactObjects
 import UOToolchain.CompilerInvariant
-import UOToolchain.OramGame
+import UOToolchain.OramModel
 
 namespace UOToolchain
 
@@ -16,9 +16,6 @@ def ArtifactSecurityWith
   (exactRun : Semantics)
   (oramRun : OramSemantics) : Prop :=
   ExactUO exactRun ∧ ComputationalUOWith security oramRun
-
-abbrev legacyArtifactSecurity (exactRun : Semantics) (oramRun : OramSemantics) : Prop :=
-  ArtifactSecurityWith legacyOramSecurityInterface exactRun oramRun
 
 theorem exactUO_withPublicGas {run : Semantics} {budget : Nat}
   (hExact : ExactUO run) :
@@ -55,15 +52,6 @@ theorem compositionGasTheorem
     manifest
     (exactEntrypointPublicGasSafe runs manifest)
     hPublic
-
-theorem legacyMixedArtifactComposition
-  (runs : List Semantics)
-  (manifest : ManifestWitness)
-  (hRuns : ExactUOFamily runs)
-  (oramRun : OramSemantics)
-  (hOram : legacyComputationalUO oramRun) :
-  legacyArtifactSecurity (exactEntrypointSemantics runs manifest) oramRun := by
-  exact ⟨compositionTheorem runs manifest hRuns, hOram⟩
 
 theorem mixedArtifactCompositionWith
   (security : OramSecurityInterface)

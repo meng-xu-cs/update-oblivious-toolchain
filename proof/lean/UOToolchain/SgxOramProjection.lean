@@ -1,4 +1,5 @@
-import UOToolchain.SgxMicroGame
+import UOToolchain.OramModel
+import UOToolchain.SgxMicroModel
 
 namespace UOToolchain
 
@@ -21,40 +22,25 @@ def oramSGXStorageRelationWith (security : OramSecurityInterface) : SGXStorageRe
       storage₁ = view₁.map sgxStorageOfOramView ∧
       storage₂ = view₂.map sgxStorageOfOramView
 
-abbrev legacyOramSGXStorageRelation : SGXStorageRelation :=
-  oramSGXStorageRelationWith legacyOramSecurityInterface
-
 def oramSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
   { storageRel := oramSGXStorageRelationWith security
   , microRel := publicSGXMicroRelation
   }
-
-abbrev legacyOramSGXProofRelation : SGXProofRelation :=
-  oramSGXProofRelationWith legacyOramSecurityInterface
 
 def oramBudgetSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
   { storageRel := oramSGXStorageRelationWith security
   , microRel := budgetConsistentSGXMicroRelation
   }
 
-abbrev legacyOramBudgetSGXProofRelation : SGXProofRelation :=
-  oramBudgetSGXProofRelationWith legacyOramSecurityInterface
-
 def oramCanonicalizedSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
   { storageRel := oramSGXStorageRelationWith security
   , microRel := canonicalizedSGXMicroRelation
   }
 
-abbrev legacyOramCanonicalizedSGXProofRelation : SGXProofRelation :=
-  oramCanonicalizedSGXProofRelationWith legacyOramSecurityInterface
-
 def oramNormalizedObservedSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
   { storageRel := oramSGXStorageRelationWith security
   , microRel := normalizedObservedSGXMicroRelation
   }
-
-abbrev legacyOramNormalizedObservedSGXProofRelation : SGXProofRelation :=
-  oramNormalizedObservedSGXProofRelationWith legacyOramSecurityInterface
 
 def OramPublicOutcomeSafe (publicOutcome : OramConfig → SGXPublicOutcome) : Prop :=
   ∀ cfg₁ cfg₂, sameOramPublicProjection cfg₁ cfg₂ → publicOutcome cfg₁ = publicOutcome cfg₂
@@ -160,17 +146,6 @@ theorem oramSecurity_projects_to_sgxStorage
     (executionLeakage cfg₁) := by
   intro hPublic hLocal
   exact ⟨cfg₁, cfg₂, view₁, view₂, hPublic, rfl, hLocal, rfl, rfl⟩
-
-theorem legacyOramLocalTheorem_projects_to_sgxStorage
-  (cfg₁ cfg₂ : OramConfig)
-  (view₁ view₂ : Distribution ViewMPlus) :
-  sameOramPublicProjection cfg₁ cfg₂ →
-  legacyOramLocalTheorem view₁ view₂ (executionLeakage cfg₁) →
-  legacyOramSGXStorageRelation
-    (view₁.map sgxStorageOfOramView)
-    (view₂.map sgxStorageOfOramView)
-    (executionLeakage cfg₁) := by
-  exact oramSecurity_projects_to_sgxStorage legacyOramSecurityInterface cfg₁ cfg₂ view₁ view₂
 
 theorem oramMicroLeakage_public
   {publicOutcome : OramConfig → SGXPublicOutcome}
@@ -323,30 +298,6 @@ theorem computationalUOWith_projects_to_sgxExecution
       rw [← hEq]
       simp
 
-theorem legacyComputationalUO_projects_to_sgxExecution
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {microTrace : OramConfig → SGXMicroTrace}
-  {modelTags : SGXModelTags}
-  (hOram : legacyComputationalUO run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule)
-  (hMicro : OramPublicMicroTraceSafe microTrace) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    legacyOramSGXProofRelation
-    (oramToSGXSemantics run publicOutcome boundarySchedule microTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  exact
-    computationalUOWith_projects_to_sgxExecution
-      legacyOramSecurityInterface
-      hOram
-      hOutcome
-      hBoundary
-      hMicro
-
 theorem computationalUOWith_projects_to_sgxExecution_with_controller
   (security : OramSecurityInterface)
   {run : OramSemantics}
@@ -364,27 +315,6 @@ theorem computationalUOWith_projects_to_sgxExecution_with_controller
     (oramMicroLeakage publicOutcome modelTags) := by
   apply computationalUOWith_projects_to_sgxExecution security hOram hOutcome hBoundary
   exact oramControllerMicroTrace_public
-
-theorem legacyComputationalUO_projects_to_sgxExecution_with_controller
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : legacyComputationalUO run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    legacyOramSGXProofRelation
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  exact
-    computationalUOWith_projects_to_sgxExecution_with_controller
-      legacyOramSecurityInterface
-      hOram
-      hOutcome
-      hBoundary
 
 theorem computationalUOWith_projects_to_sgxExecution_with_budgetController
   (security : OramSecurityInterface)
@@ -444,27 +374,6 @@ theorem computationalUOWith_projects_to_sgxExecution_with_budgetController
         (oramControllerMicroDistribution_consistent
           (run := run)
           (cfg := cfg₂))
-
-theorem legacyComputationalUO_projects_to_sgxExecution_with_budgetController
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : legacyComputationalUO run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    legacyOramBudgetSGXProofRelation
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  exact
-    computationalUOWith_projects_to_sgxExecution_with_budgetController
-      legacyOramSecurityInterface
-      hOram
-      hOutcome
-      hBoundary
 
 theorem computationalUOWith_projects_to_sgxExecution_with_canonicalController
   (security : OramSecurityInterface)
@@ -533,27 +442,6 @@ theorem computationalUOWith_projects_to_sgxExecution_with_canonicalController
         oramMicroLeakage_public hOutcome cfg₂ cfg₁ (sameOramPublicProjection_symm hPublic)
       simpa [hLeakageEq] using hCanon
 
-theorem legacyComputationalUO_projects_to_sgxExecution_with_canonicalController
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : legacyComputationalUO run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    legacyOramCanonicalizedSGXProofRelation
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  exact
-    computationalUOWith_projects_to_sgxExecution_with_canonicalController
-      legacyOramSecurityInterface
-      hOram
-      hOutcome
-      hBoundary
-
 theorem computationalUOWith_projects_to_sgxExecution_with_normalizedController
   (security : OramSecurityInterface)
   {run : OramSemantics}
@@ -613,27 +501,6 @@ theorem computationalUOWith_projects_to_sgxExecution_with_normalizedController
           (run := run)
           (cfg := cfg₂))
 
-theorem legacyComputationalUO_projects_to_sgxExecution_with_normalizedController
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : legacyComputationalUO run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    legacyOramNormalizedObservedSGXProofRelation
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  exact
-    computationalUOWith_projects_to_sgxExecution_with_normalizedController
-      legacyOramSecurityInterface
-      hOram
-      hOutcome
-      hBoundary
-
 /-- Paper-facing main theorem profile:
 exact public boundary schedule plus normalized SGX micro observer. -/
 theorem paperMain_computationalUOWith_projects_to_sgxExecution
@@ -654,27 +521,6 @@ theorem paperMain_computationalUOWith_projects_to_sgxExecution
   exact
     computationalUOWith_projects_to_sgxExecution_with_normalizedController
       security
-      hOram
-      hOutcome
-      hBoundary
-
-theorem legacyPaperMain_computationalUO_projects_to_sgxExecution
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : legacyComputationalUO run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    legacyOramNormalizedObservedSGXProofRelation
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  exact
-    paperMain_computationalUOWith_projects_to_sgxExecution
-      legacyOramSecurityInterface
       hOram
       hOutcome
       hBoundary

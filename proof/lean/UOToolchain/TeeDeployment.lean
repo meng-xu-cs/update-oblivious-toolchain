@@ -124,9 +124,6 @@ def teeStorageLocalTheoremWith (security : OramSecurityInterface) : TEEStorageLo
       teeView₁ = view₁.map (viewTEEStoreFromOramView cfg₁ termination outputShape) ∧
       teeView₂ = view₂.map (viewTEEStoreFromOramView cfg₂ termination outputShape)
 
-abbrev legacyTeeStorageLocalTheorem : TEEStorageLocalTheorem :=
-  teeStorageLocalTheoremWith legacyOramSecurityInterface
-
 theorem oramSecurity_projects_to_teeStorage
   (security : OramSecurityInterface)
   (cfg₁ cfg₂ : OramConfig)
@@ -142,19 +139,6 @@ theorem oramSecurity_projects_to_teeStorage
   intro hPublic hLocal
   refine ⟨cfg₁, cfg₂, termination, outputShape, view₁, view₂, hPublic, rfl, hLocal, rfl, rfl⟩
 
-theorem legacyOramLocalTheorem_projects_to_teeStorage
-  (cfg₁ cfg₂ : OramConfig)
-  (termination : Bool)
-  (outputShape : OutputShape)
-  (view₁ view₂ : Distribution ViewMPlus) :
-  sameOramPublicProjection cfg₁ cfg₂ →
-  legacyOramLocalTheorem view₁ view₂ (executionLeakage cfg₁) →
-  legacyTeeStorageLocalTheorem
-    (view₁.map (viewTEEStoreFromOramView cfg₁ termination outputShape))
-    (view₂.map (viewTEEStoreFromOramView cfg₂ termination outputShape))
-    (executionLeakage cfg₁) := by
-  exact oramSecurity_projects_to_teeStorage legacyOramSecurityInterface cfg₁ cfg₂ termination outputShape view₁ view₂
-
 def ComputationalTEEStorageObliviousWith
   (security : OramSecurityInterface)
   (run : OramSemantics)
@@ -166,12 +150,6 @@ def ComputationalTEEStorageObliviousWith
       (teeStoreDistribution run termination outputShape cfg₁)
       (teeStoreDistribution run termination outputShape cfg₂)
       (executionLeakage cfg₁)
-
-abbrev legacyComputationalTEEStorageOblivious
-  (run : OramSemantics)
-  (termination : OramConfig → Bool)
-  (outputShape : OramConfig → OutputShape) : Prop :=
-  ComputationalTEEStorageObliviousWith legacyOramSecurityInterface run termination outputShape
 
 theorem computationalUOWith_projects_to_teeStorage
   (security : OramSecurityInterface)
@@ -199,21 +177,6 @@ theorem computationalUOWith_projects_to_teeStorage
       hPublic
       (hOram cfg₁ cfg₂ hPublic))
 
-theorem legacyComputationalUO_projects_to_teeStorage
-  {run : OramSemantics}
-  {termination : OramConfig → Bool}
-  {outputShape : OramConfig → OutputShape}
-  (hOram : legacyComputationalUO run)
-  (hTermination : OramPublicTerminationSafe termination)
-  (hOutputShape : OramPublicOutputShapeSafe outputShape) :
-  legacyComputationalTEEStorageOblivious run termination outputShape := by
-  exact
-    computationalUOWith_projects_to_teeStorage
-      legacyOramSecurityInterface
-      hOram
-      hTermination
-      hOutputShape
-
 def TEEStorageSecurityWith
   (security : OramSecurityInterface)
   (exactRun : Semantics)
@@ -224,22 +187,6 @@ def TEEStorageSecurityWith
   (oramOutputShape : OramConfig → OutputShape) : Prop :=
   ExactTEEStorageOblivious (withPublicBoundary exactRun exactTermination exactOutputShape) ∧
     ComputationalTEEStorageObliviousWith security oramRun oramTermination oramOutputShape
-
-abbrev legacyTEEStorageSecurity
-  (exactRun : Semantics)
-  (exactTermination : Config → Bool)
-  (exactOutputShape : Config → OutputShape)
-  (oramRun : OramSemantics)
-  (oramTermination : OramConfig → Bool)
-  (oramOutputShape : OramConfig → OutputShape) : Prop :=
-  TEEStorageSecurityWith
-    legacyOramSecurityInterface
-    exactRun
-    exactTermination
-    exactOutputShape
-    oramRun
-    oramTermination
-    oramOutputShape
 
 theorem artifactSecurityWith_projects_to_teeStorage
   (security : OramSecurityInterface)
@@ -267,33 +214,5 @@ theorem artifactSecurityWith_projects_to_teeStorage
     ⟨ exactUO_projects_to_teeStorage hExact hExactTermination hExactOutputShape
     , computationalUOWith_projects_to_teeStorage security hOram hOramTermination hOramOutputShape
     ⟩
-
-theorem artifactSecurity_projects_to_teeStorage
-  {exactRun : Semantics}
-  {exactTermination : Config → Bool}
-  {exactOutputShape : Config → OutputShape}
-  {oramRun : OramSemantics}
-  {oramTermination : OramConfig → Bool}
-  {oramOutputShape : OramConfig → OutputShape}
-  (hArtifact : legacyArtifactSecurity exactRun oramRun)
-  (hExactTermination : PublicTerminationSafe exactTermination)
-  (hExactOutputShape : PublicOutputShapeSafe exactOutputShape)
-  (hOramTermination : OramPublicTerminationSafe oramTermination)
-  (hOramOutputShape : OramPublicOutputShapeSafe oramOutputShape) :
-  legacyTEEStorageSecurity
-    exactRun
-    exactTermination
-    exactOutputShape
-    oramRun
-    oramTermination
-    oramOutputShape := by
-  exact
-    artifactSecurityWith_projects_to_teeStorage
-      legacyOramSecurityInterface
-      hArtifact
-      hExactTermination
-      hExactOutputShape
-      hOramTermination
-      hOramOutputShape
 
 end UOToolchain
