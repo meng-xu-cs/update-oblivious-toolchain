@@ -86,9 +86,7 @@ impl RuntimePhaseJournal {
     }
 
     fn snapshot(&self) -> RuntimeKernelRefinementWitness {
-        RuntimeKernelRefinementWitness {
-            events: self.inner.entries.clone(),
-        }
+        RuntimeKernelRefinementWitness::from_events(self.inner.entries.clone())
     }
 
     fn push(&mut self, event: RuntimeKernelRefinementEventWitness) -> Result<()> {
@@ -96,13 +94,13 @@ impl RuntimePhaseJournal {
     }
 
     fn push_pre_committed_cold_object(&mut self, object_id: u32) -> Result<()> {
-        self.push(RuntimeKernelRefinementEventWitness::pre_committed_cold_object(
-            object_id,
-        ))
+        self.push(RuntimeKernelRefinementEventWitness::pre_committed_cold_object(object_id))
     }
 
     fn push_shadow_load_object(&mut self, object_id: u32) -> Result<()> {
-        self.push(RuntimeKernelRefinementEventWitness::shadow_load_object(object_id))
+        self.push(RuntimeKernelRefinementEventWitness::shadow_load_object(
+            object_id,
+        ))
     }
 
     fn push_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
@@ -126,9 +124,7 @@ impl RuntimePhaseJournal {
     }
 
     fn into_witness(self) -> RuntimeKernelRefinementWitness {
-        RuntimeKernelRefinementWitness {
-            events: self.inner.into_vec(),
-        }
+        RuntimeKernelRefinementWitness::from_events(self.inner.into_vec())
     }
 }
 
@@ -810,10 +806,7 @@ impl RuntimeKernel {
             public_object_ids: self.public_object_ids,
             kernel_steps: self.kernel_steps.into_vec(),
         };
-        Ok((
-            kernel_witness,
-            self.runtime_phase_events.into_witness(),
-        ))
+        Ok((kernel_witness, self.runtime_phase_events.into_witness()))
     }
 
     fn touch_value_scratch(&mut self, bytes: usize) -> Result<()> {
@@ -1088,7 +1081,8 @@ impl RuntimeKernel {
         self.allocator.record_kernel_op(opcode)?;
         self.kernel_steps
             .push(RuntimeKernelStepWitness { opcode, object_id })?;
-        self.runtime_phase_events.push_kernel_step(opcode, object_id)?;
+        self.runtime_phase_events
+            .push_kernel_step(opcode, object_id)?;
         Ok(())
     }
 

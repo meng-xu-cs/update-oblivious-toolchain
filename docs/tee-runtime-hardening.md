@@ -416,6 +416,14 @@ The current runtime has a first hardening layer:
   that runtime phase witness is now also finalized behind the runtime state
   boundary rather than being assembled in `engine.rs`, which further shrinks
   the amount of concrete runtime-phase witness construction left in the shell
+- that lower-level runtime phase witness now also has a sealed Rust surface:
+  `RuntimeKernelRefinementWitness` keeps its `events` vector private, exposes
+  only shared constructor/accessor methods for cross-module use, and the probe
+  now checks both that privacy boundary and the runtime-side `from_events(...)`
+  helper path explicitly; the exact `RuntimeShellTrace` artifact exported above
+  that witness now also keeps its stored event/schedule vectors private and is
+  rebuilt through one explicit constructor/accessor surface instead of public
+  field mutation
 - the post-call proof-facing `ExecutionTrace` packaging now also lives in
   `runtime/uo-evm/src/theorem.rs`, so `engine.rs` no longer constructs the
   controller-observer certificate, hidden Path-ORAM certificate, or

@@ -730,11 +730,11 @@ mod tests {
         assert_eq!(phase_witness.commit_object_schedule(), vec![1]);
         assert_eq!(phase_witness.cold_store_object_schedule(), vec![1]);
         assert_eq!(
-            phase_witness.events.first().map(|event| event.kind),
+            phase_witness.first_event().map(|event| event.kind),
             Some(RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject)
         );
         assert_eq!(
-            phase_witness.events.last().map(|event| event.kind),
+            phase_witness.last_event().map(|event| event.kind),
             Some(RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject)
         );
         phase_witness

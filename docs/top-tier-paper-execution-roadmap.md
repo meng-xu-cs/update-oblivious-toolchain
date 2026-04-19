@@ -256,7 +256,11 @@ Concrete tasks:
    theorem-facing runtime-kernel boundary interface.
 5. Completed for the Rust/static side: visibility restrictions, wrapper
    elimination, and probe-time confinement assertions now keep secret-bearing
-   runtime structures inside the runtime/kernel boundary.
+   runtime structures inside the runtime/kernel boundary; this now includes a
+   sealed runtime-phase witness API with probe-checked constructor/accessor
+   boundaries rather than raw cross-module event-vector mutation, plus the same
+   explicit API discipline for the exact shell-boundary trace derived from that
+   witness.
 6. Mostly completed on the Rust side: non-kernel secret buffers have been
    aggressively removed or put under wipe discipline; the remaining theorem
    work is to connect that discipline to the final formal model.

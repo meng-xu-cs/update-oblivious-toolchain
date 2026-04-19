@@ -18,13 +18,13 @@ pub struct RuntimeShellContract {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellTrace {
-    pub events: Vec<RuntimeKernelRefinementEventWitness>,
-    pub projected_kernel_schedule: RuntimeKernelScheduleWitness,
-    pub pre_committed_cold_object_schedule: Vec<u32>,
-    pub shadow_load_object_schedule: Vec<u32>,
-    pub commit_object_schedule: Vec<u32>,
-    pub cold_store_object_schedule: Vec<u32>,
-    pub post_committed_cold_object_schedule: Vec<u32>,
+    events: Vec<RuntimeKernelRefinementEventWitness>,
+    projected_kernel_schedule: RuntimeKernelScheduleWitness,
+    pre_committed_cold_object_schedule: Vec<u32>,
+    shadow_load_object_schedule: Vec<u32>,
+    commit_object_schedule: Vec<u32>,
+    cold_store_object_schedule: Vec<u32>,
+    post_committed_cold_object_schedule: Vec<u32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -65,15 +65,15 @@ impl RuntimeKernelWitness {
 
 impl RuntimeKernelRefinementWitness {
     pub fn shell_trace(&self) -> RuntimeShellTrace {
-        RuntimeShellTrace {
-            events: self.events.clone(),
-            projected_kernel_schedule: self.projected_kernel_schedule(),
-            pre_committed_cold_object_schedule: self.pre_committed_cold_object_schedule(),
-            shadow_load_object_schedule: self.shadow_load_object_schedule(),
-            commit_object_schedule: self.commit_object_schedule(),
-            cold_store_object_schedule: self.cold_store_object_schedule(),
-            post_committed_cold_object_schedule: self.post_committed_cold_object_schedule(),
-        }
+        RuntimeShellTrace::from_components(
+            self.events().to_vec(),
+            self.projected_kernel_schedule(),
+            self.pre_committed_cold_object_schedule(),
+            self.shadow_load_object_schedule(),
+            self.commit_object_schedule(),
+            self.cold_store_object_schedule(),
+            self.post_committed_cold_object_schedule(),
+        )
     }
 }
 
@@ -100,9 +100,61 @@ struct RuntimeShellReplayProgress {
 }
 
 impl RuntimeShellTrace {
+    pub fn from_components(
+        events: Vec<RuntimeKernelRefinementEventWitness>,
+        projected_kernel_schedule: RuntimeKernelScheduleWitness,
+        pre_committed_cold_object_schedule: Vec<u32>,
+        shadow_load_object_schedule: Vec<u32>,
+        commit_object_schedule: Vec<u32>,
+        cold_store_object_schedule: Vec<u32>,
+        post_committed_cold_object_schedule: Vec<u32>,
+    ) -> Self {
+        Self {
+            events,
+            projected_kernel_schedule,
+            pre_committed_cold_object_schedule,
+            shadow_load_object_schedule,
+            commit_object_schedule,
+            cold_store_object_schedule,
+            post_committed_cold_object_schedule,
+        }
+    }
+
+    pub fn events(&self) -> &[RuntimeKernelRefinementEventWitness] {
+        &self.events
+    }
+
+    pub fn event_count(&self) -> usize {
+        self.events.len()
+    }
+
+    pub fn projected_kernel_schedule(&self) -> &RuntimeKernelScheduleWitness {
+        &self.projected_kernel_schedule
+    }
+
+    pub fn pre_committed_cold_object_schedule(&self) -> &[u32] {
+        &self.pre_committed_cold_object_schedule
+    }
+
+    pub fn shadow_load_object_schedule(&self) -> &[u32] {
+        &self.shadow_load_object_schedule
+    }
+
+    pub fn commit_object_schedule(&self) -> &[u32] {
+        &self.commit_object_schedule
+    }
+
+    pub fn cold_store_object_schedule(&self) -> &[u32] {
+        &self.cold_store_object_schedule
+    }
+
+    pub fn post_committed_cold_object_schedule(&self) -> &[u32] {
+        &self.post_committed_cold_object_schedule
+    }
+
     pub fn projected_kernel_schedule_from_events(&self) -> RuntimeKernelScheduleWitness {
         let steps = self
-            .events
+            .events()
             .iter()
             .filter_map(RuntimeKernelRefinementEventWitness::projected_kernel_step)
             .collect::<Vec<_>>();
@@ -119,7 +171,7 @@ impl RuntimeShellTrace {
         &self,
         kind: RuntimeKernelRefinementEventKindWitness,
     ) -> Vec<u32> {
-        self.events
+        self.events()
             .iter()
             .filter(|event| event.kind == kind)
             .filter_map(|event| event.object_id)
@@ -151,13 +203,13 @@ impl RuntimeShellTrace {
     }
 
     pub fn summaries_match_events(&self) -> bool {
-        self.projected_kernel_schedule == self.projected_kernel_schedule_from_events()
-            && self.pre_committed_cold_object_schedule
+        self.projected_kernel_schedule() == &self.projected_kernel_schedule_from_events()
+            && self.pre_committed_cold_object_schedule()
                 == self.pre_committed_cold_object_schedule_from_events()
-            && self.shadow_load_object_schedule == self.shadow_load_object_schedule_from_events()
-            && self.commit_object_schedule == self.commit_object_schedule_from_events()
-            && self.cold_store_object_schedule == self.cold_store_object_schedule_from_events()
-            && self.post_committed_cold_object_schedule
+            && self.shadow_load_object_schedule() == self.shadow_load_object_schedule_from_events()
+            && self.commit_object_schedule() == self.commit_object_schedule_from_events()
+            && self.cold_store_object_schedule() == self.cold_store_object_schedule_from_events()
+            && self.post_committed_cold_object_schedule()
                 == self.post_committed_cold_object_schedule_from_events()
     }
 
@@ -167,7 +219,7 @@ impl RuntimeShellTrace {
         }
         let mut phase = RuntimeShellReplayPhase::BeforeBegin;
         let mut progress = RuntimeShellReplayProgress::default();
-        for event in &self.events {
+        for event in self.events() {
             if event.validate_shape().is_err() {
                 return false;
             }

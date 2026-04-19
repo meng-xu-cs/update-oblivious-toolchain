@@ -264,6 +264,14 @@ The first implementation step is now present in the codebase:
   shared `uo-core` phase-aware helpers plus a bounded runtime-phase journal
   wrapper, so `kernel.rs` / `state.rs` no longer extend those witness tails by
   mutating raw event vectors directly
+- that runtime phase witness is now also exported through a sealed
+  `RuntimeKernelRefinementWitness` surface: the `events` vector is private,
+  cross-module consumers rebuild or inspect witnesses through explicit
+  `from_events(...)` / `events()` / `event_count()` / `first_event()` /
+  `last_event()` APIs, and the probe statically checks that the runtime helper
+  path keeps using those shared constructors rather than raw field literals;
+  the derived `RuntimeShellTrace` now follows the same pattern with private
+  stored schedules/events plus explicit constructor/accessor APIs
 - live Path-ORAM stash state now also carries one public
   `working_stash_capacity(...)` bound, is rebuilt with that headroom up front,
   preserved across cold commits with `.clear()`, and checked before use so the

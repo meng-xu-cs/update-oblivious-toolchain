@@ -338,7 +338,7 @@ pub struct RuntimeKernelRefinementEventWitness {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct RuntimeKernelRefinementWitness {
     #[serde(default)]
-    pub events: Vec<RuntimeKernelRefinementEventWitness>,
+    events: Vec<RuntimeKernelRefinementEventWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -2095,7 +2095,29 @@ enum RuntimeKernelRefinementPhase {
 }
 
 impl RuntimeKernelRefinementWitness {
-    fn replay_phase(&self) -> Result<RuntimeKernelRefinementPhase, RuntimeKernelRefinementWitnessError> {
+    pub fn from_events(events: Vec<RuntimeKernelRefinementEventWitness>) -> Self {
+        Self { events }
+    }
+
+    pub fn events(&self) -> &[RuntimeKernelRefinementEventWitness] {
+        &self.events
+    }
+
+    pub fn event_count(&self) -> usize {
+        self.events.len()
+    }
+
+    pub fn first_event(&self) -> Option<&RuntimeKernelRefinementEventWitness> {
+        self.events.first()
+    }
+
+    pub fn last_event(&self) -> Option<&RuntimeKernelRefinementEventWitness> {
+        self.events.last()
+    }
+
+    fn replay_phase(
+        &self,
+    ) -> Result<RuntimeKernelRefinementPhase, RuntimeKernelRefinementWitnessError> {
         let mut phase = RuntimeKernelRefinementPhase::BeforeBegin;
         for event in &self.events {
             event.validate_shape()?;
@@ -2225,14 +2247,19 @@ impl RuntimeKernelRefinementWitness {
         Ok(phase)
     }
 
-    pub fn append_commit_object_schedule<I>(&mut self, object_ids: I) -> Result<(), RuntimeKernelRefinementWitnessError>
+    pub fn append_commit_object_schedule<I>(
+        &mut self,
+        object_ids: I,
+    ) -> Result<(), RuntimeKernelRefinementWitnessError>
     where
         I: IntoIterator<Item = u32>,
     {
         if self.replay_phase()? != RuntimeKernelRefinementPhase::CommitObjectWindow {
-            return Err(RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                witnessed: self.events.clone(),
-            });
+            return Err(
+                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                    witnessed: self.events.clone(),
+                },
+            );
         }
         self.events.extend(
             object_ids
@@ -2247,9 +2274,11 @@ impl RuntimeKernelRefinementWitness {
         public_object_ids: &[u32],
     ) -> Result<(), RuntimeKernelRefinementWitnessError> {
         if self.replay_phase()? != RuntimeKernelRefinementPhase::AfterWipe {
-            return Err(RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                witnessed: self.events.clone(),
-            });
+            return Err(
+                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                    witnessed: self.events.clone(),
+                },
+            );
         }
         let cold_stored_object_ids = self.shadow_load_object_schedule();
         self.events.extend(
@@ -4429,19 +4458,17 @@ mod tests {
     }
 
     fn sample_runtime_kernel_refinement_witness() -> RuntimeKernelRefinementWitness {
-        RuntimeKernelRefinementWitness {
-            events: vec![
-                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-                RuntimeKernelRefinementEventWitness::commit_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-                RuntimeKernelRefinementEventWitness::cold_store_object(7),
-                RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-            ],
-        }
+        RuntimeKernelRefinementWitness::from_events(vec![
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+            RuntimeKernelRefinementEventWitness::commit_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+            RuntimeKernelRefinementEventWitness::cold_store_object(7),
+            RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
+        ])
     }
 
     fn sample_read_miss_oram_object() -> RuntimeOramObjectWitness {
@@ -4592,35 +4619,31 @@ mod tests {
 
     #[test]
     fn runtime_kernel_refinement_witness_append_commit_object_schedule_requires_commit_window() {
-        let mut refinement_witness = RuntimeKernelRefinementWitness {
-            events: vec![
-                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-            ],
-        };
+        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+        ]);
         assert_eq!(
             refinement_witness
                 .append_commit_object_schedule(vec![7])
                 .unwrap_err(),
             RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                witnessed: refinement_witness.events.clone(),
+                witnessed: refinement_witness.events().to_vec(),
             }
         );
     }
 
     #[test]
     fn runtime_kernel_refinement_witness_append_cold_store_window_completes_tail() {
-        let mut refinement_witness = RuntimeKernelRefinementWitness {
-            events: vec![
-                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-                RuntimeKernelRefinementEventWitness::commit_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-            ],
-        };
+        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+            RuntimeKernelRefinementEventWitness::commit_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+        ]);
         refinement_witness.append_cold_store_window(&[7]).unwrap();
         assert_eq!(
             refinement_witness,
@@ -4630,22 +4653,20 @@ mod tests {
 
     #[test]
     fn runtime_kernel_refinement_witness_append_cold_store_window_requires_after_wipe() {
-        let mut refinement_witness = RuntimeKernelRefinementWitness {
-            events: vec![
-                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-                RuntimeKernelRefinementEventWitness::commit_object(7),
-            ],
-        };
+        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+            RuntimeKernelRefinementEventWitness::commit_object(7),
+        ]);
         assert_eq!(
             refinement_witness
                 .append_cold_store_window(&[7])
                 .unwrap_err(),
             RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                witnessed: refinement_witness.events.clone(),
+                witnessed: refinement_witness.events().to_vec(),
             }
         );
     }
@@ -4653,17 +4674,15 @@ mod tests {
     #[test]
     fn runtime_kernel_refinement_witness_rejects_missing_boundary_cold_schedules() {
         let kernel_witness = sample_runtime_kernel_witness();
-        let refinement_witness = RuntimeKernelRefinementWitness {
-            events: vec![
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-                RuntimeKernelRefinementEventWitness::commit_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-                RuntimeKernelRefinementEventWitness::cold_store_object(7),
-            ],
-        };
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+            RuntimeKernelRefinementEventWitness::commit_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+            RuntimeKernelRefinementEventWitness::cold_store_object(7),
+        ]);
         assert_eq!(
             refinement_witness
                 .validate_with_kernel_witness(&kernel_witness)
@@ -4691,9 +4710,10 @@ mod tests {
     fn runtime_refinement_witness_rejects_runtime_phase_projection_drift() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
         trace.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
-        let mut refinement_witness = sample_runtime_kernel_refinement_witness();
-        refinement_witness.events[3] =
+        let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
+        refinement_events[3] =
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(refinement_events);
         trace.runtime_kernel_refinement_witness = Some(refinement_witness);
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -4767,25 +4787,23 @@ mod tests {
                 },
             ],
         };
-        let refinement_witness = RuntimeKernelRefinementWitness {
-            events: vec![
-                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(9),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-                RuntimeKernelRefinementEventWitness::shadow_load_object(9),
-                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(9)),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::MapGet, Some(7)),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-                RuntimeKernelRefinementEventWitness::commit_object(9),
-                RuntimeKernelRefinementEventWitness::commit_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-                RuntimeKernelRefinementEventWitness::cold_store_object(9),
-                RuntimeKernelRefinementEventWitness::cold_store_object(7),
-                RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-                RuntimeKernelRefinementEventWitness::post_committed_cold_object(9),
-            ],
-        };
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(9),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            RuntimeKernelRefinementEventWitness::shadow_load_object(9),
+            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(9)),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::MapGet, Some(7)),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+            RuntimeKernelRefinementEventWitness::commit_object(9),
+            RuntimeKernelRefinementEventWitness::commit_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+            RuntimeKernelRefinementEventWitness::cold_store_object(9),
+            RuntimeKernelRefinementEventWitness::cold_store_object(7),
+            RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
+            RuntimeKernelRefinementEventWitness::post_committed_cold_object(9),
+        ]);
         assert_eq!(
             refinement_witness
                 .validate_with_kernel_witness(&kernel_witness)
@@ -4800,18 +4818,16 @@ mod tests {
     #[test]
     fn runtime_kernel_refinement_witness_rejects_missing_cold_store_schedule() {
         let kernel_witness = sample_runtime_kernel_witness();
-        let refinement_witness = RuntimeKernelRefinementWitness {
-            events: vec![
-                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-                RuntimeKernelRefinementEventWitness::commit_object(7),
-                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-                RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-            ],
-        };
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+            RuntimeKernelRefinementEventWitness::commit_object(7),
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+            RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
+        ]);
         assert_eq!(
             refinement_witness
                 .validate_with_kernel_witness(&kernel_witness)

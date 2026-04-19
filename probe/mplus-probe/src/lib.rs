@@ -2503,15 +2503,16 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_kernel_refinement_witness = runtime_kernel_refinement_witness.clone();
-    let object_event = tampered_kernel_refinement_witness
-        .events
+    let mut tampered_kernel_refinement_events = runtime_kernel_refinement_witness.events().to_vec();
+    let object_event = tampered_kernel_refinement_events
         .iter_mut()
         .find(|event| event.object_id.is_some())
         .ok_or_else(|| anyhow!("kernel refinement tamper scenario missing object-bearing event"))?;
     object_event.object_id = object_event
         .object_id
         .map(|object_id| object_id.saturating_add(1));
+    let tampered_kernel_refinement_witness =
+        RuntimeKernelRefinementWitness::from_events(tampered_kernel_refinement_events);
     scenarios.push(validate_tampered_json_pair_case(
         "kernel_refinement/object_schedule_drift",
         "kernel_refinement_witness",
@@ -2535,10 +2536,30 @@ fn run_tamper_validation() -> Result<JsonValue> {
     )?);
 
     let mut tampered_shell_boundary_bundle = shell_boundary_bundle.clone();
-    tampered_shell_boundary_bundle
-        .shell_trace
-        .commit_object_schedule
-        .clear();
+    tampered_shell_boundary_bundle.shell_trace = RuntimeShellTrace::from_components(
+        tampered_shell_boundary_bundle.shell_trace.events().to_vec(),
+        tampered_shell_boundary_bundle
+            .shell_trace
+            .projected_kernel_schedule()
+            .clone(),
+        tampered_shell_boundary_bundle
+            .shell_trace
+            .pre_committed_cold_object_schedule()
+            .to_vec(),
+        tampered_shell_boundary_bundle
+            .shell_trace
+            .shadow_load_object_schedule()
+            .to_vec(),
+        vec![],
+        tampered_shell_boundary_bundle
+            .shell_trace
+            .cold_store_object_schedule()
+            .to_vec(),
+        tampered_shell_boundary_bundle
+            .shell_trace
+            .post_committed_cold_object_schedule()
+            .to_vec(),
+    );
     scenarios.push(validate_tampered_json_case(
         "shell_boundary/trace_summary_drift",
         &tampered_shell_boundary_bundle,
@@ -5511,7 +5532,7 @@ fn validate_kernel_refinement_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "runtime_phase_event_count": runtime_kernel_refinement_witness.events.len(),
+        "runtime_phase_event_count": runtime_kernel_refinement_witness.event_count(),
         "projected_kernel_step_count": runtime_kernel_refinement_witness.projected_kernel_schedule().steps.len(),
         "pre_committed_cold_object_count": runtime_kernel_refinement_witness
             .pre_committed_cold_object_schedule()
@@ -8147,6 +8168,38 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         });
     let shell_boundary_bundle_refinement_guard_present =
         shell_boundary_source.contains("if !shell_trace.refines_contract(&shell_contract) {");
+    let runtime_shell_trace_fields_private = shell_boundary_source
+        .contains("pub struct RuntimeShellTrace {")
+        && shell_boundary_source.contains("events: Vec<RuntimeKernelRefinementEventWitness>,")
+        && shell_boundary_source
+            .contains("projected_kernel_schedule: RuntimeKernelScheduleWitness,")
+        && shell_boundary_source.contains("pre_committed_cold_object_schedule: Vec<u32>,")
+        && shell_boundary_source.contains("shadow_load_object_schedule: Vec<u32>,")
+        && shell_boundary_source.contains("commit_object_schedule: Vec<u32>,")
+        && shell_boundary_source.contains("cold_store_object_schedule: Vec<u32>,")
+        && shell_boundary_source.contains("post_committed_cold_object_schedule: Vec<u32>,")
+        && !shell_boundary_source.contains("pub events: Vec<RuntimeKernelRefinementEventWitness>,")
+        && !shell_boundary_source
+            .contains("pub projected_kernel_schedule: RuntimeKernelScheduleWitness,")
+        && !shell_boundary_source.contains("pub pre_committed_cold_object_schedule: Vec<u32>,")
+        && !shell_boundary_source.contains("pub shadow_load_object_schedule: Vec<u32>,")
+        && !shell_boundary_source.contains("pub commit_object_schedule: Vec<u32>,")
+        && !shell_boundary_source.contains("pub cold_store_object_schedule: Vec<u32>,")
+        && !shell_boundary_source.contains("pub post_committed_cold_object_schedule: Vec<u32>,");
+    let runtime_shell_trace_api_is_explicit = shell_boundary_source
+        .contains("pub fn from_components(")
+        && shell_boundary_source
+            .contains("pub fn events(&self) -> &[RuntimeKernelRefinementEventWitness] {")
+        && shell_boundary_source.contains("pub fn event_count(&self) -> usize {")
+        && shell_boundary_source
+            .contains("pub fn projected_kernel_schedule(&self) -> &RuntimeKernelScheduleWitness {")
+        && shell_boundary_source
+            .contains("pub fn pre_committed_cold_object_schedule(&self) -> &[u32] {")
+        && shell_boundary_source.contains("pub fn shadow_load_object_schedule(&self) -> &[u32] {")
+        && shell_boundary_source.contains("pub fn commit_object_schedule(&self) -> &[u32] {")
+        && shell_boundary_source.contains("pub fn cold_store_object_schedule(&self) -> &[u32] {")
+        && shell_boundary_source
+            .contains("pub fn post_committed_cold_object_schedule(&self) -> &[u32] {");
     let confidential_core_bundle_bridge_checks = [
         (
             "pub fn runtime_confidential_core_bundle(",
@@ -8198,8 +8251,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_runtime_shell_boundary_source
             .contains("bundle.shell_trace.Refines bundle.shell_contract");
     let lean_imported_shell_boundary_kernel_boundary_facts_present =
-        lean_runtime_shell_boundary_source
-            .contains("ImportedRuntimeProofGradeKernelBoundaryFacts")
+        lean_runtime_shell_boundary_source.contains("ImportedRuntimeProofGradeKernelBoundaryFacts")
             && lean_runtime_shell_boundary_source
                 .contains("theorem importedWitness_proofGradeKernelBoundaryFacts");
     let lean_confidential_core_proof_grade_assurance_present = lean_runtime_confidential_core_source
@@ -8548,6 +8600,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_shell_boundary_lowering_bundle_field_names_match
         && shell_boundary_exact_bridge_surface_restricted
         && shell_boundary_bundle_refinement_guard_present
+        && runtime_shell_trace_fields_private
+        && runtime_shell_trace_api_is_explicit
         && confidential_core_bundle_bridge_surface_restricted
         && confidential_core_reuses_shell_boundary_bundle_only
         && lean_shell_boundary_bundle_checks_exact_runtime_views
@@ -8760,6 +8814,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             shell_boundary_exact_bridge_surface_restricted,
         "shell_boundary_bundle_refinement_guard_present":
             shell_boundary_bundle_refinement_guard_present,
+        "runtime_shell_trace_fields_private": runtime_shell_trace_fields_private,
+        "runtime_shell_trace_api_is_explicit": runtime_shell_trace_api_is_explicit,
         "confidential_core_bundle_bridge_checks":
             confidential_core_bundle_bridge_checks,
         "confidential_core_bundle_bridge_surface_restricted":
@@ -9346,10 +9402,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         });
     let state_finalizes_runtime_phase_witness = state_source
         .contains("fn finalize_runtime_kernel_refinement_witness")
-        && state_source
-            .contains("runtime_kernel_refinement_witness.append_cold_store_window(public_object_ids)?;")
+        && state_source.contains(
+            "runtime_kernel_refinement_witness.append_cold_store_window(public_object_ids)?;",
+        )
         && !state_source.contains("RuntimeKernelRefinementEventWitness::cold_store_object")
-        && !state_source.contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
+        && !state_source
+            .contains("RuntimeKernelRefinementEventWitness::post_committed_cold_object");
     let state_committed_runtime_witness_snapshot_is_opaque = state_source
         .contains("struct CommittedRuntimeWitnessSnapshot")
         && !state_source.contains("pub(crate) struct CommittedRuntimeWitnessSnapshot")
@@ -9811,8 +9869,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let kernel_runtime_phase_helper_path_restricted = kernel_source
         .contains("self.runtime_phase_events.push_pre_committed_cold_object(object_id)?;")
         && kernel_source.contains("self.runtime_phase_events.push_shadow_load_object(object_id)")
-        && kernel_source.contains("self.runtime_phase_events.push_kernel_step(opcode, object_id)?;")
-        && kernel_source.contains("self.runtime_phase_events.append_commit_object_schedule(committed_object_ids)?;")
+        && kernel_source
+            .contains("self.runtime_phase_events.push_kernel_step(opcode, object_id)?;")
+        && kernel_source.contains(
+            "self.runtime_phase_events.append_commit_object_schedule(committed_object_ids)?;",
+        )
         && kernel_source.contains("witness.append_commit_object_schedule(object_ids.clone())?;");
     let state_routes_confidential_calls_through_runtime_kernel =
         state_source.contains("kernel.run_confidential_call(");
@@ -10259,6 +10320,28 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         vec![String::from("runtime/uo-evm/src/kernel.rs")];
     let runtime_phase_event_constructor_surface_restricted =
         runtime_phase_event_constructor_files == expected_runtime_phase_event_constructor_files;
+    let runtime_kernel_refinement_witness_fields_private = core_trace_source
+        .contains("pub struct RuntimeKernelRefinementWitness {")
+        && core_trace_source.contains("events: Vec<RuntimeKernelRefinementEventWitness>,")
+        && !core_trace_source.contains("pub events: Vec<RuntimeKernelRefinementEventWitness>,");
+    let runtime_kernel_refinement_witness_api_is_explicit = core_trace_source
+        .contains("pub fn from_events(events: Vec<RuntimeKernelRefinementEventWitness>) -> Self {")
+        && core_trace_source
+            .contains("pub fn events(&self) -> &[RuntimeKernelRefinementEventWitness] {")
+        && core_trace_source.contains("pub fn event_count(&self) -> usize {")
+        && core_trace_source.contains(
+            "pub fn first_event(&self) -> Option<&RuntimeKernelRefinementEventWitness> {",
+        )
+        && core_trace_source
+            .contains("pub fn last_event(&self) -> Option<&RuntimeKernelRefinementEventWitness> {");
+    let runtime_kernel_refinement_witness_builder_path_restricted = kernel_source
+        .contains("RuntimeKernelRefinementWitness::from_events(self.inner.entries.clone())")
+        && kernel_source
+            .contains("RuntimeKernelRefinementWitness::from_events(self.inner.into_vec())")
+        && runtime_evm_lib_source.contains("phase_witness.first_event().map(|event| event.kind)")
+        && runtime_evm_lib_source.contains("phase_witness.last_event().map(|event| event.kind)")
+        && probe_source.contains("runtime_kernel_refinement_witness.events().to_vec()")
+        && probe_source.contains("runtime_kernel_refinement_witness.event_count()");
     let resource_event_constructor_files =
         collect_production_pattern_hits(&allocator_src, "RuntimeKernelResourceEventWitness::")?;
     let expected_resource_event_constructor_files =
@@ -11352,6 +11435,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "runtime_phase_event_constructor_files": runtime_phase_event_constructor_files,
         "runtime_phase_event_constructor_surface_restricted":
             runtime_phase_event_constructor_surface_restricted,
+        "runtime_kernel_refinement_witness_fields_private":
+            runtime_kernel_refinement_witness_fields_private,
+        "runtime_kernel_refinement_witness_api_is_explicit":
+            runtime_kernel_refinement_witness_api_is_explicit,
+        "runtime_kernel_refinement_witness_builder_path_restricted":
+            runtime_kernel_refinement_witness_builder_path_restricted,
         "resource_event_constructor_files": resource_event_constructor_files,
         "resource_event_constructor_surface_restricted":
             resource_event_constructor_surface_restricted,
@@ -11532,6 +11621,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && trusted_kernel_probe_uses_slot_bundle
             && trusted_kernel_checker_uses_slot_bundle
             && runtime_phase_event_constructor_surface_restricted
+            && runtime_kernel_refinement_witness_fields_private
+            && runtime_kernel_refinement_witness_api_is_explicit
+            && runtime_kernel_refinement_witness_builder_path_restricted
             && resource_event_constructor_surface_restricted
             && state_only_runtime_helper_surface_restricted
             && kernel_only_state_helper_surface_restricted
@@ -12751,7 +12843,7 @@ fn runtime_kernel_refinement_witness_summary(
             });
             json!({
                 "present": true,
-                "event_count": runtime_kernel_refinement_witness.events.len(),
+                "event_count": runtime_kernel_refinement_witness.event_count(),
                 "projected_kernel_step_count": projected_kernel_schedule.steps.len(),
                 "projected_kernel_step_public_object_schedule": projected_kernel_schedule.public_object_schedule(),
                 "pre_committed_cold_object_schedule": pre_committed_cold_object_schedule,
@@ -12813,26 +12905,26 @@ fn runtime_shell_trace_summary(
 ) -> JsonValue {
     let projected_from_events = shell_trace.projected_kernel_schedule_from_events();
     json!({
-        "event_count": shell_trace.events.len(),
-        "projected_kernel_step_count": shell_trace.projected_kernel_schedule.steps.len(),
-        "projected_kernel_opcode_count": shell_trace.projected_kernel_schedule.opcodes.len(),
+        "event_count": shell_trace.event_count(),
+        "projected_kernel_step_count": shell_trace.projected_kernel_schedule().steps.len(),
+        "projected_kernel_opcode_count": shell_trace.projected_kernel_schedule().opcodes.len(),
         "projected_kernel_step_public_object_schedule":
-            shell_trace.projected_kernel_schedule.public_object_schedule(),
+            shell_trace.projected_kernel_schedule().public_object_schedule(),
         "projected_kernel_step_count_from_events": projected_from_events.steps.len(),
         "projected_kernel_step_public_object_schedule_from_events":
             projected_from_events.public_object_schedule(),
-        "pre_committed_cold_object_schedule": shell_trace.pre_committed_cold_object_schedule,
-        "shadow_load_object_schedule": shell_trace.shadow_load_object_schedule,
-        "commit_object_schedule": shell_trace.commit_object_schedule,
-        "cold_store_object_schedule": shell_trace.cold_store_object_schedule,
-        "post_committed_cold_object_schedule": shell_trace.post_committed_cold_object_schedule,
+        "pre_committed_cold_object_schedule": shell_trace.pre_committed_cold_object_schedule(),
+        "shadow_load_object_schedule": shell_trace.shadow_load_object_schedule(),
+        "commit_object_schedule": shell_trace.commit_object_schedule(),
+        "cold_store_object_schedule": shell_trace.cold_store_object_schedule(),
+        "post_committed_cold_object_schedule": shell_trace.post_committed_cold_object_schedule(),
         "summaries_match_events": shell_trace.summaries_match_events(),
         "loaded_equals_committed":
-            shell_trace.shadow_load_object_schedule == shell_trace.commit_object_schedule,
+            shell_trace.shadow_load_object_schedule() == shell_trace.commit_object_schedule(),
         "loaded_equals_cold_stored":
-            shell_trace.shadow_load_object_schedule == shell_trace.cold_store_object_schedule,
+            shell_trace.shadow_load_object_schedule() == shell_trace.cold_store_object_schedule(),
         "committed_equals_cold_stored":
-            shell_trace.commit_object_schedule == shell_trace.cold_store_object_schedule,
+            shell_trace.commit_object_schedule() == shell_trace.cold_store_object_schedule(),
         "replays_shell_contract":
             shell_contract.map(|shell_contract| shell_trace.replays_contract(shell_contract)),
         "refines_shell_contract":
