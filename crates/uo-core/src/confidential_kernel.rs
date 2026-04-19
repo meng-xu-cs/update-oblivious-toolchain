@@ -335,18 +335,6 @@ impl CompiledFunction {
             body: lower_confidential_kernel_statements(&self.body, &self.signature)?,
         })
     }
-
-    pub fn confidential_kernel_slot_program(
-        &self,
-    ) -> Result<ConfidentialKernelSlotProgram, ConfidentialKernelSlotLoweringError> {
-        if let Some(program) = &self.confidential_slot_program {
-            return Ok(program.clone());
-        }
-        if let Some(program) = &self.confidential_program {
-            return program.to_slot_program();
-        }
-        self.confidential_kernel_program()?.to_slot_program()
-    }
 }
 
 impl ConfidentialKernelProgram {
@@ -1484,7 +1472,7 @@ mod tests {
     fn confidential_kernel_slot_program_preserves_schedule() {
         let function = sample_confidential_function();
         let named = function.confidential_kernel_program().unwrap();
-        let slot = function.confidential_kernel_slot_program().unwrap();
+        let slot = named.to_slot_program().unwrap();
 
         assert_eq!(slot.entrypoint_id, named.entrypoint_id);
         assert_eq!(slot.param_count, 1);
@@ -1529,7 +1517,11 @@ mod tests {
             confidential_slot_program: None,
         };
 
-        let err = function.confidential_kernel_slot_program().unwrap_err();
+        let err = function
+            .confidential_kernel_program()
+            .unwrap()
+            .to_slot_program()
+            .unwrap_err();
         assert!(matches!(
             err,
             ConfidentialKernelSlotLoweringError::DuplicateBinding { .. }
@@ -1552,7 +1544,11 @@ mod tests {
             confidential_slot_program: None,
         };
 
-        let err = function.confidential_kernel_slot_program().unwrap_err();
+        let err = function
+            .confidential_kernel_program()
+            .unwrap()
+            .to_slot_program()
+            .unwrap_err();
         assert!(matches!(
             err,
             ConfidentialKernelSlotLoweringError::UnknownVariable { .. }

@@ -69,7 +69,7 @@ pub struct RuntimeConfidentialCoreBundle {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfidentialCoreSlotBundle {
     pub runtime_witness: RuntimeRefinementWitness,
-    pub confidential_program: ConfidentialKernelSlotProgram,
+    pub confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -126,7 +126,7 @@ impl RuntimeConfidentialCoreSlotBundle {
     }
 
     pub fn program_matches_runtime_entrypoint(&self) -> bool {
-        self.confidential_program.entrypoint_id == self.entrypoint_id()
+        self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
     pub fn from_runtime_witness(
@@ -146,7 +146,7 @@ impl RuntimeConfidentialCoreSlotBundle {
             )?;
         Ok(Self {
             runtime_witness,
-            confidential_program: manifest_entry
+            confidential_slot_program: manifest_entry
                 .confidential_slot_program
                 .clone()
                 .ok_or_else(|| {

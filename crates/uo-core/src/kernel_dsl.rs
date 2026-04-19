@@ -50,7 +50,7 @@ pub struct RuntimeKernelDslBundle {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelSlotDslBundle {
     pub kernel_witness: RuntimeKernelWitness,
-    pub confidential_program: ConfidentialKernelSlotProgram,
+    pub confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -92,11 +92,11 @@ impl RuntimeKernelSlotDslBundle {
     ) -> Result<Self, RuntimeKernelSlotDslBundleError> {
         Ok(Self {
             kernel_witness,
-            confidential_program: entry.confidential_slot_program.clone().ok_or_else(|| {
-                RuntimeKernelSlotDslBundleError::MissingConfidentialSlotProgram {
+            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
+                || RuntimeKernelSlotDslBundleError::MissingConfidentialSlotProgram {
                     entrypoint: entrypoint.into(),
-                }
-            })?,
+                },
+            )?,
         })
     }
 }

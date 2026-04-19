@@ -225,7 +225,7 @@ def ImportedRuntimeConfidentialCoreSlotAssurance
       runtimeWitness.kernel_witness = some kernelWitness ∧
         (ImportedRuntimeKernelSlotDslBundle.Valid
           { kernel_witness := kernelWitness
-          , confidential_program := program
+          , confidential_slot_program := program
           })
 
 def checkImportedRuntimeConfidentialCoreSlotAssurance
@@ -238,7 +238,7 @@ def checkImportedRuntimeConfidentialCoreSlotAssurance
     | some kernelWitness =>
         ImportedRuntimeKernelSlotDslBundle.checkValid
           { kernel_witness := kernelWitness
-          , confidential_program := program
+          , confidential_slot_program := program
           }
 
 @[simp] theorem importedRuntimeConfidentialCoreSlotAssurance_check_eq_true_iff
@@ -309,27 +309,30 @@ theorem importedWitness_toRuntimeWitness_proofGradeConfidentialCoreSlotAssurance
       by simp [ImportedRuntimeRefinementWitness.toRuntimeWitness, hKernel],
       hScheduleExact.1, hScheduleExact.2⟩
 
+def importedRuntimeConfidentialCoreSlotBundleFieldNames : List String :=
+  ["runtime_witness", "confidential_slot_program"]
+
 structure ImportedRuntimeConfidentialCoreSlotBundle where
   runtime_witness : ImportedRuntimeRefinementWitness
-  confidential_program : ImportedConfidentialKernelSlotProgram
+  confidential_slot_program : ImportedConfidentialKernelSlotProgram
 deriving FromJson
 
 def ImportedRuntimeConfidentialCoreSlotBundle.Valid
   (bundle : ImportedRuntimeConfidentialCoreSlotBundle)
   (modelTags : SGXModelTags) : Prop :=
   ImportedRuntimeConfidentialCoreSlotAssurance
-    bundle.runtime_witness bundle.confidential_program modelTags
+    bundle.runtime_witness bundle.confidential_slot_program modelTags
 
 def ImportedRuntimeConfidentialCoreSlotBundle.checkValid
   (bundle : ImportedRuntimeConfidentialCoreSlotBundle)
   (modelTags : SGXModelTags) : Bool :=
   checkImportedRuntimeConfidentialCoreSlotAssurance
-    bundle.runtime_witness bundle.confidential_program modelTags
+    bundle.runtime_witness bundle.confidential_slot_program modelTags
 
 def ImportedRuntimeConfidentialCoreSlotBundle.toRuntimeConfidentialCoreSlotBundle
   (bundle : ImportedRuntimeConfidentialCoreSlotBundle) : RuntimeConfidentialCoreSlotBundle :=
   { runtimeWitness := bundle.runtime_witness.toRuntimeWitness
-  , confidentialProgram := bundle.confidential_program.toConfidentialKernelSlotProgram
+  , confidentialProgram := bundle.confidential_slot_program.toConfidentialKernelSlotProgram
   }
 
 @[simp] theorem importedRuntimeConfidentialCoreSlotBundle_checkValid_eq_true_iff
@@ -347,13 +350,13 @@ theorem importedRuntimeConfidentialCoreSlotBundle_proofGradeAssurance
   ∃ kernelWitness runtimeKernelRefinementWitness,
     bundle.runtime_witness.kernel_witness = some kernelWitness ∧
       kernelWitness.expected_kernel_steps =
-        some bundle.confidential_program.expectedRuntimeKernelSteps ∧
-      kernelWitness.kernel_steps = bundle.confidential_program.expectedRuntimeKernelSteps ∧
+        some bundle.confidential_slot_program.expectedRuntimeKernelSteps ∧
+      kernelWitness.kernel_steps = bundle.confidential_slot_program.expectedRuntimeKernelSteps ∧
       bundle.runtime_witness.runtime_kernel_refinement_witness =
         some runtimeKernelRefinementWitness ∧
       runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
   exact importedWitness_proofGradeConfidentialCoreSlotAssurance
-    bundle.runtime_witness bundle.confidential_program modelTags hValid
+    bundle.runtime_witness bundle.confidential_slot_program modelTags hValid
 
 theorem importedRuntimeConfidentialCoreSlotBundle_toRuntimeValid
   (bundle : ImportedRuntimeConfidentialCoreSlotBundle)
@@ -361,7 +364,7 @@ theorem importedRuntimeConfidentialCoreSlotBundle_toRuntimeValid
   (hValid : bundle.Valid modelTags) :
   bundle.toRuntimeConfidentialCoreSlotBundle.Valid modelTags := by
   exact importedWitness_toRuntimeWitness_proofGradeConfidentialCoreSlotAssurance
-    bundle.runtime_witness bundle.confidential_program modelTags hValid
+    bundle.runtime_witness bundle.confidential_slot_program modelTags hValid
 
 def parseImportedRuntimeConfidentialCoreSlotBundle
   (input : String) : Except String ImportedRuntimeConfidentialCoreSlotBundle := do
@@ -415,7 +418,7 @@ def ImportedRuntimeConfidentialCoreLoweringBundle.slotBundle
   (bundle : ImportedRuntimeConfidentialCoreLoweringBundle) :
   ImportedRuntimeConfidentialCoreSlotBundle :=
   { runtime_witness := bundle.runtime_witness
-  , confidential_program := bundle.confidential_slot_program
+  , confidential_slot_program := bundle.confidential_slot_program
   }
 
 def ImportedRuntimeConfidentialCoreLoweringBundle.Valid

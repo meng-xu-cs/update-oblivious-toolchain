@@ -3484,24 +3484,27 @@ theorem importedConfidentialKernelSlotProgram_expectedRuntimeKernelSteps_toRunti
         ConfidentialKernelSlotProgram.expectedRuntimeKernelSteps,
         importedConfidentialKernelSlotStatementListExpectedRuntimeKernelSteps_toRuntime]
 
+def importedRuntimeKernelSlotDslBundleFieldNames : List String :=
+  ["kernel_witness", "confidential_slot_program"]
+
 structure ImportedRuntimeKernelSlotDslBundle where
   kernel_witness : ImportedRuntimeKernelWitness
-  confidential_program : ImportedConfidentialKernelSlotProgram
+  confidential_slot_program : ImportedConfidentialKernelSlotProgram
 deriving FromJson
 
 def ImportedRuntimeKernelSlotDslBundle.programSteps
   (bundle : ImportedRuntimeKernelSlotDslBundle) : List ImportedRuntimeKernelStep :=
-  bundle.confidential_program.expectedRuntimeKernelSteps
+  bundle.confidential_slot_program.expectedRuntimeKernelSteps
 
 def ImportedRuntimeKernelSlotDslBundle.Valid
   (bundle : ImportedRuntimeKernelSlotDslBundle) : Prop :=
-  bundle.kernel_witness.ProofGradeValid bundle.confidential_program.entrypoint_id ∧
+  bundle.kernel_witness.ProofGradeValid bundle.confidential_slot_program.entrypoint_id ∧
     bundle.kernel_witness.expected_kernel_steps = some bundle.programSteps ∧
     bundle.kernel_witness.kernel_steps = bundle.programSteps
 
 def ImportedRuntimeKernelSlotDslBundle.checkValid
   (bundle : ImportedRuntimeKernelSlotDslBundle) : Bool :=
-  bundle.kernel_witness.checkProofGrade bundle.confidential_program.entrypoint_id &&
+  bundle.kernel_witness.checkProofGrade bundle.confidential_slot_program.entrypoint_id &&
     decide (bundle.kernel_witness.expected_kernel_steps = some bundle.programSteps) &&
     decide (bundle.kernel_witness.kernel_steps = bundle.programSteps)
 
@@ -3522,16 +3525,16 @@ theorem importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact
   {bundle : ImportedRuntimeKernelSlotDslBundle}
   (hValid : bundle.Valid) :
   bundle.kernel_witness.toRuntimeKernelWitness.expectedKernelSteps =
-      some bundle.confidential_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps ∧
+      some bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps ∧
     bundle.kernel_witness.toRuntimeKernelWitness.kernelSteps =
-      bundle.confidential_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
+      bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
   rcases importedRuntimeKernelSlotDslBundle_schedule_exact hValid with ⟨hExpected, hKernel⟩
   have hProgram :
       bundle.programSteps.map ImportedRuntimeKernelStep.toRuntimeKernelStep =
-        bundle.confidential_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
+        bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
     simpa [ImportedRuntimeKernelSlotDslBundle.programSteps] using
       importedConfidentialKernelSlotProgram_expectedRuntimeKernelSteps_toRuntime
-        bundle.confidential_program
+        bundle.confidential_slot_program
   constructor
   · simpa [ImportedRuntimeKernelWitness.toRuntimeKernelWitness, hProgram] using
       congrArg (Option.map (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep)) hExpected
@@ -3541,14 +3544,14 @@ theorem importedRuntimeKernelSlotDslBundle_toRuntimeSchedule_exact
 theorem importedRuntimeKernelSlotDslBundle_entrypoint_exact
   {bundle : ImportedRuntimeKernelSlotDslBundle}
   (hValid : bundle.Valid) :
-  bundle.kernel_witness.entrypoint_id = bundle.confidential_program.entrypoint_id := by
+  bundle.kernel_witness.entrypoint_id = bundle.confidential_slot_program.entrypoint_id := by
   exact hValid.1.1.1
 
 theorem importedRuntimeKernelSlotDslBundle_toRuntimeEntrypoint_exact
   {bundle : ImportedRuntimeKernelSlotDslBundle}
   (hValid : bundle.Valid) :
   bundle.kernel_witness.toRuntimeKernelWitness.entrypointId =
-    bundle.confidential_program.toConfidentialKernelSlotProgram.entrypointId := by
+    bundle.confidential_slot_program.toConfidentialKernelSlotProgram.entrypointId := by
   simpa [ImportedRuntimeKernelWitness.toRuntimeKernelWitness,
     ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram] using
     importedRuntimeKernelSlotDslBundle_entrypoint_exact hValid
@@ -3601,7 +3604,7 @@ def ImportedRuntimeKernelLoweringBundle.namedBundle
 def ImportedRuntimeKernelLoweringBundle.slotBundle
   (bundle : ImportedRuntimeKernelLoweringBundle) : ImportedRuntimeKernelSlotDslBundle :=
   { kernel_witness := bundle.kernel_witness
-  , confidential_program := bundle.confidential_slot_program
+  , confidential_slot_program := bundle.confidential_slot_program
   }
 
 def ImportedRuntimeKernelLoweringBundle.Valid

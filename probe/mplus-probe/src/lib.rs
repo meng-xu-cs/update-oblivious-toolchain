@@ -2898,13 +2898,13 @@ fn validate_confidential_core_slot_case(
             witness.runtime_kernel_refinement_witness.as_ref(),
             exact_kernel_witness.as_ref(),
         ),
-        "confidential_program": {
-            "entrypoint_id": bundle.confidential_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_program.param_count,
-            "secret_arg_count": bundle.confidential_program.secret_args.len(),
-            "slot_count": bundle.confidential_program.slot_count,
-            "statement_count": bundle.confidential_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_program.expected_runtime_steps().len(),
+        "confidential_slot_program": {
+            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
+            "param_count": bundle.confidential_slot_program.param_count,
+            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
+            "slot_count": bundle.confidential_slot_program.slot_count,
+            "statement_count": bundle.confidential_slot_program.body.len(),
+            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_fragment_witness": {
@@ -3286,7 +3286,7 @@ fn validate_kernel_slot_dsl_case(
 
     let bundle = artifact
         .runtime_kernel_slot_dsl_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
-    let program = &bundle.confidential_program;
+    let program = &bundle.confidential_slot_program;
     let (bundle_path, kernel_slot_dsl_bundle_json_bytes) = write_temp_json(name, &bundle)?;
     let output = Command::new(checker).arg(&bundle_path).output()?;
     let _ = fs::remove_file(&bundle_path);
@@ -3303,7 +3303,7 @@ fn validate_kernel_slot_dsl_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "kernel_witness": kernel_witness_summary(Some(&kernel_witness)),
-        "confidential_program": {
+        "confidential_slot_program": {
             "entrypoint_id": program.entrypoint_id.as_str(),
             "param_count": program.param_count,
             "secret_arg_count": program.secret_args.len(),
@@ -5607,6 +5607,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let runtime_kernel_lowering_bundle_field_names_match =
         rust_runtime_kernel_lowering_bundle_field_names
             == lean_runtime_kernel_lowering_bundle_field_names;
+    let rust_runtime_kernel_slot_dsl_bundle_field_names =
+        extract_rust_struct_fields(&kernel_dsl_source, "RuntimeKernelSlotDslBundle")?;
+    let lean_runtime_kernel_slot_dsl_bundle_field_names = extract_lean_string_list(
+        &lean_runtime_kernel_dsl_source,
+        "importedRuntimeKernelSlotDslBundleFieldNames",
+    )?;
+    let runtime_kernel_slot_dsl_bundle_field_names_match =
+        rust_runtime_kernel_slot_dsl_bundle_field_names
+            == lean_runtime_kernel_slot_dsl_bundle_field_names;
 
     let rust_runtime_confidential_core_lowering_bundle_field_names = extract_rust_struct_fields(
         &confidential_core_source,
@@ -5619,6 +5628,17 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let runtime_confidential_core_lowering_bundle_field_names_match =
         rust_runtime_confidential_core_lowering_bundle_field_names
             == lean_runtime_confidential_core_lowering_bundle_field_names;
+    let rust_runtime_confidential_core_slot_bundle_field_names = extract_rust_struct_fields(
+        &confidential_core_source,
+        "RuntimeConfidentialCoreSlotBundle",
+    )?;
+    let lean_runtime_confidential_core_slot_bundle_field_names = extract_lean_string_list(
+        &lean_runtime_confidential_core_source,
+        "importedRuntimeConfidentialCoreSlotBundleFieldNames",
+    )?;
+    let runtime_confidential_core_slot_bundle_field_names_match =
+        rust_runtime_confidential_core_slot_bundle_field_names
+            == lean_runtime_confidential_core_slot_bundle_field_names;
 
     let rust_runtime_confidential_core_shell_boundary_lowering_bundle_field_names =
         extract_rust_struct_fields(
@@ -5711,7 +5731,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && confidential_kernel_program_field_names_match
         && confidential_kernel_slot_program_field_names_match
         && runtime_kernel_lowering_bundle_field_names_match
+        && runtime_kernel_slot_dsl_bundle_field_names_match
         && runtime_confidential_core_lowering_bundle_field_names_match
+        && runtime_confidential_core_slot_bundle_field_names_match
         && runtime_confidential_core_shell_boundary_lowering_bundle_field_names_match
         && runtime_shell_contract_field_names_match
         && runtime_shell_trace_field_names_match
@@ -5820,12 +5842,24 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             lean_runtime_kernel_lowering_bundle_field_names,
         "runtime_kernel_lowering_bundle_field_names_match":
             runtime_kernel_lowering_bundle_field_names_match,
+        "rust_runtime_kernel_slot_dsl_bundle_field_names":
+            rust_runtime_kernel_slot_dsl_bundle_field_names,
+        "lean_runtime_kernel_slot_dsl_bundle_field_names":
+            lean_runtime_kernel_slot_dsl_bundle_field_names,
+        "runtime_kernel_slot_dsl_bundle_field_names_match":
+            runtime_kernel_slot_dsl_bundle_field_names_match,
         "rust_runtime_confidential_core_lowering_bundle_field_names":
             rust_runtime_confidential_core_lowering_bundle_field_names,
         "lean_runtime_confidential_core_lowering_bundle_field_names":
             lean_runtime_confidential_core_lowering_bundle_field_names,
         "runtime_confidential_core_lowering_bundle_field_names_match":
             runtime_confidential_core_lowering_bundle_field_names_match,
+        "rust_runtime_confidential_core_slot_bundle_field_names":
+            rust_runtime_confidential_core_slot_bundle_field_names,
+        "lean_runtime_confidential_core_slot_bundle_field_names":
+            lean_runtime_confidential_core_slot_bundle_field_names,
+        "runtime_confidential_core_slot_bundle_field_names_match":
+            runtime_confidential_core_slot_bundle_field_names_match,
         "rust_runtime_confidential_core_shell_boundary_lowering_bundle_field_names":
             rust_runtime_confidential_core_shell_boundary_lowering_bundle_field_names,
         "lean_runtime_confidential_core_shell_boundary_lowering_bundle_field_names":
