@@ -6983,9 +6983,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "PathOramFreshCoinPlan",
             "owner": "runtime/uo-evm/src/fresh_coins.rs",
-            "boundary": "opaque public handle; raw per-object fresh-coin map stays inside crate::runtime",
+            "boundary": "opaque public handle; raw per-object fresh-coin map stays inside crate::runtime, the handle is non-Clone and consumed by value, and the per-object tapes move into live shadow state without cloning",
             "checked": fresh_coin_plan_surface_restricted
                 && fresh_coin_plan_zeroizes_on_drop
+                && fresh_coin_plan_nonclone
+                && engine_fresh_coin_api_consumes_plan
                 && !engine_defines_fresh_coin_plan_directly
                 && !engine_peeks_into_fresh_coin_map,
         }),
