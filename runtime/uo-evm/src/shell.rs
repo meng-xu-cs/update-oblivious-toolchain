@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
+use uo_core::manifest::EntrypointManifest;
 use uo_core::Value;
 
 #[derive(Clone, Debug)]
@@ -28,10 +29,11 @@ pub(crate) fn run_public_entrypoint(
     runtime: &mut ContractRuntime,
     contract: &CompiledContract,
     function: &CompiledFunction,
+    manifest_entry: &EntrypointManifest,
     public_args: Vec<Value>,
-    allocator: AllocatorPlan,
     recorder: &mut CallRecorder,
 ) -> Result<RuntimeCallOutcome> {
+    let allocator = AllocatorPlan::from_manifest(manifest_entry);
     let public_object_ids = runtime.public_object_ids();
     let mut kernel = PublicRuntimeKernel::begin(
         allocator,

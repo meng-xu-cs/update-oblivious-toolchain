@@ -6044,6 +6044,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_delegates_public_execution_to_shell = engine_impl_source
         .contains("use crate::shell::run_public_entrypoint;")
         && engine_impl_source.contains("let public_execution = run_public_entrypoint(")
+        && !engine_impl_source.contains("AllocatorPlan::from_manifest(")
+        && shell_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
         && !engine_impl_source.contains("fn exec_block(")
         && !engine_impl_source.contains("fn exec_statement(")
         && !engine_impl_source.contains("fn eval_expr(")
@@ -9083,7 +9085,9 @@ the raw `RuntimeKernel` or the public kernel facade directly, or threads the
 manifest hash-scratch bound or confidential commit budget itself, and it now
 derives the canonical public object universe from `ContractRuntime` rather
 than the artifact-side state list while the same `ContractRuntime` boundary
-now owns the ready-for-call coldness preflight over that universe as well.
+now owns the ready-for-call coldness preflight over that universe as well,
+and `shell.rs` now derives the public allocator plan from the manifest rather
+than having the engine thread that setup detail in.
 Confidential `Expr::Select` now also evaluates both admitted pure arms and
 combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade

@@ -5,7 +5,6 @@ use crate::theorem::{begin_call_trace, finalize_call_trace, FinalizeCallTraceInp
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use uo_allocator::AllocatorPlan;
 use uo_core::{CompiledArtifact, ExecutionTrace, Value};
 
 #[derive(Debug)]
@@ -156,8 +155,8 @@ impl ContractInstance {
                     &mut self.state,
                     &self.artifact.contract,
                     &function,
+                    &manifest_entry,
                     public_args,
-                    AllocatorPlan::from_manifest(&manifest_entry),
                     call_trace_context.recorder_mut(),
                 )?;
                 (
