@@ -7718,6 +7718,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let shell_boundary_path = repo_root().join("crates/uo-core/src/shell_boundary.rs");
     let lean_runtime_refinement_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeRefinement.lean");
+    let lean_runtime_refinement_json_path =
+        repo_root().join("proof/lean/UOToolchain/RuntimeRefinementJson.lean");
     let lean_runtime_trusted_kernel_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean");
     let lean_runtime_shell_boundary_path =
@@ -7754,6 +7756,13 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_runtime_refinement_path)
+            )
+        })?;
+    let lean_runtime_refinement_json_source =
+        fs::read_to_string(&lean_runtime_refinement_json_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_runtime_refinement_json_path)
             )
         })?;
     let lean_runtime_trusted_kernel_source = fs::read_to_string(&lean_runtime_trusted_kernel_path)
@@ -8394,6 +8403,65 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("theorem importedRuntimeKernelLoweringBundle_toRuntimeValid")
         && lean_runtime_kernel_dsl_source
             .contains("theorem importedRuntimeKernelLoweringBundle_toRuntimeBundle_sound");
+    let runtime_trace_bridge_checks = [
+        (
+            "pub fn new_with_kernel_witness(",
+            vec![String::from("crates/uo-core/src/trace.rs")],
+        ),
+        (
+            "pub fn runtime_trusted_kernel_bundle(",
+            vec![String::from("crates/uo-core/src/trace.rs")],
+        ),
+        (
+            "pub fn runtime_refinement_witness(",
+            vec![String::from("crates/uo-core/src/trace.rs")],
+        ),
+        (
+            "RuntimeRefinementWitness::from_certificates_with_runtime_witnesses(",
+            vec![String::from("crates/uo-core/src/trace.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&core_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let runtime_trace_bridge_surface_restricted = runtime_trace_bridge_checks.iter().all(|entry| {
+        entry["restricted"]
+            .as_bool()
+            .expect("runtime trace bridge restriction flag must be boolean")
+    });
+    let runtime_refinement_witness_reuses_trusted_kernel_bundle = core_trace_source
+        .contains("let bundle = self.runtime_trusted_kernel_bundle()?;")
+        && core_trace_source
+            .contains("RuntimeRefinementWitness::from_certificates_with_runtime_witnesses(");
+    let runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates = core_trace_source
+        .contains("let controller_observer = self.runtime_controller_observer_certificate()?;")
+        && core_trace_source
+            .contains("let hidden_certificate = self.runtime_path_oram_hidden_certificate()?;")
+        && core_trace_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness(");
+    let lean_runtime_refinement_proof_grade_exactness_present = lean_runtime_refinement_json_source
+        .contains("def ImportedRuntimeRefinementWitness.ProofGradeValid")
+        && lean_runtime_refinement_json_source
+            .contains("theorem importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid")
+        && lean_runtime_refinement_json_source
+            .contains("theorem importedWitness_proofGradeKernelSchedule_exact")
+        && lean_runtime_refinement_json_source
+            .contains("theorem importedWitness_projects_to_paper_observer");
+    let lean_runtime_trusted_kernel_proof_grade_exactness_present =
+        lean_runtime_trusted_kernel_source
+            .contains("def ImportedRuntimeTrustedKernelBundle.ProofGradeValid")
+            && lean_runtime_trusted_kernel_source.contains(
+                "theorem importedRuntimeTrustedKernelBundle_proofGradeKernelSchedule_exact",
+            )
+            && lean_runtime_trusted_kernel_source
+                .contains("theorem importedRuntimeTrustedKernelBundle_projects_to_paper_observer");
 
     let resource_event_kind_serde_snake_case =
         rust_enum_has_serde_snake_case(&core_trace_source, "RuntimeKernelResourceEventKindWitness");
@@ -8465,6 +8533,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_runtime_kernel_dsl_bundle_exactness_present
         && lean_runtime_kernel_slot_dsl_bundle_exactness_present
         && lean_runtime_kernel_lowering_bundle_exactness_present
+        && runtime_trace_bridge_surface_restricted
+        && runtime_refinement_witness_reuses_trusted_kernel_bundle
+        && runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates
+        && lean_runtime_refinement_proof_grade_exactness_present
+        && lean_runtime_trusted_kernel_proof_grade_exactness_present
         && resource_event_kind_serde_snake_case
         && scratch_region_serde_snake_case
         && refinement_event_kind_serde_snake_case
@@ -8486,6 +8559,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             "rust_trusted_kernel": display_report_path(&trusted_kernel_path),
             "rust_shell_boundary": display_report_path(&shell_boundary_path),
             "lean_runtime_refinement": display_report_path(&lean_runtime_refinement_path),
+            "lean_runtime_refinement_json":
+                display_report_path(&lean_runtime_refinement_json_path),
             "lean_runtime_trusted_kernel":
                 display_report_path(&lean_runtime_trusted_kernel_path),
             "lean_runtime_shell_boundary":
@@ -8691,6 +8766,17 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             lean_runtime_kernel_slot_dsl_bundle_exactness_present,
         "lean_runtime_kernel_lowering_bundle_exactness_present":
             lean_runtime_kernel_lowering_bundle_exactness_present,
+        "runtime_trace_bridge_checks": runtime_trace_bridge_checks,
+        "runtime_trace_bridge_surface_restricted":
+            runtime_trace_bridge_surface_restricted,
+        "runtime_refinement_witness_reuses_trusted_kernel_bundle":
+            runtime_refinement_witness_reuses_trusted_kernel_bundle,
+        "runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates":
+            runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates,
+        "lean_runtime_refinement_proof_grade_exactness_present":
+            lean_runtime_refinement_proof_grade_exactness_present,
+        "lean_runtime_trusted_kernel_proof_grade_exactness_present":
+            lean_runtime_trusted_kernel_proof_grade_exactness_present,
         "resource_event_kind_serde_snake_case": resource_event_kind_serde_snake_case,
         "scratch_region_serde_snake_case": scratch_region_serde_snake_case,
         "refinement_event_kind_serde_snake_case": refinement_event_kind_serde_snake_case,

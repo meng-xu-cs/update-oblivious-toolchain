@@ -430,9 +430,12 @@ The first implementation step is now present in the codebase:
   continuing to source the manifest-carried named and slot DSL programs,
   requires the direct runtime-kernel DSL / slot-DSL / lowering bridge family
   in that same `kernel_dsl.rs` module to stay confined and manifest-sourced as
-  well, and requires Lean to keep validating exact equality to those
-  witness-induced shell views plus the runtime-kernel, confidential-core,
-  shell-boundary slot/lowering, and trusted-kernel proof-grade equalities
+  well, requires the direct runtime trusted-kernel / refinement export bridge
+  in `crates/uo-core/src/trace.rs` to stay confined to exact controller /
+  hidden-certificate reuse rather than parallel bundle assembly, and requires
+  Lean to keep validating exact equality to those witness-induced shell views
+  plus the runtime-kernel, confidential-core, shell-boundary slot/lowering,
+  trusted-kernel, and runtime-refinement proof-grade equalities
 - the boundary report now also checks constructor authority for those witness
   alphabets: production runtime phase-witness events are restricted to
   `runtime/uo-evm/src/kernel.rs` plus `runtime/uo-evm/src/state.rs`, and

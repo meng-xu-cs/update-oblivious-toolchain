@@ -205,6 +205,7 @@
     "kernel_witness",
     "confidential_slot_program"
   ],
+  "lean_runtime_refinement_proof_grade_exactness_present": true,
   "lean_runtime_shell_boundary_bundle_field_names": [
     "kernel_witness",
     "runtime_kernel_refinement_witness",
@@ -234,6 +235,7 @@
     "cold_store_object_schedule",
     "post_committed_cold_object_schedule"
   ],
+  "lean_runtime_trusted_kernel_proof_grade_exactness_present": true,
   "lean_runtime_trusted_kernel_slot_bundle_field_names": [
     "trusted_kernel_bundle",
     "confidential_slot_program"
@@ -322,11 +324,56 @@
   "runtime_kernel_bundle_uses_manifest_programs": true,
   "runtime_kernel_lowering_bundle_field_names_match": true,
   "runtime_kernel_slot_dsl_bundle_field_names_match": true,
+  "runtime_refinement_witness_reuses_trusted_kernel_bundle": true,
   "runtime_shell_boundary_bundle_field_names_match": true,
   "runtime_shell_boundary_lowering_bundle_field_names_match": true,
   "runtime_shell_boundary_slot_bundle_field_names_match": true,
   "runtime_shell_contract_field_names_match": true,
   "runtime_shell_trace_field_names_match": true,
+  "runtime_trace_bridge_checks": [
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "pattern": "pub fn new_with_kernel_witness(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "pattern": "pub fn runtime_trusted_kernel_bundle(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "pattern": "pub fn runtime_refinement_witness(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "pattern": "RuntimeRefinementWitness::from_certificates_with_runtime_witnesses(",
+      "restricted": true
+    }
+  ],
+  "runtime_trace_bridge_surface_restricted": true,
+  "runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates": true,
   "runtime_trusted_kernel_slot_bundle_field_names_match": true,
   "rust_confidential_kernel_expr_kind_names": [
     "literal",
@@ -602,6 +649,7 @@
     "lean_runtime_confidential_core_shell_boundary_slot": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundarySlotJson.lean",
     "lean_runtime_kernel_dsl": "proof/lean/UOToolchain/RuntimeKernelDslJson.lean",
     "lean_runtime_refinement": "proof/lean/UOToolchain/RuntimeRefinement.lean",
+    "lean_runtime_refinement_json": "proof/lean/UOToolchain/RuntimeRefinementJson.lean",
     "lean_runtime_shell_boundary": "proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean",
     "lean_runtime_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean",
     "lean_runtime_shell_boundary_slot": "proof/lean/UOToolchain/RuntimeShellBoundarySlotJson.lean",
