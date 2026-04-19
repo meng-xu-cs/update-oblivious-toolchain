@@ -1,4 +1,5 @@
 use crate::controller::CallRecorder;
+use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
 use anyhow::{anyhow, bail, Result};
@@ -126,7 +127,7 @@ impl CommittedRuntimeState {
         function: &CompiledFunction,
         shadow_load_object_ids: &[u32],
         args: Vec<Value>,
-        fresh_coins_by_object: Option<&BTreeMap<u32, Vec<usize>>>,
+        fresh_coins: Option<&PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialCommittedCallOutcome> {
@@ -135,7 +136,7 @@ impl CommittedRuntimeState {
             self,
             shadow_load_object_ids,
             args,
-            fresh_coins_by_object,
+            fresh_coins,
             recorder,
             opcode_trace,
         )?;

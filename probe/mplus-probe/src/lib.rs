@@ -5875,6 +5875,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
 fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let root = repo_root();
     let engine_path = root.join("runtime/uo-evm/src/engine.rs");
+    let fresh_coins_path = root.join("runtime/uo-evm/src/fresh_coins.rs");
     let kernel_path = root.join("runtime/uo-evm/src/kernel.rs");
     let objects_path = root.join("runtime/uo-evm/src/objects.rs");
     let oram_path = root.join("runtime/uo-evm/src/oram.rs");
@@ -5897,6 +5898,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&kernel_path)))?;
     let engine_source = fs::read_to_string(&engine_path)
         .with_context(|| format!("reading {}", display_report_path(&engine_path)))?;
+    let fresh_coins_source = fs::read_to_string(&fresh_coins_path)
+        .with_context(|| format!("reading {}", display_report_path(&fresh_coins_path)))?;
     let objects_source = fs::read_to_string(&objects_path)
         .with_context(|| format!("reading {}", display_report_path(&objects_path)))?;
     let oram_source = fs::read_to_string(&oram_path)
@@ -5985,6 +5988,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         engine_impl_source.contains("objects: &mut PublicRuntimeShadowState");
     let engine_uses_public_runtime_kernel =
         engine_impl_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
+    let engine_defines_fresh_coin_plan_directly = engine_source.contains("pub struct PathOramFreshCoinPlan")
+        || engine_source.contains("struct PathOramFreshCoinPlan");
+    let engine_peeks_into_fresh_coin_map =
+        engine_impl_source.contains(".by_object") || engine_impl_source.contains("fresh_coins_by_object");
     let engine_imports_raw_runtime_kernel =
         engine_impl_source.contains("use crate::runtime::kernel::RuntimeKernel;");
     let engine_imports_runtime_object_directly =
@@ -6060,6 +6067,42 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let oram_state_nonderive_clone = !oram_state_derive_line.contains("Clone");
     let contract_instance_clone_uses_cold_runtime_clone =
         engine_source.contains("state: self.state.clone()");
+    let fresh_coin_plan_surface_checks = [
+        (
+            "pub struct PathOramFreshCoinPlan",
+            vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
+        ),
+        (
+            "impl Drop for PathOramFreshCoinPlan",
+            vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
+        ),
+        (
+            "pub fn from_scaffold_and_values(",
+            vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
+        ),
+        (
+            "pub(in crate::runtime) fn by_object(&self)",
+            vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&runtime_evm_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let fresh_coin_plan_surface_restricted = fresh_coin_plan_surface_checks.iter().all(|entry| {
+        entry["restricted"]
+            .as_bool()
+            .expect("fresh-coin surface restriction flag must be boolean")
+    });
+    let fresh_coin_plan_zeroizes_on_drop = fresh_coins_source.contains("impl Drop for PathOramFreshCoinPlan")
+        && fresh_coins_source.contains("*coin = 0;");
     let state_wrapper_present = state_source.contains("pub(crate) struct CommittedRuntimeState")
         && state_source.contains("pub(crate) struct RuntimeShadowState")
         && state_source.contains("pub(crate) struct PublicRuntimeShadowState");
@@ -6422,7 +6465,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/kernel.rs")],
         ),
         (
-            "objects.install_path_oram_leaf_coins(fresh_coins_by_object)",
+            "objects.install_path_oram_leaf_coins(fresh_coins.by_object())",
             vec![String::from("runtime/uo-evm/src/kernel.rs")],
         ),
         (
@@ -6611,7 +6654,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("runtime state restriction flag must be boolean")
     });
-    let runtime_module_layout_present = runtime_module_source.contains("#[path = \"kernel.rs\"]")
+    let runtime_module_layout_present = runtime_module_source.contains("#[path = \"fresh_coins.rs\"]")
+        && runtime_module_source.contains("#[path = \"kernel.rs\"]")
         && runtime_module_source.contains("#[path = \"objects.rs\"]")
         && runtime_module_source.contains("#[path = \"state.rs\"]");
     let store_cipher_key_zeroizes_on_drop = store_codec_source
@@ -6742,9 +6786,67 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("store wipe helper restriction flag must be boolean")
         });
+    let runtime_secret_state_inventory = vec![
+        json!({
+            "name": "PathOramFreshCoinPlan",
+            "owner": "runtime/uo-evm/src/fresh_coins.rs",
+            "boundary": "opaque public handle; raw per-object fresh-coin map stays inside crate::runtime",
+            "checked": fresh_coin_plan_surface_restricted
+                && fresh_coin_plan_zeroizes_on_drop
+                && !engine_defines_fresh_coin_plan_directly
+                && !engine_peeks_into_fresh_coin_map,
+        }),
+        json!({
+            "name": "ConfidentialExecState",
+            "owner": "runtime/uo-evm/src/kernel.rs",
+            "boundary": "private slot-file state owned by RuntimeKernel",
+            "checked": kernel_source.contains("struct ConfidentialExecState")
+                && kernel_source.contains("slots: Vec<Option<Value>>"),
+        }),
+        json!({
+            "name": "RuntimeShadowState and CommittedRuntimeState",
+            "owner": "runtime/uo-evm/src/state.rs",
+            "boundary": "secret-bearing shadow / committed object maps owned by crate::runtime",
+            "checked": state_wrapper_present
+                && state_only_runtime_helper_surface_restricted
+                && state_only_kernel_helper_surface_restricted,
+        }),
+        json!({
+            "name": "RuntimeObject graph",
+            "owner": "runtime/uo-evm/src/objects.rs",
+            "boundary": "object-level confidential state is non-Clone and helper-restricted",
+            "checked": runtime_object_nonclone
+                && confidential_object_api_surface_restricted,
+        }),
+        json!({
+            "name": "OramState",
+            "owner": "runtime/uo-evm/src/oram.rs",
+            "boundary": "live ORAM logical state remains inside runtime with restricted helper use",
+            "checked": oram_state_nonderive_clone
+                && oram_buffer_reuse_restricted
+                && oram_working_stash_capacity_restricted,
+        }),
+        json!({
+            "name": "StoreCipher and plaintext staging",
+            "owner": "runtime/uo-store/src/codec.rs and runtime/uo-store/src/store.rs",
+            "boundary": "direct seal/open stays in codec; wipe-preserving helper surface is fixed",
+            "checked": store_cipher_key_zeroizes_on_drop
+                && store_cipher_exposes_wipe_helpers
+                && direct_store_seal_surface_restricted
+                && direct_store_open_surface_restricted
+                && store_wipe_helper_surface_restricted,
+        }),
+    ];
+    let runtime_secret_state_inventory_complete =
+        runtime_secret_state_inventory.iter().all(|entry| {
+            entry["checked"]
+                .as_bool()
+                .expect("runtime secret-state inventory check flag must be boolean")
+        });
 
     Ok(json!({
         "engine_path": display_report_path(&engine_path),
+        "fresh_coins_path": display_report_path(&fresh_coins_path),
         "kernel_path": display_report_path(&kernel_path),
         "objects_path": display_report_path(&objects_path),
         "oram_path": display_report_path(&oram_path),
@@ -6761,6 +6863,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "engine_uses_opaque_committed_state": engine_uses_opaque_committed_state,
         "engine_uses_shadow_wrapper": engine_uses_shadow_wrapper,
         "engine_uses_public_runtime_kernel": engine_uses_public_runtime_kernel,
+        "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
+        "engine_peeks_into_fresh_coin_map": engine_peeks_into_fresh_coin_map,
         "engine_imports_raw_runtime_kernel": engine_imports_raw_runtime_kernel,
         "engine_imports_runtime_object_directly": engine_imports_runtime_object_directly,
         "engine_constructs_runtime_phase_events_directly": engine_constructs_runtime_phase_events_directly,
@@ -6780,6 +6884,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "oram_state_nonderive_clone": oram_state_nonderive_clone,
         "contract_instance_clone_uses_cold_runtime_clone":
             contract_instance_clone_uses_cold_runtime_clone,
+        "fresh_coin_plan_surface_checks": fresh_coin_plan_surface_checks,
+        "fresh_coin_plan_surface_restricted": fresh_coin_plan_surface_restricted,
+        "fresh_coin_plan_zeroizes_on_drop": fresh_coin_plan_zeroizes_on_drop,
         "state_wrapper_present": state_wrapper_present,
         "state_finalizes_runtime_phase_witness": state_finalizes_runtime_phase_witness,
         "theorem_finalizes_execution_trace": theorem_finalizes_execution_trace,
@@ -6881,10 +6988,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "direct_store_open_surface_restricted": direct_store_open_surface_restricted,
         "store_wipe_helper_surface_checks": store_wipe_helper_surface_checks,
         "store_wipe_helper_surface_restricted": store_wipe_helper_surface_restricted,
+        "runtime_secret_state_inventory": runtime_secret_state_inventory,
+        "runtime_secret_state_inventory_complete":
+            runtime_secret_state_inventory_complete,
         "accepted": engine_forbidden_helpers_absent
             && engine_uses_opaque_committed_state
             && engine_uses_shadow_wrapper
             && engine_uses_public_runtime_kernel
+            && !engine_defines_fresh_coin_plan_directly
+            && !engine_peeks_into_fresh_coin_map
             && !engine_imports_raw_runtime_kernel
             && !engine_imports_runtime_object_directly
             && !engine_constructs_runtime_phase_events_directly
@@ -6928,6 +7040,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_only_kernel_helper_surface_restricted
             && confidential_object_api_surface_restricted
             && runtime_state_surface_restricted
+            && fresh_coin_plan_surface_restricted
+            && fresh_coin_plan_zeroizes_on_drop
             && store_cipher_key_zeroizes_on_drop
             && store_cipher_exposes_wipe_helpers
             && execution_trace_omits_runtime_telemetry
@@ -6946,6 +7060,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && direct_store_seal_surface_restricted
             && direct_store_open_surface_restricted
             && store_wipe_helper_surface_restricted
+            && runtime_secret_state_inventory_complete
             && runtime_module_layout_present,
     }))
 }

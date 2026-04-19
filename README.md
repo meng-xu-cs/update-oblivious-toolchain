@@ -300,5 +300,6 @@ documented in [docs/supported-subset.md](docs/supported-subset.md),
 [docs/path-oram-citation-import-plan.md](docs/path-oram-citation-import-plan.md),
 [docs/stronger-import-route-feasibility.md](docs/stronger-import-route-feasibility.md),
 [docs/tee-runtime-hardening.md](docs/tee-runtime-hardening.md),
+[docs/runtime-secret-state-inventory.md](docs/runtime-secret-state-inventory.md),
 [docs/implementation-roadmap.md](docs/implementation-roadmap.md), and
 [docs/formal-proof-plan.md](docs/formal-proof-plan.md).

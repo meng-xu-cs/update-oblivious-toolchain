@@ -5,8 +5,9 @@ mod runtime;
 mod theorem;
 
 pub use engine::{
-    run_artifact, run_artifact_with_seed, CallResult, ContractInstance, PathOramFreshCoinPlan,
+    run_artifact, run_artifact_with_seed, CallResult, ContractInstance,
 };
+pub use runtime::fresh_coins::PathOramFreshCoinPlan;
 #[cfg(feature = "diagnostics")]
 pub use engine::{CallTelemetry, DiagnosticCallResult};
 

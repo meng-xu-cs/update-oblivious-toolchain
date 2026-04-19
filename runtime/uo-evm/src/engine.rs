@@ -1,4 +1,5 @@
 use crate::controller::CallRecorder;
+use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::state::{CommittedRuntimeState, PublicRuntimeShadowState};
 use crate::theorem::{build_theorem_trace, finalize_execution_trace, FinalizeExecutionTraceInput};
@@ -12,7 +13,7 @@ use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement,
 use uo_core::{
     canonical_runtime_public_object_ids, expected_runtime_kernel_opcodes_for_confidential,
     expected_runtime_manifest_kernel_steps_for_confidential, CompiledArtifact, ExecutionTrace,
-    RuntimeKernelStepWitness, RuntimeOramLeafScaffoldWitness, Value,
+    RuntimeKernelStepWitness, Value,
 };
 
 #[derive(Debug)]
@@ -50,52 +51,6 @@ pub struct CallResult {
 pub struct DiagnosticCallResult {
     pub call: CallResult,
     pub telemetry: CallTelemetry,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct PathOramFreshCoinPlan {
-    by_object: BTreeMap<u32, Vec<usize>>,
-}
-
-impl Drop for PathOramFreshCoinPlan {
-    fn drop(&mut self) {
-        for coins in self.by_object.values_mut() {
-            for coin in coins.iter_mut() {
-                *coin = 0;
-            }
-        }
-    }
-}
-
-impl PathOramFreshCoinPlan {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn insert_object_coins(&mut self, object_id: u32, coins: Vec<usize>) -> Option<Vec<usize>> {
-        self.by_object.insert(object_id, coins)
-    }
-
-    pub fn from_scaffold_and_values(
-        scaffold: &[RuntimeOramLeafScaffoldWitness],
-        values: &[usize],
-    ) -> Result<Self> {
-        if scaffold.len() != values.len() {
-            bail!(
-                "path-ORAM fresh-coin scaffold length {} does not match value length {}",
-                scaffold.len(),
-                values.len()
-            );
-        }
-        let mut plan = Self::new();
-        for (step, value) in scaffold.iter().zip(values.iter()) {
-            plan.by_object
-                .entry(step.object_id)
-                .or_default()
-                .push(*value);
-        }
-        Ok(plan)
-    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -242,7 +197,7 @@ impl ContractInstance {
                         &function,
                         &shadow_load_object_ids,
                         args,
-                        fresh_coins.map(|plan| &plan.by_object),
+                        fresh_coins,
                         &mut recorder,
                         &mut opcode_trace,
                     )?;
