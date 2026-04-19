@@ -5,6 +5,34 @@
   "all_state_restricted_signatures_present": true,
   "checker_path": "checker/uo-check/src/lib.rs",
   "checker_uses_shared_confidential_kernel_lowering": true,
+  "committed_runtime_witness_snapshot_derive_line": "#[derive(Debug)]",
+  "committed_runtime_witness_snapshot_nonclone": true,
+  "committed_runtime_witness_snapshot_surface_files": [
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "committed_runtime_witness_snapshot_surface_restricted": true,
+  "confidential_committed_kernel_outcome_derive_line": "#[derive(Debug)]",
+  "confidential_committed_kernel_outcome_nonclone": true,
+  "confidential_committed_kernel_outcome_surface_files": [
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "confidential_committed_kernel_outcome_surface_restricted": true,
+  "confidential_entrypoint_plan_surface_restricted": true,
+  "confidential_exec_state_derive_line": "#[derive(Debug)]",
+  "confidential_exec_state_nonclone": true,
+  "confidential_exec_state_surface_files": [
+    "runtime/uo-evm/src/kernel.rs"
+  ],
+  "confidential_exec_state_surface_restricted": true,
+  "confidential_exec_state_wipes_on_drop": true,
+  "confidential_execution_outcome_derive_line": "#[derive(Debug)]",
+  "confidential_execution_outcome_nonclone": true,
+  "confidential_kernel_run_outcome_derive_line": "#[derive(Debug)]",
+  "confidential_kernel_run_outcome_nonclone": true,
+  "confidential_kernel_run_outcome_surface_files": [
+    "runtime/uo-evm/src/kernel.rs"
+  ],
+  "confidential_kernel_run_outcome_surface_restricted": true,
   "confidential_object_api_surface_checks": [
     {
       "expected_files": [
@@ -69,6 +97,53 @@
   ],
   "confidential_object_api_surface_restricted": true,
   "contract_instance_clone_uses_cold_runtime_clone": true,
+  "contract_runtime_entrypoint_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/shell.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/shell.rs"
+      ],
+      "pattern": "runtime.prepare_public_shadow(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/shell.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/shell.rs"
+      ],
+      "pattern": "runtime.commit_public_shadow(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/shell.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/shell.rs"
+      ],
+      "pattern": "runtime.replace_with_cold_public_shadow(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/engine.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/engine.rs"
+      ],
+      "pattern": "runtime.run_confidential_entrypoint(",
+      "restricted": true
+    }
+  ],
+  "contract_runtime_entrypoint_surface_restricted": true,
+  "controller_output_shape_uses_manifest_return_len": true,
+  "controller_path": "runtime/uo-evm/src/controller.rs",
+  "controller_public_call_summary_uses_manifest_only": true,
+  "controller_public_trace_uses_output_shape_only": true,
   "core_trace_path": "crates/uo-core/src/trace.rs",
   "default_call_result_omits_runtime_telemetry": true,
   "diagnostic_api_gated_behind_feature": true,
@@ -82,19 +157,123 @@
   ],
   "direct_store_seal_surface_restricted": true,
   "engine_assembles_execution_trace_directly": false,
+  "engine_clones_call_args_directly": false,
+  "engine_confidential_manifest_surface_absent": true,
   "engine_constructs_runtime_phase_events_directly": false,
   "engine_constructs_theorem_certificates_directly": false,
+  "engine_defines_fresh_coin_plan_directly": false,
+  "engine_delegates_confidential_execution_to_runtime": true,
+  "engine_delegates_public_execution_to_shell": true,
+  "engine_does_not_import_public_runtime_kernel": true,
   "engine_does_not_lower_confidential_program_directly": true,
   "engine_forbidden_helpers_absent": true,
+  "engine_fresh_coin_api_consumes_plan": true,
   "engine_imports_raw_runtime_kernel": false,
   "engine_imports_runtime_object_directly": false,
+  "engine_keeps_confidential_call_inputs_inside_runtime": true,
+  "engine_leaves_runtime_phase_tail_inside_runtime": true,
   "engine_owns_raw_runtime_object_map": false,
   "engine_path": "runtime/uo-evm/src/engine.rs",
+  "engine_peeks_into_fresh_coin_map": false,
+  "engine_public_trace_uses_output_shape_only": true,
+  "engine_uses_manifest_public_call_summary": true,
   "engine_uses_opaque_committed_state": true,
-  "engine_uses_public_runtime_kernel": true,
-  "engine_uses_shadow_wrapper": true,
+  "engine_uses_runtime_public_object_universe": true,
   "execution_trace_omits_runtime_telemetry": true,
+  "expected_committed_runtime_witness_snapshot_surface_files": [
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "expected_confidential_committed_kernel_outcome_surface_files": [
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "expected_confidential_exec_state_surface_files": [
+    "runtime/uo-evm/src/kernel.rs"
+  ],
+  "expected_confidential_kernel_run_outcome_surface_files": [
+    "runtime/uo-evm/src/kernel.rs"
+  ],
+  "expected_finalized_call_trace_consumption_surface_files": [
+    "runtime/uo-evm/src/engine.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "expected_runtime_call_outcome_constructor_surface_files": [
+    "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/shell.rs",
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "expected_runtime_call_outcome_surface_files": [
+    "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/shell.rs",
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "expected_runtime_call_outcome_theorem_consumer_surface_files": [
+    "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "expected_theorem_trace_bridge_surface_files": [
+    "runtime/uo-evm/src/engine.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "expected_traced_runtime_call_outcome_constructor_surface_files": [
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "expected_traced_runtime_call_outcome_consumer_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "expected_traced_runtime_call_outcome_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "expected_traced_runtime_call_start_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "expected_traced_runtime_call_witness_state_consumer_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "expected_traced_runtime_call_witness_state_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "finalized_call_trace_api_is_explicit": true,
+  "finalized_call_trace_consumption_surface_files": [
+    "runtime/uo-evm/src/engine.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "finalized_call_trace_consumption_surface_restricted": true,
+  "finalized_call_trace_fields_private": true,
   "forbidden_engine_helper_checks": [
+    {
+      "helper": "prepare_public_shadow(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "commit_public_shadow(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "replace_with_cold_public_shadow(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "finalize_runtime_kernel_refinement_witness(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "build_theorem_trace(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "finalize_execution_trace(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "output_shape_of(",
+      "present_in_engine_impl": false
+    },
     {
       "helper": "clone_for_tx(",
       "present_in_engine_impl": false
@@ -105,6 +284,14 @@
     },
     {
       "helper": "shadow_load_objects(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "shadow_load_public_objects(",
+      "present_in_engine_impl": false
+    },
+    {
+      "helper": "shadow_load_confidential_objects(",
       "present_in_engine_impl": false
     },
     {
@@ -144,6 +331,54 @@
       "present_in_engine_impl": false
     }
   ],
+  "fresh_coin_api_gated_behind_feature": true,
+  "fresh_coin_plan_derive_line": "#[derive(Debug, Default)]",
+  "fresh_coin_plan_nonclone": true,
+  "fresh_coin_plan_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "pattern": "pub struct PathOramFreshCoinPlan",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "pattern": "impl Drop for PathOramFreshCoinPlan",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "pattern": "pub fn from_scaffold_and_values(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/fresh_coins.rs"
+      ],
+      "pattern": "pub(in crate::runtime) fn into_by_object(mut self)",
+      "restricted": true
+    }
+  ],
+  "fresh_coin_plan_surface_restricted": true,
+  "fresh_coin_plan_zeroizes_on_drop": true,
+  "fresh_coins_path": "runtime/uo-evm/src/fresh_coins.rs",
   "fullscan_buffer_reuse_checks": [
     {
       "expected_files": [
@@ -219,6 +454,7 @@
     }
   ],
   "fullscan_buffer_reuse_restricted": true,
+  "kernel_avoids_raw_escape_hatches": true,
   "kernel_bounded_journal_checks": [
     {
       "expected_files": [
@@ -282,13 +518,15 @@
     }
   ],
   "kernel_bounded_journal_restricted": true,
+  "kernel_confidential_call_inputs_stay_inside_runtime": true,
   "kernel_confidential_select_uses_branchless_value_select": true,
+  "kernel_confidential_shadow_load_private": true,
   "kernel_eval_uses_confidential_slot_exprs": true,
   "kernel_exec_block_uses_confidential_slot_statements": true,
   "kernel_exec_state_avoids_name_keyed_env": true,
   "kernel_exec_state_uses_slot_vector": true,
   "kernel_executes_program_body_via_shared_dsl": true,
-  "kernel_lowers_confidential_entrypoint_to_slot_program": true,
+  "kernel_hash_scratch_uses_public_program_bound": true,
   "kernel_only_state_helper_surface_checks": [
     {
       "expected_files": [
@@ -302,10 +540,12 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/kernel.rs",
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/kernel.rs",
+        "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".object_mut(object_id)?",
       "restricted": true
@@ -317,7 +557,7 @@
       "files": [
         "runtime/uo-evm/src/kernel.rs"
       ],
-      "pattern": "objects.install_path_oram_leaf_coins(fresh_coins_by_object)",
+      "pattern": "objects.install_path_oram_leaf_coins(fresh_coins.into_by_object())",
       "restricted": true
     },
     {
@@ -346,11 +586,7 @@
   "kernel_restricted_signature_checks": [
     {
       "present": true,
-      "signature": "pub(in crate::runtime) fn inner_mut"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn into_inner"
+      "signature": "pub(in crate::runtime) fn shadow_load_public_objects"
     },
     {
       "present": true,
@@ -359,14 +595,12 @@
     {
       "present": true,
       "signature": "pub(in crate::runtime) fn run_confidential_call"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn shadow_load_objects"
     }
   ],
+  "kernel_scratch_accounting_uses_object_type_lengths": true,
   "kernel_witness_validation_tracks_confidential_kernel_lowering_errors": true,
-  "kernel_witness_validation_uses_lowered_confidential_program": true,
+  "kernel_witness_validation_uses_manifest_confidential_slot_program": true,
+  "object_commit_io_scratch_uses_type_lengths": true,
   "objects_path": "runtime/uo-evm/src/objects.rs",
   "oram_buffer_reuse_checks": [
     {
@@ -628,6 +862,86 @@
   "probe_enables_runtime_diagnostics_feature": true,
   "probe_path": "probe/mplus-probe/src/lib.rs",
   "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
+  "raw_kernel_private_surface_checks": [
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) struct ConfidentialExecutionOutcome {",
+      "private_present": true,
+      "required_private": "struct ConfidentialExecutionOutcome {",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) struct ConfidentialKernelRunOutcome {",
+      "private_present": true,
+      "required_private": "pub(in crate::runtime) struct ConfidentialKernelRunOutcome {",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn record_shadow_load_object(",
+      "private_present": true,
+      "required_private": "fn record_shadow_load_object(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn cell_get_public(",
+      "private_present": true,
+      "required_private": "fn cell_get_public(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn cell_set_public(",
+      "private_present": true,
+      "required_private": "fn cell_set_public(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn array_get_public(",
+      "private_present": true,
+      "required_private": "fn array_get_public(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn array_set_public(",
+      "private_present": true,
+      "required_private": "fn array_set_public(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn map_get_public(",
+      "private_present": true,
+      "required_private": "fn map_get_public(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn map_put_public(",
+      "private_present": true,
+      "required_private": "fn map_put_public(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn commit_objects(",
+      "private_present": true,
+      "required_private": "fn commit_objects(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn execute_confidential_call(",
+      "private_present": true,
+      "required_private": "fn execute_confidential_call(",
+      "restricted": true
+    }
+  ],
+  "raw_kernel_private_surface_restricted": true,
   "resource_event_constructor_files": [
     "runtime/uo-allocator/src/lib.rs"
   ],
@@ -698,6 +1012,29 @@
       "signature": "pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed"
     }
   ],
+  "runtime_call_outcome_api_is_explicit": true,
+  "runtime_call_outcome_constructor_surface_files": [
+    "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/shell.rs",
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "runtime_call_outcome_constructor_surface_restricted": true,
+  "runtime_call_outcome_derive_line": "#[derive(Debug)]",
+  "runtime_call_outcome_fields_private": true,
+  "runtime_call_outcome_nonclone": true,
+  "runtime_call_outcome_runtime_private": true,
+  "runtime_call_outcome_surface_files": [
+    "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/shell.rs",
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "runtime_call_outcome_surface_restricted": true,
+  "runtime_call_outcome_theorem_consumer_surface_files": [
+    "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "runtime_call_outcome_theorem_consumer_surface_restricted": true,
   "runtime_diagnostics_feature_declared": true,
   "runtime_module_layout_present": true,
   "runtime_module_path": "runtime/uo-evm/src/runtime.rs",
@@ -708,6 +1045,93 @@
     "runtime/uo-evm/src/state.rs"
   ],
   "runtime_phase_event_constructor_surface_restricted": true,
+  "runtime_secret_state_inventory": [
+    {
+      "boundary": "shell projects only PublicCallSummary; ContractRuntime internalizes raw confidential args into ConfidentialCallInputs, whose unwrap stays inside crate::runtime",
+      "checked": true,
+      "name": "ConfidentialCallInputs",
+      "owner": "runtime/uo-evm/src/state.rs"
+    },
+    {
+      "boundary": "opaque public handle; raw per-object fresh-coin map stays inside crate::runtime, the handle is non-Clone and consumed by value, and the per-object tapes move into live shadow state without cloning",
+      "checked": true,
+      "name": "PathOramFreshCoinPlan",
+      "owner": "runtime/uo-evm/src/fresh_coins.rs"
+    },
+    {
+      "boundary": "private slot-file state owned by RuntimeKernel",
+      "checked": true,
+      "name": "ConfidentialExecState",
+      "owner": "runtime/uo-evm/src/kernel.rs"
+    },
+    {
+      "boundary": "runtime-only kernel-to-state handoff bundle carrying committed confidential shadow state, witnesses, and the live return value",
+      "checked": true,
+      "name": "ConfidentialKernelRunOutcome",
+      "owner": "runtime/uo-evm/src/kernel.rs"
+    },
+    {
+      "boundary": "runtime-only state-local post-commit confidential outcome bundle before packaging into RuntimeCallOutcome",
+      "checked": true,
+      "name": "ConfidentialCommittedKernelOutcome",
+      "owner": "runtime/uo-evm/src/state.rs"
+    },
+    {
+      "boundary": "runtime-only per-call outcome bundle; construction is pinned to runtime.rs, state.rs, and shell.rs through an explicit constructor, state.rs is the only theorem-packaging consumer of its explicit handoff API, and engine.rs does not unpack it directly",
+      "checked": true,
+      "name": "RuntimeCallOutcome",
+      "owner": "runtime/uo-evm/src/runtime.rs"
+    },
+    {
+      "boundary": "runtime/theorem post-call handoff bundle capturing the after-call hidden witness snapshot plus RuntimeCallOutcome before final execution-trace packaging",
+      "checked": true,
+      "name": "TracedRuntimeCallOutcome",
+      "owner": "runtime/uo-evm/src/state.rs"
+    },
+    {
+      "boundary": "runtime/theorem pre-call handoff token carrying the hidden committed-state snapshot without exposing the raw snapshot type outside state.rs",
+      "checked": true,
+      "name": "TracedRuntimeCallStart",
+      "owner": "runtime/uo-evm/src/state.rs"
+    },
+    {
+      "boundary": "runtime/theorem finalized hidden-witness bundle projecting before/after ORAM witness state without exposing raw snapshot helpers",
+      "checked": true,
+      "name": "TracedRuntimeCallWitnessState",
+      "owner": "runtime/uo-evm/src/state.rs"
+    },
+    {
+      "boundary": "secret-bearing committed/shadow object maps stay inside crate::runtime, with distinct public and confidential shadow wrappers delimiting the shell boundary",
+      "checked": true,
+      "name": "RuntimeShadowState / ConfidentialRuntimeShadowState / PublicRuntimeShadowState / CommittedRuntimeState",
+      "owner": "runtime/uo-evm/src/state.rs"
+    },
+    {
+      "boundary": "opaque hidden ORAM witness snapshot kept entirely inside state.rs and used only to assemble traced-call start/outcome/witness handoff bundles",
+      "checked": true,
+      "name": "CommittedRuntimeWitnessSnapshot",
+      "owner": "runtime/uo-evm/src/state.rs"
+    },
+    {
+      "boundary": "object-level confidential state is non-Clone and helper-restricted",
+      "checked": true,
+      "name": "RuntimeObject graph",
+      "owner": "runtime/uo-evm/src/objects.rs"
+    },
+    {
+      "boundary": "live ORAM logical state remains inside runtime with restricted helper use",
+      "checked": true,
+      "name": "OramState",
+      "owner": "runtime/uo-evm/src/oram.rs"
+    },
+    {
+      "boundary": "direct seal/open stays in codec; wipe-preserving helper surface is fixed",
+      "checked": true,
+      "name": "StoreCipher and plaintext staging",
+      "owner": "runtime/uo-store/src/codec.rs and runtime/uo-store/src/store.rs"
+    }
+  ],
+  "runtime_secret_state_inventory_complete": true,
   "runtime_state_surface_checks": [
     {
       "expected_files": [
@@ -722,15 +1146,51 @@
     {
       "expected_files": [
         "runtime/uo-evm/src/engine.rs",
+        "runtime/uo-evm/src/shell.rs",
+        "runtime/uo-evm/src/state.rs",
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/engine.rs",
+        "runtime/uo-evm/src/shell.rs",
+        "runtime/uo-evm/src/state.rs",
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "ContractRuntime",
+      "restricted": true
+    },
+    {
+      "expected_files": [
         "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/engine.rs",
         "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "pattern": "CommittedRuntimeState",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "pub(in crate::runtime) struct RuntimeShadowState",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/kernel.rs",
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/kernel.rs",
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": "ConfidentialRuntimeShadowState",
       "restricted": true
     },
     {
@@ -765,6 +1225,14 @@
     }
   ],
   "runtime_state_surface_restricted": true,
+  "shell_confidential_surface_absent": true,
+  "shell_path": "runtime/uo-evm/src/shell.rs",
+  "shell_uses_public_runtime_kernel": true,
+  "shell_uses_shadow_wrapper": true,
+  "state_committed_runtime_witness_snapshot_is_opaque": true,
+  "state_confidential_call_inputs_wrapper_restricted": true,
+  "state_confidential_outcome_layering_is_explicit": true,
+  "state_enforces_confidential_commit_budget": true,
   "state_finalizes_runtime_phase_witness": true,
   "state_only_kernel_helper_surface_checks": [
     {
@@ -774,7 +1242,7 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "shadow_load_objects(self, public_object_ids)?",
+      "pattern": ".shadow_load_public_objects(self, public_object_ids)",
       "restricted": true
     },
     {
@@ -794,7 +1262,7 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "kernel.into_inner().run_confidential_call(",
+      "pattern": "kernel.run_confidential_call(",
       "restricted": true
     }
   ],
@@ -877,7 +1345,7 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": ".install_path_oram_leaf_coins(coins.clone())?;",
+      "pattern": ".install_path_oram_leaf_coins(coins)?;",
       "restricted": true
     },
     {
@@ -896,6 +1364,7 @@
   "state_owns_path_oram_fresh_coin_routing": true,
   "state_owns_shadow_loading": true,
   "state_path": "runtime/uo-evm/src/state.rs",
+  "state_prepares_confidential_manifest_plan": true,
   "state_restricted_signature_checks": [
     {
       "present": true,
@@ -904,6 +1373,10 @@
     {
       "present": true,
       "signature": "pub(in crate::runtime) fn shadow_load"
+    },
+    {
+      "present": true,
+      "signature": "pub(in crate::runtime) fn from_shadow(shadow: RuntimeShadowState) -> Self"
     },
     {
       "present": true,
@@ -928,13 +1401,10 @@
     {
       "present": true,
       "signature": "pub(in crate::runtime) fn into_cold_committed_state"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn inner_mut"
     }
   ],
   "state_routes_confidential_calls_through_runtime_kernel": true,
+  "state_uses_public_runtime_kernel": true,
   "state_wrapper_present": true,
   "store_cipher_exposes_wipe_helpers": true,
   "store_cipher_key_zeroizes_on_drop": true,
@@ -988,5 +1458,138 @@
   "store_write_api_uses_mutable_plaintext": true,
   "theorem_finalizer_omits_runtime_telemetry": true,
   "theorem_finalizes_execution_trace": true,
-  "theorem_path": "runtime/uo-evm/src/theorem.rs"
+  "theorem_only_runtime_helper_surface_checks": [
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "runtime.begin_traced_call(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": "runtime.finish_traced_call(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": ".into_finalized_call_trace_parts(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/theorem.rs"
+      ],
+      "pattern": ".into_execution_trace_parts()",
+      "restricted": true
+    }
+  ],
+  "theorem_only_runtime_helper_surface_restricted": true,
+  "theorem_only_runtime_helper_visibility_restricted": true,
+  "theorem_path": "runtime/uo-evm/src/theorem.rs",
+  "theorem_private_surface_checks": [
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) struct CallTraceContext {",
+      "private_present": true,
+      "required_private": "struct CallTraceContext {",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) struct FinalizeExecutionTraceInput<'a> {",
+      "private_present": true,
+      "required_private": "struct FinalizeExecutionTraceInput<'a> {",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) struct FinalizeCallTraceInput<'a> {",
+      "private_present": true,
+      "required_private": "struct FinalizeCallTraceInput<'a> {",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn begin_call_trace(",
+      "private_present": true,
+      "required_private": "fn begin_call_trace(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn finalize_call_trace(",
+      "private_present": true,
+      "required_private": "fn finalize_call_trace(",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) fn recorder_mut(&mut self)",
+      "private_present": true,
+      "required_private": "fn recorder_mut(&mut self)",
+      "restricted": true
+    }
+  ],
+  "theorem_private_surface_restricted": true,
+  "theorem_public_trace_path_avoids_compiled_function": true,
+  "theorem_trace_bridge_api_is_compact": true,
+  "theorem_trace_bridge_surface_files": [
+    "runtime/uo-evm/src/engine.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "theorem_trace_bridge_surface_restricted": true,
+  "traced_runtime_call_outcome_api_is_explicit": true,
+  "traced_runtime_call_outcome_constructor_surface_files": [
+    "runtime/uo-evm/src/state.rs"
+  ],
+  "traced_runtime_call_outcome_constructor_surface_restricted": true,
+  "traced_runtime_call_outcome_consumer_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "traced_runtime_call_outcome_consumer_surface_restricted": true,
+  "traced_runtime_call_outcome_derive_line": "#[derive(Debug)]",
+  "traced_runtime_call_outcome_nonclone": true,
+  "traced_runtime_call_outcome_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "traced_runtime_call_outcome_surface_restricted": true,
+  "traced_runtime_call_start_derive_line": "#[derive(Debug)]",
+  "traced_runtime_call_start_nonclone": true,
+  "traced_runtime_call_start_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "traced_runtime_call_start_surface_restricted": true,
+  "traced_runtime_call_witness_state_api_is_explicit": true,
+  "traced_runtime_call_witness_state_consumer_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "traced_runtime_call_witness_state_consumer_surface_restricted": true,
+  "traced_runtime_call_witness_state_derive_line": "#[derive(Debug)]",
+  "traced_runtime_call_witness_state_nonclone": true,
+  "traced_runtime_call_witness_state_surface_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "traced_runtime_call_witness_state_surface_restricted": true
 }

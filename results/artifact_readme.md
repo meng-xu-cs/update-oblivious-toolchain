@@ -2,10 +2,6 @@
 
 This results bundle was generated from the local Rust workspace using the benchmark suite under `benches/raw/`.
 
-The bundle now also includes `artifact_configuration.json`, which records the
-materialization mode plus the compact and heavy artifact budgets used when the
-reports were generated.
-
 The generated reports now also include `witness_validation.json`, which checks
 representative theorem-backed runtime refinement witnesses against the
 proof-grade Lean-side validator that now requires an exact embedded
@@ -46,8 +42,10 @@ also lives in `runtime/uo-evm/src/theorem.rs`, so `engine.rs` no longer
 constructs the controller-observer certificate, hidden Path-ORAM certificate,
 or trusted-kernel bundle directly. Confidential expression and
 statement interpretation for admitted entrypoints now also runs inside
-`RuntimeKernel`, so the generic engine interpreter is public-only and the
-secret-bearing execution state sits behind the smaller kernel boundary. That
+`RuntimeKernel`, while the non-confidential interpreter now lives in the
+explicit `runtime/uo-evm/src/shell.rs` module, so `engine.rs` is reduced to
+public orchestration and the secret-bearing execution state sits behind the
+smaller kernel boundary. That
 confidential interpreter now also executes a slot-lowered kernel DSL rather
 than a string-keyed env: admitted entrypoints are lowered to fixed slots in
 `uo-core`, and `RuntimeKernel` stores live confidential values in a bounded
@@ -60,11 +58,27 @@ secret-bearing paths are not directly callable from `engine.rs`. The
 confidential-path `RuntimeKernel` entrypoints that shadow-load committed
 state, run confidential calls, and commit public shadows are now likewise
 visibility-restricted to `crate::runtime`, so the generic shell cannot call
-those kernel hooks directly. `engine.rs` now also uses only the
-`PublicRuntimeKernel` facade instead of importing the raw `RuntimeKernel`
-type. Confidential `Expr::Select` now also evaluates both admitted pure arms
-and combines them with `Value::confidential_select` instead of branching on
-the secret condition in Rust, while `uo-check` and the proof-grade
+those kernel hooks directly. `engine.rs` now delegates public execution to
+`shell.rs` and confidential execution to `state.rs`; confidential
+manifest-to-kernel planning is now fully internal to `ContractRuntime`, so
+`engine.rs` no longer stages a `ConfidentialEntrypointPlan`, imports either
+the raw `RuntimeKernel` or the public kernel facade directly, or threads the
+manifest hash-scratch bound or confidential commit budget itself, and it now
+derives the canonical public object universe from `ContractRuntime` rather
+than the artifact-side state list while the same `ContractRuntime` boundary
+now owns the ready-for-call coldness preflight over that universe as well,
+and `shell.rs` now derives the public allocator plan from the manifest rather
+than having the engine thread that setup detail in; the theorem-side
+`begin_call_trace` path now triggers that runtime preflight rather than
+`engine.rs` calling it directly, and the theorem finalizer now consumes the
+whole `RuntimeCallOutcome` directly so the engine no longer unpacks kernel
+witnesses, opcode traces, or return values only to feed them back into the
+same theorem-path finalizer. The same report now also pins that authority
+boundary directly: the runtime preflight and committed-state snapshot helpers
+must appear only in `runtime/uo-evm/src/theorem.rs` in production code.
+Confidential `Expr::Select` now also evaluates both admitted pure arms and
+combines them with `Value::confidential_select` instead of branching on the
+secret condition in Rust, while `uo-check` and the proof-grade
 kernel-witness validator reject confidential select arms outside that
 branchless pure fragment. Confidential `Expr::StructField` and
 `Expr::ArrayIndex` are now both rejected from the admitted confidential
@@ -74,23 +88,57 @@ directly by reading the runtime sources: it verifies that `engine.rs` does not
 call the low-level runtime object helpers, that those helpers remain
 restricted to `crate::runtime`, that `RuntimeObject` itself is not `Clone`,
 that `ContractInstance::clone` goes through the cold committed-state clone
-path, that the shell now holds an opaque `CommittedRuntimeState` handle plus a
-public `PublicRuntimeShadowState` wrapper instead of directly owning raw
-runtime object maps, and that `engine.rs` no longer constructs runtime
-phase-witness events directly because the post-call phase tail is finalized
+path, that `engine.rs` now holds only an opaque `ContractRuntime` wrapper and
+delegates the entire public-call lifecycle to `shell.rs`, that `shell.rs`
+itself stays on the `PublicRuntimeKernel` plus `PublicRuntimeShadowState`
+side of the boundary while the confidential path uses its own
+`ConfidentialRuntimeShadowState` wrapper instead of reusing the public shadow
+handle, and that `engine.rs` no longer constructs runtime phase-witness
+events directly because the post-call phase tail is finalized
 behind the runtime state boundary, no longer constructs theorem-side
-certificates directly, and no longer assembles `ExecutionTrace` directly
-beyond `runtime/uo-evm/src/theorem.rs`; the same report also checks that the
-confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
-commit, and confidential execution are visibility-restricted to
-`crate::runtime`, and that `engine.rs` uses the `PublicRuntimeKernel` facade
-rather than importing the raw `RuntimeKernel`, and that confidential
-entrypoints are lowered to the shared confidential-kernel DSL only inside
-`runtime/uo-evm/src/kernel.rs` while `runtime/uo-evm/src/state.rs` delegates
-confidential execution through that kernel, and that the production kernel
-lowers those entrypoints through `confidential_kernel_slot_program` and keeps
-its confidential execution state as a slot vector rather than a
-string-keyed map, and that the kernel-step witness journal plus the lower-level
+certificates directly, no longer assembles `ExecutionTrace` directly
+beyond `runtime/uo-evm/src/theorem.rs`, and no longer performs the
+public output-shape computation or theorem-trace assembly piecemeal; instead
+it delegates the whole theorem-finalization path through
+`run_traced_call(...)` in `runtime/uo-evm/src/theorem.rs`. The same boundary
+check also rejects engine-side calls to `output_shape_of`,
+`build_theorem_trace`, and `finalize_execution_trace`, while requiring the
+theorem module to keep deriving the public `OutputShape` from the checked
+manifest's `return_canonical_len`. `engine.rs` also no longer clones the full
+call argument vector just to recover public theorem-trace fields; instead the
+controller path must derive a `PublicCallSummary` from the checked manifest's
+`param_names`, `secret_args`, and manifest-stored `entry_input_len`, and
+`ContractRuntime` must internalize the remaining raw confidential argument
+vector into `ConfidentialCallInputs`, whose unwrap surface stays restricted to
+`crate::runtime`; the theorem-finalization path must avoid depending on
+`CompiledFunction` entirely while the public trace path sees only the
+exported `OutputShape` rather than the full return payload, and the committed
+before/after ORAM witness snapshot consumed by `theorem.rs` is now captured
+through the theorem-side `run_traced_call(...)` bridge rather than by
+`engine.rs`, and remains opaque outside the dedicated `state.rs` /
+`theorem.rs` handoff; the same theorem-side context now also owns the public
+`PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer constructs
+those theorem-path objects directly. The same report also checks that the
+confidential-path `RuntimeKernel` entrypoints for public shadow-loading,
+public commit, and confidential execution are visibility-restricted to
+`crate::runtime`, that the confidential shadow-load helper itself stays
+private to `runtime/uo-evm/src/kernel.rs`, that `shell.rs` owns the
+public-kernel facade while `state.rs` owns confidential execution setup
+through explicit wrapper operations rather than raw `inner_mut` /
+`into_inner` escape hatches, that `ConfidentialEntrypointPlan` is confined to
+`runtime/uo-evm/src/state.rs`, that `RuntimeShadowState` and
+`ConfidentialRuntimeShadowState` remain runtime-only while the shell-visible
+handle stays `PublicRuntimeShadowState`, that only `shell.rs` may drive the
+top-level `ContractRuntime` public-shadow entrypoints while only `engine.rs`
+may call `runtime.run_confidential_entrypoint(...)`, and that confidential
+entrypoints
+are sourced from the checked manifest's `confidential_slot_program` in
+`runtime/uo-evm/src/state.rs` while that module delegates confidential
+execution through `runtime/uo-evm/src/kernel.rs`, enforces the
+manifest-derived confidential commit budget there as well, and
+that the production kernel executes that shared slot DSL with a slot-vector
+confidential state rather than a string-keyed map, and that the kernel-step
+witness journal plus the lower-level
 runtime phase witness journal are both explicit bounded-capacity journals
 derived from public kernel-op/object bounds rather than plain growable
 `Vec::new()` traces, and that the remaining public shell-side commit /
@@ -131,7 +179,7 @@ the same report now also checks finer helper authority: secret-bearing
 helpers must be used only from `runtime/uo-evm/src/state.rs`, the
 shadow-state helpers that reopen committed state or reconcile committed
 shadows must be used only from `runtime/uo-evm/src/kernel.rs`, and the raw
-kernel hooks `shadow_load_objects`, `commit_public_objects`, and
+kernel hooks `shadow_load_public_objects`, `commit_public_objects`, and
 `run_confidential_call` must be invoked only from
 `runtime/uo-evm/src/state.rs`. The probe-side production-source scan now also
 strips `#[cfg(test)]` items without truncating later production code, so
@@ -168,25 +216,26 @@ the exact lowered confidential-kernel program that Rust executes, Lean
 re-derives its expected small-kernel step schedule from that DSL, and the
 proof-grade runtime kernel witness must match the imported schedule exactly.
 `kernel_slot_dsl_validation.json` now checks the slot-lowered half of that
-same bridge directly: the probe serializes the fixed-slot confidential program
-that `RuntimeKernel` actually executes, Lean re-derives the same small-kernel
-schedule from the slot DSL, and the proof-grade runtime kernel witness must
-match that slot-derived schedule exactly as well.
+same bridge directly: the probe serializes the manifest-carried fixed-slot
+confidential program that `RuntimeKernel` actually executes, Lean re-derives
+the same small-kernel schedule from the slot DSL, and the proof-grade runtime
+kernel witness must match that slot-derived schedule exactly as well.
 `kernel_lowering_validation.json` now upgrades that bridge to the runtime
 kernel theorem surface: for each representative confidential execution, the
-probe serializes both the source-named confidential program and the
-slot-lowered confidential program, Lean validates the imported lowering
-bundle, re-runs the canonical lowering algorithm over the named DSL, and
-reconstructs the corresponding runtime `RuntimeKernelLoweringBundle` whose
-named and slot schedules are both tied to the same proof-grade kernel
-witness.
+probe serializes both the manifest-carried source-named confidential program
+and the manifest-carried slot confidential program, Lean validates the
+imported lowering bundle, re-runs the canonical lowering algorithm over the
+named DSL, and reconstructs the corresponding runtime
+`RuntimeKernelLoweringBundle` whose named and slot schedules are both tied to
+the same proof-grade kernel witness.
 `confidential_core_validation.json` now closes that loop with a theorem-backed
 joint check: for the same representative proof-grade runtime witnesses, Lean
-checks both the runtime witness and the exact lowered confidential program for
-the invoked entrypoint, so the shell-contract refinement theorem is reported
-only for executions whose embedded kernel witness matches the same DSL body
-that Rust executes. The artifact-derived confidential-fragment witness remains
-in the report as a separate diagnostic summary over the admitted fragment.
+checks both the runtime witness and the exact manifest-carried named
+confidential program for the invoked entrypoint, so the shell-contract
+refinement theorem is reported only for executions whose embedded kernel
+witness matches the same DSL body that Rust executes. The artifact-derived
+confidential-fragment witness remains in the report as a separate diagnostic
+summary over the admitted fragment.
 That combined checker now consumes one serialized confidential-core bundle
 rather than coordinating separate witness files.
 `confidential_core_slot_validation.json` now performs that same joint check
@@ -293,6 +342,12 @@ witness, direct runtime-phase refinement witness, explicit trusted-kernel
 bundle, runtime refinement witness, and seeded witness-family
 validators so the bridge status can be checked without inferring it from the
 full artifact bundle.
+`tamper_validation.json` complements those positive checks with end-to-end
+negative evidence: it mutates representative direct controller/hidden
+certificates, every proof-grade translation/runtime bridge artifact, and the
+theorem-facing seeded/canonical witness-family, theorem-input, and
+pair-certificate artifacts, then checks that the shipped Lean executables
+reject those semantically drifted but still parseable artifacts.
 `pathoram_pair_validation.json` now also checks paired seeded path-ORAM proof
 input certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and
@@ -314,6 +369,12 @@ canonical pairs directly, and validates both
 `ConfidentialMixer/pathoram/deposit-canonical-pair` and
 `ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
 theorem-input path with their concrete explicit-size estimates attached.
+`reviewer_summary.json` plus `reviewer_summary.md` condense the current
+paper-facing metrics into one machine-generated table: they record per-report
+wall-clock cost, the largest materialized and estimated artifact-size fields,
+the runtime overhead report, the current TCB table, explicit assumptions, and
+non-empty source-line counts for the trusted Rust runtime surface plus the
+repo-side Lean theorem/checker surface.
 
 Security tiers:
 
@@ -338,4 +399,7 @@ Artifact packaging mode:
 
 - This bundle uses compact artifact mode. Canonical Path-ORAM families and pair certificates larger than the configured compact budget remain validated through theorem-input certificates instead of full explicit materialization.
 - Compact budget: `10737418240` bytes. Heavy-artifact budget: `21474836480` bytes.
-- Heavy artifacts are written under `results/heavy_artifacts` when heavy mode is selected.
+- Heavy artifacts are written under bundle-relative `heavy_artifacts` when heavy mode is selected.
+- `reproducibility_manifest.json` records every emitted file with its bundle-relative path, byte size, and SHA-256 digest.
+- `reviewer_summary.md` renders the same machine-generated reviewer table as `reviewer_summary.json` in Markdown form for paper/artifact writeups.
+- `./scripts/check_probe_reproducibility.sh` reruns `mplus-probe` twice and checks that the two output directories are byte-for-byte identical.

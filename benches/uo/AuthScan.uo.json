@@ -266,7 +266,390 @@
         "secret_args": [
           0
         ],
-        "confidential": true
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "auth(bytes32)",
+          "params": [
+            {
+              "name": "token",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0
+          ],
+          "body": [
+            {
+              "kind": "declare",
+              "name": "result",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "name": "result",
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 0
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "token"
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "var",
+                  "name": "result"
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "name": "result",
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 1
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "token"
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "var",
+                  "name": "result"
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "name": "result",
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 2
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "token"
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "var",
+                  "name": "result"
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "name": "result",
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 3
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "token"
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "var",
+                  "name": "result"
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 2,
+              "value": {
+                "kind": "var",
+                "name": "result"
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "var",
+                "name": "result"
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "auth(bytes32)",
+          "param_count": 1,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0
+          ],
+          "slot_count": 2,
+          "body": [
+            {
+              "kind": "declare",
+              "slot": 1,
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "slot": 1,
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 0
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "slot": 1,
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 1
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "slot": 1,
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 2
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "slot": 1,
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "array_get",
+                    "object_id": 1,
+                    "index": {
+                      "kind": "literal",
+                      "value": {
+                        "Uint": 3
+                      }
+                    }
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 2,
+              "value": {
+                "kind": "slot",
+                "slot": 1
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "slot",
+                "slot": 1
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "readLast()",
@@ -321,19 +704,398 @@
           "secret_args": [
             0
           ],
+          "param_names": [
+            "token"
+          ],
+          "entry_input_len": 32,
           "public_gas_budget": 8192,
           "arena_bytes": 4160,
           "max_stack_words": 65,
-          "kernel_opcodes": [
-            "Begin",
-            "ArrayGet",
-            "ArrayGet",
-            "ArrayGet",
-            "ArrayGet",
-            "CellSet",
-            "Commit",
-            "Wipe"
-          ],
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
+          "confidential_program": {
+            "entrypoint_id": "auth(bytes32)",
+            "params": [
+              {
+                "name": "token",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0
+            ],
+            "body": [
+              {
+                "kind": "declare",
+                "name": "result",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "name": "result",
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 0
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "var",
+                      "name": "token"
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "var",
+                    "name": "result"
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "name": "result",
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 1
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "var",
+                      "name": "token"
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "var",
+                    "name": "result"
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "name": "result",
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 2
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "var",
+                      "name": "token"
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "var",
+                    "name": "result"
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "name": "result",
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 3
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "var",
+                      "name": "token"
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "var",
+                    "name": "result"
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 2,
+                "value": {
+                  "kind": "var",
+                  "name": "result"
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "var",
+                  "name": "result"
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "auth(bytes32)",
+            "param_count": 1,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0
+            ],
+            "slot_count": 2,
+            "body": [
+              {
+                "kind": "declare",
+                "slot": 1,
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "slot": 1,
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 0
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "slot",
+                      "slot": 0
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "slot": 1,
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 1
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "slot",
+                      "slot": 0
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "slot": 1,
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 2
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "slot",
+                      "slot": 0
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "slot": 1,
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "array_get",
+                      "object_id": 1,
+                      "index": {
+                        "kind": "literal",
+                        "value": {
+                          "Uint": 3
+                        }
+                      }
+                    },
+                    "rhs": {
+                      "kind": "slot",
+                      "slot": 0
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 2,
+                "value": {
+                  "kind": "slot",
+                  "slot": 1
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              }
+            ]
+          },
           "kernel_steps": [
             {
               "opcode": "Begin",
@@ -379,10 +1141,13 @@
         },
         "readLast()": {
           "secret_args": [],
+          "param_names": [],
+          "entry_input_len": 0,
           "public_gas_budget": 2047,
           "arena_bytes": 4096,
           "max_stack_words": 64,
-          "kernel_opcodes": [],
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
           "kernel_steps": [],
           "uocell_reads": 1,
           "uocell_writes": 0,
@@ -395,10 +1160,15 @@
         },
         "seed(uint256,bytes32)": {
           "secret_args": [],
+          "param_names": [
+            "index",
+            "token"
+          ],
+          "entry_input_len": 64,
           "public_gas_budget": 2141,
           "arena_bytes": 4096,
           "max_stack_words": 64,
-          "kernel_opcodes": [],
+          "max_hash_part_bytes": 0,
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,

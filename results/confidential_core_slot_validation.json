@@ -20,7 +20,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 4440,
+      "confidential_core_slot_bundle_json_bytes": 4331,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "FixedSlotClassifier",
@@ -34,7 +34,7 @@
         },
         "entrypoint_count": 2
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -231,7 +231,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 4440,
+      "confidential_core_slot_bundle_json_bytes": 4330,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "FixedSlotClassifier",
@@ -245,7 +245,7 @@
         },
         "entrypoint_count": 2
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -442,7 +442,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 9943,
+      "confidential_core_slot_bundle_json_bytes": 9745,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -456,7 +456,7 @@
         },
         "entrypoint_count": 1
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
         "matches_runtime_entrypoint": true,
@@ -855,7 +855,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 9942,
+      "confidential_core_slot_bundle_json_bytes": 9745,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -869,7 +869,7 @@
         },
         "entrypoint_count": 1
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
         "matches_runtime_entrypoint": true,
@@ -1268,7 +1268,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 7789,
+      "confidential_core_slot_bundle_json_bytes": 7682,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "RegistryCRUD",
@@ -1282,7 +1282,7 @@
         },
         "entrypoint_count": 3
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -1647,7 +1647,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 7789,
+      "confidential_core_slot_bundle_json_bytes": 7682,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "RegistryCRUD",
@@ -1661,7 +1661,7 @@
         },
         "entrypoint_count": 3
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -2026,7 +2026,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 10803,
+      "confidential_core_slot_bundle_json_bytes": 10636,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -2040,7 +2040,7 @@
         },
         "entrypoint_count": 2
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
         "matches_runtime_entrypoint": true,
@@ -2488,7 +2488,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 10803,
+      "confidential_core_slot_bundle_json_bytes": 10636,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -2502,7 +2502,7 @@
         },
         "entrypoint_count": 2
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
         "matches_runtime_entrypoint": true,
@@ -2950,7 +2950,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 12618,
+      "confidential_core_slot_bundle_json_bytes": 12507,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -2964,7 +2964,7 @@
         },
         "entrypoint_count": 3
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -3564,7 +3564,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_slot_bundle_json_bytes": 12619,
+      "confidential_core_slot_bundle_json_bytes": 12510,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -3578,7 +3578,7 @@
         },
         "entrypoint_count": 3
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -4178,7 +4178,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_slot_bundle_json_bytes": 16479,
+      "confidential_core_slot_bundle_json_bytes": 16372,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -4192,7 +4192,7 @@
         },
         "entrypoint_count": 4
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -4977,7 +4977,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_slot_bundle_json_bytes": 16481,
+      "confidential_core_slot_bundle_json_bytes": 16369,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -4991,7 +4991,7 @@
         },
         "entrypoint_count": 4
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "matches_runtime_entrypoint": true,
@@ -5776,7 +5776,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_slot_bundle_json_bytes": 23738,
+      "confidential_core_slot_bundle_json_bytes": 23607,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5790,7 +5790,7 @@
         },
         "entrypoint_count": 4
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
         "matches_runtime_entrypoint": true,
@@ -6778,7 +6778,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_slot_bundle_json_bytes": 23734,
+      "confidential_core_slot_bundle_json_bytes": 23610,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -6792,7 +6792,7 @@
         },
         "entrypoint_count": 4
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
         "matches_runtime_entrypoint": true,
@@ -7780,7 +7780,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_slot_bundle_json_bytes": 60202,
+      "confidential_core_slot_bundle_json_bytes": 60030,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -7794,7 +7794,7 @@
         },
         "entrypoint_count": 2
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
         "matches_runtime_entrypoint": true,
@@ -10522,7 +10522,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_slot_bundle_json_bytes": 193796,
+      "confidential_core_slot_bundle_json_bytes": 193583,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -10536,7 +10536,7 @@
         },
         "entrypoint_count": 3
       },
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
         "matches_runtime_entrypoint": true,

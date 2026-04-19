@@ -18,7 +18,7 @@
       "commit_object_count": 1,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
-      "kernel_json_bytes": 1685,
+      "kernel_json_bytes": 1570,
       "kernel_refinement_json_bytes": 538,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -209,7 +209,7 @@
       "commit_object_count": 1,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
-      "kernel_json_bytes": 1685,
+      "kernel_json_bytes": 1570,
       "kernel_refinement_json_bytes": 538,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -400,7 +400,7 @@
       "commit_object_count": 2,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
-      "kernel_json_bytes": 4066,
+      "kernel_json_bytes": 3863,
       "kernel_refinement_json_bytes": 1065,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -793,7 +793,7 @@
       "commit_object_count": 2,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
-      "kernel_json_bytes": 4066,
+      "kernel_json_bytes": 3863,
       "kernel_refinement_json_bytes": 1065,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1186,7 +1186,7 @@
       "commit_object_count": 1,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 3718,
+      "kernel_json_bytes": 3605,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1545,7 +1545,7 @@
       "commit_object_count": 1,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 3718,
+      "kernel_json_bytes": 3605,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1904,7 +1904,7 @@
       "commit_object_count": 2,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 4641,
+      "kernel_json_bytes": 4470,
       "kernel_refinement_json_bytes": 1003,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2346,7 +2346,7 @@
       "commit_object_count": 2,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 4641,
+      "kernel_json_bytes": 4470,
       "kernel_refinement_json_bytes": 1003,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2788,7 +2788,7 @@
       "commit_object_count": 1,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
-      "kernel_json_bytes": 6470,
+      "kernel_json_bytes": 6357,
       "kernel_refinement_json_bytes": 668,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3382,7 +3382,7 @@
       "commit_object_count": 1,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
-      "kernel_json_bytes": 6470,
+      "kernel_json_bytes": 6357,
       "kernel_refinement_json_bytes": 668,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3976,7 +3976,7 @@
       "commit_object_count": 1,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
-      "kernel_json_bytes": 8838,
+      "kernel_json_bytes": 8725,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -4755,7 +4755,7 @@
       "commit_object_count": 1,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
-      "kernel_json_bytes": 8838,
+      "kernel_json_bytes": 8725,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -5534,7 +5534,7 @@
       "commit_object_count": 1,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
-      "kernel_json_bytes": 11323,
+      "kernel_json_bytes": 11192,
       "kernel_refinement_json_bytes": 592,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -6516,7 +6516,7 @@
       "commit_object_count": 1,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
-      "kernel_json_bytes": 11323,
+      "kernel_json_bytes": 11192,
       "kernel_refinement_json_bytes": 592,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -7498,7 +7498,7 @@
       "commit_object_count": 2,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 32393,
+      "kernel_json_bytes": 32222,
       "kernel_refinement_json_bytes": 1003,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -10220,7 +10220,7 @@
       "commit_object_count": 2,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 98678,
+      "kernel_json_bytes": 98475,
       "kernel_refinement_json_bytes": 1111,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [

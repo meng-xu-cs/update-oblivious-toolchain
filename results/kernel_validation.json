@@ -16,7 +16,7 @@
       "accepted": true,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
-      "kernel_json_bytes": 1685,
+      "kernel_json_bytes": 1570,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -153,7 +153,7 @@
       "accepted": true,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
-      "kernel_json_bytes": 1685,
+      "kernel_json_bytes": 1570,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -290,7 +290,7 @@
       "accepted": true,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
-      "kernel_json_bytes": 4066,
+      "kernel_json_bytes": 3863,
       "kernel_op_count": 8,
       "kernel_step_count": 8,
       "kernel_witness": {
@@ -612,7 +612,7 @@
       "accepted": true,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
-      "kernel_json_bytes": 4066,
+      "kernel_json_bytes": 3863,
       "kernel_op_count": 8,
       "kernel_step_count": 8,
       "kernel_witness": {
@@ -934,7 +934,7 @@
       "accepted": true,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 3718,
+      "kernel_json_bytes": 3605,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -1239,7 +1239,7 @@
       "accepted": true,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 3718,
+      "kernel_json_bytes": 3605,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -1544,7 +1544,7 @@
       "accepted": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 4641,
+      "kernel_json_bytes": 4470,
       "kernel_op_count": 7,
       "kernel_step_count": 7,
       "kernel_witness": {
@@ -1917,7 +1917,7 @@
       "accepted": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 4641,
+      "kernel_json_bytes": 4470,
       "kernel_op_count": 7,
       "kernel_step_count": 7,
       "kernel_witness": {
@@ -2290,7 +2290,7 @@
       "accepted": true,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
-      "kernel_json_bytes": 6470,
+      "kernel_json_bytes": 6357,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -2826,7 +2826,7 @@
       "accepted": true,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
-      "kernel_json_bytes": 6470,
+      "kernel_json_bytes": 6357,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -3362,7 +3362,7 @@
       "accepted": true,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
-      "kernel_json_bytes": 8838,
+      "kernel_json_bytes": 8725,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -4087,7 +4087,7 @@
       "accepted": true,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
-      "kernel_json_bytes": 8838,
+      "kernel_json_bytes": 8725,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
       "kernel_witness": {
@@ -4812,7 +4812,7 @@
       "accepted": true,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
-      "kernel_json_bytes": 11323,
+      "kernel_json_bytes": 11192,
       "kernel_op_count": 5,
       "kernel_step_count": 5,
       "kernel_witness": {
@@ -5738,7 +5738,7 @@
       "accepted": true,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
-      "kernel_json_bytes": 11323,
+      "kernel_json_bytes": 11192,
       "kernel_op_count": 5,
       "kernel_step_count": 5,
       "kernel_witness": {
@@ -6664,7 +6664,7 @@
       "accepted": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 32393,
+      "kernel_json_bytes": 32222,
       "kernel_op_count": 7,
       "kernel_step_count": 7,
       "kernel_witness": {
@@ -9317,7 +9317,7 @@
       "accepted": true,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 98678,
+      "kernel_json_bytes": 98475,
       "kernel_op_count": 9,
       "kernel_step_count": 9,
       "kernel_witness": {

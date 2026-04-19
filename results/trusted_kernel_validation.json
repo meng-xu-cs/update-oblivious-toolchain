@@ -20,7 +20,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 3492,
+      "bundle_json_bytes": 3376,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
@@ -159,7 +159,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 3491,
+      "bundle_json_bytes": 3376,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
@@ -298,7 +298,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 7294,
+      "bundle_json_bytes": 7090,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
@@ -622,7 +622,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 7293,
+      "bundle_json_bytes": 7091,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
@@ -946,7 +946,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 6947,
+      "bundle_json_bytes": 6834,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
@@ -1253,7 +1253,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 6945,
+      "bundle_json_bytes": 6834,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
@@ -1560,7 +1560,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 9131,
+      "bundle_json_bytes": 8960,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -1935,7 +1935,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 9131,
+      "bundle_json_bytes": 8961,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -2310,7 +2310,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 11517,
+      "bundle_json_bytes": 11403,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
@@ -2848,7 +2848,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 11517,
+      "bundle_json_bytes": 11404,
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
@@ -3386,7 +3386,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15640,
+      "bundle_json_bytes": 15527,
       "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
@@ -4113,7 +4113,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "bundle_json_bytes": 15639,
+      "bundle_json_bytes": 15525,
       "controller_accesses": 1,
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
@@ -4840,7 +4840,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 22671,
+      "bundle_json_bytes": 22537,
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
@@ -5768,7 +5768,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 22677,
+      "bundle_json_bytes": 22545,
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
@@ -6696,7 +6696,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 58531,
+      "bundle_json_bytes": 58361,
       "controller_accesses": 2,
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
@@ -9351,7 +9351,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "bundle_json_bytes": 191098,
+      "bundle_json_bytes": 190904,
       "controller_accesses": 6,
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",

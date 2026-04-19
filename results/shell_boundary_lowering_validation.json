@@ -209,7 +209,7 @@
       },
       "scenario": "FixedSlotClassifier/uo/class0",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 4448,
+      "shell_boundary_lowering_bundle_json_bytes": 4333,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -456,7 +456,7 @@
       },
       "scenario": "FixedSlotClassifier/uo/class1",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 4448,
+      "shell_boundary_lowering_bundle_json_bytes": 4333,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -905,7 +905,7 @@
       },
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
-      "shell_boundary_lowering_bundle_json_bytes": 10693,
+      "shell_boundary_lowering_bundle_json_bytes": 10490,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -1373,7 +1373,7 @@
       },
       "scenario": "AuthScan/uo/class1",
       "setup_calls": 2,
-      "shell_boundary_lowering_bundle_json_bytes": 10693,
+      "shell_boundary_lowering_bundle_json_bytes": 10490,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -1807,7 +1807,7 @@
       },
       "scenario": "RegistryCRUD/uo/class0",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 6271,
+      "shell_boundary_lowering_bundle_json_bytes": 6158,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -2222,7 +2222,7 @@
       },
       "scenario": "RegistryCRUD/uo/class1",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 6271,
+      "shell_boundary_lowering_bundle_json_bytes": 6158,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -2720,7 +2720,7 @@
       },
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 9212,
+      "shell_boundary_lowering_bundle_json_bytes": 9041,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -3234,7 +3234,7 @@
       },
       "scenario": "ConfidentialMixer/fullscan/class1",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 9212,
+      "shell_boundary_lowering_bundle_json_bytes": 9041,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -3900,7 +3900,7 @@
       },
       "scenario": "ERC20Lite/fullscan/class0",
       "setup_calls": 1,
-      "shell_boundary_lowering_bundle_json_bytes": 9638,
+      "shell_boundary_lowering_bundle_json_bytes": 9525,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -4553,7 +4553,7 @@
       },
       "scenario": "ERC20Lite/fullscan/class1",
       "setup_calls": 1,
-      "shell_boundary_lowering_bundle_json_bytes": 9638,
+      "shell_boundary_lowering_bundle_json_bytes": 9525,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -5391,7 +5391,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/put-class0",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 11385,
+      "shell_boundary_lowering_bundle_json_bytes": 11272,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -6226,7 +6226,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/put-class1",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 11385,
+      "shell_boundary_lowering_bundle_json_bytes": 11272,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -7264,7 +7264,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/add-class0",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 14445,
+      "shell_boundary_lowering_bundle_json_bytes": 14314,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -8305,7 +8305,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/add-class1",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 14445,
+      "shell_boundary_lowering_bundle_json_bytes": 14314,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -11086,7 +11086,7 @@
       },
       "scenario": "ConfidentialMixer/pathoram/deposit",
       "setup_calls": 0,
-      "shell_boundary_lowering_bundle_json_bytes": 36964,
+      "shell_boundary_lowering_bundle_json_bytes": 36793,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -19326,7 +19326,7 @@
       },
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
-      "shell_boundary_lowering_bundle_json_bytes": 105653,
+      "shell_boundary_lowering_bundle_json_bytes": 105450,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [

@@ -14,7 +14,7 @@
   "scenarios": [
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 1,
@@ -23,7 +23,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 2105,
+      "kernel_slot_dsl_bundle_json_bytes": 1995,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -155,7 +155,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 1,
@@ -164,7 +164,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 2105,
+      "kernel_slot_dsl_bundle_json_bytes": 1995,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -296,7 +296,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
         "param_count": 1,
@@ -305,7 +305,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_slot_dsl_bundle_json_bytes": 5659,
+      "kernel_slot_dsl_bundle_json_bytes": 5461,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -622,7 +622,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
         "param_count": 1,
@@ -631,7 +631,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_slot_dsl_bundle_json_bytes": 5659,
+      "kernel_slot_dsl_bundle_json_bytes": 5461,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -948,7 +948,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 2,
@@ -957,7 +957,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 4033,
+      "kernel_slot_dsl_bundle_json_bytes": 3925,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1257,7 +1257,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 2,
@@ -1266,7 +1266,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 4033,
+      "kernel_slot_dsl_bundle_json_bytes": 3925,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1566,7 +1566,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
         "param_count": 2,
@@ -1575,7 +1575,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 5318,
+      "kernel_slot_dsl_bundle_json_bytes": 5152,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1943,7 +1943,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
         "param_count": 2,
@@ -1952,7 +1952,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 5318,
+      "kernel_slot_dsl_bundle_json_bytes": 5152,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2320,7 +2320,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 3,
@@ -2329,7 +2329,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 6913,
+      "kernel_slot_dsl_bundle_json_bytes": 6805,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -2860,7 +2860,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 3,
@@ -2869,7 +2869,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 6913,
+      "kernel_slot_dsl_bundle_json_bytes": 6805,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -3400,7 +3400,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 2,
@@ -3409,7 +3409,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 9150,
+      "kernel_slot_dsl_bundle_json_bytes": 9042,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4129,7 +4129,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
         "param_count": 2,
@@ -4138,7 +4138,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 9150,
+      "kernel_slot_dsl_bundle_json_bytes": 9042,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4858,7 +4858,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
         "param_count": 2,
@@ -4867,7 +4867,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 11801,
+      "kernel_slot_dsl_bundle_json_bytes": 11675,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5788,7 +5788,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
         "param_count": 2,
@@ -5797,7 +5797,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 11801,
+      "kernel_slot_dsl_bundle_json_bytes": 11675,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -6718,7 +6718,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
         "param_count": 2,
@@ -6727,7 +6727,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 33070,
+      "kernel_slot_dsl_bundle_json_bytes": 32904,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -9375,7 +9375,7 @@
     },
     {
       "accepted": true,
-      "confidential_program": {
+      "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
         "param_count": 4,
@@ -9384,7 +9384,7 @@
         "statement_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 100262,
+      "kernel_slot_dsl_bundle_json_bytes": 100064,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

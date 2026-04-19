@@ -30,7 +30,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_lowering_bundle_json_bytes": 2580,
+      "kernel_lowering_bundle_json_bytes": 2465,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -178,7 +178,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_lowering_bundle_json_bytes": 2580,
+      "kernel_lowering_bundle_json_bytes": 2465,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -326,7 +326,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_lowering_bundle_json_bytes": 7381,
+      "kernel_lowering_bundle_json_bytes": 7178,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -659,7 +659,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_lowering_bundle_json_bytes": 7381,
+      "kernel_lowering_bundle_json_bytes": 7178,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -992,7 +992,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 4409,
+      "kernel_lowering_bundle_json_bytes": 4296,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1308,7 +1308,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 4409,
+      "kernel_lowering_bundle_json_bytes": 4296,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1624,7 +1624,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 6138,
+      "kernel_lowering_bundle_json_bytes": 5967,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2008,7 +2008,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 6138,
+      "kernel_lowering_bundle_json_bytes": 5967,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2392,7 +2392,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_lowering_bundle_json_bytes": 7508,
+      "kernel_lowering_bundle_json_bytes": 7395,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -2939,7 +2939,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_lowering_bundle_json_bytes": 7508,
+      "kernel_lowering_bundle_json_bytes": 7395,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -3486,7 +3486,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 9523,
+      "kernel_lowering_bundle_json_bytes": 9410,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4222,7 +4222,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 9523,
+      "kernel_lowering_bundle_json_bytes": 9410,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4958,7 +4958,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 12387,
+      "kernel_lowering_bundle_json_bytes": 12256,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5895,7 +5895,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 12387,
+      "kernel_lowering_bundle_json_bytes": 12256,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -6832,7 +6832,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 33890,
+      "kernel_lowering_bundle_json_bytes": 33719,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -9496,7 +9496,7 @@
         "statement_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "kernel_lowering_bundle_json_bytes": 102199,
+      "kernel_lowering_bundle_json_bytes": 101996,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

@@ -76,7 +76,106 @@
         "secret_args": [
           0
         ],
-        "confidential": true
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "classify(uint256)",
+          "params": [
+            {
+              "name": "secret",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              }
+            }
+          ],
+          "return_type": null,
+          "secret_args": [
+            0
+          ],
+          "body": [
+            {
+              "kind": "declare",
+              "name": "bit",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "kind": "binary",
+                "op": "BitAnd",
+                "lhs": {
+                  "kind": "var",
+                  "name": "secret"
+                },
+                "rhs": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 1,
+              "value": {
+                "kind": "var",
+                "name": "bit"
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "classify(uint256)",
+          "param_count": 1,
+          "return_type": null,
+          "secret_args": [
+            0
+          ],
+          "slot_count": 2,
+          "body": [
+            {
+              "kind": "declare",
+              "slot": 1,
+              "value": {
+                "kind": "binary",
+                "op": "BitAnd",
+                "lhs": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "rhs": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 1,
+              "value": {
+                "kind": "slot",
+                "slot": 1
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "sameSame(uint256)",
@@ -134,7 +233,110 @@
         "secret_args": [
           0
         ],
-        "confidential": true
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "sameSame(uint256)",
+          "params": [
+            {
+              "name": "secret",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              }
+            }
+          ],
+          "return_type": null,
+          "secret_args": [
+            0
+          ],
+          "body": [
+            {
+              "kind": "declare",
+              "name": "ignored",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "kind": "binary",
+                "op": "BitAnd",
+                "lhs": {
+                  "kind": "var",
+                  "name": "secret"
+                },
+                "rhs": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 7
+                  }
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 1,
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 1
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "sameSame(uint256)",
+          "param_count": 1,
+          "return_type": null,
+          "secret_args": [
+            0
+          ],
+          "slot_count": 2,
+          "body": [
+            {
+              "kind": "declare",
+              "slot": 1,
+              "value": {
+                "kind": "binary",
+                "op": "BitAnd",
+                "lhs": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "rhs": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 7
+                  }
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 1,
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 1
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "peek()",
@@ -179,15 +381,113 @@
           "secret_args": [
             0
           ],
+          "param_names": [
+            "secret"
+          ],
+          "entry_input_len": 32,
           "public_gas_budget": 4096,
           "arena_bytes": 4160,
           "max_stack_words": 65,
-          "kernel_opcodes": [
-            "Begin",
-            "CellSet",
-            "Commit",
-            "Wipe"
-          ],
+          "max_hash_part_bytes": 0,
+          "confidential_program": {
+            "entrypoint_id": "classify(uint256)",
+            "params": [
+              {
+                "name": "secret",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                }
+              }
+            ],
+            "return_type": null,
+            "secret_args": [
+              0
+            ],
+            "body": [
+              {
+                "kind": "declare",
+                "name": "bit",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "BitAnd",
+                  "lhs": {
+                    "kind": "var",
+                    "name": "secret"
+                  },
+                  "rhs": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 1,
+                "value": {
+                  "kind": "var",
+                  "name": "bit"
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "classify(uint256)",
+            "param_count": 1,
+            "return_type": null,
+            "secret_args": [
+              0
+            ],
+            "slot_count": 2,
+            "body": [
+              {
+                "kind": "declare",
+                "slot": 1,
+                "value": {
+                  "kind": "binary",
+                  "op": "BitAnd",
+                  "lhs": {
+                    "kind": "slot",
+                    "slot": 0
+                  },
+                  "rhs": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 1,
+                "value": {
+                  "kind": "slot",
+                  "slot": 1
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
           "kernel_steps": [
             {
               "opcode": "Begin",
@@ -217,10 +517,13 @@
         },
         "peek()": {
           "secret_args": [],
+          "param_names": [],
+          "entry_input_len": 0,
           "public_gas_budget": 2047,
           "arena_bytes": 4096,
           "max_stack_words": 64,
-          "kernel_opcodes": [],
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
           "kernel_steps": [],
           "uocell_reads": 1,
           "uocell_writes": 0,
@@ -235,15 +538,117 @@
           "secret_args": [
             0
           ],
+          "param_names": [
+            "secret"
+          ],
+          "entry_input_len": 32,
           "public_gas_budget": 4096,
           "arena_bytes": 4160,
           "max_stack_words": 65,
-          "kernel_opcodes": [
-            "Begin",
-            "CellSet",
-            "Commit",
-            "Wipe"
-          ],
+          "max_hash_part_bytes": 0,
+          "confidential_program": {
+            "entrypoint_id": "sameSame(uint256)",
+            "params": [
+              {
+                "name": "secret",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                }
+              }
+            ],
+            "return_type": null,
+            "secret_args": [
+              0
+            ],
+            "body": [
+              {
+                "kind": "declare",
+                "name": "ignored",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "BitAnd",
+                  "lhs": {
+                    "kind": "var",
+                    "name": "secret"
+                  },
+                  "rhs": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 7
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 1,
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "sameSame(uint256)",
+            "param_count": 1,
+            "return_type": null,
+            "secret_args": [
+              0
+            ],
+            "slot_count": 2,
+            "body": [
+              {
+                "kind": "declare",
+                "slot": 1,
+                "value": {
+                  "kind": "binary",
+                  "op": "BitAnd",
+                  "lhs": {
+                    "kind": "slot",
+                    "slot": 0
+                  },
+                  "rhs": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 7
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 1,
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
           "kernel_steps": [
             {
               "opcode": "Begin",

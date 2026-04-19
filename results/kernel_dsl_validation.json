@@ -22,7 +22,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_dsl_bundle_json_bytes": 2174,
+      "kernel_dsl_bundle_json_bytes": 2059,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -162,7 +162,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_dsl_bundle_json_bytes": 2174,
+      "kernel_dsl_bundle_json_bytes": 2059,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -302,7 +302,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_dsl_bundle_json_bytes": 5802,
+      "kernel_dsl_bundle_json_bytes": 5599,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -627,7 +627,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_dsl_bundle_json_bytes": 5802,
+      "kernel_dsl_bundle_json_bytes": 5599,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -952,7 +952,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 4108,
+      "kernel_dsl_bundle_json_bytes": 3995,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1260,7 +1260,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 4108,
+      "kernel_dsl_bundle_json_bytes": 3995,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1568,7 +1568,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 5475,
+      "kernel_dsl_bundle_json_bytes": 5304,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1944,7 +1944,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 5475,
+      "kernel_dsl_bundle_json_bytes": 5304,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2320,7 +2320,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_dsl_bundle_json_bytes": 7079,
+      "kernel_dsl_bundle_json_bytes": 6966,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -2859,7 +2859,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_dsl_bundle_json_bytes": 7079,
+      "kernel_dsl_bundle_json_bytes": 6966,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -3398,7 +3398,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 9225,
+      "kernel_dsl_bundle_json_bytes": 9112,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4126,7 +4126,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 9225,
+      "kernel_dsl_bundle_json_bytes": 9112,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4854,7 +4854,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 11923,
+      "kernel_dsl_bundle_json_bytes": 11792,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5783,7 +5783,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 11923,
+      "kernel_dsl_bundle_json_bytes": 11792,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -6712,7 +6712,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_dsl_bundle_json_bytes": 33227,
+      "kernel_dsl_bundle_json_bytes": 33056,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -9368,7 +9368,7 @@
         "statement_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "kernel_dsl_bundle_json_bytes": 100629,
+      "kernel_dsl_bundle_json_bytes": 100426,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

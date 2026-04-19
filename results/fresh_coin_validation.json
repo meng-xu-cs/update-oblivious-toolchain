@@ -1,7 +1,7 @@
 {
   "artifact_configuration": {
     "compact_budget_bytes": 10737418240,
-    "heavy_artifact_dir": "results/heavy_artifacts",
+    "heavy_artifact_dir": "heavy_artifacts",
     "heavy_budget_bytes": 21474836480,
     "materialization_mode": "compact"
   },
@@ -39,7 +39,7 @@
       "seed_count": 256,
       "setup_calls": 0,
       "validation_status": "accepted",
-      "witness_family_json_bytes": 4134150
+      "witness_family_json_bytes": 4105222
     },
     {
       "accepted": true,
@@ -67,7 +67,7 @@
       "seed_count": 4096,
       "setup_calls": 0,
       "validation_status": "accepted",
-      "witness_family_json_bytes": 95184251
+      "witness_family_json_bytes": 94647675
     },
     {
       "accepted": true,
@@ -89,16 +89,16 @@
       "seed_count": 262144,
       "setup_calls": 0,
       "size_estimate": {
-        "avg_witness_json_bytes": 59497,
-        "estimated_family_json_bytes": 15597830144,
-        "max_witness_json_bytes": 59497,
+        "avg_witness_json_bytes": 59326,
+        "estimated_family_json_bytes": 15553003520,
+        "max_witness_json_bytes": 59326,
         "public_fresh_coin_scaffold_steps": 3,
         "public_leaf_scaffold_steps": 2,
         "sampled_seed_count": 8,
         "seed_count": 262144
       },
       "symbolic_seed_space_instantiated": true,
-      "theorem_input_json_bytes": 59924,
+      "theorem_input_json_bytes": 59753,
       "validation_status": "accepted_compact_theorem_input"
     },
     {
@@ -121,16 +121,16 @@
       "seed_count": 17592186044416,
       "setup_calls": 2,
       "size_estimate": {
-        "avg_witness_json_bytes": 192167,
-        "estimated_family_json_bytes": 3380637615598338048,
-        "max_witness_json_bytes": 192167,
+        "avg_witness_json_bytes": 191964,
+        "estimated_family_json_bytes": 3377066401831321600,
+        "max_witness_json_bytes": 191964,
         "public_fresh_coin_scaffold_steps": 7,
         "public_leaf_scaffold_steps": 6,
         "sampled_seed_count": 8,
         "seed_count": 17592186044416
       },
       "symbolic_seed_space_instantiated": true,
-      "theorem_input_json_bytes": 193090,
+      "theorem_input_json_bytes": 192887,
       "validation_status": "accepted_compact_theorem_input"
     }
   ],

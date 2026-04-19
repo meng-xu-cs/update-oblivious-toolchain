@@ -1,17 +1,280 @@
 {
+  "checker": "proof/lean/.lake/build/bin/checkProofGradeTranslationArtifacts",
+  "legacy_axiom_definition_checks": [
+    {
+      "expected_files": [
+        "proof/lean/UOToolchain/SgxMicroGame.lean"
+      ],
+      "files": [
+        "proof/lean/UOToolchain/SgxMicroGame.lean"
+      ],
+      "pattern": "axiom legacySgxMicroLocalTheorem",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "proof/lean/UOToolchain/OramGame.lean"
+      ],
+      "files": [
+        "proof/lean/UOToolchain/OramGame.lean"
+      ],
+      "pattern": "axiom legacyOramLocalTheorem",
+      "restricted": true
+    }
+  ],
+  "legacy_axiom_definition_surface_restricted": true,
+  "legacy_theorem_symbol_surface_checks": [
+    {
+      "expected_files": [
+        "proof/lean/UOToolchain/LegacySgxJointProjection.lean",
+        "proof/lean/UOToolchain/SgxMicroGame.lean"
+      ],
+      "files": [
+        "proof/lean/UOToolchain/LegacySgxJointProjection.lean",
+        "proof/lean/UOToolchain/SgxMicroGame.lean"
+      ],
+      "pattern": "legacySgxMicroLocalTheorem",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "proof/lean/UOToolchain/LegacySgxJointProjection.lean",
+        "proof/lean/UOToolchain/LegacySgxOramProjection.lean",
+        "proof/lean/UOToolchain/LegacyTeeDeployment.lean",
+        "proof/lean/UOToolchain/OramGame.lean"
+      ],
+      "files": [
+        "proof/lean/UOToolchain/LegacySgxJointProjection.lean",
+        "proof/lean/UOToolchain/LegacySgxOramProjection.lean",
+        "proof/lean/UOToolchain/LegacyTeeDeployment.lean",
+        "proof/lean/UOToolchain/OramGame.lean"
+      ],
+      "pattern": "legacyOramLocalTheorem",
+      "restricted": true
+    }
+  ],
+  "legacy_theorem_symbol_surface_restricted": true,
+  "proofgrade_checker_import_surface_checks": [
+    {
+      "file": "proof/lean/CheckCanonicalPathOramPairCertificate.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckCanonicalPathOramPairTheoremInput.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckCanonicalPathOramPaperInstantiation.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckPathOramPairCertificate.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialCore.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreLowering.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreShellBoundaryLowering.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreSlot.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelDsl.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelLowering.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelRefinementWitness.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelSlotDsl.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelWitness.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeShellBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeShellBoundaryLowering.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeTrustedKernel.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeWitness.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeTranslationArtifacts.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckRuntimeControllerCertificate.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckRuntimeFreshCoinFamily.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckRuntimeFreshCoinTheoremInput.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckRuntimePathOramHiddenCertificate.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckRuntimeWitnessFamily.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    }
+  ],
+  "proofgrade_checker_import_surface_restricted": true,
+  "proofgrade_checker_legacy_symbol_checks": [
+    {
+      "absent": true,
+      "files": [],
+      "pattern": "legacySgxMicroLocalTheorem"
+    },
+    {
+      "absent": true,
+      "files": [],
+      "pattern": "legacyOramLocalTheorem"
+    }
+  ],
+  "proofgrade_checker_legacy_symbol_mentions_absent": true,
+  "proofgrade_core_module_import_surface_checks": [
+    {
+      "file": "proof/lean/UOToolchain/ProofGrade.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/Composition.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/TeeDeployment.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/SgxOramProjection.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/SgxJointProjection.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/StandardOramReduction.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/RuntimeRefinement.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/RuntimeCoins.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    }
+  ],
+  "proofgrade_core_module_import_surface_restricted": true,
   "reports": [
     {
       "benchmark": "AuthScan",
       "fullscan64_artifact": null,
       "oram_artifact": null,
-      "raw_artifact": [
-        "artifact contract AuthScan mode Raw",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
+      "raw_artifact": {
+        "accepted": false,
+        "artifact_json_bytes": 3769,
+        "contract": "AuthScan",
+        "function_count": 3,
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend",
+        "lean_stdout": "",
+        "manifest_entrypoint_count": 3,
+        "manifest_object_count": 2,
+        "metadata_contract": "AuthScan",
+        "mode": "raw",
+        "source_artifact_json_bytes": 3769,
+        "state_object_count": 2
+      },
       "source_raw": [
         "validated contract AuthScan",
         "entrypoints: seed(uint256,bytes32), auth(bytes32), readLast()",
@@ -22,41 +285,65 @@
         "entrypoints: seed(uint256,bytes32), auth(bytes32), readLast()",
         "diagnostics: none"
       ],
-      "uo_artifact": [
-        "artifact contract AuthScan mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ]
+      "uo_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 11650,
+        "contract": "AuthScan",
+        "function_count": 3,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for AuthScan",
+        "manifest_entrypoint_count": 3,
+        "manifest_object_count": 2,
+        "metadata_contract": "AuthScan",
+        "mode": "uo",
+        "source_artifact_json_bytes": 11650,
+        "state_object_count": 2
+      }
     },
     {
       "benchmark": "ConfidentialMixer",
-      "fullscan64_artifact": [
-        "artifact contract ConfidentialMixer mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
-      "oram_artifact": [
-        "artifact contract ConfidentialMixer mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
-      "raw_artifact": [
-        "artifact contract ConfidentialMixer mode Raw",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
+      "fullscan64_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 13015,
+        "contract": "ConfidentialMixer",
+        "function_count": 4,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ConfidentialMixer",
+        "manifest_entrypoint_count": 4,
+        "manifest_object_count": 2,
+        "metadata_contract": "ConfidentialMixer",
+        "mode": "uo",
+        "source_artifact_json_bytes": 13015,
+        "state_object_count": 2
+      },
+      "oram_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 13276,
+        "contract": "ConfidentialMixer",
+        "function_count": 4,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ConfidentialMixer",
+        "manifest_entrypoint_count": 4,
+        "manifest_object_count": 2,
+        "metadata_contract": "ConfidentialMixer",
+        "mode": "uo",
+        "source_artifact_json_bytes": 13276,
+        "state_object_count": 2
+      },
+      "raw_artifact": {
+        "accepted": false,
+        "artifact_json_bytes": 5442,
+        "contract": "ConfidentialMixer",
+        "function_count": 4,
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend",
+        "lean_stdout": "",
+        "manifest_entrypoint_count": 4,
+        "manifest_object_count": 2,
+        "metadata_contract": "ConfidentialMixer",
+        "mode": "raw",
+        "source_artifact_json_bytes": 5442,
+        "state_object_count": 2
+      },
       "source_raw": [
         "validated contract ConfidentialMixer",
         "entrypoints: deposit(bytes32,uint256), withdraw(bytes32,uint256), balanceOf(bytes32), totalValue()",
@@ -67,34 +354,52 @@
         "entrypoints: deposit(bytes32,uint256), withdraw(bytes32,uint256), balanceOf(bytes32), totalValue()",
         "diagnostics: none"
       ],
-      "uo_artifact": [
-        "artifact contract ConfidentialMixer mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ]
+      "uo_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 13010,
+        "contract": "ConfidentialMixer",
+        "function_count": 4,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ConfidentialMixer",
+        "manifest_entrypoint_count": 4,
+        "manifest_object_count": 2,
+        "metadata_contract": "ConfidentialMixer",
+        "mode": "uo",
+        "source_artifact_json_bytes": 13010,
+        "state_object_count": 2
+      }
     },
     {
       "benchmark": "ERC20Lite",
       "fullscan64_artifact": null,
-      "oram_artifact": [
-        "artifact contract ERC20Lite mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
-      "raw_artifact": [
-        "artifact contract ERC20Lite mode Raw",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
+      "oram_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 24179,
+        "contract": "ERC20Lite",
+        "function_count": 6,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ERC20Lite",
+        "manifest_entrypoint_count": 6,
+        "manifest_object_count": 2,
+        "metadata_contract": "ERC20Lite",
+        "mode": "uo",
+        "source_artifact_json_bytes": 24179,
+        "state_object_count": 2
+      },
+      "raw_artifact": {
+        "accepted": false,
+        "artifact_json_bytes": 9237,
+        "contract": "ERC20Lite",
+        "function_count": 6,
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend",
+        "lean_stdout": "",
+        "manifest_entrypoint_count": 6,
+        "manifest_object_count": 2,
+        "metadata_contract": "ERC20Lite",
+        "mode": "raw",
+        "source_artifact_json_bytes": 9237,
+        "state_object_count": 2
+      },
       "source_raw": [
         "validated contract ERC20Lite",
         "entrypoints: mint(address,uint256), approve(address,address,uint256), transfer(address,address,uint256), transferFrom(address,address,address,uint256), balanceOf(address), allowanceOf(address,address)",
@@ -105,27 +410,39 @@
         "entrypoints: mint(address,uint256), approve(address,address,uint256), transfer(address,address,uint256), transferFrom(address,address,address,uint256), balanceOf(address), allowanceOf(address,address)",
         "diagnostics: none"
       ],
-      "uo_artifact": [
-        "artifact contract ERC20Lite mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ]
+      "uo_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 23642,
+        "contract": "ERC20Lite",
+        "function_count": 6,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ERC20Lite",
+        "manifest_entrypoint_count": 6,
+        "manifest_object_count": 2,
+        "metadata_contract": "ERC20Lite",
+        "mode": "uo",
+        "source_artifact_json_bytes": 23642,
+        "state_object_count": 2
+      }
     },
     {
       "benchmark": "FixedSlotClassifier",
       "fullscan64_artifact": null,
       "oram_artifact": null,
-      "raw_artifact": [
-        "artifact contract FixedSlotClassifier mode Raw",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
+      "raw_artifact": {
+        "accepted": false,
+        "artifact_json_bytes": 3082,
+        "contract": "FixedSlotClassifier",
+        "function_count": 3,
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object last uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object last uses raw backend",
+        "lean_stdout": "",
+        "manifest_entrypoint_count": 3,
+        "manifest_object_count": 1,
+        "metadata_contract": "FixedSlotClassifier",
+        "mode": "raw",
+        "source_artifact_json_bytes": 3082,
+        "state_object_count": 1
+      },
       "source_raw": [
         "validated contract FixedSlotClassifier",
         "entrypoints: classify(uint256), sameSame(uint256), peek()",
@@ -136,27 +453,39 @@
         "entrypoints: classify(uint256), sameSame(uint256), peek()",
         "diagnostics: none"
       ],
-      "uo_artifact": [
-        "artifact contract FixedSlotClassifier mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ]
+      "uo_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 7013,
+        "contract": "FixedSlotClassifier",
+        "function_count": 3,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for FixedSlotClassifier",
+        "manifest_entrypoint_count": 3,
+        "manifest_object_count": 1,
+        "metadata_contract": "FixedSlotClassifier",
+        "mode": "uo",
+        "source_artifact_json_bytes": 7013,
+        "state_object_count": 1
+      }
     },
     {
       "benchmark": "RegistryCRUD",
       "fullscan64_artifact": null,
       "oram_artifact": null,
-      "raw_artifact": [
-        "artifact contract RegistryCRUD mode Raw",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ],
+      "raw_artifact": {
+        "accepted": false,
+        "artifact_json_bytes": 4375,
+        "contract": "RegistryCRUD",
+        "function_count": 4,
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object records uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object records uses raw backend",
+        "lean_stdout": "",
+        "manifest_entrypoint_count": 4,
+        "manifest_object_count": 1,
+        "metadata_contract": "RegistryCRUD",
+        "mode": "raw",
+        "source_artifact_json_bytes": 4375,
+        "state_object_count": 1
+      },
       "source_raw": [
         "validated contract RegistryCRUD",
         "entrypoints: upsert(bytes32,uint256), clear(bytes32), clearIfMatch(bytes32,uint256), read(bytes32)",
@@ -167,14 +496,20 @@
         "entrypoints: upsert(bytes32,uint256), clear(bytes32), clearIfMatch(bytes32,uint256), read(bytes32)",
         "diagnostics: none"
       ],
-      "uo_artifact": [
-        "artifact contract RegistryCRUD mode Uo",
-        "manifest/object exactness: ok",
-        "manifest/entrypoint exactness: ok",
-        "forbidden control flow in confidential IR: none",
-        "raw storage backend for confidential objects: none",
-        "source/artifact translation validation: ok"
-      ]
+      "uo_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 11428,
+        "contract": "RegistryCRUD",
+        "function_count": 4,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for RegistryCRUD",
+        "manifest_entrypoint_count": 4,
+        "manifest_object_count": 1,
+        "metadata_contract": "RegistryCRUD",
+        "mode": "uo",
+        "source_artifact_json_bytes": 11428,
+        "state_object_count": 1
+      }
     }
   ]
 }

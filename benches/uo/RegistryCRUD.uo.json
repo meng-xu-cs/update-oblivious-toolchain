@@ -65,7 +65,81 @@
           0,
           1
         ],
-        "confidential": true
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "upsert(bytes32,uint256)",
+          "params": [
+            {
+              "name": "key",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            },
+            {
+              "name": "value",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              }
+            }
+          ],
+          "return_type": null,
+          "secret_args": [
+            0,
+            1
+          ],
+          "body": [
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "var",
+                "name": "key"
+              },
+              "value": {
+                "kind": "var",
+                "name": "value"
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "upsert(bytes32,uint256)",
+          "param_count": 2,
+          "return_type": null,
+          "secret_args": [
+            0,
+            1
+          ],
+          "slot_count": 2,
+          "body": [
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "slot",
+                "slot": 0
+              },
+              "value": {
+                "kind": "slot",
+                "slot": 1
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "clear(bytes32)",
@@ -101,7 +175,75 @@
         "secret_args": [
           0
         ],
-        "confidential": true
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "clear(bytes32)",
+          "params": [
+            {
+              "name": "key",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            }
+          ],
+          "return_type": null,
+          "secret_args": [
+            0
+          ],
+          "body": [
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "var",
+                "name": "key"
+              },
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "clear(bytes32)",
+          "param_count": 1,
+          "return_type": null,
+          "secret_args": [
+            0
+          ],
+          "slot_count": 1,
+          "body": [
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "slot",
+                "slot": 0
+              },
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "clearIfMatch(bytes32,uint256)",
@@ -224,7 +366,231 @@
           0,
           1
         ],
-        "confidential": true
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "clearIfMatch(bytes32,uint256)",
+          "params": [
+            {
+              "name": "key",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            },
+            {
+              "name": "value",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0,
+            1
+          ],
+          "body": [
+            {
+              "kind": "declare",
+              "name": "current",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "key"
+                }
+              }
+            },
+            {
+              "kind": "declare",
+              "name": "result",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              }
+            },
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "var",
+                "name": "key"
+              },
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              },
+              "predicate": {
+                "kind": "binary",
+                "op": "Eq",
+                "lhs": {
+                  "kind": "var",
+                  "name": "current"
+                },
+                "rhs": {
+                  "kind": "var",
+                  "name": "value"
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "name": "result",
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "var",
+                    "name": "current"
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "value"
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "var",
+                  "name": "result"
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "var",
+                "name": "result"
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "clearIfMatch(bytes32,uint256)",
+          "param_count": 2,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0,
+            1
+          ],
+          "slot_count": 4,
+          "body": [
+            {
+              "kind": "declare",
+              "slot": 2,
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            },
+            {
+              "kind": "declare",
+              "slot": 3,
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              }
+            },
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "slot",
+                "slot": 0
+              },
+              "value": {
+                "kind": "literal",
+                "value": {
+                  "Uint": 0
+                }
+              },
+              "predicate": {
+                "kind": "binary",
+                "op": "Eq",
+                "lhs": {
+                  "kind": "slot",
+                  "slot": 2
+                },
+                "rhs": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "slot": 3,
+              "value": {
+                "kind": "select",
+                "cond": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "slot",
+                    "slot": 2
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                },
+                "when_true": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 1
+                  }
+                },
+                "when_false": {
+                  "kind": "slot",
+                  "slot": 3
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "slot",
+                "slot": 3
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "read(bytes32)",
@@ -279,15 +645,82 @@
           "secret_args": [
             0
           ],
+          "param_names": [
+            "key"
+          ],
+          "entry_input_len": 32,
           "public_gas_budget": 12288,
           "arena_bytes": 4096,
           "max_stack_words": 64,
-          "kernel_opcodes": [
-            "Begin",
-            "MapPut",
-            "Commit",
-            "Wipe"
-          ],
+          "max_hash_part_bytes": 0,
+          "confidential_program": {
+            "entrypoint_id": "clear(bytes32)",
+            "params": [
+              {
+                "name": "key",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              }
+            ],
+            "return_type": null,
+            "secret_args": [
+              0
+            ],
+            "body": [
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "key"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "clear(bytes32)",
+            "param_count": 1,
+            "return_type": null,
+            "secret_args": [
+              0
+            ],
+            "slot_count": 1,
+            "body": [
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
           "kernel_steps": [
             {
               "opcode": "Begin",
@@ -320,16 +753,240 @@
             0,
             1
           ],
+          "param_names": [
+            "key",
+            "value"
+          ],
+          "entry_input_len": 64,
           "public_gas_budget": 12288,
           "arena_bytes": 4224,
           "max_stack_words": 66,
-          "kernel_opcodes": [
-            "Begin",
-            "MapGet",
-            "MapPut",
-            "Commit",
-            "Wipe"
-          ],
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
+          "confidential_program": {
+            "entrypoint_id": "clearIfMatch(bytes32,uint256)",
+            "params": [
+              {
+                "name": "key",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              },
+              {
+                "name": "value",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0,
+              1
+            ],
+            "body": [
+              {
+                "kind": "declare",
+                "name": "current",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                },
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "key"
+                  }
+                }
+              },
+              {
+                "kind": "declare",
+                "name": "result",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                }
+              },
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "key"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                },
+                "predicate": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "var",
+                    "name": "current"
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "value"
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "name": "result",
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "var",
+                      "name": "current"
+                    },
+                    "rhs": {
+                      "kind": "var",
+                      "name": "value"
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "var",
+                    "name": "result"
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "var",
+                  "name": "result"
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "clearIfMatch(bytes32,uint256)",
+            "param_count": 2,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0,
+              1
+            ],
+            "slot_count": 4,
+            "body": [
+              {
+                "kind": "declare",
+                "slot": 2,
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              },
+              {
+                "kind": "declare",
+                "slot": 3,
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                }
+              },
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": {
+                    "Uint": 0
+                  }
+                },
+                "predicate": {
+                  "kind": "binary",
+                  "op": "Eq",
+                  "lhs": {
+                    "kind": "slot",
+                    "slot": 2
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                }
+              },
+              {
+                "kind": "assign",
+                "slot": 3,
+                "value": {
+                  "kind": "select",
+                  "cond": {
+                    "kind": "binary",
+                    "op": "Eq",
+                    "lhs": {
+                      "kind": "slot",
+                      "slot": 2
+                    },
+                    "rhs": {
+                      "kind": "slot",
+                      "slot": 1
+                    }
+                  },
+                  "when_true": {
+                    "kind": "literal",
+                    "value": {
+                      "Uint": 1
+                    }
+                  },
+                  "when_false": {
+                    "kind": "slot",
+                    "slot": 3
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "slot",
+                  "slot": 3
+                }
+              }
+            ]
+          },
           "kernel_steps": [
             {
               "opcode": "Begin",
@@ -363,10 +1020,15 @@
         },
         "read(bytes32)": {
           "secret_args": [],
+          "param_names": [
+            "key"
+          ],
+          "entry_input_len": 32,
           "public_gas_budget": 2257,
           "arena_bytes": 4096,
           "max_stack_words": 64,
-          "kernel_opcodes": [],
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -382,15 +1044,89 @@
             0,
             1
           ],
+          "param_names": [
+            "key",
+            "value"
+          ],
+          "entry_input_len": 64,
           "public_gas_budget": 12288,
           "arena_bytes": 4096,
           "max_stack_words": 64,
-          "kernel_opcodes": [
-            "Begin",
-            "MapPut",
-            "Commit",
-            "Wipe"
-          ],
+          "max_hash_part_bytes": 0,
+          "confidential_program": {
+            "entrypoint_id": "upsert(bytes32,uint256)",
+            "params": [
+              {
+                "name": "key",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              },
+              {
+                "name": "value",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                }
+              }
+            ],
+            "return_type": null,
+            "secret_args": [
+              0,
+              1
+            ],
+            "body": [
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "key"
+                },
+                "value": {
+                  "kind": "var",
+                  "name": "value"
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "upsert(bytes32,uint256)",
+            "param_count": 2,
+            "return_type": null,
+            "secret_args": [
+              0,
+              1
+            ],
+            "slot_count": 2,
+            "body": [
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "value": {
+                  "kind": "slot",
+                  "slot": 1
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
           "kernel_steps": [
             {
               "opcode": "Begin",
