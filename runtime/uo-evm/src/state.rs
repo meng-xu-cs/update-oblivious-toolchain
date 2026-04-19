@@ -3,11 +3,11 @@ use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
 use anyhow::{anyhow, bail, Result};
-use std::collections::BTreeMap;
-use uo_allocator::AllocatorSession;
+use std::collections::{BTreeMap, BTreeSet};
+use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, ConfidentialKernelSlotProgram, RuntimeKernelRefinementEventWitness,
-    RuntimeKernelRefinementWitness, RuntimeOramAccessCounterWitness,
+    RuntimeKernelRefinementWitness, RuntimeKernelStepWitness, RuntimeOramAccessCounterWitness,
     RuntimePathOramPositionMapWitness, Value,
 };
 
@@ -107,28 +107,49 @@ impl ContractRuntime {
             .commit_public_shadow(kernel, shadow, aborted, recorder)
     }
 
-    pub(crate) fn run_confidential_call(
+    pub(crate) fn run_confidential_entrypoint(
         &mut self,
-        kernel: PublicRuntimeKernel,
+        allocator: AllocatorPlan,
+        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+        public_object_ids: Vec<u32>,
         program: &ConfidentialKernelSlotProgram,
-        shadow_load_object_ids: &[u32],
         max_hash_part_bytes: usize,
         args: Vec<Value>,
         fresh_coins: Option<&PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
-        opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialCommittedCallOutcome> {
         let call_inputs = ConfidentialCallInputs::from_raw_args(args);
-        self.committed.run_confidential_call(
-            kernel,
-            program,
-            shadow_load_object_ids,
-            max_hash_part_bytes,
-            call_inputs,
-            fresh_coins,
-            recorder,
-            opcode_trace,
-        )
+        let shadow_load_object_ids = expected_kernel_steps
+            .iter()
+            .filter_map(|step| step.object_id)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let kernel = PublicRuntimeKernel::begin(
+            allocator,
+            Some(expected_kernel_steps),
+            public_object_ids.clone(),
+            Some(public_object_ids),
+        )?;
+        let mut opcode_trace = Vec::new();
+        self.committed
+            .run_confidential_call(
+                kernel,
+                program,
+                &shadow_load_object_ids,
+                max_hash_part_bytes,
+                call_inputs,
+                fresh_coins,
+                recorder,
+                &mut opcode_trace,
+            )
+            .map(|outcome| ConfidentialCommittedCallOutcome {
+                runtime_kernel_witness: outcome.runtime_kernel_witness,
+                runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
+                aborted: outcome.aborted,
+                return_value: outcome.return_value,
+                opcode_trace,
+            })
     }
 
     pub(crate) fn replace_with_cold_public_shadow(&mut self, shadow: PublicRuntimeShadowState) {
@@ -272,6 +293,7 @@ impl CommittedRuntimeState {
             runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
             aborted: outcome.aborted,
             return_value: outcome.return_value,
+            opcode_trace: Vec::new(),
         })
     }
 
@@ -350,6 +372,7 @@ pub(crate) struct ConfidentialCommittedCallOutcome {
     pub runtime_kernel_refinement_witness: uo_core::RuntimeKernelRefinementWitness,
     pub aborted: bool,
     pub return_value: Option<Value>,
+    pub opcode_trace: Vec<String>,
 }
 
 impl RuntimeShadowState {

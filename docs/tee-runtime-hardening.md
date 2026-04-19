@@ -394,8 +394,10 @@ The current runtime has a first hardening layer:
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot
   call those kernel hooks directly
-- `engine.rs` now also uses only the `PublicRuntimeKernel` facade instead of
-  importing the raw `RuntimeKernel` type
+- `engine.rs` now delegates public execution to `runtime/uo-evm/src/shell.rs`
+  and confidential-kernel setup to `runtime/uo-evm/src/state.rs`, so the
+  engine no longer imports either the raw `RuntimeKernel` or the public kernel
+  facade directly
 - confidential `Expr::Select` now also evaluates both admitted pure arms and
   combines them with `Value::confidential_select` instead of branching on the
   secret condition in Rust, while the proof-grade translation checker, the

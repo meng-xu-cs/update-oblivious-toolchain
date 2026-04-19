@@ -1,13 +1,11 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
-use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::state::ContractRuntime;
 use crate::shell::run_public_entrypoint;
 use crate::theorem::{build_theorem_trace, finalize_execution_trace, FinalizeExecutionTraceInput};
 use anyhow::{anyhow, bail, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use std::collections::BTreeSet;
 use uo_allocator::AllocatorPlan;
 use uo_core::{
     canonical_runtime_public_object_ids, CompiledArtifact, ExecutionTrace,
@@ -174,18 +172,6 @@ impl ContractInstance {
             "before executing the next call from committed storage",
         )?;
         let runtime_state_before = self.state.witness_snapshot()?;
-        let shadow_load_object_ids = if function.confidential {
-            expected_kernel_steps
-                .as_ref()
-                .expect("confidential entrypoint must derive expected kernel steps")
-                .iter()
-                .filter_map(|step| step.object_id)
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect::<Vec<_>>()
-        } else {
-            public_object_ids.clone()
-        };
         let execution = (|| -> Result<_> {
             let mut recorder =
                 CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len);
@@ -196,34 +182,29 @@ impl ContractInstance {
                 return_value,
                 opcode_trace,
             ) = if function.confidential {
-                let kernel = PublicRuntimeKernel::begin(
-                    allocator,
-                    expected_kernel_steps,
-                    public_object_ids.clone(),
-                    Some(public_object_ids.clone()),
-                )?;
-                let mut opcode_trace = Vec::new();
                 let (slot_program, _) = confidential_slot_program
                     .as_ref()
                     .expect("confidential entrypoint must carry slot program");
                 let confidential_args = confidential_args
                     .expect("confidential entrypoint must carry confidential call args");
-                let outcome = self.state.run_confidential_call(
-                    kernel,
+                let outcome = self.state.run_confidential_entrypoint(
+                    allocator,
+                    expected_kernel_steps
+                        .clone()
+                        .expect("confidential entrypoint must derive expected kernel steps"),
+                    public_object_ids.clone(),
                     slot_program,
-                    &shadow_load_object_ids,
                     max_hash_part_bytes,
                     confidential_args,
                     fresh_coins,
                     &mut recorder,
-                    &mut opcode_trace,
                 )?;
                 (
                     outcome.runtime_kernel_witness,
                     outcome.runtime_kernel_refinement_witness,
                     outcome.aborted,
                     outcome.return_value,
-                    opcode_trace,
+                    outcome.opcode_trace,
                 )
             } else {
                 let public_args =
@@ -396,8 +377,12 @@ mod tests {
             "engine.rs implementation should not import the raw RuntimeKernel directly"
         );
         assert!(
-            source.contains("use crate::runtime::kernel::PublicRuntimeKernel;"),
-            "engine.rs implementation should use the public kernel facade"
+            !source.contains("use crate::runtime::kernel::PublicRuntimeKernel;"),
+            "engine.rs should not import the public kernel facade directly once the public and confidential setup paths are delegated"
+        );
+        assert!(
+            source.contains("run_confidential_entrypoint("),
+            "engine.rs should delegate confidential-kernel setup to ContractRuntime"
         );
         assert!(
             !source.contains("RuntimeKernelRefinementEventWitness"),

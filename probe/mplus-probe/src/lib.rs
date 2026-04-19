@@ -6003,12 +6003,19 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("fn eval_expr(")
         && !engine_impl_source.contains("fn eval_binary(")
         && !engine_impl_source.contains("fn store_env_value(");
-    let engine_uses_public_runtime_kernel =
-        engine_impl_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
+    let engine_delegates_confidential_execution_to_runtime = engine_impl_source
+        .contains("run_confidential_entrypoint(")
+        && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
+    let engine_does_not_import_public_runtime_kernel = !engine_impl_source
+        .contains("use crate::runtime::kernel::PublicRuntimeKernel;")
+        && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
     let shell_uses_shadow_wrapper =
         shell_impl_source.contains("objects: &mut PublicRuntimeShadowState");
     let shell_uses_public_runtime_kernel =
         shell_source.contains("use crate::runtime::kernel::PublicRuntimeKernel;");
+    let state_uses_public_runtime_kernel = state_source
+        .contains("use crate::runtime::kernel::PublicRuntimeKernel;")
+        && state_source.contains("PublicRuntimeKernel::begin(");
     let shell_confidential_surface_absent = !shell_impl_source.contains("ConfidentialCallInputs")
         && !shell_impl_source.contains("use crate::runtime::kernel::RuntimeKernel;")
         && !shell_impl_source.contains("use crate::runtime::objects::RuntimeObject;")
@@ -6022,8 +6029,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         engine_impl_source.contains("PublicCallSummary::from_manifest_entry");
     let engine_keeps_confidential_call_inputs_inside_runtime = !engine_impl_source
         .contains("ConfidentialCallInputs::from_manifest_entry")
-        && engine_impl_source.contains("self.state.run_confidential_call(")
-        && state_source.contains("let call_inputs = ConfidentialCallInputs::from_raw_args(args);");
+        && engine_impl_source.contains("self.state.run_confidential_entrypoint(")
+        && state_source.contains("let call_inputs = ConfidentialCallInputs::from_raw_args(args);")
+        && kernel_source.contains("call_inputs.into_raw_args().into_iter()");
     let engine_clones_call_args_directly = engine_impl_source
         .contains("let mut call_args = args.clone();")
         || engine_impl_source.contains("let call_args = args.clone();");
@@ -7020,9 +7028,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "forbidden_engine_helper_checks": forbidden_engine_helper_checks,
         "engine_uses_opaque_committed_state": engine_uses_opaque_committed_state,
         "engine_delegates_public_execution_to_shell": engine_delegates_public_execution_to_shell,
-        "engine_uses_public_runtime_kernel": engine_uses_public_runtime_kernel,
+        "engine_delegates_confidential_execution_to_runtime":
+            engine_delegates_confidential_execution_to_runtime,
+        "engine_does_not_import_public_runtime_kernel":
+            engine_does_not_import_public_runtime_kernel,
         "shell_uses_shadow_wrapper": shell_uses_shadow_wrapper,
         "shell_uses_public_runtime_kernel": shell_uses_public_runtime_kernel,
+        "state_uses_public_runtime_kernel": state_uses_public_runtime_kernel,
         "shell_confidential_surface_absent": shell_confidential_surface_absent,
         "engine_defines_fresh_coin_plan_directly": engine_defines_fresh_coin_plan_directly,
         "engine_uses_manifest_public_call_summary": engine_uses_manifest_public_call_summary,
@@ -7185,9 +7197,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "accepted": engine_forbidden_helpers_absent
             && engine_uses_opaque_committed_state
             && engine_delegates_public_execution_to_shell
-            && engine_uses_public_runtime_kernel
+            && engine_delegates_confidential_execution_to_runtime
+            && engine_does_not_import_public_runtime_kernel
             && shell_uses_shadow_wrapper
             && shell_uses_public_runtime_kernel
+            && state_uses_public_runtime_kernel
             && shell_confidential_surface_absent
             && !engine_defines_fresh_coin_plan_directly
             && engine_uses_manifest_public_call_summary
@@ -8903,11 +8917,12 @@ secret-bearing paths are not directly callable from `engine.rs`. The
 confidential-path `RuntimeKernel` entrypoints that shadow-load committed
 state, run confidential calls, and commit public shadows are now likewise
 visibility-restricted to `crate::runtime`, so the generic shell cannot call
-those kernel hooks directly. `engine.rs` now also uses only the
-`PublicRuntimeKernel` facade instead of importing the raw `RuntimeKernel`
-type. Confidential `Expr::Select` now also evaluates both admitted pure arms
-and combines them with `Value::confidential_select` instead of branching on
-the secret condition in Rust, while `uo-check` and the proof-grade
+those kernel hooks directly. `engine.rs` now delegates public execution to
+`shell.rs` and confidential-kernel setup to `state.rs`, so it no longer
+imports either the raw `RuntimeKernel` or the public kernel facade directly.
+Confidential `Expr::Select` now also evaluates both admitted pure arms and
+combines them with `Value::confidential_select` instead of branching on the
+secret condition in Rust, while `uo-check` and the proof-grade
 kernel-witness validator reject confidential select arms outside that
 branchless pure fragment. Confidential `Expr::StructField` and
 `Expr::ArrayIndex` are now both rejected from the admitted confidential
@@ -8939,8 +8954,8 @@ same report
 also checks that the
 confidential-path `RuntimeKernel` entrypoints for shadow-loading, public
 commit, and confidential execution are visibility-restricted to
-`crate::runtime`, and that `engine.rs` uses the `PublicRuntimeKernel` facade
-rather than importing the raw `RuntimeKernel`, and that confidential
+`crate::runtime`, that `shell.rs` owns the public-kernel facade while
+`state.rs` owns confidential-kernel setup, and that confidential
 entrypoints are sourced from the checked manifest's
 `confidential_slot_program` in `engine.rs` while `runtime/uo-evm/src/state.rs`
 delegates confidential execution through `runtime/uo-evm/src/kernel.rs`, and
