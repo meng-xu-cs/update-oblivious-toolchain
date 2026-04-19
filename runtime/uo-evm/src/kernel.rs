@@ -16,7 +16,7 @@ use uo_core::{
 };
 use uo_precompiles::UoOpcode;
 
-pub(crate) struct RuntimeKernel {
+struct RuntimeKernel {
     allocator: AllocatorSession,
     expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
     public_object_ids: Vec<u32>,

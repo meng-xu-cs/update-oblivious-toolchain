@@ -983,6 +983,13 @@
   "raw_kernel_private_surface_checks": [
     {
       "forbidden_present": false,
+      "forbidden_pubcrate": "pub(crate) struct RuntimeKernel {",
+      "private_present": true,
+      "required_private": "struct RuntimeKernel {",
+      "restricted": true
+    },
+    {
+      "forbidden_present": false,
       "forbidden_pubcrate": "pub(crate) struct ConfidentialExecutionOutcome {",
       "private_present": true,
       "required_private": "struct ConfidentialExecutionOutcome {",

@@ -9259,6 +9259,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !kernel_source.contains("pub(crate) fn shadow_load_confidential_objects(");
     let raw_kernel_private_surface_checks = [
         (
+            "struct RuntimeKernel {",
+            "pub(crate) struct RuntimeKernel {",
+        ),
+        (
             "struct ConfidentialExecutionOutcome {",
             "pub(crate) struct ConfidentialExecutionOutcome {",
         ),
