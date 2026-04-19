@@ -385,6 +385,10 @@ The current runtime has a first hardening layer:
   objects exactly match the witnesses they claim to summarize, checks the
   shell-event trace replay, and the probe validates that interface separately
   as `shell_boundary_validation.json`
+- that shell-boundary bundle is now also accessor-only on the Rust side: its
+  witness / contract / trace fields are private, callers read them through
+  explicit getter methods, and the probe rejects drift if those fields become
+  public again or if the getter surface changes
 - the shared DSL/interpreter bridge now also composes directly through that
   shell object: `uo-core` exports a `RuntimeShellBoundaryLoweringBundle`
   carrying the shell-boundary bundle plus the named and slot confidential
@@ -432,6 +436,15 @@ The current runtime has a first hardening layer:
   `CallTraceContext`; that same theorem-side context now also owns the public
   `PublicCallSummary` and `CallRecorder`, so `engine.rs` no longer calls
   `witness_snapshot()`, `PublicCallSummary::from_manifest_entry`, or
+  `ExecutionTrace { ... }` directly; the proof-bearing runtime payloads stored
+  on `ExecutionTrace` itself now also keep their fields private and expose only
+  explicit accessors / validated reconstruction helpers, so post-call theorem
+  artifacts cannot be silently rewritten through public field mutation outside
+  `uo-core`; the intermediate `RuntimeExecutionTraceParts` carrier is now also
+  constructor-backed rather than a public-field bag, and the probe keeps its
+  single production constructor use pinned to `runtime/uo-evm/src/theorem.rs`;
+  the certificate-based `RuntimeRefinementWitness` reassembly helpers are now
+  internal to `uo-core` as well
   `CallRecorder::begin_with_input_len` for the theorem path, and the theorem
   finalizer now consumes the whole `RuntimeCallOutcome` directly rather than
   having the engine unpack kernel witnesses, opcode traces, and return values
@@ -444,12 +457,15 @@ The current runtime has a first hardening layer:
   the same pattern through `zero_writes()` plus `into_execution_trace_parts(...)`
   instead of public field reads
 - the theorem-facing constructor surface is now pinned as well:
+  `ExecutionTrace::from_runtime_trace_parts(...)` and
+  `ExecutionTrace::materialize_runtime_trusted_kernel_bundle(...)` stay
+  confined to `runtime/uo-evm/src/theorem.rs`, while the lower-level
   `RuntimeControllerObserverCertificate::new`,
   `RuntimePathOramHiddenCertificate::new`, and
-  `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus
-  `ExecutionTrace::from_runtime_trace_parts(...)` stay confined to
-  `runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
-  construction stays confined to `runtime/uo-evm/src/controller.rs`
+  `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` constructors are
+  no longer part of the runtime-facing theorem bridge and stay internal to
+  `crates/uo-core/src/trace.rs`; direct `TheoremTrace { ... }` construction
+  stays confined to `runtime/uo-evm/src/controller.rs`
 - the public-trace helper surface is pinned too:
   `PublicCallSummary::from_manifest_entry(...)` and
   `CallRecorder::begin_with_input_len(...)` stay confined to
@@ -478,14 +494,19 @@ The current runtime has a first hardening layer:
   `runtime_confidential_core_shell_boundary_slot_bundle(...)` stay confined to
   `crates/uo-core/src/confidential_core.rs`, and the anti-drift report now
   also checks that the Lean side still carries the exact proof-grade assurance
-  / witness-equality / named-vs-slot exactness theorems for those bundles
+  / witness-equality / named-vs-slot exactness theorems for those bundles and
+  that both the direct confidential-core bundle / slot-bundle / lowering-bundle
+  trio and the confidential-core shell-boundary slot/lowering pair stay
+  accessor-only on the Rust side
 - the trusted-kernel slot bridge is pinned on the same path:
   `RuntimeTrustedKernelSlotBundle::from_trusted_kernel_bundle(...)`,
   `ExecutionTrace::runtime_trusted_kernel_slot_bundle(...)`, and the
   entrypoint-match helper stay confined to `crates/uo-core/src/trusted_kernel.rs`;
   the anti-drift report now also checks that this bridge still sources the
-  exact manifest-carried slot DSL and that Lean keeps the proof-grade
-  trusted-kernel schedule exactness and slot-bundle validity path intact
+  exact manifest-carried slot DSL, that both `RuntimeTrustedKernelBundle` and
+  `RuntimeTrustedKernelSlotBundle` keep their proof-facing fields private
+  behind explicit accessors, and that Lean keeps the proof-grade trusted-kernel
+  schedule exactness and slot-bundle validity path intact
 - the shell-boundary slot/lowering bridge family is pinned too:
   `RuntimeShellBoundaryLoweringBundle::from_manifest_entry(...)`,
   `RuntimeShellBoundarySlotBundle::from_manifest_entry(...)`,
@@ -493,9 +514,10 @@ The current runtime has a first hardening layer:
   `runtime_shell_boundary_slot_bundle(...)` stay confined to
   `crates/uo-core/src/kernel_dsl.rs`; the anti-drift report now also checks
   that these bridges continue to source the manifest-carried named and slot
-  DSL programs exactly, and that Lean keeps the shell-refinement, slot-
-  schedule exactness, named-vs-slot lowering exactness, and to-runtime
-  validity theorems for those bundles
+  DSL programs exactly, that the shell-boundary slot/lowering bundles keep
+  their proof-facing fields private behind explicit accessors, and that Lean
+  keeps the shell-refinement, slot-schedule exactness, named-vs-slot lowering
+  exactness, and to-runtime validity theorems for those bundles
 - the direct runtime-kernel bundle family in that same module is pinned too:
   `RuntimeKernelDslBundle::from_manifest_entry(...)`,
   `RuntimeKernelSlotDslBundle::from_manifest_entry(...)`,
@@ -503,19 +525,20 @@ The current runtime has a first hardening layer:
   `runtime_kernel_*_bundle_for_entrypoint(...)` entrypoints stay confined to
   `crates/uo-core/src/kernel_dsl.rs`; the anti-drift report now also checks
   that these bundles keep sourcing the manifest-carried named and slot DSL
-  programs and that Lean keeps the exact schedule, exact entrypoint, lowering,
-  and to-runtime soundness theorems for them
+  programs, that the direct runtime-kernel DSL / slot-DSL / lowering bundles
+  keep their proof-facing fields private behind explicit accessors, and that
+  Lean keeps the exact schedule, exact entrypoint, lowering, and to-runtime
+  soundness theorems for them
 - the direct runtime witness/export bridge is pinned too:
-  `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)`,
-  `ExecutionTrace::store_runtime_trusted_kernel_bundle(...)`,
+  `ExecutionTrace::materialize_runtime_trusted_kernel_bundle(...)`,
   `ExecutionTrace::runtime_trusted_kernel_bundle(...)`, and
   `ExecutionTrace::runtime_refinement_witness(...)` stay confined to
   `crates/uo-core/src/trace.rs`; the anti-drift report now also checks that
   `runtime/uo-evm/src/theorem.rs` stays the only production caller allowed to
-  store a trusted-kernel bundle and that the only production assignment to the
-  backing field stays inside
-  `ExecutionTrace::store_runtime_trusted_kernel_bundle(...)`, that
-  the refinement export path reuses the trusted-kernel bundle rather than
+  materialize and persist a trusted-kernel bundle, that the only production
+  assignment to the backing field stays inside the internal
+  `ExecutionTrace::store_runtime_trusted_kernel_bundle(...)`, that the
+  refinement export path reuses the trusted-kernel bundle rather than
   assembling a parallel witness path, that any stored trusted-kernel bundle is
   revalidated against the surrounding trace before export, that the
   confidential kernel witness is exported only through the dedicated

@@ -88,27 +88,29 @@ theorem importedWitness_proofGradeConfidentialCoreAssurance
       kernelWitness.expected_kernel_steps = some program.expectedRuntimeKernelSteps ∧
       kernelWitness.kernel_steps = program.expectedRuntimeKernelSteps ∧
       runtimeWitness.runtime_kernel_refinement_witness = some runtimeKernelRefinementWitness ∧
-      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+      runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines
+        kernelWitness.shellContract := by
   rcases hAssured with ⟨hRuntimeValid, kernelWitness, hKernel, hDslValid⟩
   have hScheduleExact :
       kernelWitness.expected_kernel_steps = some program.expectedRuntimeKernelSteps ∧
         kernelWitness.kernel_steps = program.expectedRuntimeKernelSteps :=
     importedRuntimeKernelDslBundle_schedule_exact hDslValid
-  rcases importedWitness_proofGradeKernelBoundaryFacts runtimeWitness modelTags hRuntimeValid with
-    ⟨kernelWitness', runtimeKernelRefinementWitness, _expectedKernelSteps,
-      _expectedPublicObjectIds, _expectedKernelSchedule, hKernel', hRefinement,
+  rcases importedWitness_proofGradeKernelInterface runtimeWitness modelTags hRuntimeValid with
+    ⟨shellBoundaryBundle, _expectedKernelSteps, _expectedPublicObjectIds,
+      _expectedKernelSchedule, hBundle, _hKernelProofGrade, _hRefinementWitnessValid,
+      _hContractExact, _hTraceExact, hShellRefines, _hKernelStateRefinement,
       _hWitnessExpectedSteps, _hWitnessKernelSteps, _hExpectedPublicObjectIds,
       _hPublicObjectIds, _hResourceState, _hExpectedKernelSchedule,
-      _hEmittedKernelSchedule, _hFinalKernelScheduleState,
-      _hProjectedKernelSchedule, _hPreCommittedColdObjectSchedule,
-      _hPostCommittedColdObjectSchedule, hShellRefines⟩
-  have hKernelEq : kernelWitness = kernelWitness' := by
+      _hEmittedKernelSchedule, _hFinalKernelScheduleState⟩
+  have hBundleExact := importedRuntimeRefinementWitness_shellBoundaryBundle_exact hBundle
+  have hKernelEq : kernelWitness = shellBoundaryBundle.kernel_witness := by
     apply Option.some.inj
-    exact hKernel.symm.trans hKernel'
-  subst hKernelEq
+    exact hKernel.symm.trans hBundleExact.1
+  subst kernelWitness
   exact
-    ⟨kernelWitness, runtimeKernelRefinementWitness, hKernel', hScheduleExact.1,
-      hScheduleExact.2, hRefinement, hShellRefines⟩
+    ⟨shellBoundaryBundle.kernel_witness,
+      shellBoundaryBundle.runtime_kernel_refinement_witness, hBundleExact.1,
+      hScheduleExact.1, hScheduleExact.2, hBundleExact.2.1, hShellRefines⟩
 
 theorem importedWitness_toRuntimeWitness_proofGradeConfidentialCoreAssurance
   (runtimeWitness : ImportedRuntimeRefinementWitness)
@@ -177,7 +179,8 @@ theorem importedRuntimeConfidentialCoreBundle_proofGradeAssurance
       kernelWitness.kernel_steps = bundle.confidential_program.expectedRuntimeKernelSteps ∧
       bundle.runtime_witness.runtime_kernel_refinement_witness =
         some runtimeKernelRefinementWitness ∧
-      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+      runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines
+        kernelWitness.shellContract := by
   exact importedWitness_proofGradeConfidentialCoreAssurance
     bundle.runtime_witness bundle.confidential_program modelTags hValid
 
@@ -274,27 +277,29 @@ theorem importedWitness_proofGradeConfidentialCoreSlotAssurance
       kernelWitness.expected_kernel_steps = some program.expectedRuntimeKernelSteps ∧
       kernelWitness.kernel_steps = program.expectedRuntimeKernelSteps ∧
       runtimeWitness.runtime_kernel_refinement_witness = some runtimeKernelRefinementWitness ∧
-      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+      runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines
+        kernelWitness.shellContract := by
   rcases hAssured with ⟨hRuntimeValid, kernelWitness, hKernel, hDslValid⟩
   have hScheduleExact :
       kernelWitness.expected_kernel_steps = some program.expectedRuntimeKernelSteps ∧
         kernelWitness.kernel_steps = program.expectedRuntimeKernelSteps :=
     importedRuntimeKernelSlotDslBundle_schedule_exact hDslValid
-  rcases importedWitness_proofGradeKernelBoundaryFacts runtimeWitness modelTags hRuntimeValid with
-    ⟨kernelWitness', runtimeKernelRefinementWitness, _expectedKernelSteps,
-      _expectedPublicObjectIds, _expectedKernelSchedule, hKernel', hRefinement,
+  rcases importedWitness_proofGradeKernelInterface runtimeWitness modelTags hRuntimeValid with
+    ⟨shellBoundaryBundle, _expectedKernelSteps, _expectedPublicObjectIds,
+      _expectedKernelSchedule, hBundle, _hKernelProofGrade, _hRefinementWitnessValid,
+      _hContractExact, _hTraceExact, hShellRefines, _hKernelStateRefinement,
       _hWitnessExpectedSteps, _hWitnessKernelSteps, _hExpectedPublicObjectIds,
       _hPublicObjectIds, _hResourceState, _hExpectedKernelSchedule,
-      _hEmittedKernelSchedule, _hFinalKernelScheduleState,
-      _hProjectedKernelSchedule, _hPreCommittedColdObjectSchedule,
-      _hPostCommittedColdObjectSchedule, hShellRefines⟩
-  have hKernelEq : kernelWitness = kernelWitness' := by
+      _hEmittedKernelSchedule, _hFinalKernelScheduleState⟩
+  have hBundleExact := importedRuntimeRefinementWitness_shellBoundaryBundle_exact hBundle
+  have hKernelEq : kernelWitness = shellBoundaryBundle.kernel_witness := by
     apply Option.some.inj
-    exact hKernel.symm.trans hKernel'
-  subst hKernelEq
+    exact hKernel.symm.trans hBundleExact.1
+  subst kernelWitness
   exact
-    ⟨kernelWitness, runtimeKernelRefinementWitness, hKernel', hScheduleExact.1,
-      hScheduleExact.2, hRefinement, hShellRefines⟩
+    ⟨shellBoundaryBundle.kernel_witness,
+      shellBoundaryBundle.runtime_kernel_refinement_witness, hBundleExact.1,
+      hScheduleExact.1, hScheduleExact.2, hBundleExact.2.1, hShellRefines⟩
 
 theorem importedWitness_toRuntimeWitness_proofGradeConfidentialCoreSlotAssurance
   (runtimeWitness : ImportedRuntimeRefinementWitness)
@@ -366,7 +371,8 @@ theorem importedRuntimeConfidentialCoreSlotBundle_proofGradeAssurance
       kernelWitness.kernel_steps = bundle.confidential_slot_program.expectedRuntimeKernelSteps ∧
       bundle.runtime_witness.runtime_kernel_refinement_witness =
         some runtimeKernelRefinementWitness ∧
-      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+      runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines
+        kernelWitness.shellContract := by
   exact importedWitness_proofGradeConfidentialCoreSlotAssurance
     bundle.runtime_witness bundle.confidential_slot_program modelTags hValid
 
@@ -485,7 +491,8 @@ theorem importedRuntimeConfidentialCoreLoweringBundle_namedProofGradeAssurance
       kernelWitness.kernel_steps = bundle.confidential_program.expectedRuntimeKernelSteps ∧
       bundle.runtime_witness.runtime_kernel_refinement_witness =
         some runtimeKernelRefinementWitness ∧
-      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+      runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines
+        kernelWitness.shellContract := by
   exact importedRuntimeConfidentialCoreBundle_proofGradeAssurance
     bundle.namedBundle modelTags hValid.1
 
@@ -501,7 +508,8 @@ theorem importedRuntimeConfidentialCoreLoweringBundle_recomputedSlotProofGradeAs
       kernelWitness.kernel_steps = lowered.expectedRuntimeKernelSteps ∧
       bundle.runtime_witness.runtime_kernel_refinement_witness =
         some runtimeKernelRefinementWitness ∧
-      runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract := by
+      runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines
+        kernelWitness.shellContract := by
   rcases importedRuntimeConfidentialCoreLoweringBundle_namedProofGradeAssurance
       bundle modelTags hValid with
     ⟨kernelWitness, runtimeKernelRefinementWitness, hKernel, hNamedExpected, hNamedSteps,

@@ -148,11 +148,14 @@ The Rust side now exposes:
 - `RuntimeTrustedKernelBundle::to_witness`
 - `uo-evm --format trusted-kernel`
 
-The runtime engine now materializes the trusted-kernel bundle directly during
-execution, stores it on the emitted `ExecutionTrace`, and only then uses the
-older trace-field reconstruction path as an internal audit check before
-returning a call result. The public accessor on a runtime-emitted trace is
-therefore no longer a reconstruction routine. For the proof-grade
+The runtime engine now asks `ExecutionTrace` to materialize the
+trusted-kernel bundle from its own reconstructed controller/hidden/kernel
+state during execution, stores that result on the emitted `ExecutionTrace`,
+and only then uses the older trace-field reconstruction path as an internal
+audit check before returning a call result. `uo-evm` no longer hand-assembles
+the controller observer certificate, hidden certificate, or trusted-kernel
+bundle directly. The public accessor on a runtime-emitted trace is therefore
+no longer a reconstruction routine. For the proof-grade
 trusted-kernel path, `ExecutionTrace::runtime_trusted_kernel_slot_bundle` then
 packages that stored bundle together with the admitted slot program from the
 artifact manifest, and `uo-evm --format trusted-kernel` emits that stronger

@@ -8,9 +8,8 @@ use crate::runtime::state::{
 use anyhow::{anyhow, Result};
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
-    CompiledArtifact, ExecutionTrace, OutputShape, RuntimeControllerObserverCertificate,
-    RuntimeExecutionTraceParts, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
-    RuntimeOramObjectWitness, RuntimePathOramHiddenCertificate, RuntimeTrustedKernelBundle, Value,
+    CompiledArtifact, ExecutionTrace, OutputShape, RuntimeExecutionTraceParts,
+    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness, Value,
 };
 
 struct CallTraceContext {
@@ -160,7 +159,7 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         runtime_oram_position_map_after,
     ) = runtime_witness_state.into_execution_trace_parts();
 
-    let mut trace = ExecutionTrace::from_runtime_trace_parts(RuntimeExecutionTraceParts {
+    let mut trace = ExecutionTrace::from_runtime_trace_parts(RuntimeExecutionTraceParts::new(
         opcode_trace,
         logical_accesses,
         logical_writes,
@@ -168,18 +167,18 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         physical_writes,
         gas_used,
         theorem_trace,
-        runtime_seed: Some(deploy_seed),
-        runtime_kernel_witness: Some(runtime_kernel_witness.clone()),
-        runtime_kernel_refinement_witness: Some(runtime_kernel_refinement_witness),
-        runtime_controller_certificate: Some(controller_certificate),
-        runtime_oram_objects: runtime_oram_objects(artifact),
-        runtime_oram_leaf_schedule: oram_leaf_schedule,
+        Some(deploy_seed),
+        Some(runtime_kernel_witness.clone()),
+        Some(runtime_kernel_refinement_witness),
+        Some(controller_certificate),
+        runtime_oram_objects(artifact),
+        oram_leaf_schedule,
         runtime_oram_access_counters_before,
         runtime_oram_access_counters_after,
         runtime_oram_position_map_before,
         runtime_oram_position_map_after,
-        runtime_oram_leaf_state_transitions: oram_leaf_state_transitions,
-    });
+        oram_leaf_state_transitions,
+    ));
     if confidential {
         trace
             .runtime_kernel_witness_for_confidential(artifact, entrypoint)
@@ -187,48 +186,7 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
                 anyhow::anyhow!("runtime kernel witness drifted from admitted artifact: {err}")
             })?;
     }
-
-    let direct_controller_observer = RuntimeControllerObserverCertificate::new(
-        trace
-            .theorem_trace
-            .public_outcome
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("runtime theorem trace missing public_outcome"))?,
-        trace.theorem_trace.boundary_schedule.clone(),
-        trace
-            .theorem_trace
-            .controller_shape
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("runtime theorem trace missing controller_shape"))?,
-        trace
-            .theorem_trace
-            .normalized_micro_trace
-            .clone()
-            .ok_or_else(|| {
-                anyhow::anyhow!("runtime theorem trace missing normalized_micro_trace")
-            })?,
-        trace
-            .runtime_controller_certificate
-            .clone()
-            .ok_or_else(|| {
-                anyhow::anyhow!("execution trace missing runtime controller certificate")
-            })?,
-    )?;
-    let direct_hidden_certificate = RuntimePathOramHiddenCertificate::new(
-        trace.refinement_trace(),
-        trace.runtime_oram_objects.clone(),
-        trace.runtime_oram_leaf_schedule.clone(),
-        trace.runtime_oram_position_map_before.clone(),
-        trace.runtime_oram_position_map_after.clone(),
-        trace.runtime_oram_leaf_state_transitions.clone(),
-    )?;
-    let direct_bundle = RuntimeTrustedKernelBundle::new_with_kernel_witness(
-        trace.runtime_seed,
-        direct_controller_observer,
-        Some(runtime_kernel_witness),
-        direct_hidden_certificate,
-    )?;
-    trace.store_runtime_trusted_kernel_bundle(direct_bundle)?;
+    trace.materialize_runtime_trusted_kernel_bundle()?;
     Ok(trace)
 }
 

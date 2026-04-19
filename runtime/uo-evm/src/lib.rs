@@ -461,12 +461,12 @@ mod tests {
         );
         assert_eq!(
             first_witness
-                .oram_leaf_schedule
+                .oram_leaf_schedule()
                 .iter()
                 .map(|step| (&step.object_name, step.bucket_count))
                 .collect::<Vec<_>>(),
             second_witness
-                .oram_leaf_schedule
+                .oram_leaf_schedule()
                 .iter()
                 .map(|step| (&step.object_name, step.bucket_count))
                 .collect::<Vec<_>>()
@@ -515,12 +515,12 @@ mod tests {
         );
         assert_eq!(
             first_witness
-                .oram_leaf_schedule
+                .oram_leaf_schedule()
                 .iter()
                 .map(|step| (&step.object_name, step.bucket_count))
                 .collect::<Vec<_>>(),
             second_witness
-                .oram_leaf_schedule
+                .oram_leaf_schedule()
                 .iter()
                 .map(|step| (&step.object_name, step.bucket_count))
                 .collect::<Vec<_>>()
@@ -569,16 +569,19 @@ mod tests {
             )
             .unwrap();
         let witness = result.trace.runtime_refinement_witness().unwrap();
-        assert_eq!(witness.public_outcome.gas_used, result.trace.gas_used);
-        assert_eq!(witness.trace.gas_used, result.trace.gas_used);
-        assert_eq!(witness.kernel_witness, result.trace.runtime_kernel_witness);
+        assert_eq!(witness.public_outcome().gas_used, result.trace.gas_used);
+        assert_eq!(witness.trace().gas_used, result.trace.gas_used);
         assert_eq!(
-            witness.boundary_schedule.len(),
-            witness.controller_shape.boundary_event_budget
+            witness.kernel_witness(),
+            result.trace.runtime_kernel_witness()
         );
         assert_eq!(
-            witness.normalized_micro_trace,
-            witness.controller_shape.normalized_micro_trace()
+            witness.boundary_schedule().len(),
+            witness.controller_shape().boundary_event_budget
+        );
+        assert_eq!(
+            witness.normalized_micro_trace(),
+            &witness.controller_shape().normalized_micro_trace()
         );
     }
 
@@ -610,14 +613,14 @@ mod tests {
             .runtime_kernel_witness_for_confidential(&artifact, "auth(bytes32)")
             .unwrap();
         let bundle = result.trace.runtime_trusted_kernel_bundle().unwrap();
-        assert_eq!(bundle.kernel_witness, Some(witness.clone()));
+        assert_eq!(bundle.kernel_witness(), Some(&witness));
         assert_eq!(
             result
                 .trace
                 .runtime_refinement_witness()
                 .unwrap()
-                .kernel_witness,
-            Some(witness.clone())
+                .kernel_witness(),
+            Some(witness.clone()).as_ref()
         );
         let manifest_entry = artifact
             .contract
@@ -684,17 +687,17 @@ mod tests {
         assert_eq!(bundle.entrypoint_id(), "auth(bytes32)");
         assert!(bundle.program_matches_trusted_kernel_entrypoint());
         assert_eq!(
-            bundle.trusted_kernel_bundle.kernel_witness,
-            result.trace.runtime_kernel_witness
+            bundle.trusted_kernel_bundle().kernel_witness(),
+            result.trace.runtime_kernel_witness()
         );
         assert_eq!(
             bundle
-                .confidential_slot_program
+                .confidential_slot_program()
                 .expected_runtime_step_witnesses(),
             bundle
-                .trusted_kernel_bundle
-                .kernel_witness
-                .clone()
+                .trusted_kernel_bundle()
+                .kernel_witness()
+                .cloned()
                 .unwrap()
                 .kernel_steps
         );
@@ -716,11 +719,11 @@ mod tests {
                 vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
             )
             .unwrap();
-        let kernel_witness = result.trace.runtime_kernel_witness.clone().unwrap();
+        let kernel_witness = result.trace.runtime_kernel_witness().cloned().unwrap();
         let phase_witness = result
             .trace
-            .runtime_kernel_refinement_witness
-            .clone()
+            .runtime_kernel_refinement_witness()
+            .cloned()
             .unwrap();
         assert_eq!(
             phase_witness.projected_kernel_schedule(),
@@ -763,17 +766,23 @@ mod tests {
             .trace
             .runtime_kernel_witness_for_confidential(&artifact, "add(bytes32,uint256)")
             .unwrap();
-        assert!(result.trace.runtime_trusted_kernel_bundle.is_some());
-        assert!(result.trace.runtime_kernel_witness.is_some());
-        assert_eq!(bundle.kernel_witness, Some(kernel_witness.clone()));
+        assert!(result
+            .trace
+            .stored_runtime_trusted_kernel_bundle()
+            .is_some());
+        assert!(result.trace.runtime_kernel_witness().is_some());
+        assert_eq!(bundle.kernel_witness(), Some(&kernel_witness));
 
         let encoded = serde_json::to_vec(&result.trace).unwrap();
-        let mut decoded: ExecutionTrace = serde_json::from_slice(&encoded).unwrap();
-        assert_eq!(decoded.runtime_trusted_kernel_bundle, Some(bundle.clone()));
-        assert_eq!(decoded.runtime_kernel_witness, Some(kernel_witness.clone()));
+        let decoded: ExecutionTrace = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(
-            decoded.runtime_kernel_refinement_witness,
-            result.trace.runtime_kernel_refinement_witness
+            decoded.stored_runtime_trusted_kernel_bundle(),
+            Some(&bundle)
+        );
+        assert_eq!(decoded.runtime_kernel_witness(), Some(&kernel_witness));
+        assert_eq!(
+            decoded.runtime_kernel_refinement_witness(),
+            result.trace.runtime_kernel_refinement_witness()
         );
         assert_eq!(decoded.runtime_trusted_kernel_bundle().unwrap(), bundle);
         assert_eq!(
@@ -787,10 +796,18 @@ mod tests {
             result.trace.runtime_refinement_witness().unwrap()
         );
 
-        decoded.theorem_trace = TheoremTrace::default();
-        decoded.runtime_controller_certificate = None;
-        decoded.runtime_oram_position_map_after = vec![];
-        decoded.runtime_kernel_witness = None;
+        let mut decoded_json: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+        decoded_json["theorem_trace"] = serde_json::to_value(TheoremTrace::default()).unwrap();
+        decoded_json
+            .as_object_mut()
+            .unwrap()
+            .remove("runtime_controller_certificate");
+        decoded_json["runtime_oram_position_map_after"] = serde_json::json!([]);
+        decoded_json
+            .as_object_mut()
+            .unwrap()
+            .remove("runtime_kernel_witness");
+        let decoded: ExecutionTrace = serde_json::from_value(decoded_json).unwrap();
 
         assert_eq!(
             decoded.runtime_trusted_kernel_bundle().unwrap_err(),
@@ -832,8 +849,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(first_result.trace.runtime_seed, Some(17));
-        assert_eq!(second_result.trace.runtime_seed, Some(17));
+        assert_eq!(first_result.trace.runtime_seed(), Some(17));
+        assert_eq!(second_result.trace.runtime_seed(), Some(17));
         assert_eq!(first_result.trace.hashes(), second_result.trace.hashes());
         assert_eq!(
             first_result.trace.runtime_refinement_witness().unwrap(),
@@ -970,8 +987,8 @@ mod tests {
             .unwrap();
         let witness = result.trace.runtime_refinement_witness().unwrap();
         let observed_ids = witness
-            .controller_certificate
-            .observed_oram_accesses
+            .controller_certificate()
+            .observed_oram_accesses()
             .iter()
             .map(|access| access.object_id)
             .collect::<Vec<_>>();
@@ -987,7 +1004,8 @@ mod tests {
             ]
         );
         let phase_witness = witness
-            .runtime_kernel_refinement_witness
+            .runtime_kernel_refinement_witness()
+            .cloned()
             .expect("runtime refinement witness should carry the lower-level phase witness");
         assert_eq!(
             phase_witness.shadow_load_object_schedule(),

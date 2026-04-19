@@ -23,7 +23,10 @@ The repository has already closed several important proof-grade gaps.
   path
 - the theorem-facing backend path is frozen to `path_oram_local_posmap_v1`
 - the runtime exports proof-grade kernel, refinement, and trusted-kernel proof
-  objects, and Lean checks those objects with theorem-tight executable checkers
+  objects, and Lean checks those objects with theorem-tight executable
+  checkers; the trusted-kernel bundle is now materialized through
+  `ExecutionTrace`'s internal reconstruction path rather than by hand-assembling
+  theorem certificates in `uo-evm`
 - the runtime already enforces the admitted public kernel schedule online for
   confidential entrypoints
 
@@ -242,8 +245,13 @@ Concrete tasks:
    from the proof-grade runtime phase witness and kernel witness to one exact
    finished Lean `RuntimeKernelSchedule` state, including exact schedule,
    resource-state, and boundary/public-object projections.
-2. Remaining: prove witness honesty by construction, not merely by post hoc
-   checking.
+2. Remaining, but tightened substantially: prove witness honesty by
+   construction, not merely by post hoc checking. The runtime theorem bridge
+   no longer hand-assembles controller/hidden/trusted-kernel certificates; it
+   now asks `ExecutionTrace` to materialize the trusted-kernel bundle from the
+   trace's own reconstructed state, while the lower-level certificate
+   constructors stay internal to `uo-core` and the trusted-kernel proof object
+   family is now accessor-only on the Rust side rather than a public-field bag.
 3. Completed in the current proof-grade path: trusted-kernel bundles and
    runtime-kernel refinement witnesses now have exactness theorems for
    schedule, public-object universe, resource state, and boundary projections,
@@ -260,7 +268,20 @@ Concrete tasks:
    sealed runtime-phase witness API with probe-checked constructor/accessor
    boundaries rather than raw cross-module event-vector mutation, plus the same
    explicit API discipline for the exact shell-boundary trace derived from that
-   witness.
+   witness, an accessor-only shell-boundary bundle whose witness / contract /
+   trace fields are probe-checked to stay non-public, and accessor-only
+   trusted-kernel plus direct runtime-kernel DSL bundle families whose
+   proof-facing fields are likewise probe-checked against re-publication, along
+   with the full confidential-core bundle family including the shell-boundary
+   slot/lowering composites. The post-call `ExecutionTrace` now follows the
+   same rule for every proof-bearing runtime payload: seed, kernel witness,
+   runtime-phase witness, stored trusted-kernel bundle, controller certificate,
+   and ORAM witness snapshots are all accessor-only on the Rust side, and the
+   probe checks both that privacy boundary and accessor-only consumer usage.
+   The intermediate `RuntimeExecutionTraceParts` carrier now also has one
+   explicit constructor and one production construction site. The certificate-
+   based `RuntimeRefinementWitness` constructors are now internal to `uo-core`
+   rather than a public reassembly surface.
 6. Mostly completed on the Rust side: non-kernel secret buffers have been
    aggressively removed or put under wipe discipline; the remaining theorem
    work is to connect that discipline to the final formal model.

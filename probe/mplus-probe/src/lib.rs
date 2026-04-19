@@ -17,11 +17,10 @@ use uo_core::{
     BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
     CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact, ContractMetadata,
     LogicalEvent, NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
-    RuntimeConfidentialCoreBundle, RuntimeConfidentialCoreLoweringBundle,
-    RuntimeConfidentialCoreSlotBundle, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
-    RuntimeOramAccessCounterWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness,
-    RuntimeRefinementWitness, RuntimeShellContract, RuntimeShellTrace,
-    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value, WriteClass,
+    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramAccessCounterWitness,
+    RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimeRefinementWitness,
+    RuntimeShellContract, RuntimeShellTrace, SeededRuntimePathOramWitnessFamily,
+    SgxControllerShapeTrace, Value, WriteClass,
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
 
@@ -2225,14 +2224,14 @@ fn run_tamper_validation() -> Result<JsonValue> {
     let kernel_witness =
         exact_confidential_kernel_witness(&trace, &artifact, target.entrypoint)?
             .ok_or_else(|| anyhow!("tamper validation scenario is not confidential"))?;
-    if trace.runtime_kernel_witness.as_ref() != Some(&kernel_witness) {
+    if trace.runtime_kernel_witness() != Some(&kernel_witness) {
         return Err(anyhow!(
             "tamper validation scenario did not preserve the exact runtime kernel witness"
         ));
     }
     let runtime_kernel_refinement_witness = trace
-        .runtime_kernel_refinement_witness
-        .clone()
+        .runtime_kernel_refinement_witness()
+        .cloned()
         .ok_or_else(|| {
             anyhow!("tamper validation scenario is missing runtime kernel refinement witness")
         })?;
@@ -2245,21 +2244,12 @@ fn run_tamper_validation() -> Result<JsonValue> {
         .runtime_kernel_slot_dsl_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
     let kernel_lowering_bundle = artifact
         .runtime_kernel_lowering_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
-    let shell_boundary_slot_bundle =
-        artifact.runtime_shell_boundary_slot_bundle(shell_boundary_bundle.clone())?;
-    let shell_boundary_lowering_bundle =
-        artifact.runtime_shell_boundary_lowering_bundle(shell_boundary_bundle.clone())?;
-    let confidential_core_bundle =
-        RuntimeConfidentialCoreBundle::from_runtime_witness(runtime_witness.clone(), &artifact)?;
-    let confidential_core_slot_bundle = RuntimeConfidentialCoreSlotBundle::from_runtime_witness(
-        runtime_witness.clone(),
-        &artifact,
-    )?;
+    let shell_boundary_slot_bundle = trace.runtime_shell_boundary_slot_bundle(&artifact)?;
+    let shell_boundary_lowering_bundle = trace.runtime_shell_boundary_lowering_bundle(&artifact)?;
+    let confidential_core_bundle = trace.runtime_confidential_core_bundle(&artifact)?;
+    let confidential_core_slot_bundle = trace.runtime_confidential_core_slot_bundle(&artifact)?;
     let confidential_core_lowering_bundle =
-        RuntimeConfidentialCoreLoweringBundle::from_runtime_witness(
-            runtime_witness.clone(),
-            &artifact,
-        )?;
+        trace.runtime_confidential_core_lowering_bundle(&artifact)?;
     let confidential_core_shell_boundary_slot_bundle =
         trace.runtime_confidential_core_shell_boundary_slot_bundle(&artifact)?;
     let confidential_core_shell_boundary_lowering_bundle =
@@ -2329,13 +2319,23 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_controller_certificate = controller_certificate.clone();
+    let mut tampered_controller_certificate = serde_json::to_value(&controller_certificate)?;
     let observed_access = tampered_controller_certificate
-        .controller_certificate
-        .observed_oram_accesses
-        .first_mut()
+        .get_mut("controller_certificate")
+        .and_then(JsonValue::as_object_mut)
+        .and_then(|certificate| certificate.get_mut("observed_oram_accesses"))
+        .and_then(JsonValue::as_array_mut)
+        .and_then(|accesses| accesses.first_mut())
+        .and_then(JsonValue::as_object_mut)
         .ok_or_else(|| anyhow!("controller tamper scenario missing observed ORAM access"))?;
-    observed_access.recursion_depth = observed_access.recursion_depth.saturating_add(1);
+    let recursion_depth = observed_access
+        .get("recursion_depth")
+        .and_then(JsonValue::as_u64)
+        .ok_or_else(|| anyhow!("controller tamper scenario missing recursion_depth"))?;
+    observed_access.insert(
+        "recursion_depth".into(),
+        json!(recursion_depth.saturating_add(1)),
+    );
     scenarios.push(validate_tampered_json_case(
         "controller/controller_shape_drift",
         &tampered_controller_certificate,
@@ -2356,17 +2356,21 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_hidden_certificate = hidden_certificate.clone();
+    let mut tampered_hidden_certificate = serde_json::to_value(&hidden_certificate)?;
     let first_leaf = tampered_hidden_certificate
-        .oram_position_map_after
-        .first_mut()
-        .and_then(|position_map| position_map.leaves.first_mut())
+        .get_mut("oram_position_map_after")
+        .and_then(JsonValue::as_array_mut)
+        .and_then(|maps| maps.first_mut())
+        .and_then(JsonValue::as_object_mut)
+        .and_then(|position_map| position_map.get_mut("leaves"))
+        .and_then(JsonValue::as_array_mut)
+        .and_then(|leaves| leaves.first_mut())
         .ok_or_else(|| anyhow!("hidden-state tamper scenario missing position-map leaf"))?;
-    let drifted_leaf = match *first_leaf {
-        Some(leaf) => leaf.saturating_add(1),
-        None => 0,
+    let drifted_leaf = match first_leaf.as_u64() {
+        Some(leaf) => json!(leaf.saturating_add(1)),
+        None => json!(0),
     };
-    *first_leaf = Some(drifted_leaf);
+    *first_leaf = drifted_leaf;
     scenarios.push(validate_tampered_json_case(
         "hidden/path_oram_leaf_state_drift",
         &tampered_hidden_certificate,
@@ -2384,19 +2388,17 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_kernel_dsl_bundle = kernel_dsl_bundle.clone();
-    let original_kernel_dsl_statement_count =
-        tampered_kernel_dsl_bundle.confidential_program.body.len();
-    if tampered_kernel_dsl_bundle
-        .confidential_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let original_kernel_dsl_statement_count = kernel_dsl_bundle.confidential_program().body.len();
+    let mut tampered_kernel_dsl_bundle = serde_json::to_value(&kernel_dsl_bundle)?;
+    let kernel_dsl_body = tampered_kernel_dsl_bundle["confidential_program"]["body"]
+        .as_array_mut()
+        .ok_or_else(|| anyhow!("kernel DSL tamper scenario missing confidential program body"))?;
+    if kernel_dsl_body.pop().is_none() {
         return Err(anyhow!(
             "kernel DSL tamper scenario missing confidential program body"
         ));
     }
+    let tampered_kernel_dsl_statement_count = kernel_dsl_body.len();
     scenarios.push(validate_tampered_json_case(
         "kernel_dsl/program_body_drift",
         &tampered_kernel_dsl_bundle,
@@ -2412,29 +2414,34 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final named confidential-kernel statement",
             "statement_count_before": original_kernel_dsl_statement_count,
-            "statement_count_after": tampered_kernel_dsl_bundle.confidential_program.body.len(),
+            "statement_count_after": tampered_kernel_dsl_statement_count,
         }),
     )?);
 
-    let mut tampered_kernel_slot_dsl_bundle = kernel_slot_dsl_bundle.clone();
-    let original_kernel_slot_statement_count = tampered_kernel_slot_dsl_bundle
-        .confidential_slot_program
+    let original_kernel_slot_statement_count = kernel_slot_dsl_bundle
+        .confidential_slot_program()
         .body
         .len();
-    if tampered_kernel_slot_dsl_bundle
-        .confidential_slot_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let mut tampered_kernel_slot_dsl_bundle = serde_json::to_value(&kernel_slot_dsl_bundle)?;
+    let kernel_slot_dsl_body = tampered_kernel_slot_dsl_bundle["confidential_slot_program"]["body"]
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow!("kernel slot DSL tamper scenario missing confidential slot program body")
+        })?;
+    if kernel_slot_dsl_body.pop().is_none() {
         return Err(anyhow!(
             "kernel slot DSL tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_kernel_slot_statement_count = kernel_slot_dsl_body.len();
     scenarios.push(validate_tampered_json_case(
         "kernel_slot_dsl/program_body_drift",
         &tampered_kernel_slot_dsl_bundle,
-        |bundle_path| Ok(Command::new(&kernel_slot_dsl_checker).arg(bundle_path).output()?),
+        |bundle_path| {
+            Ok(Command::new(&kernel_slot_dsl_checker)
+                .arg(bundle_path)
+                .output()?)
+        },
         json!({
             "scenario": "kernel_slot_dsl/program_body_drift",
             "artifact_kind": "proofgrade_runtime_kernel_slot_dsl_bundle",
@@ -2442,25 +2449,27 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement",
             "statement_count_before": original_kernel_slot_statement_count,
-            "statement_count_after": tampered_kernel_slot_dsl_bundle.confidential_slot_program.body.len(),
+            "statement_count_after": tampered_kernel_slot_statement_count,
         }),
     )?);
 
-    let mut tampered_kernel_lowering_bundle = kernel_lowering_bundle.clone();
-    let original_kernel_lowering_slot_statement_count = tampered_kernel_lowering_bundle
-        .confidential_slot_program
+    let original_kernel_lowering_slot_statement_count = kernel_lowering_bundle
+        .confidential_slot_program()
         .body
         .len();
-    if tampered_kernel_lowering_bundle
-        .confidential_slot_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let mut tampered_kernel_lowering_bundle = serde_json::to_value(&kernel_lowering_bundle)?;
+    let kernel_lowering_slot_body = tampered_kernel_lowering_bundle["confidential_slot_program"]
+        ["body"]
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow!("kernel lowering tamper scenario missing confidential slot program body")
+        })?;
+    if kernel_lowering_slot_body.pop().is_none() {
         return Err(anyhow!(
             "kernel lowering tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_kernel_lowering_slot_statement_count = kernel_lowering_slot_body.len();
     scenarios.push(validate_tampered_json_case(
         "kernel_lowering/slot_program_body_drift",
         &tampered_kernel_lowering_bundle,
@@ -2472,7 +2481,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement while keeping the named program fixed",
             "statement_count_before": original_kernel_lowering_slot_statement_count,
-            "statement_count_after": tampered_kernel_lowering_bundle.confidential_slot_program.body.len(),
+            "statement_count_after": tampered_kernel_lowering_slot_statement_count,
         }),
     )?);
 
@@ -2535,31 +2544,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_shell_boundary_bundle = shell_boundary_bundle.clone();
-    tampered_shell_boundary_bundle.shell_trace = RuntimeShellTrace::from_components(
-        tampered_shell_boundary_bundle.shell_trace.events().to_vec(),
-        tampered_shell_boundary_bundle
-            .shell_trace
-            .projected_kernel_schedule()
-            .clone(),
-        tampered_shell_boundary_bundle
-            .shell_trace
-            .pre_committed_cold_object_schedule()
-            .to_vec(),
-        tampered_shell_boundary_bundle
-            .shell_trace
-            .shadow_load_object_schedule()
-            .to_vec(),
-        vec![],
-        tampered_shell_boundary_bundle
-            .shell_trace
-            .cold_store_object_schedule()
-            .to_vec(),
-        tampered_shell_boundary_bundle
-            .shell_trace
-            .post_committed_cold_object_schedule()
-            .to_vec(),
-    );
+    let mut tampered_shell_boundary_bundle = serde_json::to_value(&shell_boundary_bundle)?;
+    tampered_shell_boundary_bundle["shell_trace"]["commit_object_schedule"] = json!([]);
     scenarios.push(validate_tampered_json_case(
         "shell_boundary/trace_summary_drift",
         &tampered_shell_boundary_bundle,
@@ -2573,22 +2559,27 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_shell_boundary_lowering_bundle = shell_boundary_lowering_bundle.clone();
-    let original_shell_boundary_lowering_slot_statement_count =
-        tampered_shell_boundary_lowering_bundle
-            .confidential_slot_program
-            .body
-            .len();
-    if tampered_shell_boundary_lowering_bundle
-        .confidential_slot_program
+    let original_shell_boundary_lowering_slot_statement_count = shell_boundary_lowering_bundle
+        .confidential_slot_program()
         .body
-        .pop()
-        .is_none()
-    {
+        .len();
+    let mut tampered_shell_boundary_lowering_bundle =
+        serde_json::to_value(&shell_boundary_lowering_bundle)?;
+    let shell_boundary_lowering_slot_body = tampered_shell_boundary_lowering_bundle
+        ["confidential_slot_program"]["body"]
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow!(
+                "shell-boundary lowering tamper scenario missing confidential slot program body"
+            )
+        })?;
+    if shell_boundary_lowering_slot_body.pop().is_none() {
         return Err(anyhow!(
             "shell-boundary lowering tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_shell_boundary_lowering_slot_statement_count =
+        shell_boundary_lowering_slot_body.len();
     scenarios.push(validate_tampered_json_case(
         "shell_boundary_lowering/slot_program_body_drift",
         &tampered_shell_boundary_lowering_bundle,
@@ -2600,25 +2591,28 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement while keeping the shell-boundary witness fixed",
             "statement_count_before": original_shell_boundary_lowering_slot_statement_count,
-            "statement_count_after": tampered_shell_boundary_lowering_bundle.confidential_slot_program.body.len(),
+            "statement_count_after": tampered_shell_boundary_lowering_slot_statement_count,
         }),
     )?);
 
-    let mut tampered_shell_boundary_slot_bundle = shell_boundary_slot_bundle.clone();
-    let original_shell_boundary_slot_statement_count = tampered_shell_boundary_slot_bundle
-        .confidential_slot_program
+    let original_shell_boundary_slot_statement_count = shell_boundary_slot_bundle
+        .confidential_slot_program()
         .body
         .len();
-    if tampered_shell_boundary_slot_bundle
-        .confidential_slot_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let mut tampered_shell_boundary_slot_bundle =
+        serde_json::to_value(&shell_boundary_slot_bundle)?;
+    let shell_boundary_slot_body = tampered_shell_boundary_slot_bundle["confidential_slot_program"]
+        ["body"]
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow!("shell-boundary slot tamper scenario missing confidential slot program body")
+        })?;
+    if shell_boundary_slot_body.pop().is_none() {
         return Err(anyhow!(
             "shell-boundary slot tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_shell_boundary_slot_statement_count = shell_boundary_slot_body.len();
     scenarios.push(validate_tampered_json_case(
         "shell_boundary_slot/slot_program_body_drift",
         &tampered_shell_boundary_slot_bundle,
@@ -2630,25 +2624,24 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement while keeping the shell-boundary witness fixed",
             "statement_count_before": original_shell_boundary_slot_statement_count,
-            "statement_count_after": tampered_shell_boundary_slot_bundle.confidential_slot_program.body.len(),
+            "statement_count_after": tampered_shell_boundary_slot_statement_count,
         }),
     )?);
 
-    let mut tampered_confidential_core_bundle = confidential_core_bundle.clone();
-    let original_confidential_core_statement_count = tampered_confidential_core_bundle
-        .confidential_program
-        .body
-        .len();
-    if tampered_confidential_core_bundle
-        .confidential_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let original_confidential_core_statement_count =
+        confidential_core_bundle.confidential_program().body.len();
+    let mut tampered_confidential_core_bundle = serde_json::to_value(&confidential_core_bundle)?;
+    let confidential_core_body = tampered_confidential_core_bundle["confidential_program"]["body"]
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow!("confidential-core tamper scenario missing confidential program body")
+        })?;
+    if confidential_core_body.pop().is_none() {
         return Err(anyhow!(
             "confidential-core tamper scenario missing confidential program body"
         ));
     }
+    let tampered_confidential_core_statement_count = confidential_core_body.len();
     scenarios.push(validate_tampered_json_case(
         "confidential_core/program_body_drift",
         &tampered_confidential_core_bundle,
@@ -2667,25 +2660,28 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final named confidential-kernel statement while keeping the runtime witness fixed",
             "statement_count_before": original_confidential_core_statement_count,
-            "statement_count_after": tampered_confidential_core_bundle.confidential_program.body.len(),
+            "statement_count_after": tampered_confidential_core_statement_count,
         }),
     )?);
 
-    let mut tampered_confidential_core_slot_bundle = confidential_core_slot_bundle.clone();
-    let original_confidential_core_slot_statement_count = tampered_confidential_core_slot_bundle
-        .confidential_slot_program
+    let original_confidential_core_slot_statement_count = confidential_core_slot_bundle
+        .confidential_slot_program()
         .body
         .len();
-    if tampered_confidential_core_slot_bundle
-        .confidential_slot_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let mut tampered_confidential_core_slot_bundle =
+        serde_json::to_value(&confidential_core_slot_bundle)?;
+    let confidential_core_slot_body = tampered_confidential_core_slot_bundle
+        ["confidential_slot_program"]["body"]
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow!("confidential-core slot tamper scenario missing confidential slot program body")
+        })?;
+    if confidential_core_slot_body.pop().is_none() {
         return Err(anyhow!(
             "confidential-core slot tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_confidential_core_slot_statement_count = confidential_core_slot_body.len();
     scenarios.push(validate_tampered_json_case(
         "confidential_core_slot/program_body_drift",
         &tampered_confidential_core_slot_bundle,
@@ -2704,26 +2700,32 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement while keeping the runtime witness fixed",
             "statement_count_before": original_confidential_core_slot_statement_count,
-            "statement_count_after": tampered_confidential_core_slot_bundle.confidential_slot_program.body.len(),
+            "statement_count_after": tampered_confidential_core_slot_statement_count,
         }),
     )?);
 
-    let mut tampered_confidential_core_lowering_bundle = confidential_core_lowering_bundle.clone();
     let original_confidential_core_lowering_slot_statement_count =
-        tampered_confidential_core_lowering_bundle
-            .confidential_slot_program
+        confidential_core_lowering_bundle
+            .confidential_slot_program()
             .body
             .len();
-    if tampered_confidential_core_lowering_bundle
-        .confidential_slot_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let mut tampered_confidential_core_lowering_bundle =
+        serde_json::to_value(&confidential_core_lowering_bundle)?;
+    let confidential_core_lowering_slot_body = tampered_confidential_core_lowering_bundle
+        ["confidential_slot_program"]["body"]
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow!(
+                "confidential-core lowering tamper scenario missing confidential slot program body"
+            )
+        })?;
+    if confidential_core_lowering_slot_body.pop().is_none() {
         return Err(anyhow!(
             "confidential-core lowering tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_confidential_core_lowering_slot_statement_count =
+        confidential_core_lowering_slot_body.len();
     scenarios.push(validate_tampered_json_case(
         "confidential_core_lowering/slot_program_body_drift",
         &tampered_confidential_core_lowering_bundle,
@@ -2742,20 +2744,27 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement while keeping the named program and runtime witness fixed",
             "statement_count_before": original_confidential_core_lowering_slot_statement_count,
-            "statement_count_after": tampered_confidential_core_lowering_bundle.confidential_slot_program.body.len(),
+            "statement_count_after": tampered_confidential_core_lowering_slot_statement_count,
         }),
     )?);
 
-    let mut tampered_confidential_core_shell_boundary_lowering_bundle =
-        confidential_core_shell_boundary_lowering_bundle.clone();
     let original_confidential_core_shell_boundary_lowering_slot_statement_count =
-        tampered_confidential_core_shell_boundary_lowering_bundle
-            .confidential_slot_program
+        confidential_core_shell_boundary_lowering_bundle
+            .confidential_slot_program()
             .body
             .len();
-    if tampered_confidential_core_shell_boundary_lowering_bundle
-        .confidential_slot_program
-        .body
+    let mut tampered_confidential_core_shell_boundary_lowering_bundle =
+        serde_json::to_value(&confidential_core_shell_boundary_lowering_bundle)?;
+    let confidential_core_shell_boundary_lowering_slot_body =
+        tampered_confidential_core_shell_boundary_lowering_bundle["confidential_slot_program"]
+            ["body"]
+            .as_array_mut()
+            .ok_or_else(|| {
+                anyhow!(
+                    "confidential-core shell-boundary lowering tamper scenario missing confidential slot program body"
+                )
+            })?;
+    if confidential_core_shell_boundary_lowering_slot_body
         .pop()
         .is_none()
     {
@@ -2763,6 +2772,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "confidential-core shell-boundary lowering tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_confidential_core_shell_boundary_lowering_slot_statement_count =
+        confidential_core_shell_boundary_lowering_slot_body.len();
     scenarios.push(validate_tampered_json_case(
         "confidential_core_shell_boundary_lowering/slot_program_body_drift",
         &tampered_confidential_core_shell_boundary_lowering_bundle,
@@ -2781,27 +2792,33 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement while keeping the runtime witness and shell-boundary bundle fixed",
             "statement_count_before": original_confidential_core_shell_boundary_lowering_slot_statement_count,
-            "statement_count_after": tampered_confidential_core_shell_boundary_lowering_bundle.confidential_slot_program.body.len(),
+            "statement_count_after":
+                tampered_confidential_core_shell_boundary_lowering_slot_statement_count,
         }),
     )?);
 
-    let mut tampered_confidential_core_shell_boundary_slot_bundle =
-        confidential_core_shell_boundary_slot_bundle.clone();
     let original_confidential_core_shell_boundary_slot_statement_count =
-        tampered_confidential_core_shell_boundary_slot_bundle
-            .confidential_slot_program
+        confidential_core_shell_boundary_slot_bundle
+            .confidential_slot_program()
             .body
             .len();
-    if tampered_confidential_core_shell_boundary_slot_bundle
-        .confidential_slot_program
-        .body
-        .pop()
-        .is_none()
-    {
+    let mut tampered_confidential_core_shell_boundary_slot_bundle =
+        serde_json::to_value(&confidential_core_shell_boundary_slot_bundle)?;
+    let confidential_core_shell_boundary_slot_body =
+        tampered_confidential_core_shell_boundary_slot_bundle["confidential_slot_program"]["body"]
+            .as_array_mut()
+            .ok_or_else(|| {
+                anyhow!(
+                    "confidential-core shell-boundary slot tamper scenario missing confidential slot program body"
+                )
+            })?;
+    if confidential_core_shell_boundary_slot_body.pop().is_none() {
         return Err(anyhow!(
             "confidential-core shell-boundary slot tamper scenario missing confidential slot program body"
         ));
     }
+    let tampered_confidential_core_shell_boundary_slot_statement_count =
+        confidential_core_shell_boundary_slot_body.len();
     scenarios.push(validate_tampered_json_case(
         "confidential_core_shell_boundary_slot/slot_program_body_drift",
         &tampered_confidential_core_shell_boundary_slot_bundle,
@@ -2820,17 +2837,18 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot confidential-kernel statement while keeping the runtime witness and shell-boundary bundle fixed",
             "statement_count_before": original_confidential_core_shell_boundary_slot_statement_count,
-            "statement_count_after": tampered_confidential_core_shell_boundary_slot_bundle.confidential_slot_program.body.len(),
+            "statement_count_after":
+                tampered_confidential_core_shell_boundary_slot_statement_count,
         }),
     )?);
 
-    let mut tampered_runtime_witness = runtime_witness.clone();
-    let witnessed_access = tampered_runtime_witness
-        .controller_certificate
-        .observed_oram_accesses
-        .first_mut()
+    let mut tampered_runtime_witness = serde_json::to_value(&runtime_witness)?;
+    let witnessed_access = tampered_runtime_witness["controller_certificate"]
+        ["observed_oram_accesses"]
+        .get_mut(0)
         .ok_or_else(|| anyhow!("runtime witness tamper scenario missing observed ORAM access"))?;
-    witnessed_access.recursion_depth = witnessed_access.recursion_depth.saturating_add(1);
+    let old_depth = witnessed_access["recursion_depth"].as_u64().unwrap_or(0);
+    witnessed_access["recursion_depth"] = json!(old_depth.saturating_add(1));
     scenarios.push(validate_tampered_json_case(
         "runtime_witness/controller_certificate_drift",
         &tampered_runtime_witness,
@@ -2851,21 +2869,19 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_trusted_kernel_bundle = trusted_kernel_bundle.clone();
-    let trusted_leaf = tampered_trusted_kernel_bundle
-        .trusted_kernel_bundle
-        .hidden_certificate
-        .oram_position_map_after
-        .first_mut()
-        .and_then(|position_map| position_map.leaves.first_mut())
+    let mut tampered_trusted_kernel_bundle = serde_json::to_value(&trusted_kernel_bundle)?;
+    let trusted_leaf = tampered_trusted_kernel_bundle["trusted_kernel_bundle"]
+        ["hidden_certificate"]["oram_position_map_after"]
+        .get_mut(0)
+        .and_then(|position_map| position_map["leaves"].get_mut(0))
         .ok_or_else(|| {
             anyhow!("trusted-kernel tamper scenario missing hidden position-map leaf")
         })?;
-    let drifted_trusted_leaf = match *trusted_leaf {
-        Some(leaf) => leaf.saturating_add(1),
-        None => 0,
-    };
-    *trusted_leaf = Some(drifted_trusted_leaf);
+    let drifted_trusted_leaf = trusted_leaf
+        .as_u64()
+        .map(|leaf| leaf.saturating_add(1))
+        .unwrap_or(0);
+    *trusted_leaf = json!(drifted_trusted_leaf);
     scenarios.push(validate_tampered_json_case(
         "trusted_kernel/hidden_state_drift",
         &tampered_trusted_kernel_bundle,
@@ -2886,14 +2902,14 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_seeded_family =
-        collect_seeded_pathoram_family(&artifact, &[], target.entrypoint, target.args.clone(), 8)?
-            .family;
-    let second_seeded_witness = tampered_seeded_family
-        .witnesses
+    let mut tampered_seeded_family = serde_json::to_value(
+        &collect_seeded_pathoram_family(&artifact, &[], target.entrypoint, target.args.clone(), 8)?
+            .family,
+    )?;
+    let second_seeded_witness = tampered_seeded_family["witnesses"]
         .get_mut(1)
         .ok_or_else(|| anyhow!("seeded family tamper scenario needs at least two witnesses"))?;
-    second_seeded_witness.runtime_seed = Some(99);
+    second_seeded_witness["runtime_seed"] = json!(99);
     scenarios.push(validate_tampered_json_case(
         "seeded_witness_family/seed_tag_drift",
         &tampered_seeded_family,
@@ -2914,19 +2930,25 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_fresh_coin_family = collect_canonical_fresh_coin_family_case(
+    let tampered_fresh_coin_family = collect_canonical_fresh_coin_family_case(
         "SingleAccessMap/pathoram/put-fresh-coins-tamper",
         &artifact,
         &[],
         &target,
     )?
     .family;
-    if tampered_fresh_coin_family.seed_count == 0 {
+    if tampered_fresh_coin_family.seed_count() == 0 {
         return Err(anyhow!(
             "fresh-coin family tamper scenario has empty seed space"
         ));
     }
-    tampered_fresh_coin_family.seed_count -= 1;
+    let mut tampered_fresh_coin_family = serde_json::to_value(&tampered_fresh_coin_family)?;
+    tampered_fresh_coin_family["seed_count"] = json!(
+        tampered_fresh_coin_family["seed_count"]
+            .as_u64()
+            .unwrap_or_default()
+            - 1
+    );
     scenarios.push(validate_tampered_json_case(
         "fresh_coin_family/seed_count_drift",
         &tampered_fresh_coin_family,
@@ -2947,15 +2969,17 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_fresh_coin_theorem_input = collect_canonical_fresh_coin_theorem_input_case(
+    let tampered_fresh_coin_theorem_input = collect_canonical_fresh_coin_theorem_input_case(
         "SingleAccessMap/pathoram/put-fresh-coins-theorem-input-tamper",
         &artifact,
         &[],
         &target,
     )?
     .input;
-    tampered_fresh_coin_theorem_input.representative_seed =
-        tampered_fresh_coin_theorem_input.seed_count;
+    let mut tampered_fresh_coin_theorem_input =
+        serde_json::to_value(&tampered_fresh_coin_theorem_input)?;
+    tampered_fresh_coin_theorem_input["representative_seed"] =
+        tampered_fresh_coin_theorem_input["seed_count"].clone();
     scenarios.push(validate_tampered_json_case(
         "fresh_coin_theorem_input/representative_seed_drift",
         &tampered_fresh_coin_theorem_input,
@@ -2976,22 +3000,21 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_pathoram_pair_certificate = build_seeded_pathoram_pair_certificate(
-        "SingleAccessMap/pathoram/put-pair-tamper",
-        &artifact,
-        &[],
-        &target,
-        &pair_target,
-        8,
-    )?;
-    let rhs_seeded_pair_witness = tampered_pathoram_pair_certificate
-        .rhs_family
-        .witnesses
+    let mut tampered_pathoram_pair_certificate =
+        serde_json::to_value(&build_seeded_pathoram_pair_certificate(
+            "SingleAccessMap/pathoram/put-pair-tamper",
+            &artifact,
+            &[],
+            &target,
+            &pair_target,
+            8,
+        )?)?;
+    let rhs_seeded_pair_witness = tampered_pathoram_pair_certificate["rhs_family"]["witnesses"]
         .get_mut(1)
         .ok_or_else(|| {
             anyhow!("path-ORAM pair tamper scenario needs at least two rhs witnesses")
         })?;
-    rhs_seeded_pair_witness.runtime_seed = Some(99);
+    rhs_seeded_pair_witness["runtime_seed"] = json!(99);
     scenarios.push(validate_tampered_json_case(
         "pathoram_pair/seed_tag_drift",
         &tampered_pathoram_pair_certificate,
@@ -3012,26 +3035,29 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_canonical_pathoram_pair_certificate =
-        build_canonical_pathoram_pair_certificate(
-            "SingleAccessMap/pathoram/put-canonical-pair-tamper",
-            &artifact,
-            &[],
-            &target,
-            &pair_target,
-        )?;
+    let tampered_canonical_pathoram_pair_certificate = build_canonical_pathoram_pair_certificate(
+        "SingleAccessMap/pathoram/put-canonical-pair-tamper",
+        &artifact,
+        &[],
+        &target,
+        &pair_target,
+    )?;
     if tampered_canonical_pathoram_pair_certificate
         .rhs_family
-        .seed_count
+        .seed_count()
         == 0
     {
         return Err(anyhow!(
             "canonical path-ORAM pair tamper scenario has empty rhs canonical seed space"
         ));
     }
-    tampered_canonical_pathoram_pair_certificate
-        .rhs_family
-        .seed_count -= 1;
+    let mut tampered_canonical_pathoram_pair_certificate =
+        serde_json::to_value(&tampered_canonical_pathoram_pair_certificate)?;
+    let rhs_seed_count = tampered_canonical_pathoram_pair_certificate["rhs_family"]["seed_count"]
+        .as_u64()
+        .unwrap_or_default();
+    tampered_canonical_pathoram_pair_certificate["rhs_family"]["seed_count"] =
+        json!(rhs_seed_count - 1);
     scenarios.push(validate_tampered_json_case(
         "canonical_pathoram_pair/seed_count_drift",
         &tampered_canonical_pathoram_pair_certificate,
@@ -3072,7 +3098,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
-    let mut tampered_canonical_pathoram_pair_theorem_input =
+    let tampered_canonical_pathoram_pair_theorem_input =
         build_canonical_pathoram_pair_theorem_input(
             "SingleAccessMap/pathoram/put-canonical-pair-theorem-input-tamper",
             &artifact,
@@ -3080,11 +3106,10 @@ fn run_tamper_validation() -> Result<JsonValue> {
             &target,
             &pair_target,
         )?;
-    tampered_canonical_pathoram_pair_theorem_input
-        .rhs_input
-        .representative_seed = tampered_canonical_pathoram_pair_theorem_input
-        .rhs_input
-        .seed_count;
+    let mut tampered_canonical_pathoram_pair_theorem_input =
+        serde_json::to_value(&tampered_canonical_pathoram_pair_theorem_input)?;
+    tampered_canonical_pathoram_pair_theorem_input["rhs_input"]["representative_seed"] =
+        tampered_canonical_pathoram_pair_theorem_input["rhs_input"]["seed_count"].clone();
     scenarios.push(validate_tampered_json_case(
         "canonical_pathoram_pair_theorem_input/representative_seed_drift",
         &tampered_canonical_pathoram_pair_theorem_input,
@@ -4628,13 +4653,13 @@ fn validate_witness_case(
     let witness = trace.runtime_refinement_witness()?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if witness.kernel_witness != exact_kernel_witness {
+    if witness.kernel_witness() != exact_kernel_witness.as_ref() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if witness.runtime_kernel_refinement_witness != trace.runtime_kernel_refinement_witness {
+    if witness.runtime_kernel_refinement_witness() != trace.runtime_kernel_refinement_witness() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the runtime phase witness",
             name
@@ -4661,15 +4686,15 @@ fn validate_witness_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "boundary_events": witness.boundary_schedule.len(),
-        "controller_phase_count": witness.controller_shape.controller_phase_order.len(),
-        "controller_accesses": witness.controller_certificate.observed_oram_accesses.len(),
-        "page_trace_events": witness.normalized_micro_trace.page_trace.len(),
-        "exit_events": witness.normalized_micro_trace.exit_pattern.len(),
-        "shared_resource_events": witness.normalized_micro_trace.shared_resource_pattern.len(),
+        "boundary_events": witness.boundary_schedule().len(),
+        "controller_phase_count": witness.controller_shape().controller_phase_order.len(),
+        "controller_accesses": witness.controller_certificate().observed_oram_accesses().len(),
+        "page_trace_events": witness.normalized_micro_trace().page_trace.len(),
+        "exit_events": witness.normalized_micro_trace().exit_pattern.len(),
+        "shared_resource_events": witness.normalized_micro_trace().shared_resource_pattern.len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            witness.runtime_kernel_refinement_witness.as_ref(),
+            witness.runtime_kernel_refinement_witness(),
             exact_kernel_witness.as_ref(),
         ),
         "witness_json_bytes": witness_json_bytes,
@@ -4689,20 +4714,20 @@ fn validate_confidential_core_case(
     let witness = trace.runtime_refinement_witness()?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if witness.kernel_witness != exact_kernel_witness {
+    if witness.kernel_witness() != exact_kernel_witness.as_ref() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if witness.runtime_kernel_refinement_witness != trace.runtime_kernel_refinement_witness {
+    if witness.runtime_kernel_refinement_witness() != trace.runtime_kernel_refinement_witness() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the runtime phase witness",
             name
         ));
     }
 
-    let bundle = RuntimeConfidentialCoreBundle::from_runtime_witness(witness.clone(), artifact)?;
+    let bundle = trace.runtime_confidential_core_bundle(artifact)?;
     let fragment_witness = artifact.confidential_fragment_witness();
     let fragment_entrypoint = fragment_witness
         .entrypoint(target.entrypoint)
@@ -4734,23 +4759,24 @@ fn validate_confidential_core_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "boundary_events": witness.boundary_schedule.len(),
-        "controller_phase_count": witness.controller_shape.controller_phase_order.len(),
-        "controller_accesses": witness.controller_certificate.observed_oram_accesses.len(),
-        "page_trace_events": witness.normalized_micro_trace.page_trace.len(),
-        "exit_events": witness.normalized_micro_trace.exit_pattern.len(),
-        "shared_resource_events": witness.normalized_micro_trace.shared_resource_pattern.len(),
+        "boundary_events": witness.boundary_schedule().len(),
+        "controller_phase_count": witness.controller_shape().controller_phase_order.len(),
+        "controller_accesses": witness.controller_certificate().observed_oram_accesses().len(),
+        "page_trace_events": witness.normalized_micro_trace().page_trace.len(),
+        "exit_events": witness.normalized_micro_trace().exit_pattern.len(),
+        "shared_resource_events": witness.normalized_micro_trace().shared_resource_pattern.len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            witness.runtime_kernel_refinement_witness.as_ref(),
+            witness.runtime_kernel_refinement_witness(),
             exact_kernel_witness.as_ref(),
         ),
         "confidential_program": {
-            "entrypoint_id": bundle.confidential_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_program.params.len(),
-            "secret_arg_count": bundle.confidential_program.secret_args.len(),
-            "statement_count": bundle.confidential_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_program.expected_runtime_steps().len(),
+            "entrypoint_id": bundle.confidential_program().entrypoint_id.as_str(),
+            "param_count": bundle.confidential_program().params.len(),
+            "secret_arg_count": bundle.confidential_program().secret_args.len(),
+            "statement_count": bundle.confidential_program().body.len(),
+            "expected_runtime_step_count":
+                bundle.confidential_program().expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_fragment_witness": {
@@ -4783,21 +4809,20 @@ fn validate_confidential_core_slot_case(
     let witness = trace.runtime_refinement_witness()?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if witness.kernel_witness != exact_kernel_witness {
+    if witness.kernel_witness() != exact_kernel_witness.as_ref() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if witness.runtime_kernel_refinement_witness != trace.runtime_kernel_refinement_witness {
+    if witness.runtime_kernel_refinement_witness() != trace.runtime_kernel_refinement_witness() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the runtime phase witness",
             name
         ));
     }
 
-    let bundle =
-        RuntimeConfidentialCoreSlotBundle::from_runtime_witness(witness.clone(), artifact)?;
+    let bundle = trace.runtime_confidential_core_slot_bundle(artifact)?;
     let fragment_witness = artifact.confidential_fragment_witness();
     let fragment_entrypoint = fragment_witness
         .entrypoint(target.entrypoint)
@@ -4829,24 +4854,25 @@ fn validate_confidential_core_slot_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "boundary_events": witness.boundary_schedule.len(),
-        "controller_phase_count": witness.controller_shape.controller_phase_order.len(),
-        "controller_accesses": witness.controller_certificate.observed_oram_accesses.len(),
-        "page_trace_events": witness.normalized_micro_trace.page_trace.len(),
-        "exit_events": witness.normalized_micro_trace.exit_pattern.len(),
-        "shared_resource_events": witness.normalized_micro_trace.shared_resource_pattern.len(),
+        "boundary_events": witness.boundary_schedule().len(),
+        "controller_phase_count": witness.controller_shape().controller_phase_order.len(),
+        "controller_accesses": witness.controller_certificate().observed_oram_accesses().len(),
+        "page_trace_events": witness.normalized_micro_trace().page_trace.len(),
+        "exit_events": witness.normalized_micro_trace().exit_pattern.len(),
+        "shared_resource_events": witness.normalized_micro_trace().shared_resource_pattern.len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            witness.runtime_kernel_refinement_witness.as_ref(),
+            witness.runtime_kernel_refinement_witness(),
             exact_kernel_witness.as_ref(),
         ),
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "entrypoint_id": bundle.confidential_slot_program().entrypoint_id.as_str(),
+            "param_count": bundle.confidential_slot_program().param_count,
+            "secret_arg_count": bundle.confidential_slot_program().secret_args.len(),
+            "slot_count": bundle.confidential_slot_program().slot_count,
+            "statement_count": bundle.confidential_slot_program().body.len(),
+            "expected_runtime_step_count":
+                bundle.confidential_slot_program().expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_fragment_witness": {
@@ -4879,13 +4905,14 @@ fn validate_confidential_core_shell_boundary_slot_case(
     let runtime_witness = trace.runtime_refinement_witness()?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if runtime_witness.kernel_witness != exact_kernel_witness {
+    if runtime_witness.kernel_witness() != exact_kernel_witness.as_ref() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if runtime_witness.runtime_kernel_refinement_witness != trace.runtime_kernel_refinement_witness
+    if runtime_witness.runtime_kernel_refinement_witness()
+        != trace.runtime_kernel_refinement_witness()
     {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the runtime phase witness",
@@ -4895,18 +4922,20 @@ fn validate_confidential_core_shell_boundary_slot_case(
 
     let shell_boundary_bundle = trace.runtime_shell_boundary_bundle()?;
     let bundle = trace.runtime_confidential_core_shell_boundary_slot_bundle(artifact)?;
-    if bundle.runtime_witness != runtime_witness {
+    if bundle.runtime_witness() != &runtime_witness {
         return Err(anyhow!(
             "confidential-core shell-boundary slot bundle for {} does not preserve the runtime witness",
             name
         ));
     }
-    if bundle.shell_boundary_bundle != shell_boundary_bundle {
+    if bundle.shell_boundary_bundle() != &shell_boundary_bundle {
         return Err(anyhow!(
             "confidential-core shell-boundary slot bundle for {} does not preserve the shell-boundary bundle",
             name
         ));
     }
+    let shell_boundary_bundle_ref = bundle.shell_boundary_bundle();
+    let confidential_slot_program = bundle.confidential_slot_program();
 
     let fragment_witness = artifact.confidential_fragment_witness();
     let fragment_entrypoint = fragment_witness
@@ -4940,31 +4969,33 @@ fn validate_confidential_core_shell_boundary_slot_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "boundary_events": runtime_witness.boundary_schedule.len(),
-        "controller_phase_count": runtime_witness.controller_shape.controller_phase_order.len(),
-        "controller_accesses": runtime_witness.controller_certificate.observed_oram_accesses.len(),
-        "page_trace_events": runtime_witness.normalized_micro_trace.page_trace.len(),
-        "exit_events": runtime_witness.normalized_micro_trace.exit_pattern.len(),
-        "shared_resource_events": runtime_witness.normalized_micro_trace.shared_resource_pattern.len(),
+        "boundary_events": runtime_witness.boundary_schedule().len(),
+        "controller_phase_count": runtime_witness.controller_shape().controller_phase_order.len(),
+        "controller_accesses": runtime_witness.controller_certificate().observed_oram_accesses().len(),
+        "page_trace_events": runtime_witness.normalized_micro_trace().page_trace.len(),
+        "exit_events": runtime_witness.normalized_micro_trace().exit_pattern.len(),
+        "shared_resource_events":
+            runtime_witness.normalized_micro_trace().shared_resource_pattern.len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            runtime_witness.runtime_kernel_refinement_witness.as_ref(),
+            runtime_witness.runtime_kernel_refinement_witness(),
             exact_kernel_witness.as_ref(),
         ),
         "shell_contract": runtime_shell_contract_summary(
-            &bundle.shell_boundary_bundle.shell_contract,
+            shell_boundary_bundle_ref.shell_contract(),
         ),
         "shell_trace": runtime_shell_trace_summary(
-            &bundle.shell_boundary_bundle.shell_trace,
-            Some(&bundle.shell_boundary_bundle.shell_contract),
+            shell_boundary_bundle_ref.shell_trace(),
+            Some(shell_boundary_bundle_ref.shell_contract()),
         ),
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
+            "param_count": confidential_slot_program.param_count,
+            "secret_arg_count": confidential_slot_program.secret_args.len(),
+            "slot_count": confidential_slot_program.slot_count,
+            "statement_count": confidential_slot_program.body.len(),
+            "expected_runtime_step_count":
+                confidential_slot_program.expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_fragment_witness": {
@@ -4998,21 +5029,20 @@ fn validate_confidential_core_lowering_case(
     let witness = trace.runtime_refinement_witness()?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if witness.kernel_witness != exact_kernel_witness {
+    if witness.kernel_witness() != exact_kernel_witness.as_ref() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if witness.runtime_kernel_refinement_witness != trace.runtime_kernel_refinement_witness {
+    if witness.runtime_kernel_refinement_witness() != trace.runtime_kernel_refinement_witness() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the runtime phase witness",
             name
         ));
     }
 
-    let bundle =
-        RuntimeConfidentialCoreLoweringBundle::from_runtime_witness(witness.clone(), artifact)?;
+    let bundle = trace.runtime_confidential_core_lowering_bundle(artifact)?;
     let fragment_witness = artifact.confidential_fragment_witness();
     let fragment_entrypoint = fragment_witness
         .entrypoint(target.entrypoint)
@@ -5045,32 +5075,34 @@ fn validate_confidential_core_lowering_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "boundary_events": witness.boundary_schedule.len(),
-        "controller_phase_count": witness.controller_shape.controller_phase_order.len(),
-        "controller_accesses": witness.controller_certificate.observed_oram_accesses.len(),
-        "page_trace_events": witness.normalized_micro_trace.page_trace.len(),
-        "exit_events": witness.normalized_micro_trace.exit_pattern.len(),
-        "shared_resource_events": witness.normalized_micro_trace.shared_resource_pattern.len(),
+        "boundary_events": witness.boundary_schedule().len(),
+        "controller_phase_count": witness.controller_shape().controller_phase_order.len(),
+        "controller_accesses": witness.controller_certificate().observed_oram_accesses().len(),
+        "page_trace_events": witness.normalized_micro_trace().page_trace.len(),
+        "exit_events": witness.normalized_micro_trace().exit_pattern.len(),
+        "shared_resource_events": witness.normalized_micro_trace().shared_resource_pattern.len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            witness.runtime_kernel_refinement_witness.as_ref(),
+            witness.runtime_kernel_refinement_witness(),
             exact_kernel_witness.as_ref(),
         ),
         "confidential_program": {
-            "entrypoint_id": bundle.confidential_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_program.params.len(),
-            "secret_arg_count": bundle.confidential_program.secret_args.len(),
-            "statement_count": bundle.confidential_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_program.expected_runtime_steps().len(),
+            "entrypoint_id": bundle.confidential_program().entrypoint_id.as_str(),
+            "param_count": bundle.confidential_program().params.len(),
+            "secret_arg_count": bundle.confidential_program().secret_args.len(),
+            "statement_count": bundle.confidential_program().body.len(),
+            "expected_runtime_step_count":
+                bundle.confidential_program().expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "entrypoint_id": bundle.confidential_slot_program().entrypoint_id.as_str(),
+            "param_count": bundle.confidential_slot_program().param_count,
+            "secret_arg_count": bundle.confidential_slot_program().secret_args.len(),
+            "slot_count": bundle.confidential_slot_program().slot_count,
+            "statement_count": bundle.confidential_slot_program().body.len(),
+            "expected_runtime_step_count":
+                bundle.confidential_slot_program().expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_fragment_witness": {
@@ -5104,13 +5136,14 @@ fn validate_confidential_core_shell_boundary_lowering_case(
     let runtime_witness = trace.runtime_refinement_witness()?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if runtime_witness.kernel_witness != exact_kernel_witness {
+    if runtime_witness.kernel_witness() != exact_kernel_witness.as_ref() {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if runtime_witness.runtime_kernel_refinement_witness != trace.runtime_kernel_refinement_witness
+    if runtime_witness.runtime_kernel_refinement_witness()
+        != trace.runtime_kernel_refinement_witness()
     {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the runtime phase witness",
@@ -5120,18 +5153,21 @@ fn validate_confidential_core_shell_boundary_lowering_case(
 
     let shell_boundary_bundle = trace.runtime_shell_boundary_bundle()?;
     let bundle = trace.runtime_confidential_core_shell_boundary_lowering_bundle(artifact)?;
-    if bundle.runtime_witness != runtime_witness {
+    if bundle.runtime_witness() != &runtime_witness {
         return Err(anyhow!(
             "confidential-core shell-boundary lowering bundle for {} does not preserve the runtime witness",
             name
         ));
     }
-    if bundle.shell_boundary_bundle != shell_boundary_bundle {
+    if bundle.shell_boundary_bundle() != &shell_boundary_bundle {
         return Err(anyhow!(
             "confidential-core shell-boundary lowering bundle for {} does not preserve the shell-boundary bundle",
             name
         ));
     }
+    let shell_boundary_bundle_ref = bundle.shell_boundary_bundle();
+    let confidential_program = bundle.confidential_program();
+    let confidential_slot_program = bundle.confidential_slot_program();
 
     let fragment_witness = artifact.confidential_fragment_witness();
     let fragment_entrypoint = fragment_witness
@@ -5165,39 +5201,42 @@ fn validate_confidential_core_shell_boundary_lowering_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "boundary_events": runtime_witness.boundary_schedule.len(),
-        "controller_phase_count": runtime_witness.controller_shape.controller_phase_order.len(),
-        "controller_accesses": runtime_witness.controller_certificate.observed_oram_accesses.len(),
-        "page_trace_events": runtime_witness.normalized_micro_trace.page_trace.len(),
-        "exit_events": runtime_witness.normalized_micro_trace.exit_pattern.len(),
-        "shared_resource_events": runtime_witness.normalized_micro_trace.shared_resource_pattern.len(),
+        "boundary_events": runtime_witness.boundary_schedule().len(),
+        "controller_phase_count": runtime_witness.controller_shape().controller_phase_order.len(),
+        "controller_accesses": runtime_witness.controller_certificate().observed_oram_accesses().len(),
+        "page_trace_events": runtime_witness.normalized_micro_trace().page_trace.len(),
+        "exit_events": runtime_witness.normalized_micro_trace().exit_pattern.len(),
+        "shared_resource_events":
+            runtime_witness.normalized_micro_trace().shared_resource_pattern.len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            runtime_witness.runtime_kernel_refinement_witness.as_ref(),
+            runtime_witness.runtime_kernel_refinement_witness(),
             exact_kernel_witness.as_ref(),
         ),
         "shell_contract": runtime_shell_contract_summary(
-            &bundle.shell_boundary_bundle.shell_contract,
+            shell_boundary_bundle_ref.shell_contract(),
         ),
         "shell_trace": runtime_shell_trace_summary(
-            &bundle.shell_boundary_bundle.shell_trace,
-            Some(&bundle.shell_boundary_bundle.shell_contract),
+            shell_boundary_bundle_ref.shell_trace(),
+            Some(shell_boundary_bundle_ref.shell_contract()),
         ),
         "confidential_program": {
-            "entrypoint_id": bundle.confidential_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_program.params.len(),
-            "secret_arg_count": bundle.confidential_program.secret_args.len(),
-            "statement_count": bundle.confidential_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_program.expected_runtime_steps().len(),
+            "entrypoint_id": confidential_program.entrypoint_id.as_str(),
+            "param_count": confidential_program.params.len(),
+            "secret_arg_count": confidential_program.secret_args.len(),
+            "statement_count": confidential_program.body.len(),
+            "expected_runtime_step_count":
+                confidential_program.expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
+            "param_count": confidential_slot_program.param_count,
+            "secret_arg_count": confidential_slot_program.secret_args.len(),
+            "slot_count": confidential_slot_program.slot_count,
+            "statement_count": confidential_slot_program.body.len(),
+            "expected_runtime_step_count":
+                confidential_slot_program.expected_runtime_steps().len(),
             "matches_runtime_entrypoint": bundle.program_matches_runtime_entrypoint(),
         },
         "confidential_fragment_witness": {
@@ -5284,7 +5323,7 @@ fn validate_kernel_dsl_case(
                 name
             )
         })?;
-    if trace.runtime_kernel_witness.as_ref() != Some(&kernel_witness) {
+    if trace.runtime_kernel_witness() != Some(&kernel_witness) {
         return Err(anyhow!(
             "execution trace for {} does not preserve the exact runtime kernel witness",
             name
@@ -5293,7 +5332,7 @@ fn validate_kernel_dsl_case(
 
     let bundle = artifact
         .runtime_kernel_dsl_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
-    let program = &bundle.confidential_program;
+    let program = bundle.confidential_program();
     let (bundle_path, kernel_dsl_bundle_json_bytes) = write_temp_json(name, &bundle)?;
     let output = Command::new(checker).arg(&bundle_path).output()?;
     let _ = fs::remove_file(&bundle_path);
@@ -5338,7 +5377,7 @@ fn validate_kernel_slot_dsl_case(
                 name
             )
         })?;
-    if trace.runtime_kernel_witness.as_ref() != Some(&kernel_witness) {
+    if trace.runtime_kernel_witness() != Some(&kernel_witness) {
         return Err(anyhow!(
             "execution trace for {} does not preserve the exact runtime kernel witness",
             name
@@ -5347,7 +5386,7 @@ fn validate_kernel_slot_dsl_case(
 
     let bundle = artifact
         .runtime_kernel_slot_dsl_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
-    let program = &bundle.confidential_slot_program;
+    let program = bundle.confidential_slot_program();
     let (bundle_path, kernel_slot_dsl_bundle_json_bytes) = write_temp_json(name, &bundle)?;
     let output = Command::new(checker).arg(&bundle_path).output()?;
     let _ = fs::remove_file(&bundle_path);
@@ -5393,7 +5432,7 @@ fn validate_kernel_lowering_case(
                 name
             )
         })?;
-    if trace.runtime_kernel_witness.as_ref() != Some(&kernel_witness) {
+    if trace.runtime_kernel_witness() != Some(&kernel_witness) {
         return Err(anyhow!(
             "execution trace for {} does not preserve the exact runtime kernel witness",
             name
@@ -5419,19 +5458,21 @@ fn validate_kernel_lowering_case(
         "setup_calls": setup.len(),
         "kernel_witness": kernel_witness_summary(Some(&kernel_witness)),
         "confidential_program": {
-            "entrypoint_id": bundle.confidential_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_program.params.len(),
-            "secret_arg_count": bundle.confidential_program.secret_args.len(),
-            "statement_count": bundle.confidential_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_program.expected_runtime_steps().len(),
+            "entrypoint_id": bundle.confidential_program().entrypoint_id.as_str(),
+            "param_count": bundle.confidential_program().params.len(),
+            "secret_arg_count": bundle.confidential_program().secret_args.len(),
+            "statement_count": bundle.confidential_program().body.len(),
+            "expected_runtime_step_count":
+                bundle.confidential_program().expected_runtime_steps().len(),
         },
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "entrypoint_id": bundle.confidential_slot_program().entrypoint_id.as_str(),
+            "param_count": bundle.confidential_slot_program().param_count,
+            "secret_arg_count": bundle.confidential_slot_program().secret_args.len(),
+            "slot_count": bundle.confidential_slot_program().slot_count,
+            "statement_count": bundle.confidential_slot_program().body.len(),
+            "expected_runtime_step_count":
+                bundle.confidential_slot_program().expected_runtime_steps().len(),
         },
         "kernel_lowering_bundle_json_bytes": kernel_lowering_bundle_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
@@ -5449,7 +5490,7 @@ fn validate_kernel_case(
     let trace = run_target_call(artifact, setup, target.entrypoint, target.args.clone())?;
     let kernel_witness = exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?
         .ok_or_else(|| anyhow!("kernel validation scenario {} is not confidential", name))?;
-    if trace.runtime_kernel_witness.as_ref() != Some(&kernel_witness) {
+    if trace.runtime_kernel_witness() != Some(&kernel_witness) {
         return Err(anyhow!(
             "execution trace for {} does not preserve the exact runtime kernel witness",
             name
@@ -5499,8 +5540,8 @@ fn validate_kernel_refinement_case(
             )
         })?;
     let runtime_kernel_refinement_witness = trace
-        .runtime_kernel_refinement_witness
-        .clone()
+        .runtime_kernel_refinement_witness()
+        .cloned()
         .ok_or_else(|| {
             anyhow!(
                 "execution trace for {} is missing the runtime kernel refinement witness",
@@ -5573,13 +5614,14 @@ fn validate_shell_boundary_case(
                 )
             },
         )?;
-    if runtime_witness.kernel_witness.as_ref() != Some(&exact_kernel_witness) {
+    if runtime_witness.kernel_witness() != Some(&exact_kernel_witness) {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if runtime_witness.runtime_kernel_refinement_witness != trace.runtime_kernel_refinement_witness
+    if runtime_witness.runtime_kernel_refinement_witness()
+        != trace.runtime_kernel_refinement_witness()
     {
         return Err(anyhow!(
             "runtime refinement witness for {} does not preserve the runtime phase witness",
@@ -5588,14 +5630,14 @@ fn validate_shell_boundary_case(
     }
 
     let bundle = trace.runtime_shell_boundary_bundle()?;
-    if bundle.kernel_witness != exact_kernel_witness {
+    if bundle.kernel_witness() != &exact_kernel_witness {
         return Err(anyhow!(
             "runtime shell-boundary bundle for {} does not preserve the exact kernel witness",
             name
         ));
     }
-    if runtime_witness.runtime_kernel_refinement_witness.as_ref()
-        != Some(&bundle.runtime_kernel_refinement_witness)
+    if runtime_witness.runtime_kernel_refinement_witness()
+        != Some(bundle.runtime_kernel_refinement_witness())
     {
         return Err(anyhow!(
             "runtime shell-boundary bundle for {} does not preserve the runtime phase witness",
@@ -5619,21 +5661,21 @@ fn validate_shell_boundary_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "kernel_witness": kernel_witness_summary(Some(&bundle.kernel_witness)),
+        "kernel_witness": kernel_witness_summary(Some(bundle.kernel_witness())),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            Some(&bundle.runtime_kernel_refinement_witness),
-            Some(&bundle.kernel_witness),
+            Some(bundle.runtime_kernel_refinement_witness()),
+            Some(bundle.kernel_witness()),
         ),
-        "shell_contract": runtime_shell_contract_summary(&bundle.shell_contract),
+        "shell_contract": runtime_shell_contract_summary(bundle.shell_contract()),
         "shell_trace": runtime_shell_trace_summary(
-            &bundle.shell_trace,
-            Some(&bundle.shell_contract),
+            bundle.shell_trace(),
+            Some(bundle.shell_contract()),
         ),
         "shell_contract_matches_kernel_witness":
-            bundle.shell_contract == bundle.kernel_witness.shell_contract(),
+            bundle.shell_contract() == &bundle.kernel_witness().shell_contract(),
         "shell_trace_matches_runtime_phase_witness":
-            bundle.shell_trace
-                == bundle.runtime_kernel_refinement_witness.shell_trace(),
+            bundle.shell_trace()
+                == &bundle.runtime_kernel_refinement_witness().shell_trace(),
         "shell_boundary_bundle_json_bytes": shell_boundary_bundle_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
@@ -5658,20 +5700,22 @@ fn validate_shell_boundary_slot_case(
                 )
             },
         )?;
-    if shell_boundary_bundle.kernel_witness != exact_kernel_witness {
+    if shell_boundary_bundle.kernel_witness() != &exact_kernel_witness {
         return Err(anyhow!(
             "runtime shell-boundary bundle for {} does not preserve the exact kernel witness",
             name
         ));
     }
 
-    let bundle = artifact.runtime_shell_boundary_slot_bundle(shell_boundary_bundle.clone())?;
-    if bundle.shell_boundary_bundle != shell_boundary_bundle {
+    let bundle = trace.runtime_shell_boundary_slot_bundle(artifact)?;
+    if bundle.shell_boundary_bundle() != &shell_boundary_bundle {
         return Err(anyhow!(
             "runtime shell-boundary slot bundle for {} does not preserve the exact shell-boundary bundle",
             name
         ));
     }
+    let shell_boundary_bundle_ref = bundle.shell_boundary_bundle();
+    let confidential_slot_program = bundle.confidential_slot_program();
     let (bundle_path, shell_boundary_slot_bundle_json_bytes) = write_temp_json(name, &bundle)?;
     let output = Command::new(checker).arg(&bundle_path).output()?;
     let _ = fs::remove_file(&bundle_path);
@@ -5687,25 +5731,27 @@ fn validate_shell_boundary_slot_case(
         "scenario": name,
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
-        "kernel_witness": kernel_witness_summary(Some(&bundle.shell_boundary_bundle.kernel_witness)),
+        "kernel_witness": kernel_witness_summary(Some(
+            shell_boundary_bundle_ref.kernel_witness(),
+        )),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            Some(&bundle.shell_boundary_bundle.runtime_kernel_refinement_witness),
-            Some(&bundle.shell_boundary_bundle.kernel_witness),
+            Some(shell_boundary_bundle_ref.runtime_kernel_refinement_witness()),
+            Some(shell_boundary_bundle_ref.kernel_witness()),
         ),
         "shell_contract": runtime_shell_contract_summary(
-            &bundle.shell_boundary_bundle.shell_contract,
+            shell_boundary_bundle_ref.shell_contract(),
         ),
         "shell_trace": runtime_shell_trace_summary(
-            &bundle.shell_boundary_bundle.shell_trace,
-            Some(&bundle.shell_boundary_bundle.shell_contract),
+            shell_boundary_bundle_ref.shell_trace(),
+            Some(shell_boundary_bundle_ref.shell_contract()),
         ),
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
+            "param_count": confidential_slot_program.param_count,
+            "secret_arg_count": confidential_slot_program.secret_args.len(),
+            "slot_count": confidential_slot_program.slot_count,
+            "statement_count": confidential_slot_program.body.len(),
+            "expected_runtime_step_count": confidential_slot_program.expected_runtime_steps().len(),
             "matches_shell_entrypoint": bundle.program_matches_shell_entrypoint(),
         },
         "shell_boundary_slot_bundle_json_bytes": shell_boundary_slot_bundle_json_bytes,
@@ -5732,20 +5778,23 @@ fn validate_shell_boundary_lowering_case(
                 )
             },
         )?;
-    if shell_boundary_bundle.kernel_witness != exact_kernel_witness {
+    if shell_boundary_bundle.kernel_witness() != &exact_kernel_witness {
         return Err(anyhow!(
             "runtime shell-boundary bundle for {} does not preserve the exact kernel witness",
             name
         ));
     }
 
-    let bundle = artifact.runtime_shell_boundary_lowering_bundle(shell_boundary_bundle.clone())?;
-    if bundle.shell_boundary_bundle != shell_boundary_bundle {
+    let bundle = trace.runtime_shell_boundary_lowering_bundle(artifact)?;
+    if bundle.shell_boundary_bundle() != &shell_boundary_bundle {
         return Err(anyhow!(
             "runtime shell-boundary lowering bundle for {} does not preserve the exact shell-boundary bundle",
             name
         ));
     }
+    let shell_boundary_bundle_ref = bundle.shell_boundary_bundle();
+    let confidential_program = bundle.confidential_program();
+    let confidential_slot_program = bundle.confidential_slot_program();
     let (bundle_path, shell_boundary_lowering_bundle_json_bytes) = write_temp_json(name, &bundle)?;
     let output = Command::new(checker).arg(&bundle_path).output()?;
     let _ = fs::remove_file(&bundle_path);
@@ -5761,33 +5810,35 @@ fn validate_shell_boundary_lowering_case(
         "scenario": name,
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
-        "kernel_witness": kernel_witness_summary(Some(&bundle.shell_boundary_bundle.kernel_witness)),
+        "kernel_witness": kernel_witness_summary(Some(
+            shell_boundary_bundle_ref.kernel_witness(),
+        )),
         "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
-            Some(&bundle.shell_boundary_bundle.runtime_kernel_refinement_witness),
-            Some(&bundle.shell_boundary_bundle.kernel_witness),
+            Some(shell_boundary_bundle_ref.runtime_kernel_refinement_witness()),
+            Some(shell_boundary_bundle_ref.kernel_witness()),
         ),
         "shell_contract": runtime_shell_contract_summary(
-            &bundle.shell_boundary_bundle.shell_contract,
+            shell_boundary_bundle_ref.shell_contract(),
         ),
         "shell_trace": runtime_shell_trace_summary(
-            &bundle.shell_boundary_bundle.shell_trace,
-            Some(&bundle.shell_boundary_bundle.shell_contract),
+            shell_boundary_bundle_ref.shell_trace(),
+            Some(shell_boundary_bundle_ref.shell_contract()),
         ),
         "confidential_program": {
-            "entrypoint_id": bundle.confidential_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_program.params.len(),
-            "secret_arg_count": bundle.confidential_program.secret_args.len(),
-            "statement_count": bundle.confidential_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_program.expected_runtime_steps().len(),
+            "entrypoint_id": confidential_program.entrypoint_id.as_str(),
+            "param_count": confidential_program.params.len(),
+            "secret_arg_count": confidential_program.secret_args.len(),
+            "statement_count": confidential_program.body.len(),
+            "expected_runtime_step_count": confidential_program.expected_runtime_steps().len(),
             "matches_shell_entrypoint": bundle.program_matches_shell_entrypoint(),
         },
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
-            "expected_runtime_step_count": bundle.confidential_slot_program.expected_runtime_steps().len(),
+            "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
+            "param_count": confidential_slot_program.param_count,
+            "secret_arg_count": confidential_slot_program.secret_args.len(),
+            "slot_count": confidential_slot_program.slot_count,
+            "statement_count": confidential_slot_program.body.len(),
+            "expected_runtime_step_count": confidential_slot_program.expected_runtime_steps().len(),
             "matches_shell_entrypoint": bundle.program_matches_shell_entrypoint(),
         },
         "shell_boundary_lowering_bundle_json_bytes": shell_boundary_lowering_bundle_json_bytes,
@@ -5807,12 +5858,16 @@ fn validate_trusted_kernel_case(
     let bundle = trace.runtime_trusted_kernel_slot_bundle(artifact)?;
     let exact_kernel_witness =
         exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
-    if bundle.trusted_kernel_bundle.kernel_witness != exact_kernel_witness {
+    if bundle.trusted_kernel_bundle().kernel_witness() != exact_kernel_witness.as_ref() {
         return Err(anyhow!(
             "runtime trusted-kernel bundle for {} does not preserve the exact kernel witness",
             name
         ));
     }
+    let trusted_kernel_bundle = bundle.trusted_kernel_bundle();
+    let controller_observer = trusted_kernel_bundle.controller_observer();
+    let hidden_certificate = trusted_kernel_bundle.hidden_certificate();
+    let confidential_slot_program = bundle.confidential_slot_program();
     let (bundle_path, bundle_json_bytes) = write_temp_json(name, &bundle)?;
     let output = Command::new(checker)
         .arg(&bundle_path)
@@ -5833,24 +5888,24 @@ fn validate_trusted_kernel_case(
         "scenario": name,
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
-        "gas_used": bundle.trusted_kernel_bundle.controller_observer.public_outcome.gas_used,
-        "boundary_events": bundle.trusted_kernel_bundle.controller_observer.boundary_schedule.len(),
+        "gas_used": controller_observer.public_outcome().gas_used,
+        "boundary_events": controller_observer.boundary_schedule().len(),
         "controller_phase_count":
-            bundle.trusted_kernel_bundle.controller_observer.controller_shape.controller_phase_order.len(),
+            controller_observer.controller_shape().controller_phase_order.len(),
         "controller_accesses":
-            bundle.trusted_kernel_bundle.controller_observer.controller_certificate.observed_oram_accesses.len(),
-        "leaf_steps": bundle.trusted_kernel_bundle.hidden_certificate.oram_leaf_schedule.len(),
+            controller_observer.controller_certificate().observed_oram_accesses().len(),
+        "leaf_steps": hidden_certificate.oram_leaf_schedule().len(),
         "position_map_objects":
-            bundle.trusted_kernel_bundle.hidden_certificate.oram_position_map_before.len(),
+            hidden_certificate.oram_position_map_before().len(),
         "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
         "confidential_slot_program": {
-            "entrypoint_id": bundle.confidential_slot_program.entrypoint_id.as_str(),
-            "param_count": bundle.confidential_slot_program.param_count,
-            "secret_arg_count": bundle.confidential_slot_program.secret_args.len(),
-            "slot_count": bundle.confidential_slot_program.slot_count,
-            "statement_count": bundle.confidential_slot_program.body.len(),
+            "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
+            "param_count": confidential_slot_program.param_count,
+            "secret_arg_count": confidential_slot_program.secret_args.len(),
+            "slot_count": confidential_slot_program.slot_count,
+            "statement_count": confidential_slot_program.body.len(),
             "expected_runtime_step_count":
-                bundle.confidential_slot_program.expected_runtime_steps().len(),
+                confidential_slot_program.expected_runtime_steps().len(),
             "matches_trusted_kernel_entrypoint":
                 bundle.program_matches_trusted_kernel_entrypoint(),
         },
@@ -5888,13 +5943,13 @@ fn validate_controller_certificate_case(
         "scenario": name,
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
-        "gas_used": certificate.public_outcome.gas_used,
-        "boundary_events": certificate.boundary_schedule.len(),
-        "controller_phase_count": certificate.controller_shape.controller_phase_order.len(),
-        "controller_accesses": certificate.controller_certificate.observed_oram_accesses.len(),
-        "page_trace_events": certificate.normalized_micro_trace.page_trace.len(),
-        "exit_events": certificate.normalized_micro_trace.exit_pattern.len(),
-        "shared_resource_events": certificate.normalized_micro_trace.shared_resource_pattern.len(),
+        "gas_used": certificate.public_outcome().gas_used,
+        "boundary_events": certificate.boundary_schedule().len(),
+        "controller_phase_count": certificate.controller_shape().controller_phase_order.len(),
+        "controller_accesses": certificate.controller_certificate().observed_oram_accesses().len(),
+        "page_trace_events": certificate.normalized_micro_trace().page_trace.len(),
+        "exit_events": certificate.normalized_micro_trace().exit_pattern.len(),
+        "shared_resource_events": certificate.normalized_micro_trace().shared_resource_pattern.len(),
         "certificate_json_bytes": certificate_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
@@ -5924,9 +5979,9 @@ fn validate_pathoram_hidden_case(
         "scenario": name,
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
-        "leaf_steps": certificate.oram_leaf_schedule.len(),
-        "public_leaf_scaffold_steps": certificate.oram_leaf_public_scaffold.len(),
-        "position_map_objects": certificate.oram_position_map_before.len(),
+        "leaf_steps": certificate.oram_leaf_schedule().len(),
+        "public_leaf_scaffold_steps": certificate.oram_leaf_public_scaffold().len(),
+        "position_map_objects": certificate.oram_position_map_before().len(),
         "certificate_json_bytes": certificate_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
@@ -5958,26 +6013,31 @@ fn validate_seeded_witness_family_case(
             seed as u64,
         )?;
         let witness = trace.runtime_refinement_witness()?;
-        gas_used.insert(witness.trace.gas_used);
-        boundary_events.insert(witness.boundary_schedule.len());
-        controller_phase_counts.insert(witness.controller_shape.controller_phase_order.len());
-        public_leaf_scaffold_steps.insert(witness.oram_leaf_public_scaffold.len());
-        oram_object_configs.insert(serde_json::to_string(&witness.oram_objects)?);
-        physical_read_shapes.insert(serde_json::to_string(&witness.trace.physical_reads)?);
-        physical_write_shapes.insert(serde_json::to_string(&witness.trace.physical_writes)?);
+        gas_used.insert(witness.trace().gas_used);
+        boundary_events.insert(witness.boundary_schedule().len());
+        controller_phase_counts.insert(witness.controller_shape().controller_phase_order.len());
+        public_leaf_scaffold_steps.insert(witness.oram_leaf_public_scaffold().len());
+        oram_object_configs.insert(serde_json::to_string(witness.oram_objects())?);
+        physical_read_shapes.insert(serde_json::to_string(&witness.trace().physical_reads)?);
+        physical_write_shapes.insert(serde_json::to_string(&witness.trace().physical_writes)?);
         witnesses.push(witness);
     }
     let family = SeededRuntimePathOramWitnessFamily::new(witnesses)?;
     let canonical_leaf_seed_space_size =
-        canonical_path_oram_leaf_seed_space_size(&family.public_leaf_scaffold);
-    let canonical_leaf_values_match = family.witnesses.iter().enumerate().all(|(seed, witness)| {
-        witness
-            .oram_leaf_schedule
+        canonical_path_oram_leaf_seed_space_size(family.public_leaf_scaffold());
+    let canonical_leaf_values_match =
+        family
+            .witnesses()
             .iter()
-            .map(|step| step.leaf)
-            .collect::<Vec<_>>()
-            == canonical_path_oram_leaf_values_of_seed(&family.public_leaf_scaffold, seed)
-    });
+            .enumerate()
+            .all(|(seed, witness)| {
+                witness
+                    .oram_leaf_schedule()
+                    .iter()
+                    .map(|step| step.leaf)
+                    .collect::<Vec<_>>()
+                    == canonical_path_oram_leaf_values_of_seed(family.public_leaf_scaffold(), seed)
+            });
     let (family_path, family_json_bytes) = write_temp_json(name, &family)?;
     let output = Command::new(checker)
         .arg(&family_path)
@@ -6005,9 +6065,10 @@ fn validate_seeded_witness_family_case(
         "oram_object_config_uniform": oram_object_configs.len() == 1,
         "physical_read_shape_uniform": physical_read_shapes.len() == 1,
         "physical_write_shape_uniform": physical_write_shapes.len() == 1,
-        "public_leaf_scaffold_steps": family.public_leaf_scaffold.len(),
+        "public_leaf_scaffold_steps": family.public_leaf_scaffold().len(),
         "canonical_leaf_seed_space_size": canonical_leaf_seed_space_size,
-        "canonical_leaf_seed_space_matches": canonical_leaf_seed_space_size == Some(family.seed_count),
+        "canonical_leaf_seed_space_matches":
+            canonical_leaf_seed_space_size == Some(family.seed_count()),
         "canonical_leaf_values_match_runtime_seed": canonical_leaf_values_match,
         "witness_family_json_bytes": family_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
@@ -6057,38 +6118,38 @@ fn validate_fresh_coin_family_case(
     let collected = collect_canonical_fresh_coin_family_case(name, artifact, setup, target)?;
     let family = collected.family;
     let first_witness = collected.first_witness;
-    let public_leaf_scaffold_step_count = first_witness.oram_leaf_public_scaffold.len();
-    let public_fresh_coin_scaffold_step_count = family.public_fresh_coin_scaffold.len();
+    let public_leaf_scaffold_step_count = first_witness.oram_leaf_public_scaffold().len();
+    let public_fresh_coin_scaffold_step_count = family.public_fresh_coin_scaffold().len();
     let gas_uniform = family
-        .witnesses
+        .witnesses()
         .iter()
-        .map(|w| w.trace.gas_used)
+        .map(|w| w.trace().gas_used)
         .collect::<BTreeSet<_>>()
         .len()
         == 1;
     let boundary_uniform = family
-        .witnesses
+        .witnesses()
         .iter()
-        .map(|w| w.boundary_schedule.len())
+        .map(|w| w.boundary_schedule().len())
         .collect::<BTreeSet<_>>()
         .len()
         == 1;
     let controller_phase_uniform = family
-        .witnesses
+        .witnesses()
         .iter()
-        .map(|w| w.controller_shape.controller_phase_order.len())
+        .map(|w| w.controller_shape().controller_phase_order.len())
         .collect::<BTreeSet<_>>()
         .len()
         == 1;
     let public_leaf_scaffold_uniform = family
-        .witnesses
+        .witnesses()
         .iter()
-        .map(|w| w.oram_leaf_public_scaffold.len())
+        .map(|w| w.oram_leaf_public_scaffold().len())
         .collect::<BTreeSet<_>>()
         .len()
         == 1;
     let public_fresh_coin_scaffold_uniform = family
-        .witnesses
+        .witnesses()
         .iter()
         .map(|w| {
             w.path_oram_fresh_coin_scaffold()
@@ -6099,17 +6160,24 @@ fn validate_fresh_coin_family_case(
         .len()
         == 1;
     let oram_object_config_uniform = family
-        .witnesses
+        .witnesses()
         .iter()
-        .map(|w| serde_json::to_string(&w.oram_objects))
+        .map(|w| serde_json::to_string(w.oram_objects()))
         .collect::<Result<BTreeSet<_>, _>>()?
         .len()
         == 1;
     let canonical_fresh_coin_values_match_index =
-        family.witnesses.iter().enumerate().all(|(seed, witness)| {
-            witness.path_oram_fresh_coin_values().unwrap_or_default()
-                == canonical_path_oram_leaf_values_of_seed(&family.public_fresh_coin_scaffold, seed)
-        });
+        family
+            .witnesses()
+            .iter()
+            .enumerate()
+            .all(|(seed, witness)| {
+                witness.path_oram_fresh_coin_values().unwrap_or_default()
+                    == canonical_path_oram_leaf_values_of_seed(
+                        family.public_fresh_coin_scaffold(),
+                        seed,
+                    )
+            });
     let (family_path, family_json_bytes) = write_temp_json(name, &family)?;
     let output = Command::new(family_checker)
         .arg(&family_path)
@@ -6135,8 +6203,8 @@ fn validate_fresh_coin_family_case(
         "setup_calls": setup.len(),
         "mode": "injected_canonical_tape",
         "deploy_seed": 0,
-        "seed_count": family.seed_count,
-        "distinct_canonical_seeds_found": family.seed_count,
+        "seed_count": family.seed_count(),
+        "distinct_canonical_seeds_found": family.seed_count(),
         "coverage_fraction": 1.0,
         "coverage_complete": true,
         "gas_uniform": gas_uniform,
@@ -6147,7 +6215,7 @@ fn validate_fresh_coin_family_case(
         "oram_object_config_uniform": oram_object_config_uniform,
         "public_leaf_scaffold_steps": public_leaf_scaffold_step_count,
         "public_fresh_coin_scaffold_steps": public_fresh_coin_scaffold_step_count,
-        "canonical_fresh_coin_seed_space_size": Some(family.seed_count),
+        "canonical_fresh_coin_seed_space_size": Some(family.seed_count()),
         "canonical_fresh_coin_values_match_index": canonical_fresh_coin_values_match_index,
         "witness_family_json_bytes": family_json_bytes,
         "heavy_artifact_path": persisted_artifact.as_ref().map(|(path, _)| path.clone()),
@@ -6170,18 +6238,18 @@ fn validate_fresh_coin_theorem_input_case(
     let collected = collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, target)?;
     let theorem_input = collected.input;
     let representative_values = theorem_input
-        .representative_witness
+        .representative_witness()
         .path_oram_fresh_coin_values()
         .ok_or_else(|| {
             anyhow!(
                 "fresh-coin value extraction failed for {} representative seed {}",
                 name,
-                theorem_input.representative_seed
+                theorem_input.representative_seed()
             )
         })?;
     let canonical_values = canonical_path_oram_leaf_values_of_seed(
-        &theorem_input.public_fresh_coin_scaffold,
-        theorem_input.representative_seed,
+        theorem_input.public_fresh_coin_scaffold(),
+        theorem_input.representative_seed(),
     );
     let (theorem_input_path, theorem_input_json_bytes) = write_temp_json(name, &theorem_input)?;
     let output = Command::new(checker)
@@ -6212,14 +6280,14 @@ fn validate_fresh_coin_theorem_input_case(
         "setup_calls": setup.len(),
         "mode": "compact_canonical_seed_space",
         "deploy_seed": 0,
-        "representative_seed": theorem_input.representative_seed,
+        "representative_seed": theorem_input.representative_seed(),
         "representative_witness_count": 1,
-        "seed_count": theorem_input.seed_count,
+        "seed_count": theorem_input.seed_count(),
         "symbolic_seed_space_instantiated": true,
         "coverage_complete": false,
-        "public_leaf_scaffold_steps": theorem_input.public_leaf_scaffold.len(),
-        "public_fresh_coin_scaffold_steps": theorem_input.public_fresh_coin_scaffold.len(),
-        "canonical_fresh_coin_seed_space_size": Some(theorem_input.seed_count),
+        "public_leaf_scaffold_steps": theorem_input.public_leaf_scaffold().len(),
+        "public_fresh_coin_scaffold_steps": theorem_input.public_fresh_coin_scaffold().len(),
+        "canonical_fresh_coin_seed_space_size": Some(theorem_input.seed_count()),
         "canonical_fresh_coin_values_match_representative_seed": representative_values == canonical_values,
         "theorem_input_json_bytes": theorem_input_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
@@ -6292,7 +6360,7 @@ fn collect_canonical_fresh_coin_family_case(
     Ok(CollectedCanonicalFreshCoinFamily {
         family: CanonicalFreshCoinRuntimePathOramWitnessFamily::new(witnesses)?,
         first_witness,
-        access_counters_before: first_trace.runtime_oram_access_counters_before.clone(),
+        access_counters_before: first_trace.runtime_oram_access_counters_before().to_vec(),
     })
 }
 
@@ -6360,7 +6428,7 @@ fn collect_canonical_fresh_coin_theorem_input_case(
     })?;
     Ok(CollectedCanonicalFreshCoinTheoremInput {
         input,
-        access_counters_before: first_trace.runtime_oram_access_counters_before.clone(),
+        access_counters_before: first_trace.runtime_oram_access_counters_before().to_vec(),
     })
 }
 
@@ -6443,7 +6511,7 @@ fn estimate_canonical_fresh_coin_family_size(
         avg_witness_json_bytes: avg_bytes,
         max_witness_json_bytes: max_bytes,
         estimated_family_json_bytes,
-        public_leaf_scaffold_steps: first_witness.oram_leaf_public_scaffold.len(),
+        public_leaf_scaffold_steps: first_witness.oram_leaf_public_scaffold().len(),
         public_fresh_coin_scaffold_steps: fresh_coin_scaffold.len(),
     })
 }
@@ -6461,7 +6529,7 @@ fn prepare_canonical_fresh_coin_family(
         .call(target.entrypoint, target.args.clone())?
         .trace;
     let first_witness = first_trace.runtime_refinement_witness()?;
-    let public_leaf_scaffold = first_witness.oram_leaf_public_scaffold.clone();
+    let public_leaf_scaffold = first_witness.oram_leaf_public_scaffold().to_vec();
     let public_fresh_coin_scaffold = first_witness
         .path_oram_fresh_coin_scaffold()
         .ok_or_else(|| anyhow!("fresh-coin scaffold extraction failed for {}", name))?;
@@ -6470,7 +6538,7 @@ fn prepare_canonical_fresh_coin_family(
     Ok(PreparedCanonicalFreshCoinFamily {
         prepared,
         first_witness,
-        access_counters_before: first_trace.runtime_oram_access_counters_before.clone(),
+        access_counters_before: first_trace.runtime_oram_access_counters_before().to_vec(),
         public_leaf_scaffold,
         public_fresh_coin_scaffold,
         seed_count,
@@ -6546,7 +6614,7 @@ fn materialize_canonical_fresh_coin_family_object<W: Write>(
                 seed
             )
         })?;
-        if witness.oram_leaf_public_scaffold != context.public_leaf_scaffold
+        if witness.oram_leaf_public_scaffold() != context.public_leaf_scaffold.as_slice()
             || extracted_scaffold != context.public_fresh_coin_scaffold
             || extracted_values != fresh_coin_values
         {
@@ -6556,21 +6624,21 @@ fn materialize_canonical_fresh_coin_family_object<W: Write>(
                 seed
             ));
         }
-        update_uniform(&mut gas_seen, &mut gas_uniform, witness.trace.gas_used);
+        update_uniform(&mut gas_seen, &mut gas_uniform, witness.trace().gas_used);
         update_uniform(
             &mut boundary_seen,
             &mut boundary_uniform,
-            witness.boundary_schedule.len(),
+            witness.boundary_schedule().len(),
         );
         update_uniform(
             &mut controller_phase_seen,
             &mut controller_phase_uniform,
-            witness.controller_shape.controller_phase_order.len(),
+            witness.controller_shape().controller_phase_order.len(),
         );
         update_uniform(
             &mut oram_object_cfg_seen,
             &mut oram_object_config_uniform,
-            serde_json::to_string(&witness.oram_objects)?,
+            serde_json::to_string(witness.oram_objects())?,
         );
         if seed > 0 {
             writer.write_all(b",")?;
@@ -6762,18 +6830,18 @@ fn validate_canonical_pathoram_pair_heavy_case(
     let public_view = imported_oram_public_view(&lhs_context.first_witness);
     let public_location = imported_path_oram_public_location(&lhs_context.first_witness);
     let storage_shape = imported_path_oram_storage_shape(&lhs_context.first_witness);
-    let public_outcome = lhs_context.first_witness.public_outcome.clone();
-    let boundary_schedule = lhs_context.first_witness.boundary_schedule.clone();
-    let controller_shape = lhs_context.first_witness.controller_shape.clone();
-    let normalized_micro_trace = lhs_context.first_witness.normalized_micro_trace.clone();
+    let public_outcome = lhs_context.first_witness.public_outcome().clone();
+    let boundary_schedule = lhs_context.first_witness.boundary_schedule().to_vec();
+    let controller_shape = lhs_context.first_witness.controller_shape().clone();
+    let normalized_micro_trace = lhs_context.first_witness.normalized_micro_trace().clone();
     let public_outcome_equal =
-        lhs_context.first_witness.public_outcome == rhs_context.first_witness.public_outcome;
-    let boundary_schedule_equal =
-        lhs_context.first_witness.boundary_schedule == rhs_context.first_witness.boundary_schedule;
-    let controller_shape_equal =
-        lhs_context.first_witness.controller_shape == rhs_context.first_witness.controller_shape;
-    let normalized_micro_trace_equal = lhs_context.first_witness.normalized_micro_trace
-        == rhs_context.first_witness.normalized_micro_trace;
+        lhs_context.first_witness.public_outcome() == rhs_context.first_witness.public_outcome();
+    let boundary_schedule_equal = lhs_context.first_witness.boundary_schedule()
+        == rhs_context.first_witness.boundary_schedule();
+    let controller_shape_equal = lhs_context.first_witness.controller_shape()
+        == rhs_context.first_witness.controller_shape();
+    let normalized_micro_trace_equal = lhs_context.first_witness.normalized_micro_trace()
+        == rhs_context.first_witness.normalized_micro_trace();
 
     let (artifact_path, preserve_path) = heavy_artifact_materialization_path(
         options,
@@ -6905,12 +6973,12 @@ fn validate_pathoram_pair_case(
 
     let lhs_first = lhs_collected
         .family
-        .witnesses
+        .witnesses()
         .first()
         .ok_or_else(|| anyhow!("left seeded family is empty for {}", name))?;
     let rhs_first = rhs_collected
         .family
-        .witnesses
+        .witnesses()
         .first()
         .ok_or_else(|| anyhow!("right seeded family is empty for {}", name))?;
 
@@ -6940,10 +7008,10 @@ fn validate_pathoram_pair_case(
         public_view: imported_oram_public_view(lhs_first),
         public_location: imported_path_oram_public_location(lhs_first),
         storage_shape: imported_path_oram_storage_shape(lhs_first),
-        public_outcome: lhs_first.public_outcome.clone(),
-        boundary_schedule: lhs_first.boundary_schedule.clone(),
-        controller_shape: lhs_first.controller_shape.clone(),
-        normalized_micro_trace: lhs_first.normalized_micro_trace.clone(),
+        public_outcome: lhs_first.public_outcome().clone(),
+        boundary_schedule: lhs_first.boundary_schedule().to_vec(),
+        controller_shape: lhs_first.controller_shape().clone(),
+        normalized_micro_trace: lhs_first.normalized_micro_trace().clone(),
     };
 
     let (certificate_path, certificate_json_bytes) = write_temp_json(name, &certificate)?;
@@ -6966,13 +7034,14 @@ fn validate_pathoram_pair_case(
     Ok(json!({
         "scenario": name,
         "entrypoint": lhs.entrypoint,
-        "lhs_seed_count": lhs_collected.family.seed_count,
-        "rhs_seed_count": rhs_collected.family.seed_count,
+        "lhs_seed_count": lhs_collected.family.seed_count(),
+        "rhs_seed_count": rhs_collected.family.seed_count(),
         "access_counters_equal": lhs_collected.access_counters_before == rhs_collected.access_counters_before,
-        "public_outcome_equal": lhs_first.public_outcome == rhs_first.public_outcome,
-        "boundary_schedule_equal": lhs_first.boundary_schedule == rhs_first.boundary_schedule,
-        "controller_shape_equal": lhs_first.controller_shape == rhs_first.controller_shape,
-        "normalized_micro_trace_equal": lhs_first.normalized_micro_trace == rhs_first.normalized_micro_trace,
+        "public_outcome_equal": lhs_first.public_outcome() == rhs_first.public_outcome(),
+        "boundary_schedule_equal": lhs_first.boundary_schedule() == rhs_first.boundary_schedule(),
+        "controller_shape_equal": lhs_first.controller_shape() == rhs_first.controller_shape(),
+        "normalized_micro_trace_equal":
+            lhs_first.normalized_micro_trace() == rhs_first.normalized_micro_trace(),
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "certificate_json_bytes": certificate_json_bytes,
         "accepted": true,
@@ -7069,10 +7138,10 @@ fn validate_canonical_pathoram_pair_case(
         public_view: imported_oram_public_view(lhs_first),
         public_location: imported_path_oram_public_location(lhs_first),
         storage_shape: imported_path_oram_storage_shape(lhs_first),
-        public_outcome: lhs_first.public_outcome.clone(),
-        boundary_schedule: lhs_first.boundary_schedule.clone(),
-        controller_shape: lhs_first.controller_shape.clone(),
-        normalized_micro_trace: lhs_first.normalized_micro_trace.clone(),
+        public_outcome: lhs_first.public_outcome().clone(),
+        boundary_schedule: lhs_first.boundary_schedule().to_vec(),
+        controller_shape: lhs_first.controller_shape().clone(),
+        normalized_micro_trace: lhs_first.normalized_micro_trace().clone(),
     };
 
     let (certificate_path, certificate_json_bytes) = write_temp_json(name, &certificate)?;
@@ -7115,13 +7184,14 @@ fn validate_canonical_pathoram_pair_case(
         "scenario": name,
         "entrypoint": lhs.entrypoint,
         "validation_status": "accepted",
-        "lhs_seed_count": lhs_collected.family.seed_count,
-        "rhs_seed_count": rhs_collected.family.seed_count,
+        "lhs_seed_count": lhs_collected.family.seed_count(),
+        "rhs_seed_count": rhs_collected.family.seed_count(),
         "access_counters_equal": lhs_collected.access_counters_before == rhs_collected.access_counters_before,
-        "public_outcome_equal": lhs_first.public_outcome == rhs_first.public_outcome,
-        "boundary_schedule_equal": lhs_first.boundary_schedule == rhs_first.boundary_schedule,
-        "controller_shape_equal": lhs_first.controller_shape == rhs_first.controller_shape,
-        "normalized_micro_trace_equal": lhs_first.normalized_micro_trace == rhs_first.normalized_micro_trace,
+        "public_outcome_equal": lhs_first.public_outcome() == rhs_first.public_outcome(),
+        "boundary_schedule_equal": lhs_first.boundary_schedule() == rhs_first.boundary_schedule(),
+        "controller_shape_equal": lhs_first.controller_shape() == rhs_first.controller_shape(),
+        "normalized_micro_trace_equal":
+            lhs_first.normalized_micro_trace() == rhs_first.normalized_micro_trace(),
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "paper_instantiation_status": "validated",
         "paper_instantiation_stdout": String::from_utf8_lossy(&paper_instantiation_output.stdout).trim(),
@@ -7149,8 +7219,8 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
     let rhs_collected =
         collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, rhs)?;
 
-    let lhs_witness = &lhs_collected.input.representative_witness;
-    let rhs_witness = &rhs_collected.input.representative_witness;
+    let lhs_witness = lhs_collected.input.representative_witness();
+    let rhs_witness = rhs_collected.input.representative_witness();
     let cfg = imported_oram_config(
         artifact,
         lhs.entrypoint,
@@ -7173,15 +7243,16 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
     let public_view = imported_oram_public_view(lhs_witness);
     let public_location = imported_path_oram_public_location(lhs_witness);
     let storage_shape = imported_path_oram_storage_shape(lhs_witness);
-    let public_outcome = lhs_witness.public_outcome.clone();
-    let boundary_schedule = lhs_witness.boundary_schedule.clone();
-    let controller_shape = lhs_witness.controller_shape.clone();
-    let normalized_micro_trace = lhs_witness.normalized_micro_trace.clone();
-    let public_outcome_equal = lhs_witness.public_outcome == rhs_witness.public_outcome;
-    let boundary_schedule_equal = lhs_witness.boundary_schedule == rhs_witness.boundary_schedule;
-    let controller_shape_equal = lhs_witness.controller_shape == rhs_witness.controller_shape;
+    let public_outcome = lhs_witness.public_outcome().clone();
+    let boundary_schedule = lhs_witness.boundary_schedule().to_vec();
+    let controller_shape = lhs_witness.controller_shape().clone();
+    let normalized_micro_trace = lhs_witness.normalized_micro_trace().clone();
+    let public_outcome_equal = lhs_witness.public_outcome() == rhs_witness.public_outcome();
+    let boundary_schedule_equal =
+        lhs_witness.boundary_schedule() == rhs_witness.boundary_schedule();
+    let controller_shape_equal = lhs_witness.controller_shape() == rhs_witness.controller_shape();
     let normalized_micro_trace_equal =
-        lhs_witness.normalized_micro_trace == rhs_witness.normalized_micro_trace;
+        lhs_witness.normalized_micro_trace() == rhs_witness.normalized_micro_trace();
 
     let theorem_input = ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput {
         cfg,
@@ -7224,10 +7295,10 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
         "estimated_certificate_json_bytes": estimated_certificate_json_bytes,
         "lhs_estimate": lhs_estimate,
         "rhs_estimate": rhs_estimate,
-        "lhs_seed_count": theorem_input.lhs_input.seed_count,
-        "rhs_seed_count": theorem_input.rhs_input.seed_count,
-        "lhs_representative_seed": theorem_input.lhs_input.representative_seed,
-        "rhs_representative_seed": theorem_input.rhs_input.representative_seed,
+        "lhs_seed_count": theorem_input.lhs_input.seed_count(),
+        "rhs_seed_count": theorem_input.rhs_input.seed_count(),
+        "lhs_representative_seed": theorem_input.lhs_input.representative_seed(),
+        "rhs_representative_seed": theorem_input.rhs_input.representative_seed(),
         "public_outcome_equal": public_outcome_equal,
         "boundary_schedule_equal": boundary_schedule_equal,
         "controller_shape_equal": controller_shape_equal,
@@ -7265,12 +7336,12 @@ fn build_seeded_pathoram_pair_certificate(
 
     let lhs_first = lhs_collected
         .family
-        .witnesses
+        .witnesses()
         .first()
         .ok_or_else(|| anyhow!("left seeded family is empty for {}", name))?;
     let rhs_first = rhs_collected
         .family
-        .witnesses
+        .witnesses()
         .first()
         .ok_or_else(|| anyhow!("right seeded family is empty for {}", name))?;
 
@@ -7296,10 +7367,10 @@ fn build_seeded_pathoram_pair_certificate(
     let public_view = imported_oram_public_view(lhs_first);
     let public_location = imported_path_oram_public_location(lhs_first);
     let storage_shape = imported_path_oram_storage_shape(lhs_first);
-    let public_outcome = lhs_first.public_outcome.clone();
-    let boundary_schedule = lhs_first.boundary_schedule.clone();
-    let controller_shape = lhs_first.controller_shape.clone();
-    let normalized_micro_trace = lhs_first.normalized_micro_trace.clone();
+    let public_outcome = lhs_first.public_outcome().clone();
+    let boundary_schedule = lhs_first.boundary_schedule().to_vec();
+    let controller_shape = lhs_first.controller_shape().clone();
+    let normalized_micro_trace = lhs_first.normalized_micro_trace().clone();
 
     Ok(ImportedSeededRuntimePathOramPairCertificate {
         cfg,
@@ -7349,10 +7420,10 @@ fn build_canonical_pathoram_pair_certificate(
     let public_view = imported_oram_public_view(lhs_first);
     let public_location = imported_path_oram_public_location(lhs_first);
     let storage_shape = imported_path_oram_storage_shape(lhs_first);
-    let public_outcome = lhs_first.public_outcome.clone();
-    let boundary_schedule = lhs_first.boundary_schedule.clone();
-    let controller_shape = lhs_first.controller_shape.clone();
-    let normalized_micro_trace = lhs_first.normalized_micro_trace.clone();
+    let public_outcome = lhs_first.public_outcome().clone();
+    let boundary_schedule = lhs_first.boundary_schedule().to_vec();
+    let controller_shape = lhs_first.controller_shape().clone();
+    let normalized_micro_trace = lhs_first.normalized_micro_trace().clone();
 
     Ok(ImportedCanonicalFreshCoinRuntimePathOramPairCertificate {
         cfg,
@@ -7380,8 +7451,8 @@ fn build_canonical_pathoram_pair_theorem_input(
     let rhs_collected =
         collect_canonical_fresh_coin_theorem_input_case(name, artifact, setup, rhs)?;
 
-    let lhs_witness = &lhs_collected.input.representative_witness;
-    let rhs_witness = &rhs_collected.input.representative_witness;
+    let lhs_witness = lhs_collected.input.representative_witness();
+    let rhs_witness = rhs_collected.input.representative_witness();
     let cfg = imported_oram_config(
         artifact,
         lhs.entrypoint,
@@ -7404,10 +7475,10 @@ fn build_canonical_pathoram_pair_theorem_input(
     let public_view = imported_oram_public_view(lhs_witness);
     let public_location = imported_path_oram_public_location(lhs_witness);
     let storage_shape = imported_path_oram_storage_shape(lhs_witness);
-    let public_outcome = lhs_witness.public_outcome.clone();
-    let boundary_schedule = lhs_witness.boundary_schedule.clone();
-    let controller_shape = lhs_witness.controller_shape.clone();
-    let normalized_micro_trace = lhs_witness.normalized_micro_trace.clone();
+    let public_outcome = lhs_witness.public_outcome().clone();
+    let boundary_schedule = lhs_witness.boundary_schedule().to_vec();
+    let controller_shape = lhs_witness.controller_shape().clone();
+    let normalized_micro_trace = lhs_witness.normalized_micro_trace().clone();
 
     Ok(ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput {
         cfg,
@@ -8200,6 +8271,26 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && shell_boundary_source.contains("pub fn cold_store_object_schedule(&self) -> &[u32] {")
         && shell_boundary_source
             .contains("pub fn post_committed_cold_object_schedule(&self) -> &[u32] {");
+    let runtime_shell_boundary_bundle_fields_private = shell_boundary_source
+        .contains("pub struct RuntimeShellBoundaryBundle {")
+        && shell_boundary_source.contains("kernel_witness: RuntimeKernelWitness,")
+        && shell_boundary_source
+            .contains("runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,")
+        && shell_boundary_source.contains("shell_contract: RuntimeShellContract,")
+        && shell_boundary_source.contains("shell_trace: RuntimeShellTrace,")
+        && !shell_boundary_source.contains("pub kernel_witness: RuntimeKernelWitness,")
+        && !shell_boundary_source
+            .contains("pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,")
+        && !shell_boundary_source.contains("pub shell_contract: RuntimeShellContract,")
+        && !shell_boundary_source.contains("pub shell_trace: RuntimeShellTrace,");
+    let runtime_shell_boundary_bundle_api_is_explicit = shell_boundary_source
+        .contains("pub fn kernel_witness(&self) -> &RuntimeKernelWitness {")
+        && shell_boundary_source.contains(
+            "pub fn runtime_kernel_refinement_witness(&self) -> &RuntimeKernelRefinementWitness {",
+        )
+        && shell_boundary_source
+            .contains("pub fn shell_contract(&self) -> &RuntimeShellContract {")
+        && shell_boundary_source.contains("pub fn shell_trace(&self) -> &RuntimeShellTrace {");
     let confidential_core_bundle_bridge_checks = [
         (
             "pub fn runtime_confidential_core_bundle(",
@@ -8239,6 +8330,90 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("confidential-core bridge restriction flag must be boolean")
         });
+    let runtime_confidential_core_bundle_fields_private = confidential_core_source
+        .contains("pub struct RuntimeConfidentialCoreBundle {")
+        && confidential_core_source.contains("runtime_witness: RuntimeRefinementWitness,")
+        && confidential_core_source.contains("confidential_program: ConfidentialKernelProgram,")
+        && !confidential_core_source.contains("pub runtime_witness: RuntimeRefinementWitness,")
+        && !confidential_core_source
+            .contains("pub confidential_program: ConfidentialKernelProgram,");
+    let runtime_confidential_core_bundle_api_is_explicit = confidential_core_source
+        .contains("pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {")
+        && confidential_core_source
+            .contains("pub fn confidential_program(&self) -> &ConfidentialKernelProgram {");
+    let runtime_confidential_core_slot_bundle_fields_private = confidential_core_source
+        .contains("pub struct RuntimeConfidentialCoreSlotBundle {")
+        && confidential_core_source.contains("runtime_witness: RuntimeRefinementWitness,")
+        && confidential_core_source
+            .contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+        && !confidential_core_source.contains("pub runtime_witness: RuntimeRefinementWitness,")
+        && !confidential_core_source
+            .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_confidential_core_slot_bundle_api_is_explicit = confidential_core_source
+        .contains("pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {");
+    let runtime_confidential_core_lowering_bundle_fields_private = confidential_core_source
+        .contains("pub struct RuntimeConfidentialCoreLoweringBundle {")
+        && confidential_core_source.contains("runtime_witness: RuntimeRefinementWitness,")
+        && confidential_core_source.contains("confidential_program: ConfidentialKernelProgram,")
+        && confidential_core_source
+            .contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+        && !confidential_core_source.contains("pub runtime_witness: RuntimeRefinementWitness,")
+        && !confidential_core_source
+            .contains("pub confidential_program: ConfidentialKernelProgram,")
+        && !confidential_core_source
+            .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_confidential_core_lowering_bundle_api_is_explicit = confidential_core_source
+        .contains("pub fn confidential_program(&self) -> &ConfidentialKernelProgram {")
+        && confidential_core_source.contains(
+            "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
+        );
+    let runtime_confidential_core_shell_boundary_lowering_bundle_fields_private =
+        confidential_core_source
+            .contains("pub struct RuntimeConfidentialCoreShellBoundaryLoweringBundle {")
+            && confidential_core_source.contains("runtime_witness: RuntimeRefinementWitness,")
+            && confidential_core_source
+                .contains("shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+            && confidential_core_source
+                .contains("confidential_program: ConfidentialKernelProgram,")
+            && confidential_core_source
+                .contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+            && !confidential_core_source.contains("pub runtime_witness: RuntimeRefinementWitness,")
+            && !confidential_core_source
+                .contains("pub shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+            && !confidential_core_source
+                .contains("pub confidential_program: ConfidentialKernelProgram,")
+            && !confidential_core_source
+                .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_confidential_core_shell_boundary_lowering_bundle_api_is_explicit =
+        confidential_core_source
+            .contains("pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {")
+            && confidential_core_source
+                .contains("pub fn confidential_program(&self) -> &ConfidentialKernelProgram {")
+            && confidential_core_source.contains(
+                "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
+            );
+    let runtime_confidential_core_shell_boundary_slot_bundle_fields_private =
+        confidential_core_source
+            .contains("pub struct RuntimeConfidentialCoreShellBoundarySlotBundle {")
+            && confidential_core_source.contains("runtime_witness: RuntimeRefinementWitness,")
+            && confidential_core_source
+                .contains("shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+            && confidential_core_source
+                .contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+            && !confidential_core_source.contains("pub runtime_witness: RuntimeRefinementWitness,")
+            && !confidential_core_source
+                .contains("pub shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+            && !confidential_core_source
+                .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_confidential_core_shell_boundary_slot_bundle_api_is_explicit =
+        confidential_core_source
+            .contains("pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {")
+            && confidential_core_source.contains(
+                "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
+            );
+    let confidential_core_runtime_witness_constructors_private = confidential_core_source
+        .contains("fn from_runtime_witness(")
+        && !confidential_core_source.contains("pub fn from_runtime_witness(");
     let confidential_core_reuses_shell_boundary_bundle_only = confidential_core_source
         .contains("RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness.clone())?;")
         && !confidential_core_source.contains(".shell_contract()")
@@ -8260,18 +8435,21 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_runtime_confidential_core_source.contains(
             "kernelWitness.kernel_steps = bundle.confidential_program.expectedRuntimeKernelSteps",
         )
-        && lean_runtime_confidential_core_source.contains(
-            "runtimeKernelRefinementWitness.shellTrace.Refines kernelWitness.shellContract",
-        );
+        && lean_runtime_confidential_core_source
+            .contains("runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines");
     let lean_confidential_core_reuses_kernel_boundary_facts = lean_runtime_confidential_core_source
         .contains("importedWitness_proofGradeKernelBoundaryFacts");
     let lean_confidential_core_shell_boundary_slot_exactness_present =
         lean_runtime_confidential_core_shell_boundary_slot_source.contains(
+            "theorem importedRuntimeConfidentialCoreShellBoundarySlotBundle_proofGradeAssurance",
+        ) && lean_runtime_confidential_core_shell_boundary_slot_source.contains(
             "bundle.runtime_witness.kernel_witness = some bundle.shell_boundary_bundle.kernel_witness",
         ) && lean_runtime_confidential_core_shell_boundary_slot_source.contains(
             "bundle.runtime_witness.runtime_kernel_refinement_witness =",
         ) && lean_runtime_confidential_core_shell_boundary_slot_source.contains(
             "some bundle.shell_boundary_bundle.runtime_kernel_refinement_witness",
+        ) && lean_runtime_confidential_core_shell_boundary_slot_source.contains(
+            "bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines",
         );
     let lean_confidential_core_shell_boundary_lowering_exactness_present =
         lean_runtime_confidential_core_shell_boundary_lowering_source.contains(
@@ -8286,10 +8464,6 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let trusted_kernel_slot_bundle_bridge_checks = [
         (
             "pub fn program_matches_trusted_kernel_entrypoint(&self) -> bool {",
-            vec![String::from("crates/uo-core/src/trusted_kernel.rs")],
-        ),
-        (
-            "pub fn from_trusted_kernel_bundle(",
             vec![String::from("crates/uo-core/src/trusted_kernel.rs")],
         ),
         (
@@ -8316,6 +8490,125 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                     .as_bool()
                     .expect("trusted-kernel slot bridge restriction flag must be boolean")
             });
+    let runtime_trusted_kernel_bundle_fields_private = core_trace_source
+        .contains("pub struct RuntimeTrustedKernelBundle {")
+        && core_trace_source.contains("runtime_seed: Option<u64>,")
+        && core_trace_source.contains("controller_observer: RuntimeControllerObserverCertificate,")
+        && core_trace_source.contains("kernel_witness: Option<RuntimeKernelWitness>,")
+        && core_trace_source.contains("hidden_certificate: RuntimePathOramHiddenCertificate,")
+        && !core_trace_source.contains("pub runtime_seed: Option<u64>,")
+        && !core_trace_source
+            .contains("pub controller_observer: RuntimeControllerObserverCertificate,")
+        && !core_trace_source.contains("pub kernel_witness: Option<RuntimeKernelWitness>,")
+        && !core_trace_source.contains("pub hidden_certificate: RuntimePathOramHiddenCertificate,");
+    let runtime_trusted_kernel_bundle_api_is_explicit = core_trace_source
+        .contains("pub fn runtime_seed(&self) -> Option<u64> {")
+        && core_trace_source.contains(
+            "pub fn controller_observer(&self) -> &RuntimeControllerObserverCertificate {",
+        )
+        && core_trace_source
+            .contains("pub fn kernel_witness(&self) -> Option<&RuntimeKernelWitness> {")
+        && core_trace_source
+            .contains("pub fn hidden_certificate(&self) -> &RuntimePathOramHiddenCertificate {");
+    let execution_trace_runtime_fields_private = core_trace_source
+        .contains("pub struct ExecutionTrace {")
+        && core_trace_source.contains("runtime_seed: Option<u64>,")
+        && core_trace_source.contains("runtime_kernel_witness: Option<RuntimeKernelWitness>,")
+        && core_trace_source
+            .contains("runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,")
+        && core_trace_source
+            .contains("runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
+        && core_trace_source
+            .contains("runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
+        && core_trace_source.contains("runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
+        && core_trace_source.contains("runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source.contains(
+            "runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+        )
+        && !core_trace_source.contains("pub runtime_seed: Option<u64>,")
+        && !core_trace_source.contains("pub runtime_kernel_witness: Option<RuntimeKernelWitness>,")
+        && !core_trace_source.contains(
+            "pub runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,",
+        )
+        && !core_trace_source
+            .contains("pub runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
+        && !core_trace_source
+            .contains("pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
+        && !core_trace_source.contains("pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
+        && !core_trace_source
+            .contains("pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+        && !core_trace_source.contains(
+            "pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+        );
+    let execution_trace_runtime_api_is_explicit = core_trace_source
+        .contains("pub fn runtime_seed(&self) -> Option<u64> {")
+        && core_trace_source
+            .contains("pub fn runtime_kernel_witness(&self) -> Option<&RuntimeKernelWitness> {")
+        && core_trace_source.contains(
+            "pub fn runtime_kernel_refinement_witness(&self) -> Option<&RuntimeKernelRefinementWitness> {",
+        )
+        && core_trace_source.contains(
+            "pub fn stored_runtime_trusted_kernel_bundle(&self) -> Option<&RuntimeTrustedKernelBundle> {",
+        )
+        && core_trace_source.contains(
+            "pub fn stored_runtime_controller_certificate(&self) -> Option<&RuntimeControllerCertificate> {",
+        )
+        && core_trace_source
+            .contains("pub fn runtime_oram_objects(&self) -> &[RuntimeOramObjectWitness] {")
+        && core_trace_source
+            .contains("pub fn runtime_oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {")
+        && core_trace_source.contains(
+            "pub fn runtime_oram_access_counters_before(&self) -> &[RuntimeOramAccessCounterWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_access_counters_after(&self) -> &[RuntimeOramAccessCounterWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_position_map_before(&self) -> &[RuntimePathOramPositionMapWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_position_map_after(&self) -> &[RuntimePathOramPositionMapWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {",
+        );
+    let trusted_kernel_slot_bundle_constructor_private = trusted_kernel_source
+        .contains("fn from_trusted_kernel_bundle(")
+        && !trusted_kernel_source.contains("pub fn from_trusted_kernel_bundle(");
+    let runtime_trusted_kernel_slot_bundle_fields_private = trusted_kernel_source
+        .contains("pub struct RuntimeTrustedKernelSlotBundle {")
+        && trusted_kernel_source.contains("trusted_kernel_bundle: RuntimeTrustedKernelBundle,")
+        && trusted_kernel_source
+            .contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+        && !trusted_kernel_source
+            .contains("pub trusted_kernel_bundle: RuntimeTrustedKernelBundle,")
+        && !trusted_kernel_source
+            .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_trusted_kernel_slot_bundle_api_is_explicit = trusted_kernel_source
+        .contains("pub fn trusted_kernel_bundle(&self) -> &RuntimeTrustedKernelBundle {")
+        && trusted_kernel_source.contains(
+            "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
+        );
     let trusted_kernel_slot_bundle_uses_manifest_slot_program = trusted_kernel_source
         .contains("manifest_entry")
         && trusted_kernel_source.contains(".confidential_slot_program")
@@ -8368,10 +8661,42 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                     .as_bool()
                     .expect("shell-boundary slot/lowering bridge restriction flag must be boolean")
             });
+    let runtime_shell_boundary_lowering_bundle_fields_private = kernel_dsl_source
+        .contains("pub struct RuntimeShellBoundaryLoweringBundle {")
+        && kernel_dsl_source.contains("shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+        && kernel_dsl_source.contains("confidential_program: ConfidentialKernelProgram,")
+        && kernel_dsl_source.contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+        && !kernel_dsl_source.contains("pub shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+        && !kernel_dsl_source.contains("pub confidential_program: ConfidentialKernelProgram,")
+        && !kernel_dsl_source
+            .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_shell_boundary_lowering_bundle_api_is_explicit = kernel_dsl_source
+        .contains("pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {")
+        && kernel_dsl_source
+            .contains("pub fn confidential_program(&self) -> &ConfidentialKernelProgram {")
+        && kernel_dsl_source.contains(
+            "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
+        );
+    let runtime_shell_boundary_slot_bundle_fields_private = kernel_dsl_source
+        .contains("pub struct RuntimeShellBoundarySlotBundle {")
+        && kernel_dsl_source.contains("shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+        && kernel_dsl_source.contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+        && !kernel_dsl_source.contains("pub shell_boundary_bundle: RuntimeShellBoundaryBundle,")
+        && !kernel_dsl_source
+            .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_shell_boundary_slot_bundle_api_is_explicit = kernel_dsl_source
+        .contains("pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {")
+        && kernel_dsl_source.contains(
+            "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
+        );
     let shell_boundary_slot_lowering_uses_manifest_programs = kernel_dsl_source
         .contains("entry.confidential_program")
         && kernel_dsl_source.contains("entry.confidential_slot_program")
         && kernel_dsl_source.contains("let manifest_entry = self");
+    let kernel_dsl_manifest_entry_constructors_private = kernel_dsl_source
+        .contains("fn from_manifest_entry(")
+        && !kernel_dsl_source.contains("pub(crate) fn from_manifest_entry(")
+        && !kernel_dsl_source.contains("pub fn from_manifest_entry(");
     let lean_shell_boundary_slot_bundle_exactness_present = lean_runtime_shell_boundary_slot_source
         .contains("theorem importedRuntimeShellBoundarySlotBundle_shellRefines")
         && lean_runtime_shell_boundary_slot_source
@@ -8433,6 +8758,39 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("runtime-kernel bundle bridge restriction flag must be boolean")
         });
+    let runtime_kernel_dsl_bundle_fields_private = kernel_dsl_source
+        .contains("pub struct RuntimeKernelDslBundle {")
+        && kernel_dsl_source.contains("kernel_witness: RuntimeKernelWitness,")
+        && kernel_dsl_source.contains("confidential_program: ConfidentialKernelProgram,")
+        && !kernel_dsl_source.contains("pub kernel_witness: RuntimeKernelWitness,")
+        && !kernel_dsl_source.contains("pub confidential_program: ConfidentialKernelProgram,");
+    let runtime_kernel_dsl_bundle_api_is_explicit = kernel_dsl_source
+        .contains("pub fn kernel_witness(&self) -> &RuntimeKernelWitness {")
+        && kernel_dsl_source
+            .contains("pub fn confidential_program(&self) -> &ConfidentialKernelProgram {");
+    let runtime_kernel_slot_dsl_bundle_fields_private = kernel_dsl_source
+        .contains("pub struct RuntimeKernelSlotDslBundle {")
+        && kernel_dsl_source.contains("kernel_witness: RuntimeKernelWitness,")
+        && kernel_dsl_source.contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+        && !kernel_dsl_source.contains("pub kernel_witness: RuntimeKernelWitness,")
+        && !kernel_dsl_source
+            .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_kernel_slot_dsl_bundle_api_is_explicit = kernel_dsl_source
+        .contains("pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {");
+    let runtime_kernel_lowering_bundle_fields_private = kernel_dsl_source
+        .contains("pub struct RuntimeKernelLoweringBundle {")
+        && kernel_dsl_source.contains("kernel_witness: RuntimeKernelWitness,")
+        && kernel_dsl_source.contains("confidential_program: ConfidentialKernelProgram,")
+        && kernel_dsl_source.contains("confidential_slot_program: ConfidentialKernelSlotProgram,")
+        && !kernel_dsl_source.contains("pub kernel_witness: RuntimeKernelWitness,")
+        && !kernel_dsl_source.contains("pub confidential_program: ConfidentialKernelProgram,")
+        && !kernel_dsl_source
+            .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
+    let runtime_kernel_lowering_bundle_api_is_explicit = kernel_dsl_source
+        .contains("pub fn confidential_program(&self) -> &ConfidentialKernelProgram {")
+        && kernel_dsl_source.contains(
+            "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
+        );
     let runtime_kernel_bundle_uses_manifest_programs = kernel_dsl_source
         .contains("entry.confidential_program")
         && kernel_dsl_source.contains("entry.confidential_slot_program")
@@ -8465,11 +8823,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("theorem importedRuntimeKernelLoweringBundle_toRuntimeBundle_sound");
     let runtime_trace_bridge_checks = [
         (
-            "pub fn new_with_kernel_witness(",
+            "fn new_with_kernel_witness(",
             vec![String::from("crates/uo-core/src/trace.rs")],
         ),
         (
             "pub fn from_runtime_trace_parts(",
+            vec![String::from("crates/uo-core/src/trace.rs")],
+        ),
+        (
+            "pub fn materialize_runtime_trusted_kernel_bundle(",
             vec![String::from("crates/uo-core/src/trace.rs")],
         ),
         (
@@ -8501,8 +8863,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("runtime trace bridge restriction flag must be boolean")
     });
-    let runtime_trusted_kernel_bundle_storage_surface_files =
-        collect_production_pattern_hits(&runtime_evm_src, "store_runtime_trusted_kernel_bundle(")?;
+    let runtime_trusted_kernel_bundle_storage_surface_files = collect_production_pattern_hits(
+        &runtime_evm_src,
+        "materialize_runtime_trusted_kernel_bundle(",
+    )?;
     let expected_runtime_trusted_kernel_bundle_storage_surface_files =
         vec![String::from("runtime/uo-evm/src/theorem.rs")];
     let runtime_trusted_kernel_bundle_storage_surface_restricted =
@@ -8519,8 +8883,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         .contains("let bundle = self.runtime_trusted_kernel_bundle()?;")
         && core_trace_source
             .contains("RuntimeRefinementWitness::from_certificates_with_runtime_witnesses(");
+    let runtime_refinement_witness_constructors_private = core_trace_source
+        .contains("fn from_certificates(")
+        && core_trace_source.contains("fn from_certificates_with_kernel_witness(")
+        && core_trace_source.contains("fn from_certificates_with_runtime_witnesses(")
+        && !core_trace_source.contains("pub fn from_certificates(")
+        && !core_trace_source.contains("pub fn from_certificates_with_kernel_witness(")
+        && !core_trace_source.contains("pub fn from_certificates_with_runtime_witnesses(");
     let runtime_trusted_kernel_bundle_enforces_trace_exactness = core_trace_source
-        .contains("pub fn store_runtime_trusted_kernel_bundle(")
+        .contains("fn store_runtime_trusted_kernel_bundle(")
         && core_trace_source
             .contains("let reconstructed = self.reconstructed_runtime_trusted_kernel_bundle()?;")
         && core_trace_source.contains("if bundle != reconstructed {")
@@ -8531,6 +8902,77 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && core_trace_source.contains(".runtime_kernel_witness\n            .clone()")
         && core_trace_source.contains(".ok_or(KernelWitnessError::MissingKernelWitness)?;")
         && !core_trace_source.contains(".and_then(|bundle| bundle.kernel_witness.clone())");
+    let proof_interface_bundle_literal_checks = [
+        (
+            "RuntimeShellBoundaryBundle {",
+            vec![String::from("crates/uo-core/src/shell_boundary.rs")],
+        ),
+        (
+            "RuntimeTrustedKernelBundle {",
+            vec![String::from("crates/uo-core/src/trace.rs")],
+        ),
+        (
+            "RuntimeTrustedKernelSlotBundle {",
+            vec![String::from("crates/uo-core/src/trusted_kernel.rs")],
+        ),
+        (
+            "RuntimeKernelDslBundle {",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeKernelSlotDslBundle {",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeKernelLoweringBundle {",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeShellBoundaryLoweringBundle {",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeShellBoundarySlotBundle {",
+            vec![String::from("crates/uo-core/src/kernel_dsl.rs")],
+        ),
+        (
+            "RuntimeConfidentialCoreBundle {",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "RuntimeConfidentialCoreSlotBundle {",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "RuntimeConfidentialCoreLoweringBundle {",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "RuntimeConfidentialCoreShellBoundaryLoweringBundle {",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+        (
+            "RuntimeConfidentialCoreShellBoundarySlotBundle {",
+            vec![String::from("crates/uo-core/src/confidential_core.rs")],
+        ),
+    ]
+    .into_iter()
+    .map(|(pattern, expected_files)| {
+        let files = collect_production_pattern_hits(&core_src, pattern)?;
+        Ok(json!({
+            "pattern": pattern,
+            "files": files,
+            "expected_files": expected_files,
+            "restricted": files == expected_files,
+        }))
+    })
+    .collect::<Result<Vec<_>>>()?;
+    let proof_interface_bundle_literal_surface_restricted =
+        proof_interface_bundle_literal_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("proof-interface bundle literal restriction flag must be boolean")
+        });
     let lean_runtime_refinement_proof_grade_exactness_present = lean_runtime_refinement_json_source
         .contains("def ImportedRuntimeRefinementWitness.ProofGradeValid")
         && lean_runtime_refinement_json_source
@@ -8602,7 +9044,20 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && shell_boundary_bundle_refinement_guard_present
         && runtime_shell_trace_fields_private
         && runtime_shell_trace_api_is_explicit
+        && runtime_shell_boundary_bundle_fields_private
+        && runtime_shell_boundary_bundle_api_is_explicit
         && confidential_core_bundle_bridge_surface_restricted
+        && runtime_confidential_core_bundle_fields_private
+        && runtime_confidential_core_bundle_api_is_explicit
+        && runtime_confidential_core_slot_bundle_fields_private
+        && runtime_confidential_core_slot_bundle_api_is_explicit
+        && runtime_confidential_core_lowering_bundle_fields_private
+        && runtime_confidential_core_lowering_bundle_api_is_explicit
+        && runtime_confidential_core_shell_boundary_lowering_bundle_fields_private
+        && runtime_confidential_core_shell_boundary_lowering_bundle_api_is_explicit
+        && runtime_confidential_core_shell_boundary_slot_bundle_fields_private
+        && runtime_confidential_core_shell_boundary_slot_bundle_api_is_explicit
+        && confidential_core_runtime_witness_constructors_private
         && confidential_core_reuses_shell_boundary_bundle_only
         && lean_shell_boundary_bundle_checks_exact_runtime_views
         && lean_imported_shell_boundary_kernel_boundary_facts_present
@@ -8611,13 +9066,32 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_confidential_core_shell_boundary_slot_exactness_present
         && lean_confidential_core_shell_boundary_lowering_exactness_present
         && trusted_kernel_slot_bundle_bridge_surface_restricted
+        && runtime_trusted_kernel_bundle_fields_private
+        && runtime_trusted_kernel_bundle_api_is_explicit
+        && execution_trace_runtime_fields_private
+        && execution_trace_runtime_api_is_explicit
+        && runtime_refinement_witness_constructors_private
+        && trusted_kernel_slot_bundle_constructor_private
+        && runtime_trusted_kernel_slot_bundle_fields_private
+        && runtime_trusted_kernel_slot_bundle_api_is_explicit
         && trusted_kernel_slot_bundle_uses_manifest_slot_program
         && lean_trusted_kernel_slot_bundle_proof_grade_exactness_present
         && shell_boundary_slot_lowering_bridge_surface_restricted
+        && runtime_shell_boundary_lowering_bundle_fields_private
+        && runtime_shell_boundary_lowering_bundle_api_is_explicit
+        && runtime_shell_boundary_slot_bundle_fields_private
+        && runtime_shell_boundary_slot_bundle_api_is_explicit
         && shell_boundary_slot_lowering_uses_manifest_programs
+        && kernel_dsl_manifest_entry_constructors_private
         && lean_shell_boundary_slot_bundle_exactness_present
         && lean_shell_boundary_lowering_bundle_exactness_present
         && runtime_kernel_bundle_bridge_surface_restricted
+        && runtime_kernel_dsl_bundle_fields_private
+        && runtime_kernel_dsl_bundle_api_is_explicit
+        && runtime_kernel_slot_dsl_bundle_fields_private
+        && runtime_kernel_slot_dsl_bundle_api_is_explicit
+        && runtime_kernel_lowering_bundle_fields_private
+        && runtime_kernel_lowering_bundle_api_is_explicit
         && runtime_kernel_bundle_uses_manifest_programs
         && lean_runtime_kernel_dsl_bundle_exactness_present
         && lean_runtime_kernel_slot_dsl_bundle_exactness_present
@@ -8628,6 +9102,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_refinement_witness_reuses_trusted_kernel_bundle
         && runtime_trusted_kernel_bundle_enforces_trace_exactness
         && runtime_kernel_witness_export_uses_explicit_field_only
+        && proof_interface_bundle_literal_surface_restricted
         && lean_runtime_refinement_proof_grade_exactness_present
         && lean_runtime_trusted_kernel_proof_grade_exactness_present
         && resource_event_kind_serde_snake_case
@@ -8816,10 +9291,36 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             shell_boundary_bundle_refinement_guard_present,
         "runtime_shell_trace_fields_private": runtime_shell_trace_fields_private,
         "runtime_shell_trace_api_is_explicit": runtime_shell_trace_api_is_explicit,
+        "runtime_shell_boundary_bundle_fields_private":
+            runtime_shell_boundary_bundle_fields_private,
+        "runtime_shell_boundary_bundle_api_is_explicit":
+            runtime_shell_boundary_bundle_api_is_explicit,
         "confidential_core_bundle_bridge_checks":
             confidential_core_bundle_bridge_checks,
         "confidential_core_bundle_bridge_surface_restricted":
             confidential_core_bundle_bridge_surface_restricted,
+        "runtime_confidential_core_bundle_fields_private":
+            runtime_confidential_core_bundle_fields_private,
+        "runtime_confidential_core_bundle_api_is_explicit":
+            runtime_confidential_core_bundle_api_is_explicit,
+        "runtime_confidential_core_slot_bundle_fields_private":
+            runtime_confidential_core_slot_bundle_fields_private,
+        "runtime_confidential_core_slot_bundle_api_is_explicit":
+            runtime_confidential_core_slot_bundle_api_is_explicit,
+        "runtime_confidential_core_lowering_bundle_fields_private":
+            runtime_confidential_core_lowering_bundle_fields_private,
+        "runtime_confidential_core_lowering_bundle_api_is_explicit":
+            runtime_confidential_core_lowering_bundle_api_is_explicit,
+        "runtime_confidential_core_shell_boundary_lowering_bundle_fields_private":
+            runtime_confidential_core_shell_boundary_lowering_bundle_fields_private,
+        "runtime_confidential_core_shell_boundary_lowering_bundle_api_is_explicit":
+            runtime_confidential_core_shell_boundary_lowering_bundle_api_is_explicit,
+        "runtime_confidential_core_shell_boundary_slot_bundle_fields_private":
+            runtime_confidential_core_shell_boundary_slot_bundle_fields_private,
+        "runtime_confidential_core_shell_boundary_slot_bundle_api_is_explicit":
+            runtime_confidential_core_shell_boundary_slot_bundle_api_is_explicit,
+        "confidential_core_runtime_witness_constructors_private":
+            confidential_core_runtime_witness_constructors_private,
         "confidential_core_reuses_shell_boundary_bundle_only":
             confidential_core_reuses_shell_boundary_bundle_only,
         "lean_shell_boundary_bundle_checks_exact_runtime_views":
@@ -8838,6 +9339,22 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             trusted_kernel_slot_bundle_bridge_checks,
         "trusted_kernel_slot_bundle_bridge_surface_restricted":
             trusted_kernel_slot_bundle_bridge_surface_restricted,
+        "runtime_trusted_kernel_bundle_fields_private":
+            runtime_trusted_kernel_bundle_fields_private,
+        "runtime_trusted_kernel_bundle_api_is_explicit":
+            runtime_trusted_kernel_bundle_api_is_explicit,
+        "execution_trace_runtime_fields_private":
+            execution_trace_runtime_fields_private,
+        "execution_trace_runtime_api_is_explicit":
+            execution_trace_runtime_api_is_explicit,
+        "runtime_refinement_witness_constructors_private":
+            runtime_refinement_witness_constructors_private,
+        "trusted_kernel_slot_bundle_constructor_private":
+            trusted_kernel_slot_bundle_constructor_private,
+        "runtime_trusted_kernel_slot_bundle_fields_private":
+            runtime_trusted_kernel_slot_bundle_fields_private,
+        "runtime_trusted_kernel_slot_bundle_api_is_explicit":
+            runtime_trusted_kernel_slot_bundle_api_is_explicit,
         "trusted_kernel_slot_bundle_uses_manifest_slot_program":
             trusted_kernel_slot_bundle_uses_manifest_slot_program,
         "lean_trusted_kernel_slot_bundle_proof_grade_exactness_present":
@@ -8846,8 +9363,18 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             shell_boundary_slot_lowering_bridge_checks,
         "shell_boundary_slot_lowering_bridge_surface_restricted":
             shell_boundary_slot_lowering_bridge_surface_restricted,
+        "runtime_shell_boundary_lowering_bundle_fields_private":
+            runtime_shell_boundary_lowering_bundle_fields_private,
+        "runtime_shell_boundary_lowering_bundle_api_is_explicit":
+            runtime_shell_boundary_lowering_bundle_api_is_explicit,
+        "runtime_shell_boundary_slot_bundle_fields_private":
+            runtime_shell_boundary_slot_bundle_fields_private,
+        "runtime_shell_boundary_slot_bundle_api_is_explicit":
+            runtime_shell_boundary_slot_bundle_api_is_explicit,
         "shell_boundary_slot_lowering_uses_manifest_programs":
             shell_boundary_slot_lowering_uses_manifest_programs,
+        "kernel_dsl_manifest_entry_constructors_private":
+            kernel_dsl_manifest_entry_constructors_private,
         "lean_shell_boundary_slot_bundle_exactness_present":
             lean_shell_boundary_slot_bundle_exactness_present,
         "lean_shell_boundary_lowering_bundle_exactness_present":
@@ -8856,6 +9383,18 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_kernel_bundle_bridge_checks,
         "runtime_kernel_bundle_bridge_surface_restricted":
             runtime_kernel_bundle_bridge_surface_restricted,
+        "runtime_kernel_dsl_bundle_fields_private":
+            runtime_kernel_dsl_bundle_fields_private,
+        "runtime_kernel_dsl_bundle_api_is_explicit":
+            runtime_kernel_dsl_bundle_api_is_explicit,
+        "runtime_kernel_slot_dsl_bundle_fields_private":
+            runtime_kernel_slot_dsl_bundle_fields_private,
+        "runtime_kernel_slot_dsl_bundle_api_is_explicit":
+            runtime_kernel_slot_dsl_bundle_api_is_explicit,
+        "runtime_kernel_lowering_bundle_fields_private":
+            runtime_kernel_lowering_bundle_fields_private,
+        "runtime_kernel_lowering_bundle_api_is_explicit":
+            runtime_kernel_lowering_bundle_api_is_explicit,
         "runtime_kernel_bundle_uses_manifest_programs":
             runtime_kernel_bundle_uses_manifest_programs,
         "lean_runtime_kernel_dsl_bundle_exactness_present":
@@ -8885,6 +9424,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_trusted_kernel_bundle_enforces_trace_exactness,
         "runtime_kernel_witness_export_uses_explicit_field_only":
             runtime_kernel_witness_export_uses_explicit_field_only,
+        "proof_interface_bundle_literal_checks":
+            proof_interface_bundle_literal_checks,
+        "proof_interface_bundle_literal_surface_restricted":
+            proof_interface_bundle_literal_surface_restricted,
         "lean_runtime_refinement_proof_grade_exactness_present":
             lean_runtime_refinement_proof_grade_exactness_present,
         "lean_runtime_trusted_kernel_proof_grade_exactness_present":
@@ -9503,8 +10046,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains("CallRecorder::begin_with_input_len(")
         && theorem_source.contains("fn finalize_execution_trace")
         && theorem_source.contains("ExecutionTrace::from_runtime_trace_parts(")
+        && theorem_source.contains("trace.materialize_runtime_trusted_kernel_bundle()?;")
         && !theorem_source.contains("ExecutionTrace {")
-        && theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness")
+        && !theorem_source.contains("RuntimeControllerObserverCertificate::new(")
+        && !theorem_source.contains("RuntimePathOramHiddenCertificate::new(")
+        && !theorem_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness(")
         && theorem_source
             .contains("traced_outcome.into_finalized_call_trace_parts(runtime_call_start)")
         && theorem_source.contains("runtime_witness_state.into_execution_trace_parts()")
@@ -9588,18 +10134,22 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let theorem_certificate_constructor_checks = [
         (
             "RuntimeControllerObserverCertificate::new(",
-            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+            Vec::<String>::new(),
         ),
         (
             "RuntimePathOramHiddenCertificate::new(",
-            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+            Vec::<String>::new(),
         ),
         (
             "RuntimeTrustedKernelBundle::new_with_kernel_witness(",
-            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+            Vec::<String>::new(),
         ),
         (
             "ExecutionTrace::from_runtime_trace_parts(",
+            vec![String::from("runtime/uo-evm/src/theorem.rs")],
+        ),
+        (
+            "ExecutionTrace::materialize_runtime_trusted_kernel_bundle(",
             vec![String::from("runtime/uo-evm/src/theorem.rs")],
         ),
     ]
@@ -10711,6 +11261,271 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let execution_trace_omits_runtime_telemetry = core_trace_source
         .contains("pub struct ExecutionTrace {")
         && !core_trace_source.contains("pub host_proxy_metrics:");
+    let execution_trace_runtime_fields_private = core_trace_source
+        .contains("pub struct ExecutionTrace {")
+        && core_trace_source.contains("runtime_seed: Option<u64>,")
+        && core_trace_source.contains("runtime_kernel_witness: Option<RuntimeKernelWitness>,")
+        && core_trace_source
+            .contains("runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,")
+        && core_trace_source
+            .contains("runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
+        && core_trace_source
+            .contains("runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
+        && core_trace_source.contains("runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
+        && core_trace_source.contains("runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source
+            .contains("runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source.contains(
+            "runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+        )
+        && !core_trace_source.contains("pub runtime_seed: Option<u64>,")
+        && !core_trace_source.contains("pub runtime_kernel_witness: Option<RuntimeKernelWitness>,")
+        && !core_trace_source.contains(
+            "pub runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,",
+        )
+        && !core_trace_source
+            .contains("pub runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
+        && !core_trace_source
+            .contains("pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
+        && !core_trace_source.contains("pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
+        && !core_trace_source
+            .contains("pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+        && !core_trace_source.contains(
+            "pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,",
+        )
+        && !core_trace_source.contains(
+            "pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+        );
+    let execution_trace_runtime_api_is_explicit = core_trace_source
+        .contains("pub fn runtime_seed(&self) -> Option<u64> {")
+        && core_trace_source
+            .contains("pub fn runtime_kernel_witness(&self) -> Option<&RuntimeKernelWitness> {")
+        && core_trace_source.contains(
+            "pub fn runtime_kernel_refinement_witness(&self) -> Option<&RuntimeKernelRefinementWitness> {",
+        )
+        && core_trace_source.contains(
+            "pub fn stored_runtime_trusted_kernel_bundle(&self) -> Option<&RuntimeTrustedKernelBundle> {",
+        )
+        && core_trace_source.contains(
+            "pub fn stored_runtime_controller_certificate(&self) -> Option<&RuntimeControllerCertificate> {",
+        )
+        && core_trace_source
+            .contains("pub fn runtime_oram_objects(&self) -> &[RuntimeOramObjectWitness] {")
+        && core_trace_source
+            .contains("pub fn runtime_oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {")
+        && core_trace_source.contains(
+            "pub fn runtime_oram_access_counters_before(&self) -> &[RuntimeOramAccessCounterWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_access_counters_after(&self) -> &[RuntimeOramAccessCounterWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_position_map_before(&self) -> &[RuntimePathOramPositionMapWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_position_map_after(&self) -> &[RuntimePathOramPositionMapWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn runtime_oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {",
+        );
+    let runtime_execution_trace_parts_fields_private = core_trace_source
+        .contains("pub struct RuntimeExecutionTraceParts {")
+        && core_trace_source.contains("opcode_trace: Vec<String>,")
+        && core_trace_source.contains("runtime_seed: Option<u64>,")
+        && core_trace_source.contains("runtime_kernel_witness: Option<RuntimeKernelWitness>,")
+        && !core_trace_source.contains("pub opcode_trace: Vec<String>,")
+        && !core_trace_source.contains("pub runtime_seed: Option<u64>,")
+        && !core_trace_source.contains("pub runtime_kernel_witness: Option<RuntimeKernelWitness>,");
+    let runtime_execution_trace_parts_constructor_is_explicit = core_trace_source
+        .contains("impl RuntimeExecutionTraceParts {")
+        && core_trace_source.contains("pub fn new(")
+        && !core_trace_source.contains("#[derive(Clone, Debug, PartialEq, Default)]");
+    let runtime_controller_certificate_fields_private = core_trace_source
+        .contains("pub struct RuntimeControllerCertificate {")
+        && core_trace_source.contains("entry_input_len: usize,")
+        && core_trace_source.contains("observed_oram_accesses: Vec<RuntimeOramAccessWitness>,")
+        && !core_trace_source.contains("pub entry_input_len: usize,")
+        && !core_trace_source
+            .contains("pub observed_oram_accesses: Vec<RuntimeOramAccessWitness>,");
+    let runtime_controller_certificate_api_is_explicit = core_trace_source
+        .contains("impl RuntimeControllerCertificate {")
+        && core_trace_source.contains("pub fn new(")
+        && core_trace_source.contains("pub fn entry_input_len(&self) -> usize {")
+        && core_trace_source
+            .contains("pub fn observed_oram_accesses(&self) -> &[RuntimeOramAccessWitness] {");
+    let runtime_controller_observer_certificate_fields_private = core_trace_source
+        .contains("pub struct RuntimeControllerObserverCertificate {")
+        && core_trace_source.contains("public_outcome: PublicOutcomeTrace,")
+        && core_trace_source.contains("boundary_schedule: Vec<BoundaryEvent>,")
+        && core_trace_source.contains("controller_shape: SgxControllerShapeTrace,")
+        && core_trace_source.contains("normalized_micro_trace: NormalizedMicroTrace,")
+        && core_trace_source.contains("controller_certificate: RuntimeControllerCertificate,")
+        && !core_trace_source.contains("pub public_outcome: PublicOutcomeTrace,")
+        && !core_trace_source.contains("pub boundary_schedule: Vec<BoundaryEvent>,")
+        && !core_trace_source.contains("pub controller_shape: SgxControllerShapeTrace,")
+        && !core_trace_source.contains("pub normalized_micro_trace: NormalizedMicroTrace,")
+        && !core_trace_source.contains("pub controller_certificate: RuntimeControllerCertificate,");
+    let runtime_controller_observer_certificate_api_is_explicit = core_trace_source
+        .contains("pub fn public_outcome(&self) -> &PublicOutcomeTrace {")
+        && core_trace_source.contains("pub fn boundary_schedule(&self) -> &[BoundaryEvent] {")
+        && core_trace_source
+            .contains("pub fn controller_shape(&self) -> &SgxControllerShapeTrace {")
+        && core_trace_source
+            .contains("pub fn normalized_micro_trace(&self) -> &NormalizedMicroTrace {")
+        && core_trace_source
+            .contains("pub fn controller_certificate(&self) -> &RuntimeControllerCertificate {");
+    let runtime_path_oram_hidden_certificate_fields_private = core_trace_source
+        .contains("pub struct RuntimePathOramHiddenCertificate {")
+        && core_trace_source.contains("trace: RefinementTrace,")
+        && core_trace_source.contains("oram_objects: Vec<RuntimeOramObjectWitness>,")
+        && core_trace_source
+            .contains("oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && core_trace_source.contains("oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+        && core_trace_source
+            .contains("oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source
+            .contains("oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source
+            .contains("oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,")
+        && !core_trace_source.contains("pub trace: RefinementTrace,")
+        && !core_trace_source.contains("pub oram_objects: Vec<RuntimeOramObjectWitness>,")
+        && !core_trace_source
+            .contains("pub oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && !core_trace_source.contains("pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+        && !core_trace_source
+            .contains("pub oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,")
+        && !core_trace_source
+            .contains("pub oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,")
+        && !core_trace_source
+            .contains("pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,");
+    let runtime_path_oram_hidden_certificate_api_is_explicit = core_trace_source
+        .contains("pub fn trace(&self) -> &RefinementTrace {")
+        && core_trace_source
+            .contains("pub fn oram_objects(&self) -> &[RuntimeOramObjectWitness] {")
+        && core_trace_source.contains(
+            "pub fn oram_leaf_public_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {",
+        )
+        && core_trace_source
+            .contains("pub fn oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {")
+        && core_trace_source.contains(
+            "pub fn oram_position_map_before(&self) -> &[RuntimePathOramPositionMapWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn oram_position_map_after(&self) -> &[RuntimePathOramPositionMapWitness] {",
+        )
+        && core_trace_source.contains(
+            "pub fn oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {",
+        );
+    let seeded_runtime_pathoram_witness_family_fields_private = core_trace_source
+        .contains("pub struct SeededRuntimePathOramWitnessFamily {")
+        && core_trace_source.contains("seed_count: usize,")
+        && core_trace_source.contains("witnesses: Vec<RuntimeRefinementWitness>,")
+        && core_trace_source.contains("public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && !core_trace_source.contains("pub seed_count: usize,")
+        && !core_trace_source.contains("pub witnesses: Vec<RuntimeRefinementWitness>,")
+        && !core_trace_source
+            .contains("pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,");
+    let seeded_runtime_pathoram_witness_family_api_is_explicit = core_trace_source
+        .contains("pub fn seed_count(&self) -> usize {")
+        && core_trace_source.contains("pub fn witnesses(&self) -> &[RuntimeRefinementWitness] {")
+        && core_trace_source
+            .contains("pub fn public_leaf_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {");
+    let canonical_fresh_coin_witness_family_fields_private = core_trace_source
+        .contains("pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {")
+        && core_trace_source.contains("seed_count: usize,")
+        && core_trace_source.contains("witnesses: Vec<RuntimeRefinementWitness>,")
+        && core_trace_source.contains("public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && core_trace_source
+            .contains("public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && !core_trace_source.contains("pub seed_count: usize,")
+        && !core_trace_source.contains("pub witnesses: Vec<RuntimeRefinementWitness>,")
+        && !core_trace_source
+            .contains("pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && !core_trace_source
+            .contains("pub public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,");
+    let canonical_fresh_coin_witness_family_api_is_explicit = core_trace_source
+        .contains("pub fn seed_count(&self) -> usize {")
+        && core_trace_source.contains("pub fn witnesses(&self) -> &[RuntimeRefinementWitness] {")
+        && core_trace_source
+            .contains("pub fn public_leaf_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {")
+        && core_trace_source.contains(
+            "pub fn public_fresh_coin_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {",
+        );
+    let canonical_fresh_coin_theorem_input_fields_private = core_trace_source
+        .contains("pub struct CanonicalFreshCoinRuntimePathOramTheoremInput {")
+        && core_trace_source.contains("seed_count: usize,")
+        && core_trace_source.contains("representative_seed: usize,")
+        && core_trace_source.contains("representative_witness: RuntimeRefinementWitness,")
+        && core_trace_source.contains("public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && core_trace_source
+            .contains("public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && !core_trace_source.contains("pub seed_count: usize,")
+        && !core_trace_source.contains("pub representative_seed: usize,")
+        && !core_trace_source.contains("pub representative_witness: RuntimeRefinementWitness,")
+        && !core_trace_source
+            .contains("pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,")
+        && !core_trace_source
+            .contains("pub public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,");
+    let canonical_fresh_coin_theorem_input_api_is_explicit = core_trace_source
+        .contains("pub fn seed_count(&self) -> usize {")
+        && core_trace_source.contains("pub fn representative_seed(&self) -> usize {")
+        && core_trace_source
+            .contains("pub fn representative_witness(&self) -> &RuntimeRefinementWitness {")
+        && core_trace_source
+            .contains("pub fn public_leaf_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {")
+        && core_trace_source.contains(
+            "pub fn public_fresh_coin_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {",
+        );
+    let execution_trace_runtime_consumers_use_accessors = main_source
+        .contains("trace.runtime_kernel_witness().cloned().ok_or_else(")
+        && main_source.contains("trace.runtime_kernel_refinement_witness()")
+        && runtime_evm_lib_source.contains("result.trace.runtime_kernel_witness()")
+        && runtime_evm_lib_source.contains("result.trace.runtime_seed()")
+        && runtime_evm_lib_source
+            .contains("result.trace.stored_runtime_trusted_kernel_bundle().is_some()")
+        && probe_source.contains("trace.runtime_kernel_witness() != Some(&kernel_witness)")
+        && probe_source.contains("trace.runtime_oram_access_counters_before().to_vec()");
+    let execution_trace_builder_surface_files = collect_production_pattern_hits(
+        &runtime_evm_src,
+        "ExecutionTrace::from_runtime_trace_parts(",
+    )?;
+    let expected_execution_trace_builder_surface_files =
+        vec![String::from("runtime/uo-evm/src/theorem.rs")];
+    let execution_trace_builder_surface_restricted =
+        execution_trace_builder_surface_files == expected_execution_trace_builder_surface_files;
+    let runtime_execution_trace_parts_constructor_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "RuntimeExecutionTraceParts::new(")?;
+    let expected_runtime_execution_trace_parts_constructor_surface_files =
+        vec![String::from("runtime/uo-evm/src/theorem.rs")];
+    let runtime_execution_trace_parts_constructor_surface_restricted =
+        runtime_execution_trace_parts_constructor_surface_files
+            == expected_runtime_execution_trace_parts_constructor_surface_files;
+    let runtime_controller_certificate_constructor_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "RuntimeControllerCertificate::new(")?;
+    let expected_runtime_controller_certificate_constructor_surface_files =
+        vec![String::from("runtime/uo-evm/src/controller.rs")];
+    let runtime_controller_certificate_constructor_surface_restricted =
+        runtime_controller_certificate_constructor_surface_files
+            == expected_runtime_controller_certificate_constructor_surface_files;
+    let execution_trace_struct_literal_files =
+        collect_production_pattern_hits(&runtime_evm_src, "ExecutionTrace {")?;
+    let execution_trace_struct_literal_surface_restricted =
+        execution_trace_struct_literal_files.is_empty();
     let runtime_diagnostics_feature_declared = runtime_evm_cargo_source.contains("[features]")
         && runtime_evm_cargo_source.contains("diagnostics = []");
     let probe_enables_runtime_diagnostics_feature = probe_cargo_source
@@ -11477,6 +12292,62 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "store_cipher_exposes_wipe_helpers": store_cipher_exposes_wipe_helpers,
         "execution_trace_omits_runtime_telemetry":
             execution_trace_omits_runtime_telemetry,
+        "execution_trace_runtime_fields_private":
+            execution_trace_runtime_fields_private,
+        "execution_trace_runtime_api_is_explicit":
+            execution_trace_runtime_api_is_explicit,
+        "runtime_execution_trace_parts_fields_private":
+            runtime_execution_trace_parts_fields_private,
+        "runtime_execution_trace_parts_constructor_is_explicit":
+            runtime_execution_trace_parts_constructor_is_explicit,
+        "runtime_controller_certificate_fields_private":
+            runtime_controller_certificate_fields_private,
+        "runtime_controller_certificate_api_is_explicit":
+            runtime_controller_certificate_api_is_explicit,
+        "runtime_controller_observer_certificate_fields_private":
+            runtime_controller_observer_certificate_fields_private,
+        "runtime_controller_observer_certificate_api_is_explicit":
+            runtime_controller_observer_certificate_api_is_explicit,
+        "runtime_path_oram_hidden_certificate_fields_private":
+            runtime_path_oram_hidden_certificate_fields_private,
+        "runtime_path_oram_hidden_certificate_api_is_explicit":
+            runtime_path_oram_hidden_certificate_api_is_explicit,
+        "seeded_runtime_pathoram_witness_family_fields_private":
+            seeded_runtime_pathoram_witness_family_fields_private,
+        "seeded_runtime_pathoram_witness_family_api_is_explicit":
+            seeded_runtime_pathoram_witness_family_api_is_explicit,
+        "canonical_fresh_coin_witness_family_fields_private":
+            canonical_fresh_coin_witness_family_fields_private,
+        "canonical_fresh_coin_witness_family_api_is_explicit":
+            canonical_fresh_coin_witness_family_api_is_explicit,
+        "canonical_fresh_coin_theorem_input_fields_private":
+            canonical_fresh_coin_theorem_input_fields_private,
+        "canonical_fresh_coin_theorem_input_api_is_explicit":
+            canonical_fresh_coin_theorem_input_api_is_explicit,
+        "execution_trace_runtime_consumers_use_accessors":
+            execution_trace_runtime_consumers_use_accessors,
+        "execution_trace_builder_surface_files":
+            execution_trace_builder_surface_files,
+        "expected_execution_trace_builder_surface_files":
+            expected_execution_trace_builder_surface_files,
+        "execution_trace_builder_surface_restricted":
+            execution_trace_builder_surface_restricted,
+        "runtime_execution_trace_parts_constructor_surface_files":
+            runtime_execution_trace_parts_constructor_surface_files,
+        "expected_runtime_execution_trace_parts_constructor_surface_files":
+            expected_runtime_execution_trace_parts_constructor_surface_files,
+        "runtime_execution_trace_parts_constructor_surface_restricted":
+            runtime_execution_trace_parts_constructor_surface_restricted,
+        "runtime_controller_certificate_constructor_surface_files":
+            runtime_controller_certificate_constructor_surface_files,
+        "expected_runtime_controller_certificate_constructor_surface_files":
+            expected_runtime_controller_certificate_constructor_surface_files,
+        "runtime_controller_certificate_constructor_surface_restricted":
+            runtime_controller_certificate_constructor_surface_restricted,
+        "execution_trace_struct_literal_files":
+            execution_trace_struct_literal_files,
+        "execution_trace_struct_literal_surface_restricted":
+            execution_trace_struct_literal_surface_restricted,
         "runtime_diagnostics_feature_declared":
             runtime_diagnostics_feature_declared,
         "probe_enables_runtime_diagnostics_feature":
@@ -11646,6 +12517,27 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && store_cipher_key_zeroizes_on_drop
             && store_cipher_exposes_wipe_helpers
             && execution_trace_omits_runtime_telemetry
+            && execution_trace_runtime_fields_private
+            && execution_trace_runtime_api_is_explicit
+            && runtime_execution_trace_parts_fields_private
+            && runtime_execution_trace_parts_constructor_is_explicit
+            && runtime_controller_certificate_fields_private
+            && runtime_controller_certificate_api_is_explicit
+            && runtime_controller_observer_certificate_fields_private
+            && runtime_controller_observer_certificate_api_is_explicit
+            && runtime_path_oram_hidden_certificate_fields_private
+            && runtime_path_oram_hidden_certificate_api_is_explicit
+            && seeded_runtime_pathoram_witness_family_fields_private
+            && seeded_runtime_pathoram_witness_family_api_is_explicit
+            && canonical_fresh_coin_witness_family_fields_private
+            && canonical_fresh_coin_witness_family_api_is_explicit
+            && canonical_fresh_coin_theorem_input_fields_private
+            && canonical_fresh_coin_theorem_input_api_is_explicit
+            && execution_trace_runtime_consumers_use_accessors
+            && execution_trace_builder_surface_restricted
+            && runtime_execution_trace_parts_constructor_surface_restricted
+            && runtime_controller_certificate_constructor_surface_restricted
+            && execution_trace_struct_literal_surface_restricted
             && runtime_diagnostics_feature_declared
             && probe_enables_runtime_diagnostics_feature
             && default_call_result_omits_runtime_telemetry
@@ -12968,14 +13860,14 @@ fn collect_seeded_pathoram_family(
         let trace =
             run_target_call_with_seed(artifact, setup, entrypoint, args.clone(), seed as u64)?;
         if let Some(expected) = &access_counters_before {
-            if *expected != trace.runtime_oram_access_counters_before {
+            if expected.as_slice() != trace.runtime_oram_access_counters_before() {
                 return Err(anyhow!(
                     "seeded path-ORAM family for {} does not keep pre-call access counters public and stable across seeds",
                     entrypoint
                 ));
             }
         } else {
-            access_counters_before = Some(trace.runtime_oram_access_counters_before.clone());
+            access_counters_before = Some(trace.runtime_oram_access_counters_before().to_vec());
         }
         witnesses.push(trace.runtime_refinement_witness()?);
     }
@@ -13009,10 +13901,10 @@ fn imported_oram_config(
                         .map(|(object_id, count)| (*object_id, *count))
                         .collect(),
                 },
-                entrypoint_id: witness.public_outcome.entrypoint_id.clone(),
-                oram_objects: witness.oram_objects.clone(),
+                entrypoint_id: witness.public_outcome().entrypoint_id.clone(),
+                oram_objects: witness.oram_objects().to_vec(),
             },
-            public_args: witness.public_outcome.public_args.clone(),
+            public_args: witness.public_outcome().public_args.clone(),
             access_counters: access_counters_before
                 .iter()
                 .map(|counter| (counter.object_id, counter.access_counter))
@@ -13039,15 +13931,15 @@ fn normalize_path_oram_logical_event(event: &LogicalEvent) -> LogicalEvent {
 
 fn imported_oram_public_view(witness: &RuntimeRefinementWitness) -> ImportedOramViewPublicPart {
     ImportedOramViewPublicPart {
-        opcode_trace: witness.trace.opcode_trace.clone(),
+        opcode_trace: witness.trace().opcode_trace.clone(),
         logical_accesses: witness
-            .trace
+            .trace()
             .logical_accesses
             .iter()
             .map(normalize_path_oram_logical_event)
             .collect(),
-        logical_writes: witness.trace.logical_writes.clone(),
-        gas_used: witness.trace.gas_used,
+        logical_writes: witness.trace().logical_writes.clone(),
+        gas_used: witness.trace().gas_used,
     }
 }
 
@@ -13056,7 +13948,7 @@ fn imported_path_oram_public_location(
 ) -> ImportedPathOramStorageLocationTrace {
     ImportedPathOramStorageLocationTrace {
         read_labels: witness
-            .trace
+            .trace()
             .physical_reads
             .iter()
             .map(|event| ImportedPathOramPhysicalEventLabel {
@@ -13065,7 +13957,7 @@ fn imported_path_oram_public_location(
             })
             .collect(),
         write_labels: witness
-            .trace
+            .trace()
             .physical_writes
             .iter()
             .map(|event| ImportedPathOramPhysicalEventLabel {
@@ -13089,19 +13981,19 @@ fn imported_path_oram_storage_shape(
 ) -> ImportedPathOramStorageShape {
     ImportedPathOramStorageShape {
         read_lengths: witness
-            .trace
+            .trace()
             .physical_reads
             .iter()
             .map(|event| event.len)
             .collect(),
         write_classes: witness
-            .trace
+            .trace()
             .physical_writes
             .iter()
             .map(|event| event.write_class.clone())
             .collect(),
         write_lengths: witness
-            .trace
+            .trace()
             .physical_writes
             .iter()
             .map(|event| event.len)
@@ -13489,11 +14381,14 @@ those theorem-path objects directly. The same report now also pins the
 proof-artifact export path: `translation_validation.rs` must project
 kernel-step views through `EntrypointManifest::canonical_kernel_step_manifest()`
 instead of reading the duplicated raw manifest field directly. The same report now also pins the
-theorem-facing constructor surface itself: `RuntimeControllerObserverCertificate::new`,
+theorem-facing constructor surface itself:
+`ExecutionTrace::from_runtime_trace_parts(...)` and
+`ExecutionTrace::materialize_runtime_trusted_kernel_bundle(...)` must stay
+confined to `runtime/uo-evm/src/theorem.rs`, while the lower-level
+`RuntimeControllerObserverCertificate::new`,
 `RuntimePathOramHiddenCertificate::new`, and
-`RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` plus
-`ExecutionTrace::from_runtime_trace_parts(...)` must stay confined to
-`runtime/uo-evm/src/theorem.rs`, while direct `TheoremTrace { ... }`
+`RuntimeTrustedKernelBundle::new_with_kernel_witness(...)` constructors stay
+internal to `crates/uo-core/src/trace.rs`; direct `TheoremTrace { ... }`
 construction must stay confined to `runtime/uo-evm/src/controller.rs`. The
 same boundary report now also pins the public-trace helper surface:
 `PublicCallSummary::from_manifest_entry(...)` and

@@ -501,9 +501,9 @@ fn controller_certificate(
     entry_input_len: usize,
     observed_oram_schedule: &[ObservedOramAccess],
 ) -> RuntimeControllerCertificate {
-    RuntimeControllerCertificate {
+    RuntimeControllerCertificate::new(
         entry_input_len,
-        observed_oram_accesses: observed_oram_schedule
+        observed_oram_schedule
             .iter()
             .map(|access| RuntimeOramAccessWitness {
                 object_id: access.object_id,
@@ -514,7 +514,7 @@ fn controller_certificate(
                 stash_bound: access.parameters.stash_bound,
             })
             .collect(),
-    }
+    )
 }
 
 fn assert_oram_field_eq<T>(object_id: u32, field: &str, observed: T, manifest: T) -> Result<()>

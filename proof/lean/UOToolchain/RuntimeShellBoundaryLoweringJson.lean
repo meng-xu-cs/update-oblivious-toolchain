@@ -55,9 +55,9 @@ def ImportedRuntimeShellBoundaryLoweringBundle.toRuntimeShellBoundaryLoweringBun
 theorem importedRuntimeShellBoundaryLoweringBundle_shellRefines
   {bundle : ImportedRuntimeShellBoundaryLoweringBundle}
   (hValid : bundle.Valid) :
-  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.Refines
+  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
       bundle.shell_boundary_bundle.kernel_witness.shellContract := by
-  exact importedRuntimeShellBoundaryBundle_witness_refines hValid.1
+  exact importedRuntimeShellBoundaryBundle_witness_proofGradeRefines hValid.1
 
 theorem importedRuntimeShellBoundaryLoweringBundle_lowering_exact
   {bundle : ImportedRuntimeShellBoundaryLoweringBundle}
@@ -85,6 +85,43 @@ theorem importedRuntimeShellBoundaryLoweringBundle_recomputedSlotSchedule_exact
       bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
         lowered.expectedRuntimeKernelSteps := by
   exact importedRuntimeKernelLoweringBundle_recomputedSlotSchedule_exact hValid.2
+
+theorem importedRuntimeShellBoundaryLoweringBundle_proofGradeAssurance
+  (bundle : ImportedRuntimeShellBoundaryLoweringBundle)
+  (hValid : bundle.Valid) :
+  ∃ lowered,
+    bundle.confidential_program.toConfidentialKernelSlotProgram? = .ok lowered ∧
+      bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
+        bundle.shell_boundary_bundle.kernel_witness.shellContract ∧
+      bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+        some bundle.confidential_program.expectedRuntimeKernelSteps ∧
+      bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+        bundle.confidential_program.expectedRuntimeKernelSteps ∧
+      bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+        some lowered.expectedRuntimeKernelSteps ∧
+      bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+        lowered.expectedRuntimeKernelSteps ∧
+      checkImportedConfidentialKernelProgramSlotLowering
+        bundle.confidential_program bundle.confidential_slot_program = true := by
+  have hShellRefines :
+      bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
+        bundle.shell_boundary_bundle.kernel_witness.shellContract := by
+    exact importedRuntimeShellBoundaryLoweringBundle_shellRefines hValid
+  have hNamed :
+      bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+          some bundle.confidential_program.expectedRuntimeKernelSteps ∧
+        bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+          bundle.confidential_program.expectedRuntimeKernelSteps := by
+    exact importedRuntimeShellBoundaryLoweringBundle_namedSchedule_exact hValid
+  rcases importedRuntimeShellBoundaryLoweringBundle_recomputedSlotSchedule_exact hValid with
+    ⟨lowered, hLowered, hLoweredExpected, hLoweredSteps⟩
+  have hLowering :
+      checkImportedConfidentialKernelProgramSlotLowering
+          bundle.confidential_program bundle.confidential_slot_program = true := by
+    exact importedRuntimeShellBoundaryLoweringBundle_lowering_exact hValid
+  exact
+    ⟨lowered, hLowered, hShellRefines, hNamed.1, hNamed.2,
+      hLoweredExpected, hLoweredSteps, hLowering⟩
 
 theorem importedRuntimeShellBoundaryLoweringBundle_lowered_toRuntimeValid
   {bundle : ImportedRuntimeShellBoundaryLoweringBundle}

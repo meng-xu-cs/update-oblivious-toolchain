@@ -97,7 +97,7 @@ theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_shellRefines
   {bundle : ImportedRuntimeConfidentialCoreShellBoundaryLoweringBundle}
   {modelTags : SGXModelTags}
   (hValid : bundle.Valid modelTags) :
-  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.Refines
+  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
       bundle.shell_boundary_bundle.kernel_witness.shellContract := by
   exact importedRuntimeShellBoundaryLoweringBundle_shellRefines hValid.2.1
 
@@ -140,7 +140,7 @@ theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_proofGradeAss
       bundle.runtime_witness.kernel_witness = some bundle.shell_boundary_bundle.kernel_witness ∧
       bundle.runtime_witness.runtime_kernel_refinement_witness =
         some bundle.shell_boundary_bundle.runtime_kernel_refinement_witness ∧
-      bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.Refines
+      bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
         bundle.shell_boundary_bundle.kernel_witness.shellContract ∧
       bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
         some bundle.confidential_program.expectedRuntimeKernelSteps ∧
@@ -164,7 +164,7 @@ theorem importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_proofGradeAss
       importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_runtimeKernelRefinementWitness_exact
         hValid
   have hShellRefines :
-      bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.Refines
+      bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
         bundle.shell_boundary_bundle.kernel_witness.shellContract := by
     exact
       importedRuntimeConfidentialCoreShellBoundaryLoweringBundle_shellRefines

@@ -29,10 +29,10 @@ pub struct RuntimeShellTrace {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellBoundaryBundle {
-    pub kernel_witness: RuntimeKernelWitness,
-    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    pub shell_contract: RuntimeShellContract,
-    pub shell_trace: RuntimeShellTrace,
+    kernel_witness: RuntimeKernelWitness,
+    runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
+    shell_contract: RuntimeShellContract,
+    shell_trace: RuntimeShellTrace,
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -403,7 +403,23 @@ impl RuntimeShellBoundaryBundle {
         &self.kernel_witness.entrypoint_id
     }
 
-    pub fn from_witnesses(
+    pub fn kernel_witness(&self) -> &RuntimeKernelWitness {
+        &self.kernel_witness
+    }
+
+    pub fn runtime_kernel_refinement_witness(&self) -> &RuntimeKernelRefinementWitness {
+        &self.runtime_kernel_refinement_witness
+    }
+
+    pub fn shell_contract(&self) -> &RuntimeShellContract {
+        &self.shell_contract
+    }
+
+    pub fn shell_trace(&self) -> &RuntimeShellTrace {
+        &self.shell_trace
+    }
+
+    fn from_witnesses(
         kernel_witness: RuntimeKernelWitness,
         runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
     ) -> Result<Self, RuntimeShellBoundaryBundleError> {
@@ -422,17 +438,18 @@ impl RuntimeShellBoundaryBundle {
         })
     }
 
-    pub fn from_runtime_witness(
+    pub(crate) fn from_runtime_witness(
         runtime_witness: RuntimeRefinementWitness,
     ) -> Result<Self, RuntimeShellBoundaryBundleError> {
         runtime_witness.validate()?;
         let kernel_witness = runtime_witness
-            .kernel_witness
+            .kernel_witness()
+            .cloned()
             .ok_or(RuntimeShellBoundaryBundleError::MissingKernelWitness)?;
-        let runtime_kernel_refinement_witness =
-            runtime_witness
-                .runtime_kernel_refinement_witness
-                .ok_or(RuntimeShellBoundaryBundleError::MissingRuntimeKernelRefinementWitness)?;
+        let runtime_kernel_refinement_witness = runtime_witness
+            .runtime_kernel_refinement_witness()
+            .cloned()
+            .ok_or(RuntimeShellBoundaryBundleError::MissingRuntimeKernelRefinementWitness)?;
         Self::from_witnesses(kernel_witness, runtime_kernel_refinement_witness)
     }
 }

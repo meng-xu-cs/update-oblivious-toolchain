@@ -323,6 +323,10 @@ The first implementation step is now present in the codebase:
   shell-event trace replays the shell contract, and that the shell trace
   refines the shell contract, and the probe reports that checker separately as
   `shell_boundary_validation.json`
+- that shell-boundary bundle is now sealed on the Rust side as well: the
+  witness / contract / trace fields stay private behind explicit accessor
+  methods, and the probe treats any re-publication of those fields or drift in
+  the getter surface as a proof-interface regression
 - the shared DSL/interpreter route now also composes directly through that
   shell interface: `uo-core` exports a
   `RuntimeShellBoundaryLoweringBundle` carrying the shell-boundary bundle plus
@@ -353,7 +357,12 @@ The first implementation step is now present in the codebase:
 - the post-call proof-facing `ExecutionTrace` packaging now also lives in
   `runtime/uo-evm/src/theorem.rs`, so `engine.rs` no longer constructs the
   controller-observer certificate, hidden Path-ORAM certificate, or
-  trusted-kernel bundle directly
+  trusted-kernel bundle directly; the proof-bearing runtime fields carried by
+  `ExecutionTrace` now also keep their stored state private and are exported
+  only through explicit accessors / validated reconstruction helpers, so the
+  theorem bridge no longer depends on public field mutation after trace
+  materialization; the intermediate `RuntimeExecutionTraceParts` carrier now
+  also uses one explicit constructor instead of a public-field literal surface
 - the confidential-path `RuntimeKernel` entrypoints that shadow-load
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot
@@ -440,20 +449,31 @@ The first implementation step is now present in the codebase:
   views plus an explicit `refines_contract` guard, requires downstream
   confidential-core bundles to reuse `RuntimeShellBoundaryBundle` rather than
   rederive shell summaries, requires the confidential-core theorem bundle
-  entrypoints to stay confined to `crates/uo-core/src/confidential_core.rs`,
+  entrypoints to stay confined to `crates/uo-core/src/confidential_core.rs`
+  while keeping both the direct confidential-core bundle / slot-bundle /
+  lowering-bundle trio and the confidential-core shell-boundary slot/lowering
+  pair accessor-only on the Rust side,
   requires the trusted-kernel slot bundle bridge to stay confined to
   `crates/uo-core/src/trusted_kernel.rs` while continuing to source the exact
-  manifest-carried slot DSL, requires the shell-boundary slot/lowering bundle
-  bridge family to stay confined to `crates/uo-core/src/kernel_dsl.rs` while
-  continuing to source the manifest-carried named and slot DSL programs,
+  manifest-carried slot DSL and keep both the trusted-kernel bundle and its
+  slot wrapper accessor-only on the Rust side, requires the shell-boundary
+  slot/lowering bundle bridge family to stay confined to
+  `crates/uo-core/src/kernel_dsl.rs` while continuing to source the
+  manifest-carried named and slot DSL programs and keep those shell-boundary
+  slot/lowering bundles accessor-only on the Rust side,
   requires the direct runtime-kernel DSL / slot-DSL / lowering bridge family
   in that same `kernel_dsl.rs` module to stay confined and manifest-sourced as
-  well, requires the direct runtime trusted-kernel / refinement export bridge
+  well while keeping the direct runtime-kernel DSL / slot-DSL / lowering
+  bundles accessor-only on the Rust side, requires the direct runtime trusted-
+  kernel / refinement export bridge
   in `crates/uo-core/src/trace.rs` to stay confined to exactness-checked
   trusted-kernel storage and export rather than parallel bundle assembly,
   requires `runtime/uo-evm/src/theorem.rs` to stay the only production caller
-  allowed to store a trusted-kernel bundle and `trace.rs` to stay the only
-  production site that performs the backing field assignment,
+  allowed to materialize a trusted-kernel bundle through
+  `ExecutionTrace::materialize_runtime_trusted_kernel_bundle(...)`, and
+  `trace.rs` to stay the only production site that performs the backing field
+  assignment through its internal
+  `store_runtime_trusted_kernel_bundle(...)`,
   requires any stored trusted-kernel bundle to match the surrounding
   execution trace exactly before it can be re-exported, requires confidential
   kernel witnesses to remain sourced only from the dedicated

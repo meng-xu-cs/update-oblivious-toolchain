@@ -78,52 +78,60 @@ pub enum RuntimeConfidentialCoreShellBoundarySlotBundleError {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfidentialCoreBundle {
-    pub runtime_witness: RuntimeRefinementWitness,
-    pub confidential_program: ConfidentialKernelProgram,
+    runtime_witness: RuntimeRefinementWitness,
+    confidential_program: ConfidentialKernelProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfidentialCoreSlotBundle {
-    pub runtime_witness: RuntimeRefinementWitness,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    runtime_witness: RuntimeRefinementWitness,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfidentialCoreLoweringBundle {
-    pub runtime_witness: RuntimeRefinementWitness,
-    pub confidential_program: ConfidentialKernelProgram,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    runtime_witness: RuntimeRefinementWitness,
+    confidential_program: ConfidentialKernelProgram,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfidentialCoreShellBoundaryLoweringBundle {
-    pub runtime_witness: RuntimeRefinementWitness,
-    pub shell_boundary_bundle: RuntimeShellBoundaryBundle,
-    pub confidential_program: ConfidentialKernelProgram,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    runtime_witness: RuntimeRefinementWitness,
+    shell_boundary_bundle: RuntimeShellBoundaryBundle,
+    confidential_program: ConfidentialKernelProgram,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfidentialCoreShellBoundarySlotBundle {
-    pub runtime_witness: RuntimeRefinementWitness,
-    pub shell_boundary_bundle: RuntimeShellBoundaryBundle,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    runtime_witness: RuntimeRefinementWitness,
+    shell_boundary_bundle: RuntimeShellBoundaryBundle,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 impl RuntimeConfidentialCoreBundle {
+    pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {
+        &self.runtime_witness
+    }
+
+    pub fn confidential_program(&self) -> &ConfidentialKernelProgram {
+        &self.confidential_program
+    }
+
     pub fn entrypoint_id(&self) -> &str {
-        &self.runtime_witness.public_outcome.entrypoint_id
+        &self.runtime_witness.public_outcome().entrypoint_id
     }
 
     pub fn program_matches_runtime_entrypoint(&self) -> bool {
         self.confidential_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_runtime_witness(
+    fn from_runtime_witness(
         runtime_witness: RuntimeRefinementWitness,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeConfidentialCoreBundleError> {
-        let entrypoint = runtime_witness.public_outcome.entrypoint_id.clone();
+        let entrypoint = runtime_witness.public_outcome().entrypoint_id.clone();
         let manifest_entry = artifact
             .contract
             .manifest
@@ -144,19 +152,27 @@ impl RuntimeConfidentialCoreBundle {
 }
 
 impl RuntimeConfidentialCoreSlotBundle {
+    pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {
+        &self.runtime_witness
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
     pub fn entrypoint_id(&self) -> &str {
-        &self.runtime_witness.public_outcome.entrypoint_id
+        &self.runtime_witness.public_outcome().entrypoint_id
     }
 
     pub fn program_matches_runtime_entrypoint(&self) -> bool {
         self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_runtime_witness(
+    fn from_runtime_witness(
         runtime_witness: RuntimeRefinementWitness,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeConfidentialCoreSlotBundleError> {
-        let entrypoint = runtime_witness.public_outcome.entrypoint_id.clone();
+        let entrypoint = runtime_witness.public_outcome().entrypoint_id.clone();
         let manifest_entry = artifact
             .contract
             .manifest
@@ -182,8 +198,20 @@ impl RuntimeConfidentialCoreSlotBundle {
 }
 
 impl RuntimeConfidentialCoreLoweringBundle {
+    pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {
+        &self.runtime_witness
+    }
+
+    pub fn confidential_program(&self) -> &ConfidentialKernelProgram {
+        &self.confidential_program
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
     pub fn entrypoint_id(&self) -> &str {
-        &self.runtime_witness.public_outcome.entrypoint_id
+        &self.runtime_witness.public_outcome().entrypoint_id
     }
 
     pub fn program_matches_runtime_entrypoint(&self) -> bool {
@@ -191,11 +219,11 @@ impl RuntimeConfidentialCoreLoweringBundle {
             && self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_runtime_witness(
+    fn from_runtime_witness(
         runtime_witness: RuntimeRefinementWitness,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeConfidentialCoreLoweringBundleError> {
-        let entrypoint = runtime_witness.public_outcome.entrypoint_id.clone();
+        let entrypoint = runtime_witness.public_outcome().entrypoint_id.clone();
         let manifest_entry = artifact
             .contract
             .manifest
@@ -226,8 +254,24 @@ impl RuntimeConfidentialCoreLoweringBundle {
 }
 
 impl RuntimeConfidentialCoreShellBoundaryLoweringBundle {
+    pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {
+        &self.runtime_witness
+    }
+
+    pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {
+        &self.shell_boundary_bundle
+    }
+
+    pub fn confidential_program(&self) -> &ConfidentialKernelProgram {
+        &self.confidential_program
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
     pub fn entrypoint_id(&self) -> &str {
-        &self.runtime_witness.public_outcome.entrypoint_id
+        &self.runtime_witness.public_outcome().entrypoint_id
     }
 
     pub fn program_matches_runtime_entrypoint(&self) -> bool {
@@ -236,14 +280,14 @@ impl RuntimeConfidentialCoreShellBoundaryLoweringBundle {
             && self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_runtime_witness(
+    fn from_runtime_witness(
         runtime_witness: RuntimeRefinementWitness,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeConfidentialCoreShellBoundaryLoweringBundleError> {
         runtime_witness.validate()?;
         let shell_boundary_bundle =
             RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness.clone())?;
-        let entrypoint = runtime_witness.public_outcome.entrypoint_id.clone();
+        let entrypoint = runtime_witness.public_outcome().entrypoint_id.clone();
         let manifest_entry = artifact
             .contract
             .manifest
@@ -275,8 +319,20 @@ impl RuntimeConfidentialCoreShellBoundaryLoweringBundle {
 }
 
 impl RuntimeConfidentialCoreShellBoundarySlotBundle {
+    pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {
+        &self.runtime_witness
+    }
+
+    pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {
+        &self.shell_boundary_bundle
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
     pub fn entrypoint_id(&self) -> &str {
-        &self.runtime_witness.public_outcome.entrypoint_id
+        &self.runtime_witness.public_outcome().entrypoint_id
     }
 
     pub fn program_matches_runtime_entrypoint(&self) -> bool {
@@ -284,14 +340,14 @@ impl RuntimeConfidentialCoreShellBoundarySlotBundle {
             && self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_runtime_witness(
+    fn from_runtime_witness(
         runtime_witness: RuntimeRefinementWitness,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeConfidentialCoreShellBoundarySlotBundleError> {
         runtime_witness.validate()?;
         let shell_boundary_bundle =
             RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness.clone())?;
-        let entrypoint = runtime_witness.public_outcome.entrypoint_id.clone();
+        let entrypoint = runtime_witness.public_outcome().entrypoint_id.clone();
         let manifest_entry = artifact
             .contract
             .manifest

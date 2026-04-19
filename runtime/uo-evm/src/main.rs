@@ -46,13 +46,13 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&trace)?);
         }
         OutputFormat::KernelWitness => {
-            let witness = trace.runtime_kernel_witness.clone().ok_or_else(|| {
+            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
                 anyhow::anyhow!("execution trace is missing runtime kernel witness")
             })?;
             println!("{}", witness.to_json_pretty());
         }
         OutputFormat::KernelDsl => {
-            let witness = trace.runtime_kernel_witness.clone().ok_or_else(|| {
+            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
                 anyhow::anyhow!("execution trace is missing runtime kernel witness")
             })?;
             let bundle =
@@ -60,7 +60,7 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::KernelSlotDsl => {
-            let witness = trace.runtime_kernel_witness.clone().ok_or_else(|| {
+            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
                 anyhow::anyhow!("execution trace is missing runtime kernel witness")
             })?;
             let bundle =
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::KernelLowering => {
-            let witness = trace.runtime_kernel_witness.clone().ok_or_else(|| {
+            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
                 anyhow::anyhow!("execution trace is missing runtime kernel witness")
             })?;
             let bundle =
@@ -77,8 +77,8 @@ fn main() -> Result<()> {
         }
         OutputFormat::KernelRefinementWitness => {
             let witness = trace
-                .runtime_kernel_refinement_witness
-                .clone()
+                .runtime_kernel_refinement_witness()
+                .cloned()
                 .ok_or_else(|| {
                     anyhow::anyhow!("execution trace is missing runtime kernel refinement witness")
                 })?;

@@ -118,6 +118,73 @@ theorem importedRuntimeConfidentialCoreShellBoundarySlotBundle_toRuntimeValid
           some bundle.shell_boundary_bundle.toRuntimeShellBoundaryBundle.runtimeKernelRefinementWitness from
       ⟨hCore, hShell, hKernelExact, hRefinementExact⟩)
 
+theorem importedRuntimeConfidentialCoreShellBoundarySlotBundle_kernelWitness_exact
+  {bundle : ImportedRuntimeConfidentialCoreShellBoundarySlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  bundle.runtime_witness.kernel_witness = some bundle.shell_boundary_bundle.kernel_witness := by
+  exact hValid.2.2.1
+
+theorem importedRuntimeConfidentialCoreShellBoundarySlotBundle_runtimeKernelRefinementWitness_exact
+  {bundle : ImportedRuntimeConfidentialCoreShellBoundarySlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  bundle.runtime_witness.runtime_kernel_refinement_witness =
+      some bundle.shell_boundary_bundle.runtime_kernel_refinement_witness := by
+  exact hValid.2.2.2
+
+theorem importedRuntimeConfidentialCoreShellBoundarySlotBundle_shellRefines
+  {bundle : ImportedRuntimeConfidentialCoreShellBoundarySlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
+      bundle.shell_boundary_bundle.kernel_witness.shellContract := by
+  exact importedRuntimeShellBoundarySlotBundle_shellRefines hValid.2.1
+
+theorem importedRuntimeConfidentialCoreShellBoundarySlotBundle_slotSchedule_exact
+  {bundle : ImportedRuntimeConfidentialCoreShellBoundarySlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+      some bundle.confidential_slot_program.expectedRuntimeKernelSteps ∧
+    bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+      bundle.confidential_slot_program.expectedRuntimeKernelSteps := by
+  exact importedRuntimeShellBoundarySlotBundle_slotSchedule_exact hValid.2.1
+
+theorem importedRuntimeConfidentialCoreShellBoundarySlotBundle_proofGradeAssurance
+  (bundle : ImportedRuntimeConfidentialCoreShellBoundarySlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.runtime_witness.kernel_witness = some bundle.shell_boundary_bundle.kernel_witness ∧
+    bundle.runtime_witness.runtime_kernel_refinement_witness =
+      some bundle.shell_boundary_bundle.runtime_kernel_refinement_witness ∧
+    bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
+      bundle.shell_boundary_bundle.kernel_witness.shellContract ∧
+    bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+      some bundle.confidential_slot_program.expectedRuntimeKernelSteps ∧
+    bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+      bundle.confidential_slot_program.expectedRuntimeKernelSteps := by
+  have hKernelExact :
+      bundle.runtime_witness.kernel_witness = some bundle.shell_boundary_bundle.kernel_witness := by
+    exact importedRuntimeConfidentialCoreShellBoundarySlotBundle_kernelWitness_exact hValid
+  have hRefinementExact :
+      bundle.runtime_witness.runtime_kernel_refinement_witness =
+        some bundle.shell_boundary_bundle.runtime_kernel_refinement_witness := by
+    exact
+      importedRuntimeConfidentialCoreShellBoundarySlotBundle_runtimeKernelRefinementWitness_exact
+        hValid
+  have hShellRefines :
+      bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
+        bundle.shell_boundary_bundle.kernel_witness.shellContract := by
+    exact importedRuntimeConfidentialCoreShellBoundarySlotBundle_shellRefines hValid
+  have hSlot :
+      bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+          some bundle.confidential_slot_program.expectedRuntimeKernelSteps ∧
+        bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+          bundle.confidential_slot_program.expectedRuntimeKernelSteps := by
+    exact importedRuntimeConfidentialCoreShellBoundarySlotBundle_slotSchedule_exact hValid
+  exact ⟨hKernelExact, hRefinementExact, hShellRefines, hSlot.1, hSlot.2⟩
+
 def parseImportedRuntimeConfidentialCoreShellBoundarySlotBundle
   (input : String) : Except String ImportedRuntimeConfidentialCoreShellBoundarySlotBundle := do
   let json ← Lean.Json.parse input

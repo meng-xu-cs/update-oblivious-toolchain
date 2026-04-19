@@ -19,30 +19,38 @@ pub enum RuntimeTrustedKernelSlotBundleError {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeTrustedKernelSlotBundle {
-    pub trusted_kernel_bundle: RuntimeTrustedKernelBundle,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    trusted_kernel_bundle: RuntimeTrustedKernelBundle,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 impl RuntimeTrustedKernelSlotBundle {
     pub fn entrypoint_id(&self) -> &str {
         &self
             .trusted_kernel_bundle
-            .controller_observer
-            .public_outcome
+            .controller_observer()
+            .public_outcome()
             .entrypoint_id
+    }
+
+    pub fn trusted_kernel_bundle(&self) -> &RuntimeTrustedKernelBundle {
+        &self.trusted_kernel_bundle
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
     }
 
     pub fn program_matches_trusted_kernel_entrypoint(&self) -> bool {
         self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_trusted_kernel_bundle(
+    fn from_trusted_kernel_bundle(
         trusted_kernel_bundle: RuntimeTrustedKernelBundle,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeTrustedKernelSlotBundleError> {
         let entrypoint = trusted_kernel_bundle
-            .controller_observer
-            .public_outcome
+            .controller_observer()
+            .public_outcome()
             .entrypoint_id
             .clone();
         let manifest_entry = artifact

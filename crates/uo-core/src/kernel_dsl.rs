@@ -1,6 +1,7 @@
 use crate::{
     artifact::CompiledArtifact, manifest::EntrypointManifest, ConfidentialKernelProgram,
-    ConfidentialKernelSlotProgram, RuntimeKernelWitness, RuntimeShellBoundaryBundle,
+    ConfidentialKernelSlotProgram, ExecutionTrace, RuntimeKernelWitness,
+    RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -33,6 +34,8 @@ pub enum RuntimeKernelLoweringBundleError {
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum RuntimeShellBoundaryLoweringBundleError {
+    #[error("runtime shell-boundary lowering bundle requires a valid shell-boundary bundle: {0}")]
+    ShellBoundary(#[from] RuntimeShellBoundaryBundleError),
     #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
     MissingEntrypoint { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_program")]
@@ -43,6 +46,8 @@ pub enum RuntimeShellBoundaryLoweringBundleError {
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum RuntimeShellBoundarySlotBundleError {
+    #[error("runtime shell-boundary slot bundle requires a valid shell-boundary bundle: {0}")]
+    ShellBoundary(#[from] RuntimeShellBoundaryBundleError),
     #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
     MissingEntrypoint { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
@@ -51,38 +56,46 @@ pub enum RuntimeShellBoundarySlotBundleError {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelDslBundle {
-    pub kernel_witness: RuntimeKernelWitness,
-    pub confidential_program: ConfidentialKernelProgram,
+    kernel_witness: RuntimeKernelWitness,
+    confidential_program: ConfidentialKernelProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelSlotDslBundle {
-    pub kernel_witness: RuntimeKernelWitness,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    kernel_witness: RuntimeKernelWitness,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelLoweringBundle {
-    pub kernel_witness: RuntimeKernelWitness,
-    pub confidential_program: ConfidentialKernelProgram,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    kernel_witness: RuntimeKernelWitness,
+    confidential_program: ConfidentialKernelProgram,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellBoundaryLoweringBundle {
-    pub shell_boundary_bundle: RuntimeShellBoundaryBundle,
-    pub confidential_program: ConfidentialKernelProgram,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    shell_boundary_bundle: RuntimeShellBoundaryBundle,
+    confidential_program: ConfidentialKernelProgram,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellBoundarySlotBundle {
-    pub shell_boundary_bundle: RuntimeShellBoundaryBundle,
-    pub confidential_slot_program: ConfidentialKernelSlotProgram,
+    shell_boundary_bundle: RuntimeShellBoundaryBundle,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 impl RuntimeKernelDslBundle {
-    pub fn from_manifest_entry(
+    pub fn kernel_witness(&self) -> &RuntimeKernelWitness {
+        &self.kernel_witness
+    }
+
+    pub fn confidential_program(&self) -> &ConfidentialKernelProgram {
+        &self.confidential_program
+    }
+
+    fn from_manifest_entry(
         kernel_witness: RuntimeKernelWitness,
         entrypoint: &str,
         entry: &EntrypointManifest,
@@ -99,7 +112,15 @@ impl RuntimeKernelDslBundle {
 }
 
 impl RuntimeKernelSlotDslBundle {
-    pub fn from_manifest_entry(
+    pub fn kernel_witness(&self) -> &RuntimeKernelWitness {
+        &self.kernel_witness
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
+    fn from_manifest_entry(
         kernel_witness: RuntimeKernelWitness,
         entrypoint: &str,
         entry: &EntrypointManifest,
@@ -116,7 +137,19 @@ impl RuntimeKernelSlotDslBundle {
 }
 
 impl RuntimeKernelLoweringBundle {
-    pub fn from_manifest_entry(
+    pub fn kernel_witness(&self) -> &RuntimeKernelWitness {
+        &self.kernel_witness
+    }
+
+    pub fn confidential_program(&self) -> &ConfidentialKernelProgram {
+        &self.confidential_program
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
+    fn from_manifest_entry(
         kernel_witness: RuntimeKernelWitness,
         entrypoint: &str,
         entry: &EntrypointManifest,
@@ -138,6 +171,18 @@ impl RuntimeKernelLoweringBundle {
 }
 
 impl RuntimeShellBoundaryLoweringBundle {
+    pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {
+        &self.shell_boundary_bundle
+    }
+
+    pub fn confidential_program(&self) -> &ConfidentialKernelProgram {
+        &self.confidential_program
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
     pub fn entrypoint_id(&self) -> &str {
         self.shell_boundary_bundle.entrypoint_id()
     }
@@ -147,7 +192,7 @@ impl RuntimeShellBoundaryLoweringBundle {
             && self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_manifest_entry(
+    fn from_manifest_entry(
         shell_boundary_bundle: RuntimeShellBoundaryBundle,
         entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeShellBoundaryLoweringBundleError> {
@@ -169,6 +214,14 @@ impl RuntimeShellBoundaryLoweringBundle {
 }
 
 impl RuntimeShellBoundarySlotBundle {
+    pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {
+        &self.shell_boundary_bundle
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
     pub fn entrypoint_id(&self) -> &str {
         self.shell_boundary_bundle.entrypoint_id()
     }
@@ -177,7 +230,7 @@ impl RuntimeShellBoundarySlotBundle {
         self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
-    pub fn from_manifest_entry(
+    fn from_manifest_entry(
         shell_boundary_bundle: RuntimeShellBoundaryBundle,
         entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeShellBoundarySlotBundleError> {
@@ -277,5 +330,23 @@ impl CompiledArtifact {
                 entrypoint: entrypoint.clone(),
             })?;
         RuntimeShellBoundarySlotBundle::from_manifest_entry(shell_boundary_bundle, manifest_entry)
+    }
+}
+
+impl ExecutionTrace {
+    pub fn runtime_shell_boundary_lowering_bundle(
+        &self,
+        artifact: &CompiledArtifact,
+    ) -> Result<RuntimeShellBoundaryLoweringBundle, RuntimeShellBoundaryLoweringBundleError> {
+        let shell_boundary_bundle = self.runtime_shell_boundary_bundle()?;
+        artifact.runtime_shell_boundary_lowering_bundle(shell_boundary_bundle)
+    }
+
+    pub fn runtime_shell_boundary_slot_bundle(
+        &self,
+        artifact: &CompiledArtifact,
+    ) -> Result<RuntimeShellBoundarySlotBundle, RuntimeShellBoundarySlotBundleError> {
+        let shell_boundary_bundle = self.runtime_shell_boundary_bundle()?;
+        artifact.runtime_shell_boundary_slot_bundle(shell_boundary_bundle)
     }
 }

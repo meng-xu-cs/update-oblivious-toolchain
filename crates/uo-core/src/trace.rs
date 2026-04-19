@@ -343,33 +343,33 @@ pub struct RuntimeKernelRefinementWitness {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct RuntimeControllerCertificate {
-    pub entry_input_len: usize,
-    pub observed_oram_accesses: Vec<RuntimeOramAccessWitness>,
+    entry_input_len: usize,
+    observed_oram_accesses: Vec<RuntimeOramAccessWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeControllerObserverCertificate {
-    pub public_outcome: PublicOutcomeTrace,
-    pub boundary_schedule: Vec<BoundaryEvent>,
-    pub controller_shape: SgxControllerShapeTrace,
-    pub normalized_micro_trace: NormalizedMicroTrace,
-    pub controller_certificate: RuntimeControllerCertificate,
+    public_outcome: PublicOutcomeTrace,
+    boundary_schedule: Vec<BoundaryEvent>,
+    controller_shape: SgxControllerShapeTrace,
+    normalized_micro_trace: NormalizedMicroTrace,
+    controller_certificate: RuntimeControllerCertificate,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimePathOramHiddenCertificate {
-    pub trace: RefinementTrace,
-    pub oram_objects: Vec<RuntimeOramObjectWitness>,
+    trace: RefinementTrace,
+    oram_objects: Vec<RuntimeOramObjectWitness>,
     #[serde(default)]
-    pub oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
     #[serde(default)]
-    pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
     #[serde(default)]
-    pub oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
     #[serde(default)]
-    pub oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
     #[serde(default)]
-    pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
@@ -404,37 +404,37 @@ pub struct RefinementTrace {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeRefinementWitness {
-    pub trace: RefinementTrace,
-    pub runtime_seed: Option<u64>,
-    pub public_outcome: PublicOutcomeTrace,
+    trace: RefinementTrace,
+    runtime_seed: Option<u64>,
+    public_outcome: PublicOutcomeTrace,
     #[serde(default)]
-    pub kernel_witness: Option<RuntimeKernelWitness>,
+    kernel_witness: Option<RuntimeKernelWitness>,
     #[serde(default)]
-    pub runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
-    pub boundary_schedule: Vec<BoundaryEvent>,
-    pub controller_shape: SgxControllerShapeTrace,
-    pub normalized_micro_trace: NormalizedMicroTrace,
-    pub controller_certificate: RuntimeControllerCertificate,
-    pub oram_objects: Vec<RuntimeOramObjectWitness>,
+    runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    boundary_schedule: Vec<BoundaryEvent>,
+    controller_shape: SgxControllerShapeTrace,
+    normalized_micro_trace: NormalizedMicroTrace,
+    controller_certificate: RuntimeControllerCertificate,
+    oram_objects: Vec<RuntimeOramObjectWitness>,
     #[serde(default)]
-    pub oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
     #[serde(default)]
-    pub oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
     #[serde(default)]
-    pub oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
     #[serde(default)]
-    pub oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
     #[serde(default)]
-    pub oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeTrustedKernelBundle {
-    pub runtime_seed: Option<u64>,
-    pub controller_observer: RuntimeControllerObserverCertificate,
+    runtime_seed: Option<u64>,
+    controller_observer: RuntimeControllerObserverCertificate,
     #[serde(default)]
-    pub kernel_witness: Option<RuntimeKernelWitness>,
-    pub hidden_certificate: RuntimePathOramHiddenCertificate,
+    kernel_witness: Option<RuntimeKernelWitness>,
+    hidden_certificate: RuntimePathOramHiddenCertificate,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -467,37 +467,37 @@ pub struct RuntimeKernelWitness {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SeededRuntimeWitnessFamily {
-    pub seed_count: usize,
-    pub witnesses: Vec<RuntimeRefinementWitness>,
+    seed_count: usize,
+    witnesses: Vec<RuntimeRefinementWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SeededRuntimePathOramWitnessFamily {
-    pub seed_count: usize,
-    pub witnesses: Vec<RuntimeRefinementWitness>,
+    seed_count: usize,
+    witnesses: Vec<RuntimeRefinementWitness>,
     #[serde(default)]
-    pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
-    pub seed_count: usize,
-    pub witnesses: Vec<RuntimeRefinementWitness>,
+    seed_count: usize,
+    witnesses: Vec<RuntimeRefinementWitness>,
     #[serde(default)]
-    pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
     #[serde(default)]
-    pub public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanonicalFreshCoinRuntimePathOramTheoremInput {
-    pub seed_count: usize,
-    pub representative_seed: usize,
-    pub representative_witness: RuntimeRefinementWitness,
+    seed_count: usize,
+    representative_seed: usize,
+    representative_witness: RuntimeRefinementWitness,
     #[serde(default)]
-    pub public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
     #[serde(default)]
-    pub public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1296,7 +1296,68 @@ impl fmt::Display for CanonicalFreshCoinTheoremInputError {
 impl std::error::Error for CanonicalFreshCoinTheoremInputError {}
 
 impl RuntimeRefinementWitness {
-    pub fn from_certificates(
+    pub fn trace(&self) -> &RefinementTrace {
+        &self.trace
+    }
+
+    pub fn runtime_seed(&self) -> Option<u64> {
+        self.runtime_seed
+    }
+
+    pub fn public_outcome(&self) -> &PublicOutcomeTrace {
+        &self.public_outcome
+    }
+
+    pub fn kernel_witness(&self) -> Option<&RuntimeKernelWitness> {
+        self.kernel_witness.as_ref()
+    }
+
+    pub fn runtime_kernel_refinement_witness(&self) -> Option<&RuntimeKernelRefinementWitness> {
+        self.runtime_kernel_refinement_witness.as_ref()
+    }
+
+    pub fn boundary_schedule(&self) -> &[BoundaryEvent] {
+        &self.boundary_schedule
+    }
+
+    pub fn controller_shape(&self) -> &SgxControllerShapeTrace {
+        &self.controller_shape
+    }
+
+    pub fn normalized_micro_trace(&self) -> &NormalizedMicroTrace {
+        &self.normalized_micro_trace
+    }
+
+    pub fn controller_certificate(&self) -> &RuntimeControllerCertificate {
+        &self.controller_certificate
+    }
+
+    pub fn oram_objects(&self) -> &[RuntimeOramObjectWitness] {
+        &self.oram_objects
+    }
+
+    pub fn oram_leaf_public_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {
+        &self.oram_leaf_public_scaffold
+    }
+
+    pub fn oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {
+        &self.oram_leaf_schedule
+    }
+
+    pub fn oram_position_map_before(&self) -> &[RuntimePathOramPositionMapWitness] {
+        &self.oram_position_map_before
+    }
+
+    pub fn oram_position_map_after(&self) -> &[RuntimePathOramPositionMapWitness] {
+        &self.oram_position_map_after
+    }
+
+    pub fn oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {
+        &self.oram_leaf_state_transitions
+    }
+
+    #[cfg(test)]
+    fn from_certificates(
         runtime_seed: Option<u64>,
         controller_observer: RuntimeControllerObserverCertificate,
         hidden_certificate: RuntimePathOramHiddenCertificate,
@@ -1310,7 +1371,7 @@ impl RuntimeRefinementWitness {
         )
     }
 
-    pub fn from_certificates_with_kernel_witness(
+    fn from_certificates_with_kernel_witness(
         runtime_seed: Option<u64>,
         controller_observer: RuntimeControllerObserverCertificate,
         kernel_witness: Option<RuntimeKernelWitness>,
@@ -1325,7 +1386,7 @@ impl RuntimeRefinementWitness {
         )
     }
 
-    pub fn from_certificates_with_runtime_witnesses(
+    fn from_certificates_with_runtime_witnesses(
         runtime_seed: Option<u64>,
         controller_observer: RuntimeControllerObserverCertificate,
         kernel_witness: Option<RuntimeKernelWitness>,
@@ -1424,15 +1485,23 @@ impl RuntimeRefinementWitness {
 }
 
 impl RuntimeTrustedKernelBundle {
-    pub fn new(
-        runtime_seed: Option<u64>,
-        controller_observer: RuntimeControllerObserverCertificate,
-        hidden_certificate: RuntimePathOramHiddenCertificate,
-    ) -> Result<Self, RefinementWitnessError> {
-        Self::new_with_kernel_witness(runtime_seed, controller_observer, None, hidden_certificate)
+    pub fn runtime_seed(&self) -> Option<u64> {
+        self.runtime_seed
     }
 
-    pub fn new_with_kernel_witness(
+    pub fn controller_observer(&self) -> &RuntimeControllerObserverCertificate {
+        &self.controller_observer
+    }
+
+    pub fn kernel_witness(&self) -> Option<&RuntimeKernelWitness> {
+        self.kernel_witness.as_ref()
+    }
+
+    pub fn hidden_certificate(&self) -> &RuntimePathOramHiddenCertificate {
+        &self.hidden_certificate
+    }
+
+    fn new_with_kernel_witness(
         runtime_seed: Option<u64>,
         controller_observer: RuntimeControllerObserverCertificate,
         kernel_witness: Option<RuntimeKernelWitness>,
@@ -2485,7 +2554,35 @@ fn manifest_kernel_steps_as_witness(
 }
 
 impl RuntimePathOramHiddenCertificate {
-    pub fn new(
+    pub fn trace(&self) -> &RefinementTrace {
+        &self.trace
+    }
+
+    pub fn oram_objects(&self) -> &[RuntimeOramObjectWitness] {
+        &self.oram_objects
+    }
+
+    pub fn oram_leaf_public_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {
+        &self.oram_leaf_public_scaffold
+    }
+
+    pub fn oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {
+        &self.oram_leaf_schedule
+    }
+
+    pub fn oram_position_map_before(&self) -> &[RuntimePathOramPositionMapWitness] {
+        &self.oram_position_map_before
+    }
+
+    pub fn oram_position_map_after(&self) -> &[RuntimePathOramPositionMapWitness] {
+        &self.oram_position_map_after
+    }
+
+    pub fn oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {
+        &self.oram_leaf_state_transitions
+    }
+
+    fn new(
         trace: RefinementTrace,
         oram_objects: Vec<RuntimeOramObjectWitness>,
         oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
@@ -2601,6 +2698,14 @@ fn validate_seeded_runtime_witnesses(
 }
 
 impl SeededRuntimeWitnessFamily {
+    pub fn seed_count(&self) -> usize {
+        self.seed_count
+    }
+
+    pub fn witnesses(&self) -> &[RuntimeRefinementWitness] {
+        &self.witnesses
+    }
+
     pub fn new(
         witnesses: Vec<RuntimeRefinementWitness>,
     ) -> Result<Self, SeededRuntimeWitnessFamilyError> {
@@ -2627,6 +2732,18 @@ impl SeededRuntimeWitnessFamily {
 }
 
 impl SeededRuntimePathOramWitnessFamily {
+    pub fn seed_count(&self) -> usize {
+        self.seed_count
+    }
+
+    pub fn witnesses(&self) -> &[RuntimeRefinementWitness] {
+        &self.witnesses
+    }
+
+    pub fn public_leaf_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {
+        &self.public_leaf_scaffold
+    }
+
     pub fn new(
         witnesses: Vec<RuntimeRefinementWitness>,
     ) -> Result<Self, SeededRuntimeWitnessFamilyError> {
@@ -2665,6 +2782,22 @@ impl SeededRuntimePathOramWitnessFamily {
 }
 
 impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
+    pub fn seed_count(&self) -> usize {
+        self.seed_count
+    }
+
+    pub fn witnesses(&self) -> &[RuntimeRefinementWitness] {
+        &self.witnesses
+    }
+
+    pub fn public_leaf_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {
+        &self.public_leaf_scaffold
+    }
+
+    pub fn public_fresh_coin_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {
+        &self.public_fresh_coin_scaffold
+    }
+
     pub fn new(
         witnesses: Vec<RuntimeRefinementWitness>,
     ) -> Result<Self, CanonicalFreshCoinWitnessFamilyError> {
@@ -2811,6 +2944,26 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
 }
 
 impl CanonicalFreshCoinRuntimePathOramTheoremInput {
+    pub fn seed_count(&self) -> usize {
+        self.seed_count
+    }
+
+    pub fn representative_seed(&self) -> usize {
+        self.representative_seed
+    }
+
+    pub fn representative_witness(&self) -> &RuntimeRefinementWitness {
+        &self.representative_witness
+    }
+
+    pub fn public_leaf_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {
+        &self.public_leaf_scaffold
+    }
+
+    pub fn public_fresh_coin_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {
+        &self.public_fresh_coin_scaffold
+    }
+
     pub fn new(
         representative_seed: usize,
         representative_witness: RuntimeRefinementWitness,
@@ -2931,6 +3084,24 @@ impl RuntimeOramObjectWitness {
 }
 
 impl RuntimeControllerCertificate {
+    pub fn new(
+        entry_input_len: usize,
+        observed_oram_accesses: Vec<RuntimeOramAccessWitness>,
+    ) -> Self {
+        Self {
+            entry_input_len,
+            observed_oram_accesses,
+        }
+    }
+
+    pub fn entry_input_len(&self) -> usize {
+        self.entry_input_len
+    }
+
+    pub fn observed_oram_accesses(&self) -> &[RuntimeOramAccessWitness] {
+        &self.observed_oram_accesses
+    }
+
     pub fn boundary_schedule(&self, public_outcome: &PublicOutcomeTrace) -> Vec<BoundaryEvent> {
         let mut schedule = Vec::with_capacity(2 * self.observed_oram_accesses.len() + 2);
         schedule.push(BoundaryEvent {
@@ -3076,7 +3247,27 @@ impl RuntimeControllerCertificate {
 }
 
 impl RuntimeControllerObserverCertificate {
-    pub fn new(
+    pub fn public_outcome(&self) -> &PublicOutcomeTrace {
+        &self.public_outcome
+    }
+
+    pub fn boundary_schedule(&self) -> &[BoundaryEvent] {
+        &self.boundary_schedule
+    }
+
+    pub fn controller_shape(&self) -> &SgxControllerShapeTrace {
+        &self.controller_shape
+    }
+
+    pub fn normalized_micro_trace(&self) -> &NormalizedMicroTrace {
+        &self.normalized_micro_trace
+    }
+
+    pub fn controller_certificate(&self) -> &RuntimeControllerCertificate {
+        &self.controller_certificate
+    }
+
+    fn new(
         public_outcome: PublicOutcomeTrace,
         boundary_schedule: Vec<BoundaryEvent>,
         controller_shape: SgxControllerShapeTrace,
@@ -3737,54 +3928,147 @@ pub struct ExecutionTrace {
     #[serde(default)]
     pub theorem_trace: TheoremTrace,
     #[serde(default)]
-    pub runtime_seed: Option<u64>,
+    runtime_seed: Option<u64>,
     #[serde(default)]
-    pub runtime_kernel_witness: Option<RuntimeKernelWitness>,
+    runtime_kernel_witness: Option<RuntimeKernelWitness>,
     #[serde(default)]
-    pub runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
     #[serde(default)]
-    pub runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,
+    runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,
     #[serde(default)]
-    pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,
+    runtime_controller_certificate: Option<RuntimeControllerCertificate>,
     #[serde(default)]
-    pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
+    runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
     #[serde(default)]
-    pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
     #[serde(default)]
-    pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
     #[serde(default)]
-    pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
     #[serde(default)]
-    pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
     #[serde(default)]
-    pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
     #[serde(default)]
-    pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RuntimeExecutionTraceParts {
-    pub opcode_trace: Vec<String>,
-    pub logical_accesses: Vec<LogicalEvent>,
-    pub logical_writes: Vec<LogicalEvent>,
-    pub physical_reads: Vec<PhysicalReadEvent>,
-    pub physical_writes: Vec<PhysicalWriteEvent>,
-    pub gas_used: u64,
-    pub theorem_trace: TheoremTrace,
-    pub runtime_seed: Option<u64>,
-    pub runtime_kernel_witness: Option<RuntimeKernelWitness>,
-    pub runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
-    pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,
-    pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
-    pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
-    pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
-    pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
-    pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
-    pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
-    pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    opcode_trace: Vec<String>,
+    logical_accesses: Vec<LogicalEvent>,
+    logical_writes: Vec<LogicalEvent>,
+    physical_reads: Vec<PhysicalReadEvent>,
+    physical_writes: Vec<PhysicalWriteEvent>,
+    gas_used: u64,
+    theorem_trace: TheoremTrace,
+    runtime_seed: Option<u64>,
+    runtime_kernel_witness: Option<RuntimeKernelWitness>,
+    runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    runtime_controller_certificate: Option<RuntimeControllerCertificate>,
+    runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
+    runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+}
+
+impl RuntimeExecutionTraceParts {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        opcode_trace: Vec<String>,
+        logical_accesses: Vec<LogicalEvent>,
+        logical_writes: Vec<LogicalEvent>,
+        physical_reads: Vec<PhysicalReadEvent>,
+        physical_writes: Vec<PhysicalWriteEvent>,
+        gas_used: u64,
+        theorem_trace: TheoremTrace,
+        runtime_seed: Option<u64>,
+        runtime_kernel_witness: Option<RuntimeKernelWitness>,
+        runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+        runtime_controller_certificate: Option<RuntimeControllerCertificate>,
+        runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
+        runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+        runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+        runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
+        runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+        runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+        runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    ) -> Self {
+        Self {
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            gas_used,
+            theorem_trace,
+            runtime_seed,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            runtime_controller_certificate,
+            runtime_oram_objects,
+            runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions,
+        }
+    }
 }
 
 impl ExecutionTrace {
+    pub fn runtime_seed(&self) -> Option<u64> {
+        self.runtime_seed
+    }
+
+    pub fn runtime_kernel_witness(&self) -> Option<&RuntimeKernelWitness> {
+        self.runtime_kernel_witness.as_ref()
+    }
+
+    pub fn runtime_kernel_refinement_witness(&self) -> Option<&RuntimeKernelRefinementWitness> {
+        self.runtime_kernel_refinement_witness.as_ref()
+    }
+
+    pub fn stored_runtime_trusted_kernel_bundle(&self) -> Option<&RuntimeTrustedKernelBundle> {
+        self.runtime_trusted_kernel_bundle.as_ref()
+    }
+
+    pub fn stored_runtime_controller_certificate(&self) -> Option<&RuntimeControllerCertificate> {
+        self.runtime_controller_certificate.as_ref()
+    }
+
+    pub fn runtime_oram_objects(&self) -> &[RuntimeOramObjectWitness] {
+        &self.runtime_oram_objects
+    }
+
+    pub fn runtime_oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {
+        &self.runtime_oram_leaf_schedule
+    }
+
+    pub fn runtime_oram_access_counters_before(&self) -> &[RuntimeOramAccessCounterWitness] {
+        &self.runtime_oram_access_counters_before
+    }
+
+    pub fn runtime_oram_access_counters_after(&self) -> &[RuntimeOramAccessCounterWitness] {
+        &self.runtime_oram_access_counters_after
+    }
+
+    pub fn runtime_oram_position_map_before(&self) -> &[RuntimePathOramPositionMapWitness] {
+        &self.runtime_oram_position_map_before
+    }
+
+    pub fn runtime_oram_position_map_after(&self) -> &[RuntimePathOramPositionMapWitness] {
+        &self.runtime_oram_position_map_after
+    }
+
+    pub fn runtime_oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {
+        &self.runtime_oram_leaf_state_transitions
+    }
+
     pub fn from_runtime_trace_parts(parts: RuntimeExecutionTraceParts) -> Self {
         let RuntimeExecutionTraceParts {
             opcode_trace,
@@ -3952,7 +4236,7 @@ impl ExecutionTrace {
         Ok(reconstructed)
     }
 
-    pub fn store_runtime_trusted_kernel_bundle(
+    fn store_runtime_trusted_kernel_bundle(
         &mut self,
         mut bundle: RuntimeTrustedKernelBundle,
     ) -> Result<(), RefinementWitnessError> {
@@ -3974,6 +4258,14 @@ impl ExecutionTrace {
         bundle.validate()?;
         self.runtime_trusted_kernel_bundle = Some(bundle);
         Ok(())
+    }
+
+    pub fn materialize_runtime_trusted_kernel_bundle(
+        &mut self,
+    ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
+        let bundle = self.reconstructed_runtime_trusted_kernel_bundle()?;
+        self.store_runtime_trusted_kernel_bundle(bundle.clone())?;
+        Ok(bundle)
     }
 
     pub fn runtime_trusted_kernel_bundle(

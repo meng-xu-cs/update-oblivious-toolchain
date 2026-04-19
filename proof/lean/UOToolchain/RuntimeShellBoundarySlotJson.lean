@@ -47,9 +47,9 @@ def ImportedRuntimeShellBoundarySlotBundle.toRuntimeShellBoundarySlotBundle
 theorem importedRuntimeShellBoundarySlotBundle_shellRefines
   {bundle : ImportedRuntimeShellBoundarySlotBundle}
   (hValid : bundle.Valid) :
-  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.Refines
+  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
       bundle.shell_boundary_bundle.kernel_witness.shellContract := by
-  exact importedRuntimeShellBoundaryBundle_witness_refines hValid.1
+  exact importedRuntimeShellBoundaryBundle_witness_proofGradeRefines hValid.1
 
 theorem importedRuntimeShellBoundarySlotBundle_slotSchedule_exact
   {bundle : ImportedRuntimeShellBoundarySlotBundle}
@@ -59,6 +59,20 @@ theorem importedRuntimeShellBoundarySlotBundle_slotSchedule_exact
     bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
       bundle.confidential_slot_program.expectedRuntimeKernelSteps := by
   exact importedRuntimeKernelSlotDslBundle_schedule_exact hValid.2
+
+theorem importedRuntimeShellBoundarySlotBundle_proofGradeAssurance
+  (bundle : ImportedRuntimeShellBoundarySlotBundle)
+  (hValid : bundle.Valid) :
+  bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.shellTrace.ProofGradeRefines
+      bundle.shell_boundary_bundle.kernel_witness.shellContract ∧
+    bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+      some bundle.confidential_slot_program.expectedRuntimeKernelSteps ∧
+    bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+      bundle.confidential_slot_program.expectedRuntimeKernelSteps := by
+  exact
+    ⟨importedRuntimeShellBoundarySlotBundle_shellRefines hValid,
+      (importedRuntimeShellBoundarySlotBundle_slotSchedule_exact hValid).1,
+      (importedRuntimeShellBoundarySlotBundle_slotSchedule_exact hValid).2⟩
 
 theorem importedRuntimeShellBoundarySlotBundle_toRuntimeValid
   (bundle : ImportedRuntimeShellBoundarySlotBundle)
