@@ -1,21 +1,13 @@
 use crate::controller::CallRecorder;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::state::{ContractRuntime, PublicRuntimeShadowState};
+use crate::runtime::RuntimeCallOutcome;
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
-use uo_core::{RuntimeKernelRefinementWitness, RuntimeKernelWitness, Value};
-
-#[derive(Clone, Debug)]
-pub(crate) struct PublicCallOutcome {
-    pub runtime_kernel_witness: RuntimeKernelWitness,
-    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    pub aborted: bool,
-    pub return_value: Option<Value>,
-    pub opcode_trace: Vec<String>,
-}
+use uo_core::Value;
 
 #[derive(Clone, Debug)]
 struct PublicExecutionOutcome {
@@ -40,7 +32,7 @@ pub(crate) fn run_public_entrypoint(
     allocator: AllocatorPlan,
     public_object_ids: Vec<u32>,
     recorder: &mut CallRecorder,
-) -> Result<PublicCallOutcome> {
+) -> Result<RuntimeCallOutcome> {
     let mut kernel = PublicRuntimeKernel::begin(
         allocator,
         None,
@@ -66,7 +58,7 @@ pub(crate) fn run_public_entrypoint(
         &public_object_ids,
         "after completing the call and returning to committed storage",
     )?;
-    Ok(PublicCallOutcome {
+    Ok(RuntimeCallOutcome {
         runtime_kernel_witness,
         runtime_kernel_refinement_witness,
         aborted: execution.aborted,

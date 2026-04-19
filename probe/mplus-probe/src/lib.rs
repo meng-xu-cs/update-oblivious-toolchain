@@ -6445,7 +6445,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         state_source.contains("kernel.run_confidential_call(");
     let state_confidential_outcome_layering_is_explicit = state_source
         .contains("struct ConfidentialCommittedKernelOutcome")
-        && state_source.contains("struct ConfidentialCommittedCallOutcome")
+        && !state_source.contains("struct ConfidentialCommittedCallOutcome")
+        && runtime_module_source.contains("struct RuntimeCallOutcome")
+        && shell_source.contains("RuntimeCallOutcome")
         && !state_source.contains("opcode_trace: Vec::new()");
     let state_enforces_confidential_commit_budget = state_source
         .contains("recorder.physical_write_count() > max_commit_ops")

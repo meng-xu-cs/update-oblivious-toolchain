@@ -2,6 +2,7 @@ use crate::controller::CallRecorder;
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
+use crate::runtime::RuntimeCallOutcome;
 use anyhow::{anyhow, bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use uo_allocator::{AllocatorPlan, AllocatorSession};
@@ -131,7 +132,7 @@ impl ContractRuntime {
         args: Vec<Value>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
-    ) -> Result<ConfidentialCommittedCallOutcome> {
+    ) -> Result<RuntimeCallOutcome> {
         let plan = ConfidentialEntrypointPlan::from_manifest_entry(
             entrypoint,
             manifest_entry,
@@ -177,7 +178,7 @@ impl ContractRuntime {
             &public_object_ids,
             "after completing the call and returning to committed storage",
         )?;
-        Ok(ConfidentialCommittedCallOutcome {
+        Ok(RuntimeCallOutcome {
             runtime_kernel_witness: outcome.runtime_kernel_witness,
             runtime_kernel_refinement_witness: outcome.runtime_kernel_refinement_witness,
             aborted: outcome.aborted,
@@ -441,15 +442,6 @@ pub(in crate::runtime) struct ConfidentialCommittedKernelOutcome {
     pub runtime_kernel_refinement_witness: uo_core::RuntimeKernelRefinementWitness,
     pub aborted: bool,
     pub return_value: Option<Value>,
-}
-
-#[derive(Debug)]
-pub(crate) struct ConfidentialCommittedCallOutcome {
-    pub runtime_kernel_witness: uo_core::RuntimeKernelWitness,
-    pub runtime_kernel_refinement_witness: uo_core::RuntimeKernelRefinementWitness,
-    pub aborted: bool,
-    pub return_value: Option<Value>,
-    pub opcode_trace: Vec<String>,
 }
 
 impl RuntimeShadowState {

@@ -9,3 +9,14 @@ pub(crate) mod objects;
 
 #[path = "state.rs"]
 pub(crate) mod state;
+
+use uo_core::{RuntimeKernelRefinementWitness, RuntimeKernelWitness, Value};
+
+#[derive(Clone, Debug)]
+pub(crate) struct RuntimeCallOutcome {
+    pub runtime_kernel_witness: RuntimeKernelWitness,
+    pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
+    pub aborted: bool,
+    pub return_value: Option<Value>,
+    pub opcode_trace: Vec<String>,
+}
