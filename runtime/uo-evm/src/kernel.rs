@@ -585,12 +585,6 @@ impl RuntimeKernel {
         self.allocator.wipe_region(ScratchRegion::IoScratch);
         let allocator = self.allocator.finish()?;
         let expected_kernel_steps = self.expected_kernel_steps;
-        let expected_kernel_opcodes = expected_kernel_steps.as_ref().map(|steps| {
-            steps
-                .iter()
-                .map(RuntimeKernelStepWitness::projected_opcode)
-                .collect()
-        });
         let kernel_witness = RuntimeKernelWitness {
             entrypoint_id: entrypoint_id.into(),
             arena_bytes: allocator.plan().arena_bytes,
@@ -607,11 +601,9 @@ impl RuntimeKernel {
             io_scratch_live_bytes_end: allocator.io_scratch_usage().live_bytes,
             io_scratch_wipe_count: allocator.io_scratch_usage().wipe_count,
             resource_events: allocator.resource_events().to_vec(),
-            expected_kernel_opcodes,
             expected_kernel_steps,
             public_object_ids: self.public_object_ids,
             expected_public_object_ids: self.expected_public_object_ids,
-            kernel_opcodes: allocator.kernel_ops().to_vec(),
             kernel_steps: self.kernel_steps.into_vec(),
         };
         Ok((
@@ -1135,10 +1127,6 @@ mod tests {
         assert_eq!(
             witness.expected_kernel_steps,
             Some(witness.kernel_steps.clone())
-        );
-        assert_eq!(
-            witness.expected_kernel_opcodes,
-            Some(witness.kernel_opcodes.clone())
         );
         assert_eq!(
             refinement_witness.projected_kernel_schedule(),

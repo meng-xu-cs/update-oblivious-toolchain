@@ -128,7 +128,7 @@ Current closure status:
    state-object / manifest exactness, secret-arg agreement, arena / stack
    budgets, logical access counts, ORAM access counts and theorem-facing ORAM
    shape, `max_commit_ops`, confidential-fragment lowering acceptance, and the
-   exact confidential kernel opcode / step schedule; proof-grade static checks
+   exact confidential kernel step schedule; proof-grade static checks
    now also report confidential raw artifacts as rejected rather than silently
    accepting them. In the theorem-facing interface, imported proof-grade
    validity now yields not only `source_view = artifact_view`, but also that
@@ -139,8 +139,8 @@ Current closure status:
    supported backend path, and both now carry the kernel witness that Lean
    threads through imported JSON plus theorem-side runtime/trusted-kernel
    validity for envelope / budget / wipe shape, with the proof-grade checker
-   path now also requiring the embedded artifact-side expected opcode
-   sequence and expected public kernel-step schedule; the runtime kernel now
+   path now also requiring the embedded artifact-side expected public
+   kernel-step schedule; the runtime kernel now
    also enforces that admitted public schedule online during confidential
    execution, and the repo exposes a direct proof-grade kernel-witness checker
    alongside the larger trusted-kernel / refinement validators; Lean now also

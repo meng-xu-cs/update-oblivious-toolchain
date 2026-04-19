@@ -213,8 +213,8 @@ The current runtime has a first hardening layer:
   `entries`/`position_map`/`stash` logical state before each rewrite; it now
   moves the working vectors into the access routine and rebuilds them in place
 - the runtime now emits a compact `RuntimeKernelWitness` containing the kernel
-  opcode journal, public kernel-step trace, peak stack usage, public allocator
-  bounds, scratch peaks, and wipe counts
+  public kernel-step trace, derived schedule facts, peak stack usage, public
+  allocator bounds, scratch peaks, wipe counts, and the public object universe
 - for accepted confidential entrypoints, `uo-evm` now validates that witness
   against the admitted function body before returning the trace
 - for accepted confidential entrypoints, the runtime kernel now also executes
@@ -228,12 +228,12 @@ The current runtime has a first hardening layer:
   than only through the larger trusted-kernel / refinement bundles
 - the Lean imported trusted-kernel / refinement-witness validators now consume
   that exported kernel witness and check entrypoint alignment, opcode-envelope
-  shape, scratch-budget consistency, wipe discipline, exact kernel-op
-  equality, kernel-step shape, and exact kernel-step equality, while the
+  shape, scratch-budget consistency, wipe discipline, kernel-step shape, and
+  exact kernel-step equality, while the
   proof-grade `checkProofGradeRuntimeWitness` and
-  `checkProofGradeRuntimeTrustedKernel` validators now require both the
-  artifact-side expected opcode list and the exact expected public kernel-step
-  trace from the checked manifest to be embedded in confidential witnesses
+  `checkProofGradeRuntimeTrustedKernel` validators now require the exact
+  expected public kernel-step trace from the checked manifest to be embedded in
+  confidential witnesses
 - the core Lean trusted-kernel / refinement-witness structures now also expose
   theorem-side `ProofGradeValid` predicates, so the "kernel witness is present
   and exact" condition is available above the JSON importer layer as well
@@ -244,7 +244,7 @@ The current runtime has a first hardening layer:
 - the Lean side now also packages that admitted schedule explicitly as a
   `RuntimeKernelSchedule` / `ImportedRuntimeKernelSchedule` object derived from
   the witness, so later refinement statements can target the schedule object
-  directly instead of unpacking separate opcode and step fields
+  directly instead of unpacking duplicated opcode-list and step-trace fields
 - the Lean side now also gives that schedule an explicit small-kernel replay
   semantics, so accepted proof-grade kernel witnesses must not only carry the
   exact admitted public schedule but also replay it successfully from

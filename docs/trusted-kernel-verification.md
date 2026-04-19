@@ -72,15 +72,15 @@ The core Lean development now also exposes theorem-side proof-grade predicates
 for the kernel witness, refinement witness, and trusted-kernel bundle, so the
 "kernel witness is present and exact" condition is no longer only a JSON-layer
 importer notion. For the kernel witness specifically, the proof-grade path now
-requires both:
+requires:
 
-- the exact expected kernel opcode list for the admitted confidential entrypoint
 - the exact expected public kernel-step trace, where each step is just
   `{ opcode, object_id? }`
 
-That step trace is stronger than the old flat opcode list because it fixes the
-kernel-visible persistent object schedule without exposing secret keys, indices,
-or values.
+Lean derives the public kernel schedule object, including its projected opcode
+list, from that step trace. The step trace is stronger than the old flat opcode
+list because it fixes the kernel-visible persistent object schedule without
+exposing secret keys, indices, or values.
 
 Lean now also exposes proof-grade schedule-exactness lemmas for the kernel
 witness, runtime refinement witness, and trusted-kernel bundle: once a
@@ -90,7 +90,7 @@ schedule and the emitted kernel steps are provably equal to it.
 That schedule is now also packaged explicitly on the Lean side as a
 `RuntimeKernelSchedule` / `ImportedRuntimeKernelSchedule` object derived from
 the witness, so the proof interface can talk directly about "the admitted
-public kernel schedule" rather than only about separate opcode and step fields.
+public kernel schedule" rather than about duplicated opcode-list sidecars.
 Lean now also gives that schedule an explicit small-kernel execution semantics:
 the accepted public schedule must replay from `ready` to `finished` under the
 modeled `Begin -> object ops* -> Commit -> Wipe` machine, not merely satisfy a
@@ -128,12 +128,11 @@ longer only "emit then compare later" at that kernel boundary.
 The emitted runtime kernel witness now contains:
 
 - the public allocator and scratch-budget facts
-- the flat kernel opcode journal
 - the public kernel-step trace over `{ opcode, object_id? }`
 - the public resource-event trace over stack checks, scratch reservations, and
   scratch wipes
-- the checked-manifest expected opcode list for confidential entrypoints
 - the checked-manifest expected step trace for confidential entrypoints
+- the emitted and expected public object universes used by the kernel witness
 
 The repository now also exposes that smaller object directly via
 `uo-evm --format kernel-witness`, and the proof-grade checker accepts that
@@ -144,9 +143,9 @@ runtime phase witness directly via
 theorem boundary, but it is the concrete runtime-to-kernel refinement
 certificate carried inside the larger runtime refinement witness.
 
-For proof-grade validation, Lean checks that the step trace is well-formed,
-that its projected opcode list matches the flat opcode journal, and that the
-runtime-emitted step trace exactly matches the expected admitted step trace.
+For proof-grade validation, Lean checks that the step trace is well-formed and
+that the runtime-emitted step trace exactly matches the expected admitted step
+trace.
 The proof-grade kernel, refinement, and trusted-kernel checkers now also
 require that this admitted public schedule actually reaches a finished
 small-kernel state under the modeled execution semantics, and the resulting

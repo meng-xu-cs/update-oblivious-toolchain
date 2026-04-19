@@ -47,8 +47,6 @@ pub struct EntrypointManifest {
     pub arena_bytes: usize,
     pub max_stack_words: usize,
     #[serde(default)]
-    pub kernel_opcodes: Vec<UoOpcode>,
-    #[serde(default)]
     pub kernel_steps: Vec<RuntimeKernelStepManifest>,
     pub uocell_reads: usize,
     pub uocell_writes: usize,

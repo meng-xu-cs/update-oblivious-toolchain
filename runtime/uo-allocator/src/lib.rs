@@ -45,10 +45,10 @@ impl AllocatorPlan {
             + entry.uomap_reads
             + entry.uomap_writes;
         let mut plan = Self::for_entrypoint(entry.arena_bytes, entry.max_stack_words);
-        plan.max_kernel_ops = if entry.kernel_opcodes.is_empty() {
+        plan.max_kernel_ops = if entry.kernel_steps.is_empty() {
             logical_kernel_ops + 3
         } else {
-            entry.kernel_opcodes.len()
+            entry.kernel_steps.len()
         };
         plan
     }
@@ -225,7 +225,7 @@ fn runtime_kernel_region(region: ScratchRegion) -> RuntimeKernelScratchRegionWit
 #[cfg(test)]
 mod tests {
     use super::{AllocatorPlan, AllocatorSession, ScratchRegion};
-    use uo_core::EntrypointManifest;
+    use uo_core::{EntrypointManifest, RuntimeKernelStepManifest};
     use uo_precompiles::UoOpcode;
 
     fn sample_manifest() -> EntrypointManifest {
@@ -234,27 +234,26 @@ mod tests {
             public_gas_budget: 4096,
             arena_bytes: 4096,
             max_stack_words: 65,
-            kernel_opcodes: vec![
-                UoOpcode::Begin,
-                UoOpcode::CellGet,
-                UoOpcode::CellSet,
-                UoOpcode::CellSet,
-                UoOpcode::ArrayGet,
-                UoOpcode::ArrayGet,
-                UoOpcode::ArrayGet,
-                UoOpcode::MapGet,
-                UoOpcode::MapGet,
-                UoOpcode::MapGet,
-                UoOpcode::MapGet,
-                UoOpcode::MapPut,
-                UoOpcode::MapPut,
-                UoOpcode::MapPut,
-                UoOpcode::MapPut,
-                UoOpcode::MapPut,
-                UoOpcode::Commit,
-                UoOpcode::Wipe,
+            kernel_steps: vec![
+                RuntimeKernelStepManifest { opcode: UoOpcode::Begin, object_id: None },
+                RuntimeKernelStepManifest { opcode: UoOpcode::CellGet, object_id: Some(1) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::CellSet, object_id: Some(1) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::CellSet, object_id: Some(1) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::ArrayGet, object_id: Some(2) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::ArrayGet, object_id: Some(2) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::ArrayGet, object_id: Some(2) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapGet, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::MapPut, object_id: Some(3) },
+                RuntimeKernelStepManifest { opcode: UoOpcode::Commit, object_id: None },
+                RuntimeKernelStepManifest { opcode: UoOpcode::Wipe, object_id: None },
             ],
-            kernel_steps: vec![],
             uocell_reads: 1,
             uocell_writes: 2,
             uoarray_reads: 3,
@@ -269,7 +268,7 @@ mod tests {
     #[test]
     fn manifest_plan_sets_exact_kernel_budget() {
         let plan = AllocatorPlan::from_manifest(&sample_manifest());
-        assert_eq!(plan.max_kernel_ops, 1 + 2 + 3 + 0 + 4 + 5 + 3);
+        assert_eq!(plan.max_kernel_ops, sample_manifest().kernel_steps.len());
     }
 
     #[test]

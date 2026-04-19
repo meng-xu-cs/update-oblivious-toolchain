@@ -275,7 +275,6 @@ pub struct ProofRelevantEntrypointView {
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
-    pub kernel_opcodes: Vec<String>,
     pub kernel_steps: Vec<ProofRelevantKernelStepView>,
     pub uocell_reads: usize,
     pub uocell_writes: usize,
@@ -295,12 +294,6 @@ impl ProofRelevantEntrypointView {
             public_gas_budget: entrypoint.public_gas_budget,
             arena_bytes: entrypoint.arena_bytes,
             max_stack_words: entrypoint.max_stack_words,
-            kernel_opcodes: entrypoint
-                .kernel_opcodes
-                .iter()
-                .map(opcode_tag)
-                .map(str::to_string)
-                .collect(),
             kernel_steps: entrypoint
                 .kernel_steps
                 .iter()

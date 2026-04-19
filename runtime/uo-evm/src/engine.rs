@@ -11,9 +11,8 @@ use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::{
-    canonical_runtime_public_object_ids, expected_runtime_kernel_opcodes_for_confidential,
-    expected_runtime_manifest_kernel_steps_for_confidential, CompiledArtifact, ExecutionTrace,
-    RuntimeKernelStepWitness, Value,
+    canonical_runtime_public_object_ids, expected_runtime_manifest_kernel_steps_for_confidential,
+    CompiledArtifact, ExecutionTrace, RuntimeKernelStepWitness, Value,
 };
 
 #[derive(Debug)]
@@ -153,17 +152,10 @@ impl ContractInstance {
                 &function,
             )
             .map_err(|err| anyhow!("confidential kernel witness derivation failed: {err}"))?;
-            let expected_kernel_opcodes =
-                expected_runtime_kernel_opcodes_for_confidential(&function).map_err(|err| {
-                    anyhow!("confidential kernel witness derivation failed: {err}")
-                })?;
-            if manifest_entry.kernel_opcodes != expected_kernel_opcodes {
-                bail!("manifest kernel opcode trace drifted for {entrypoint}");
-            }
             if manifest_entry.kernel_steps != expected_kernel_steps {
                 bail!("manifest kernel step trace drifted for {entrypoint}");
             }
-            allocator.max_kernel_ops = manifest_entry.kernel_opcodes.len();
+            allocator.max_kernel_ops = manifest_entry.kernel_steps.len();
         }
         let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
         self.state.ensure_cold(

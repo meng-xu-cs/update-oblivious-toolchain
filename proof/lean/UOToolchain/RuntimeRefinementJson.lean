@@ -708,25 +708,22 @@ structure ImportedRuntimeKernelWitness where
   io_scratch_live_bytes_end : Nat
   io_scratch_wipe_count : Nat
   resource_events : List ImportedRuntimeKernelResourceEvent
-  expected_kernel_opcodes : Option (List String)
   expected_kernel_steps : Option (List ImportedRuntimeKernelStep)
   public_object_ids : List Nat
   expected_public_object_ids : Option (List Nat)
-  kernel_opcodes : List String
   kernel_steps : List ImportedRuntimeKernelStep
 deriving Repr, DecidableEq, FromJson, ToJson
 
 def ImportedRuntimeKernelWitness.emittedKernelSchedule
   (witness : ImportedRuntimeKernelWitness) : ImportedRuntimeKernelSchedule :=
-  { opcodes := witness.kernel_opcodes
+  { opcodes := witness.kernel_steps.map ImportedRuntimeKernelStep.opcode
   , steps := witness.kernel_steps
   }
 
 def ImportedRuntimeKernelWitness.expectedKernelSchedule?
   (witness : ImportedRuntimeKernelWitness) : Option ImportedRuntimeKernelSchedule := do
-  let opcodes ← witness.expected_kernel_opcodes
   let steps ← witness.expected_kernel_steps
-  some { opcodes := opcodes, steps := steps }
+  some { opcodes := steps.map ImportedRuntimeKernelStep.opcode, steps := steps }
 
 def ImportedRuntimeKernelWitness.toRuntimeKernelWitness
   (witness : ImportedRuntimeKernelWitness) : RuntimeKernelWitness :=
@@ -750,12 +747,13 @@ def ImportedRuntimeKernelWitness.toRuntimeKernelWitness
       , words := event.words
       , bytes := event.bytes
       })
-  , expectedKernelOpcodes := witness.expected_kernel_opcodes
+  , expectedKernelOpcodes := witness.expected_kernel_steps.map
+      (List.map ImportedRuntimeKernelStep.opcode)
   , expectedKernelSteps := witness.expected_kernel_steps.map
       (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep)
   , publicObjectIds := witness.public_object_ids
   , expectedPublicObjectIds := witness.expected_public_object_ids
-  , kernelOpcodes := witness.kernel_opcodes
+  , kernelOpcodes := witness.kernel_steps.map ImportedRuntimeKernelStep.opcode
   , kernelSteps := witness.kernel_steps.map ImportedRuntimeKernelStep.toRuntimeKernelStep
   }
 
@@ -780,7 +778,8 @@ def ImportedRuntimeKernelWitness.checkResourceReplayExact
 
 def ImportedRuntimeKernelWitness.kernelOpcodesAllowed
   (witness : ImportedRuntimeKernelWitness) : Bool :=
-  witness.kernel_opcodes.all (fun opcode => decide (opcode ∈ importedRuntimeKernelOpcodeNames))
+  (witness.kernel_steps.map ImportedRuntimeKernelStep.opcode).all
+    (fun opcode => decide (opcode ∈ importedRuntimeKernelOpcodeNames))
 
 def ImportedRuntimeKernelWitness.kernelStepsShapeValid
   (witness : ImportedRuntimeKernelWitness) : Bool :=
@@ -791,14 +790,15 @@ def ImportedRuntimeKernelWitness.projectedKernelOpcodes
   witness.kernel_steps.map ImportedRuntimeKernelStep.opcode
 
 def ImportedRuntimeKernelWitness.kernelStepOpcodesMatch
-  (witness : ImportedRuntimeKernelWitness) : Bool :=
-  decide (witness.kernel_steps = [] ∨ witness.projectedKernelOpcodes = witness.kernel_opcodes)
+  (_witness : ImportedRuntimeKernelWitness) : Bool :=
+  true
 
 def ImportedRuntimeKernelWitness.HasBeginCommitWipeEnvelope
   (witness : ImportedRuntimeKernelWitness) : Bool :=
-  decide (witness.kernel_opcodes.head? = some "Begin") &&
+  decide (witness.projectedKernelOpcodes.head? = some "Begin") &&
     decide
-      (witness.kernel_opcodes.drop (witness.kernel_opcodes.length - 2) = ["Commit", "Wipe"])
+      (witness.projectedKernelOpcodes.drop (witness.projectedKernelOpcodes.length - 2) =
+        ["Commit", "Wipe"])
 
 def importedRuntimeKernelObjectIdScheduleCanonical : List Nat → Bool
   | [] => true
@@ -844,9 +844,10 @@ def ImportedRuntimeKernelWitness.Valid
     witness.kernelStepOpcodesMatch = true ∧
     witness.HasBeginCommitWipeEnvelope = true ∧
     witness.emittedKernelSchedule.checkRunsToCompletion = true ∧
-    (match witness.expected_kernel_opcodes with
+    (match witness.expected_kernel_steps with
     | none => True
-    | some expectedKernelOpcodes => witness.kernel_opcodes = expectedKernelOpcodes) ∧
+    | some expectedKernelSteps =>
+        witness.projectedKernelOpcodes = expectedKernelSteps.map ImportedRuntimeKernelStep.opcode) ∧
     (match witness.expected_kernel_steps with
     | none => True
     | some expectedKernelSteps => witness.kernel_steps = expectedKernelSteps) ∧
@@ -878,9 +879,12 @@ def ImportedRuntimeKernelWitness.checkValid
     witness.kernelStepOpcodesMatch &&
     witness.HasBeginCommitWipeEnvelope &&
     witness.emittedKernelSchedule.checkRunsToCompletion &&
-    (match witness.expected_kernel_opcodes with
+    (match witness.expected_kernel_steps with
     | none => true
-    | some expectedKernelOpcodes => decide (witness.kernel_opcodes = expectedKernelOpcodes)) &&
+    | some expectedKernelSteps =>
+        decide
+          (witness.projectedKernelOpcodes =
+            expectedKernelSteps.map ImportedRuntimeKernelStep.opcode)) &&
     (match witness.expected_kernel_steps with
     | none => true
     | some expectedKernelSteps => decide (witness.kernel_steps = expectedKernelSteps)) &&
@@ -892,21 +896,17 @@ def ImportedRuntimeKernelWitness.ProofGradeValid
   (witness : ImportedRuntimeKernelWitness)
   (entrypointId : String) : Prop :=
   witness.Valid entrypointId ∧
-    match witness.expected_kernel_opcodes with
+    match witness.expected_kernel_steps with
     | none => False
     | some _ =>
-        match witness.expected_kernel_steps with
+        match witness.expected_public_object_ids with
         | none => False
-        | some _ =>
-            match witness.expected_public_object_ids with
-            | none => False
-            | some _ => True
+        | some _ => True
 
 def ImportedRuntimeKernelWitness.checkProofGrade
   (witness : ImportedRuntimeKernelWitness)
   (entrypointId : String) : Bool :=
   witness.checkValid entrypointId &&
-    witness.expected_kernel_opcodes.isSome &&
     witness.expected_kernel_steps.isSome &&
     witness.expected_public_object_ids.isSome
 
@@ -914,8 +914,7 @@ def ImportedRuntimeKernelWitness.checkProofGrade
   (witness : ImportedRuntimeKernelWitness)
   (entrypointId : String) :
   witness.checkValid entrypointId = true ↔ witness.Valid entrypointId := by
-  cases hExpectedOpcodes : witness.expected_kernel_opcodes <;>
-    cases hExpectedSteps : witness.expected_kernel_steps <;>
+  cases hExpectedSteps : witness.expected_kernel_steps <;>
     cases hExpectedPublicObjectIds : witness.expected_public_object_ids <;>
     simp [ImportedRuntimeKernelWitness.checkValid,
       ImportedRuntimeKernelWitness.Valid,
@@ -929,19 +928,18 @@ def ImportedRuntimeKernelWitness.checkProofGrade
       ImportedRuntimeKernelWitness.publicObjectIdsShapeValid,
       ImportedRuntimeKernelWitness.expectedPublicObjectIdsShapeAndMatch,
       ImportedRuntimeKernelWitness.kernelObjectsInPublicObjectUniverse,
-      hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds,
+      hExpectedSteps, hExpectedPublicObjectIds,
       List.all_eq_true, and_assoc]
 
 @[simp] theorem importedRuntimeKernelWitness_checkProofGrade_eq_true_iff
   (witness : ImportedRuntimeKernelWitness)
   (entrypointId : String) :
   witness.checkProofGrade entrypointId = true ↔ witness.ProofGradeValid entrypointId := by
-  cases hExpectedOpcodes : witness.expected_kernel_opcodes <;>
-    cases hExpectedSteps : witness.expected_kernel_steps <;>
+  cases hExpectedSteps : witness.expected_kernel_steps <;>
     cases hExpectedPublicObjectIds : witness.expected_public_object_ids <;>
     simp [ImportedRuntimeKernelWitness.checkProofGrade,
       ImportedRuntimeKernelWitness.ProofGradeValid,
-      hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds]
+      hExpectedSteps, hExpectedPublicObjectIds]
 
 @[simp] theorem importedRuntimeKernelStep_toRuntimeKernelStep_opcode
   (step : ImportedRuntimeKernelStep) :
@@ -1021,21 +1019,18 @@ theorem importedRuntimeKernelStep_toRuntimeKernelStep_injective :
           simp [importedRuntimeKernelObjectIdScheduleCanonical,
             runtimeKernelObjectIdScheduleCanonical, ih]
 
-theorem importedRuntimeKernelWitness_checkProofGrade_toRuntime_eq
+theorem importedRuntimeKernelWitness_toRuntimeKernelWitness_valid
   (witness : ImportedRuntimeKernelWitness)
-  (entrypointId : String) :
-  witness.checkProofGrade entrypointId =
-    witness.toRuntimeKernelWitness.checkProofGradeForEntrypoint entrypointId := by
-    cases hExpectedOpcodes : witness.expected_kernel_opcodes <;>
-    cases hExpectedSteps : witness.expected_kernel_steps <;>
+  (entrypointId : String)
+  (hValid : witness.Valid entrypointId) :
+  witness.toRuntimeKernelWitness.ValidForEntrypoint entrypointId := by
+  cases hExpectedSteps : witness.expected_kernel_steps <;>
     cases hExpectedPublicObjectIds : witness.expected_public_object_ids <;>
-    simp [ImportedRuntimeKernelWitness.checkProofGrade,
-      RuntimeKernelWitness.checkProofGradeForEntrypoint,
-      ImportedRuntimeKernelWitness.checkValid,
-      RuntimeKernelWitness.checkValidForEntrypoint,
+  simpa [ImportedRuntimeKernelWitness.Valid,
+      RuntimeKernelWitness.ValidForEntrypoint,
       ImportedRuntimeKernelWitness.toRuntimeKernelWitness,
-      ImportedRuntimeKernelWitness.checkResourceReplayExact,
-      RuntimeKernelWitness.checkResourceReplayExact,
+      ImportedRuntimeKernelWitness.resourceReplayExact,
+      RuntimeKernelWitness.ResourceReplayExact,
       ImportedRuntimeKernelWitness.emittedKernelSchedule,
       RuntimeKernelWitness.emittedKernelSchedule,
       ImportedRuntimeKernelWitness.kernelOpcodesAllowed,
@@ -1062,23 +1057,26 @@ theorem importedRuntimeKernelWitness_checkProofGrade_toRuntime_eq
       runtimeKernelOpcodeNames,
       importedRuntimeKernelObjectIdScheduleCanonical_eq_runtime,
       importedRuntimeKernelStep_opcode_comp_toRuntimeKernelStep,
-      hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds]
+      hExpectedSteps, hExpectedPublicObjectIds] using hValid
 
 theorem importedRuntimeKernelWitness_toRuntimeKernelWitness_proofGradeValid
   (witness : ImportedRuntimeKernelWitness)
   (entrypointId : String)
   (hValid : witness.ProofGradeValid entrypointId) :
   witness.toRuntimeKernelWitness.ProofGradeValid entrypointId := by
-  have hImportedCheck :
-      witness.checkProofGrade entrypointId = true := by
-    exact
-      (importedRuntimeKernelWitness_checkProofGrade_eq_true_iff witness entrypointId).2 hValid
-  have hCheck :
-      witness.toRuntimeKernelWitness.checkProofGradeForEntrypoint entrypointId = true := by
-    simpa [importedRuntimeKernelWitness_checkProofGrade_toRuntime_eq] using hImportedCheck
-  exact
-    (runtimeKernelWitness_checkProofGradeForEntrypoint_eq_true_iff
-      witness.toRuntimeKernelWitness entrypointId).1 hCheck
+  refine ⟨importedRuntimeKernelWitness_toRuntimeKernelWitness_valid
+      witness entrypointId hValid.1, ?_⟩
+  cases hExpectedSteps : witness.expected_kernel_steps with
+  | none =>
+      simp [ImportedRuntimeKernelWitness.ProofGradeValid, hExpectedSteps] at hValid
+  | some expectedKernelSteps =>
+      cases hExpectedPublicObjectIds : witness.expected_public_object_ids with
+      | none =>
+          simp [ImportedRuntimeKernelWitness.ProofGradeValid, hExpectedSteps,
+            hExpectedPublicObjectIds] at hValid
+      | some expectedPublicObjectIds =>
+          simp [ImportedRuntimeKernelWitness.toRuntimeKernelWitness, hExpectedSteps,
+            hExpectedPublicObjectIds]
 
 theorem importedRuntimeKernelWitness_proofGradeKernelSchedule_exact
   {witness : ImportedRuntimeKernelWitness}
@@ -1090,8 +1088,7 @@ theorem importedRuntimeKernelWitness_proofGradeKernelSchedule_exact
   rcases hValid with ⟨hValidForEntrypoint, hProofGrade⟩
   cases hExpectedSteps : witness.expected_kernel_steps with
   | none =>
-      cases hExpectedOpcodes : witness.expected_kernel_opcodes <;>
-        simp [hExpectedSteps, hExpectedOpcodes] at hProofGrade
+      simp [hExpectedSteps] at hProofGrade
   | some expectedKernelSteps =>
       refine ⟨expectedKernelSteps, rfl, ?_⟩
       rcases hValidForEntrypoint with
@@ -1105,25 +1102,14 @@ theorem importedRuntimeKernelWitness_proofGradeKernelScheduleObject_exact
   ∃ expectedKernelSchedule,
     witness.expectedKernelSchedule? = some expectedKernelSchedule ∧
       witness.emittedKernelSchedule = expectedKernelSchedule := by
-  rcases hValid with ⟨hValidForEntrypoint, hProofGrade⟩
-  cases hExpectedOpcodes : witness.expected_kernel_opcodes with
-  | none =>
-      simp [hExpectedOpcodes] at hProofGrade
-  | some expectedKernelOpcodes =>
-      cases hExpectedSteps : witness.expected_kernel_steps with
-      | none =>
-          simp [hExpectedOpcodes, hExpectedSteps] at hProofGrade
-      | some expectedKernelSteps =>
-          refine ⟨{ opcodes := expectedKernelOpcodes, steps := expectedKernelSteps }, ?_, ?_⟩
-          · simp [ImportedRuntimeKernelWitness.expectedKernelSchedule?, hExpectedOpcodes, hExpectedSteps]
-          · rcases hValidForEntrypoint with
-              ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hKernelOpcodes,
-                hKernelSteps, _, _, _⟩
-            simp [hExpectedOpcodes] at hKernelOpcodes
-            simp [hExpectedSteps] at hKernelSteps
-            cases hKernelOpcodes
-            cases hKernelSteps
-            rfl
+  rcases importedRuntimeKernelWitness_proofGradeKernelSchedule_exact hValid with
+    ⟨expectedKernelSteps, hExpectedSteps, hKernelSteps⟩
+  refine
+    ⟨{ opcodes := expectedKernelSteps.map ImportedRuntimeKernelStep.opcode
+     , steps := expectedKernelSteps
+     }, ?_, ?_⟩
+  · simp [ImportedRuntimeKernelWitness.expectedKernelSchedule?, hExpectedSteps]
+  · simp [ImportedRuntimeKernelWitness.emittedKernelSchedule, hKernelSteps]
 
 theorem importedRuntimeKernelWitness_proofGradePublicObjectUniverse_exact
   {witness : ImportedRuntimeKernelWitness}
@@ -1135,9 +1121,8 @@ theorem importedRuntimeKernelWitness_proofGradePublicObjectUniverse_exact
   rcases hValid with ⟨hValidForEntrypoint, hProofGrade⟩
   cases hExpectedPublicObjectIds : witness.expected_public_object_ids with
   | none =>
-      cases hExpectedOpcodes : witness.expected_kernel_opcodes <;>
-        cases hExpectedSteps : witness.expected_kernel_steps <;>
-        simp [hExpectedOpcodes, hExpectedSteps, hExpectedPublicObjectIds] at hProofGrade
+      cases hExpectedSteps : witness.expected_kernel_steps <;>
+        simp [hExpectedSteps, hExpectedPublicObjectIds] at hProofGrade
   | some expectedPublicObjectIds =>
       refine ⟨expectedPublicObjectIds, rfl, ?_⟩
       rcases hValidForEntrypoint with
@@ -1168,8 +1153,7 @@ theorem importedRuntimeKernelWitness_emittedKernelSchedule_valid
         ImportedRuntimeKernelWitness.emittedKernelSchedule,
         ImportedRuntimeKernelWitness.kernelStepsShapeValid,
         ImportedRuntimeKernelWitness.kernelStepOpcodesMatch,
-        ImportedRuntimeKernelSchedule.projectedOpcodes,
-        ImportedRuntimeKernelWitness.projectedKernelOpcodes]
+        ImportedRuntimeKernelSchedule.projectedOpcodes]
     rw [hShapeEq]
     simp [hStepsShape, hOpcodeMatch]
   have hEnvelopeEq :

@@ -20,9 +20,8 @@ mod tests {
     #[cfg(feature = "diagnostics")]
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
-        expected_runtime_kernel_opcodes_for_confidential, expected_runtime_kernel_steps_for_confidential,
-        ContractMetadata, ExecutionTrace, ProgramMode, RuntimeKernelRefinementEventKindWitness,
-        TheoremTrace, Value, WriteClass,
+        expected_runtime_kernel_steps_for_confidential, ContractMetadata, ExecutionTrace,
+        ProgramMode, RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
 
@@ -630,10 +629,6 @@ mod tests {
             .find(|function| function.signature == "auth(bytes32)")
             .unwrap();
         assert_eq!(
-            witness.kernel_opcodes,
-            expected_runtime_kernel_opcodes_for_confidential(function).unwrap()
-        );
-        assert_eq!(
             witness.expected_kernel_steps,
             Some(expected_runtime_kernel_steps_for_confidential(function).unwrap())
         );
@@ -641,12 +636,13 @@ mod tests {
             witness.kernel_steps,
             witness.expected_kernel_steps.clone().unwrap()
         );
+        let emitted_kernel_schedule = witness.emitted_kernel_schedule();
         assert_eq!(
-            witness.kernel_opcodes.first().copied(),
+            emitted_kernel_schedule.opcodes.first().copied(),
             Some(uo_precompiles::UoOpcode::Begin)
         );
         assert_eq!(
-            witness.kernel_opcodes.last().copied(),
+            emitted_kernel_schedule.opcodes.last().copied(),
             Some(uo_precompiles::UoOpcode::Wipe)
         );
         assert_eq!(
@@ -991,7 +987,7 @@ mod tests {
     }
 
     #[test]
-    fn call_rejects_manifest_kernel_opcode_drift() {
+    fn call_rejects_manifest_kernel_step_drift_by_append() {
         let mut artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
             include_str!(
@@ -1005,8 +1001,11 @@ mod tests {
             .entrypoints
             .get_mut("classify(uint256)")
             .unwrap()
-            .kernel_opcodes
-            .push(UoOpcode::Commit);
+            .kernel_steps
+            .push(uo_core::RuntimeKernelStepManifest {
+                opcode: UoOpcode::Commit,
+                object_id: None,
+            });
 
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         let err = instance
@@ -1014,11 +1013,11 @@ mod tests {
             .unwrap_err();
         assert!(err
             .to_string()
-            .contains("manifest kernel opcode trace drifted"));
+            .contains("manifest kernel step trace drifted"));
     }
 
     #[test]
-    fn call_rejects_missing_manifest_kernel_opcode_trace() {
+    fn call_rejects_missing_manifest_kernel_step_trace() {
         let mut artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
             include_str!(
@@ -1032,7 +1031,7 @@ mod tests {
             .entrypoints
             .get_mut("classify(uint256)")
             .unwrap()
-            .kernel_opcodes
+            .kernel_steps
             .clear();
 
         let mut instance = ContractInstance::deploy(artifact).unwrap();
@@ -1041,7 +1040,7 @@ mod tests {
             .unwrap_err();
         assert!(err
             .to_string()
-            .contains("manifest kernel opcode trace drifted"));
+            .contains("manifest kernel step trace drifted"));
     }
 
     #[test]

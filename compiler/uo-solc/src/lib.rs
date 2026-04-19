@@ -9,7 +9,6 @@ use uo_core::manifest::{
     EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
 };
 use uo_core::{
-    expected_runtime_kernel_opcodes_for_confidential,
     expected_runtime_manifest_kernel_steps_for_confidential, CompiledArtifact, ContractMetadata,
     ProofRelevantTranslationBundle, ScalarType, StateMetadata, StructField, Type, Value,
 };
@@ -1063,11 +1062,6 @@ fn build_manifest_entry(
             + counts.expr_count as u64 * 7
             + max_commit_ops as u64 * 29,
     );
-    let kernel_opcodes = if function.confidential {
-        expected_runtime_kernel_opcodes_for_confidential(function)?
-    } else {
-        Vec::new()
-    };
     let kernel_steps = if function.confidential {
         expected_runtime_manifest_kernel_steps_for_confidential(function)?
     } else {
@@ -1078,7 +1072,6 @@ fn build_manifest_entry(
         public_gas_budget: budget,
         arena_bytes: 4096 + counts.local_count * 64,
         max_stack_words: 64 + counts.local_count,
-        kernel_opcodes,
         kernel_steps,
         uocell_reads: counts.cell_reads,
         uocell_writes: counts.cell_writes,
@@ -2490,14 +2483,6 @@ bounds:
             .entrypoints
             .get("classify(uint256)")
             .unwrap();
-        assert_eq!(
-            entry
-                .kernel_steps
-                .iter()
-                .map(|step| step.opcode)
-                .collect::<Vec<_>>(),
-            entry.kernel_opcodes
-        );
         assert_eq!(
             entry.kernel_steps.first().and_then(|step| step.object_id),
             None

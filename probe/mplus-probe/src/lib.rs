@@ -3411,7 +3411,7 @@ fn validate_kernel_case(
         "entrypoint": target.entrypoint,
         "setup_calls": setup.len(),
         "gas_used": trace.gas_used,
-        "kernel_op_count": kernel_witness.kernel_opcodes.len(),
+        "kernel_op_count": kernel_witness.kernel_steps.len(),
         "kernel_step_count": kernel_witness.kernel_steps.len(),
         "object_step_count": kernel_witness.kernel_steps.iter().filter(|step| step.object_id.is_some()).count(),
         "kernel_witness": kernel_witness_summary(Some(&kernel_witness)),
@@ -8206,7 +8206,7 @@ fn kernel_witness_summary(kernel_witness: Option<&RuntimeKernelWitness>) -> Json
         Some(kernel_witness) => json!({
             "present": true,
             "entrypoint": kernel_witness.entrypoint_id,
-            "kernel_op_count": kernel_witness.kernel_opcodes.len(),
+            "kernel_op_count": kernel_witness.kernel_steps.len(),
             "public_object_universe": kernel_witness.emitted_public_object_schedule(),
             "expected_public_object_universe": kernel_witness.expected_public_object_schedule(),
             "canonical_loaded_object_schedule": kernel_witness.canonical_loaded_object_schedule(),

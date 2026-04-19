@@ -417,8 +417,8 @@ The first implementation step is now present in the codebase:
   kernel witness, and Lean now threads it through both imported validation and
   theorem-side runtime / trusted-kernel validity checks for its envelope /
   budget / wipe invariants, with the proof-grade checker path now requiring
-  both the artifact-side expected opcode list and the exact expected public
-  kernel-step trace and checking exact equality for each
+  the artifact-side exact expected public kernel-step trace and checking exact
+  equality against it
 - the kernel witness now also carries an explicit `io` scratch region for
   confidential storage payload staging, and the runtime accounts ORAM
   refresh/decode plus confidential commit/rewrite payload buffers under that

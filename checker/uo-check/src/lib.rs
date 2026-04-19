@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, Statement};
 use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{
-    expected_runtime_kernel_opcodes_for_confidential,
     expected_runtime_manifest_kernel_steps_for_confidential, lower_confidential_kernel_statements,
     CompiledArtifact, ContractMetadata, OramManifest, ProofRelevantTranslationBundle,
     StateObjectManifest,
@@ -133,17 +132,6 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 function.signature,
                 entry.max_stack_words,
                 64 + counts.local_count
-            );
-        }
-        let expected_kernel_opcodes = if function.confidential {
-            expected_runtime_kernel_opcodes_for_confidential(function)?
-        } else {
-            Vec::new()
-        };
-        if entry.kernel_opcodes != expected_kernel_opcodes {
-            bail!(
-                "manifest kernel_opcodes mismatch for entrypoint {}",
-                function.signature
             );
         }
         let expected_kernel_steps = if function.confidential {
@@ -915,7 +903,9 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
-    use uo_core::{CompiledArtifact, ContractMetadata, Expr, ProgramMode, Value};
+    use uo_core::{
+        CompiledArtifact, ContractMetadata, Expr, ProgramMode, RuntimeKernelStepManifest, Value,
+    };
     use uo_precompiles::UoOpcode;
 
     static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1052,7 +1042,7 @@ bounds:
     }
 
     #[test]
-    fn artifact_checker_rejects_kernel_opcode_drift() {
+    fn artifact_checker_rejects_kernel_step_drift_by_append() {
         let (_, _, mut artifact) = sample_artifact();
         let signature = artifact.contract.functions[0].signature.clone();
         artifact
@@ -1061,16 +1051,19 @@ bounds:
             .entrypoints
             .get_mut(&signature)
             .unwrap()
-            .kernel_opcodes
-            .push(UoOpcode::Wipe);
+            .kernel_steps
+            .push(RuntimeKernelStepManifest {
+                opcode: UoOpcode::Wipe,
+                object_id: None,
+            });
         let err = check_artifact(&artifact).unwrap_err();
         assert!(err
             .to_string()
-            .contains("manifest kernel_opcodes mismatch for entrypoint"));
+            .contains("manifest kernel_steps mismatch for entrypoint"));
     }
 
     #[test]
-    fn artifact_checker_rejects_missing_confidential_kernel_opcode_trace() {
+    fn artifact_checker_rejects_missing_confidential_kernel_step_trace() {
         let (_, _, mut artifact) = sample_artifact();
         let signature = artifact.contract.functions[0].signature.clone();
         artifact
@@ -1079,12 +1072,12 @@ bounds:
             .entrypoints
             .get_mut(&signature)
             .unwrap()
-            .kernel_opcodes
+            .kernel_steps
             .clear();
         let err = check_artifact(&artifact).unwrap_err();
         assert!(err
             .to_string()
-            .contains("manifest kernel_opcodes mismatch for entrypoint"));
+            .contains("manifest kernel_steps mismatch for entrypoint"));
     }
 
     #[test]

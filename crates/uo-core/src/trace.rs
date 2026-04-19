@@ -435,14 +435,11 @@ pub struct RuntimeKernelWitness {
     #[serde(default)]
     pub resource_events: Vec<RuntimeKernelResourceEventWitness>,
     #[serde(default)]
-    pub expected_kernel_opcodes: Option<Vec<UoOpcode>>,
-    #[serde(default)]
     pub expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
     #[serde(default)]
     pub public_object_ids: Vec<u32>,
     #[serde(default)]
     pub expected_public_object_ids: Option<Vec<u32>>,
-    pub kernel_opcodes: Vec<UoOpcode>,
     #[serde(default)]
     pub kernel_steps: Vec<RuntimeKernelStepWitness>,
 }
@@ -630,9 +627,6 @@ pub enum KernelWitnessError {
         entrypoint: String,
     },
     ConfidentialArrayIndex {
-        entrypoint: String,
-    },
-    MissingExpectedKernelOpcodes {
         entrypoint: String,
     },
     MissingExpectedKernelSteps {
@@ -1049,11 +1043,6 @@ impl fmt::Display for KernelWitnessError {
                 "confidential entrypoint {} contains unsupported array indexing in the confidential fragment",
                 entrypoint
             ),
-            Self::MissingExpectedKernelOpcodes { entrypoint } => write!(
-                f,
-                "confidential runtime kernel witness for {} is missing the artifact-derived expected opcode trace",
-                entrypoint
-            ),
             Self::MissingExpectedKernelSteps { entrypoint } => write!(
                 f,
                 "confidential runtime kernel witness for {} is missing the artifact-derived expected step trace",
@@ -1456,15 +1445,23 @@ struct RuntimeKernelResourceReplayState {
 impl RuntimeKernelWitness {
     pub fn emitted_kernel_schedule(&self) -> RuntimeKernelScheduleWitness {
         RuntimeKernelScheduleWitness {
-            opcodes: self.kernel_opcodes.clone(),
+            opcodes: self
+                .kernel_steps
+                .iter()
+                .map(RuntimeKernelStepWitness::projected_opcode)
+                .collect(),
             steps: self.kernel_steps.clone(),
         }
     }
 
     pub fn expected_kernel_schedule(&self) -> Option<RuntimeKernelScheduleWitness> {
+        let steps = self.expected_kernel_steps.clone()?;
         Some(RuntimeKernelScheduleWitness {
-            opcodes: self.expected_kernel_opcodes.clone()?,
-            steps: self.expected_kernel_steps.clone()?,
+            opcodes: steps
+                .iter()
+                .map(RuntimeKernelStepWitness::projected_opcode)
+                .collect(),
+            steps,
         })
     }
 
@@ -1524,25 +1521,22 @@ impl RuntimeKernelWitness {
                 wipe_count: self.io_scratch_wipe_count,
             });
         }
+        let emitted_kernel_opcodes = self
+            .kernel_steps
+            .iter()
+            .map(RuntimeKernelStepWitness::projected_opcode)
+            .collect::<Vec<_>>();
         if !matches!(
-            self.kernel_opcodes.as_slice(),
+            emitted_kernel_opcodes.as_slice(),
             [UoOpcode::Begin, .., UoOpcode::Commit, UoOpcode::Wipe]
         ) {
             return Err(KernelWitnessError::MalformedKernelOpcodeEnvelope {
-                witnessed: self.kernel_opcodes.clone(),
+                witnessed: emitted_kernel_opcodes,
             });
         }
         self.emitted_kernel_schedule().validate_shape()?;
         if let Some(expected_schedule) = self.expected_kernel_schedule() {
             expected_schedule.validate_shape()?;
-        }
-        if let Some(expected) = &self.expected_kernel_opcodes {
-            if &self.kernel_opcodes != expected {
-                return Err(KernelWitnessError::KernelOpcodeTraceMismatch {
-                    expected: expected.clone(),
-                    witnessed: self.kernel_opcodes.clone(),
-                });
-            }
         }
         if let Some(expected) = &self.expected_kernel_steps {
             if &self.kernel_steps != expected {
@@ -1616,30 +1610,6 @@ impl RuntimeKernelWitness {
             return Err(KernelWitnessError::StackBudgetMismatch {
                 witnessed: self.max_stack_words,
                 expected: manifest_entry.max_stack_words,
-            });
-        }
-        let expected = expected_runtime_kernel_opcodes_for_confidential(function)?;
-        if manifest_entry.kernel_opcodes != expected {
-            return Err(KernelWitnessError::KernelOpcodeTraceMismatch {
-                expected,
-                witnessed: manifest_entry.kernel_opcodes.clone(),
-            });
-        }
-        let witness_expected = self.expected_kernel_opcodes.as_ref().ok_or_else(|| {
-            KernelWitnessError::MissingExpectedKernelOpcodes {
-                entrypoint: function.signature.clone(),
-            }
-        })?;
-        if witness_expected != &manifest_entry.kernel_opcodes {
-            return Err(KernelWitnessError::KernelOpcodeTraceMismatch {
-                expected: manifest_entry.kernel_opcodes.clone(),
-                witnessed: witness_expected.clone(),
-            });
-        }
-        if self.kernel_opcodes != manifest_entry.kernel_opcodes {
-            return Err(KernelWitnessError::KernelOpcodeTraceMismatch {
-                expected: manifest_entry.kernel_opcodes.clone(),
-                witnessed: self.kernel_opcodes.clone(),
             });
         }
         let expected_steps = expected_runtime_manifest_kernel_steps_for_confidential(function)?;
@@ -2412,15 +2382,6 @@ pub fn expected_runtime_manifest_kernel_steps_for_confidential(
     Ok(expected_runtime_kernel_steps_for_confidential(function)?
         .into_iter()
         .map(runtime_kernel_step_witness_to_manifest)
-        .collect())
-}
-
-pub fn expected_runtime_kernel_opcodes_for_confidential(
-    function: &CompiledFunction,
-) -> Result<Vec<UoOpcode>, KernelWitnessError> {
-    Ok(expected_runtime_kernel_steps_for_confidential(function)?
-        .into_iter()
-        .map(|step| step.opcode)
         .collect())
 }
 
@@ -4243,12 +4204,6 @@ mod tests {
             io_scratch_live_bytes_end: 0,
             io_scratch_wipe_count: 0,
             resource_events: vec![],
-            expected_kernel_opcodes: Some(vec![
-                UoOpcode::Begin,
-                UoOpcode::CellGet,
-                UoOpcode::Commit,
-                UoOpcode::Wipe,
-            ]),
             expected_kernel_steps: Some(vec![
                 RuntimeKernelStepWitness {
                     opcode: UoOpcode::Begin,
@@ -4269,12 +4224,6 @@ mod tests {
             ]),
             public_object_ids: vec![7],
             expected_public_object_ids: Some(vec![7]),
-            kernel_opcodes: vec![
-                UoOpcode::Begin,
-                UoOpcode::CellGet,
-                UoOpcode::Commit,
-                UoOpcode::Wipe,
-            ],
             kernel_steps: vec![
                 RuntimeKernelStepWitness {
                     opcode: UoOpcode::Begin,
@@ -4549,17 +4498,9 @@ mod tests {
             io_scratch_live_bytes_end: 0,
             io_scratch_wipe_count: 0,
             resource_events: vec![],
-            expected_kernel_opcodes: None,
             expected_kernel_steps: None,
             public_object_ids: vec![7, 9],
             expected_public_object_ids: None,
-            kernel_opcodes: vec![
-                UoOpcode::Begin,
-                UoOpcode::CellGet,
-                UoOpcode::MapGet,
-                UoOpcode::Commit,
-                UoOpcode::Wipe,
-            ],
             kernel_steps: vec![
                 RuntimeKernelStepWitness {
                     opcode: UoOpcode::Begin,

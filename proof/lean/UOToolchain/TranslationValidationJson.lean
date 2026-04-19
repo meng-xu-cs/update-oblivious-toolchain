@@ -74,7 +74,6 @@ structure ImportedProofRelevantEntrypointView where
   public_gas_budget : Nat
   arena_bytes : Nat
   max_stack_words : Nat
-  kernel_opcodes : List String
   kernel_steps : List ImportedProofRelevantKernelStepView
   uocell_reads : Nat
   uocell_writes : Nat
@@ -330,7 +329,6 @@ private def parseImportedManifestEntrypointViewFromRawJson
     , public_gas_budget := ← lookupFieldAs json "public_gas_budget"
     , arena_bytes := ← lookupFieldAs json "arena_bytes"
     , max_stack_words := ← lookupFieldAs json "max_stack_words"
-    , kernel_opcodes := ← lookupFieldAs json "kernel_opcodes"
     , kernel_steps := ← lookupFieldAs json "kernel_steps"
     , uocell_reads := ← lookupFieldAs json "uocell_reads"
     , uocell_writes := ← lookupFieldAs json "uocell_writes"
@@ -1594,11 +1592,10 @@ private def functionConfidentialLoweringMatchesManifest
   if fn.confidential then
     match expectedKernelStepsForConfidentialBodyStrings fn.body with
     | .ok expectedSteps =>
-        entry.kernel_steps == expectedSteps &&
-          entry.kernel_opcodes == expectedSteps.map ImportedProofRelevantKernelStepView.opcode
+        entry.kernel_steps == expectedSteps
     | .error _ => false
   else
-    entry.kernel_opcodes.isEmpty && entry.kernel_steps.isEmpty
+    entry.kernel_steps.isEmpty
 
 private def functionConfidentialLoweringMismatchMessage
   (fn : ImportedProofRelevantFunctionView)
@@ -1609,11 +1606,7 @@ private def functionConfidentialLoweringMismatchMessage
         if entry.kernel_steps != expectedSteps then
           s!"{fn.signature}: expected kernel_steps {renderKernelSteps expectedSteps}, manifest has {renderKernelSteps entry.kernel_steps}"
         else
-          let expectedOpcodes :=
-            String.intercalate ", "
-              (expectedSteps.map ImportedProofRelevantKernelStepView.opcode)
-          let actualOpcodes := String.intercalate ", " entry.kernel_opcodes
-          s!"{fn.signature}: expected kernel_opcodes {expectedOpcodes}, manifest has {actualOpcodes}"
+          s!"{fn.signature}: confidential lowering mismatch despite matching kernel_steps"
     | .error err =>
         s!"{fn.signature}: confidential lowering rejected body: {err}"
   else
