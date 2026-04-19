@@ -1,4 +1,4 @@
-#![recursion_limit = "512"]
+#![recursion_limit = "1024"]
 
 use anyhow::{anyhow, Context, Result};
 use rayon::prelude::*;
@@ -8444,6 +8444,25 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && runtime_module_source.contains("struct RuntimeCallOutcome")
         && shell_source.contains("RuntimeCallOutcome")
         && !state_source.contains("opcode_trace: Vec::new()");
+    let confidential_committed_kernel_outcome_decl =
+        "pub(in crate::runtime) struct ConfidentialCommittedKernelOutcome";
+    let confidential_committed_kernel_outcome_derive_line = state_source
+        .split(confidential_committed_kernel_outcome_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate ConfidentialCommittedKernelOutcome declaration"))?;
+    let confidential_committed_kernel_outcome_nonclone =
+        !confidential_committed_kernel_outcome_derive_line.contains("Clone");
+    let confidential_committed_kernel_outcome_surface_files = collect_production_pattern_hits(
+        &runtime_evm_src,
+        "ConfidentialCommittedKernelOutcome",
+    )?;
+    let expected_confidential_committed_kernel_outcome_surface_files =
+        vec![String::from("runtime/uo-evm/src/state.rs")];
+    let confidential_committed_kernel_outcome_surface_restricted =
+        confidential_committed_kernel_outcome_surface_files
+            == expected_confidential_committed_kernel_outcome_surface_files;
     let runtime_call_outcome_surface_files =
         collect_production_pattern_hits(&runtime_evm_src, "RuntimeCallOutcome")?;
     let expected_runtime_call_outcome_surface_files = vec![
@@ -8480,6 +8499,23 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         vec![String::from("runtime/uo-evm/src/kernel.rs")];
     let confidential_exec_state_surface_restricted =
         confidential_exec_state_surface_files == expected_confidential_exec_state_surface_files;
+    let confidential_kernel_run_outcome_decl =
+        "pub(in crate::runtime) struct ConfidentialKernelRunOutcome";
+    let confidential_kernel_run_outcome_derive_line = kernel_source
+        .split(confidential_kernel_run_outcome_decl)
+        .next()
+        .and_then(|prefix| prefix.lines().rev().find(|line| !line.trim().is_empty()))
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("failed to locate ConfidentialKernelRunOutcome declaration"))?;
+    let confidential_kernel_run_outcome_nonclone =
+        !confidential_kernel_run_outcome_derive_line.contains("Clone");
+    let confidential_kernel_run_outcome_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "ConfidentialKernelRunOutcome")?;
+    let expected_confidential_kernel_run_outcome_surface_files =
+        vec![String::from("runtime/uo-evm/src/kernel.rs")];
+    let confidential_kernel_run_outcome_surface_restricted =
+        confidential_kernel_run_outcome_surface_files
+            == expected_confidential_kernel_run_outcome_surface_files;
     let confidential_execution_outcome_decl = "struct ConfidentialExecutionOutcome";
     let confidential_execution_outcome_derive_line = kernel_source
         .split(confidential_execution_outcome_decl)
@@ -9192,6 +9228,23 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && confidential_exec_state_wipes_on_drop,
         }),
         json!({
+            "name": "ConfidentialKernelRunOutcome",
+            "owner": "runtime/uo-evm/src/kernel.rs",
+            "boundary": "runtime-only kernel-to-state handoff bundle carrying committed confidential shadow state, witnesses, and the live return value",
+            "checked": kernel_source.contains(confidential_kernel_run_outcome_decl)
+                && confidential_kernel_run_outcome_nonclone
+                && confidential_kernel_run_outcome_surface_restricted,
+        }),
+        json!({
+            "name": "ConfidentialCommittedKernelOutcome",
+            "owner": "runtime/uo-evm/src/state.rs",
+            "boundary": "runtime-only state-local post-commit confidential outcome bundle before packaging into RuntimeCallOutcome",
+            "checked": state_source.contains(confidential_committed_kernel_outcome_decl)
+                && confidential_committed_kernel_outcome_nonclone
+                && confidential_committed_kernel_outcome_surface_restricted
+                && state_confidential_outcome_layering_is_explicit,
+        }),
+        json!({
             "name": "RuntimeCallOutcome",
             "owner": "runtime/uo-evm/src/runtime.rs",
             "boundary": "runtime-only per-call outcome bundle; state.rs and shell.rs construct it, theorem.rs consumes it whole, and engine.rs does not unpack it directly",
@@ -9394,12 +9447,32 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             confidential_exec_state_surface_restricted,
         "confidential_exec_state_derive_line": confidential_exec_state_derive_line,
         "confidential_exec_state_nonclone": confidential_exec_state_nonclone,
+        "confidential_kernel_run_outcome_derive_line":
+            confidential_kernel_run_outcome_derive_line,
+        "confidential_kernel_run_outcome_nonclone":
+            confidential_kernel_run_outcome_nonclone,
+        "confidential_kernel_run_outcome_surface_files":
+            confidential_kernel_run_outcome_surface_files,
+        "expected_confidential_kernel_run_outcome_surface_files":
+            expected_confidential_kernel_run_outcome_surface_files,
+        "confidential_kernel_run_outcome_surface_restricted":
+            confidential_kernel_run_outcome_surface_restricted,
         "confidential_execution_outcome_derive_line":
             confidential_execution_outcome_derive_line,
         "confidential_execution_outcome_nonclone":
             confidential_execution_outcome_nonclone,
         "confidential_exec_state_wipes_on_drop":
             confidential_exec_state_wipes_on_drop,
+        "confidential_committed_kernel_outcome_derive_line":
+            confidential_committed_kernel_outcome_derive_line,
+        "confidential_committed_kernel_outcome_nonclone":
+            confidential_committed_kernel_outcome_nonclone,
+        "confidential_committed_kernel_outcome_surface_files":
+            confidential_committed_kernel_outcome_surface_files,
+        "expected_confidential_committed_kernel_outcome_surface_files":
+            expected_confidential_committed_kernel_outcome_surface_files,
+        "confidential_committed_kernel_outcome_surface_restricted":
+            confidential_committed_kernel_outcome_surface_restricted,
         "state_enforces_confidential_commit_budget":
             state_enforces_confidential_commit_budget,
         "oram_working_stash_capacity_checks": oram_working_stash_capacity_checks,

@@ -14,6 +14,8 @@ the refinement proof is still being completed.
 | `ConfidentialCallInputs` | `runtime/uo-evm/src/state.rs` | shell projects public summary, then `ContractRuntime` internalizes the raw payload for `crate::runtime` | confidential entrypoint arguments may contain secrets before the kernel slot file is initialized | `engine.rs` can read only the projected `PublicCallSummary`; raw args are wrapped by `ContractRuntime`, and unwrap is restricted to `crate::runtime` |
 | `PathOramFreshCoinPlan` | `runtime/uo-evm/src/fresh_coins.rs` | `crate::runtime` plus a diagnostics-gated opaque public API handle | injected fresh-leaf choices determine hidden ORAM randomness | `engine.rs` passes the opaque handle through but does not touch the internal per-object coin map; the handle is non-`Clone`, consumed by value, and moved into the live shadow state without cloning the per-object tapes first; the public injection API is absent from the default surface |
 | `ConfidentialExecState` | `runtime/uo-evm/src/kernel.rs` | `RuntimeKernel` | live confidential slot values, abort/return flags, and confidential return value | private to `kernel.rs`; non-`Clone`; wiped on drop |
+| `ConfidentialKernelRunOutcome` | `runtime/uo-evm/src/kernel.rs` | `RuntimeKernel` / `crate::runtime` | kernel-owned confidential shadow state, runtime witnesses, abort bit, and live return value at the kernel-to-state handoff | runtime-only type; non-`Clone`; confined to `kernel.rs` |
+| `ConfidentialCommittedKernelOutcome` | `runtime/uo-evm/src/state.rs` | `crate::runtime` | committed-state confidential outcome bundle after shadow commit and before packaging into the runtime/theorem handoff | runtime-only type; non-`Clone`; confined to `state.rs` |
 | `RuntimeCallOutcome` | `runtime/uo-evm/src/runtime.rs` | `crate::runtime` / theorem finalizer | per-call runtime witnesses plus the live return value remain bundled until theorem packaging finishes | runtime-only type; non-`Clone`; `state.rs` and `shell.rs` construct it, `theorem.rs` consumes it whole, and `engine.rs` does not unpack or own it directly |
 | `RuntimeShadowState`, `ConfidentialRuntimeShadowState`, `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | `crate::runtime` | live reopened confidential object state for one call, with separate wrappers for the confidential kernel path and the public shell path | raw shadow state and the confidential shadow wrapper are now visibility-restricted to `crate::runtime`; the shell sees only `PublicRuntimeShadowState`, while confidential execution uses `ConfidentialRuntimeShadowState` only behind `ContractRuntime` |
 | `CommittedRuntimeWitnessSnapshot` | `runtime/uo-evm/src/state.rs` | `state.rs` / `theorem.rs` | theorem-facing hidden ORAM access-counter and position-map witness state from committed storage before and after a call | the snapshot fields are private; the type is non-`Clone`; only `into_hidden_oram_state()` exposes the hidden theorem inputs, and the snapshot is now captured inside the theorem-side `CallTraceContext`, so `engine.rs` no longer calls `witness_snapshot()` or sees the hidden snapshot type directly |
@@ -35,15 +37,17 @@ These are the invariants this inventory is meant to support.
    non-`Clone`, and move their per-object secret tapes into runtime-owned
    state without cloning them first.
 3. Confidential expression execution should live in `RuntimeKernel`.
-4. Intermediate per-call outcome bundles that still carry runtime witnesses or
-   a live return value should stay runtime-only and be consumed as whole
-   objects by the theorem finalizer rather than unpacked in `engine.rs`.
-5. Reopen / commit / cold-store / hidden-witness helpers should stay inside
+4. Intermediate per-call outcome bundles that still carry runtime witnesses,
+   live shadow state, or a live return value should stay runtime-only across
+   the kernel-to-state, state-to-runtime, and runtime-to-theorem handoffs.
+5. The final runtime/theorem outcome bundle should be consumed as a whole
+   object by the theorem finalizer rather than unpacked in `engine.rs`.
+6. Reopen / commit / cold-store / hidden-witness helpers should stay inside
    `crate::runtime`.
-6. Direct cryptographic open/seal calls should stay inside the codec layer.
-7. Secret-bearing transient buffers should either be wiped on drop or confined
+7. Direct cryptographic open/seal calls should stay inside the codec layer.
+8. Secret-bearing transient buffers should either be wiped on drop or confined
    to an explicitly modeled kernel/state object.
-8. Where object/type/program metadata already fixes a confidential buffer
+9. Where object/type/program metadata already fixes a confidential buffer
    shape, kernel and commit scratch accounting should use that public shape
    rather than deriving sizes from live secret values; in particular,
    confidential hash scratch should come from the checked manifest's
