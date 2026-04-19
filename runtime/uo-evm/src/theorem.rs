@@ -218,11 +218,7 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         Some(runtime_kernel_witness),
         direct_hidden_certificate,
     )?;
-    let reconstructed_bundle = trace.runtime_trusted_kernel_bundle()?;
-    if reconstructed_bundle != direct_bundle {
-        anyhow::bail!("runtime trusted kernel drifted from direct certificate reconstruction");
-    }
-    trace.runtime_trusted_kernel_bundle = Some(direct_bundle);
+    trace.store_runtime_trusted_kernel_bundle(direct_bundle)?;
     Ok(trace)
 }
 

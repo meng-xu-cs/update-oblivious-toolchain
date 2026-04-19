@@ -69,6 +69,12 @@
   "confidential_kernel_slot_statement_serde_snake_case": true,
   "confidential_kernel_statement_kind_names_match": true,
   "confidential_kernel_statement_serde_snake_case": true,
+  "expected_runtime_trusted_kernel_bundle_field_assignment_files": [
+    "crates/uo-core/src/trace.rs"
+  ],
+  "expected_runtime_trusted_kernel_bundle_storage_surface_files": [
+    "runtime/uo-evm/src/theorem.rs"
+  ],
   "lean_confidential_core_proof_grade_assurance_present": true,
   "lean_confidential_core_shell_boundary_lowering_exactness_present": true,
   "lean_confidential_core_shell_boundary_slot_exactness_present": true,
@@ -324,6 +330,7 @@
   "runtime_kernel_bundle_uses_manifest_programs": true,
   "runtime_kernel_lowering_bundle_field_names_match": true,
   "runtime_kernel_slot_dsl_bundle_field_names_match": true,
+  "runtime_kernel_witness_export_uses_explicit_field_only": true,
   "runtime_refinement_witness_reuses_trusted_kernel_bundle": true,
   "runtime_shell_boundary_bundle_field_names_match": true,
   "runtime_shell_boundary_lowering_bundle_field_names_match": true,
@@ -373,7 +380,15 @@
     }
   ],
   "runtime_trace_bridge_surface_restricted": true,
-  "runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates": true,
+  "runtime_trusted_kernel_bundle_enforces_trace_exactness": true,
+  "runtime_trusted_kernel_bundle_field_assignment_files": [
+    "crates/uo-core/src/trace.rs"
+  ],
+  "runtime_trusted_kernel_bundle_field_assignment_restricted": true,
+  "runtime_trusted_kernel_bundle_storage_surface_files": [
+    "runtime/uo-evm/src/theorem.rs"
+  ],
+  "runtime_trusted_kernel_bundle_storage_surface_restricted": true,
   "runtime_trusted_kernel_slot_bundle_field_names_match": true,
   "rust_confidential_kernel_expr_kind_names": [
     "literal",

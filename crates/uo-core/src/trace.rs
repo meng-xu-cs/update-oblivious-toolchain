@@ -502,6 +502,9 @@ pub enum RefinementWitnessError {
     MissingControllerShape,
     MissingNormalizedMicroTrace,
     MissingControllerCertificate,
+    ControllerObserverTraceMismatch,
+    HiddenCertificateTraceMismatch,
+    TrustedKernelBundleTraceMismatch,
     KernelWitnessTraceMismatch,
     KernelWitness(KernelWitnessError),
     RuntimeKernelRefinement(RuntimeKernelRefinementWitnessError),
@@ -796,6 +799,18 @@ impl fmt::Display for RefinementWitnessError {
             Self::MissingControllerCertificate => {
                 write!(f, "execution trace is missing runtime_controller_certificate")
             }
+            Self::ControllerObserverTraceMismatch => write!(
+                f,
+                "stored runtime trusted kernel bundle disagrees with execution trace controller observer"
+            ),
+            Self::HiddenCertificateTraceMismatch => write!(
+                f,
+                "stored runtime trusted kernel bundle disagrees with execution trace hidden certificate"
+            ),
+            Self::TrustedKernelBundleTraceMismatch => write!(
+                f,
+                "stored runtime trusted kernel bundle disagrees with execution trace reconstruction"
+            ),
             Self::KernelWitnessTraceMismatch => write!(
                 f,
                 "stored runtime trusted kernel bundle disagrees with execution trace kernel witness"
@@ -3717,13 +3732,9 @@ impl ExecutionTrace {
         }
     }
 
-    pub fn runtime_controller_observer_certificate(
+    fn reconstructed_runtime_controller_observer_certificate(
         &self,
     ) -> Result<RuntimeControllerObserverCertificate, RefinementWitnessError> {
-        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
-            bundle.controller_observer.validate()?;
-            return Ok(bundle.controller_observer.clone());
-        }
         RuntimeControllerObserverCertificate::new(
             self.theorem_trace
                 .public_outcome
@@ -3744,13 +3755,9 @@ impl ExecutionTrace {
         )
     }
 
-    pub fn runtime_path_oram_hidden_certificate(
+    fn reconstructed_runtime_path_oram_hidden_certificate(
         &self,
     ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
-        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
-            bundle.hidden_certificate.validate()?;
-            return Ok(bundle.hidden_certificate.clone());
-        }
         RuntimePathOramHiddenCertificate::new(
             self.refinement_trace(),
             self.runtime_oram_objects.clone(),
@@ -3759,6 +3766,69 @@ impl ExecutionTrace {
             self.runtime_oram_position_map_after.clone(),
             self.runtime_oram_leaf_state_transitions.clone(),
         )
+    }
+
+    fn reconstructed_runtime_trusted_kernel_bundle(
+        &self,
+    ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
+        RuntimeTrustedKernelBundle::new_with_kernel_witness(
+            self.runtime_seed,
+            self.reconstructed_runtime_controller_observer_certificate()?,
+            self.runtime_kernel_witness.clone(),
+            self.reconstructed_runtime_path_oram_hidden_certificate()?,
+        )
+    }
+
+    pub fn runtime_controller_observer_certificate(
+        &self,
+    ) -> Result<RuntimeControllerObserverCertificate, RefinementWitnessError> {
+        let reconstructed = self.reconstructed_runtime_controller_observer_certificate()?;
+        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+            bundle.controller_observer.validate()?;
+            if bundle.controller_observer != reconstructed {
+                return Err(RefinementWitnessError::ControllerObserverTraceMismatch);
+            }
+            return Ok(bundle.controller_observer.clone());
+        }
+        Ok(reconstructed)
+    }
+
+    pub fn runtime_path_oram_hidden_certificate(
+        &self,
+    ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
+        let reconstructed = self.reconstructed_runtime_path_oram_hidden_certificate()?;
+        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+            bundle.hidden_certificate.validate()?;
+            if bundle.hidden_certificate != reconstructed {
+                return Err(RefinementWitnessError::HiddenCertificateTraceMismatch);
+            }
+            return Ok(bundle.hidden_certificate.clone());
+        }
+        Ok(reconstructed)
+    }
+
+    pub fn store_runtime_trusted_kernel_bundle(
+        &mut self,
+        mut bundle: RuntimeTrustedKernelBundle,
+    ) -> Result<(), RefinementWitnessError> {
+        if let Some(trace_kernel_witness) = &self.runtime_kernel_witness {
+            match &bundle.kernel_witness {
+                Some(bundle_kernel_witness) if bundle_kernel_witness != trace_kernel_witness => {
+                    return Err(RefinementWitnessError::KernelWitnessTraceMismatch);
+                }
+                None => {
+                    bundle.kernel_witness = Some(trace_kernel_witness.clone());
+                }
+                Some(_) => {}
+            }
+        }
+        let reconstructed = self.reconstructed_runtime_trusted_kernel_bundle()?;
+        if bundle != reconstructed {
+            return Err(RefinementWitnessError::TrustedKernelBundleTraceMismatch);
+        }
+        bundle.validate()?;
+        self.runtime_trusted_kernel_bundle = Some(bundle);
+        Ok(())
     }
 
     pub fn runtime_trusted_kernel_bundle(
@@ -3779,17 +3849,14 @@ impl ExecutionTrace {
                     Some(_) => {}
                 }
             }
+            let reconstructed = self.reconstructed_runtime_trusted_kernel_bundle()?;
+            if bundle != reconstructed {
+                return Err(RefinementWitnessError::TrustedKernelBundleTraceMismatch);
+            }
             bundle.validate()?;
             return Ok(bundle);
         }
-        let controller_observer = self.runtime_controller_observer_certificate()?;
-        let hidden_certificate = self.runtime_path_oram_hidden_certificate()?;
-        RuntimeTrustedKernelBundle::new_with_kernel_witness(
-            self.runtime_seed,
-            controller_observer,
-            self.runtime_kernel_witness.clone(),
-            hidden_certificate,
-        )
+        self.reconstructed_runtime_trusted_kernel_bundle()
     }
 
     pub fn runtime_refinement_witness(
@@ -3813,11 +3880,6 @@ impl ExecutionTrace {
         let witness = self
             .runtime_kernel_witness
             .clone()
-            .or_else(|| {
-                self.runtime_trusted_kernel_bundle
-                    .as_ref()
-                    .and_then(|bundle| bundle.kernel_witness.clone())
-            })
             .ok_or(KernelWitnessError::MissingKernelWitness)?;
         let function = artifact
             .contract
@@ -4620,17 +4682,39 @@ mod tests {
     }
 
     #[test]
-    fn runtime_trusted_kernel_bundle_uses_stored_kernel_on_emitted_trace() {
+    fn runtime_trusted_kernel_bundle_uses_stored_kernel_on_matching_trace() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
         let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
         trace.runtime_trusted_kernel_bundle = Some(bundle.clone());
-        trace.theorem_trace = TheoremTrace::default();
-        trace.runtime_controller_certificate = None;
-        trace.runtime_oram_position_map_after = vec![];
         assert_eq!(trace.runtime_trusted_kernel_bundle().unwrap(), bundle);
         assert_eq!(
             trace.runtime_refinement_witness().unwrap(),
             bundle.to_witness().unwrap()
+        );
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_rejects_stored_controller_observer_drift_from_trace() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        trace.runtime_trusted_kernel_bundle = Some(bundle);
+        trace.theorem_trace = TheoremTrace::default();
+        trace.runtime_controller_certificate = None;
+        assert_eq!(
+            trace.runtime_trusted_kernel_bundle().unwrap_err(),
+            RefinementWitnessError::MissingPublicOutcome
+        );
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_rejects_stored_hidden_certificate_drift_from_trace() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        trace.runtime_trusted_kernel_bundle = Some(bundle);
+        trace.runtime_oram_position_map_after = vec![];
+        assert_eq!(
+            trace.runtime_trusted_kernel_bundle().unwrap_err(),
+            RefinementWitnessError::OramLeafStateMismatch
         );
     }
 
@@ -4642,7 +4726,7 @@ mod tests {
         trace.runtime_trusted_kernel_bundle = Some(bundle);
         assert_eq!(
             trace.runtime_trusted_kernel_bundle().unwrap_err(),
-            RefinementWitnessError::OramLeafStateMismatch
+            RefinementWitnessError::TrustedKernelBundleTraceMismatch
         );
     }
 

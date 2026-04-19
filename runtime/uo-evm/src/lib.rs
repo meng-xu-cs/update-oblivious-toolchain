@@ -19,8 +19,9 @@ mod tests {
     #[cfg(feature = "diagnostics")]
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
-        ContractMetadata, ExecutionTrace, ProgramMode, RuntimeKernelRefinementEventKindWitness,
-        TheoremTrace, Value, WriteClass,
+        ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode,
+        RefinementWitnessError, RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value,
+        WriteClass,
     };
     use uo_precompiles::UoOpcode;
 
@@ -745,7 +746,7 @@ mod tests {
     }
 
     #[test]
-    fn serialized_execution_trace_preserves_trusted_kernel_bundle() {
+    fn serialized_execution_trace_preserves_trusted_kernel_bundle_only_on_matching_trace() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
             include_str!(
@@ -777,22 +778,36 @@ mod tests {
             decoded.runtime_kernel_refinement_witness,
             result.trace.runtime_kernel_refinement_witness
         );
+        assert_eq!(decoded.runtime_trusted_kernel_bundle().unwrap(), bundle);
+        assert_eq!(
+            decoded
+                .runtime_kernel_witness_for_confidential(&artifact, "add(bytes32,uint256)")
+                .unwrap(),
+            kernel_witness.clone()
+        );
+        assert_eq!(
+            decoded.runtime_refinement_witness().unwrap(),
+            result.trace.runtime_refinement_witness().unwrap()
+        );
 
         decoded.theorem_trace = TheoremTrace::default();
         decoded.runtime_controller_certificate = None;
         decoded.runtime_oram_position_map_after = vec![];
         decoded.runtime_kernel_witness = None;
 
-        assert_eq!(decoded.runtime_trusted_kernel_bundle().unwrap(), bundle);
+        assert_eq!(
+            decoded.runtime_trusted_kernel_bundle().unwrap_err(),
+            RefinementWitnessError::MissingPublicOutcome
+        );
         assert_eq!(
             decoded
                 .runtime_kernel_witness_for_confidential(&artifact, "add(bytes32,uint256)")
-                .unwrap(),
-            kernel_witness
+                .unwrap_err(),
+            KernelWitnessError::MissingKernelWitness
         );
         assert_eq!(
-            decoded.runtime_refinement_witness().unwrap(),
-            result.trace.runtime_refinement_witness().unwrap()
+            decoded.runtime_refinement_witness().unwrap_err(),
+            RefinementWitnessError::MissingPublicOutcome
         );
     }
 

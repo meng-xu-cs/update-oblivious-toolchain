@@ -7709,6 +7709,7 @@ fn collect_lean_pattern_hits(root: &Path, pattern: &str) -> Result<Vec<String>> 
 
 fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let core_src = repo_root().join("crates/uo-core/src");
+    let runtime_evm_src = repo_root().join("runtime/uo-evm/src");
     let precompiles_path = repo_root().join("runtime/uo-precompiles/src/lib.rs");
     let core_trace_path = repo_root().join("crates/uo-core/src/trace.rs");
     let confidential_kernel_path = repo_root().join("crates/uo-core/src/confidential_kernel.rs");
@@ -8437,15 +8438,38 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("runtime trace bridge restriction flag must be boolean")
     });
+    let runtime_trusted_kernel_bundle_storage_surface_files =
+        collect_production_pattern_hits(&runtime_evm_src, "store_runtime_trusted_kernel_bundle(")?;
+    let expected_runtime_trusted_kernel_bundle_storage_surface_files =
+        vec![String::from("runtime/uo-evm/src/theorem.rs")];
+    let runtime_trusted_kernel_bundle_storage_surface_restricted =
+        runtime_trusted_kernel_bundle_storage_surface_files
+            == expected_runtime_trusted_kernel_bundle_storage_surface_files;
+    let runtime_trusted_kernel_bundle_field_assignment_files = collect_production_pattern_hits(
+        &core_src,
+        "runtime_trusted_kernel_bundle = Some(",
+    )?;
+    let expected_runtime_trusted_kernel_bundle_field_assignment_files =
+        vec![String::from("crates/uo-core/src/trace.rs")];
+    let runtime_trusted_kernel_bundle_field_assignment_restricted =
+        runtime_trusted_kernel_bundle_field_assignment_files
+            == expected_runtime_trusted_kernel_bundle_field_assignment_files;
     let runtime_refinement_witness_reuses_trusted_kernel_bundle = core_trace_source
         .contains("let bundle = self.runtime_trusted_kernel_bundle()?;")
         && core_trace_source
             .contains("RuntimeRefinementWitness::from_certificates_with_runtime_witnesses(");
-    let runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates = core_trace_source
-        .contains("let controller_observer = self.runtime_controller_observer_certificate()?;")
+    let runtime_trusted_kernel_bundle_enforces_trace_exactness = core_trace_source
+        .contains("pub fn store_runtime_trusted_kernel_bundle(")
         && core_trace_source
-            .contains("let hidden_certificate = self.runtime_path_oram_hidden_certificate()?;")
-        && core_trace_source.contains("RuntimeTrustedKernelBundle::new_with_kernel_witness(");
+            .contains("let reconstructed = self.reconstructed_runtime_trusted_kernel_bundle()?;")
+        && core_trace_source.contains("if bundle != reconstructed {")
+        && core_trace_source
+            .contains("return Err(RefinementWitnessError::TrustedKernelBundleTraceMismatch);");
+    let runtime_kernel_witness_export_uses_explicit_field_only = core_trace_source
+        .contains("pub fn runtime_kernel_witness_for_confidential(")
+        && core_trace_source.contains(".runtime_kernel_witness\n            .clone()")
+        && core_trace_source.contains(".ok_or(KernelWitnessError::MissingKernelWitness)?;")
+        && !core_trace_source.contains(".and_then(|bundle| bundle.kernel_witness.clone())");
     let lean_runtime_refinement_proof_grade_exactness_present = lean_runtime_refinement_json_source
         .contains("def ImportedRuntimeRefinementWitness.ProofGradeValid")
         && lean_runtime_refinement_json_source
@@ -8534,8 +8558,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_runtime_kernel_slot_dsl_bundle_exactness_present
         && lean_runtime_kernel_lowering_bundle_exactness_present
         && runtime_trace_bridge_surface_restricted
+        && runtime_trusted_kernel_bundle_storage_surface_restricted
+        && runtime_trusted_kernel_bundle_field_assignment_restricted
         && runtime_refinement_witness_reuses_trusted_kernel_bundle
-        && runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates
+        && runtime_trusted_kernel_bundle_enforces_trace_exactness
+        && runtime_kernel_witness_export_uses_explicit_field_only
         && lean_runtime_refinement_proof_grade_exactness_present
         && lean_runtime_trusted_kernel_proof_grade_exactness_present
         && resource_event_kind_serde_snake_case
@@ -8769,10 +8796,24 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         "runtime_trace_bridge_checks": runtime_trace_bridge_checks,
         "runtime_trace_bridge_surface_restricted":
             runtime_trace_bridge_surface_restricted,
+        "runtime_trusted_kernel_bundle_storage_surface_files":
+            runtime_trusted_kernel_bundle_storage_surface_files,
+        "expected_runtime_trusted_kernel_bundle_storage_surface_files":
+            expected_runtime_trusted_kernel_bundle_storage_surface_files,
+        "runtime_trusted_kernel_bundle_storage_surface_restricted":
+            runtime_trusted_kernel_bundle_storage_surface_restricted,
+        "runtime_trusted_kernel_bundle_field_assignment_files":
+            runtime_trusted_kernel_bundle_field_assignment_files,
+        "expected_runtime_trusted_kernel_bundle_field_assignment_files":
+            expected_runtime_trusted_kernel_bundle_field_assignment_files,
+        "runtime_trusted_kernel_bundle_field_assignment_restricted":
+            runtime_trusted_kernel_bundle_field_assignment_restricted,
         "runtime_refinement_witness_reuses_trusted_kernel_bundle":
             runtime_refinement_witness_reuses_trusted_kernel_bundle,
-        "runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates":
-            runtime_trusted_kernel_bundle_reuses_controller_and_hidden_certificates,
+        "runtime_trusted_kernel_bundle_enforces_trace_exactness":
+            runtime_trusted_kernel_bundle_enforces_trace_exactness,
+        "runtime_kernel_witness_export_uses_explicit_field_only":
+            runtime_kernel_witness_export_uses_explicit_field_only,
         "lean_runtime_refinement_proof_grade_exactness_present":
             lean_runtime_refinement_proof_grade_exactness_present,
         "lean_runtime_trusted_kernel_proof_grade_exactness_present":

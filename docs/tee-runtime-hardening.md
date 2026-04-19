@@ -478,14 +478,22 @@ The current runtime has a first hardening layer:
   and to-runtime soundness theorems for them
 - the direct runtime witness/export bridge is pinned too:
   `RuntimeTrustedKernelBundle::new_with_kernel_witness(...)`,
+  `ExecutionTrace::store_runtime_trusted_kernel_bundle(...)`,
   `ExecutionTrace::runtime_trusted_kernel_bundle(...)`, and
   `ExecutionTrace::runtime_refinement_witness(...)` stay confined to
   `crates/uo-core/src/trace.rs`; the anti-drift report now also checks that
+  `runtime/uo-evm/src/theorem.rs` stays the only production caller allowed to
+  store a trusted-kernel bundle and that the only production assignment to the
+  backing field stays inside
+  `ExecutionTrace::store_runtime_trusted_kernel_bundle(...)`, that
   the refinement export path reuses the trusted-kernel bundle rather than
-  assembling a parallel witness path, that the trusted-kernel export path
-  reuses the controller and hidden certificates, and that Lean keeps the
-  imported runtime-refinement / trusted-kernel proof-grade exactness and
-  paper-observer projection theorems aligned with those exports
+  assembling a parallel witness path, that any stored trusted-kernel bundle is
+  revalidated against the surrounding trace before export, that the
+  confidential kernel witness is exported only through the dedicated
+  `runtime_kernel_witness` field rather than recovered from a stored bundle,
+  and that Lean keeps the imported runtime-refinement / trusted-kernel
+  proof-grade exactness and paper-observer projection theorems aligned with
+  those exports
 - the hidden traced-call witness staging objects in `state.rs` now also wipe
   their access-counter and position-map vectors on drop unless the theorem
   finalizer explicitly consumes them

@@ -431,11 +431,19 @@ The first implementation step is now present in the codebase:
   requires the direct runtime-kernel DSL / slot-DSL / lowering bridge family
   in that same `kernel_dsl.rs` module to stay confined and manifest-sourced as
   well, requires the direct runtime trusted-kernel / refinement export bridge
-  in `crates/uo-core/src/trace.rs` to stay confined to exact controller /
-  hidden-certificate reuse rather than parallel bundle assembly, and requires
-  Lean to keep validating exact equality to those witness-induced shell views
-  plus the runtime-kernel, confidential-core, shell-boundary slot/lowering,
-  trusted-kernel, and runtime-refinement proof-grade equalities
+  in `crates/uo-core/src/trace.rs` to stay confined to exactness-checked
+  trusted-kernel storage and export rather than parallel bundle assembly,
+  requires `runtime/uo-evm/src/theorem.rs` to stay the only production caller
+  allowed to store a trusted-kernel bundle and `trace.rs` to stay the only
+  production site that performs the backing field assignment,
+  requires any stored trusted-kernel bundle to match the surrounding
+  execution trace exactly before it can be re-exported, requires confidential
+  kernel witnesses to remain sourced only from the dedicated
+  `runtime_kernel_witness` field rather than recovered from stored bundles,
+  and requires Lean to keep validating exact equality to those witness-induced
+  shell views plus the runtime-kernel, confidential-core, shell-boundary
+  slot/lowering, trusted-kernel, and runtime-refinement proof-grade
+  equalities
 - the boundary report now also checks constructor authority for those witness
   alphabets: production runtime phase-witness events are restricted to
   `runtime/uo-evm/src/kernel.rs` plus `runtime/uo-evm/src/state.rs`, and

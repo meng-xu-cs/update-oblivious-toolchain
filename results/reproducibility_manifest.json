@@ -14,8 +14,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 7743791,
-      "sha256": "432bbaec6ad8eddc1bdd87b2901bdf025fd2dacf2fbbafc3cd9ed2aea3447aec"
+      "bytes": 7744423,
+      "sha256": "a9a908a70ddafbad7fdb6a6f681b8c56680e68329161858d01c4024e30e76dc2"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -79,8 +79,8 @@
     },
     {
       "path": "kernel_model_alignment_validation.json",
-      "bytes": 20076,
-      "sha256": "74258121e2dd725b4e3fe641013de18ddacfeb5bcad84af29c4cb774fdf76b4f"
+      "bytes": 20678,
+      "sha256": "550ccad2a936a3c64d39eef128cf3a5a82985c2bfcc5de25593229c517ee8cc7"
     },
     {
       "path": "kernel_refinement_validation.json",
