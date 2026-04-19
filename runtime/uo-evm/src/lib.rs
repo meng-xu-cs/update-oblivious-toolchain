@@ -7,17 +7,22 @@ mod theorem;
 pub use engine::{
     run_artifact, run_artifact_with_seed, CallResult, ContractInstance,
 };
+#[cfg(feature = "diagnostics")]
 pub use runtime::fresh_coins::PathOramFreshCoinPlan;
 #[cfg(feature = "diagnostics")]
 pub use engine::{CallTelemetry, DiagnosticCallResult};
 
 #[cfg(test)]
 mod tests {
-    use super::{ContractInstance, PathOramFreshCoinPlan};
+    use super::ContractInstance;
+    #[cfg(feature = "diagnostics")]
+    use super::PathOramFreshCoinPlan;
+    #[cfg(feature = "diagnostics")]
+    use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
-        canonical_path_oram_leaf_values_of_seed, expected_runtime_kernel_opcodes_for_confidential,
-        expected_runtime_kernel_steps_for_confidential, ContractMetadata, ExecutionTrace,
-        ProgramMode, RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value, WriteClass,
+        expected_runtime_kernel_opcodes_for_confidential, expected_runtime_kernel_steps_for_confidential,
+        ContractMetadata, ExecutionTrace, ProgramMode, RuntimeKernelRefinementEventKindWitness,
+        TheoremTrace, Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
 
@@ -781,6 +786,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "diagnostics")]
     #[test]
     fn injected_path_oram_fresh_coin_tape_realizes_canonical_values() {
         let artifact = compile_bench(
@@ -826,6 +832,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "diagnostics")]
     #[test]
     fn injected_path_oram_fresh_coin_tape_rejects_short_tape() {
         let artifact = compile_bench(

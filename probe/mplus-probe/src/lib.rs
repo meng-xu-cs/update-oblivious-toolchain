@@ -6128,6 +6128,50 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 .as_bool()
                 .expect("kernel signature presence must be boolean")
         });
+    let raw_kernel_private_surface_checks = [
+        (
+            "struct ConfidentialExecutionOutcome {",
+            "pub(crate) struct ConfidentialExecutionOutcome {",
+        ),
+        (
+            "pub(in crate::runtime) struct ConfidentialKernelRunOutcome {",
+            "pub(crate) struct ConfidentialKernelRunOutcome {",
+        ),
+        (
+            "fn record_shadow_load_object(",
+            "pub(crate) fn record_shadow_load_object(",
+        ),
+        ("fn cell_get_public(", "pub(crate) fn cell_get_public("),
+        ("fn cell_set_public(", "pub(crate) fn cell_set_public("),
+        ("fn array_get_public(", "pub(crate) fn array_get_public("),
+        ("fn array_set_public(", "pub(crate) fn array_set_public("),
+        ("fn map_get_public(", "pub(crate) fn map_get_public("),
+        ("fn map_put_public(", "pub(crate) fn map_put_public("),
+        ("fn commit_objects(", "pub(crate) fn commit_objects("),
+        (
+            "fn execute_confidential_call(",
+            "pub(crate) fn execute_confidential_call(",
+        ),
+    ]
+    .into_iter()
+    .map(|(required_private, forbidden_pubcrate)| {
+        let private_present = kernel_source.contains(required_private);
+        let forbidden_present = kernel_source.contains(forbidden_pubcrate);
+        json!({
+            "required_private": required_private,
+            "forbidden_pubcrate": forbidden_pubcrate,
+            "private_present": private_present,
+            "forbidden_present": forbidden_present,
+            "restricted": private_present && !forbidden_present,
+        })
+    })
+    .collect::<Vec<_>>();
+    let raw_kernel_private_surface_restricted =
+        raw_kernel_private_surface_checks.iter().all(|entry| {
+            entry["restricted"]
+                .as_bool()
+                .expect("raw-kernel private surface restriction flag must be boolean")
+        });
     let state_restricted_signatures = [
         "pub(in crate::runtime) fn objects",
         "pub(in crate::runtime) fn shadow_load",
@@ -6686,6 +6730,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && engine_source
             .contains("let (call, zero_writes) = self.call_impl(entrypoint, args, None)?;")
         && engine_source.contains("telemetry: CallTelemetry { zero_writes },");
+    let fresh_coin_api_gated_behind_feature = engine_source
+        .contains("#[cfg(feature = \"diagnostics\")]")
+        && engine_source.contains("pub fn call_with_path_oram_fresh_coins(")
+        && runtime_evm_lib_source.contains("#[cfg(feature = \"diagnostics\")]")
+        && runtime_evm_lib_source.contains("pub use runtime::fresh_coins::PathOramFreshCoinPlan;");
     let diagnostic_api_gated_behind_feature = engine_source
         .contains("#[cfg(feature = \"diagnostics\")]")
         && engine_source.contains("pub fn call_with_diagnostics(")
@@ -6876,6 +6925,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "restricted_signature_checks": restricted_signature_checks,
         "all_kernel_restricted_signatures_present": all_kernel_restricted_signatures_present,
         "kernel_restricted_signature_checks": kernel_restricted_signature_checks,
+        "raw_kernel_private_surface_checks": raw_kernel_private_surface_checks,
+        "raw_kernel_private_surface_restricted": raw_kernel_private_surface_restricted,
         "all_state_restricted_signatures_present": all_state_restricted_signatures_present,
         "state_restricted_signature_checks": state_restricted_signature_checks,
         "runtime_object_derive_line": runtime_object_derive_line,
@@ -6969,6 +7020,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             default_call_result_omits_runtime_telemetry,
         "diagnostic_call_api_exposes_runtime_telemetry":
             diagnostic_call_api_exposes_runtime_telemetry,
+        "fresh_coin_api_gated_behind_feature":
+            fresh_coin_api_gated_behind_feature,
         "diagnostic_api_gated_behind_feature":
             diagnostic_api_gated_behind_feature,
         "theorem_finalizer_omits_runtime_telemetry":
@@ -7005,6 +7058,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && !engine_owns_raw_runtime_object_map
             && all_restricted_signatures_present
             && all_kernel_restricted_signatures_present
+            && raw_kernel_private_surface_restricted
             && all_state_restricted_signatures_present
             && runtime_object_nonclone
             && oram_state_nonderive_clone
@@ -7049,6 +7103,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && probe_enables_runtime_diagnostics_feature
             && default_call_result_omits_runtime_telemetry
             && diagnostic_call_api_exposes_runtime_telemetry
+            && fresh_coin_api_gated_behind_feature
             && diagnostic_api_gated_behind_feature
             && theorem_finalizer_omits_runtime_telemetry
             && probe_reads_runtime_telemetry_from_diagnostic_channel

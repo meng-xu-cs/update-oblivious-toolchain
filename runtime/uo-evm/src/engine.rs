@@ -79,6 +79,7 @@ impl ContractInstance {
         Ok(self.call_impl(entrypoint, args, None)?.0)
     }
 
+    #[cfg(feature = "diagnostics")]
     pub fn call_with_path_oram_fresh_coins(
         &mut self,
         entrypoint: &str,

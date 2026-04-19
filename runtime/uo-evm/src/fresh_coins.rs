@@ -1,5 +1,9 @@
-use anyhow::{bail, Result};
+#[cfg(feature = "diagnostics")]
+use anyhow::bail;
+#[cfg(feature = "diagnostics")]
+use anyhow::Result;
 use std::collections::BTreeMap;
+#[cfg(feature = "diagnostics")]
 use uo_core::RuntimeOramLeafScaffoldWitness;
 
 #[derive(Clone, Debug, Default)]
@@ -18,14 +22,17 @@ impl Drop for PathOramFreshCoinPlan {
 }
 
 impl PathOramFreshCoinPlan {
+    #[cfg(feature = "diagnostics")]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[cfg(feature = "diagnostics")]
     pub fn insert_object_coins(&mut self, object_id: u32, coins: Vec<usize>) -> Option<Vec<usize>> {
         self.by_object.insert(object_id, coins)
     }
 
+    #[cfg(feature = "diagnostics")]
     pub fn from_scaffold_and_values(
         scaffold: &[RuntimeOramLeafScaffoldWitness],
         values: &[usize],
