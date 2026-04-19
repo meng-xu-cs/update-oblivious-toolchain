@@ -6044,8 +6044,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("fn eval_binary(")
         && !engine_impl_source.contains("fn store_env_value(");
     let engine_delegates_confidential_execution_to_runtime = engine_impl_source
-        .contains("prepare_confidential_entrypoint(")
-        && engine_impl_source.contains("run_confidential_entrypoint(")
+        .contains("run_confidential_entrypoint(")
+        && !engine_impl_source.contains("prepare_confidential_entrypoint(")
         && !engine_impl_source.contains("PublicRuntimeKernel::begin(");
     let engine_confidential_manifest_surface_absent = !engine_impl_source
         .contains(".confidential_slot_program")
@@ -6354,7 +6354,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !engine_impl_source.contains("finalize_execution_trace(");
     let state_prepares_confidential_manifest_plan = state_source
         .contains("struct ConfidentialEntrypointPlan")
-        && state_source.contains("fn prepare_confidential_entrypoint(")
+        && state_source.contains("ConfidentialEntrypointPlan::from_manifest_entry(")
+        && !state_source.contains("pub(crate) fn prepare_confidential_entrypoint(")
         && state_source.contains("AllocatorPlan::from_manifest(manifest_entry)")
         && state_source.contains(".confidential_slot_program")
         && state_source.contains(".kernel_step_witnesses()")
@@ -6362,6 +6363,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !state_source.contains("RuntimeKernelStepWitness {")
         && state_source.contains("max_commit_ops: manifest_entry.max_commit_ops")
         && state_source.contains("max_hash_part_bytes: manifest_entry.max_hash_part_bytes");
+    let confidential_entrypoint_plan_surface_restricted =
+        collect_production_pattern_hits(&runtime_evm_src, "ConfidentialEntrypointPlan")?
+            == vec![String::from("runtime/uo-evm/src/state.rs")];
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
     let kernel_confidential_call_inputs_stay_inside_runtime = kernel_source
@@ -7184,6 +7188,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             engine_keeps_confidential_call_inputs_inside_runtime,
         "state_prepares_confidential_manifest_plan":
             state_prepares_confidential_manifest_plan,
+        "confidential_entrypoint_plan_surface_restricted":
+            confidential_entrypoint_plan_surface_restricted,
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
         "kernel_confidential_call_inputs_stay_inside_runtime":
@@ -7340,6 +7346,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_public_trace_uses_output_shape_only
             && engine_keeps_confidential_call_inputs_inside_runtime
             && state_prepares_confidential_manifest_plan
+            && confidential_entrypoint_plan_surface_restricted
             && kernel_executes_program_body_via_shared_dsl
             && kernel_confidential_call_inputs_stay_inside_runtime
             && kernel_exec_block_uses_confidential_slot_statements

@@ -125,15 +125,6 @@ impl ContractInstance {
             (public_call, None, Some(args))
         };
         let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
-        let confidential_entrypoint_plan = if function.confidential {
-            Some(self.state.prepare_confidential_entrypoint(
-                entrypoint,
-                &manifest_entry,
-                public_object_ids.clone(),
-            )?)
-        } else {
-            None
-        };
         self.state.ensure_cold(
             &public_object_ids,
             "before executing the next call from committed storage",
@@ -152,9 +143,9 @@ impl ContractInstance {
                 let confidential_args = confidential_args
                     .expect("confidential entrypoint must carry confidential call args");
                 let outcome = self.state.run_confidential_entrypoint(
-                    confidential_entrypoint_plan
-                        .clone()
-                        .expect("confidential entrypoint must derive runtime plan"),
+                    entrypoint,
+                    &manifest_entry,
+                    public_object_ids.clone(),
                     confidential_args,
                     fresh_coins,
                     &mut recorder,
@@ -312,11 +303,15 @@ mod tests {
         );
         assert!(
             source.contains("run_confidential_entrypoint("),
-            "engine.rs should delegate confidential-kernel setup to ContractRuntime"
+            "engine.rs should delegate confidential entrypoint execution to ContractRuntime"
         );
         assert!(
-            source.contains("prepare_confidential_entrypoint("),
-            "engine.rs should delegate confidential manifest-to-kernel planning to ContractRuntime"
+            !source.contains("prepare_confidential_entrypoint("),
+            "engine.rs should not stage confidential manifest-to-kernel planning outside ContractRuntime"
+        );
+        assert!(
+            !source.contains("ConfidentialEntrypointPlan"),
+            "engine.rs should not mention the confidential entrypoint plan directly"
         );
         assert!(
             !source.contains("RuntimeKernelRefinementEventWitness"),

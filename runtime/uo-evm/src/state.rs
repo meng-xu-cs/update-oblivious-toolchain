@@ -52,7 +52,7 @@ pub(crate) struct PublicRuntimeShadowState {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ConfidentialEntrypointPlan {
+struct ConfidentialEntrypointPlan {
     allocator: AllocatorPlan,
     expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
     public_object_ids: Vec<u32>,
@@ -123,26 +123,20 @@ impl ContractRuntime {
             .commit_public_shadow(kernel, shadow, aborted, recorder)
     }
 
-    pub(crate) fn prepare_confidential_entrypoint(
-        &self,
+    pub(crate) fn run_confidential_entrypoint(
+        &mut self,
         entrypoint: &str,
         manifest_entry: &EntrypointManifest,
         public_object_ids: Vec<u32>,
-    ) -> Result<ConfidentialEntrypointPlan> {
-        ConfidentialEntrypointPlan::from_manifest_entry(
-            entrypoint,
-            manifest_entry,
-            public_object_ids,
-        )
-    }
-
-    pub(crate) fn run_confidential_entrypoint(
-        &mut self,
-        plan: ConfidentialEntrypointPlan,
         args: Vec<Value>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
     ) -> Result<ConfidentialCommittedCallOutcome> {
+        let plan = ConfidentialEntrypointPlan::from_manifest_entry(
+            entrypoint,
+            manifest_entry,
+            public_object_ids,
+        )?;
         let ConfidentialEntrypointPlan {
             allocator,
             expected_kernel_steps,
