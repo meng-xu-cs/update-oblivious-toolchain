@@ -1082,6 +1082,15 @@ fn build_manifest_entry(
     } else {
         (None, None, Vec::new())
     };
+    let max_hash_part_bytes = confidential_program
+        .as_ref()
+        .map(|program| {
+            program.max_keccak_part_canonical_len_for_state(
+                &frontend.state_by_name.values().cloned().collect::<Vec<_>>(),
+            )
+        })
+        .transpose()?
+        .unwrap_or(0);
     Ok(EntrypointManifest {
         secret_args: function.secret_args.clone(),
         param_names: function
@@ -1097,6 +1106,7 @@ fn build_manifest_entry(
         public_gas_budget: budget,
         arena_bytes: 4096 + counts.local_count * 64,
         max_stack_words: 64 + counts.local_count,
+        max_hash_part_bytes,
         return_canonical_len: function.return_type.as_ref().map(Type::canonical_len),
         confidential_program,
         confidential_slot_program,

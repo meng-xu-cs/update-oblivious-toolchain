@@ -35,7 +35,10 @@ These are the invariants this inventory is meant to support.
    to an explicitly modeled kernel/state object.
 6. Where object/type/program metadata already fixes a confidential buffer
    shape, kernel and commit scratch accounting should use that public shape
-   rather than deriving sizes from live secret values.
+   rather than deriving sizes from live secret values; in particular,
+   confidential hash scratch should come from the checked manifest's
+   `max_hash_part_bytes` field instead of runtime recomputation over live
+   values.
 
 ## Enforcement
 

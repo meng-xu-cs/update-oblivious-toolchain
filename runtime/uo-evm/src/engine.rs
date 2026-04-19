@@ -155,14 +155,6 @@ impl ContractInstance {
         } else {
             None
         };
-        let confidential_program =
-            if function.confidential {
-                Some(manifest_entry.confidential_program.clone().ok_or_else(|| {
-                    anyhow!("manifest confidential_program missing for {entrypoint}")
-                })?)
-            } else {
-                None
-            };
         let confidential_slot_program = if function.confidential {
             let program = manifest_entry
                 .confidential_slot_program
@@ -186,13 +178,7 @@ impl ContractInstance {
         let expected_kernel_steps = confidential_slot_program
             .as_ref()
             .map(|(_, expected_kernel_steps)| expected_kernel_steps.clone());
-        let max_hash_part_bytes = confidential_program
-            .as_ref()
-            .map(|program| {
-                program.max_keccak_part_canonical_len_for_state(&self.artifact.contract.state)
-            })
-            .transpose()?
-            .unwrap_or(0);
+        let max_hash_part_bytes = manifest_entry.max_hash_part_bytes;
         let public_object_ids = canonical_runtime_public_object_ids(&self.artifact.contract.state);
         self.state.ensure_cold(
             &public_object_ids,

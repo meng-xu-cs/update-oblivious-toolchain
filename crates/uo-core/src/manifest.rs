@@ -51,6 +51,8 @@ pub struct EntrypointManifest {
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
+    #[serde(default)]
+    pub max_hash_part_bytes: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub return_canonical_len: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

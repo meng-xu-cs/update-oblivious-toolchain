@@ -463,10 +463,12 @@ The first implementation step is now present in the codebase:
   of live confidential value lengths wherever the runtime already knows the
   canonical shape statically, which removes another residual secret-to-budget
   dependency from cell/array/map mutation and commit paths
-- confidential `keccak256` hash-scratch reservations now also use a public
-  bound derived from the manifest-stored confidential DSL plus admitted object
-  metadata, instead of sizing the hash scratch region from each live hashed
-  value as the kernel evaluates the expression
+- confidential `keccak256` hash-scratch reservations now also use the checked
+  manifest's explicit `max_hash_part_bytes` field, which `uo-solc`,
+  `uo-check`, and the Lean translation validator all derive from the stored
+  confidential DSL plus admitted object metadata, instead of sizing the hash
+  scratch region from each live hashed value as the kernel evaluates the
+  expression
 - ORAM refresh/metadata decode now wipes decrypted payload buffers after parse
   rather than dropping them as ordinary plaintext heap allocations, and it now
   streams decoded position-map / stash pages directly into bounded live ORAM

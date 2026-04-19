@@ -238,6 +238,7 @@ mod tests {
             public_gas_budget: 4096,
             arena_bytes: 4096,
             max_stack_words: 65,
+            max_hash_part_bytes: 0,
             return_canonical_len: None,
             confidential_program: None,
             confidential_slot_program: None,

@@ -171,6 +171,21 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 64 + counts.local_count
             );
         }
+        let expected_max_hash_part_bytes = if function.confidential {
+            function
+                .confidential_kernel_program()?
+                .max_keccak_part_canonical_len_for_state(&artifact.contract.state)?
+        } else {
+            0
+        };
+        if entry.max_hash_part_bytes != expected_max_hash_part_bytes {
+            bail!(
+                "manifest max_hash_part_bytes mismatch for entrypoint {}: {} != {}",
+                function.signature,
+                entry.max_hash_part_bytes,
+                expected_max_hash_part_bytes
+            );
+        }
         let expected_kernel_steps = if function.confidential {
             let expected_program = function.confidential_kernel_program()?;
             let witnessed_program = entry.confidential_program.as_ref().ok_or_else(|| {

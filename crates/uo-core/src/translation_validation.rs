@@ -282,6 +282,7 @@ pub struct ProofRelevantEntrypointView {
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
+    pub max_hash_part_bytes: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub return_canonical_len: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -309,6 +310,7 @@ impl ProofRelevantEntrypointView {
             public_gas_budget: entrypoint.public_gas_budget,
             arena_bytes: entrypoint.arena_bytes,
             max_stack_words: entrypoint.max_stack_words,
+            max_hash_part_bytes: entrypoint.max_hash_part_bytes,
             return_canonical_len: entrypoint.return_canonical_len,
             confidential_program: entrypoint.confidential_program.clone(),
             confidential_slot_program: entrypoint.confidential_slot_program.clone(),

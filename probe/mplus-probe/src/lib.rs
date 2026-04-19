@@ -6246,10 +6246,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let engine_uses_manifest_confidential_slot_program = engine_source
         .contains(".confidential_slot_program")
         && engine_source.contains("manifest confidential_slot_program missing");
-    let engine_derives_hash_scratch_from_manifest_confidential_program = engine_source
-        .contains(".confidential_program")
-        && engine_source.contains("manifest confidential_program missing")
-        && engine_source
+    let engine_uses_manifest_hash_scratch_bound = engine_source
+        .contains("let max_hash_part_bytes = manifest_entry.max_hash_part_bytes;")
+        && !engine_source.contains("manifest confidential_program missing")
+        && !engine_source
             .contains("max_keccak_part_canonical_len_for_state(&self.artifact.contract.state)");
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
@@ -7034,8 +7034,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             engine_uses_confidential_call_inputs_wrapper,
         "engine_uses_manifest_confidential_slot_program":
             engine_uses_manifest_confidential_slot_program,
-        "engine_derives_hash_scratch_from_manifest_confidential_program":
-            engine_derives_hash_scratch_from_manifest_confidential_program,
+        "engine_uses_manifest_hash_scratch_bound":
+            engine_uses_manifest_hash_scratch_bound,
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
         "kernel_confidential_call_inputs_stay_inside_runtime":
@@ -7177,7 +7177,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && engine_public_trace_uses_output_shape_only
             && engine_uses_confidential_call_inputs_wrapper
             && engine_uses_manifest_confidential_slot_program
-            && engine_derives_hash_scratch_from_manifest_confidential_program
+            && engine_uses_manifest_hash_scratch_bound
             && kernel_executes_program_body_via_shared_dsl
             && kernel_confidential_call_inputs_stay_inside_runtime
             && kernel_exec_block_uses_confidential_slot_statements
