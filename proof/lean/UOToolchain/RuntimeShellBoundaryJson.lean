@@ -884,6 +884,16 @@ def ImportedRuntimeProofGradeKernelInterface
           , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
           }
 
+/--
+Explicit-bundle imported analogue of the theorem-facing runtime/kernel
+interface. This keeps the imported checker route phrased over the same
+runtime-exported `RuntimeKernelInterfaceBundle` object as the native theorem
+surface.
+-/
+def ImportedRuntimeProofGradeKernelInterfaceBundle
+  (witness : ImportedRuntimeRefinementWitness) : Prop :=
+  ∃ bundle, witness.kernelInterfaceBundle? = some bundle ∧ bundle.Valid
+
 theorem importedWitness_proofGradeKernelInterface
   (witness : ImportedRuntimeRefinementWitness)
   (modelTags : SGXModelTags)
@@ -989,11 +999,38 @@ theorem importedWitness_proofGradeKernelInterfaceBundle_valid
         hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
         hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
 
+theorem importedRuntimeProofGradeKernelInterfaceBundle_toProofGradeKernelInterface
+  {witness : ImportedRuntimeRefinementWitness}
+  (hBundle : ImportedRuntimeProofGradeKernelInterfaceBundle witness) :
+  ImportedRuntimeProofGradeKernelInterface witness := by
+  rcases hBundle with ⟨bundle, hExact, hValid⟩
+  rcases hValid with
+    ⟨hShellValid, hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,
+      hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
+      hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+  have hBundleExact := importedRuntimeRefinementWitness_kernelInterfaceBundle_exact hExact
+  refine
+    ⟨bundle.shell_boundary_bundle, bundle.expected_kernel_steps, bundle.expected_public_object_ids,
+      bundle.expected_kernel_schedule, hBundleExact.1, hShellValid.1, hShellValid.2.1,
+      hShellValid.2.2.1, hShellValid.2.2.2.1, ?_, hKernelStateRefinement,
+      hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds, hPublicObjectIds,
+      hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
+      hFinalKernelScheduleState⟩
+  exact importedRuntimeShellBoundaryBundle_witness_proofGradeRefines hShellValid
+
+theorem importedWitness_proofGradeKernelInterfaceBundle
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ImportedRuntimeProofGradeKernelInterfaceBundle witness := by
+  simpa [ImportedRuntimeProofGradeKernelInterfaceBundle] using
+    importedWitness_proofGradeKernelInterfaceBundle_valid witness modelTags hValid
+
 def ImportedRuntimeProofGradeKernelInterfaceAssurance
   (witness : ImportedRuntimeRefinementWitness)
   (modelTags : SGXModelTags) : Prop :=
   witness.ProofGradeValid modelTags ∧
-    ImportedRuntimeProofGradeKernelInterface witness
+    ImportedRuntimeProofGradeKernelInterfaceBundle witness
 
 def checkImportedRuntimeProofGradeKernelInterface
   (witness : ImportedRuntimeRefinementWitness)
@@ -1011,7 +1048,7 @@ def checkImportedRuntimeProofGradeKernelInterface
   · intro hCheck
     have hValid : witness.ProofGradeValid modelTags := by
       exact (importedWitness_checkProofGrade_eq_true_iff witness modelTags).mp hCheck
-    exact ⟨hValid, importedWitness_proofGradeKernelInterface witness modelTags hValid⟩
+    exact ⟨hValid, importedWitness_proofGradeKernelInterfaceBundle witness modelTags hValid⟩
   · intro hAssurance
     exact (importedWitness_checkProofGrade_eq_true_iff witness modelTags).mpr hAssurance.1
 

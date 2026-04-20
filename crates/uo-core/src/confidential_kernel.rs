@@ -1,5 +1,6 @@
 use crate::ir::{BinaryOp, CompiledFunction, Expr, StateObject, Statement, UnaryOp};
 use crate::types::{Type, Value};
+use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -306,6 +307,326 @@ pub enum ConfidentialKernelHashShapeError {
         when_true: usize,
         when_false: usize,
     },
+}
+
+pub trait ConfidentialKernelSlotRuntime {
+    fn note_statement(&mut self, _statement: &ConfidentialKernelSlotStatement) -> Result<()> {
+        Ok(())
+    }
+
+    fn load_slot(&self, slot: usize) -> Result<Value>;
+
+    fn store_slot(&mut self, slot: usize, value: Value) -> Result<()>;
+
+    fn cell_get(&mut self, object_id: u32) -> Result<Value>;
+
+    fn cell_set(&mut self, object_id: u32, value: Value, predicate: Option<bool>) -> Result<()>;
+
+    fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value>;
+
+    fn array_set(
+        &mut self,
+        object_id: u32,
+        index: usize,
+        value: Value,
+        predicate: Option<bool>,
+    ) -> Result<()>;
+
+    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value>;
+
+    fn map_put(
+        &mut self,
+        object_id: u32,
+        key: Value,
+        value: Value,
+        predicate: Option<bool>,
+    ) -> Result<()>;
+
+    fn keccak256(&mut self, parts: Vec<Value>) -> Result<Value>;
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ConfidentialKernelExecutionOutcome {
+    pub aborted: bool,
+    pub return_value: Option<Value>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct ConfidentialKernelInterpreterState {
+    aborted: bool,
+    returned: bool,
+    return_value: Option<Value>,
+}
+
+pub fn execute_confidential_kernel_slot_program<R: ConfidentialKernelSlotRuntime>(
+    runtime: &mut R,
+    program: &ConfidentialKernelSlotProgram,
+) -> Result<ConfidentialKernelExecutionOutcome> {
+    if !program.is_runtime_normal_form() {
+        bail!(
+            "confidential slot program {} is not in runtime normal form",
+            program.entrypoint_id
+        );
+    }
+    let mut state = ConfidentialKernelInterpreterState::default();
+    execute_confidential_kernel_slot_block(runtime, &program.body, &mut state)?;
+    Ok(ConfidentialKernelExecutionOutcome {
+        aborted: state.aborted,
+        return_value: state.return_value,
+    })
+}
+
+fn execute_confidential_kernel_slot_block<R: ConfidentialKernelSlotRuntime>(
+    runtime: &mut R,
+    statements: &[ConfidentialKernelSlotStatement],
+    state: &mut ConfidentialKernelInterpreterState,
+) -> Result<()> {
+    for statement in statements {
+        if state.returned {
+            break;
+        }
+        runtime.note_statement(statement)?;
+        execute_confidential_kernel_slot_statement(runtime, statement, state)?;
+    }
+    Ok(())
+}
+
+fn execute_confidential_kernel_slot_statement<R: ConfidentialKernelSlotRuntime>(
+    runtime: &mut R,
+    statement: &ConfidentialKernelSlotStatement,
+    state: &mut ConfidentialKernelInterpreterState,
+) -> Result<()> {
+    match statement {
+        ConfidentialKernelSlotStatement::Declare { slot, value }
+        | ConfidentialKernelSlotStatement::Assign { slot, value } => {
+            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
+            runtime.store_slot(*slot, value)?;
+        }
+        ConfidentialKernelSlotStatement::Require { .. } => {
+            bail!("confidential slot program must be normalized before runtime execution");
+        }
+        ConfidentialKernelSlotStatement::AbortIf { cond } => {
+            let cond = eval_confidential_kernel_slot_expr(runtime, cond)?
+                .as_bool()
+                .ok_or_else(|| anyhow!("abort condition must be boolean"))?;
+            if cond {
+                state.aborted = true;
+            }
+        }
+        ConfidentialKernelSlotStatement::CellSet {
+            object_id,
+            value,
+            predicate,
+        } => {
+            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
+            let predicate =
+                eval_optional_confidential_kernel_predicate(runtime, predicate, "cell")?;
+            runtime.cell_set(*object_id, value, predicate)?;
+        }
+        ConfidentialKernelSlotStatement::ArraySet {
+            object_id,
+            index,
+            value,
+            predicate,
+        } => {
+            let index = eval_confidential_kernel_slot_expr(runtime, index)?
+                .as_uint()
+                .ok_or_else(|| anyhow!("array index must be uint"))?
+                as usize;
+            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
+            let predicate =
+                eval_optional_confidential_kernel_predicate(runtime, predicate, "array")?;
+            runtime.array_set(*object_id, index, value, predicate)?;
+        }
+        ConfidentialKernelSlotStatement::MapPut {
+            object_id,
+            key,
+            value,
+            predicate,
+        } => {
+            let key = eval_confidential_kernel_slot_expr(runtime, key)?;
+            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
+            let predicate = eval_optional_confidential_kernel_predicate(runtime, predicate, "map")?;
+            runtime.map_put(*object_id, key, value, predicate)?;
+        }
+        ConfidentialKernelSlotStatement::Return { value } => {
+            state.return_value = value
+                .as_ref()
+                .map(|expr| eval_confidential_kernel_slot_expr(runtime, expr))
+                .transpose()?;
+            state.returned = true;
+        }
+    }
+    Ok(())
+}
+
+fn eval_optional_confidential_kernel_predicate<R: ConfidentialKernelSlotRuntime>(
+    runtime: &mut R,
+    predicate: &Option<ConfidentialKernelSlotExpr>,
+    label: &str,
+) -> Result<Option<bool>> {
+    predicate
+        .as_ref()
+        .map(|expr| eval_confidential_kernel_slot_expr(runtime, expr))
+        .transpose()?
+        .map(|value| {
+            value
+                .as_bool()
+                .ok_or_else(|| anyhow!("{label} predicate must be boolean"))
+        })
+        .transpose()
+}
+
+fn eval_confidential_kernel_slot_expr<R: ConfidentialKernelSlotRuntime>(
+    runtime: &mut R,
+    expr: &ConfidentialKernelSlotExpr,
+) -> Result<Value> {
+    match expr {
+        ConfidentialKernelSlotExpr::Literal { value } => Ok(value.clone()),
+        ConfidentialKernelSlotExpr::Slot { slot } => runtime.load_slot(*slot),
+        ConfidentialKernelSlotExpr::Unary { op, expr } => {
+            let value = eval_confidential_kernel_slot_expr(runtime, expr)?;
+            eval_confidential_kernel_unary(op, value)
+        }
+        ConfidentialKernelSlotExpr::Binary { op, lhs, rhs } => {
+            let lhs = eval_confidential_kernel_slot_expr(runtime, lhs)?;
+            let rhs = eval_confidential_kernel_slot_expr(runtime, rhs)?;
+            eval_confidential_kernel_binary(op, lhs, rhs)
+        }
+        ConfidentialKernelSlotExpr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            let cond = eval_confidential_kernel_slot_expr(runtime, cond)?
+                .as_bool()
+                .ok_or_else(|| anyhow!("select condition must be boolean"))?;
+            let when_true = eval_confidential_kernel_slot_pure_expr(runtime, when_true)?;
+            let when_false = eval_confidential_kernel_slot_pure_expr(runtime, when_false)?;
+            Value::confidential_select(cond, when_true, when_false)
+        }
+        ConfidentialKernelSlotExpr::CellGet { object_id } => runtime.cell_get(*object_id),
+        ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {
+            let index = eval_confidential_kernel_slot_expr(runtime, index)?
+                .as_uint()
+                .ok_or_else(|| anyhow!("array index must be uint"))?
+                as usize;
+            runtime.array_get(*object_id, index)
+        }
+        ConfidentialKernelSlotExpr::MapGet { object_id, key } => {
+            let key = eval_confidential_kernel_slot_expr(runtime, key)?;
+            runtime.map_get(*object_id, &key)
+        }
+        ConfidentialKernelSlotExpr::Keccak256 { parts } => {
+            let mut values = Vec::with_capacity(parts.len());
+            for part in parts {
+                values.push(eval_confidential_kernel_slot_expr(runtime, part)?);
+            }
+            runtime.keccak256(values)
+        }
+    }
+}
+
+fn eval_confidential_kernel_slot_pure_expr<R: ConfidentialKernelSlotRuntime>(
+    runtime: &mut R,
+    expr: &ConfidentialKernelSlotPureExpr,
+) -> Result<Value> {
+    match expr {
+        ConfidentialKernelSlotPureExpr::Literal { value } => Ok(value.clone()),
+        ConfidentialKernelSlotPureExpr::Slot { slot } => runtime.load_slot(*slot),
+        ConfidentialKernelSlotPureExpr::Unary { op, expr } => {
+            let value = eval_confidential_kernel_slot_pure_expr(runtime, expr)?;
+            eval_confidential_kernel_unary(op, value)
+        }
+        ConfidentialKernelSlotPureExpr::Binary { op, lhs, rhs } => {
+            let lhs = eval_confidential_kernel_slot_pure_expr(runtime, lhs)?;
+            let rhs = eval_confidential_kernel_slot_pure_expr(runtime, rhs)?;
+            eval_confidential_kernel_binary(op, lhs, rhs)
+        }
+        ConfidentialKernelSlotPureExpr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            let cond = eval_confidential_kernel_slot_pure_expr(runtime, cond)?
+                .as_bool()
+                .ok_or_else(|| anyhow!("select condition must be boolean"))?;
+            let when_true = eval_confidential_kernel_slot_pure_expr(runtime, when_true)?;
+            let when_false = eval_confidential_kernel_slot_pure_expr(runtime, when_false)?;
+            Value::confidential_select(cond, when_true, when_false)
+        }
+        ConfidentialKernelSlotPureExpr::Keccak256 { parts } => {
+            let mut values = Vec::with_capacity(parts.len());
+            for part in parts {
+                values.push(eval_confidential_kernel_slot_pure_expr(runtime, part)?);
+            }
+            runtime.keccak256(values)
+        }
+    }
+}
+
+fn eval_confidential_kernel_unary(op: &UnaryOp, value: Value) -> Result<Value> {
+    match op {
+        UnaryOp::Not => Ok(Value::Bool(
+            !value
+                .as_bool()
+                .ok_or_else(|| anyhow!("logical not expects bool"))?,
+        )),
+        UnaryOp::Neg => Ok(Value::Uint(
+            0u128.wrapping_sub(
+                value
+                    .as_uint()
+                    .ok_or_else(|| anyhow!("negation expects uint"))?,
+            ),
+        )),
+    }
+}
+
+fn eval_confidential_kernel_binary(op: &BinaryOp, lhs: Value, rhs: Value) -> Result<Value> {
+    match op {
+        BinaryOp::Add => Ok(Value::Uint(lhs_uint(&lhs)?.wrapping_add(lhs_uint(&rhs)?))),
+        BinaryOp::Sub => Ok(Value::Uint(lhs_uint(&lhs)?.wrapping_sub(lhs_uint(&rhs)?))),
+        BinaryOp::Mul => Ok(Value::Uint(lhs_uint(&lhs)?.wrapping_mul(lhs_uint(&rhs)?))),
+        BinaryOp::Div => {
+            let divisor = lhs_uint(&rhs)?;
+            Ok(Value::Uint(if divisor == 0 {
+                0
+            } else {
+                lhs_uint(&lhs)? / divisor
+            }))
+        }
+        BinaryOp::Mod => {
+            let divisor = lhs_uint(&rhs)?;
+            Ok(Value::Uint(if divisor == 0 {
+                0
+            } else {
+                lhs_uint(&lhs)? % divisor
+            }))
+        }
+        BinaryOp::BitAnd => Ok(Value::Uint(lhs_uint(&lhs)? & lhs_uint(&rhs)?)),
+        BinaryOp::BitOr => Ok(Value::Uint(lhs_uint(&lhs)? | lhs_uint(&rhs)?)),
+        BinaryOp::BitXor => Ok(Value::Uint(lhs_uint(&lhs)? ^ lhs_uint(&rhs)?)),
+        BinaryOp::Eq => Ok(Value::Bool(lhs == rhs)),
+        BinaryOp::Neq => Ok(Value::Bool(lhs != rhs)),
+        BinaryOp::Lt => Ok(Value::Bool(lhs_uint(&lhs)? < lhs_uint(&rhs)?)),
+        BinaryOp::Lte => Ok(Value::Bool(lhs_uint(&lhs)? <= lhs_uint(&rhs)?)),
+        BinaryOp::Gt => Ok(Value::Bool(lhs_uint(&lhs)? > lhs_uint(&rhs)?)),
+        BinaryOp::Gte => Ok(Value::Bool(lhs_uint(&lhs)? >= lhs_uint(&rhs)?)),
+        BinaryOp::And => Ok(Value::Bool(lhs_bool(&lhs)? && lhs_bool(&rhs)?)),
+        BinaryOp::Or => Ok(Value::Bool(lhs_bool(&lhs)? || lhs_bool(&rhs)?)),
+    }
+}
+
+fn lhs_uint(value: &Value) -> Result<u128> {
+    value
+        .as_uint()
+        .ok_or_else(|| anyhow!("expected uint-compatible value"))
+}
+
+fn lhs_bool(value: &Value) -> Result<bool> {
+    value
+        .as_bool()
+        .ok_or_else(|| anyhow!("expected bool-compatible value"))
 }
 
 impl CompiledFunction {
@@ -1413,13 +1734,16 @@ fn expr_contains_kernel_access(expr: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
+        execute_confidential_kernel_slot_program, ConfidentialKernelExecutionOutcome,
         ConfidentialKernelSlotExpr, ConfidentialKernelSlotLoweringError,
+        ConfidentialKernelSlotProgram, ConfidentialKernelSlotRuntime,
         ConfidentialKernelSlotStatement,
     };
     use crate::{
         ir::StateObject, BackendKind, BinaryOp, CompiledFunction, ContainerKind, Expr, ScalarType,
         Statement, Type, Value,
     };
+    use anyhow::{anyhow, Result};
 
     fn uint_type() -> Type {
         Type::Scalar(ScalarType::Uint(256))
@@ -1475,6 +1799,101 @@ mod tests {
             key_type: None,
             capacity: None,
             confidential: true,
+        }
+    }
+
+    #[derive(Default)]
+    struct MockRuntime {
+        slots: Vec<Option<Value>>,
+        statements: Vec<&'static str>,
+        cell_sets: Vec<(u32, Value, Option<bool>)>,
+    }
+
+    impl MockRuntime {
+        fn with_slot_count(slot_count: usize) -> Self {
+            Self {
+                slots: vec![None; slot_count],
+                statements: Vec::new(),
+                cell_sets: Vec::new(),
+            }
+        }
+    }
+
+    impl ConfidentialKernelSlotRuntime for MockRuntime {
+        fn note_statement(&mut self, statement: &ConfidentialKernelSlotStatement) -> Result<()> {
+            self.statements.push(statement.trace_name());
+            Ok(())
+        }
+
+        fn load_slot(&self, slot: usize) -> Result<Value> {
+            self.slots
+                .get(slot)
+                .and_then(Option::as_ref)
+                .cloned()
+                .ok_or_else(|| anyhow!("missing mock slot {slot}"))
+        }
+
+        fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {
+            let cell = self
+                .slots
+                .get_mut(slot)
+                .ok_or_else(|| anyhow!("missing mock slot {slot}"))?;
+            *cell = Some(value);
+            Ok(())
+        }
+
+        fn cell_get(&mut self, object_id: u32) -> Result<Value> {
+            Err(anyhow!("unexpected cell_get({object_id}) in mock runtime"))
+        }
+
+        fn cell_set(
+            &mut self,
+            object_id: u32,
+            value: Value,
+            predicate: Option<bool>,
+        ) -> Result<()> {
+            self.cell_sets.push((object_id, value, predicate));
+            Ok(())
+        }
+
+        fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value> {
+            Err(anyhow!(
+                "unexpected array_get({object_id}, {index}) in mock runtime"
+            ))
+        }
+
+        fn array_set(
+            &mut self,
+            object_id: u32,
+            index: usize,
+            _value: Value,
+            _predicate: Option<bool>,
+        ) -> Result<()> {
+            Err(anyhow!(
+                "unexpected array_set({object_id}, {index}) in mock runtime"
+            ))
+        }
+
+        fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value> {
+            Err(anyhow!(
+                "unexpected map_get({object_id}, {key:?}) in mock runtime"
+            ))
+        }
+
+        fn map_put(
+            &mut self,
+            object_id: u32,
+            key: Value,
+            value: Value,
+            predicate: Option<bool>,
+        ) -> Result<()> {
+            Err(anyhow!(
+                "unexpected map_put({object_id}, {key:?}, {value:?}, {predicate:?}) in mock runtime"
+            ))
+        }
+
+        fn keccak256(&mut self, parts: Vec<Value>) -> Result<Value> {
+            Err(anyhow!("unexpected keccak256({parts:?}) in mock runtime"))
         }
     }
 
@@ -1591,6 +2010,85 @@ mod tests {
             slot.body.as_slice(),
             [ConfidentialKernelSlotStatement::AbortIf { .. }]
         ));
+    }
+
+    #[test]
+    fn confidential_kernel_slot_expr_json_roundtrips_large_uint_literals() {
+        let expr = ConfidentialKernelSlotExpr::Literal {
+            value: Value::Uint((1u128 << 100) + 7),
+        };
+        let encoded = serde_json::to_vec(&expr).unwrap();
+        let decoded: ConfidentialKernelSlotExpr = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, expr);
+    }
+
+    #[test]
+    fn shared_slot_interpreter_executes_runtime_normal_form_program() {
+        let mut runtime = MockRuntime::with_slot_count(2);
+        runtime.store_slot(0, Value::Uint(5)).unwrap();
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "demo(uint256)".into(),
+            param_count: 1,
+            return_type: Some(uint_type()),
+            secret_args: vec![0],
+            slot_count: 2,
+            body: vec![
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 1,
+                    value: ConfidentialKernelSlotExpr::Binary {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(ConfidentialKernelSlotExpr::Slot { slot: 0 }),
+                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(2),
+                        }),
+                    },
+                },
+                ConfidentialKernelSlotStatement::CellSet {
+                    object_id: 7,
+                    value: ConfidentialKernelSlotExpr::Slot { slot: 1 },
+                    predicate: Some(ConfidentialKernelSlotExpr::Literal {
+                        value: Value::Bool(true),
+                    }),
+                },
+                ConfidentialKernelSlotStatement::Return {
+                    value: Some(ConfidentialKernelSlotExpr::Slot { slot: 1 }),
+                },
+            ],
+        };
+
+        let outcome = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap();
+
+        assert_eq!(
+            outcome,
+            ConfidentialKernelExecutionOutcome {
+                aborted: false,
+                return_value: Some(Value::Uint(7)),
+            }
+        );
+        assert_eq!(runtime.load_slot(1).unwrap(), Value::Uint(7));
+        assert_eq!(runtime.cell_sets, vec![(7, Value::Uint(7), Some(true))]);
+        assert_eq!(runtime.statements, vec!["declare", "cell_set", "return"]);
+    }
+
+    #[test]
+    fn shared_slot_interpreter_rejects_non_normalized_programs() {
+        let mut runtime = MockRuntime::with_slot_count(1);
+        runtime.store_slot(0, Value::Uint(1)).unwrap();
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "guard(uint256)".into(),
+            param_count: 1,
+            return_type: None,
+            secret_args: vec![0],
+            slot_count: 1,
+            body: vec![ConfidentialKernelSlotStatement::Require {
+                cond: ConfidentialKernelSlotExpr::Literal {
+                    value: Value::Bool(true),
+                },
+            }],
+        };
+
+        let err = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap_err();
+        assert!(err.to_string().contains("not in runtime normal form"));
     }
 
     #[test]

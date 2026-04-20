@@ -526,6 +526,15 @@ pub struct SeededRuntimePaperMainFamilyBundle {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SeededRuntimePaperMainSlotFamilyBundle {
+    family: SeededRuntimePathOramWitnessFamily,
+    public_outcome: PublicOutcomeTrace,
+    #[serde(default)]
+    boundary_schedule: Vec<BoundaryEvent>,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
     seed_count: usize,
     witnesses: Vec<RuntimeRefinementWitness>,
@@ -832,6 +841,42 @@ pub enum SeededRuntimePaperMainFamilyBundleError {
     EmptyFamily,
     PublicOutcomeMismatch { index: usize },
     BoundaryScheduleMismatch { index: usize },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SeededRuntimePaperMainSlotFamilyBundleError {
+    Family(SeededRuntimePaperMainFamilyBundleError),
+    SlotProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
+    SlotProgramNotRuntimeNormalForm {
+        entrypoint: String,
+    },
+    MissingKernelWitness {
+        index: usize,
+    },
+    ExpectedKernelStepsMismatch {
+        index: usize,
+    },
+    EmittedKernelStepsMismatch {
+        index: usize,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimePaperMainFamilyBundleError {
+    RuntimeWitness(RefinementWitnessError),
+    Family(SeededRuntimeWitnessFamilyError),
+    PaperMain(SeededRuntimePaperMainFamilyBundleError),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimePaperMainSlotFamilyBundleError {
+    Family(RuntimePaperMainFamilyBundleError),
+    MissingEntrypoint { entrypoint: String },
+    MissingConfidentialSlotProgram { entrypoint: String },
+    PaperMainSlot(SeededRuntimePaperMainSlotFamilyBundleError),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1394,6 +1439,101 @@ impl fmt::Display for SeededRuntimePaperMainFamilyBundleError {
 }
 
 impl std::error::Error for SeededRuntimePaperMainFamilyBundleError {}
+
+impl fmt::Display for SeededRuntimePaperMainSlotFamilyBundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Family(err) => write!(
+                f,
+                "seeded runtime paper-main slot family bundle requires a valid paper-main family bundle: {}",
+                err
+            ),
+            Self::SlotProgramEntrypointMismatch {
+                expected_entrypoint,
+                program_entrypoint,
+            } => write!(
+                f,
+                "seeded runtime paper-main slot family bundle expected confidential slot program for '{}' but found program for '{}'",
+                expected_entrypoint, program_entrypoint
+            ),
+            Self::SlotProgramNotRuntimeNormalForm { entrypoint } => write!(
+                f,
+                "seeded runtime paper-main slot family bundle requires a runtime-normal-form confidential slot program for '{}'",
+                entrypoint
+            ),
+            Self::MissingKernelWitness { index } => write!(
+                f,
+                "seeded runtime paper-main slot family witness at index {} is missing a kernel witness",
+                index
+            ),
+            Self::ExpectedKernelStepsMismatch { index } => write!(
+                f,
+                "seeded runtime paper-main slot family witness at index {} does not match the shared slot program's expected kernel schedule",
+                index
+            ),
+            Self::EmittedKernelStepsMismatch { index } => write!(
+                f,
+                "seeded runtime paper-main slot family witness at index {} does not emit the shared slot program's exact kernel schedule",
+                index
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SeededRuntimePaperMainSlotFamilyBundleError {}
+
+impl fmt::Display for RuntimePaperMainFamilyBundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RuntimeWitness(err) => write!(
+                f,
+                "runtime paper-main family bundle requires a valid runtime refinement witness: {}",
+                err
+            ),
+            Self::Family(err) => write!(
+                f,
+                "runtime paper-main family bundle requires a valid canonical seeded family: {}",
+                err
+            ),
+            Self::PaperMain(err) => write!(
+                f,
+                "runtime paper-main family bundle failed proof-grade validation: {}",
+                err
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RuntimePaperMainFamilyBundleError {}
+
+impl fmt::Display for RuntimePaperMainSlotFamilyBundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Family(err) => write!(
+                f,
+                "runtime paper-main slot family bundle requires a valid canonical paper-main family bundle: {}",
+                err
+            ),
+            Self::MissingEntrypoint { entrypoint } => write!(
+                f,
+                "runtime paper-main slot family bundle is missing manifest entrypoint '{}'",
+                entrypoint
+            ),
+            Self::MissingConfidentialSlotProgram { entrypoint } => write!(
+                f,
+                "runtime paper-main slot family bundle is missing confidential_slot_program for '{}'",
+                entrypoint
+            ),
+            Self::PaperMainSlot(err) => write!(
+                f,
+                "runtime paper-main slot family bundle failed proof-grade validation: {}",
+                err
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RuntimePaperMainSlotFamilyBundleError {}
 
 impl fmt::Display for CanonicalFreshCoinWitnessFamilyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3520,6 +3660,94 @@ impl SeededRuntimePaperMainFamilyBundle {
     }
 }
 
+impl SeededRuntimePaperMainSlotFamilyBundle {
+    pub fn family(&self) -> &SeededRuntimePathOramWitnessFamily {
+        &self.family
+    }
+
+    pub fn public_outcome(&self) -> &PublicOutcomeTrace {
+        &self.public_outcome
+    }
+
+    pub fn boundary_schedule(&self) -> &[BoundaryEvent] {
+        &self.boundary_schedule
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
+    pub fn new(
+        family: SeededRuntimePathOramWitnessFamily,
+        confidential_slot_program: ConfidentialKernelSlotProgram,
+    ) -> Result<Self, SeededRuntimePaperMainSlotFamilyBundleError> {
+        let paper_main_bundle = SeededRuntimePaperMainFamilyBundle::new(family.clone())
+            .map_err(SeededRuntimePaperMainSlotFamilyBundleError::Family)?;
+        let bundle = Self {
+            family,
+            public_outcome: paper_main_bundle.public_outcome.clone(),
+            boundary_schedule: paper_main_bundle.boundary_schedule.clone(),
+            confidential_slot_program,
+        };
+        bundle.validate()?;
+        Ok(bundle)
+    }
+
+    pub fn validate(&self) -> Result<(), SeededRuntimePaperMainSlotFamilyBundleError> {
+        SeededRuntimePaperMainFamilyBundle::new(self.family.clone())
+            .map_err(SeededRuntimePaperMainSlotFamilyBundleError::Family)?;
+        let expected_entrypoint = &self.public_outcome.entrypoint_id;
+        if &self.confidential_slot_program.entrypoint_id != expected_entrypoint {
+            return Err(
+                SeededRuntimePaperMainSlotFamilyBundleError::SlotProgramEntrypointMismatch {
+                    expected_entrypoint: expected_entrypoint.clone(),
+                    program_entrypoint: self.confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
+        if !self.confidential_slot_program.is_runtime_normal_form() {
+            return Err(
+                SeededRuntimePaperMainSlotFamilyBundleError::SlotProgramNotRuntimeNormalForm {
+                    entrypoint: expected_entrypoint.clone(),
+                },
+            );
+        }
+        let expected_kernel_steps = self
+            .confidential_slot_program
+            .expected_runtime_step_witnesses();
+        for (index, witness) in self.family.witnesses().iter().enumerate() {
+            let kernel_witness = witness.kernel_witness().ok_or(
+                SeededRuntimePaperMainSlotFamilyBundleError::MissingKernelWitness { index },
+            )?;
+            if kernel_witness.expected_kernel_steps() != Some(expected_kernel_steps.as_slice()) {
+                return Err(
+                    SeededRuntimePaperMainSlotFamilyBundleError::ExpectedKernelStepsMismatch {
+                        index,
+                    },
+                );
+            }
+            if kernel_witness.kernel_steps() != expected_kernel_steps.as_slice() {
+                return Err(
+                    SeededRuntimePaperMainSlotFamilyBundleError::EmittedKernelStepsMismatch {
+                        index,
+                    },
+                );
+            }
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self)
+            .expect("seeded runtime paper-main slot family bundle is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("seeded runtime paper-main slot family bundle is JSON serializable")
+    }
+}
+
 impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
     pub fn seed_count(&self) -> usize {
         self.seed_count
@@ -5048,6 +5276,52 @@ impl ExecutionTrace {
         )
     }
 
+    pub fn runtime_paper_main_family_bundle(
+        &self,
+    ) -> Result<SeededRuntimePaperMainFamilyBundle, RuntimePaperMainFamilyBundleError> {
+        let runtime_witness = self
+            .runtime_refinement_witness()
+            .map_err(RuntimePaperMainFamilyBundleError::RuntimeWitness)?
+            .with_runtime_seed(0)
+            .map_err(RuntimePaperMainFamilyBundleError::RuntimeWitness)?;
+        let family = SeededRuntimePathOramWitnessFamily::new(vec![runtime_witness])
+            .map_err(RuntimePaperMainFamilyBundleError::Family)?;
+        SeededRuntimePaperMainFamilyBundle::new(family)
+            .map_err(RuntimePaperMainFamilyBundleError::PaperMain)
+    }
+
+    pub fn runtime_paper_main_slot_family_bundle(
+        &self,
+        artifact: &crate::CompiledArtifact,
+    ) -> Result<SeededRuntimePaperMainSlotFamilyBundle, RuntimePaperMainSlotFamilyBundleError> {
+        let paper_main_bundle = self
+            .runtime_paper_main_family_bundle()
+            .map_err(RuntimePaperMainSlotFamilyBundleError::Family)?;
+        let entrypoint = paper_main_bundle.public_outcome().entrypoint_id.clone();
+        let confidential_slot_program = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get(&entrypoint)
+            .ok_or_else(
+                || RuntimePaperMainSlotFamilyBundleError::MissingEntrypoint {
+                    entrypoint: entrypoint.clone(),
+                },
+            )?
+            .confidential_slot_program
+            .clone()
+            .ok_or_else(|| {
+                RuntimePaperMainSlotFamilyBundleError::MissingConfidentialSlotProgram {
+                    entrypoint: entrypoint.clone(),
+                }
+            })?;
+        SeededRuntimePaperMainSlotFamilyBundle::new(
+            paper_main_bundle.family().clone(),
+            confidential_slot_program,
+        )
+        .map_err(RuntimePaperMainSlotFamilyBundleError::PaperMainSlot)
+    }
+
     pub fn runtime_kernel_witness_for_confidential(
         &self,
         artifact: &crate::CompiledArtifact,
@@ -5173,13 +5447,20 @@ mod tests {
         RuntimeKernelRefinementTrackerError, RuntimeKernelRefinementWitness,
         RuntimeKernelRefinementWitnessError, RuntimeKernelStepWitness, RuntimeKernelWitness,
         RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
-        RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
+        RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
+        RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
         RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
         SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
+        SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePaperMainSlotFamilyBundleError,
         SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
         WriteClass,
     };
-    use crate::{Expr, Value};
+    use crate::{
+        CompiledArtifact, CompiledContract, CompiledFunction, ConfidentialKernelSlotExpr,
+        ConfidentialKernelSlotProgram, ConfidentialKernelSlotStatement, EntrypointManifest, Expr,
+        ProgramMode, RuntimeManifest, Value,
+    };
+    use std::collections::BTreeMap;
     use uo_precompiles::UoOpcode;
 
     #[test]
@@ -5473,6 +5754,16 @@ mod tests {
             .unwrap()
     }
 
+    fn sample_runtime_refinement_witness_with_seed_and_kernel(
+        seed: u64,
+    ) -> super::RuntimeRefinementWitness {
+        let mut witness = sample_runtime_refinement_witness_with_seed(seed);
+        witness.kernel_witness = Some(sample_runtime_kernel_witness());
+        witness.runtime_kernel_refinement_witness =
+            Some(sample_runtime_kernel_refinement_witness());
+        witness
+    }
+
     fn sample_runtime_kernel_witness() -> RuntimeKernelWitness {
         RuntimeKernelWitness {
             entrypoint_id: "put(bytes32,uint256)".into(),
@@ -5528,6 +5819,81 @@ mod tests {
                     object_id: None,
                 },
             ],
+        }
+    }
+
+    fn sample_runtime_paper_main_slot_program() -> ConfidentialKernelSlotProgram {
+        ConfidentialKernelSlotProgram {
+            entrypoint_id: "put(bytes32,uint256)".into(),
+            param_count: 0,
+            return_type: None,
+            secret_args: vec![],
+            slot_count: 1,
+            body: vec![
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 0,
+                    value: ConfidentialKernelSlotExpr::CellGet { object_id: 7 },
+                },
+                ConfidentialKernelSlotStatement::Return { value: None },
+            ],
+        }
+    }
+
+    fn sample_runtime_paper_main_artifact() -> CompiledArtifact {
+        let confidential_slot_program = sample_runtime_paper_main_slot_program();
+        let entrypoint = confidential_slot_program.entrypoint_id.clone();
+        let mut entrypoints = BTreeMap::new();
+        entrypoints.insert(
+            entrypoint.clone(),
+            EntrypointManifest {
+                secret_args: vec![],
+                param_names: vec![],
+                entry_input_len: 0,
+                public_gas_budget: 99,
+                arena_bytes: 0,
+                max_stack_words: 0,
+                max_hash_part_bytes: 0,
+                return_canonical_len: None,
+                confidential_program: None,
+                confidential_slot_program: Some(confidential_slot_program.clone()),
+                kernel_steps: vec![],
+                uocell_reads: 0,
+                uocell_writes: 0,
+                uoarray_reads: 0,
+                uoarray_writes: 0,
+                uomap_reads: 0,
+                uomap_writes: 0,
+                max_commit_ops: 0,
+                oram_accesses: BTreeMap::new(),
+            },
+        );
+        CompiledArtifact {
+            compiler_version: "test".into(),
+            contract: CompiledContract {
+                contract: "PaperMainTest".into(),
+                mode: ProgramMode::Uo,
+                source_file: "paper_main_test.sol".into(),
+                state: vec![],
+                functions: vec![CompiledFunction {
+                    signature: entrypoint,
+                    params: vec![],
+                    return_type: None,
+                    body: vec![],
+                    secret_args: vec![],
+                    confidential: true,
+                    confidential_program: None,
+                    confidential_slot_program: Some(confidential_slot_program),
+                }],
+                manifest: RuntimeManifest {
+                    contract: "PaperMainTest".into(),
+                    compilation_mode: "uo".into(),
+                    objects: vec![],
+                    entrypoints,
+                },
+            },
+            diagnostics: vec![],
+            transformed_source: None,
+            disassembly: vec![],
         }
     }
 
@@ -6391,6 +6757,138 @@ mod tests {
             )
             .unwrap_err(),
             SeededRuntimePaperMainFamilyBundleError::BoundaryScheduleMismatch { index: 1 }
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_slot_family_bundle_accepts_uniform_shared_slot_program() {
+        let bundle = SeededRuntimePaperMainSlotFamilyBundle::new(
+            SeededRuntimePathOramWitnessFamily::new(vec![
+                sample_runtime_refinement_witness_with_seed_and_kernel(0),
+                sample_runtime_refinement_witness_with_seed_and_kernel(1),
+            ])
+            .unwrap(),
+            sample_runtime_paper_main_slot_program(),
+        )
+        .unwrap();
+        assert_eq!(bundle.family().seed_count(), 2);
+        assert_eq!(
+            bundle
+                .confidential_slot_program()
+                .expected_runtime_step_witnesses(),
+            bundle.family().witnesses()[0]
+                .kernel_witness()
+                .unwrap()
+                .kernel_steps()
+                .to_vec()
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_slot_family_bundle_rejects_expected_kernel_step_drift() {
+        let mut second = sample_runtime_refinement_witness_with_seed_and_kernel(1);
+        second
+            .kernel_witness
+            .as_mut()
+            .unwrap()
+            .expected_kernel_steps
+            .as_mut()
+            .unwrap()[1]
+            .object_id = Some(9);
+        assert_eq!(
+            SeededRuntimePaperMainSlotFamilyBundle::new(
+                SeededRuntimePathOramWitnessFamily::new(vec![
+                    sample_runtime_refinement_witness_with_seed_and_kernel(0),
+                    second,
+                ])
+                .unwrap(),
+                sample_runtime_paper_main_slot_program(),
+            )
+            .unwrap_err(),
+            SeededRuntimePaperMainSlotFamilyBundleError::ExpectedKernelStepsMismatch { index: 1 }
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_slot_family_bundle_rejects_non_runtime_normal_form_program() {
+        let mut slot_program = sample_runtime_paper_main_slot_program();
+        slot_program
+            .body
+            .push(ConfidentialKernelSlotStatement::Require {
+                cond: ConfidentialKernelSlotExpr::Literal {
+                    value: Value::Bool(true),
+                },
+            });
+        assert_eq!(
+            SeededRuntimePaperMainSlotFamilyBundle::new(
+                SeededRuntimePathOramWitnessFamily::new(vec![
+                    sample_runtime_refinement_witness_with_seed_and_kernel(0),
+                ])
+                .unwrap(),
+                slot_program,
+            )
+            .unwrap_err(),
+            SeededRuntimePaperMainSlotFamilyBundleError::SlotProgramNotRuntimeNormalForm {
+                entrypoint: "put(bytes32,uint256)".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_paper_main_family_bundle_retags_to_canonical_seed_zero() {
+        let trace = sample_runtime_execution_trace_with_seed(19);
+        let bundle = trace.runtime_paper_main_family_bundle().unwrap();
+        assert_eq!(bundle.family().seed_count(), 1);
+        assert_eq!(bundle.family().witnesses()[0].runtime_seed(), Some(0));
+        assert_eq!(bundle.public_outcome(), &sample_public_outcome(99));
+    }
+
+    #[test]
+    fn runtime_paper_main_slot_family_bundle_uses_manifest_slot_program() {
+        let mut trace = sample_runtime_execution_trace_with_seed(19);
+        trace.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
+        trace.runtime_kernel_refinement_witness = Some(sample_runtime_kernel_refinement_witness());
+        let artifact = sample_runtime_paper_main_artifact();
+        let bundle = trace
+            .runtime_paper_main_slot_family_bundle(&artifact)
+            .unwrap();
+        assert_eq!(bundle.family().seed_count(), 1);
+        assert_eq!(bundle.family().witnesses()[0].runtime_seed(), Some(0));
+        assert_eq!(
+            bundle.confidential_slot_program(),
+            artifact
+                .contract
+                .manifest
+                .entrypoints
+                .get("put(bytes32,uint256)")
+                .unwrap()
+                .confidential_slot_program
+                .as_ref()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn runtime_paper_main_slot_family_bundle_rejects_missing_manifest_slot_program() {
+        let mut trace = sample_runtime_execution_trace_with_seed(19);
+        trace.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
+        trace.runtime_kernel_refinement_witness = Some(sample_runtime_kernel_refinement_witness());
+        let mut artifact = sample_runtime_paper_main_artifact();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("put(bytes32,uint256)")
+            .unwrap()
+            .confidential_slot_program = None;
+        let err = trace
+            .runtime_paper_main_slot_family_bundle(&artifact)
+            .unwrap_err();
+        assert_eq!(
+            err,
+            RuntimePaperMainSlotFamilyBundleError::MissingConfidentialSlotProgram {
+                entrypoint: "put(bytes32,uint256)".into()
+            }
         );
     }
 

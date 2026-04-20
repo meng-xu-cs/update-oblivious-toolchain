@@ -410,9 +410,12 @@ The current runtime has a first hardening layer:
   `checkProofGradeRuntimeKernelInterface` checker still exposes the same
   paper-facing theorem surface directly from the full runtime witness JSON,
   the new `checkProofGradeRuntimeKernelInterfaceBundle` checker validates the
-  explicit exported `RuntimeKernelInterfaceBundle`, and the probe validates
-  the explicit shell-boundary artifact separately as
-  `shell_boundary_validation.json`
+  explicit exported `RuntimeKernelInterfaceBundle`, the stronger
+  `checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot` checker validates
+  the exported `RuntimeConfidentialCoreKernelInterfaceSlotBundle`, and the
+  probe validates those explicit shell-boundary and confidential-core/kernel-
+  interface/slot artifacts separately as `shell_boundary_validation.json` and
+  `confidential_core_kernel_interface_slot_validation.json`
 - that shell-boundary bundle is now also accessor-only on the Rust side: its
   witness / contract / trace fields are private, callers read them through
   explicit getter methods, the shell contract itself is now accessor-only, the
@@ -682,15 +685,24 @@ The current runtime has a first hardening layer:
   and the explicit theorem object now also has
   `checkProofGradeRuntimeKernelInterfaceBundle`, which accepts the exported
   `RuntimeKernelInterfaceBundle` and names the exact shell-boundary /
-  kernel-state interface facts that the paper argument consumes; the seeded
+  kernel-state interface facts that the paper argument consumes, and the
+  stronger confidential-core composite route now also has
+  `checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot`, which accepts
+  the exported `RuntimeConfidentialCoreKernelInterfaceSlotBundle` and checks
+  that the fixed confidential slot program agrees with the same accepted
+  runtime witness and explicit kernel-interface bundle; the seeded
   paper-route artifact path now also has
   `checkProofGradeRuntimePaperMainFamilyBundle`, which accepts the exported
   `SeededRuntimePaperMainFamilyBundle` and names the exact paper-route public
-  outcome / boundary schedule that the stronger theorem route consumes
+  outcome / boundary schedule that the stronger theorem route consumes, and
+  `checkProofGradeRuntimePaperMainSlotFamilyBundle`, which accepts the
+  exported `SeededRuntimePaperMainSlotFamilyBundle` and names those same
+  paper-route facts together with one exact confidential slot program
 - the theorem side now also mirrors those exported artifacts directly:
   `RuntimeShellBoundaryBundle`, `RuntimeShellBoundarySlotBundle`,
   `RuntimeShellBoundaryLoweringBundle`,
   `RuntimeConfidentialCoreBundle`, `RuntimeConfidentialCoreSlotBundle`,
+  `RuntimeConfidentialCoreKernelInterfaceSlotBundle`,
   `RuntimeConfidentialCoreShellBoundarySlotBundle`,
   `RuntimeConfidentialCoreLoweringBundle`, and
   `RuntimeConfidentialCoreShellBoundaryLoweringBundle` are now first-class
@@ -912,9 +924,12 @@ That witness is now in the proof-facing boundary:
   `uo-evm --format shell-boundary-lowering` now expose the public-only shell
   contract/trace witness and its shared-DSL lowering bridge directly, instead
   of leaving those proof objects probe-only
-- `uo-evm --format confidential-core-shell-boundary-lowering` now also exposes
-  the combined runtime-witness plus shell-boundary plus named/slot DSL bundle
-  that closes the shared-DSL/shell-refinement loop at one exported artifact
+- `uo-evm --format confidential-core-kernel-interface-slot`,
+  `confidential-core-shell-boundary-lowering`,
+  `paper-main-family`, and `paper-main-slot-family` now also expose the
+  stronger confidential-core/kernel-interface composite and both paper-route
+  family objects directly from runtime traces, so offline validation no longer
+  has to rebuild those proof interfaces from lower-level pieces
 - `results/kernel_refinement_validation.json` now validates that same
   lower-level runtime phase witness directly on the benchmark-backed proof
   scenarios rather than only through the larger refinement-witness report

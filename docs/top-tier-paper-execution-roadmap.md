@@ -30,8 +30,13 @@ The repository has already closed several important proof-grade gaps.
 - the paper-facing Lean route now also freezes the remaining runtime-side trust
   point as explicit objects,
   `PaperMainRuntimeKernelAssumptions`,
-  `PaperMainRuntimeKernelBoundary`, `PaperMainPathOramAssumptions`, and
-  `PaperMainPathOramEndToEndBoundary`, so the end-to-end claim surface now
+  `PaperMainRuntimeKernelBoundary`,
+  `PaperMainRuntimeKernelSlotAssumptions`,
+  `PaperMainRuntimeKernelSlotBoundary`,
+  `PaperMainPathOramAssumptions`,
+  `PaperMainPathOramEndToEndBoundary`,
+  `PaperMainPathOramSlotAssumptions`, and
+  `PaperMainPathOramSlotEndToEndBoundary`, so the end-to-end claim surface now
   names the runtime/kernel gap instead of leaving it informal
 - the runtime already enforces the admitted public kernel schedule online for
   confidential entrypoints, and that online check plus emitted kernel-step
@@ -230,8 +235,9 @@ Exit gate:
 
 ## Work Package 3: Prove Runtime-Kernel Refinement And Secret Confinement
 
-Status: active. The runtime-boundary confinement audit is now green, but the
-final runtime-implementation refinement theorem is still the next
+Status: active. The runtime-boundary confinement audit and the stronger
+confidential-core/kernel-interface/slot composite validation are now green,
+but the final runtime-implementation refinement theorem is still the next
 proof-critical obligation on the critical path.
 
 Objective: upgrade from "the runtime emits accepted proof objects" to "the real
@@ -273,24 +279,35 @@ Concrete tasks:
    routes through a shared `uo-core` execution tracker rather than a local
    bounded journal in `kernel.rs`, and the final `RuntimeKernelWitness`
    assembly now also routes through a `uo-core` telemetry/execution helper,
-   with `uo-allocator` handing that helper one explicit telemetry snapshot
-   rather than `kernel.rs` field-packing allocator state by hand. The
+   with `uo-allocator` handing that helper a consumed `finish()` snapshot
+   rather than `kernel.rs` field-packing allocator state by hand; allocator
+   kernel-op tracking is now count-only and its stale public telemetry getters
+   have been removed from the production API. The
    production trace finalizer
    now also re-derives and validates the admitted confidential proof-bearing
    bundle family online for confidential calls: direct kernel DSL / slot /
    lowering bundles, the trusted-kernel slot bundle, and the confidential-core
-   direct / slot / lowering / shell-boundary slot / shell-boundary lowering
-   bundle family all have to agree with the admitted artifact before a trace is
-   returned. The confidential theorem finalizer now also re-derives a
+   direct / slot / kernel-interface-slot / lowering / shell-boundary slot /
+   shell-boundary lowering bundle family all have to agree with the admitted
+   artifact before a trace is returned. The confidential theorem finalizer now
+   also re-derives a
    single-trace seeded witness, retags it canonically, and rebuilds the
    explicit `SeededRuntimePaperMainFamilyBundle` online before a confidential
-   trace returns, so the paper-route theorem object is now checked in the
-   production runtime path rather than only by the external probe/checker
-   route. The Rust side now also packages the paper-facing shell-boundary /
-   expected-step / expected-public-object / expected-schedule facts as an
-   explicit `RuntimeKernelInterfaceBundle`, so the runtime/kernel interface is
-   now first-class on both the Lean and Rust sides even though the final
-   implementation-refinement theorem is still open.
+   trace returns, and it now also rebuilds the stronger
+   `SeededRuntimePaperMainSlotFamilyBundle` against the admitted manifest slot
+   program before the trace is returned, so both paper-route theorem objects
+   are now checked in the production runtime path rather than only by the
+   external probe/checker route. The Rust side now also packages the
+   paper-facing shell-boundary / expected-step / expected-public-object /
+   expected-schedule facts as an explicit `RuntimeKernelInterfaceBundle`, so
+   the runtime/kernel interface is now first-class on both the Lean and Rust
+   sides even though the final implementation-refinement theorem is still
+   open. The frozen paper route now phrases
+   `PaperMainRuntimeKernelBoundary` over that explicit kernel-interface bundle
+   object, and the stronger shared-slot route now phrases
+   `PaperMainRuntimeKernelSlotBoundary` as "one fixed confidential slot
+   program plus one valid explicit runtime kernel-interface bundle" rather
+   than only an existential shell-refinement fact.
 3. Completed in the current proof-grade path: trusted-kernel bundles and
    runtime-kernel refinement witnesses now have exactness theorems for
    schedule, public-object universe, resource state, and boundary projections,
@@ -314,8 +331,9 @@ Concrete tasks:
    confined inside `uo-core`, and accessor-only
    trusted-kernel plus direct runtime-kernel DSL bundle families whose
    proof-facing fields are likewise probe-checked against re-publication, along
-   with the full confidential-core bundle family including the shell-boundary
-   slot/lowering composites. The post-call `ExecutionTrace` now follows the
+   with the full confidential-core bundle family including the new
+   `RuntimeConfidentialCoreKernelInterfaceSlotBundle` and the older
+   shell-boundary slot/lowering composites. The post-call `ExecutionTrace` now follows the
    same rule for every proof-bearing runtime payload: seed, kernel witness,
    runtime-phase witness, stored trusted-kernel bundle, controller certificate,
    and ORAM witness snapshots are all accessor-only on the Rust side, with the
@@ -338,28 +356,58 @@ Concrete tasks:
    runtime witness JSON accepted by `checkProofGradeRuntimeWitness`, and the
    explicit-bundle checker,
    `checkProofGradeRuntimeKernelInterfaceBundle`, over the exported
-   `RuntimeKernelInterfaceBundle`. The same audit path,
+   `RuntimeKernelInterfaceBundle`. The stronger confidential-core composite
+   route now also has
+   `checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot`, over the
+   exported `RuntimeConfidentialCoreKernelInterfaceSlotBundle`, so one
+   accepted runtime witness, one valid explicit runtime kernel-interface
+   bundle, and one fixed confidential slot program are rechecked together at
+   the artifact boundary. The same audit path,
    `runtime_boundary_validation.json`, is now green on the current tree while
    still rejecting any regression that reintroduces secret-bearing runtime
-   work outside the kernel-owned boundary.
+   work outside the kernel-owned boundary, and `tamper_validation.json` now
+   also rejects slot-program drift inside that stronger
+   confidential-core/kernel-interface composite.
 6. Completed on April 20, 2026: the remaining runtime-side trust point is now
    frozen explicitly in Lean as
    `PaperMainRuntimeKernelAssumptions`,
-   `PaperMainRuntimeKernelBoundary`, `PaperMainPathOramAssumptions`, and
-   `PaperMainPathOramEndToEndBoundary`, so the paper route now carries the
-   undischarged runtime/kernel honesty gap as a named assumption bundle rather
-   than prose.
+   `PaperMainRuntimeKernelBoundary`,
+   `PaperMainRuntimeKernelSlotAssumptions`,
+   `PaperMainRuntimeKernelSlotBoundary`,
+   `PaperMainPathOramAssumptions`, and
+   `PaperMainPathOramEndToEndBoundary`, and now also
+   `PaperMainPathOramSlotAssumptions`,
+   `PaperMainPathOramSlotAssurance`, and
+   `PaperMainPathOramSlotEndToEndBoundary`, so the paper route now carries the
+   undischarged runtime/kernel honesty gap as named assumption and assurance
+   bundles rather than prose.
 7. Completed on April 20, 2026: that explicit paper-route runtime bundle is no
    longer only a documentation object. Lean now has
    `ProofGradeSeededRuntimePaperMainBundle`, which discharges
    `PaperMainRuntimeKernelAssumptions` mechanically whenever a seeded
-   paper-main bundle already carries proof-grade witness acceptance. The
-   executable artifact path now also has a family-level proof-grade runtime
-   kernel-interface checker plus an explicit
-   `SeededRuntimePaperMainFamilyBundle` checker over seeded path-ORAM witness
-   families, so the paper-route runtime/kernel boundary and exact
-   public-outcome / boundary-schedule uniformity are rechecked against one
-   exported theorem-facing object rather than only inferred witness by witness.
+   paper-main bundle already carries proof-grade witness acceptance, and it now
+   also has the stronger `ProofGradeSeededRuntimePaperMainSlotBundle` route
+   for the shared slot-DSL boundary whenever the family is paired with the
+   exact confidential slot program. The executable artifact path now also has a
+   family-level proof-grade runtime kernel-interface checker plus explicit
+   `SeededRuntimePaperMainFamilyBundle` and
+   `SeededRuntimePaperMainSlotFamilyBundle` checkers over seeded path-ORAM
+   witness families. The runtime now also exposes canonical single-seed
+   paper-main family and slot-family artifacts through shared `ExecutionTrace`
+   constructors and direct `uo-evm` output formats, and the probe now runs
+   both the positive acceptance path and tamper rejection cases for the
+   slot-family bundle, covering both shared slot-program entrypoint drift and
+   slot-program body drift while the seeded family stays fixed, so the
+   paper-route runtime/kernel boundary and exact public-outcome /
+   boundary-schedule / shared-slot-program facts are rechecked against
+   exported theorem-facing objects rather than only inferred witness by
+   witness. On the imported Lean side, the paper-main family artifact projects
+   to `importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_family_assurance`,
+   the stronger slot-family artifact projects to
+   `importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_slot_assurance`,
+   and `runtime_boundary_validation.json` now pins both projection theorems plus
+   the stronger kernel-interface-slot theorem route as part of the production
+   anti-drift audit.
 8. Mostly completed on the Rust side: non-kernel secret buffers have been
    aggressively removed or put under wipe discipline; the remaining theorem
    work is to connect that discipline to the final formal model. The
@@ -591,7 +639,8 @@ If implementation resumes immediately, the next concrete sequence should be:
    duplicate an already available DSL program.
 5. Completed: add static confinement guardrails so only the kernel can own or
    manipulate secret-bearing runtime structures.
-6. Active next item: discharge `PaperMainRuntimeKernelAssumptions` by proving
+6. Active next item: discharge `PaperMainRuntimeKernelAssumptions` and then
+   the stronger `PaperMainRuntimeKernelSlotAssumptions` route by proving
    runtime-kernel refinement for the shared DSL/interpreter route.
 7. Completed: prove that the non-kernel shell is public-only and package that
    shell contract together with the exact proof-grade boundary facts needed by
@@ -618,26 +667,35 @@ cd proof/lean && lake build \
   checkProofGradeRuntimeWitness \
   checkProofGradeRuntimeKernelInterface \
   checkProofGradeRuntimeKernelInterfaceBundle \
+  checkProofGradeRuntimePaperMainFamilyBundle \
+  checkProofGradeRuntimePaperMainSlotFamilyBundle \
   checkProofGradeRuntimeShellBoundary \
   checkProofGradeRuntimeShellBoundarySlot \
   checkProofGradeRuntimeShellBoundaryLowering \
   checkProofGradeRuntimeConfidentialCore \
   checkProofGradeRuntimeConfidentialCoreSlot \
+  checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot \
   checkProofGradeRuntimeConfidentialCoreShellBoundarySlot \
   checkProofGradeRuntimeConfidentialCoreLowering \
   checkProofGradeRuntimeConfidentialCoreShellBoundaryLowering \
   checkProofGradeRuntimeTrustedKernel
 cargo run -q -p mplus-probe -- --only static-checks --out-dir /tmp/uo-static
+cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir /tmp/uo-runtime-boundary
 cargo run -q -p mplus-probe -- --only shell-boundary-validation --out-dir /tmp/uo-shell-boundary
 cargo run -q -p mplus-probe -- --only shell-boundary-slot-validation --out-dir /tmp/uo-shell-boundary-slot
 cargo run -q -p mplus-probe -- --only shell-boundary-lowering-validation --out-dir /tmp/uo-shell-boundary-lowering
 cargo run -q -p mplus-probe -- --only confidential-core-validation --out-dir /tmp/uo-confidential-core
+cargo run -q -p mplus-probe -- --only confidential-core-slot-validation --out-dir /tmp/uo-confidential-core-slot
+cargo run -q -p mplus-probe -- --only confidential-core-kernel-interface-slot-validation --out-dir /tmp/uo-confidential-core-kernel-interface-slot
 cargo run -q -p mplus-probe -- --only confidential-core-shell-boundary-slot-validation --out-dir /tmp/uo-confidential-core-shell-boundary-slot
 cargo run -q -p mplus-probe -- --only confidential-core-lowering-validation --out-dir /tmp/uo-confidential-core-lowering
 cargo run -q -p mplus-probe -- --only confidential-core-shell-boundary-lowering-validation --out-dir /tmp/uo-confidential-core-shell-boundary-lowering
 cargo run -q -p mplus-probe -- --only kernel-interface-validation --out-dir /tmp/uo-kernel-interface
 cargo run -q -p mplus-probe -- --only kernel-validation --out-dir /tmp/uo-kernel
+cargo run -q -p mplus-probe -- --only kernel-refinement-validation --out-dir /tmp/uo-kernel-refinement
 cargo run -q -p mplus-probe -- --only trusted-kernel-validation --out-dir /tmp/uo-tk
+cargo run -q -p mplus-probe -- --only witness-validation --out-dir /tmp/uo-witness
+cargo run -q -p mplus-probe -- --only seeded-witness-validation --out-dir /tmp/uo-seeded
 cargo run -q -p mplus-probe -- --only tamper-validation --out-dir /tmp/uo-tamper
 ./scripts/check_probe_reproducibility.sh --only static-checks
 ```

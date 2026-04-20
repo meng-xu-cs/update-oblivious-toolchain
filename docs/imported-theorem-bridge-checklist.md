@@ -153,10 +153,17 @@ Status labels:
   checkers, and the probe runs the corresponding validation reports. The probe
   now also emits `tamper_validation.json`, which mutates representative direct
   controller/hidden certificates, every proof-grade translation/runtime bridge
-  artifact, and the theorem-facing runtime kernel-interface bundle, seeded
-  paper-main bundle, seeded/canonical witness-family, theorem-input, and
-  pair-certificate artifacts, then checks that the shipped Lean executables
-  reject those semantically drifted but still parseable artifacts end to end.
+  artifact, the stronger confidential-core/kernel-interface/slot composite
+  artifact, the theorem-facing runtime kernel-interface bundle, seeded
+  paper-main family and slot-family bundles, seeded/canonical witness-family,
+  theorem-input, and pair-certificate artifacts, then checks that the shipped
+  Lean executables reject those semantically drifted but still parseable
+  artifacts end to end. The imported Lean bridge now also exposes reusable
+  projection theorems for both paper-main family routes,
+  `importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_family_assurance`
+  and
+  `importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_slot_assurance`,
+  so accepted paper-main artifacts do not stop at checker acceptance alone.
 
 - `cleared` Provide a dedicated bridge-validation report rather than forcing
   users to infer bridge status from the full probe bundle.
@@ -169,8 +176,10 @@ Status labels:
   kernel-refinement / trusted-kernel / witness bridge reports, and the
   companion `tamper_validation.json` report extends the negative testing to
   those bridge artifacts plus the explicit runtime kernel-interface bundle,
-  explicit seeded paper-main bundle, seeded/canonical witness-family,
-  theorem-input, and pair-certificate interfaces.
+  the stronger confidential-core/kernel-interface/slot composite bundle, the
+  explicit seeded paper-main family and slot-family bundles,
+  seeded/canonical witness-family, theorem-input, and pair-certificate
+  interfaces.
 
 - `optional` The paper-main theorem provenance step is tracked separately in
   `docs/paper-main-theorem-checklist.md`: supply or cite an external

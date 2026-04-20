@@ -18,11 +18,13 @@ mod tests {
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
         ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, RefinementWitnessError,
+        RuntimeConfidentialCoreKernelInterfaceSlotBundleError,
         RuntimeConfidentialCoreShellBoundaryLoweringBundleError,
         RuntimeConfidentialCoreShellBoundarySlotBundleError, RuntimeKernelInterfaceBundleError,
         RuntimeKernelRefinementEventKindWitness, RuntimeKernelRefinementEventWitness,
         RuntimeKernelStepWitness, RuntimeShellBoundaryLoweringBundleError,
-        RuntimeShellBoundarySlotBundleError, RuntimeTrustedKernelSlotBundleError, TheoremTrace,
+        RuntimeShellBoundarySlotBundleError, RuntimeTrustedKernelSlotBundleError,
+        SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainSlotFamilyBundle, TheoremTrace,
         Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
@@ -339,6 +341,48 @@ mod tests {
             .all(|event| event.class == WriteClass::Update));
         assert_eq!(first_trace.trace.gas_used, 12288);
         assert_eq!(second_trace.trace.gas_used, 12288);
+    }
+
+    #[test]
+    fn mixer_path_oram_trace_builds_shared_paper_main_bundles() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let call = instance
+            .call(
+                "deposit(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(3)],
+            )
+            .unwrap();
+
+        let family = call.trace.runtime_paper_main_family_bundle().unwrap();
+        let slot_family = call
+            .trace
+            .runtime_paper_main_slot_family_bundle(&artifact)
+            .unwrap();
+
+        assert_eq!(
+            family.public_outcome().entrypoint_id,
+            "deposit(bytes32,uint256)"
+        );
+        assert_eq!(
+            slot_family.confidential_slot_program().entrypoint_id,
+            "deposit(bytes32,uint256)"
+        );
+        assert!(!family.boundary_schedule().is_empty());
+        assert_eq!(slot_family.family(), family.family());
+
+        let decoded_family: SeededRuntimePaperMainFamilyBundle =
+            serde_json::from_str(&family.to_json()).unwrap();
+        let decoded_slot_family: SeededRuntimePaperMainSlotFamilyBundle =
+            serde_json::from_str(&slot_family.to_json()).unwrap();
+        assert_eq!(decoded_family, family);
+        assert_eq!(decoded_slot_family, slot_family);
     }
 
     #[test]
@@ -939,6 +983,48 @@ mod tests {
     }
 
     #[test]
+    fn execution_trace_exports_confidential_core_kernel_interface_slot_bundle() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let result = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+        let bundle = result
+            .trace
+            .runtime_confidential_core_kernel_interface_slot_bundle(&artifact)
+            .unwrap();
+        assert_eq!(bundle.entrypoint_id(), "add(bytes32,uint256)");
+        assert!(bundle.program_matches_runtime_entrypoint());
+        assert_eq!(
+            bundle.kernel_interface_bundle().entrypoint_id(),
+            bundle.entrypoint_id()
+        );
+        assert_eq!(
+            bundle.confidential_slot_program().entrypoint_id,
+            bundle.entrypoint_id()
+        );
+        assert_eq!(
+            bundle
+                .kernel_interface_bundle()
+                .kernel_witness()
+                .expected_kernel_steps()
+                .unwrap(),
+            bundle
+                .confidential_slot_program()
+                .expected_runtime_step_witnesses()
+        );
+    }
+
+    #[test]
     fn confidential_core_shell_boundary_slot_bundle_rejects_slot_program_entrypoint_drift() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
@@ -983,6 +1069,16 @@ mod tests {
                 .runtime_confidential_core_shell_boundary_slot_bundle(&tampered_artifact)
                 .unwrap_err(),
             RuntimeConfidentialCoreShellBoundarySlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                expected_entrypoint: "add(bytes32,uint256)".into(),
+                program_entrypoint: "put(bytes32,uint256)".into(),
+            }
+        );
+        assert_eq!(
+            result
+                .trace
+                .runtime_confidential_core_kernel_interface_slot_bundle(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeConfidentialCoreKernelInterfaceSlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
                 expected_entrypoint: "add(bytes32,uint256)".into(),
                 program_entrypoint: "put(bytes32,uint256)".into(),
             }
@@ -1036,6 +1132,41 @@ mod tests {
             RuntimeConfidentialCoreShellBoundaryLoweringBundleError::ConfidentialProgramLoweringMismatch {
                 entrypoint: "add(bytes32,uint256)".into(),
             }
+        );
+    }
+
+    #[test]
+    fn call_rejects_confidential_core_kernel_interface_slot_drift() {
+        let mut artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("add(bytes32,uint256)")
+            .unwrap()
+            .confidential_slot_program
+            .as_mut()
+            .unwrap()
+            .entrypoint_id = "put(bytes32,uint256)".into();
+
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let err = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap_err();
+        let err = err.to_string();
+        assert!(
+            err.contains("runtime kernel interface drifted from admitted artifact")
+                || err.contains("entrypoint mismatch"),
+            "unexpected error: {err}"
         );
     }
 

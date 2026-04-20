@@ -96,6 +96,49 @@ theorem runtimeWitness_proofGradeConfidentialCoreSlotAssurance
       hBundleExact.1, hExpectedSteps, hKernelSteps, hBundleExact.2.1,
       runtimeShellBoundaryBundle_witness_proofGradeRefines hBundleValid⟩
 
+/--
+Stronger slot-lowered confidential-core assurance that packages the explicit
+runtime kernel-interface bundle together with the same fixed slot program. This
+is the proof interface that matches the shared-slot paper route directly.
+-/
+def RuntimeConfidentialCoreKernelInterfaceSlotAssurance
+  (runtimeWitness : RuntimeRefinementWitness)
+  (program : ConfidentialKernelSlotProgram)
+  (modelTags : SGXModelTags) : Prop :=
+  runtimeWitness.ProofGradeValid modelTags ∧
+    program.RuntimeNormalForm ∧
+    ∃ kernelInterfaceBundle,
+      runtimeWitness.kernelInterfaceBundle? = some kernelInterfaceBundle ∧
+        kernelInterfaceBundle.Valid ∧
+        kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+          some program.expectedRuntimeKernelSteps ∧
+        kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+          program.expectedRuntimeKernelSteps
+
+theorem runtimeConfidentialCoreKernelInterfaceSlotAssurance_of_slotAssurance
+  (runtimeWitness : RuntimeRefinementWitness)
+  (program : ConfidentialKernelSlotProgram)
+  (modelTags : SGXModelTags)
+  (hAssured : RuntimeConfidentialCoreSlotAssurance runtimeWitness program modelTags) :
+  RuntimeConfidentialCoreKernelInterfaceSlotAssurance runtimeWitness program modelTags := by
+  rcases hAssured with
+    ⟨hRuntimeValid, hRuntimeNormalForm, kernelWitness, hKernel, hExpectedSteps, hKernelSteps⟩
+  rcases runtimeWitness_proofGradeKernelInterfaceBundle_valid
+      runtimeWitness
+      modelTags
+      hRuntimeValid with
+    ⟨kernelInterfaceBundle, hBundle, hBundleValid⟩
+  have hBundleExact := runtimeRefinementWitness_kernelInterfaceBundle_exact hBundle
+  have hShellExact := runtimeRefinementWitness_shellBoundaryBundle_exact hBundleExact.1
+  have hKernelEq :
+      kernelWitness = kernelInterfaceBundle.shellBoundaryBundle.kernelWitness := by
+    apply Option.some.inj
+    exact hKernel.symm.trans hShellExact.1
+  subst kernelWitness
+  exact
+    ⟨hRuntimeValid, hRuntimeNormalForm, kernelInterfaceBundle, hBundle, hBundleValid,
+      hExpectedSteps, hKernelSteps⟩
+
 theorem runtimeConfidentialCoreAssurance_slotAssurance_of_lowering
   (runtimeWitness : RuntimeRefinementWitness)
   (program : ConfidentialKernelProgram)
@@ -317,6 +360,11 @@ structure RuntimeConfidentialCoreShellBoundarySlotBundle where
   shellBoundaryBundle : RuntimeShellBoundaryBundle
   confidentialSlotProgram : ConfidentialKernelSlotProgram
 
+structure RuntimeConfidentialCoreKernelInterfaceSlotBundle where
+  runtimeWitness : RuntimeRefinementWitness
+  kernelInterfaceBundle : RuntimeKernelInterfaceBundle
+  confidentialSlotProgram : ConfidentialKernelSlotProgram
+
 def RuntimeConfidentialCoreShellBoundaryLoweringBundle.Valid
   (bundle : RuntimeConfidentialCoreShellBoundaryLoweringBundle)
   (modelTags : SGXModelTags) : Prop :=
@@ -348,6 +396,16 @@ def RuntimeConfidentialCoreShellBoundarySlotBundle.Valid
     bundle.runtimeWitness.kernelWitness = some bundle.shellBoundaryBundle.kernelWitness ∧
     bundle.runtimeWitness.runtimeKernelRefinementWitness =
       some bundle.shellBoundaryBundle.runtimeKernelRefinementWitness
+
+def RuntimeConfidentialCoreKernelInterfaceSlotBundle.Valid
+  (bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle)
+  (modelTags : SGXModelTags) : Prop :=
+  RuntimeConfidentialCoreSlotBundle.Valid
+      { runtimeWitness := bundle.runtimeWitness
+      , confidentialProgram := bundle.confidentialSlotProgram
+      } modelTags ∧
+    bundle.kernelInterfaceBundle.Valid ∧
+    bundle.runtimeWitness.kernelInterfaceBundle? = some bundle.kernelInterfaceBundle
 
 theorem runtimeConfidentialCoreShellBoundaryLoweringBundle_proofGradeAssurance
   (bundle : RuntimeConfidentialCoreShellBoundaryLoweringBundle)
@@ -471,5 +529,42 @@ theorem runtimeConfidentialCoreShellBoundarySlotBundle_proofGradeAssurance
   subst hShellKernelEq
   subst hShellRefinementEq
   exact ⟨hKernelExact, hRefinementExact, hShell.1, hRuntimeExpected, hRuntimeSteps⟩
+
+theorem runtimeConfidentialCoreKernelInterfaceSlotBundle_proofGradeAssurance
+  (bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.runtimeWitness.kernelInterfaceBundle? = some bundle.kernelInterfaceBundle ∧
+    bundle.kernelInterfaceBundle.Valid ∧
+    bundle.kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+      some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    bundle.kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+      bundle.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  rcases hValid with ⟨hCoreValid, hInterfaceValid, hBundleExact⟩
+  have hCore :
+      ∃ kernelWitness runtimeKernelRefinementWitness,
+        bundle.runtimeWitness.kernelWitness = some kernelWitness ∧
+          kernelWitness.expectedKernelSteps =
+            some bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+          kernelWitness.kernelSteps = bundle.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+          bundle.runtimeWitness.runtimeKernelRefinementWitness =
+            some runtimeKernelRefinementWitness ∧
+          runtimeKernelRefinementWitness.shellTrace.ProofGradeRefines
+            kernelWitness.shellContract := by
+    exact runtimeConfidentialCoreSlotBundle_proofGradeAssurance
+      { runtimeWitness := bundle.runtimeWitness
+      , confidentialProgram := bundle.confidentialSlotProgram
+      } modelTags hCoreValid
+  have hInterfaceExact := runtimeRefinementWitness_kernelInterfaceBundle_exact hBundleExact
+  have hShellExact := runtimeRefinementWitness_shellBoundaryBundle_exact hInterfaceExact.1
+  rcases hCore with
+    ⟨kernelWitness, _runtimeKernelRefinementWitness, hRuntimeKernel, hRuntimeExpected,
+      hRuntimeSteps, _hRuntimeRefinement, _hRuntimeShellRefines⟩
+  have hKernelEq :
+      kernelWitness = bundle.kernelInterfaceBundle.shellBoundaryBundle.kernelWitness := by
+    apply Option.some.inj
+    exact hRuntimeKernel.symm.trans hShellExact.1
+  subst hKernelEq
+  exact ⟨hBundleExact, hInterfaceValid, hRuntimeExpected, hRuntimeSteps⟩
 
 end UOToolchain

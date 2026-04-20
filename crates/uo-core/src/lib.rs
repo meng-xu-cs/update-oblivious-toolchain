@@ -15,20 +15,22 @@ pub mod types;
 pub use artifact::{ArtifactFormat, CompiledArtifact};
 pub use confidential_core::{
     RuntimeConfidentialCoreBundle, RuntimeConfidentialCoreBundleError,
-    RuntimeConfidentialCoreLoweringBundle, RuntimeConfidentialCoreLoweringBundleError,
-    RuntimeConfidentialCoreShellBoundaryLoweringBundle,
+    RuntimeConfidentialCoreKernelInterfaceSlotBundle,
+    RuntimeConfidentialCoreKernelInterfaceSlotBundleError, RuntimeConfidentialCoreLoweringBundle,
+    RuntimeConfidentialCoreLoweringBundleError, RuntimeConfidentialCoreShellBoundaryLoweringBundle,
     RuntimeConfidentialCoreShellBoundaryLoweringBundleError,
     RuntimeConfidentialCoreShellBoundarySlotBundle,
     RuntimeConfidentialCoreShellBoundarySlotBundleError, RuntimeConfidentialCoreSlotBundle,
     RuntimeConfidentialCoreSlotBundleError,
 };
 pub use confidential_kernel::{
-    lower_confidential_kernel_expr, lower_confidential_kernel_pure_expr,
-    lower_confidential_kernel_statements, ConfidentialKernelExpr, ConfidentialKernelLoweringError,
+    execute_confidential_kernel_slot_program, lower_confidential_kernel_expr,
+    lower_confidential_kernel_pure_expr, lower_confidential_kernel_statements,
+    ConfidentialKernelExecutionOutcome, ConfidentialKernelExpr, ConfidentialKernelLoweringError,
     ConfidentialKernelParam, ConfidentialKernelProgram, ConfidentialKernelPureExpr,
     ConfidentialKernelSlotExpr, ConfidentialKernelSlotLoweringError, ConfidentialKernelSlotProgram,
-    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement, ConfidentialKernelStatement,
-    ConfidentialKernelStep,
+    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotRuntime, ConfidentialKernelSlotStatement,
+    ConfidentialKernelStatement, ConfidentialKernelStep,
 };
 pub use fragment::{
     ConfidentialFragmentEntrypointWitness, ConfidentialFragmentStats, ConfidentialFragmentWitness,
@@ -72,10 +74,12 @@ pub use trace::{
     RuntimeKernelScratchRegionWitness, RuntimeKernelStepWitness, RuntimeKernelTelemetrySnapshot,
     RuntimeKernelWitness, RuntimeOramAccessCounterWitness, RuntimeOramAccessWitness,
     RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
+    RuntimePaperMainFamilyBundleError, RuntimePaperMainSlotFamilyBundleError,
     RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness,
     RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
     RuntimeTrustedKernelBundle, SeededRuntimePaperMainFamilyBundle,
-    SeededRuntimePaperMainFamilyBundleError, SeededRuntimePathOramWitnessFamily,
+    SeededRuntimePaperMainFamilyBundleError, SeededRuntimePaperMainSlotFamilyBundle,
+    SeededRuntimePaperMainSlotFamilyBundleError, SeededRuntimePathOramWitnessFamily,
     SeededRuntimeWitnessFamily, SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace,
     TheoremTrace, TraceHashBundle, WriteClass,
 };

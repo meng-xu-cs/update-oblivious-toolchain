@@ -56,6 +56,7 @@ Status labels:
   `results/shell_boundary_lowering_validation.json`,
   `results/confidential_core_validation.json`,
   `results/confidential_core_slot_validation.json`,
+  `results/confidential_core_kernel_interface_slot_validation.json`,
   `results/confidential_core_shell_boundary_slot_validation.json`,
   `results/confidential_core_lowering_validation.json`,
   `results/confidential_core_shell_boundary_lowering_validation.json`,
@@ -66,6 +67,7 @@ Status labels:
   `proof/lean/UOToolchain/RuntimeShellBoundarySlotJson.lean`,
   `proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean`,
+  `proof/lean/UOToolchain/RuntimeConfidentialCoreKernelInterfaceSlotJson.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundarySlotJson.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean`.
 
@@ -76,6 +78,9 @@ Status labels:
   `results/pathoram_pair_validation.json`,
   `proof/lean/CheckRuntimeWitnessFamily.lean`,
   `proof/lean/CheckPathOramPairCertificate.lean`.
+  The seeded-family bridge now also exports and checks the stronger
+  `SeededRuntimePaperMainSlotFamilyBundle` alongside the original seeded
+  paper-main family bundle.
 
 - `cleared` Checked canonical fresh-coin families and canonical pair
   certificates, with compact theorem-input fallback for oversized families and

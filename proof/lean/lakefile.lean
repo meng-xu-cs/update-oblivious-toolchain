@@ -30,6 +30,10 @@ lean_exe checkProofGradeRuntimePaperMainFamilyBundle where
   root := `CheckProofGradeRuntimePaperMainFamilyBundle
 
 @[default_target]
+lean_exe checkProofGradeRuntimePaperMainSlotFamilyBundle where
+  root := `CheckProofGradeRuntimePaperMainSlotFamilyBundle
+
+@[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCore where
   root := `CheckProofGradeRuntimeConfidentialCore
 
@@ -40,6 +44,10 @@ lean_exe checkProofGradeRuntimeConfidentialCoreSlot where
 @[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCoreShellBoundarySlot where
   root := `CheckProofGradeRuntimeConfidentialCoreShellBoundarySlot
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot where
+  root := `CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlot
 
 @[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCoreLowering where

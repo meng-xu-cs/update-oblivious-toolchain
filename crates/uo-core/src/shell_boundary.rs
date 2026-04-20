@@ -492,6 +492,10 @@ impl RuntimeShellBoundaryBundle {
 }
 
 impl RuntimeKernelInterfaceBundle {
+    pub fn entrypoint_id(&self) -> &str {
+        self.kernel_witness().entrypoint_id()
+    }
+
     pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {
         &self.shell_boundary_bundle
     }
@@ -510,6 +514,15 @@ impl RuntimeKernelInterfaceBundle {
 
     pub fn expected_kernel_schedule(&self) -> &RuntimeKernelScheduleWitness {
         &self.expected_kernel_schedule
+    }
+
+    pub(crate) fn from_runtime_witness(
+        runtime_witness: RuntimeRefinementWitness,
+        artifact: &CompiledArtifact,
+    ) -> Result<Self, RuntimeKernelInterfaceBundleError> {
+        let shell_boundary_bundle =
+            RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness)?;
+        Self::from_shell_boundary_bundle(shell_boundary_bundle, artifact)
     }
 
     fn from_shell_boundary_bundle(

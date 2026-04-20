@@ -10,8 +10,7 @@ use anyhow::{anyhow, Result};
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
     CompiledArtifact, ExecutionTrace, OutputShape, RuntimeExecutionTraceParts,
-    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness,
-    SeededRuntimePaperMainFamilyBundle, SeededRuntimePathOramWitnessFamily, Value,
+    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness, Value,
 };
 
 struct CallTraceContext {
@@ -187,6 +186,13 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
             .map_err(|err| {
                 anyhow::anyhow!("runtime kernel interface drifted from admitted artifact: {err}")
             })?;
+        trace
+            .runtime_confidential_core_kernel_interface_slot_bundle(artifact)
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "runtime confidential-core/kernel-interface/slot interface drifted from admitted artifact: {err}"
+                )
+            })?;
         let runtime_kernel_witness = runtime_kernel_interface_bundle.kernel_witness().clone();
         artifact
             .runtime_kernel_dsl_bundle_for_entrypoint(runtime_kernel_witness.clone(), entrypoint)
@@ -254,26 +260,18 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
                     "runtime shell-boundary/lowering interface drifted from admitted artifact: {err}"
                 )
             })?;
-        let seeded_runtime_refinement_witness = trace
-            .runtime_refinement_witness()
-            .and_then(|witness| witness.with_runtime_seed(0))
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime seeded paper-main witness projection drifted from admitted artifact: {err}"
-                )
-            })?;
-        let seeded_runtime_witness_family =
-            SeededRuntimePathOramWitnessFamily::new(vec![seeded_runtime_refinement_witness])
-                .map_err(|err| {
-                    anyhow::anyhow!(
-                        "runtime seeded paper-main family drifted from admitted artifact: {err}"
-                    )
-                })?;
-        SeededRuntimePaperMainFamilyBundle::new(seeded_runtime_witness_family).map_err(|err| {
+        trace.runtime_paper_main_family_bundle().map_err(|err| {
             anyhow::anyhow!(
                 "runtime seeded paper-main bundle drifted from admitted artifact: {err}"
             )
         })?;
+        trace
+            .runtime_paper_main_slot_family_bundle(artifact)
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "runtime seeded paper-main slot bundle drifted from admitted artifact: {err}"
+                )
+            })?;
     }
     trace.materialize_runtime_trusted_kernel_bundle()?;
     Ok(trace)

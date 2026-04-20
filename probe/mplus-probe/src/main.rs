@@ -46,6 +46,7 @@ enum ReportKind {
     ConfidentialCoreValidation,
     ConfidentialCoreSlotValidation,
     ConfidentialCoreShellBoundarySlotValidation,
+    ConfidentialCoreKernelInterfaceSlotValidation,
     ConfidentialCoreLoweringValidation,
     ConfidentialCoreShellBoundaryLoweringValidation,
     CanonicalPathoramPairValidation,
@@ -336,6 +337,16 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "confidential_core_shell_boundary_slot_validation.json",
                 "confidential_core_shell_boundary_slot_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialCoreKernelInterfaceSlotValidation) => {
+            let report =
+                mplus_probe::run_confidential_core_kernel_interface_slot_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_core_kernel_interface_slot_validation.json",
+                "confidential_core_kernel_interface_slot_validation",
                 &report,
             )?;
         }

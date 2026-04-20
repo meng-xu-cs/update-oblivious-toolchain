@@ -14,9 +14,12 @@ enum OutputFormat {
     ShellBoundarySlot,
     ShellBoundaryLowering,
     TrustedKernel,
+    PaperMainFamily,
+    PaperMainSlotFamily,
     RefinementWitness,
     ConfidentialCore,
     ConfidentialCoreSlot,
+    ConfidentialCoreKernelInterfaceSlot,
     ConfidentialCoreShellBoundarySlot,
     ConfidentialCoreLowering,
     ConfidentialCoreShellBoundaryLowering,
@@ -107,6 +110,14 @@ fn main() -> Result<()> {
             let bundle = trace.runtime_trusted_kernel_slot_bundle(&artifact)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
+        OutputFormat::PaperMainFamily => {
+            let bundle = trace.runtime_paper_main_family_bundle()?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
+        OutputFormat::PaperMainSlotFamily => {
+            let bundle = trace.runtime_paper_main_slot_family_bundle(&artifact)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
         OutputFormat::RefinementWitness => {
             let witness = trace.runtime_refinement_witness()?;
             println!("{}", witness.to_json_pretty());
@@ -117,6 +128,10 @@ fn main() -> Result<()> {
         }
         OutputFormat::ConfidentialCoreSlot => {
             let bundle = trace.runtime_confidential_core_slot_bundle(&artifact)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
+        OutputFormat::ConfidentialCoreKernelInterfaceSlot => {
+            let bundle = trace.runtime_confidential_core_kernel_interface_slot_bundle(&artifact)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::ConfidentialCoreShellBoundarySlot => {

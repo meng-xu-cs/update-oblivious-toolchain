@@ -1,7 +1,8 @@
 use crate::{
     CompiledArtifact, ConfidentialKernelProgram, ConfidentialKernelSlotLoweringError,
     ConfidentialKernelSlotProgram, ExecutionTrace, RefinementWitnessError,
-    RuntimeRefinementWitness, RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError,
+    RuntimeKernelInterfaceBundle, RuntimeKernelInterfaceBundleError, RuntimeRefinementWitness,
+    RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -155,6 +156,36 @@ pub enum RuntimeConfidentialCoreShellBoundarySlotBundleError {
     },
 }
 
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum RuntimeConfidentialCoreKernelInterfaceSlotBundleError {
+    #[error(
+        "runtime confidential-core kernel-interface slot bundle requires a valid runtime refinement witness: {0}"
+    )]
+    RuntimeWitness(#[from] RefinementWitnessError),
+    #[error(
+        "runtime confidential-core kernel-interface slot bundle requires a valid runtime kernel-interface bundle: {0}"
+    )]
+    KernelInterface(#[from] RuntimeKernelInterfaceBundleError),
+    #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
+    MissingEntrypoint { entrypoint: String },
+    #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
+    MissingConfidentialSlotProgram { entrypoint: String },
+    #[error(
+        "runtime confidential-core kernel-interface slot bundle expected kernel-interface bundle for '{runtime_entrypoint}' but found kernel-interface bundle for '{kernel_interface_entrypoint}'"
+    )]
+    KernelInterfaceEntrypointMismatch {
+        runtime_entrypoint: String,
+        kernel_interface_entrypoint: String,
+    },
+    #[error(
+        "runtime confidential-core kernel-interface slot bundle expected confidential_slot_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialSlotProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfidentialCoreBundle {
     runtime_witness: RuntimeRefinementWitness,
@@ -186,6 +217,13 @@ pub struct RuntimeConfidentialCoreShellBoundaryLoweringBundle {
 pub struct RuntimeConfidentialCoreShellBoundarySlotBundle {
     runtime_witness: RuntimeRefinementWitness,
     shell_boundary_bundle: RuntimeShellBoundaryBundle,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeConfidentialCoreKernelInterfaceSlotBundle {
+    runtime_witness: RuntimeRefinementWitness,
+    kernel_interface_bundle: RuntimeKernelInterfaceBundle,
     confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
@@ -548,6 +586,78 @@ impl RuntimeConfidentialCoreShellBoundarySlotBundle {
     }
 }
 
+impl RuntimeConfidentialCoreKernelInterfaceSlotBundle {
+    pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {
+        &self.runtime_witness
+    }
+
+    pub fn kernel_interface_bundle(&self) -> &RuntimeKernelInterfaceBundle {
+        &self.kernel_interface_bundle
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
+    pub fn entrypoint_id(&self) -> &str {
+        &self.runtime_witness.public_outcome().entrypoint_id
+    }
+
+    pub fn program_matches_runtime_entrypoint(&self) -> bool {
+        self.kernel_interface_bundle.entrypoint_id() == self.entrypoint_id()
+            && self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
+    }
+
+    fn from_runtime_witness(
+        runtime_witness: RuntimeRefinementWitness,
+        artifact: &CompiledArtifact,
+    ) -> Result<Self, RuntimeConfidentialCoreKernelInterfaceSlotBundleError> {
+        runtime_witness.validate()?;
+        let kernel_interface_bundle =
+            RuntimeKernelInterfaceBundle::from_runtime_witness(runtime_witness.clone(), artifact)?;
+        let entrypoint = runtime_witness.public_outcome().entrypoint_id.clone();
+        if kernel_interface_bundle.entrypoint_id() != entrypoint {
+            return Err(
+                RuntimeConfidentialCoreKernelInterfaceSlotBundleError::KernelInterfaceEntrypointMismatch {
+                    runtime_entrypoint: entrypoint.clone(),
+                    kernel_interface_entrypoint: kernel_interface_bundle.entrypoint_id().to_owned(),
+                },
+            );
+        }
+        let manifest_entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get(&entrypoint)
+            .ok_or_else(|| {
+                RuntimeConfidentialCoreKernelInterfaceSlotBundleError::MissingEntrypoint {
+                    entrypoint: entrypoint.clone(),
+                }
+            })?;
+        let confidential_slot_program = manifest_entry
+            .confidential_slot_program
+            .clone()
+            .ok_or_else(|| {
+                RuntimeConfidentialCoreKernelInterfaceSlotBundleError::MissingConfidentialSlotProgram {
+                    entrypoint: entrypoint.clone(),
+                }
+            })?;
+        if confidential_slot_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeConfidentialCoreKernelInterfaceSlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint,
+                    program_entrypoint: confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
+        Ok(Self {
+            runtime_witness,
+            kernel_interface_bundle,
+            confidential_slot_program,
+        })
+    }
+}
+
 impl ExecutionTrace {
     pub fn runtime_confidential_core_bundle(
         &self,
@@ -597,6 +707,20 @@ impl ExecutionTrace {
     > {
         let runtime_witness = self.runtime_refinement_witness()?;
         RuntimeConfidentialCoreShellBoundarySlotBundle::from_runtime_witness(
+            runtime_witness,
+            artifact,
+        )
+    }
+
+    pub fn runtime_confidential_core_kernel_interface_slot_bundle(
+        &self,
+        artifact: &CompiledArtifact,
+    ) -> Result<
+        RuntimeConfidentialCoreKernelInterfaceSlotBundle,
+        RuntimeConfidentialCoreKernelInterfaceSlotBundleError,
+    > {
+        let runtime_witness = self.runtime_refinement_witness()?;
+        RuntimeConfidentialCoreKernelInterfaceSlotBundle::from_runtime_witness(
             runtime_witness,
             artifact,
         )

@@ -36,14 +36,19 @@ What is already established at the frozen interface:
 - an explicit paper-facing runtime assumption bundle and end-to-end boundary in
   Lean, `PaperMainRuntimeKernelAssumptions`,
   `PaperMainRuntimeKernelBoundary`, `PaperMainPathOramAssumptions`, and
-  `PaperMainPathOramEndToEndBoundary`, so the remaining runtime/kernel trust
-  point is no longer carried only in prose
+  `PaperMainPathOramEndToEndBoundary`, plus the stronger shared-slot route
+  `PaperMainRuntimeKernelSlotAssumptions`,
+  `PaperMainRuntimeKernelSlotBoundary`,
+  `PaperMainPathOramSlotAssumptions`, and
+  `PaperMainPathOramSlotEndToEndBoundary`, so the remaining runtime/kernel
+  trust point is no longer carried only in prose and is now phrased over the
+  explicit theorem-facing runtime kernel-interface bundle
 - a strengthened Lean wrapper,
   `ProofGradeSeededRuntimePaperMainBundle`, from which
   `PaperMainRuntimeKernelAssumptions` can now be discharged mechanically when a
   seeded paper-main bundle already carries proof-grade witness acceptance, with
-  the seeded-family artifact route now also rechecking exact public-outcome and
-  exact boundary-schedule uniformity in Lean
+  the seeded-family artifact route now also rechecking exact public-outcome,
+  exact boundary-schedule, and shared slot-program uniformity in Lean
 - a machine-generated reviewer summary emitted by the full probe bundle as
   `reviewer_summary.json` plus `reviewer_summary.md`, covering proof/report
   cost, artifact sizes, runtime overheads, TCB surface, and explicit
@@ -90,7 +95,7 @@ implicit in prose.
 | `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents in the concrete `path_oram_local_posmap_v1` backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages in the local-posmap wrapper | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
 | `stashOverflowBounded` | bounds stash-overflow failure for the deployed local-posmap parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet fully discharged in-repo |
-| `PaperMainRuntimeKernelAssumptions` | says every emitted runtime witness on the frozen paper route is Lean-proof-grade accepted, and therefore satisfies the checked shell-boundary / kernel-interface boundary `PaperMainRuntimeKernelBoundary` | explicit Lean assumption bundle in `PaperPathOramTheoremRoute.lean`; mechanically discharged for `ProofGradeSeededRuntimePaperMainBundle`, with the seeded witness-family artifact path now also rechecked by dedicated family-level kernel-interface and paper-main validators, but not yet for the real runtime by a machine-checked refinement plus confinement theorem |
+| `PaperMainRuntimeKernelAssumptions` | says every emitted runtime witness on the frozen paper route is Lean-proof-grade accepted, and therefore satisfies the checked explicit kernel-interface-bundle boundary `PaperMainRuntimeKernelBoundary` | explicit Lean assumption bundle in `PaperPathOramTheoremRoute.lean`; mechanically discharged for `ProofGradeSeededRuntimePaperMainBundle`, with the seeded witness-family artifact path now also rechecked by dedicated family-level kernel-interface and paper-main validators, but not yet for the real runtime by a machine-checked refinement plus confinement theorem |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model | required by the final malicious-host theorem; not yet fully closed in Lean |
 
 The exact fresh-leaf remapping bridge is no longer a separate theorem-side
@@ -377,7 +382,10 @@ The runtime-to-Lean witness interface is now fixed in:
 - `uo-evm --format refinement-witness` in `runtime/uo-evm/src/main.rs`
 - `uo-evm --format shell-boundary`,
   `shell-boundary-lowering`, and
-  `confidential-core-shell-boundary-lowering` in
+  `confidential-core-kernel-interface-slot`,
+  `confidential-core-shell-boundary-lowering`,
+  `paper-main-family`, and
+  `paper-main-slot-family` in
   `runtime/uo-evm/src/main.rs`
 - `RuntimeRefinementWitness` and its projection lemmas in
   `proof/lean/UOToolchain/RuntimeRefinement.lean`
@@ -399,7 +407,24 @@ The runtime-to-Lean witness interface is now fixed in:
 - `checkProofGradeRuntimePaperMainFamilyBundle` in
   `proof/lean/CheckProofGradeRuntimePaperMainFamilyBundle.lean` for the
   explicit theorem-facing `SeededRuntimePaperMainFamilyBundle` emitted by the
-  seeded paper-route bridge
+  seeded paper-route bridge; the imported bridge also proves
+  `importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_family_assurance`
+  so accepted family artifacts project to a reusable theorem-side family
+  assurance object
+- `checkProofGradeRuntimePaperMainSlotFamilyBundle` in
+  `proof/lean/CheckProofGradeRuntimePaperMainSlotFamilyBundle.lean` for the
+  stronger shared-slot theorem-facing
+  `SeededRuntimePaperMainSlotFamilyBundle`; the imported bridge also now
+  proves
+  `importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_slot_assurance`,
+  so an accepted slot-family artifact can be reused as an explicit theorem-side
+  family-slot assurance object rather than only as a checker success bit
+- `checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot` in
+  `proof/lean/CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlot.lean`
+  for the exported
+  `RuntimeConfidentialCoreKernelInterfaceSlotBundle`, which pairs one accepted
+  runtime witness with one explicit runtime kernel-interface bundle and one
+  exact confidential slot program
 - `results/kernel_refinement_validation.json` for benchmark-backed validation
   that the lower-level runtime phase witness is accepted directly against the
   exported kernel witness on representative supported paths
@@ -407,10 +432,15 @@ The runtime-to-Lean witness interface is now fixed in:
   that the explicit exported `RuntimeKernelInterfaceBundle` artifacts are
   accepted by the dedicated paper-facing runtime/kernel interface bundle
   checker on representative supported paths
+- `results/confidential_core_kernel_interface_slot_validation.json` for
+  benchmark-backed validation that the stronger confidential-core/kernel-
+  interface/slot composite artifacts are accepted on representative supported
+  paths
 - `results/seeded_witness_validation.json` for benchmark-backed validation
-  that the explicit exported `SeededRuntimePaperMainFamilyBundle` artifacts are
-  accepted by the dedicated paper-facing seeded runtime bundle checker on
-  representative supported paths, alongside the lower seeded-family validators
+  that the explicit exported `SeededRuntimePaperMainFamilyBundle` and
+  `SeededRuntimePaperMainSlotFamilyBundle` artifacts are accepted by the
+  dedicated paper-facing seeded runtime bundle checkers on representative
+  supported paths, alongside the lower seeded-family validators
 - `results/witness_validation.json` for benchmark-backed validation that the
   emitted runtime witnesses are accepted by the Lean checker on representative
   supported paths, including a multi-object ORAM `transferFrom` witness

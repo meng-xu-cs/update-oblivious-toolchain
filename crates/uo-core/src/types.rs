@@ -1,6 +1,8 @@
 use anyhow::{anyhow, bail, Result};
+use serde::de::{self, DeserializeSeed, Deserializer, EnumAccess, VariantAccess, Visitor};
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use serde_json::Number;
+use std::{fmt, marker::PhantomData};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ScalarType {
@@ -23,7 +25,7 @@ pub enum Type {
     Array(Box<Type>, usize),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, Hash)]
 pub enum Value {
     Bool(bool),
     Uint(u128),
@@ -31,6 +33,74 @@ pub enum Value {
     Address([u8; 20]),
     Struct(Vec<(String, Value)>),
     Array(Vec<Value>),
+}
+
+#[derive(Deserialize)]
+enum ValueVariant {
+    Bool,
+    Uint,
+    Bytes32,
+    Address,
+    Struct,
+    Array,
+}
+
+struct U128Seed;
+
+impl<'de> DeserializeSeed<'de> for U128Seed {
+    type Value = u128;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let number = Number::deserialize(deserializer)?;
+        number
+            .as_u128()
+            .ok_or_else(|| de::Error::custom(format!("JSON number {number} does not fit in u128")))
+    }
+}
+
+struct ValueVisitor {
+    marker: PhantomData<Value>,
+}
+
+impl<'de> Visitor<'de> for ValueVisitor {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a Value enum")
+    }
+
+    fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
+    where
+        A: EnumAccess<'de>,
+    {
+        let (variant, variant_access) = data.variant::<ValueVariant>()?;
+        match variant {
+            ValueVariant::Bool => Ok(Value::Bool(variant_access.newtype_variant()?)),
+            ValueVariant::Uint => Ok(Value::Uint(variant_access.newtype_variant_seed(U128Seed)?)),
+            ValueVariant::Bytes32 => Ok(Value::Bytes32(variant_access.newtype_variant()?)),
+            ValueVariant::Address => Ok(Value::Address(variant_access.newtype_variant()?)),
+            ValueVariant::Struct => Ok(Value::Struct(variant_access.newtype_variant()?)),
+            ValueVariant::Array => Ok(Value::Array(variant_access.newtype_variant()?)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_enum(
+            "Value",
+            &["Bool", "Uint", "Bytes32", "Address", "Struct", "Array"],
+            ValueVisitor {
+                marker: PhantomData,
+            },
+        )
+    }
 }
 
 impl Value {
@@ -562,6 +632,14 @@ mod tests {
         ]);
         let encoded = value.canonical_bytes();
         assert_eq!(Value::decode_canonical(&ty, &encoded).unwrap(), value);
+    }
+
+    #[test]
+    fn serde_json_roundtrips_large_uint_values() {
+        let value = Value::Uint((1u128 << 100) + 7);
+        let encoded = serde_json::to_vec(&value).unwrap();
+        let decoded: Value = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, value);
     }
 
     #[test]

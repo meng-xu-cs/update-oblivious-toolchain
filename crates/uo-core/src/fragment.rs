@@ -349,4 +349,23 @@ mod tests {
         assert_eq!(entrypoint.non_branchless_select_arm_count, 1);
         assert!(!entrypoint.valid());
     }
+
+    #[test]
+    fn compiled_artifact_json_roundtrips_large_uint_literals() {
+        let artifact = sample_artifact(vec![CompiledFunction {
+            signature: "big()".into(),
+            params: vec![],
+            return_type: Some(Type::Scalar(crate::ScalarType::Uint(256))),
+            body: vec![Statement::Return {
+                value: Some(Expr::Literal(Value::Uint((1u128 << 100) + 7))),
+            }],
+            secret_args: vec![],
+            confidential: false,
+            confidential_program: None,
+            confidential_slot_program: None,
+        }]);
+        let encoded = serde_json::to_vec(&artifact).unwrap();
+        let decoded: CompiledArtifact = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, artifact);
+    }
 }

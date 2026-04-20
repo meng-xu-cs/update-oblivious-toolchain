@@ -34,7 +34,7 @@ The current runtime-side TCB should be read explicitly rather than inferred.
 | Lean kernel plus Lean theorem/checker development | yes | proof checker and theorem body |
 | Explicit backend / cryptographic assumptions | yes | they are the named remaining assumptions |
 | `RuntimeTrustedKernelBundle` / `RuntimeTrustedKernelSlotBundle` acceptance predicates and imported JSON checker | yes | theorem-facing validation boundary |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | the theorem-facing witness-to-Lean-state refinement relation now exists, but implementation honesty is not yet derived by a full refinement proof; this remaining trust point is now frozen explicitly as `PaperMainRuntimeKernelAssumptions` and `PaperMainRuntimeKernelBoundary` |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | the theorem-facing witness-to-Lean-state refinement relation now exists, but implementation honesty is not yet derived by a full refinement proof; this remaining trust point is now frozen explicitly as `PaperMainRuntimeKernelAssumptions` / `PaperMainRuntimeKernelBoundary`, where the frozen paper route is phrased over an explicit proof-grade `RuntimeKernelInterfaceBundle`, with a stronger shared-slot-DSL paper route now also spelled out as `PaperMainRuntimeKernelSlotAssumptions` / `PaperMainRuntimeKernelSlotBoundary` and lifted into the paper-facing `PaperMainPathOramSlotAssumptions` / `PaperMainPathOramSlotEndToEndBoundary` route |
 | Rust shell/object code outside the tiny kernel | partially | the confidential surface is narrower now, but this code still matters until confinement and refinement are proved end to end |
 | `uo-check` | no | removed from the proof-grade acceptance path |
 | `mplus-probe` | no | validation/reporting only |
@@ -88,11 +88,32 @@ executable-only predicate.
 At the paper theorem route, the remaining runtime-side trust point is now also
 named explicitly in Lean. `PaperMainRuntimeKernelAssumptions` says that every
 emitted runtime witness on the frozen paper route is proof-grade accepted, and
-that assumption projects to the checked `PaperMainRuntimeKernelBoundary`.
+that assumption projects to the checked `PaperMainRuntimeKernelBoundary`, now
+phrased over the explicit `RuntimeKernelInterfaceBundle` exported by the
+runtime/kernel interface. Lean now also exposes the stronger shared-DSL variant,
+`PaperMainRuntimeKernelSlotAssumptions`, which fixes one confidential slot
+program per public ORAM configuration and projects to both the original
+runtime-kernel boundary and the stronger
+`PaperMainRuntimeKernelSlotBoundary`, which now pairs that fixed slot program
+with a valid explicit runtime kernel-interface bundle instead of only an
+existential shell-refinement fact.
+The paper-route end-to-end layer now carries that stronger route as well via
+`PaperMainPathOramSlotAssumptions`,
+`PaperMainPathOramSlotAssurance`, and
+`PaperMainPathOramSlotEndToEndBoundary`.
 The emitted seeded-family artifact path now also has dedicated family-level
 Lean validators for both the runtime kernel-interface boundary and exact
 public-outcome / boundary-schedule uniformity at the paper-main runtime
-bundle surface.
+bundle surface, plus the stronger paper-main slot-family checker that pairs
+that shared seeded family with one exact confidential slot program.
+The runtime-side artifact interface now exposes the canonical single-seed
+paper-main family and slot-family objects directly from `ExecutionTrace` and
+`uo-evm`, so that exported paper-route objects no longer depend on probe-local
+reassembly code.
+The Rust/probe path now exercises both the positive acceptance route and
+explicit tamper-rejection cases for that slot-family checker, covering both
+shared slot-program entrypoint drift and slot-program body drift while the
+seeded family stays fixed.
 This does not discharge the runtime-refinement gap yet, but it keeps the gap
 visible at the theorem surface instead of leaving it implicit in prose.
 
@@ -185,9 +206,9 @@ artifact manifest, and `uo-evm --format trusted-kernel` emits that stronger
 slot-wrapped artifact. That slot bridge now rejects manifest slot-program
 entrypoint drift by construction, and the production runtime finalizer also
 re-derives that slot bundle online together with the direct kernel DSL / slot /
-lowering bundles and the confidential-core direct / slot / lowering /
-shell-boundary slot / shell-boundary lowering family before returning a
-confidential trace.
+lowering bundles and the confidential-core direct / slot /
+kernel-interface-slot / lowering / shell-boundary slot /
+shell-boundary lowering family before returning a confidential trace.
 
 For confidential entrypoints, the checked manifest now carries the canonical
 named confidential program, the canonical slot confidential program, and the
@@ -262,6 +283,8 @@ Lean via:
 - `results/kernel_refinement_validation.json`
 - `cargo run -q -p mplus-probe -- --only trusted-kernel-validation --out-dir results`
 - `results/trusted_kernel_validation.json`
+- `cargo run -q -p mplus-probe -- --only confidential-core-kernel-interface-slot-validation --out-dir results`
+- `results/confidential_core_kernel_interface_slot_validation.json`
 - `cargo run -q -p mplus-probe -- --only tamper-validation --out-dir results`
 - `results/tamper_validation.json`
 - `results/bridge_validation.json`
@@ -271,11 +294,12 @@ the slot-wrapped trusted-kernel artifact, not just the bare certificate
 bundle. The new tamper report complements the positive validation reports by
 mutating representative direct controller/hidden certificates, the
 proof-grade translation, kernel, refinement, shell-boundary,
-confidential-core, runtime-witness, runtime kernel-interface bundle,
-trusted-kernel-slot, and seeded paper-main bundle artifacts, and the
-seeded/canonical witness-family, theorem-input, and pair-certificate
-artifacts, then checking that the corresponding Lean executables reject those
-drifted artifacts.
+confidential-core, the stronger confidential-core/kernel-interface/slot
+composite, runtime-witness, runtime kernel-interface bundle,
+trusted-kernel-slot, and seeded paper-main family and slot-family bundle
+artifacts, and the seeded/canonical witness-family, theorem-input, and
+pair-certificate artifacts, then checking that the corresponding Lean
+executables reject those drifted artifacts.
 
 ## Precise Claim
 
@@ -291,11 +315,16 @@ public kernel schedule online through shared `uo-core` schedule and execution
 trackers, routes runtime-phase witness construction through the same shared
 `uo-core` refinement tracker used by the witness validator, and emits a
 proof-grade kernel witness whose final assembly now also goes through a shared
-core telemetry/execution helper fed by an explicit allocator snapshot, emits a
+core telemetry/execution helper fed directly by `uo-allocator`'s consumed
+`finish()` handoff, with allocator-side kernel-op tracking reduced to a public
+count budget rather than a redundant opcode log, emits a
 lower-level runtime phase witness whose projection to that kernel schedule is
 checked directly, and also
 packages the same kernel boundary through the trusted-kernel and
 refinement-bundle paths, with Lean now checking exact schedule equality plus
 successful modeled small-kernel replay,
+and with the stronger confidential-core composite route now also checking that
+the accepted runtime witness, explicit runtime kernel-interface bundle, and
+fixed confidential slot program agree on one exact kernel interface,
 not that the whole Rust runtime has already been reduced to that model by a
 machine-checked refinement proof.

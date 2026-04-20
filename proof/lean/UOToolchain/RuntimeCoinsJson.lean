@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import UOToolchain.RuntimeCoins
+import UOToolchain.RuntimeConfidentialCoreAssuranceJson
 import UOToolchain.RuntimeRefinementJson
 import UOToolchain.RuntimeShellBoundaryJson
 
@@ -483,7 +484,7 @@ def ImportedSeededRuntimePathOramWitnessFamily.ProofGradeKernelInterfaceAssuranc
     ∀ seed, seed < family.seed_count →
       ∃ witness,
         family.witnessAt? seed = some witness ∧
-        ImportedRuntimeProofGradeKernelInterface witness
+        ImportedRuntimeProofGradeKernelInterfaceBundle witness
 
 def checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
   (family : ImportedSeededRuntimePathOramWitnessFamily)
@@ -509,7 +510,7 @@ def checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
     rcases hValid.1.2 seed hSeed with ⟨witness, hGet, _hTag, hWitnessValid⟩
     exact
       ⟨witness, hGet,
-        importedWitness_proofGradeKernelInterface witness modelTags hWitnessValid⟩
+        importedWitness_proofGradeKernelInterfaceBundle witness modelTags hWitnessValid⟩
   · intro hAssurance
     exact
       (importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
@@ -826,6 +827,261 @@ def loadAndCheckImportedProofGradeSeededRuntimePaperMainFamilyBundle
       throw
         <| IO.userError
             s!"failed to validate proof-grade seeded runtime paper-main family bundle: {err}"
+
+def importedSeededRuntimePaperMainSlotFamilyBundleFieldNames : List String :=
+  ["family", "public_outcome", "boundary_schedule", "confidential_slot_program"]
+
+structure ImportedSeededRuntimePaperMainSlotFamilyBundle where
+  family : ImportedSeededRuntimePathOramWitnessFamily
+  public_outcome : ImportedPublicOutcomeTrace
+  boundary_schedule : List ImportedBoundaryEvent
+  confidential_slot_program : ImportedConfidentialKernelSlotProgram
+deriving FromJson
+
+def ImportedSeededRuntimePaperMainSlotFamilyBundle.runtimePublicOutcome
+  (bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle) : SGXPublicOutcome :=
+  bundle.public_outcome.toPublicOutcome
+
+def ImportedSeededRuntimePaperMainSlotFamilyBundle.runtimeBoundarySchedule
+  (bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle) : List BoundaryEvent :=
+  bundle.boundary_schedule.map ImportedBoundaryEvent.toBoundaryEvent
+
+def ImportedSeededRuntimePaperMainSlotFamilyBundle.Valid
+  (bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle)
+  (modelTags : SGXModelTags) : Prop :=
+  bundle.family.ProofGradeValid modelTags ∧
+    0 < bundle.family.seed_count ∧
+    bundle.confidential_slot_program.RuntimeNormalForm ∧
+    bundle.confidential_slot_program.entrypoint_id = bundle.runtimePublicOutcome.entrypointId ∧
+    ∀ seed, seed < bundle.family.seed_count →
+      ∃ witness,
+        bundle.family.witnessAt? seed = some witness ∧
+          ImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+            witness
+            bundle.confidential_slot_program
+            modelTags ∧
+          witness.public_outcome = bundle.public_outcome ∧
+          witness.boundary_schedule = bundle.boundary_schedule
+
+def ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
+  (bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle)
+  (modelTags : SGXModelTags) : Bool :=
+  bundle.family.checkProofGrade modelTags &&
+    decide (0 < bundle.family.seed_count) &&
+    bundle.confidential_slot_program.checkRuntimeNormalForm &&
+    decide
+      (bundle.confidential_slot_program.entrypoint_id =
+        bundle.runtimePublicOutcome.entrypointId) &&
+    (List.range bundle.family.seed_count).all fun seed =>
+      match bundle.family.witnessAt? seed with
+      | some witness =>
+          checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+              witness
+              bundle.confidential_slot_program
+              modelTags &&
+            decide (witness.public_outcome = bundle.public_outcome) &&
+            decide (witness.boundary_schedule = bundle.boundary_schedule)
+      | none => false
+
+@[simp] theorem importedSeededRuntimePaperMainSlotFamilyBundle_checkValid_eq_true_iff
+  (bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle)
+  (modelTags : SGXModelTags) :
+  bundle.checkValid modelTags = true ↔ bundle.Valid modelTags := by
+  constructor
+  · intro hCheck
+    have hCheck' := hCheck
+    unfold ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid at hCheck'
+    rw [Bool.and_eq_true] at hCheck'
+    rcases hCheck' with ⟨hPrefix4, hAll⟩
+    rw [Bool.and_eq_true] at hPrefix4
+    rcases hPrefix4 with ⟨hPrefix3, hEntrypoint⟩
+    rw [Bool.and_eq_true] at hPrefix3
+    rcases hPrefix3 with ⟨hPrefix2, hNorm⟩
+    rw [Bool.and_eq_true] at hPrefix2
+    rcases hPrefix2 with ⟨hFamily, hSeedPos⟩
+    have hFamilyValid :
+        bundle.family.ProofGradeValid modelTags :=
+      (importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
+        bundle.family
+        modelTags).mp hFamily
+    refine ⟨hFamilyValid, ?_, ?_, ?_, ?_⟩
+    · simpa [decide_eq_true_eq] using hSeedPos
+    · exact (importedConfidentialKernelSlotProgram_checkRuntimeNormalForm_eq_true_iff _).mp hNorm
+    · simpa [decide_eq_true_eq] using hEntrypoint
+    intro seed hSeed
+    rcases hFamilyValid.1.2 seed hSeed with ⟨witness, hWitness, _hTag, _hWitnessValid⟩
+    have hSeedCheck := (List.all_eq_true.mp hAll) seed (List.mem_range.mpr hSeed)
+    simp [hWitness, Bool.and_eq_true] at hSeedCheck
+    rcases hSeedCheck with ⟨hSeedCheck, hBoundary⟩
+    rcases hSeedCheck with ⟨hSlot, hOutcome⟩
+    refine
+      ⟨witness, hWitness, hSlot, ?_, ?_⟩
+    · exact hOutcome
+    · exact hBoundary
+  · intro hValid
+    have hFamily :
+        bundle.family.checkProofGrade modelTags = true :=
+      (importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
+        bundle.family
+        modelTags).mpr hValid.1
+    have hSeedPos : decide (0 < bundle.family.seed_count) = true := by
+      simpa [decide_eq_true_eq] using hValid.2.1
+    have hNorm : bundle.confidential_slot_program.checkRuntimeNormalForm = true :=
+      (importedConfidentialKernelSlotProgram_checkRuntimeNormalForm_eq_true_iff _).mpr hValid.2.2.1
+    have hEntrypoint :
+        decide
+          (bundle.confidential_slot_program.entrypoint_id =
+            bundle.runtimePublicOutcome.entrypointId) = true := by
+      simpa [decide_eq_true_eq] using hValid.2.2.2.1
+    have hAll :
+        (List.range bundle.family.seed_count).all fun seed =>
+          match bundle.family.witnessAt? seed with
+          | some witness =>
+              checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+                  witness
+                  bundle.confidential_slot_program
+                  modelTags &&
+                decide (witness.public_outcome = bundle.public_outcome) &&
+                decide (witness.boundary_schedule = bundle.boundary_schedule)
+          | none => false := by
+      refine List.all_eq_true.mpr ?_
+      intro seed hSeedMem
+      have hSeed : seed < bundle.family.seed_count := List.mem_range.mp hSeedMem
+      rcases hValid.2.2.2.2 seed hSeed with ⟨witness, hWitness, hSlot, hOutcome, hBoundary⟩
+      have hSlotCheck :
+          checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+            witness
+            bundle.confidential_slot_program
+            modelTags = true :=
+        (importedRuntimeConfidentialCoreKernelInterfaceSlotAssurance_check_eq_true_iff
+          _ _ _).mpr hSlot
+      have hOutcomeCheck : decide (witness.public_outcome = bundle.public_outcome) = true := by
+        simpa [decide_eq_true_eq] using hOutcome
+      have hBoundaryCheck :
+          decide (witness.boundary_schedule = bundle.boundary_schedule) = true := by
+        simpa [decide_eq_true_eq] using hBoundary
+      simp [hWitness, hSlotCheck, hOutcomeCheck, hBoundaryCheck]
+    unfold ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
+    simp [hFamily, hSeedPos, hNorm, hEntrypoint, hAll]
+
+theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_slot_assurance
+  {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  bundle.family.ProofGradePaperMainRuntimeAssurance modelTags ∧
+    bundle.confidential_slot_program.RuntimeNormalForm ∧
+    bundle.confidential_slot_program.entrypoint_id = bundle.runtimePublicOutcome.entrypointId ∧
+    ∀ seed, seed < bundle.family.seed_count →
+      ∃ witness,
+        bundle.family.witnessAt? seed = some witness ∧
+          ImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+            witness
+            bundle.confidential_slot_program
+            modelTags := by
+  refine ⟨?_, hValid.2.2.1, hValid.2.2.2.1, ?_⟩
+  · have hKernelInterface :
+        bundle.family.ProofGradeKernelInterfaceAssurance modelTags := by
+      refine ⟨hValid.1, ?_⟩
+      intro seed hSeed
+      rcases hValid.2.2.2.2 seed hSeed with
+        ⟨witness, hWitness, hSlot, _hOutcome, _hBoundary⟩
+      exact
+        ⟨witness, hWitness,
+          importedWitness_proofGradeKernelInterfaceBundle witness modelTags hSlot.1⟩
+    refine ⟨hKernelInterface, ?_, ?_⟩
+    · refine ⟨hValid.2.1, ?_⟩
+      intro seed hSeed
+      have hSeedOutcome :
+          (bundle.family.runtimeWitnessAt seed).publicOutcome =
+            bundle.runtimePublicOutcome := by
+        rcases hValid.2.2.2.2 seed hSeed with
+          ⟨witness, hWitness, _hSlot, hOutcome, _hBoundary⟩
+        simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
+          ImportedRuntimeRefinementWitness.toRuntimeWitness,
+          ImportedSeededRuntimePaperMainSlotFamilyBundle.runtimePublicOutcome,
+          hWitness]
+          using congrArg ImportedPublicOutcomeTrace.toPublicOutcome hOutcome
+      have hZeroOutcome :
+          (bundle.family.runtimeWitnessAt 0).publicOutcome =
+            bundle.runtimePublicOutcome := by
+        rcases hValid.2.2.2.2 0 hValid.2.1 with
+          ⟨witness, hWitness, _hSlot, hOutcome, _hBoundary⟩
+        simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
+          ImportedRuntimeRefinementWitness.toRuntimeWitness,
+          ImportedSeededRuntimePaperMainSlotFamilyBundle.runtimePublicOutcome,
+          hWitness]
+          using congrArg ImportedPublicOutcomeTrace.toPublicOutcome hOutcome
+      calc
+        (bundle.family.runtimeWitnessAt seed).publicOutcome = bundle.runtimePublicOutcome :=
+          hSeedOutcome
+        _ = (bundle.family.runtimeWitnessAt 0).publicOutcome := by
+              simpa using hZeroOutcome.symm
+    · refine ⟨hValid.2.1, ?_⟩
+      intro seed hSeed
+      have hSeedBoundary :
+          (bundle.family.runtimeWitnessAt seed).boundarySchedule =
+            bundle.runtimeBoundarySchedule := by
+        rcases hValid.2.2.2.2 seed hSeed with
+          ⟨witness, hWitness, _hSlot, _hOutcome, hBoundary⟩
+        simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
+          ImportedRuntimeRefinementWitness.toRuntimeWitness,
+          ImportedSeededRuntimePaperMainSlotFamilyBundle.runtimeBoundarySchedule,
+          hWitness]
+          using congrArg (List.map ImportedBoundaryEvent.toBoundaryEvent) hBoundary
+      have hZeroBoundary :
+          (bundle.family.runtimeWitnessAt 0).boundarySchedule =
+            bundle.runtimeBoundarySchedule := by
+        rcases hValid.2.2.2.2 0 hValid.2.1 with
+          ⟨witness, hWitness, _hSlot, _hOutcome, hBoundary⟩
+        simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
+          ImportedRuntimeRefinementWitness.toRuntimeWitness,
+          ImportedSeededRuntimePaperMainSlotFamilyBundle.runtimeBoundarySchedule,
+          hWitness]
+          using congrArg (List.map ImportedBoundaryEvent.toBoundaryEvent) hBoundary
+      calc
+        (bundle.family.runtimeWitnessAt seed).boundarySchedule =
+            bundle.runtimeBoundarySchedule := hSeedBoundary
+        _ = (bundle.family.runtimeWitnessAt 0).boundarySchedule := by
+              simpa using hZeroBoundary.symm
+  · intro seed hSeed
+    rcases hValid.2.2.2.2 seed hSeed with
+      ⟨witness, hWitness, hSlot, _hOutcome, _hBoundary⟩
+    exact ⟨witness, hWitness, hSlot⟩
+
+def parseImportedSeededRuntimePaperMainSlotFamilyBundle
+  (input : String) : Except String ImportedSeededRuntimePaperMainSlotFamilyBundle := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedProofGradeSeededRuntimePaperMainSlotFamilyBundle
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedSeededRuntimePaperMainSlotFamilyBundle := do
+  let bundle ← parseImportedSeededRuntimePaperMainSlotFamilyBundle input
+  if bundle.checkValid modelTags then
+    pure bundle
+  else
+    throw
+      "imported proof-grade seeded runtime paper-main slot family bundle does not satisfy Lean validity checks"
+
+def loadImportedSeededRuntimePaperMainSlotFamilyBundle
+  (path : System.FilePath) : IO ImportedSeededRuntimePaperMainSlotFamilyBundle := do
+  let input ← IO.FS.readFile path
+  match parseImportedSeededRuntimePaperMainSlotFamilyBundle input with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <|
+        IO.userError s!"failed to parse seeded runtime paper-main slot family bundle: {err}"
+
+def loadAndCheckImportedProofGradeSeededRuntimePaperMainSlotFamilyBundle
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedSeededRuntimePaperMainSlotFamilyBundle := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeSeededRuntimePaperMainSlotFamilyBundle input modelTags with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <|
+        IO.userError
+          s!"failed to validate proof-grade seeded runtime paper-main slot family bundle: {err}"
 
 structure ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily where
   seed_count : Nat

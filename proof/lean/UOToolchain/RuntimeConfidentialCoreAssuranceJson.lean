@@ -297,6 +297,58 @@ theorem importedWitness_toRuntimeWitness_proofGradeConfidentialCoreSlotAssurance
       by simp [ImportedRuntimeRefinementWitness.toRuntimeWitness, hKernel],
       hScheduleExact.1, hScheduleExact.2⟩
 
+def ImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+  (runtimeWitness : ImportedRuntimeRefinementWitness)
+  (program : ImportedConfidentialKernelSlotProgram)
+  (modelTags : SGXModelTags) : Prop :=
+  runtimeWitness.ProofGradeValid modelTags ∧
+    program.RuntimeNormalForm ∧
+    ∃ kernelInterfaceBundle,
+      runtimeWitness.kernelInterfaceBundle? = some kernelInterfaceBundle ∧
+        kernelInterfaceBundle.Valid ∧
+        kernelInterfaceBundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+          some program.expectedRuntimeKernelSteps ∧
+        kernelInterfaceBundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+          program.expectedRuntimeKernelSteps
+
+def checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+  (runtimeWitness : ImportedRuntimeRefinementWitness)
+  (program : ImportedConfidentialKernelSlotProgram)
+  (modelTags : SGXModelTags) : Bool :=
+  runtimeWitness.checkProofGrade modelTags &&
+    program.checkRuntimeNormalForm &&
+    match runtimeWitness.kernelInterfaceBundle? with
+    | none => false
+    | some kernelInterfaceBundle =>
+        ImportedRuntimeKernelInterfaceBundle.checkValid kernelInterfaceBundle &&
+          decide
+            (kernelInterfaceBundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+              some program.expectedRuntimeKernelSteps) &&
+          decide
+            (kernelInterfaceBundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+              program.expectedRuntimeKernelSteps)
+
+@[simp] theorem importedRuntimeConfidentialCoreKernelInterfaceSlotAssurance_check_eq_true_iff
+  (runtimeWitness : ImportedRuntimeRefinementWitness)
+  (program : ImportedConfidentialKernelSlotProgram)
+  (modelTags : SGXModelTags) :
+  checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+      runtimeWitness program modelTags = true ↔
+    ImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+      runtimeWitness program modelTags := by
+  cases hBundle : runtimeWitness.kernelInterfaceBundle? with
+  | none =>
+      unfold checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+        ImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+      simp [hBundle]
+  | some kernelInterfaceBundle =>
+      unfold checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+        ImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+      simp [hBundle, importedWitness_checkProofGrade_eq_true_iff,
+        importedConfidentialKernelSlotProgram_checkRuntimeNormalForm_eq_true_iff,
+        importedRuntimeKernelInterfaceBundle_checkValid_eq_true_iff,
+        decide_eq_true_eq, and_assoc]
+
 def importedRuntimeConfidentialCoreSlotBundleFieldNames : List String :=
   ["runtime_witness", "confidential_slot_program"]
 

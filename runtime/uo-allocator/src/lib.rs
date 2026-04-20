@@ -13,10 +13,10 @@ pub enum ScratchRegion {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ScratchUsage {
-    pub live_bytes: usize,
-    pub peak_bytes: usize,
-    pub wipe_count: usize,
+struct ScratchUsage {
+    live_bytes: usize,
+    peak_bytes: usize,
+    wipe_count: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -28,7 +28,7 @@ pub struct AllocatorPlan {
 }
 
 impl AllocatorPlan {
-    pub fn for_entrypoint(arena_bytes: usize, max_stack_words: usize) -> Self {
+    fn for_entrypoint(arena_bytes: usize, max_stack_words: usize) -> Self {
         Self {
             arena_bytes,
             max_stack_words,
@@ -88,49 +88,6 @@ impl AllocatorSession {
             hash_scratch: ScratchUsage::default(),
             io_scratch: ScratchUsage::default(),
         }
-    }
-
-    pub fn plan(&self) -> &AllocatorPlan {
-        &self.plan
-    }
-
-    pub fn peak_stack_words(&self) -> usize {
-        self.peak_stack_words
-    }
-
-    pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {
-        &self.resource_events
-    }
-
-    pub fn value_scratch_usage(&self) -> &ScratchUsage {
-        &self.value_scratch
-    }
-
-    pub fn hash_scratch_usage(&self) -> &ScratchUsage {
-        &self.hash_scratch
-    }
-
-    pub fn io_scratch_usage(&self) -> &ScratchUsage {
-        &self.io_scratch
-    }
-
-    pub fn into_kernel_telemetry_snapshot(self) -> RuntimeKernelTelemetrySnapshot {
-        RuntimeKernelTelemetrySnapshot::new(
-            self.plan.arena_bytes,
-            self.plan.max_stack_words,
-            self.plan.scratch_bytes,
-            self.peak_stack_words,
-            self.value_scratch.peak_bytes,
-            self.value_scratch.live_bytes,
-            self.value_scratch.wipe_count,
-            self.hash_scratch.peak_bytes,
-            self.hash_scratch.live_bytes,
-            self.hash_scratch.wipe_count,
-            self.io_scratch.peak_bytes,
-            self.io_scratch.live_bytes,
-            self.io_scratch.wipe_count,
-            self.resource_events,
-        )
     }
 
     pub fn record_kernel_op(&mut self) -> Result<()> {
@@ -200,11 +157,26 @@ impl AllocatorSession {
         Ok(())
     }
 
-    pub fn finish(self) -> Result<Self> {
+    pub fn finish(self) -> Result<RuntimeKernelTelemetrySnapshot> {
         self.ensure_region_wiped(ScratchRegion::ValueScratch, &self.value_scratch)?;
         self.ensure_region_wiped(ScratchRegion::HashScratch, &self.hash_scratch)?;
         self.ensure_region_wiped(ScratchRegion::IoScratch, &self.io_scratch)?;
-        Ok(self)
+        Ok(RuntimeKernelTelemetrySnapshot::new(
+            self.plan.arena_bytes,
+            self.plan.max_stack_words,
+            self.plan.scratch_bytes,
+            self.peak_stack_words,
+            self.value_scratch.peak_bytes,
+            self.value_scratch.live_bytes,
+            self.value_scratch.wipe_count,
+            self.hash_scratch.peak_bytes,
+            self.hash_scratch.live_bytes,
+            self.hash_scratch.wipe_count,
+            self.io_scratch.peak_bytes,
+            self.io_scratch.live_bytes,
+            self.io_scratch.wipe_count,
+            self.resource_events,
+        ))
     }
 
     fn usage_mut(&mut self, region: ScratchRegion) -> &mut ScratchUsage {
@@ -425,8 +397,8 @@ mod tests {
         {
             let _guard = session.reserve_guard(ScratchRegion::IoScratch, 96).unwrap();
         }
-        assert_eq!(session.io_scratch_usage().live_bytes, 0);
-        assert_eq!(session.io_scratch_usage().peak_bytes, 96);
-        assert_eq!(session.io_scratch_usage().wipe_count, 1);
+        assert_eq!(session.io_scratch.live_bytes, 0);
+        assert_eq!(session.io_scratch.peak_bytes, 96);
+        assert_eq!(session.io_scratch.wipe_count, 1);
     }
 }

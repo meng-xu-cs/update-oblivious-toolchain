@@ -1086,6 +1086,17 @@ def RuntimeProofGradeKernelInterface
           , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
           }
 
+/--
+Explicit-bundle variant of the theorem-facing runtime/kernel interface. This
+packages the same proof obligations through the runtime-exported
+`RuntimeKernelInterfaceBundle`, so downstream theorem routes can name the
+bundle object directly instead of reconstructing the interface shape from raw
+witness fields.
+-/
+def RuntimeProofGradeKernelInterfaceBundle
+  (witness : RuntimeRefinementWitness) : Prop :=
+  ∃ bundle, witness.kernelInterfaceBundle? = some bundle ∧ bundle.Valid
+
 theorem runtimeKernelInterfaceBundle_toProofGradeKernelInterface
   {witness : RuntimeRefinementWitness}
   {bundle : RuntimeKernelInterfaceBundle}
@@ -1104,6 +1115,13 @@ theorem runtimeKernelInterfaceBundle_toProofGradeKernelInterface
       hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
       hFinalKernelScheduleState⟩
   exact runtimeShellBoundaryBundle_proofGradeRefines hShellValid
+
+theorem runtimeProofGradeKernelInterfaceBundle_toProofGradeKernelInterface
+  {witness : RuntimeRefinementWitness}
+  (hBundle : RuntimeProofGradeKernelInterfaceBundle witness) :
+  RuntimeProofGradeKernelInterface witness := by
+  rcases hBundle with ⟨bundle, hExact, hValid⟩
+  exact runtimeKernelInterfaceBundle_toProofGradeKernelInterface hExact hValid
 
 theorem runtimeWitness_proofGradeKernelBoundaryFacts
   (witness : RuntimeRefinementWitness)
@@ -1274,5 +1292,13 @@ theorem runtimeWitness_proofGradeKernelInterfaceBundle_valid
       ⟨hBundleValid, hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,
         hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
         hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+
+theorem runtimeWitness_proofGradeKernelInterfaceBundle
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  RuntimeProofGradeKernelInterfaceBundle witness := by
+  simpa [RuntimeProofGradeKernelInterfaceBundle] using
+    runtimeWitness_proofGradeKernelInterfaceBundle_valid witness modelTags hValid
 
 end UOToolchain

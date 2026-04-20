@@ -733,8 +733,9 @@ Remaining change:
   kernel rather than at the whole trace bundle
 - the remaining trusted runtime/kernel gap is now explicit in Lean as
   `PaperMainRuntimeKernelAssumptions`, which projects to the checked
-  `PaperMainRuntimeKernelBoundary` at the frozen paper route; the next proof
-  step is to discharge that bundle rather than describe it informally
+  `PaperMainRuntimeKernelBoundary` at the frozen paper route, now phrased over
+  the explicit runtime kernel-interface bundle; the next proof step is to
+  discharge that bundle rather than describe it informally
 - Lean now also has a stronger wrapper,
   `ProofGradeSeededRuntimePaperMainBundle`, that discharges
   `PaperMainRuntimeKernelAssumptions` mechanically when the seeded paper-main

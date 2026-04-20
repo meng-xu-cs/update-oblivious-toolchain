@@ -116,9 +116,10 @@ restricted to `pub(in crate::runtime)`, and only
 `runtime.run_confidential_entrypoint(...)` inside the traced-call bridge.
 For confidential calls, that same theorem finalizer now also re-derives the
 runtime refinement witness, canonically retags it for the single-seed paper
-route, and rebuilds the explicit `SeededRuntimePaperMainFamilyBundle` before
-returning the trace, so the production runtime path now rechecks the paper
-theorem object instead of leaving it solely to offline probe validation.
+route, and rebuilds the explicit `SeededRuntimePaperMainFamilyBundle` and
+`SeededRuntimePaperMainSlotFamilyBundle` before returning the trace, so the
+production runtime path now rechecks both paper-route theorem objects instead
+of leaving them solely to offline probe validation.
 The same report now also pins the residual raw public-field surface in the
 runtime hot path: after the `MapEntry` / `OramState` / `OramTranscript` /
 `OramCommit` / `OramWrite` / `OramStorage` / `OramBlock` / `OramBucket`
