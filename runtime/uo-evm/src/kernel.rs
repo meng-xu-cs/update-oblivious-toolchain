@@ -12,7 +12,7 @@ use uo_core::{
     BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
     ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement, RuntimeKernelExecutionTracker,
     RuntimeKernelRefinementTracker, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
-    RuntimeKernelTelemetrySnapshot, RuntimeKernelWitness, UnaryOp, Value,
+    RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
 
@@ -667,25 +667,9 @@ impl RuntimeKernel {
         self.allocator.wipe_region(ScratchRegion::IoScratch);
         let allocator = self.allocator.finish()?;
         let public_object_ids = self.public_object_ids.clone();
-        let telemetry = RuntimeKernelTelemetrySnapshot::new(
-            allocator.plan().arena_bytes,
-            allocator.plan().max_stack_words,
-            allocator.plan().scratch_bytes,
-            allocator.peak_stack_words(),
-            allocator.value_scratch_usage().peak_bytes,
-            allocator.value_scratch_usage().live_bytes,
-            allocator.value_scratch_usage().wipe_count,
-            allocator.hash_scratch_usage().peak_bytes,
-            allocator.hash_scratch_usage().live_bytes,
-            allocator.hash_scratch_usage().wipe_count,
-            allocator.io_scratch_usage().peak_bytes,
-            allocator.io_scratch_usage().live_bytes,
-            allocator.io_scratch_usage().wipe_count,
-            allocator.resource_events().to_vec(),
-        );
         let kernel_witness = RuntimeKernelWitness::from_telemetry_and_execution_tracker(
             entrypoint_id.into(),
-            telemetry,
+            allocator.into_kernel_telemetry_snapshot(),
             self.kernel_execution,
             public_object_ids.clone(),
             Some(public_object_ids.clone()),

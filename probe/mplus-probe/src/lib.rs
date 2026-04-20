@@ -11463,7 +11463,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source
             .contains("pub fn kernel_steps(&self) -> &[RuntimeKernelStepWitness] {");
     let runtime_kernel_witness_builder_path_restricted = kernel_source
-        .contains("RuntimeKernelTelemetrySnapshot::new(")
+        .contains("allocator.into_kernel_telemetry_snapshot()")
+        && allocator_source.contains(
+            "pub fn into_kernel_telemetry_snapshot(self) -> RuntimeKernelTelemetrySnapshot {",
+        )
         && kernel_source.contains("RuntimeKernelWitness::from_telemetry_and_execution_tracker(")
         && !kernel_source.contains("RuntimeKernelWitness::new(")
         && !kernel_source.contains("RuntimeKernelWitness {")

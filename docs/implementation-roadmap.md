@@ -293,6 +293,9 @@ The first implementation step is now present in the codebase:
   collapsed into a shared `uo-core` telemetry/execution helper, so the runtime
   no longer owns the field-by-field assembly of the theorem-facing kernel
   witness after execution finishes
+- `uo-allocator` now also emits the corresponding `RuntimeKernelTelemetrySnapshot`
+  directly, so `kernel.rs` no longer repacks allocator plan/scratch/resource
+  telemetry into that core witness-builder call by hand
 - that runtime phase witness is now also exported through a sealed
   `RuntimeKernelRefinementWitness` surface: the `events` vector is private,
   cross-module consumers rebuild or inspect witnesses through explicit

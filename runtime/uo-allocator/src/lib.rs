@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use uo_core::{
     EntrypointManifest, RuntimeKernelResourceEventWitness, RuntimeKernelScratchRegionWitness,
+    RuntimeKernelTelemetrySnapshot,
 };
 use uo_precompiles::UoOpcode;
 
@@ -117,6 +118,25 @@ impl AllocatorSession {
 
     pub fn io_scratch_usage(&self) -> &ScratchUsage {
         &self.io_scratch
+    }
+
+    pub fn into_kernel_telemetry_snapshot(self) -> RuntimeKernelTelemetrySnapshot {
+        RuntimeKernelTelemetrySnapshot::new(
+            self.plan.arena_bytes,
+            self.plan.max_stack_words,
+            self.plan.scratch_bytes,
+            self.peak_stack_words,
+            self.value_scratch.peak_bytes,
+            self.value_scratch.live_bytes,
+            self.value_scratch.wipe_count,
+            self.hash_scratch.peak_bytes,
+            self.hash_scratch.live_bytes,
+            self.hash_scratch.wipe_count,
+            self.io_scratch.peak_bytes,
+            self.io_scratch.live_bytes,
+            self.io_scratch.wipe_count,
+            self.resource_events,
+        )
     }
 
     pub fn record_kernel_op(&mut self, opcode: UoOpcode) -> Result<()> {
