@@ -290,10 +290,11 @@ current kernel-side statement is therefore: the runtime enforces the admitted
 public kernel schedule online through shared `uo-core` schedule and execution
 trackers, routes runtime-phase witness construction through the same shared
 `uo-core` refinement tracker used by the witness validator, and emits a
-proof-grade kernel witness that is checked directly, emits a lower-level
-runtime phase witness whose projection to that kernel schedule is checked
-directly, and also packages the same kernel boundary through the
-trusted-kernel and refinement-bundle paths, with Lean now checking exact
-schedule equality plus successful modeled small-kernel replay,
+proof-grade kernel witness whose final assembly now also goes through a shared
+core telemetry/execution helper, emits a lower-level runtime phase witness
+whose projection to that kernel schedule is checked directly, and also
+packages the same kernel boundary through the trusted-kernel and
+refinement-bundle paths, with Lean now checking exact schedule equality plus
+successful modeled small-kernel replay,
 not that the whole Rust runtime has already been reduced to that model by a
 machine-checked refinement proof.

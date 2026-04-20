@@ -289,6 +289,10 @@ The first implementation step is now present in the codebase:
   `RuntimeKernelRefinementTracker` in `uo-core`, so `kernel.rs` no longer owns
   a separate phase-machine helper or local event-bound calculation for the
   lower-level refinement witness
+- the final `RuntimeKernelWitness` constructor call in `kernel.rs` has now
+  collapsed into a shared `uo-core` telemetry/execution helper, so the runtime
+  no longer owns the field-by-field assembly of the theorem-facing kernel
+  witness after execution finishes
 - that runtime phase witness is now also exported through a sealed
   `RuntimeKernelRefinementWitness` surface: the `events` vector is private,
   cross-module consumers rebuild or inspect witnesses through explicit

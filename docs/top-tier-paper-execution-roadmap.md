@@ -271,7 +271,10 @@ Concrete tasks:
    phase helper, so the old tail-appending witness mutators are no longer part
    of the production API surface. The emitted kernel-step trace now likewise
    routes through a shared `uo-core` execution tracker rather than a local
-   bounded journal in `kernel.rs`. The production trace finalizer
+   bounded journal in `kernel.rs`, and the final `RuntimeKernelWitness`
+   assembly now also routes through a `uo-core` telemetry/execution helper
+   rather than a runtime-local field-to-field constructor call. The production
+   trace finalizer
    now also re-derives and validates the admitted confidential proof-bearing
    bundle family online for confidential calls: direct kernel DSL / slot /
    lowering bundles, the trusted-kernel slot bundle, and the confidential-core

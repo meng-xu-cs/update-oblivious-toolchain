@@ -485,6 +485,24 @@ pub struct RuntimeKernelWitness {
     kernel_steps: Vec<RuntimeKernelStepWitness>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeKernelTelemetrySnapshot {
+    arena_bytes: usize,
+    max_stack_words: usize,
+    scratch_bytes: usize,
+    peak_stack_words: usize,
+    value_scratch_peak_bytes: usize,
+    value_scratch_live_bytes_end: usize,
+    value_scratch_wipe_count: usize,
+    hash_scratch_peak_bytes: usize,
+    hash_scratch_live_bytes_end: usize,
+    hash_scratch_wipe_count: usize,
+    io_scratch_peak_bytes: usize,
+    io_scratch_live_bytes_end: usize,
+    io_scratch_wipe_count: usize,
+    resource_events: Vec<RuntimeKernelResourceEventWitness>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SeededRuntimeWitnessFamily {
     seed_count: usize,
@@ -1757,7 +1775,82 @@ struct RuntimeKernelResourceReplayState {
     io_scratch: RuntimeKernelResourceReplayUsage,
 }
 
+impl RuntimeKernelTelemetrySnapshot {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        arena_bytes: usize,
+        max_stack_words: usize,
+        scratch_bytes: usize,
+        peak_stack_words: usize,
+        value_scratch_peak_bytes: usize,
+        value_scratch_live_bytes_end: usize,
+        value_scratch_wipe_count: usize,
+        hash_scratch_peak_bytes: usize,
+        hash_scratch_live_bytes_end: usize,
+        hash_scratch_wipe_count: usize,
+        io_scratch_peak_bytes: usize,
+        io_scratch_live_bytes_end: usize,
+        io_scratch_wipe_count: usize,
+        resource_events: Vec<RuntimeKernelResourceEventWitness>,
+    ) -> Self {
+        Self {
+            arena_bytes,
+            max_stack_words,
+            scratch_bytes,
+            peak_stack_words,
+            value_scratch_peak_bytes,
+            value_scratch_live_bytes_end,
+            value_scratch_wipe_count,
+            hash_scratch_peak_bytes,
+            hash_scratch_live_bytes_end,
+            hash_scratch_wipe_count,
+            io_scratch_peak_bytes,
+            io_scratch_live_bytes_end,
+            io_scratch_wipe_count,
+            resource_events,
+        }
+    }
+
+    pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {
+        &self.resource_events
+    }
+}
+
 impl RuntimeKernelWitness {
+    pub fn from_telemetry_and_execution_tracker(
+        entrypoint_id: String,
+        telemetry: RuntimeKernelTelemetrySnapshot,
+        kernel_execution: RuntimeKernelExecutionTracker,
+        public_object_ids: Vec<u32>,
+        expected_public_object_ids: Option<Vec<u32>>,
+    ) -> Result<Self, KernelWitnessError> {
+        let expected_kernel_steps = kernel_execution
+            .expected_kernel_steps()
+            .map(|steps| steps.to_vec());
+        let kernel_steps = kernel_execution.into_emitted_kernel_steps();
+        Self::new(
+            entrypoint_id,
+            telemetry.arena_bytes,
+            telemetry.max_stack_words,
+            telemetry.scratch_bytes,
+            telemetry.peak_stack_words,
+            telemetry.value_scratch_peak_bytes,
+            telemetry.value_scratch_live_bytes_end,
+            telemetry.value_scratch_wipe_count,
+            telemetry.hash_scratch_peak_bytes,
+            telemetry.hash_scratch_live_bytes_end,
+            telemetry.hash_scratch_wipe_count,
+            telemetry.io_scratch_peak_bytes,
+            telemetry.io_scratch_live_bytes_end,
+            telemetry.io_scratch_wipe_count,
+            telemetry.resource_events,
+            expected_kernel_steps,
+            public_object_ids,
+            expected_public_object_ids,
+            kernel_steps,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         entrypoint_id: String,

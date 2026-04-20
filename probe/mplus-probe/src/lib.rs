@@ -10848,7 +10848,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && kernel_source.contains(".bind_expected_kernel_steps(expected_kernel_steps)")
         && kernel_source.contains(".record_step(observed.clone())?")
         && kernel_source.contains(".ensure_expected_kernel_schedule_consumed()?")
-        && kernel_source.contains(".into_emitted_kernel_steps()")
+        && kernel_source.contains("RuntimeKernelWitness::from_telemetry_and_execution_tracker(")
         && !kernel_source.contains("kernel_steps: BoundedJournal<RuntimeKernelStepWitness>")
         && !kernel_source.contains("struct BoundedJournal");
     let kernel_uses_core_refinement_tracker = kernel_source
@@ -11453,6 +11453,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("kernel_steps: Vec<RuntimeKernelStepWitness>,");
     let runtime_kernel_witness_api_is_explicit = core_trace_source.contains("pub fn new(")
         && core_trace_source.contains(") -> Result<Self, KernelWitnessError> {")
+        && core_trace_source.contains("pub fn from_telemetry_and_execution_tracker(")
         && core_trace_source.contains("pub fn entrypoint_id(&self) -> &str {")
         && core_trace_source
             .contains("pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {")
@@ -11462,7 +11463,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source
             .contains("pub fn kernel_steps(&self) -> &[RuntimeKernelStepWitness] {");
     let runtime_kernel_witness_builder_path_restricted = kernel_source
-        .contains("RuntimeKernelWitness::new(")
+        .contains("RuntimeKernelTelemetrySnapshot::new(")
+        && kernel_source.contains("RuntimeKernelWitness::from_telemetry_and_execution_tracker(")
+        && !kernel_source.contains("RuntimeKernelWitness::new(")
         && !kernel_source.contains("RuntimeKernelWitness {")
         && probe_source.contains("kernel_witness.kernel_steps().len()")
         && probe_source.contains("kernel_witness.resource_events().len()")
