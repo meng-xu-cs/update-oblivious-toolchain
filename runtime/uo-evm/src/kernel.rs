@@ -8,12 +8,11 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
-use uo_core::trace::{runtime_kernel_refinement_phase_step, RuntimeKernelRefinementPhase};
 use uo_core::{
     BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
     ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
-    RuntimeKernelScheduleTracker, RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
+    RuntimeKernelRefinementTracker, RuntimeKernelRefinementWitness, RuntimeKernelScheduleTracker,
+    RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
 
@@ -23,7 +22,7 @@ struct RuntimeKernel {
     max_hash_part_bytes: usize,
     expected_kernel_schedule: RuntimeKernelScheduleTracker,
     kernel_steps: BoundedJournal<RuntimeKernelStepWitness>,
-    runtime_phase_events: RuntimePhaseJournal,
+    runtime_phase_events: RuntimeKernelRefinementTracker,
 }
 
 pub(in crate::runtime) struct PublicRuntimeKernel {
@@ -61,107 +60,6 @@ impl<T> BoundedJournal<T> {
 
     fn into_vec(self) -> Vec<T> {
         self.entries
-    }
-}
-
-struct RuntimePhaseJournal {
-    inner: BoundedJournal<RuntimeKernelRefinementEventWitness>,
-    phase: RuntimeKernelRefinementPhase,
-}
-
-impl RuntimePhaseJournal {
-    fn with_capacity(max_len: usize) -> Self {
-        Self {
-            inner: BoundedJournal::with_capacity("runtime-phase-event", max_len),
-            phase: RuntimeKernelRefinementPhase::BeforeBegin,
-        }
-    }
-
-    fn push(&mut self, event: RuntimeKernelRefinementEventWitness) -> Result<()> {
-        self.inner.push(event)
-    }
-
-    fn observe_event(&mut self, event: &RuntimeKernelRefinementEventWitness) -> Result<()> {
-        self.phase = runtime_kernel_refinement_phase_step(self.phase, event).ok_or_else(|| {
-            anyhow!(
-                "runtime-phase journal rejected event {:?} in phase {:?}",
-                event.kind(),
-                self.phase
-            )
-        })?;
-        Ok(())
-    }
-
-    fn push_pre_committed_cold_object(&mut self, object_id: u32) -> Result<()> {
-        let event = RuntimeKernelRefinementEventWitness::pre_committed_cold_object(object_id);
-        self.observe_event(&event)?;
-        self.push(event)
-    }
-
-    fn push_shadow_load_object(&mut self, object_id: u32) -> Result<()> {
-        let event = RuntimeKernelRefinementEventWitness::shadow_load_object(object_id);
-        self.observe_event(&event)?;
-        self.push(event)
-    }
-
-    fn push_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
-        let event = RuntimeKernelRefinementEventWitness::kernel_step(opcode, object_id);
-        self.observe_event(&event)?;
-        self.push(event)
-    }
-
-    fn append_commit_object_schedule<I>(&mut self, object_ids: I) -> Result<()>
-    where
-        I: IntoIterator<Item = u32>,
-    {
-        if self.phase != RuntimeKernelRefinementPhase::CommitObjectWindow {
-            bail!(
-                "runtime-phase journal rejected commit-object schedule in phase {:?}",
-                self.phase
-            );
-        }
-        for object_id in object_ids {
-            let event = RuntimeKernelRefinementEventWitness::commit_object(object_id);
-            self.observe_event(&event)?;
-            self.push(event)?;
-        }
-        Ok(())
-    }
-
-    fn append_cold_store_window(&mut self, public_object_ids: &[u32]) -> Result<()> {
-        if self.phase != RuntimeKernelRefinementPhase::AfterWipe {
-            bail!(
-                "runtime-phase journal rejected cold-store tail in phase {:?}",
-                self.phase
-            );
-        }
-        let cold_stored_object_ids = self.shadow_load_object_schedule();
-        for object_id in cold_stored_object_ids {
-            let event = RuntimeKernelRefinementEventWitness::cold_store_object(object_id);
-            self.observe_event(&event)?;
-            self.push(event)?;
-        }
-        for object_id in public_object_ids.iter().copied() {
-            let event = RuntimeKernelRefinementEventWitness::post_committed_cold_object(object_id);
-            self.observe_event(&event)?;
-            self.push(event)?;
-        }
-        Ok(())
-    }
-
-    fn shadow_load_object_schedule(&self) -> Vec<u32> {
-        self.inner
-            .entries
-            .iter()
-            .filter(|event| {
-                event.kind() == uo_core::RuntimeKernelRefinementEventKindWitness::ShadowLoadObject
-            })
-            .filter_map(RuntimeKernelRefinementEventWitness::object_id)
-            .collect()
-    }
-
-    fn into_witness(self) -> Result<RuntimeKernelRefinementWitness> {
-        RuntimeKernelRefinementWitness::from_events(self.inner.into_vec()).map_err(Into::into)
     }
 }
 
@@ -239,22 +137,6 @@ impl ConfidentialExecState {
     fn live_slot_words(&self) -> usize {
         self.initialized_slots
     }
-}
-
-fn max_runtime_phase_event_count(
-    public_object_count: usize,
-    max_kernel_ops: usize,
-) -> Result<usize> {
-    public_object_count
-        .checked_mul(5)
-        .and_then(|count| count.checked_add(max_kernel_ops))
-        .ok_or_else(|| {
-            anyhow!(
-                "runtime phase-event bound overflowed for {} public objects and {} kernel ops",
-                public_object_count,
-                max_kernel_ops
-            )
-        })
 }
 
 impl Drop for ConfidentialExecState {
@@ -433,8 +315,7 @@ impl PublicRuntimeKernel {
 impl RuntimeKernel {
     fn begin(plan: AllocatorPlan, public_object_ids: Vec<u32>) -> Result<Self> {
         let kernel_step_capacity = plan.max_kernel_ops;
-        let runtime_phase_event_capacity =
-            max_runtime_phase_event_count(public_object_ids.len(), plan.max_kernel_ops)?;
+        let public_object_count = public_object_ids.len();
         let mut kernel = Self {
             allocator: AllocatorSession::new(plan),
             public_object_ids,
@@ -444,7 +325,11 @@ impl RuntimeKernel {
                 "runtime-kernel-step",
                 kernel_step_capacity,
             ),
-            runtime_phase_events: RuntimePhaseJournal::with_capacity(runtime_phase_event_capacity),
+            runtime_phase_events:
+                RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(
+                    public_object_count,
+                    kernel_step_capacity,
+                )?,
         };
         for object_id in kernel.public_object_ids.clone() {
             kernel
@@ -490,7 +375,9 @@ impl RuntimeKernel {
     }
 
     fn record_shadow_load_object(&mut self, object_id: u32) -> Result<()> {
-        self.runtime_phase_events.push_shadow_load_object(object_id)
+        Ok(self
+            .runtime_phase_events
+            .push_shadow_load_object(object_id)?)
     }
 
     fn cell_get(
@@ -1232,9 +1119,9 @@ fn lhs_bool(value: &Value) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{max_runtime_phase_event_count, BoundedJournal, RuntimeKernel};
+    use super::{BoundedJournal, RuntimeKernel};
     use uo_allocator::AllocatorPlan;
-    use uo_core::RuntimeKernelStepWitness;
+    use uo_core::{max_runtime_kernel_refinement_event_count, RuntimeKernelStepWitness};
     use uo_precompiles::UoOpcode;
 
     #[test]
@@ -1247,8 +1134,8 @@ mod tests {
 
     #[test]
     fn runtime_phase_event_bound_matches_public_objects_and_kernel_ops() {
-        assert_eq!(max_runtime_phase_event_count(0, 3).unwrap(), 3);
-        assert_eq!(max_runtime_phase_event_count(2, 4).unwrap(), 14);
+        assert_eq!(max_runtime_kernel_refinement_event_count(0, 3).unwrap(), 3);
+        assert_eq!(max_runtime_kernel_refinement_event_count(2, 4).unwrap(), 14);
     }
 
     #[test]

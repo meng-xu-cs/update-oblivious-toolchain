@@ -285,6 +285,10 @@ The first implementation step is now present in the codebase:
   shared `uo-core` phase-aware helpers plus a bounded runtime-phase journal
   wrapper, so `kernel.rs` / `state.rs` no longer extend those witness tails by
   mutating raw event vectors directly
+- that runtime-phase journal now also lives behind the shared
+  `RuntimeKernelRefinementTracker` in `uo-core`, so `kernel.rs` no longer owns
+  a separate phase-machine helper or local event-bound calculation for the
+  lower-level refinement witness
 - that runtime phase witness is now also exported through a sealed
   `RuntimeKernelRefinementWitness` surface: the `events` vector is private,
   cross-module consumers rebuild or inspect witnesses through explicit

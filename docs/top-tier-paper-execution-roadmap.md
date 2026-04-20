@@ -265,8 +265,10 @@ Concrete tasks:
    The runtime kernel now also emits the complete runtime-phase witness tail
    itself, with the live journal and the witness validator now sharing the same
    phase-transition function for commit/cold-store progression before the
-   witness is materialized, and the old tail-appending witness mutators are no
-   longer part of the production API surface. The production trace finalizer
+   witness is materialized, and that live runtime-phase journal now routes
+   through a shared `uo-core` refinement tracker rather than a runtime-local
+   phase helper, so the old tail-appending witness mutators are no longer part
+   of the production API surface. The production trace finalizer
    now also re-derives and validates the admitted confidential proof-bearing
    bundle family online for confidential calls: direct kernel DSL / slot /
    lowering bundles, the trusted-kernel slot bundle, and the confidential-core

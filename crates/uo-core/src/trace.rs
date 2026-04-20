@@ -321,6 +321,13 @@ pub struct RuntimeKernelScheduleTracker {
     expected_kernel_step_index: usize,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeKernelRefinementTracker {
+    events: Vec<RuntimeKernelRefinementEventWitness>,
+    max_event_count: usize,
+    phase: RuntimeKernelRefinementPhase,
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeKernelRefinementEventKindWitness {
@@ -584,6 +591,28 @@ pub enum RuntimeKernelRefinementWitnessError {
         kernel_objects: Vec<u32>,
         loaded_objects: Vec<u32>,
     },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimeKernelRefinementTrackerError {
+    EventCapacityOverflow {
+        public_object_count: usize,
+        max_kernel_ops: usize,
+    },
+    EventCapacityExceeded {
+        attempted_events: usize,
+        max_events: usize,
+    },
+    UnexpectedPhaseEvent {
+        phase: RuntimeKernelRefinementPhase,
+        event: RuntimeKernelRefinementEventWitness,
+    },
+    PhaseMismatch {
+        action: &'static str,
+        observed: RuntimeKernelRefinementPhase,
+        expected: RuntimeKernelRefinementPhase,
+    },
+    Witness(RuntimeKernelRefinementWitnessError),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -985,6 +1014,54 @@ impl fmt::Display for RuntimeKernelRefinementWitnessError {
 }
 
 impl std::error::Error for RuntimeKernelRefinementWitnessError {}
+
+impl fmt::Display for RuntimeKernelRefinementTrackerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EventCapacityOverflow {
+                public_object_count,
+                max_kernel_ops,
+            } => write!(
+                f,
+                "runtime-phase event bound overflowed for {} public objects and {} kernel ops",
+                public_object_count, max_kernel_ops
+            ),
+            Self::EventCapacityExceeded {
+                attempted_events,
+                max_events,
+            } => write!(
+                f,
+                "runtime-phase tracker exceeded bound: attempted {} events with bound {}",
+                attempted_events, max_events
+            ),
+            Self::UnexpectedPhaseEvent { phase, event } => write!(
+                f,
+                "runtime-phase tracker rejected event {:?} in phase {:?}",
+                event.kind(),
+                phase
+            ),
+            Self::PhaseMismatch {
+                action,
+                observed,
+                expected,
+            } => write!(
+                f,
+                "runtime-phase tracker cannot {} in phase {:?}; expected {:?}",
+                action, observed, expected
+            ),
+            Self::Witness(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RuntimeKernelRefinementTrackerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Witness(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 impl fmt::Display for KernelWitnessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -2380,6 +2457,148 @@ impl RuntimeKernelScheduleTracker {
 
     pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {
         self.expected_kernel_steps.as_deref()
+    }
+}
+
+pub fn max_runtime_kernel_refinement_event_count(
+    public_object_count: usize,
+    max_kernel_ops: usize,
+) -> Result<usize, RuntimeKernelRefinementTrackerError> {
+    public_object_count
+        .checked_mul(5)
+        .and_then(|count| count.checked_add(max_kernel_ops))
+        .ok_or(RuntimeKernelRefinementTrackerError::EventCapacityOverflow {
+            public_object_count,
+            max_kernel_ops,
+        })
+}
+
+impl RuntimeKernelRefinementTracker {
+    pub fn with_public_object_count_and_kernel_ops(
+        public_object_count: usize,
+        max_kernel_ops: usize,
+    ) -> Result<Self, RuntimeKernelRefinementTrackerError> {
+        let max_event_count =
+            max_runtime_kernel_refinement_event_count(public_object_count, max_kernel_ops)?;
+        Ok(Self {
+            events: Vec::with_capacity(max_event_count.max(1)),
+            max_event_count,
+            phase: RuntimeKernelRefinementPhase::BeforeBegin,
+        })
+    }
+
+    fn push_observed_event(
+        &mut self,
+        event: RuntimeKernelRefinementEventWitness,
+    ) -> Result<(), RuntimeKernelRefinementTrackerError> {
+        if self.events.len() >= self.max_event_count {
+            return Err(RuntimeKernelRefinementTrackerError::EventCapacityExceeded {
+                attempted_events: self.events.len() + 1,
+                max_events: self.max_event_count,
+            });
+        }
+        let next_phase =
+            runtime_kernel_refinement_phase_step(self.phase, &event).ok_or_else(|| {
+                RuntimeKernelRefinementTrackerError::UnexpectedPhaseEvent {
+                    phase: self.phase,
+                    event: event.clone(),
+                }
+            })?;
+        self.events.push(event);
+        self.phase = next_phase;
+        Ok(())
+    }
+
+    pub fn push_pre_committed_cold_object(
+        &mut self,
+        object_id: u32,
+    ) -> Result<(), RuntimeKernelRefinementTrackerError> {
+        self.push_observed_event(
+            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(object_id),
+        )
+    }
+
+    pub fn push_shadow_load_object(
+        &mut self,
+        object_id: u32,
+    ) -> Result<(), RuntimeKernelRefinementTrackerError> {
+        self.push_observed_event(RuntimeKernelRefinementEventWitness::shadow_load_object(
+            object_id,
+        ))
+    }
+
+    pub fn push_kernel_step(
+        &mut self,
+        opcode: UoOpcode,
+        object_id: Option<u32>,
+    ) -> Result<(), RuntimeKernelRefinementTrackerError> {
+        self.push_observed_event(RuntimeKernelRefinementEventWitness::kernel_step(
+            opcode, object_id,
+        ))
+    }
+
+    pub fn append_commit_object_schedule<I>(
+        &mut self,
+        object_ids: I,
+    ) -> Result<(), RuntimeKernelRefinementTrackerError>
+    where
+        I: IntoIterator<Item = u32>,
+    {
+        if self.phase != RuntimeKernelRefinementPhase::CommitObjectWindow {
+            return Err(RuntimeKernelRefinementTrackerError::PhaseMismatch {
+                action: "append commit-object schedule",
+                observed: self.phase,
+                expected: RuntimeKernelRefinementPhase::CommitObjectWindow,
+            });
+        }
+        for object_id in object_ids {
+            self.push_observed_event(RuntimeKernelRefinementEventWitness::commit_object(
+                object_id,
+            ))?;
+        }
+        Ok(())
+    }
+
+    pub fn append_cold_store_window(
+        &mut self,
+        public_object_ids: &[u32],
+    ) -> Result<(), RuntimeKernelRefinementTrackerError> {
+        if self.phase != RuntimeKernelRefinementPhase::AfterWipe {
+            return Err(RuntimeKernelRefinementTrackerError::PhaseMismatch {
+                action: "append cold-store window",
+                observed: self.phase,
+                expected: RuntimeKernelRefinementPhase::AfterWipe,
+            });
+        }
+        let cold_stored_object_ids = self.shadow_load_object_schedule();
+        for object_id in cold_stored_object_ids {
+            self.push_observed_event(RuntimeKernelRefinementEventWitness::cold_store_object(
+                object_id,
+            ))?;
+        }
+        for object_id in public_object_ids.iter().copied() {
+            self.push_observed_event(
+                RuntimeKernelRefinementEventWitness::post_committed_cold_object(object_id),
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn shadow_load_object_schedule(&self) -> Vec<u32> {
+        self.events
+            .iter()
+            .filter(|event| {
+                event.kind() == RuntimeKernelRefinementEventKindWitness::ShadowLoadObject
+            })
+            .filter_map(RuntimeKernelRefinementEventWitness::object_id)
+            .collect()
+    }
+
+    pub fn into_witness(
+        self,
+    ) -> Result<RuntimeKernelRefinementWitness, RuntimeKernelRefinementTrackerError> {
+        RuntimeKernelRefinementWitness::from_events(self.events)
+            .map_err(RuntimeKernelRefinementTrackerError::Witness)
     }
 }
 
@@ -4781,12 +5000,13 @@ mod tests {
         canonical_path_oram_leaf_seed_space_size, canonical_path_oram_seed_of_leaf_values,
         classify_write, collect_kernel_steps_from_expr,
         extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
-        CanonicalFreshCoinRuntimePathOramTheoremInput,
+        max_runtime_kernel_refinement_event_count, CanonicalFreshCoinRuntimePathOramTheoremInput,
         CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
         CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
         LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
         PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace, RefinementWitnessError,
         RuntimeControllerCertificate, RuntimeKernelRefinementEventWitness,
+        RuntimeKernelRefinementTracker, RuntimeKernelRefinementTrackerError,
         RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
         RuntimeKernelStepWitness, RuntimeKernelWitness, RuntimeOramAccessWitness,
         RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
@@ -4805,6 +5025,29 @@ mod tests {
         assert_eq!(classify_write(&[0, 0], &[1, 2]), WriteClass::Set);
         assert_eq!(classify_write(&[1, 2], &[0, 0]), WriteClass::Clear);
         assert_eq!(classify_write(&[1, 2], &[2, 3]), WriteClass::Update);
+    }
+
+    #[test]
+    fn runtime_kernel_refinement_event_bound_matches_public_objects_and_kernel_ops() {
+        assert_eq!(max_runtime_kernel_refinement_event_count(0, 3).unwrap(), 3);
+        assert_eq!(max_runtime_kernel_refinement_event_count(2, 4).unwrap(), 14);
+    }
+
+    #[test]
+    fn runtime_kernel_refinement_tracker_rejects_push_past_bound() {
+        let mut tracker =
+            RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(0, 1).unwrap();
+        tracker.push_kernel_step(UoOpcode::Begin, None).unwrap();
+        let err = tracker
+            .push_kernel_step(UoOpcode::Commit, None)
+            .unwrap_err();
+        assert_eq!(
+            err,
+            RuntimeKernelRefinementTrackerError::EventCapacityExceeded {
+                attempted_events: 2,
+                max_events: 1,
+            }
+        );
     }
 
     #[test]

@@ -10838,6 +10838,18 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && kernel_source.contains(".ensure_expected_kernel_schedule_consumed()?")
         && !kernel_source.contains("expected_kernel_step_index:")
         && !kernel_source.contains("fn enforce_expected_kernel_step(");
+    let kernel_uses_core_refinement_tracker = kernel_source
+        .contains("RuntimeKernelRefinementTracker")
+        && kernel_source.contains("runtime_phase_events: RuntimeKernelRefinementTracker")
+        && kernel_source
+            .contains("RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(")
+        && kernel_source.contains(".push_pre_committed_cold_object(object_id)?")
+        && kernel_source.contains(".push_shadow_load_object(object_id)")
+        && kernel_source.contains(".push_kernel_step(opcode, object_id)?")
+        && kernel_source.contains(".append_commit_object_schedule(committed_object_ids)?")
+        && kernel_source.contains(".append_cold_store_window(&public_object_ids)?")
+        && !kernel_source.contains("struct RuntimePhaseJournal")
+        && !kernel_source.contains("fn max_runtime_phase_event_count(");
     let kernel_confidential_call_inputs_stay_inside_runtime = kernel_source
         .contains("raw_args: Box<[Value]>")
         && theorem_source.contains("ConfidentialCallInputs::from_raw_args(args)")
@@ -10884,23 +10896,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/kernel.rs")],
         ),
         (
-            "struct RuntimePhaseJournal",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
-        ),
-        (
-            "runtime_phase_events: RuntimePhaseJournal",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
-        ),
-        (
             "entries: Vec::with_capacity(max_len.max(1))",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
-        ),
-        (
-            "fn max_runtime_phase_event_count(",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
-        ),
-        (
-            "max_runtime_phase_event_count(public_object_ids.len(), plan.max_kernel_ops)?;",
             vec![String::from("runtime/uo-evm/src/kernel.rs")],
         ),
     ]
@@ -10920,25 +10916,27 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .as_bool()
             .expect("kernel bounded-journal restriction flag must be boolean")
     });
-    let kernel_runtime_phase_helper_path_restricted = kernel_source
+    let kernel_runtime_phase_helper_path_restricted = !kernel_source
         .contains("fn push_pre_committed_cold_object(&mut self, object_id: u32) -> Result<()> {")
         && kernel_source
+            .contains("push_pre_committed_cold_object(object_id)?;")
+        && !kernel_source
             .contains("fn push_shadow_load_object(&mut self, object_id: u32) -> Result<()> {")
-        && kernel_source.contains(
+        && !kernel_source.contains(
             "fn push_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {",
         )
-        && kernel_source.contains("push_pre_committed_cold_object(object_id)?;")
-        && kernel_source.contains("push_shadow_load_object(object_id)")
-        && kernel_source.contains("push_kernel_step(opcode, object_id)?;")
-        && kernel_source
+        && !kernel_source
             .contains("fn append_commit_object_schedule<I>(&mut self, object_ids: I) -> Result<()>")
+        && kernel_source.contains("push_shadow_load_object(object_id)?")
+        && kernel_source.contains("push_kernel_step(opcode, object_id)?;")
         && kernel_source.contains(
             "self.runtime_phase_events\n            .append_commit_object_schedule(committed_object_ids)?;",
         )
         && kernel_source.contains(
             "self.runtime_phase_events\n            .append_cold_store_window(&public_object_ids)?;",
         )
-        && kernel_source.contains("Ok((kernel_witness, self.runtime_phase_events.into_witness()?))");
+        && kernel_source.contains("Ok((kernel_witness, self.runtime_phase_events.into_witness()?))")
+        && !kernel_source.contains("struct RuntimePhaseJournal");
     let state_routes_confidential_calls_through_runtime_kernel =
         state_source.contains("kernel.run_confidential_call(");
     let state_confidential_outcome_layering_is_explicit = state_source
@@ -11434,8 +11432,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("SeededRuntimePaperMainFamilyBundle::new(seeded_runtime_witness_family)");
     let runtime_phase_event_constructor_files =
         collect_production_pattern_hits(&runtime_evm_src, "RuntimeKernelRefinementEventWitness::")?;
-    let expected_runtime_phase_event_constructor_files =
-        vec![String::from("runtime/uo-evm/src/kernel.rs")];
+    let expected_runtime_phase_event_constructor_files = Vec::<String>::new();
     let runtime_phase_event_constructor_surface_restricted =
         runtime_phase_event_constructor_files == expected_runtime_phase_event_constructor_files;
     let runtime_kernel_witness_fields_private = core_trace_source
@@ -11504,32 +11501,36 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         )
         && core_trace_source
             .contains("pub fn last_event(&self) -> Option<&RuntimeKernelRefinementEventWitness> {");
-    let runtime_kernel_refinement_witness_mutators_private = !core_trace_source
-        .contains("pub fn append_commit_object_schedule(")
-        && !core_trace_source.contains("pub fn append_cold_store_window(");
+    let runtime_kernel_refinement_witness_mutators_private = !core_trace_source.contains(
+        "pub fn append_commit_object_schedule<I>(\n        &mut self,\n        object_ids: I,\n    ) -> Result<(), RuntimeKernelRefinementWitnessError>",
+    ) && !core_trace_source.contains(
+        "pub fn append_cold_store_window(\n        &mut self,\n        public_object_ids: &[u32],\n    ) -> Result<(), RuntimeKernelRefinementWitnessError>",
+    );
     let runtime_kernel_refinement_witness_builder_files = collect_production_pattern_hits(
         &runtime_evm_src,
         "RuntimeKernelRefinementWitness::from_events(",
     )?;
-    let expected_runtime_kernel_refinement_witness_builder_files =
-        vec![String::from("runtime/uo-evm/src/kernel.rs")];
+    let expected_runtime_kernel_refinement_witness_builder_files = Vec::<String>::new();
     let runtime_kernel_refinement_witness_builder_path_restricted =
         runtime_kernel_refinement_witness_builder_files
             == expected_runtime_kernel_refinement_witness_builder_files
+            && kernel_source.contains("self.runtime_phase_events.into_witness()?")
             && runtime_evm_lib_source.contains(".first_event()")
             && runtime_evm_lib_source.contains(".last_event()")
-            && runtime_evm_lib_source.contains("RuntimeKernelRefinementEventWitness::kind")
             && probe_source.contains("runtime_kernel_refinement_witness.events().to_vec()")
             && probe_source.contains("runtime_kernel_refinement_witness.event_count()");
     let runtime_kernel_refinement_witness_builder_single_shot = kernel_source
-        .match_indices("RuntimeKernelRefinementWitness::from_events(")
+        .match_indices("self.runtime_phase_events.into_witness()?")
         .count()
         == 1
+        && !kernel_source.contains("RuntimeKernelRefinementWitness::from_events(")
         && !kernel_source.contains("fn snapshot(&self)");
-    let kernel_runtime_phase_tracker_uses_shared_transition_fn = kernel_source.contains(
-        "use uo_core::trace::{runtime_kernel_refinement_phase_step, RuntimeKernelRefinementPhase};",
-    ) && kernel_source
-        .contains("self.phase = runtime_kernel_refinement_phase_step(self.phase, event)");
+    let kernel_runtime_phase_tracker_uses_shared_transition_fn = kernel_source
+        .contains("RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(")
+        && core_trace_source.contains("impl RuntimeKernelRefinementTracker {")
+        && core_trace_source.contains("runtime_kernel_refinement_phase_step(self.phase, &event)")
+        && !kernel_source.contains("runtime_kernel_refinement_phase_step")
+        && !kernel_source.contains("RuntimeKernelRefinementPhase");
     let resource_event_constructor_files =
         collect_production_pattern_hits(&allocator_src, "RuntimeKernelResourceEventWitness::")?;
     let expected_resource_event_constructor_files =
@@ -12777,6 +12778,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
         "kernel_uses_core_schedule_tracker": kernel_uses_core_schedule_tracker,
+        "kernel_uses_core_refinement_tracker": kernel_uses_core_refinement_tracker,
         "kernel_confidential_call_inputs_stay_inside_runtime":
             kernel_confidential_call_inputs_stay_inside_runtime,
         "kernel_exec_block_uses_confidential_slot_statements":
@@ -13217,6 +13219,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && confidential_entrypoint_plan_surface_restricted
             && kernel_executes_program_body_via_shared_dsl
             && kernel_uses_core_schedule_tracker
+            && kernel_uses_core_refinement_tracker
             && kernel_confidential_call_inputs_stay_inside_runtime
             && kernel_exec_block_uses_confidential_slot_statements
             && kernel_eval_uses_confidential_slot_exprs
