@@ -4,7 +4,6 @@ use uo_core::{
     EntrypointManifest, RuntimeKernelResourceEventWitness, RuntimeKernelScratchRegionWitness,
     RuntimeKernelTelemetrySnapshot,
 };
-use uo_precompiles::UoOpcode;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ScratchRegion {
@@ -59,7 +58,7 @@ impl AllocatorPlan {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AllocatorSession {
     plan: AllocatorPlan,
-    kernel_ops: Vec<UoOpcode>,
+    kernel_op_count: usize,
     resource_events: Vec<RuntimeKernelResourceEventWitness>,
     peak_stack_words: usize,
     value_scratch: ScratchUsage,
@@ -80,10 +79,9 @@ impl Drop for ScratchGuard<'_> {
 
 impl AllocatorSession {
     pub fn new(plan: AllocatorPlan) -> Self {
-        let kernel_ops = Vec::with_capacity(plan.max_kernel_ops.max(1));
         Self {
             plan,
-            kernel_ops,
+            kernel_op_count: 0,
             resource_events: Vec::new(),
             peak_stack_words: 0,
             value_scratch: ScratchUsage::default(),
@@ -94,10 +92,6 @@ impl AllocatorSession {
 
     pub fn plan(&self) -> &AllocatorPlan {
         &self.plan
-    }
-
-    pub fn kernel_ops(&self) -> &[UoOpcode] {
-        &self.kernel_ops
     }
 
     pub fn peak_stack_words(&self) -> usize {
@@ -139,15 +133,15 @@ impl AllocatorSession {
         )
     }
 
-    pub fn record_kernel_op(&mut self, opcode: UoOpcode) -> Result<()> {
-        if self.kernel_ops.len() >= self.plan.max_kernel_ops {
+    pub fn record_kernel_op(&mut self) -> Result<()> {
+        if self.kernel_op_count >= self.plan.max_kernel_ops {
             bail!(
                 "allocator kernel-op budget exceeded: {} >= {}",
-                self.kernel_ops.len(),
+                self.kernel_op_count,
                 self.plan.max_kernel_ops
             );
         }
-        self.kernel_ops.push(opcode);
+        self.kernel_op_count += 1;
         Ok(())
     }
 
@@ -384,8 +378,8 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 1,
         });
-        session.record_kernel_op(UoOpcode::Begin).unwrap();
-        assert!(session.record_kernel_op(UoOpcode::Commit).is_err());
+        session.record_kernel_op().unwrap();
+        assert!(session.record_kernel_op().is_err());
     }
 
     #[test]
@@ -410,13 +404,13 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 4,
         });
-        session.record_kernel_op(UoOpcode::Begin).unwrap();
+        session.record_kernel_op().unwrap();
         session
             .reserve_scratch(ScratchRegion::ValueScratch, 32)
             .unwrap();
         session.wipe_region(ScratchRegion::ValueScratch);
-        session.record_kernel_op(UoOpcode::Commit).unwrap();
-        session.record_kernel_op(UoOpcode::Wipe).unwrap();
+        session.record_kernel_op().unwrap();
+        session.record_kernel_op().unwrap();
         session.finish().unwrap();
     }
 

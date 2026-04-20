@@ -949,7 +949,7 @@ impl RuntimeKernel {
     fn record_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
         let observed = RuntimeKernelStepWitness::new(opcode, object_id)?;
         self.kernel_execution.record_step(observed.clone())?;
-        self.allocator.record_kernel_op(opcode)?;
+        self.allocator.record_kernel_op()?;
         self.runtime_phase_events
             .push_kernel_step(opcode, object_id)?;
         Ok(())

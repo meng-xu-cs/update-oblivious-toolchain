@@ -11367,6 +11367,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !allocator_source.contains("entry.kernel_steps.is_empty()")
         && !allocator_source.contains("entry.kernel_steps.len()")
         && !allocator_source.contains("program.expected_runtime_steps().len()");
+    let allocator_tracks_kernel_ops_by_count_only = allocator_source
+        .contains("kernel_op_count: usize,")
+        && !allocator_source.contains("kernel_ops: Vec<UoOpcode>,")
+        && !allocator_source.contains("pub fn kernel_ops(&self) -> &[UoOpcode] {")
+        && allocator_source.contains("if self.kernel_op_count >= self.plan.max_kernel_ops")
+        && allocator_source.contains("self.kernel_op_count += 1;")
+        && !allocator_source.contains("self.kernel_ops.push(opcode);");
     let translation_validation_uses_canonical_kernel_step_manifest = translation_validation_source
         .contains("canonical_kernel_step_manifest()")
         && translation_validation_source
@@ -12958,6 +12965,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             kernel_witness_validation_tracks_confidential_kernel_lowering_errors,
         "allocator_uses_manifest_kernel_step_budget":
             allocator_uses_manifest_kernel_step_budget,
+        "allocator_tracks_kernel_ops_by_count_only":
+            allocator_tracks_kernel_ops_by_count_only,
         "translation_validation_uses_canonical_kernel_step_manifest":
             translation_validation_uses_canonical_kernel_step_manifest,
         "state_uses_checked_manifest_kernel_schedule":
@@ -13267,6 +13276,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && kernel_witness_validation_uses_manifest_confidential_slot_program
             && kernel_witness_validation_tracks_confidential_kernel_lowering_errors
             && allocator_uses_manifest_kernel_step_budget
+            && allocator_tracks_kernel_ops_by_count_only
             && translation_validation_uses_canonical_kernel_step_manifest
             && state_uses_checked_manifest_kernel_schedule
             && trusted_kernel_slot_bundle_uses_manifest_confidential_slot_program
