@@ -18,7 +18,8 @@ mod tests {
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
         ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, RefinementWitnessError,
-        RuntimeKernelRefinementEventKindWitness, TheoremTrace, Value, WriteClass,
+        RuntimeKernelRefinementEventKindWitness, RuntimeKernelRefinementEventWitness,
+        RuntimeKernelStepWitness, TheoremTrace, Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
 
@@ -630,28 +631,34 @@ mod tests {
             .unwrap();
         let manifest_expected_kernel_steps = manifest_entry.kernel_step_witnesses();
         assert_eq!(
-            witness.expected_kernel_steps,
-            Some(manifest_expected_kernel_steps)
+            witness.expected_kernel_steps(),
+            Some(manifest_expected_kernel_steps.as_slice())
         );
         assert_eq!(
-            witness.kernel_steps,
-            witness.expected_kernel_steps.clone().unwrap()
+            witness.kernel_steps(),
+            manifest_expected_kernel_steps.as_slice()
         );
         let emitted_kernel_schedule = witness.emitted_kernel_schedule();
         assert_eq!(
-            emitted_kernel_schedule.opcodes.first().copied(),
+            emitted_kernel_schedule.opcodes().first().copied(),
             Some(uo_precompiles::UoOpcode::Begin)
         );
         assert_eq!(
-            emitted_kernel_schedule.opcodes.last().copied(),
+            emitted_kernel_schedule.opcodes().last().copied(),
             Some(uo_precompiles::UoOpcode::Wipe)
         );
         assert_eq!(
-            witness.kernel_steps.first().and_then(|step| step.object_id),
+            witness
+                .kernel_steps()
+                .first()
+                .and_then(RuntimeKernelStepWitness::object_id),
             None
         );
         assert_eq!(
-            witness.kernel_steps.last().and_then(|step| step.object_id),
+            witness
+                .kernel_steps()
+                .last()
+                .and_then(RuntimeKernelStepWitness::object_id),
             None
         );
     }
@@ -699,7 +706,7 @@ mod tests {
                 .kernel_witness()
                 .cloned()
                 .unwrap()
-                .kernel_steps
+                .kernel_steps()
         );
     }
 
@@ -733,11 +740,15 @@ mod tests {
         assert_eq!(phase_witness.commit_object_schedule(), vec![1]);
         assert_eq!(phase_witness.cold_store_object_schedule(), vec![1]);
         assert_eq!(
-            phase_witness.first_event().map(|event| event.kind),
+            phase_witness
+                .first_event()
+                .map(RuntimeKernelRefinementEventWitness::kind),
             Some(RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject)
         );
         assert_eq!(
-            phase_witness.last_event().map(|event| event.kind),
+            phase_witness
+                .last_event()
+                .map(RuntimeKernelRefinementEventWitness::kind),
             Some(RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject)
         );
         phase_witness

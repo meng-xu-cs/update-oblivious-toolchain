@@ -54,9 +54,7 @@ pub(in crate::runtime) fn run_public_entrypoint(
     let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
         kernel.finish(&function.signature)?;
     runtime.replace_with_cold_public_shadow(shadow);
-    let mut runtime_kernel_refinement_witness = runtime_kernel_refinement_witness;
-    runtime.finalize_runtime_kernel_refinement_witness(
-        &mut runtime_kernel_refinement_witness,
+    runtime.ensure_cold_call_boundary(
         &public_object_ids,
         "after completing the call and returning to committed storage",
     )?;

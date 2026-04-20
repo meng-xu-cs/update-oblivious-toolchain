@@ -1,5 +1,6 @@
 use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
+use crate::runtime::kernel::ConfidentialCallInputs;
 use crate::runtime::shell::run_public_entrypoint;
 use crate::runtime::state::{
     ContractRuntime, TracedRuntimeCallOutcome, TracedRuntimeCallStart,
@@ -83,7 +84,7 @@ pub(in crate::runtime) fn run_traced_call(
         runtime.run_confidential_entrypoint(
             entrypoint,
             manifest_entry,
-            args,
+            ConfidentialCallInputs::from_raw_args(args),
             fresh_coins,
             context.recorder_mut(),
         )?

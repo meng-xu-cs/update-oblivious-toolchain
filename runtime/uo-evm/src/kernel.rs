@@ -8,11 +8,12 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
+use uo_core::trace::{runtime_kernel_refinement_phase_step, RuntimeKernelRefinementPhase};
 use uo_core::{
     BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
     ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
-    RuntimeKernelWitness, UnaryOp, Value,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
+    RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
 
@@ -59,16 +60,6 @@ impl<T> BoundedJournal<T> {
         Ok(())
     }
 
-    fn extend<I>(&mut self, entries: I) -> Result<()>
-    where
-        I: IntoIterator<Item = T>,
-    {
-        for entry in entries {
-            self.push(entry)?;
-        }
-        Ok(())
-    }
-
     fn into_vec(self) -> Vec<T> {
         self.entries
     }
@@ -76,61 +67,108 @@ impl<T> BoundedJournal<T> {
 
 struct RuntimePhaseJournal {
     inner: BoundedJournal<RuntimeKernelRefinementEventWitness>,
+    phase: RuntimeKernelRefinementPhase,
 }
 
 impl RuntimePhaseJournal {
     fn with_capacity(max_len: usize) -> Self {
         Self {
             inner: BoundedJournal::with_capacity("runtime-phase-event", max_len),
+            phase: RuntimeKernelRefinementPhase::BeforeBegin,
         }
-    }
-
-    fn snapshot(&self) -> RuntimeKernelRefinementWitness {
-        RuntimeKernelRefinementWitness::from_events(self.inner.entries.clone())
     }
 
     fn push(&mut self, event: RuntimeKernelRefinementEventWitness) -> Result<()> {
         self.inner.push(event)
     }
 
+    fn observe_event(&mut self, event: &RuntimeKernelRefinementEventWitness) -> Result<()> {
+        self.phase = runtime_kernel_refinement_phase_step(self.phase, event).ok_or_else(|| {
+            anyhow!(
+                "runtime-phase journal rejected event {:?} in phase {:?}",
+                event.kind(),
+                self.phase
+            )
+        })?;
+        Ok(())
+    }
+
     fn push_pre_committed_cold_object(&mut self, object_id: u32) -> Result<()> {
-        self.push(RuntimeKernelRefinementEventWitness::pre_committed_cold_object(object_id))
+        let event = RuntimeKernelRefinementEventWitness::pre_committed_cold_object(object_id);
+        self.observe_event(&event)?;
+        self.push(event)
     }
 
     fn push_shadow_load_object(&mut self, object_id: u32) -> Result<()> {
-        self.push(RuntimeKernelRefinementEventWitness::shadow_load_object(
-            object_id,
-        ))
+        let event = RuntimeKernelRefinementEventWitness::shadow_load_object(object_id);
+        self.observe_event(&event)?;
+        self.push(event)
     }
 
     fn push_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
-        self.push(RuntimeKernelRefinementEventWitness::kernel_step(
-            opcode, object_id,
-        ))
+        let event = RuntimeKernelRefinementEventWitness::kernel_step(opcode, object_id);
+        self.observe_event(&event)?;
+        self.push(event)
     }
 
     fn append_commit_object_schedule<I>(&mut self, object_ids: I) -> Result<()>
     where
         I: IntoIterator<Item = u32>,
     {
-        let object_ids: Vec<u32> = object_ids.into_iter().collect();
-        let mut witness = self.snapshot();
-        witness.append_commit_object_schedule(object_ids.clone())?;
-        self.inner.extend(
-            object_ids
-                .into_iter()
-                .map(RuntimeKernelRefinementEventWitness::commit_object),
-        )
+        if self.phase != RuntimeKernelRefinementPhase::CommitObjectWindow {
+            bail!(
+                "runtime-phase journal rejected commit-object schedule in phase {:?}",
+                self.phase
+            );
+        }
+        for object_id in object_ids {
+            let event = RuntimeKernelRefinementEventWitness::commit_object(object_id);
+            self.observe_event(&event)?;
+            self.push(event)?;
+        }
+        Ok(())
     }
 
-    fn into_witness(self) -> RuntimeKernelRefinementWitness {
-        RuntimeKernelRefinementWitness::from_events(self.inner.into_vec())
+    fn append_cold_store_window(&mut self, public_object_ids: &[u32]) -> Result<()> {
+        if self.phase != RuntimeKernelRefinementPhase::AfterWipe {
+            bail!(
+                "runtime-phase journal rejected cold-store tail in phase {:?}",
+                self.phase
+            );
+        }
+        let cold_stored_object_ids = self.shadow_load_object_schedule();
+        for object_id in cold_stored_object_ids {
+            let event = RuntimeKernelRefinementEventWitness::cold_store_object(object_id);
+            self.observe_event(&event)?;
+            self.push(event)?;
+        }
+        for object_id in public_object_ids.iter().copied() {
+            let event = RuntimeKernelRefinementEventWitness::post_committed_cold_object(object_id);
+            self.observe_event(&event)?;
+            self.push(event)?;
+        }
+        Ok(())
+    }
+
+    fn shadow_load_object_schedule(&self) -> Vec<u32> {
+        self.inner
+            .entries
+            .iter()
+            .filter(|event| {
+                event.kind() == uo_core::RuntimeKernelRefinementEventKindWitness::ShadowLoadObject
+            })
+            .filter_map(RuntimeKernelRefinementEventWitness::object_id)
+            .collect()
+    }
+
+    fn into_witness(self) -> Result<RuntimeKernelRefinementWitness> {
+        RuntimeKernelRefinementWitness::from_events(self.inner.into_vec()).map_err(Into::into)
     }
 }
 
 #[derive(Debug)]
 struct ConfidentialExecState {
-    slots: Vec<Option<Value>>,
+    slots: Box<[Option<Value>]>,
     initialized_slots: usize,
     aborted: bool,
     returned: bool,
@@ -144,17 +182,19 @@ struct ConfidentialExecutionOutcome {
 }
 
 #[derive(Debug)]
-struct ConfidentialCallInputs {
-    raw_args: Vec<Value>,
+pub(in crate::runtime) struct ConfidentialCallInputs {
+    raw_args: Box<[Value]>,
 }
 
 impl ConfidentialCallInputs {
-    fn from_raw_args(args: Vec<Value>) -> Self {
-        Self { raw_args: args }
+    pub(in crate::runtime) fn from_raw_args(args: Vec<Value>) -> Self {
+        Self {
+            raw_args: args.into_boxed_slice(),
+        }
     }
 
-    fn into_raw_args(mut self) -> Vec<Value> {
-        std::mem::take(&mut self.raw_args)
+    fn into_raw_args(mut self) -> std::vec::IntoIter<Value> {
+        std::mem::take(&mut self.raw_args).into_vec().into_iter()
     }
 }
 
@@ -169,7 +209,7 @@ impl Drop for ConfidentialCallInputs {
 impl ConfidentialExecState {
     fn new(slot_count: usize) -> Self {
         Self {
-            slots: vec![None; slot_count],
+            slots: vec![None; slot_count].into_boxed_slice(),
             initialized_slots: 0,
             aborted: false,
             returned: false,
@@ -358,7 +398,7 @@ impl PublicRuntimeKernel {
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
         max_hash_part_bytes: usize,
-        raw_args: Vec<Value>,
+        raw_args: ConfidentialCallInputs,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
@@ -428,7 +468,7 @@ impl RuntimeKernel {
         let Some(begin_step) = expected_kernel_steps.first() else {
             return Err(anyhow!("{context} emitted no admitted runtime steps"));
         };
-        if begin_step.opcode != UoOpcode::Begin || begin_step.object_id.is_some() {
+        if begin_step.projected_opcode() != UoOpcode::Begin || begin_step.object_id().is_some() {
             return Err(anyhow!(
                 "{context} does not begin with the admitted Begin step"
             ));
@@ -681,7 +721,7 @@ impl RuntimeKernel {
         program: &ConfidentialKernelSlotProgram,
         committed: &CommittedRuntimeState,
         max_hash_part_bytes: usize,
-        raw_args: Vec<Value>,
+        call_inputs: ConfidentialCallInputs,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
@@ -698,7 +738,6 @@ impl RuntimeKernel {
                 program.entrypoint_id
             ));
         }
-        let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);
         self.max_hash_part_bytes = max_hash_part_bytes;
         self.bind_expected_kernel_program(program)?;
         let shadow_load_object_ids = self.expected_shadow_load_object_ids()?;
@@ -744,7 +783,7 @@ impl RuntimeKernel {
         })?;
         Ok(expected_kernel_steps
             .iter()
-            .filter_map(|step| step.object_id)
+            .filter_map(RuntimeKernelStepWitness::object_id)
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect())
@@ -759,7 +798,7 @@ impl RuntimeKernel {
         opcode_trace: &mut Vec<String>,
     ) -> Result<ConfidentialExecutionOutcome> {
         let mut state = ConfidentialExecState::new(program.slot_count);
-        for (slot, arg) in call_inputs.into_raw_args().into_iter().enumerate() {
+        for (slot, arg) in call_inputs.into_raw_args().enumerate() {
             self.store_confidential_slot_value(&mut state, slot, arg)?;
         }
         self.exec_confidential_block(&program.body, objects, &mut state, opcode_trace, recorder)?;
@@ -785,28 +824,31 @@ impl RuntimeKernel {
         self.allocator.wipe_region(ScratchRegion::IoScratch);
         let allocator = self.allocator.finish()?;
         let expected_kernel_steps = self.expected_kernel_steps;
-        let kernel_witness = RuntimeKernelWitness {
-            entrypoint_id: entrypoint_id.into(),
-            arena_bytes: allocator.plan().arena_bytes,
-            max_stack_words: allocator.plan().max_stack_words,
-            scratch_bytes: allocator.plan().scratch_bytes,
-            peak_stack_words: allocator.peak_stack_words(),
-            value_scratch_peak_bytes: allocator.value_scratch_usage().peak_bytes,
-            value_scratch_live_bytes_end: allocator.value_scratch_usage().live_bytes,
-            value_scratch_wipe_count: allocator.value_scratch_usage().wipe_count,
-            hash_scratch_peak_bytes: allocator.hash_scratch_usage().peak_bytes,
-            hash_scratch_live_bytes_end: allocator.hash_scratch_usage().live_bytes,
-            hash_scratch_wipe_count: allocator.hash_scratch_usage().wipe_count,
-            io_scratch_peak_bytes: allocator.io_scratch_usage().peak_bytes,
-            io_scratch_live_bytes_end: allocator.io_scratch_usage().live_bytes,
-            io_scratch_wipe_count: allocator.io_scratch_usage().wipe_count,
-            resource_events: allocator.resource_events().to_vec(),
+        let public_object_ids = self.public_object_ids.clone();
+        let kernel_witness = RuntimeKernelWitness::new(
+            entrypoint_id.into(),
+            allocator.plan().arena_bytes,
+            allocator.plan().max_stack_words,
+            allocator.plan().scratch_bytes,
+            allocator.peak_stack_words(),
+            allocator.value_scratch_usage().peak_bytes,
+            allocator.value_scratch_usage().live_bytes,
+            allocator.value_scratch_usage().wipe_count,
+            allocator.hash_scratch_usage().peak_bytes,
+            allocator.hash_scratch_usage().live_bytes,
+            allocator.hash_scratch_usage().wipe_count,
+            allocator.io_scratch_usage().peak_bytes,
+            allocator.io_scratch_usage().live_bytes,
+            allocator.io_scratch_usage().wipe_count,
+            allocator.resource_events().to_vec(),
             expected_kernel_steps,
-            expected_public_object_ids: Some(self.public_object_ids.clone()),
-            public_object_ids: self.public_object_ids,
-            kernel_steps: self.kernel_steps.into_vec(),
-        };
-        Ok((kernel_witness, self.runtime_phase_events.into_witness()))
+            public_object_ids.clone(),
+            Some(public_object_ids.clone()),
+            self.kernel_steps.into_vec(),
+        )?;
+        self.runtime_phase_events
+            .append_cold_store_window(&public_object_ids)?;
+        Ok((kernel_witness, self.runtime_phase_events.into_witness()?))
     }
 
     fn touch_value_scratch(&mut self, bytes: usize) -> Result<()> {
@@ -1080,7 +1122,7 @@ impl RuntimeKernel {
         self.enforce_expected_kernel_step(opcode, object_id)?;
         self.allocator.record_kernel_op(opcode)?;
         self.kernel_steps
-            .push(RuntimeKernelStepWitness { opcode, object_id })?;
+            .push(RuntimeKernelStepWitness::new(opcode, object_id)?)?;
         self.runtime_phase_events
             .push_kernel_step(opcode, object_id)?;
         Ok(())
@@ -1094,7 +1136,7 @@ impl RuntimeKernel {
         let Some(expected_kernel_steps) = &self.expected_kernel_steps else {
             return Ok(());
         };
-        let observed = RuntimeKernelStepWitness { opcode, object_id };
+        let observed = RuntimeKernelStepWitness::new(opcode, object_id)?;
         let Some(expected) = expected_kernel_steps.get(self.expected_kernel_step_index) else {
             return Err(anyhow!(
                 "runtime kernel emitted unexpected extra step {:?} after exhausting admitted schedule",
@@ -1174,7 +1216,7 @@ impl RuntimeKernel {
         let Some(fresh_coins) = fresh_coins else {
             return Ok(());
         };
-        objects.install_path_oram_leaf_coins(fresh_coins.into_by_object())
+        objects.install_path_oram_leaf_coins(fresh_coins.into_entries())
     }
 
     fn ensure_path_oram_fresh_coins_consumed(
@@ -1278,22 +1320,10 @@ mod tests {
                 max_kernel_ops: 4,
             },
             vec![
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Begin,
-                    object_id: None,
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::CellGet,
-                    object_id: Some(7),
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Commit,
-                    object_id: None,
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Wipe,
-                    object_id: None,
-                },
+                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
             ],
             vec![7],
         )
@@ -1317,18 +1347,9 @@ mod tests {
                 max_kernel_ops: 3,
             },
             vec![
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Begin,
-                    object_id: None,
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Commit,
-                    object_id: None,
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Wipe,
-                    object_id: None,
-                },
+                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
             ],
             vec![],
         )
@@ -1337,8 +1358,8 @@ mod tests {
         kernel.record_kernel_step(UoOpcode::Commit, None).unwrap();
         let (witness, refinement_witness) = kernel.finish("demo()").unwrap();
         assert_eq!(
-            witness.expected_kernel_steps,
-            Some(witness.kernel_steps.clone())
+            witness.expected_kernel_steps(),
+            Some(witness.kernel_steps())
         );
         assert_eq!(
             refinement_witness.projected_kernel_schedule(),

@@ -136,6 +136,33 @@ impl StoreCipher {
         true
     }
 
+    pub fn seal_and_wipe_into_slice(
+        &self,
+        aad: &[u8],
+        payload: &mut [u8],
+        rng: &mut ChaCha20Rng,
+        out: &mut [u8],
+    ) -> bool {
+        let mut payload = WipeOnDrop { bytes: payload };
+        let required_len = Self::sealed_encoded_len(payload.as_slice().len());
+        if out.len() != required_len {
+            return false;
+        }
+        let mut nonce_bytes = [0u8; SEALED_NONCE_BYTES];
+        rng.fill_bytes(&mut nonce_bytes);
+        let cipher = ChaCha20Poly1305::new_from_slice(&self.key).expect("fixed-size key");
+        let tag = cipher
+            .encrypt_in_place_detached(Nonce::from_slice(&nonce_bytes), aad, payload.as_mut_slice())
+            .expect("fixed-size nonce");
+        let mut cursor = 0usize;
+        write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC);
+        write_nonzero_encoded(out, &mut cursor, &nonce_bytes);
+        write_nonzero_encoded(out, &mut cursor, payload.as_slice());
+        write_nonzero_encoded(out, &mut cursor, tag.as_slice());
+        debug_assert_eq!(cursor, out.len());
+        true
+    }
+
     pub fn filler(&self, aad: &[u8], len: usize, rng: &mut ChaCha20Rng) -> Vec<u8> {
         let mut filler = vec![0u8; len];
         self.seal_and_wipe(aad, &mut filler, rng)
@@ -181,6 +208,16 @@ fn push_nonzero_encoded(out: &mut Vec<u8>, bytes: &[u8]) {
         out.push((byte >> 4) + 1);
         out.push((byte & 0x0F) + 1);
     }
+}
+
+fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) {
+    let end = *cursor + bytes.len() * 2;
+    let out = &mut out[*cursor..end];
+    for (index, byte) in bytes.iter().enumerate() {
+        out[index * 2] = (byte >> 4) + 1;
+        out[index * 2 + 1] = (byte & 0x0F) + 1;
+    }
+    *cursor = end;
 }
 
 fn decode_nonzero(encoded: &[u8]) -> Option<Vec<u8>> {
@@ -265,6 +302,28 @@ mod tests {
         let encoded_ptr = encoded.as_ptr();
 
         assert!(cipher.seal_and_wipe_into(b"object:slot", &mut payload, &mut rng, &mut encoded));
+        assert_eq!(payload, vec![0u8; 4]);
+        assert_eq!(encoded.as_ptr(), encoded_ptr);
+        assert_eq!(
+            cipher.open(b"object:slot", 4, &encoded),
+            Some(vec![5u8, 6u8, 7u8, 8u8])
+        );
+    }
+
+    #[test]
+    fn sealed_codec_seal_into_slice_reuses_fixed_output_buffer_and_wipes_payload() {
+        let cipher = StoreCipher::random();
+        let mut rng = ChaCha20Rng::seed_from_u64(43);
+        let mut payload = vec![5u8, 6u8, 7u8, 8u8];
+        let mut encoded = vec![0u8; StoreCipher::sealed_encoded_len(payload.len())];
+        let encoded_ptr = encoded.as_ptr();
+
+        assert!(cipher.seal_and_wipe_into_slice(
+            b"object:slot",
+            &mut payload,
+            &mut rng,
+            &mut encoded,
+        ));
         assert_eq!(payload, vec![0u8; 4]);
         assert_eq!(encoded.as_ptr(), encoded_ptr);
         assert_eq!(

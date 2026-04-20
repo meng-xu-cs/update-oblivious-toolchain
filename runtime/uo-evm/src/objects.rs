@@ -17,7 +17,7 @@ use uo_store::StoreCipher;
 pub(crate) struct CellObject {
     spec: StateObject,
     value: Value,
-    physical: Vec<u8>,
+    physical: Box<[u8]>,
     cipher: StoreCipher,
     accessed: bool,
     written: bool,
@@ -73,8 +73,8 @@ impl Drop for CellObject {
 #[derive(Clone, Debug)]
 pub(crate) struct ArrayObject {
     spec: StateObject,
-    values: Vec<Value>,
-    physical_slots: Vec<Vec<u8>>,
+    values: Box<[Value]>,
+    physical_slots: Box<[Box<[u8]>]>,
     cipher: StoreCipher,
     accessed: bool,
     written_indices: BTreeSet<usize>,
@@ -94,8 +94,13 @@ impl ArrayObject {
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
-    fn decode_values_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Vec<Value>> {
-        let mut values = Vec::with_capacity(self.physical_slots.len());
+    fn zero_values(&self) -> Box<[Value]> {
+        vec![Value::zero_for_type(&self.spec.value_type); self.physical_slots.len()]
+            .into_boxed_slice()
+    }
+
+    fn decode_values_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Box<[Value]>> {
+        let mut values = self.zero_values();
         self.decode_values_from_storage_into(allocator, &mut values)?;
         Ok(values)
     }
@@ -103,27 +108,26 @@ impl ArrayObject {
     fn decode_values_from_storage_into(
         &self,
         allocator: &mut AllocatorSession,
-        values: &mut Vec<Value>,
+        values: &mut [Value],
     ) -> Result<()> {
-        if values.capacity() < self.physical_slots.len() {
+        if values.len() != self.physical_slots.len() {
             bail!(
-                "array decode buffer capacity {} fell below public slot count {} for {}",
-                values.capacity(),
+                "array decode buffer length {} mismatched public slot count {} for {}",
+                values.len(),
                 self.physical_slots.len(),
                 self.spec.name
             );
         }
-        values.clear();
         for (index, physical) in self.physical_slots.iter().enumerate() {
             let aad = array_slot_aad(&self.spec.name, index);
-            values.push(decode_sealed_value(
+            values[index] = decode_sealed_value(
                 &self.cipher,
                 &aad,
                 physical,
                 &self.spec.value_type,
                 &self.spec.name,
                 allocator,
-            )?);
+            )?;
         }
         Ok(())
     }
@@ -141,11 +145,10 @@ impl ArrayObject {
     }
 
     fn cold_commit(&mut self) {
-        self.values.clear();
-        self.values.resize(
-            self.physical_slots.len(),
-            Value::zero_for_type(&self.spec.value_type),
-        );
+        for value in self.values.iter_mut() {
+            value.wipe_secrets();
+            *value = Value::zero_for_type(&self.spec.value_type);
+        }
         self.accessed = false;
         self.written_indices.clear();
     }
@@ -160,7 +163,7 @@ impl Drop for ArrayObject {
 #[derive(Clone, Debug)]
 struct RawMapEntry {
     value: Value,
-    physical: Vec<u8>,
+    physical: Box<[u8]>,
 }
 
 impl RawMapEntry {
@@ -186,8 +189,8 @@ pub(crate) struct RawMapObject {
 #[derive(Clone, Debug)]
 pub(crate) struct SmallMapObject {
     spec: StateObject,
-    entries: Vec<MapEntry>,
-    physical_slots: Vec<Vec<u8>>,
+    entries: Box<[MapEntry]>,
+    physical_slots: Box<[Box<[u8]>]>,
     cipher: StoreCipher,
     accessed: bool,
     dirty: bool,
@@ -210,8 +213,8 @@ impl SmallMapObject {
     fn decode_entries_from_storage(
         &self,
         allocator: &mut AllocatorSession,
-    ) -> Result<Vec<MapEntry>> {
-        let mut entries = Vec::with_capacity(self.physical_slots.len());
+    ) -> Result<Box<[MapEntry]>> {
+        let mut entries = self.zero_entries();
         self.decode_entries_from_storage_into(allocator, &mut entries)?;
         Ok(entries)
     }
@@ -219,22 +222,21 @@ impl SmallMapObject {
     fn decode_entries_from_storage_into(
         &self,
         allocator: &mut AllocatorSession,
-        entries: &mut Vec<MapEntry>,
+        entries: &mut [MapEntry],
     ) -> Result<()> {
         let record_len = map_record_len(&self.spec)?;
-        if entries.capacity() < self.physical_slots.len() {
+        if entries.len() != self.physical_slots.len() {
             bail!(
-                "small-map decode buffer capacity {} fell below public slot count {} for {}",
-                entries.capacity(),
+                "small-map decode buffer length {} mismatched public slot count {} for {}",
+                entries.len(),
                 self.physical_slots.len(),
                 self.spec.name
             );
         }
-        entries.clear();
         for (index, physical) in self.physical_slots.iter().enumerate() {
             let aad = small_map_slot_aad(&self.spec.name, index);
             let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, record_len)?;
-            let entry = self
+            entries[index] = self
                 .cipher
                 .with_opened_payload(aad.as_bytes(), record_len, physical, |payload| {
                     decode_map_record(&self.spec, payload)
@@ -246,9 +248,20 @@ impl SmallMapObject {
                         self.spec.name
                     )
                 })??;
-            entries.push(entry);
         }
         Ok(())
+    }
+
+    fn zero_entries(&self) -> Box<[MapEntry]> {
+        let zero_key = Value::zero_for_type(
+            self.spec
+                .key_type
+                .as_ref()
+                .expect("small-map objects must have key types"),
+        );
+        let zero_value = Value::zero_for_type(&self.spec.value_type);
+        vec![MapEntry::new(false, zero_key, zero_value); self.physical_slots.len()]
+            .into_boxed_slice()
     }
 
     fn clone_for_tx(&self, allocator: &mut AllocatorSession) -> Result<Self> {
@@ -264,18 +277,19 @@ impl SmallMapObject {
     }
 
     fn cold_commit(&mut self) {
-        let zero_key = Value::zero_for_type(
-            self.spec
-                .key_type
-                .as_ref()
-                .expect("small-map objects must have key types"),
-        );
-        let zero_value = Value::zero_for_type(&self.spec.value_type);
-        self.entries.clear();
-        self.entries.resize(
-            self.physical_slots.len(),
-            MapEntry::new(false, zero_key.clone(), zero_value.clone()),
-        );
+        for entry in self.entries.iter_mut() {
+            entry.wipe_secrets();
+            *entry = MapEntry::new(
+                false,
+                Value::zero_for_type(
+                    self.spec
+                        .key_type
+                        .as_ref()
+                        .expect("small-map objects must have key types"),
+                ),
+                Value::zero_for_type(&self.spec.value_type),
+            );
+        }
         self.accessed = false;
         self.dirty = false;
     }
@@ -397,8 +411,13 @@ impl RuntimeObject {
                 let capacity = spec
                     .capacity
                     .ok_or_else(|| anyhow!("array {} is missing capacity", spec.name))?;
-                let values = vec![Value::zero_for_type(&spec.value_type); capacity];
-                let physical_slots = values.iter().map(raw_encode).collect();
+                let values =
+                    vec![Value::zero_for_type(&spec.value_type); capacity].into_boxed_slice();
+                let physical_slots = values
+                    .iter()
+                    .map(raw_encode)
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
                 Ok(Self::RawArray(ArrayObject {
                     spec: spec.clone(),
                     values,
@@ -415,15 +434,18 @@ impl RuntimeObject {
                     .ok_or_else(|| anyhow!("array {} is missing capacity", spec.name))?;
                 let zero_value = Value::zero_for_type(&spec.value_type);
                 let zero_payload = zero_value.canonical_bytes();
-                let values = vec![zero_value; capacity];
+                let values = vec![zero_value; capacity].into_boxed_slice();
                 let cipher = StoreCipher::from_rng(&mut rng);
                 let physical_slots = (0..capacity)
                     .map(|index| {
                         let aad = array_slot_aad(&spec.name, index);
                         let mut payload = zero_payload.clone();
-                        cipher.seal_and_wipe(aad.as_bytes(), &mut payload, &mut rng)
+                        cipher
+                            .seal_and_wipe(aad.as_bytes(), &mut payload, &mut rng)
+                            .into_boxed_slice()
                     })
-                    .collect();
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
                 Ok(Self::UoArray(ArrayObject {
                     spec: spec.clone(),
                     values,
@@ -451,16 +473,20 @@ impl RuntimeObject {
                 let zero_value = Value::zero_for_type(&spec.value_type);
                 let entries = (0..capacity)
                     .map(|_| MapEntry::new(false, zero_key.clone(), zero_value.clone()))
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
                 let zero_record = map_record_bytes(&MapEntry::new(false, zero_key, zero_value));
                 let cipher = StoreCipher::from_rng(&mut rng);
                 let physical_slots = (0..capacity)
                     .map(|index| {
                         let aad = small_map_slot_aad(&spec.name, index);
                         let mut payload = zero_record.clone();
-                        cipher.seal_and_wipe(aad.as_bytes(), &mut payload, &mut rng)
+                        cipher
+                            .seal_and_wipe(aad.as_bytes(), &mut payload, &mut rng)
+                            .into_boxed_slice()
                     })
-                    .collect();
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
                 Ok(Self::UoSmallMap(SmallMapObject {
                     spec: spec.clone(),
                     entries,
@@ -549,11 +575,10 @@ impl RuntimeObject {
                     && !object.written
             }
             Self::UoArray(object) => {
-                object.values
-                    == vec![
-                        Value::zero_for_type(&object.spec.value_type);
-                        object.physical_slots.len()
-                    ]
+                object
+                    .values
+                    .iter()
+                    .all(|value| *value == Value::zero_for_type(&object.spec.value_type))
                     && !object.accessed
                     && object.written_indices.is_empty()
             }
@@ -971,7 +996,7 @@ impl RuntimeObject {
                         next.spec.value_type.canonical_len(),
                     )?;
                     let mut payload = committed_value.canonical_bytes();
-                    if !next.cipher.seal_and_wipe_into(
+                    if !next.cipher.seal_and_wipe_into_slice(
                         aad.as_bytes(),
                         &mut payload,
                         &mut next.rng,
@@ -1029,7 +1054,7 @@ impl RuntimeObject {
                             next.spec.value_type.canonical_len(),
                         )?;
                         let mut payload = value.canonical_bytes();
-                        if !next.cipher.seal_and_wipe_into(
+                        if !next.cipher.seal_and_wipe_into_slice(
                             aad.as_bytes(),
                             &mut payload,
                             &mut next.rng,
@@ -1062,7 +1087,7 @@ impl RuntimeObject {
                         let old_physical = old
                             .entries
                             .get(key_name)
-                            .map(|entry| entry.physical.as_slice())
+                            .map(|entry| entry.physical.as_ref())
                             .unwrap_or(zero_physical.as_slice());
                         let new_physical = raw_encode(value);
                         trace.physical_write_from_buffers(
@@ -1099,7 +1124,7 @@ impl RuntimeObject {
                         let _io_guard = allocator
                             .reserve_guard(ScratchRegion::IoScratch, map_record_len(&next.spec)?)?;
                         let mut payload = map_record_bytes(&entry);
-                        if !next.cipher.seal_and_wipe_into(
+                        if !next.cipher.seal_and_wipe_into_slice(
                             aad.as_bytes(),
                             &mut payload,
                             &mut next.rng,
@@ -1194,7 +1219,7 @@ impl RuntimeObject {
 
     pub(in crate::runtime) fn install_path_oram_leaf_coins(
         &mut self,
-        coins: Vec<usize>,
+        coins: Box<[usize]>,
     ) -> Result<()> {
         match self {
             Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
@@ -1216,22 +1241,24 @@ impl RuntimeObject {
     }
 }
 
-fn raw_encode(value: &Value) -> Vec<u8> {
+fn raw_encode(value: &Value) -> Box<[u8]> {
     if value.is_zero_like() {
-        vec![0u8; 32]
+        vec![0u8; 32].into_boxed_slice()
     } else {
         let bytes = value.canonical_bytes();
         if bytes.iter().all(|byte| *byte == 0) {
-            vec![1u8; 32]
+            vec![1u8; 32].into_boxed_slice()
         } else {
-            bytes
+            bytes.into_boxed_slice()
         }
     }
 }
 
-fn seal_value(cipher: &StoreCipher, aad: &[u8], value: &Value, rng: &mut ChaCha20Rng) -> Vec<u8> {
+fn seal_value(cipher: &StoreCipher, aad: &[u8], value: &Value, rng: &mut ChaCha20Rng) -> Box<[u8]> {
     let mut payload = value.canonical_bytes();
-    cipher.seal_and_wipe(aad, &mut payload, rng)
+    cipher
+        .seal_and_wipe(aad, &mut payload, rng)
+        .into_boxed_slice()
 }
 
 fn decode_sealed_value(
@@ -1454,7 +1481,8 @@ mod tests {
                         ("owner".into(), Value::Address([0x33; 20])),
                         ("count".into(), Value::Uint(7)),
                     ]),
-                ];
+                ]
+                .into_boxed_slice();
                 array.accessed = true;
                 array.written_indices.extend([0, 1, 2]);
             }
@@ -1467,7 +1495,7 @@ mod tests {
 
         match cloned {
             RuntimeObject::UoArray(array) => {
-                assert_eq!(array.values, vec![zero; 3]);
+                assert_eq!(array.values, vec![zero; 3].into_boxed_slice());
                 assert_eq!(array.physical_slots, original_slots);
                 assert!(!array.accessed);
                 assert!(array.written_indices.is_empty());
@@ -1529,6 +1557,7 @@ mod tests {
                         MapEntry::new(false, zero_key.clone(), zero_value.clone()),
                         MapEntry::new(false, zero_key, zero_value),
                     ]
+                    .into_boxed_slice()
                 );
                 assert_eq!(map.physical_slots, original_slots);
                 assert!(!map.accessed);
@@ -1674,7 +1703,8 @@ mod tests {
                         ("owner".into(), Value::Address([0x93; 20])),
                         ("count".into(), Value::Uint(10)),
                     ]),
-                ];
+                ]
+                .into_boxed_slice();
             }
             _ => unreachable!(),
         }
@@ -1696,7 +1726,7 @@ mod tests {
 
         match committed {
             RuntimeObject::UoArray(array) => {
-                assert_eq!(array.values, vec![zero; 3]);
+                assert_eq!(array.values, vec![zero; 3].into_boxed_slice());
                 assert_eq!(array.values.as_ptr(), values_ptr);
                 assert_eq!(array.physical_slots.as_ptr(), physical_slots_ptr);
                 assert!(!array.accessed);
@@ -1813,6 +1843,7 @@ mod tests {
                         MapEntry::new(false, zero_key.clone(), zero_value.clone()),
                         MapEntry::new(false, zero_key, zero_value),
                     ]
+                    .into_boxed_slice()
                 );
                 assert_eq!(map.entries.as_ptr(), entries_ptr);
                 assert_eq!(map.physical_slots.as_ptr(), physical_slots_ptr);

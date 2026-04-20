@@ -11,6 +11,18 @@ lean_exe checkProofGradeRuntimeWitness where
   root := `CheckProofGradeRuntimeWitness
 
 @[default_target]
+lean_exe checkProofGradeRuntimeKernelInterface where
+  root := `CheckProofGradeRuntimeKernelInterface
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelInterfaceFamily where
+  root := `CheckProofGradeRuntimeKernelInterfaceFamily
+
+@[default_target]
+lean_exe checkProofGradeRuntimePaperMainFamily where
+  root := `CheckProofGradeRuntimePaperMainFamily
+
+@[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCore where
   root := `CheckProofGradeRuntimeConfidentialCore
 
@@ -81,6 +93,10 @@ lean_exe checkRuntimePathOramHiddenCertificate where
 @[default_target]
 lean_exe checkRuntimeWitnessFamily where
   root := `CheckRuntimeWitnessFamily
+
+@[default_target]
+lean_exe checkProofGradeRuntimeWitnessFamily where
+  root := `CheckProofGradeRuntimeWitnessFamily
 
 @[default_target]
 lean_exe checkRuntimeFreshCoinFamily where

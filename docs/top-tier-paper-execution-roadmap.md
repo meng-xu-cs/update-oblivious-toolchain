@@ -27,6 +27,12 @@ The repository has already closed several important proof-grade gaps.
   checkers; the trusted-kernel bundle is now materialized through
   `ExecutionTrace`'s internal reconstruction path rather than by hand-assembling
   theorem certificates in `uo-evm`
+- the paper-facing Lean route now also freezes the remaining runtime-side trust
+  point as explicit objects,
+  `PaperMainRuntimeKernelAssumptions`,
+  `PaperMainRuntimeKernelBoundary`, `PaperMainPathOramAssumptions`, and
+  `PaperMainPathOramEndToEndBoundary`, so the end-to-end claim surface now
+  names the runtime/kernel gap instead of leaving it informal
 - the runtime already enforces the admitted public kernel schedule online for
   confidential entrypoints
 
@@ -40,6 +46,8 @@ story. The remaining gaps are:
   relation
 - there is not yet a machine-checked theorem that all secret-dependent runtime
   behavior is confined to that kernel
+- the explicit runtime-side paper bundle
+  `PaperMainRuntimeKernelAssumptions` is still assumed rather than discharged
 - there is not yet a source-to-kernel compiler correctness theorem for the
   admitted Solidity subset
 - the concrete `PathOramLocalPosmapV1SecurityAssumptions` bundle is still only
@@ -252,6 +260,11 @@ Concrete tasks:
    trace's own reconstructed state, while the lower-level certificate
    constructors stay internal to `uo-core` and the trusted-kernel proof object
    family is now accessor-only on the Rust side rather than a public-field bag.
+   The runtime kernel now also emits the complete runtime-phase witness tail
+   itself, with the live journal and the witness validator now sharing the same
+   phase-transition function for commit/cold-store progression before the
+   witness is materialized, and the old tail-appending witness mutators are no
+   longer part of the production API surface.
 3. Completed in the current proof-grade path: trusted-kernel bundles and
    runtime-kernel refinement witnesses now have exactness theorems for
    schedule, public-object universe, resource state, and boundary projections,
@@ -266,25 +279,74 @@ Concrete tasks:
    elimination, and probe-time confinement assertions now keep secret-bearing
    runtime structures inside the runtime/kernel boundary; this now includes a
    sealed runtime-phase witness API with probe-checked constructor/accessor
-   boundaries rather than raw cross-module event-vector mutation, plus the same
-   explicit API discipline for the exact shell-boundary trace derived from that
-   witness, an accessor-only shell-boundary bundle whose witness / contract /
-   trace fields are probe-checked to stay non-public, and accessor-only
+   boundaries rather than raw cross-module event-vector mutation, where the
+   public constructor now rejects malformed phase traces up front, plus the
+   same explicit API discipline for the exact shell-boundary trace derived from
+   that witness, an accessor-only shell-boundary bundle whose witness /
+   contract / trace fields are probe-checked to stay non-public, with the
+   shell contract now accessor-only and the shell-trace derivation helpers
+   confined inside `uo-core`, and accessor-only
    trusted-kernel plus direct runtime-kernel DSL bundle families whose
    proof-facing fields are likewise probe-checked against re-publication, along
    with the full confidential-core bundle family including the shell-boundary
    slot/lowering composites. The post-call `ExecutionTrace` now follows the
    same rule for every proof-bearing runtime payload: seed, kernel witness,
    runtime-phase witness, stored trusted-kernel bundle, controller certificate,
-   and ORAM witness snapshots are all accessor-only on the Rust side, and the
-   probe checks both that privacy boundary and accessor-only consumer usage.
+   and ORAM witness snapshots are all accessor-only on the Rust side, with the
+   public kernel-witness constructor now checked as well, the derived runtime
+   kernel schedule witness likewise sealed behind checked construction plus
+   accessor-only reads, and the probe checks both that privacy boundary and
+   accessor-only consumer usage. The lower-level runtime-refinement witness now
+   also keeps its tail-appending helpers private, so the production runtime
+   path cannot mutate a finished witness to append commit/cold-store windows
+   outside `uo-core`.
    The intermediate `RuntimeExecutionTraceParts` carrier now also has one
    explicit constructor and one production construction site. The certificate-
    based `RuntimeRefinementWitness` constructors are now internal to `uo-core`
-   rather than a public reassembly surface.
-6. Mostly completed on the Rust side: non-kernel secret buffers have been
+   rather than a public reassembly surface. On the Lean/imported-JSON side,
+   the paper-facing runtime/kernel interface is now also exposed as a direct
+   executable checker, `checkProofGradeRuntimeKernelInterface`, over the same
+   runtime witness JSON accepted by `checkProofGradeRuntimeWitness`.
+6. Completed on April 20, 2026: the remaining runtime-side trust point is now
+   frozen explicitly in Lean as
+   `PaperMainRuntimeKernelAssumptions`,
+   `PaperMainRuntimeKernelBoundary`, `PaperMainPathOramAssumptions`, and
+   `PaperMainPathOramEndToEndBoundary`, so the paper route now carries the
+   undischarged runtime/kernel honesty gap as a named assumption bundle rather
+   than prose.
+7. Completed on April 20, 2026: that explicit paper-route runtime bundle is no
+   longer only a documentation object. Lean now has
+   `ProofGradeSeededRuntimePaperMainBundle`, which discharges
+   `PaperMainRuntimeKernelAssumptions` mechanically whenever a seeded
+   paper-main bundle already carries proof-grade witness acceptance. The
+   executable artifact path now also has a family-level proof-grade runtime
+   kernel-interface checker plus a paper-main family checker over seeded
+   path-ORAM witness families, so the paper-route runtime/kernel boundary and
+   exact public-outcome / boundary-schedule uniformity are rechecked at the
+   seeded-family level rather than only witness by witness.
+8. Mostly completed on the Rust side: non-kernel secret buffers have been
    aggressively removed or put under wipe discipline; the remaining theorem
-   work is to connect that discipline to the final formal model.
+   work is to connect that discipline to the final formal model. The
+   confidential kernel now also keeps its live slot file and staged
+   confidential argument buffer in fixed-size boxed slices rather than
+   growable vectors, and the injected Path-ORAM fresh-leaf source now keeps a
+   fixed-size tape plus cursor rather than widening staged tapes into a
+   growable queue. The fixed-shape confidential array / small-map logical
+   buffers, the boxed UO cell ciphertext slot, and the fixed-shape live
+   Path-ORAM entry array, live stash, and live position map now likewise live
+   in fixed-capacity containers, the path-bucket payload now uses a
+   fixed-shape block buffer, and the fixed public-shape Path-ORAM page arrays
+   plus boxed ORAM counter slot are now boxed as well, and the long-lived
+   committed/shadow object carrier has now been reduced to a boxed fixed-order
+   table over the public object universe rather than a generic map, the
+   injected fresh-coin plan now likewise uses boxed per-object entries rather
+   than a generic map, and the kernel/runtime witness path now finishes the
+   full runtime-phase tail inside `kernel.rs` rather than through a post-hoc
+   state-side append, so the manifest-bounded working-set story is tighter
+   than before even prior to the final refinement theorem. The raw-backend
+   `RawMapEntry` ciphertext slot is
+   now boxed as well, so the runtime object graph no longer keeps
+   secret-bearing ciphertext in growable `Vec<u8>` buffers.
 
 Deliverables:
 
@@ -493,8 +555,8 @@ If implementation resumes immediately, the next concrete sequence should be:
    duplicate an already available DSL program.
 5. Completed: add static confinement guardrails so only the kernel can own or
    manipulate secret-bearing runtime structures.
-6. Active next item: prove runtime-kernel refinement for the shared
-   DSL/interpreter route.
+6. Active next item: discharge `PaperMainRuntimeKernelAssumptions` by proving
+   runtime-kernel refinement for the shared DSL/interpreter route.
 7. Completed: prove that the non-kernel shell is public-only and package that
    shell contract together with the exact proof-grade boundary facts needed by
    the confidential-core argument.
@@ -518,6 +580,7 @@ cd proof/lean && lake build \
   checkProofGradeRuntimeKernelWitness \
   checkProofGradeRuntimeKernelRefinementWitness \
   checkProofGradeRuntimeWitness \
+  checkProofGradeRuntimeKernelInterface \
   checkProofGradeRuntimeShellBoundary \
   checkProofGradeRuntimeShellBoundarySlot \
   checkProofGradeRuntimeShellBoundaryLowering \
@@ -535,6 +598,7 @@ cargo run -q -p mplus-probe -- --only confidential-core-validation --out-dir /tm
 cargo run -q -p mplus-probe -- --only confidential-core-shell-boundary-slot-validation --out-dir /tmp/uo-confidential-core-shell-boundary-slot
 cargo run -q -p mplus-probe -- --only confidential-core-lowering-validation --out-dir /tmp/uo-confidential-core-lowering
 cargo run -q -p mplus-probe -- --only confidential-core-shell-boundary-lowering-validation --out-dir /tmp/uo-confidential-core-shell-boundary-lowering
+cargo run -q -p mplus-probe -- --only kernel-interface-validation --out-dir /tmp/uo-kernel-interface
 cargo run -q -p mplus-probe -- --only kernel-validation --out-dir /tmp/uo-kernel
 cargo run -q -p mplus-probe -- --only trusted-kernel-validation --out-dir /tmp/uo-tk
 cargo run -q -p mplus-probe -- --only tamper-validation --out-dir /tmp/uo-tamper

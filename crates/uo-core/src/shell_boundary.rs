@@ -11,9 +11,9 @@ use uo_precompiles::UoOpcode;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellContract {
-    pub public_object_universe: Vec<u32>,
-    pub canonical_loaded_object_schedule: Vec<u32>,
-    pub kernel_schedule: RuntimeKernelScheduleWitness,
+    public_object_universe: Vec<u32>,
+    canonical_loaded_object_schedule: Vec<u32>,
+    kernel_schedule: RuntimeKernelScheduleWitness,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -54,7 +54,7 @@ pub enum RuntimeShellBoundaryBundleError {
 }
 
 impl RuntimeKernelWitness {
-    pub fn shell_contract(&self) -> RuntimeShellContract {
+    pub(crate) fn shell_contract(&self) -> RuntimeShellContract {
         RuntimeShellContract {
             public_object_universe: self.emitted_public_object_schedule(),
             canonical_loaded_object_schedule: self.canonical_loaded_object_schedule(),
@@ -64,7 +64,7 @@ impl RuntimeKernelWitness {
 }
 
 impl RuntimeKernelRefinementWitness {
-    pub fn shell_trace(&self) -> RuntimeShellTrace {
+    pub(crate) fn shell_trace(&self) -> RuntimeShellTrace {
         RuntimeShellTrace::from_components(
             self.events().to_vec(),
             self.projected_kernel_schedule(),
@@ -100,7 +100,7 @@ struct RuntimeShellReplayProgress {
 }
 
 impl RuntimeShellTrace {
-    pub fn from_components(
+    fn from_components(
         events: Vec<RuntimeKernelRefinementEventWitness>,
         projected_kernel_schedule: RuntimeKernelScheduleWitness,
         pre_committed_cold_object_schedule: Vec<u32>,
@@ -158,13 +158,16 @@ impl RuntimeShellTrace {
             .iter()
             .filter_map(RuntimeKernelRefinementEventWitness::projected_kernel_step)
             .collect::<Vec<_>>();
-        RuntimeKernelScheduleWitness {
-            opcodes: steps
+        RuntimeKernelScheduleWitness::new(
+            steps
                 .iter()
                 .map(RuntimeKernelStepWitness::projected_opcode)
                 .collect(),
             steps,
-        }
+        )
+        .expect(
+            "projected shell-boundary schedule derived from events must satisfy shape invariants",
+        )
     }
 
     fn object_schedule_from_events(
@@ -173,8 +176,8 @@ impl RuntimeShellTrace {
     ) -> Vec<u32> {
         self.events()
             .iter()
-            .filter(|event| event.kind == kind)
-            .filter_map(|event| event.object_id)
+            .filter(|event| event.kind() == kind)
+            .filter_map(RuntimeKernelRefinementEventWitness::object_id)
             .collect()
     }
 
@@ -223,9 +226,9 @@ impl RuntimeShellTrace {
             if event.validate_shape().is_err() {
                 return false;
             }
-            match event.kind {
+            match event.kind() {
                 RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject => {
-                    let Some(object_id) = event.object_id else {
+                    let Some(object_id) = event.object_id() else {
                         return false;
                     };
                     let Some(expected_object_id) = contract
@@ -247,7 +250,7 @@ impl RuntimeShellTrace {
                     progress.pre_committed_cold_index += 1;
                 }
                 RuntimeKernelRefinementEventKindWitness::ShadowLoadObject => {
-                    let Some(object_id) = event.object_id else {
+                    let Some(object_id) = event.object_id() else {
                         return false;
                     };
                     let Some(expected_object_id) = contract
@@ -264,7 +267,7 @@ impl RuntimeShellTrace {
                     progress.shadow_load_index += 1;
                 }
                 RuntimeKernelRefinementEventKindWitness::CommitObject => {
-                    let Some(object_id) = event.object_id else {
+                    let Some(object_id) = event.object_id() else {
                         return false;
                     };
                     let Some(expected_object_id) = contract
@@ -281,7 +284,7 @@ impl RuntimeShellTrace {
                     progress.commit_index += 1;
                 }
                 RuntimeKernelRefinementEventKindWitness::ColdStoreObject => {
-                    let Some(object_id) = event.object_id else {
+                    let Some(object_id) = event.object_id() else {
                         return false;
                     };
                     let Some(expected_object_id) = contract
@@ -303,7 +306,7 @@ impl RuntimeShellTrace {
                     progress.cold_store_index += 1;
                 }
                 RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject => {
-                    let Some(object_id) = event.object_id else {
+                    let Some(object_id) = event.object_id() else {
                         return false;
                     };
                     let Some(expected_object_id) = contract
@@ -331,7 +334,7 @@ impl RuntimeShellTrace {
                     };
                     let Some(expected_step) = contract
                         .kernel_schedule
-                        .steps
+                        .steps()
                         .get(progress.kernel_step_index)
                     else {
                         return false;
@@ -339,7 +342,7 @@ impl RuntimeShellTrace {
                     if step != *expected_step {
                         return false;
                     }
-                    phase = match (phase, step.opcode) {
+                    phase = match (phase, step.projected_opcode()) {
                         (RuntimeShellReplayPhase::BeforeBegin, UoOpcode::Begin)
                         | (RuntimeShellReplayPhase::PreCommittedColdWindow, UoOpcode::Begin) => {
                             RuntimeShellReplayPhase::ShadowLoadWindow
@@ -380,7 +383,7 @@ impl RuntimeShellTrace {
                 | RuntimeShellReplayPhase::ColdStoreWindow
                 | RuntimeShellReplayPhase::PostCommittedColdWindow
         ) && progress.pre_committed_cold_index == contract.public_object_universe.len()
-            && progress.kernel_step_index == contract.kernel_schedule.steps.len()
+            && progress.kernel_step_index == contract.kernel_schedule.steps().len()
             && progress.shadow_load_index == contract.canonical_loaded_object_schedule.len()
             && progress.commit_index == contract.canonical_loaded_object_schedule.len()
             && progress.cold_store_index == contract.canonical_loaded_object_schedule.len()
@@ -400,7 +403,7 @@ impl RuntimeShellTrace {
 
 impl RuntimeShellBoundaryBundle {
     pub fn entrypoint_id(&self) -> &str {
-        &self.kernel_witness.entrypoint_id
+        self.kernel_witness.entrypoint_id()
     }
 
     pub fn kernel_witness(&self) -> &RuntimeKernelWitness {
@@ -423,7 +426,7 @@ impl RuntimeShellBoundaryBundle {
         kernel_witness: RuntimeKernelWitness,
         runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
     ) -> Result<Self, RuntimeShellBoundaryBundleError> {
-        kernel_witness.validate_for_entrypoint(&kernel_witness.entrypoint_id)?;
+        kernel_witness.validate_for_entrypoint(kernel_witness.entrypoint_id())?;
         runtime_kernel_refinement_witness.validate_with_kernel_witness(&kernel_witness)?;
         let shell_contract = kernel_witness.shell_contract();
         let shell_trace = runtime_kernel_refinement_witness.shell_trace();
@@ -454,6 +457,20 @@ impl RuntimeShellBoundaryBundle {
     }
 }
 
+impl RuntimeShellContract {
+    pub fn public_object_universe(&self) -> &[u32] {
+        &self.public_object_universe
+    }
+
+    pub fn canonical_loaded_object_schedule(&self) -> &[u32] {
+        &self.canonical_loaded_object_schedule
+    }
+
+    pub fn kernel_schedule(&self) -> &RuntimeKernelScheduleWitness {
+        &self.kernel_schedule
+    }
+}
+
 impl ExecutionTrace {
     pub fn runtime_shell_boundary_bundle(
         &self,
@@ -475,32 +492,21 @@ mod tests {
         RuntimeShellContract {
             public_object_universe: vec![7],
             canonical_loaded_object_schedule: vec![7],
-            kernel_schedule: RuntimeKernelScheduleWitness {
-                opcodes: vec![
+            kernel_schedule: RuntimeKernelScheduleWitness::new(
+                vec![
                     UoOpcode::Begin,
                     UoOpcode::CellGet,
                     UoOpcode::Commit,
                     UoOpcode::Wipe,
                 ],
-                steps: vec![
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::Begin,
-                        object_id: None,
-                    },
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::CellGet,
-                        object_id: Some(7),
-                    },
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::Commit,
-                        object_id: None,
-                    },
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::Wipe,
-                        object_id: None,
-                    },
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
                 ],
-            },
+            )
+            .unwrap(),
         }
     }
 
@@ -517,32 +523,21 @@ mod tests {
                 RuntimeKernelRefinementEventWitness::cold_store_object(7),
                 RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
             ],
-            projected_kernel_schedule: RuntimeKernelScheduleWitness {
-                opcodes: vec![
+            projected_kernel_schedule: RuntimeKernelScheduleWitness::new(
+                vec![
                     UoOpcode::Begin,
                     UoOpcode::CellGet,
                     UoOpcode::Commit,
                     UoOpcode::Wipe,
                 ],
-                steps: vec![
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::Begin,
-                        object_id: None,
-                    },
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::CellGet,
-                        object_id: Some(7),
-                    },
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::Commit,
-                        object_id: None,
-                    },
-                    RuntimeKernelStepWitness {
-                        opcode: UoOpcode::Wipe,
-                        object_id: None,
-                    },
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
                 ],
-            },
+            )
+            .unwrap(),
             pre_committed_cold_object_schedule: vec![7],
             shadow_load_object_schedule: vec![7],
             commit_object_schedule: vec![7],

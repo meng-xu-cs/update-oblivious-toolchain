@@ -1,6 +1,7 @@
 import Lean.Data.Json
 import UOToolchain.RuntimeCoins
 import UOToolchain.RuntimeRefinementJson
+import UOToolchain.RuntimeShellBoundaryJson
 
 open Lean
 
@@ -33,6 +34,16 @@ def ImportedSeededRuntimeWitnessFamily.Valid
         witness.runtime_seed = some seed ∧
         witness.Valid modelTags
 
+def ImportedSeededRuntimeWitnessFamily.ProofGradeValid
+  (family : ImportedSeededRuntimeWitnessFamily)
+  (modelTags : SGXModelTags) : Prop :=
+  family.witnesses.length = family.seed_count ∧
+    ∀ seed, seed < family.seed_count →
+      ∃ witness,
+        family.witnessAt? seed = some witness ∧
+        witness.runtime_seed = some seed ∧
+        witness.ProofGradeValid modelTags
+
 def ImportedSeededRuntimeWitnessFamily.checkValid
   (family : ImportedSeededRuntimeWitnessFamily)
   (modelTags : SGXModelTags) : Bool :=
@@ -42,6 +53,17 @@ def ImportedSeededRuntimeWitnessFamily.checkValid
       | some witness =>
           decide (witness.runtime_seed = some seed) &&
             witness.checkValid modelTags
+      | none => false
+
+def ImportedSeededRuntimeWitnessFamily.checkProofGrade
+  (family : ImportedSeededRuntimeWitnessFamily)
+  (modelTags : SGXModelTags) : Bool :=
+  decide (family.witnesses.length = family.seed_count) &&
+    (List.range family.seed_count).all fun seed =>
+      match family.witnessAt? seed with
+      | some witness =>
+          decide (witness.runtime_seed = some seed) &&
+            witness.checkProofGrade modelTags
       | none => false
 
 def ImportedSeededRuntimeWitnessFamily.toSeededRuntimeWitnessFamily
@@ -94,6 +116,27 @@ def loadAndCheckImportedSeededRuntimeWitnessFamily
   | .error err =>
       throw <| IO.userError s!"failed to validate seeded runtime witness family: {err}"
 
+def parseAndCheckImportedProofGradeSeededRuntimeWitnessFamily
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedSeededRuntimeWitnessFamily := do
+  let family ← parseImportedSeededRuntimeWitnessFamily input
+  if family.checkProofGrade modelTags then
+    pure family
+  else
+    throw
+      "imported proof-grade seeded runtime witness family does not satisfy Lean validity checks"
+
+def loadAndCheckImportedProofGradeSeededRuntimeWitnessFamily
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedSeededRuntimeWitnessFamily := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeSeededRuntimeWitnessFamily input modelTags with
+  | .ok family => pure family
+  | .error err =>
+      throw
+        <| IO.userError
+            s!"failed to validate proof-grade seeded runtime witness family: {err}"
+
 @[simp] theorem importedSeededRuntimeWitnessFamily_checkValid_eq_true_iff
   (family : ImportedSeededRuntimeWitnessFamily)
   (modelTags : SGXModelTags) :
@@ -136,6 +179,81 @@ def loadAndCheckImportedSeededRuntimeWitnessFamily
       rcases hValid.2 seed hSeed with ⟨witness, hGet, hTag, hWitnessValid⟩
       simp [hGet, hTag, (importedWitness_checkValid_eq_true_iff witness modelTags).2 hWitnessValid]
 
+@[simp] theorem importedSeededRuntimeWitnessFamily_checkProofGrade_eq_true_iff
+  (family : ImportedSeededRuntimeWitnessFamily)
+  (modelTags : SGXModelTags) :
+  family.checkProofGrade modelTags = true ↔ family.ProofGradeValid modelTags := by
+  constructor
+  · intro hCheck
+    rw [ImportedSeededRuntimeWitnessFamily.checkProofGrade, Bool.and_eq_true] at hCheck
+    refine ⟨?_, ?_⟩
+    · simpa using hCheck.1
+    · intro seed hSeed
+      have hSeedCheck :
+          (match family.witnessAt? seed with
+            | some witness =>
+                decide (witness.runtime_seed = some seed) &&
+                  witness.checkProofGrade modelTags
+            | none => false) = true := by
+        exact (List.all_eq_true.mp hCheck.2) seed (List.mem_range.mpr hSeed)
+      cases hGet : family.witnessAt? seed with
+      | none =>
+          simp [hGet] at hSeedCheck
+      | some witness =>
+          have hWitness :
+              witness.runtime_seed = some seed ∧ witness.ProofGradeValid modelTags := by
+            have :
+                (decide (witness.runtime_seed = some seed) &&
+                  witness.checkProofGrade modelTags) = true := by
+              simpa [hGet] using hSeedCheck
+            rw [Bool.and_eq_true] at this
+            refine ⟨?_, ?_⟩
+            · simpa using this.1
+            · exact (importedWitness_checkProofGrade_eq_true_iff witness modelTags).mp this.2
+          exact ⟨witness, rfl, hWitness.1, hWitness.2⟩
+  · intro hValid
+    rw [ImportedSeededRuntimeWitnessFamily.checkProofGrade, Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · simpa using hValid.1
+    · refine List.all_eq_true.mpr ?_
+      intro seed hSeedMem
+      have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
+      rcases hValid.2 seed hSeed with ⟨witness, hGet, hTag, hWitnessValid⟩
+      simp [hGet, hTag,
+        (importedWitness_checkProofGrade_eq_true_iff witness modelTags).2 hWitnessValid]
+
+theorem importedSeededRuntimeWitnessFamily_proofGradeValid_implies_valid
+  {family : ImportedSeededRuntimeWitnessFamily}
+  {modelTags : SGXModelTags}
+  (hValid : family.ProofGradeValid modelTags) :
+  family.Valid modelTags := by
+  refine ⟨hValid.1, ?_⟩
+  intro seed hSeed
+  rcases hValid.2 seed hSeed with ⟨witness, hGet, hTag, hWitnessValid⟩
+  refine ⟨witness, hGet, hTag, ?_⟩
+  rcases hWitnessValid with ⟨hRuntimeValid, hKernelProofGrade, hRefinementProofGrade⟩
+  refine ⟨hRuntimeValid, ?_, ?_⟩
+  · unfold ImportedRuntimeRefinementWitness.kernelWitnessValid
+      ImportedRuntimeRefinementWitness.proofGradeKernelWitnessValid at *
+    cases hKernel : witness.kernel_witness with
+    | none =>
+        simp [hKernel] at hKernelProofGrade
+    | some kernelWitness =>
+        simp [hKernel] at hKernelProofGrade
+        exact hKernelProofGrade.1
+  · unfold ImportedRuntimeRefinementWitness.runtimeKernelRefinementWitnessValid
+      ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid at *
+    cases hKernel : witness.kernel_witness with
+    | none =>
+        cases hRefinement : witness.runtime_kernel_refinement_witness <;>
+          simp [hKernel, hRefinement] at hRefinementProofGrade
+    | some kernelWitness =>
+        cases hRefinement : witness.runtime_kernel_refinement_witness with
+        | none =>
+            simp [hKernel, hRefinement] at hRefinementProofGrade
+        | some runtimeKernelRefinementWitness =>
+            simpa [hKernel, hRefinement] using hRefinementProofGrade
+
 structure ImportedSeededRuntimePathOramWitnessFamily
     extends ImportedSeededRuntimeWitnessFamily where
   public_leaf_scaffold : List ImportedRuntimeOramLeafScaffoldCertificate
@@ -163,10 +281,32 @@ def ImportedSeededRuntimePathOramWitnessFamily.Valid
         witness.toRuntimeWitness.oramLeafPublicScaffold =
           family.runtimePublicLeafScaffold
 
+def ImportedSeededRuntimePathOramWitnessFamily.ProofGradeValid
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Prop :=
+  family.toImportedSeededRuntimeWitnessFamily.ProofGradeValid modelTags ∧
+    ∀ seed, seed < family.seed_count →
+      ∃ witness,
+        family.toImportedSeededRuntimeWitnessFamily.witnessAt? seed = some witness ∧
+        witness.toRuntimeWitness.oramLeafPublicScaffold =
+          family.runtimePublicLeafScaffold
+
 def ImportedSeededRuntimePathOramWitnessFamily.checkValid
   (family : ImportedSeededRuntimePathOramWitnessFamily)
   (modelTags : SGXModelTags) : Bool :=
   family.toImportedSeededRuntimeWitnessFamily.checkValid modelTags &&
+    (List.range family.seed_count).all fun seed =>
+      match family.toImportedSeededRuntimeWitnessFamily.witnessAt? seed with
+      | some witness =>
+          decide
+            (witness.toRuntimeWitness.oramLeafPublicScaffold =
+              family.runtimePublicLeafScaffold)
+      | none => false
+
+def ImportedSeededRuntimePathOramWitnessFamily.checkProofGrade
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Bool :=
+  family.toImportedSeededRuntimeWitnessFamily.checkProofGrade modelTags &&
     (List.range family.seed_count).all fun seed =>
       match family.toImportedSeededRuntimeWitnessFamily.witnessAt? seed with
       | some witness =>
@@ -230,6 +370,26 @@ def loadAndCheckImportedSeededRuntimePathOramWitnessFamily
       throw <| IO.userError
         s!"failed to validate seeded path-ORAM runtime witness family: {err}"
 
+def parseAndCheckImportedProofGradeSeededRuntimePathOramWitnessFamily
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedSeededRuntimePathOramWitnessFamily := do
+  let family ← parseImportedSeededRuntimePathOramWitnessFamily input
+  if family.checkProofGrade modelTags then
+    pure family
+  else
+    throw
+      "imported proof-grade seeded path-ORAM runtime witness family does not satisfy Lean validity checks"
+
+def loadAndCheckImportedProofGradeSeededRuntimePathOramWitnessFamily
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedSeededRuntimePathOramWitnessFamily := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeSeededRuntimePathOramWitnessFamily input modelTags with
+  | .ok family => pure family
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate proof-grade seeded path-ORAM runtime witness family: {err}"
+
 @[simp] theorem importedSeededRuntimePathOramWitnessFamily_checkValid_eq_true_iff
   (family : ImportedSeededRuntimePathOramWitnessFamily)
   (modelTags : SGXModelTags) :
@@ -267,6 +427,261 @@ def loadAndCheckImportedSeededRuntimePathOramWitnessFamily
       have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
       rcases hValid.2 seed hSeed with ⟨witness, hGet, hScaffold⟩
       simp [hGet, hScaffold]
+
+@[simp] theorem importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) :
+  family.checkProofGrade modelTags = true ↔ family.ProofGradeValid modelTags := by
+  constructor
+  · intro hCheck
+    rw [ImportedSeededRuntimePathOramWitnessFamily.checkProofGrade, Bool.and_eq_true] at hCheck
+    refine ⟨?_, ?_⟩
+    · exact
+        (importedSeededRuntimeWitnessFamily_checkProofGrade_eq_true_iff
+          family.toImportedSeededRuntimeWitnessFamily modelTags).mp hCheck.1
+    · intro seed hSeed
+      have hSeedCheck :
+          (match family.witnessAt? seed with
+            | some witness =>
+                decide
+                  (witness.toRuntimeWitness.oramLeafPublicScaffold =
+                    family.runtimePublicLeafScaffold)
+            | none => false) = true := by
+        exact (List.all_eq_true.mp hCheck.2) seed (List.mem_range.mpr hSeed)
+      cases hGet : family.witnessAt? seed with
+      | none =>
+          simp [hGet] at hSeedCheck
+      | some witness =>
+          refine ⟨witness, rfl, ?_⟩
+          simpa [hGet] using hSeedCheck
+  · intro hValid
+    rw [ImportedSeededRuntimePathOramWitnessFamily.checkProofGrade, Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · exact
+        (importedSeededRuntimeWitnessFamily_checkProofGrade_eq_true_iff
+          family.toImportedSeededRuntimeWitnessFamily modelTags).2 hValid.1
+    · refine List.all_eq_true.mpr ?_
+      intro seed hSeedMem
+      have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
+      rcases hValid.2 seed hSeed with ⟨witness, hGet, hScaffold⟩
+      simp [hGet, hScaffold]
+
+theorem importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+  {family : ImportedSeededRuntimePathOramWitnessFamily}
+  {modelTags : SGXModelTags}
+  (hValid : family.ProofGradeValid modelTags) :
+  family.Valid modelTags := by
+  refine
+    ⟨ importedSeededRuntimeWitnessFamily_proofGradeValid_implies_valid hValid.1
+    , hValid.2
+    ⟩
+
+def ImportedSeededRuntimePathOramWitnessFamily.ProofGradeKernelInterfaceAssurance
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Prop :=
+  family.ProofGradeValid modelTags ∧
+    ∀ seed, seed < family.seed_count →
+      ∃ witness,
+        family.witnessAt? seed = some witness ∧
+        ImportedRuntimeProofGradeKernelInterface witness
+
+def checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Bool :=
+  family.checkProofGrade modelTags
+
+@[simp] theorem
+    importedSeededRuntimePathOramKernelInterfaceFamily_check_eq_true_iff
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) :
+  checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily family modelTags = true ↔
+    family.ProofGradeKernelInterfaceAssurance modelTags := by
+  unfold checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
+    ImportedSeededRuntimePathOramWitnessFamily.ProofGradeKernelInterfaceAssurance
+  constructor
+  · intro hCheck
+    have hValid : family.ProofGradeValid modelTags := by
+      exact
+        (importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
+          family modelTags).mp hCheck
+    refine ⟨hValid, ?_⟩
+    intro seed hSeed
+    rcases hValid.1.2 seed hSeed with ⟨witness, hGet, _hTag, hWitnessValid⟩
+    exact
+      ⟨witness, hGet,
+        importedWitness_proofGradeKernelInterface witness modelTags hWitnessValid⟩
+  · intro hAssurance
+    exact
+      (importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
+        family modelTags).mpr hAssurance.1
+
+def parseAndCheckImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedSeededRuntimePathOramWitnessFamily := do
+  let family ← parseImportedSeededRuntimePathOramWitnessFamily input
+  if checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily family modelTags then
+    pure family
+  else
+    throw
+      "imported proof-grade seeded path-ORAM runtime kernel-interface family does not satisfy Lean validity checks"
+
+def loadAndCheckImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedSeededRuntimePathOramWitnessFamily := do
+  let input ← IO.FS.readFile path
+  match
+      parseAndCheckImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
+        input
+        modelTags with
+  | .ok family => pure family
+  | .error err =>
+      throw
+        <| IO.userError
+            s!"failed to validate proof-grade seeded path-ORAM runtime kernel-interface family: {err}"
+
+def ImportedSeededRuntimePathOramWitnessFamily.PublicOutcomeUniform
+  (family : ImportedSeededRuntimePathOramWitnessFamily) : Prop :=
+  0 < family.seed_count ∧
+    ∀ seed, seed < family.seed_count →
+      (family.runtimeWitnessAt seed).publicOutcome =
+        (family.runtimeWitnessAt 0).publicOutcome
+
+def ImportedSeededRuntimePathOramWitnessFamily.BoundaryScheduleUniform
+  (family : ImportedSeededRuntimePathOramWitnessFamily) : Prop :=
+  0 < family.seed_count ∧
+    ∀ seed, seed < family.seed_count →
+      (family.runtimeWitnessAt seed).boundarySchedule =
+        (family.runtimeWitnessAt 0).boundarySchedule
+
+def ImportedSeededRuntimePathOramWitnessFamily.checkPublicOutcomeUniform
+  (family : ImportedSeededRuntimePathOramWitnessFamily) : Bool :=
+  decide (0 < family.seed_count) &&
+    (List.range family.seed_count).all fun seed =>
+      decide
+        ((family.runtimeWitnessAt seed).publicOutcome =
+          (family.runtimeWitnessAt 0).publicOutcome)
+
+def ImportedSeededRuntimePathOramWitnessFamily.checkBoundaryScheduleUniform
+  (family : ImportedSeededRuntimePathOramWitnessFamily) : Bool :=
+  decide (0 < family.seed_count) &&
+    (List.range family.seed_count).all fun seed =>
+      decide
+        ((family.runtimeWitnessAt seed).boundarySchedule =
+          (family.runtimeWitnessAt 0).boundarySchedule)
+
+@[simp] theorem
+    importedSeededRuntimePathOramWitnessFamily_checkPublicOutcomeUniform_eq_true_iff
+  (family : ImportedSeededRuntimePathOramWitnessFamily) :
+  family.checkPublicOutcomeUniform = true ↔ family.PublicOutcomeUniform := by
+  unfold ImportedSeededRuntimePathOramWitnessFamily.checkPublicOutcomeUniform
+    ImportedSeededRuntimePathOramWitnessFamily.PublicOutcomeUniform
+  constructor
+  · intro hCheck
+    rw [Bool.and_eq_true] at hCheck
+    refine ⟨by simpa [decide_eq_true_eq] using hCheck.1, ?_⟩
+    intro seed hSeed
+    have hSeedCheck := (List.all_eq_true.mp hCheck.2) seed (List.mem_range.mpr hSeed)
+    simpa [decide_eq_true_eq] using hSeedCheck
+  · intro hUniform
+    rw [Bool.and_eq_true]
+    refine ⟨by simpa [decide_eq_true_eq] using hUniform.1, ?_⟩
+    refine List.all_eq_true.mpr ?_
+    intro seed hSeedMem
+    have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
+    simpa [decide_eq_true_eq] using hUniform.2 seed hSeed
+
+@[simp] theorem
+    importedSeededRuntimePathOramWitnessFamily_checkBoundaryScheduleUniform_eq_true_iff
+  (family : ImportedSeededRuntimePathOramWitnessFamily) :
+  family.checkBoundaryScheduleUniform = true ↔ family.BoundaryScheduleUniform := by
+  unfold ImportedSeededRuntimePathOramWitnessFamily.checkBoundaryScheduleUniform
+    ImportedSeededRuntimePathOramWitnessFamily.BoundaryScheduleUniform
+  constructor
+  · intro hCheck
+    rw [Bool.and_eq_true] at hCheck
+    refine ⟨by simpa [decide_eq_true_eq] using hCheck.1, ?_⟩
+    intro seed hSeed
+    have hSeedCheck := (List.all_eq_true.mp hCheck.2) seed (List.mem_range.mpr hSeed)
+    simpa [decide_eq_true_eq] using hSeedCheck
+  · intro hUniform
+    rw [Bool.and_eq_true]
+    refine ⟨by simpa [decide_eq_true_eq] using hUniform.1, ?_⟩
+    refine List.all_eq_true.mpr ?_
+    intro seed hSeedMem
+    have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
+    simpa [decide_eq_true_eq] using hUniform.2 seed hSeed
+
+def ImportedSeededRuntimePathOramWitnessFamily.ProofGradePaperMainRuntimeAssurance
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Prop :=
+  family.ProofGradeKernelInterfaceAssurance modelTags ∧
+    family.PublicOutcomeUniform ∧
+    family.BoundaryScheduleUniform
+
+def checkImportedProofGradeSeededRuntimePathOramPaperMainFamily
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Bool :=
+  checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily family modelTags &&
+    family.checkPublicOutcomeUniform &&
+    family.checkBoundaryScheduleUniform
+
+@[simp] theorem
+    importedSeededRuntimePathOramPaperMainFamily_check_eq_true_iff
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) :
+  checkImportedProofGradeSeededRuntimePathOramPaperMainFamily family modelTags = true ↔
+    family.ProofGradePaperMainRuntimeAssurance modelTags := by
+  unfold checkImportedProofGradeSeededRuntimePathOramPaperMainFamily
+    ImportedSeededRuntimePathOramWitnessFamily.ProofGradePaperMainRuntimeAssurance
+  rw [Bool.and_eq_true, Bool.and_eq_true]
+  constructor
+  · intro hCheck
+    rcases hCheck with ⟨hKernelAndOutcome, hBoundary⟩
+    rcases hKernelAndOutcome with ⟨hKernel, hOutcome⟩
+    exact
+      ⟨ (importedSeededRuntimePathOramKernelInterfaceFamily_check_eq_true_iff
+            family
+            modelTags).mp hKernel
+      , (importedSeededRuntimePathOramWitnessFamily_checkPublicOutcomeUniform_eq_true_iff
+            family).mp hOutcome
+      , (importedSeededRuntimePathOramWitnessFamily_checkBoundaryScheduleUniform_eq_true_iff
+            family).mp hBoundary
+      ⟩
+  · intro hAssurance
+    exact
+      ⟨ ⟨ (importedSeededRuntimePathOramKernelInterfaceFamily_check_eq_true_iff
+              family
+              modelTags).mpr hAssurance.1
+        , (importedSeededRuntimePathOramWitnessFamily_checkPublicOutcomeUniform_eq_true_iff
+              family).mpr hAssurance.2.1
+        ⟩
+      , (importedSeededRuntimePathOramWitnessFamily_checkBoundaryScheduleUniform_eq_true_iff
+            family).mpr hAssurance.2.2
+      ⟩
+
+def parseAndCheckImportedProofGradeSeededRuntimePathOramPaperMainFamily
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedSeededRuntimePathOramWitnessFamily := do
+  let family ← parseImportedSeededRuntimePathOramWitnessFamily input
+  if checkImportedProofGradeSeededRuntimePathOramPaperMainFamily family modelTags then
+    pure family
+  else
+    throw
+      "imported proof-grade seeded path-ORAM runtime paper-main family does not satisfy Lean validity checks"
+
+def loadAndCheckImportedProofGradeSeededRuntimePathOramPaperMainFamily
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedSeededRuntimePathOramWitnessFamily := do
+  let input ← IO.FS.readFile path
+  match
+      parseAndCheckImportedProofGradeSeededRuntimePathOramPaperMainFamily
+        input
+        modelTags with
+  | .ok family => pure family
+  | .error err =>
+      throw
+        <| IO.userError
+            s!"failed to validate proof-grade seeded path-ORAM runtime paper-main family: {err}"
 
 structure ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily where
   seed_count : Nat

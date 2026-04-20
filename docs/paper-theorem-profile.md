@@ -33,6 +33,17 @@ What is already established at the frozen interface:
 - Lean-side proof-grade predicates and executable checkers for the runtime
   kernel witness, runtime refinement witness, and runtime trusted-kernel
   bundle
+- an explicit paper-facing runtime assumption bundle and end-to-end boundary in
+  Lean, `PaperMainRuntimeKernelAssumptions`,
+  `PaperMainRuntimeKernelBoundary`, `PaperMainPathOramAssumptions`, and
+  `PaperMainPathOramEndToEndBoundary`, so the remaining runtime/kernel trust
+  point is no longer carried only in prose
+- a strengthened Lean wrapper,
+  `ProofGradeSeededRuntimePaperMainBundle`, from which
+  `PaperMainRuntimeKernelAssumptions` can now be discharged mechanically when a
+  seeded paper-main bundle already carries proof-grade witness acceptance, with
+  the seeded-family artifact route now also rechecking exact public-outcome and
+  exact boundary-schedule uniformity in Lean
 - a machine-generated reviewer summary emitted by the full probe bundle as
   `reviewer_summary.json` plus `reviewer_summary.md`, covering proof/report
   cost, artifact sizes, runtime overheads, TCB surface, and explicit
@@ -49,6 +60,9 @@ What is still open:
   kernel model
 - a machine-checked proof that secret-dependent runtime behavior is confined to
   that kernel
+- discharge of the explicit paper-route runtime bundle
+  `PaperMainRuntimeKernelAssumptions`, which is now the named Lean boundary for
+  the remaining implementation-honesty gap
 - full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
 - the final malicious-host SGX / TEE deployment theorem for the real runtime
@@ -76,6 +90,7 @@ implicit in prose.
 | `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents in the concrete `path_oram_local_posmap_v1` backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages in the local-posmap wrapper | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
 | `stashOverflowBounded` | bounds stash-overflow failure for the deployed local-posmap parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet fully discharged in-repo |
+| `PaperMainRuntimeKernelAssumptions` | says every emitted runtime witness on the frozen paper route is Lean-proof-grade accepted, and therefore satisfies the checked shell-boundary / kernel-interface boundary `PaperMainRuntimeKernelBoundary` | explicit Lean assumption bundle in `PaperPathOramTheoremRoute.lean`; mechanically discharged for `ProofGradeSeededRuntimePaperMainBundle`, with the seeded witness-family artifact path now also rechecked by dedicated family-level kernel-interface and paper-main validators, but not yet for the real runtime by a machine-checked refinement plus confinement theorem |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model | required by the final malicious-host theorem; not yet fully closed in Lean |
 
 The exact fresh-leaf remapping bridge is no longer a separate theorem-side
@@ -91,7 +106,7 @@ interface and the hidden-leaf coverage proof/checker path.
 | `uo-check` | not in the proof-grade TCB | not in the TCB |
 | `mplus-probe` | not in the proof-grade TCB | not in the TCB |
 | `uo-solc` | not trusted for current artifact-level acceptance, but source-level compiler correctness is still unproved | remove from TCB by proving compiler correctness |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for implementation honesty | shrink to the smallest kernel and prove it refines the Lean model |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for implementation honesty; the remaining trust point is now frozen explicitly as `PaperMainRuntimeKernelAssumptions` and `PaperMainRuntimeKernelBoundary` | shrink to the smallest kernel and prove it refines the Lean model |
 | Rust code outside the tiny kernel | still part of the implementation risk until confinement and refinement are proved | prove public-only or remove from the confidential path |
 
 ## Observer Shape
@@ -373,9 +388,17 @@ The runtime-to-Lean witness interface is now fixed in:
 - `checkProofGradeRuntimeWitness` in
   `proof/lean/CheckProofGradeRuntimeWitness.lean` for end-to-end
   proof-grade witness validation from the Lean side
+- `checkProofGradeRuntimeKernelInterface` in
+  `proof/lean/CheckProofGradeRuntimeKernelInterface.lean` for the paper-facing
+  runtime/kernel interface theorem surface extracted from the same accepted
+  runtime witness
 - `results/kernel_refinement_validation.json` for benchmark-backed validation
   that the lower-level runtime phase witness is accepted directly against the
   exported kernel witness on representative supported paths
+- `results/kernel_interface_validation.json` for benchmark-backed validation
+  that the same proof-grade runtime witnesses are accepted by the dedicated
+  paper-facing runtime/kernel interface checker on representative supported
+  paths
 - `results/witness_validation.json` for benchmark-backed validation that the
   emitted runtime witnesses are accepted by the Lean checker on representative
   supported paths, including a multi-object ORAM `transferFrom` witness

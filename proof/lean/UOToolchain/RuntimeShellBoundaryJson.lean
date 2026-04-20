@@ -612,4 +612,51 @@ theorem importedWitness_proofGradeKernelInterface
       hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
       hFinalKernelScheduleState⟩
 
+def ImportedRuntimeProofGradeKernelInterfaceAssurance
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags) : Prop :=
+  witness.ProofGradeValid modelTags ∧
+    ImportedRuntimeProofGradeKernelInterface witness
+
+def checkImportedRuntimeProofGradeKernelInterface
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags) : Bool :=
+  witness.checkProofGrade modelTags
+
+@[simp] theorem importedRuntimeProofGradeKernelInterface_check_eq_true_iff
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags) :
+  checkImportedRuntimeProofGradeKernelInterface witness modelTags = true ↔
+    ImportedRuntimeProofGradeKernelInterfaceAssurance witness modelTags := by
+  unfold checkImportedRuntimeProofGradeKernelInterface
+    ImportedRuntimeProofGradeKernelInterfaceAssurance
+  constructor
+  · intro hCheck
+    have hValid : witness.ProofGradeValid modelTags := by
+      exact (importedWitness_checkProofGrade_eq_true_iff witness modelTags).mp hCheck
+    exact ⟨hValid, importedWitness_proofGradeKernelInterface witness modelTags hValid⟩
+  · intro hAssurance
+    exact (importedWitness_checkProofGrade_eq_true_iff witness modelTags).mpr hAssurance.1
+
+def parseAndCheckImportedProofGradeRuntimeKernelInterfaceWitness
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedRuntimeRefinementWitness := do
+  let witness ← parseImportedRuntimeRefinementWitness input
+  if checkImportedRuntimeProofGradeKernelInterface witness modelTags then
+    pure witness
+  else
+    throw
+      "imported proof-grade runtime kernel-interface witness does not satisfy Lean validity checks"
+
+def loadAndCheckImportedProofGradeRuntimeKernelInterfaceWitness
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedRuntimeRefinementWitness := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeRuntimeKernelInterfaceWitness input modelTags with
+  | .ok witness => pure witness
+  | .error err =>
+      throw
+        <| IO.userError
+            s!"failed to validate proof-grade runtime kernel-interface witness: {err}"
+
 end UOToolchain

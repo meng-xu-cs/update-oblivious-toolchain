@@ -34,7 +34,7 @@ The current runtime-side TCB should be read explicitly rather than inferred.
 | Lean kernel plus Lean theorem/checker development | yes | proof checker and theorem body |
 | Explicit backend / cryptographic assumptions | yes | they are the named remaining assumptions |
 | `RuntimeTrustedKernelBundle` / `RuntimeTrustedKernelSlotBundle` acceptance predicates and imported JSON checker | yes | theorem-facing validation boundary |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | the theorem-facing witness-to-Lean-state refinement relation now exists, but implementation honesty is not yet derived by a full refinement proof |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | the theorem-facing witness-to-Lean-state refinement relation now exists, but implementation honesty is not yet derived by a full refinement proof; this remaining trust point is now frozen explicitly as `PaperMainRuntimeKernelAssumptions` and `PaperMainRuntimeKernelBoundary` |
 | Rust shell/object code outside the tiny kernel | partially | the confidential surface is narrower now, but this code still matters until confinement and refinement are proved end to end |
 | `uo-check` | no | removed from the proof-grade acceptance path |
 | `mplus-probe` | no | validation/reporting only |
@@ -62,6 +62,7 @@ The Lean development now contains:
 
 - `proof/lean/UOToolchain/RuntimeTrustedKernel.lean`
 - `proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean`
+- `proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean`
 - `proof/lean/CheckProofGradeRuntimeKernelWitness.lean`
 - `proof/lean/CheckProofGradeRuntimeTrustedKernel.lean`
 
@@ -83,6 +84,17 @@ obligations are:
 Lean also proves `checkValid = true ↔ Valid` for the imported JSON form of the
 bundle, so the command-line checker is theorem-tight rather than an
 executable-only predicate.
+
+At the paper theorem route, the remaining runtime-side trust point is now also
+named explicitly in Lean. `PaperMainRuntimeKernelAssumptions` says that every
+emitted runtime witness on the frozen paper route is proof-grade accepted, and
+that assumption projects to the checked `PaperMainRuntimeKernelBoundary`.
+The emitted seeded-family artifact path now also has dedicated family-level
+Lean validators for both the runtime kernel-interface boundary and exact
+public-outcome / boundary-schedule uniformity at the paper-main runtime
+bundle surface.
+This does not discharge the runtime-refinement gap yet, but it keeps the gap
+visible at the theorem surface instead of leaving it implicit in prose.
 
 The proof-grade trusted-kernel statement then adds the admitted slot DSL
 object: once a `RuntimeTrustedKernelSlotBundle` is accepted, the embedded
@@ -129,6 +141,15 @@ relation to that finished Lean kernel state, so accepted proof-grade runtime
 phase witnesses no longer stop at "shape-consistent trace" and instead certify
 one exact admitted small-kernel execution object with exact boundary and
 resource projections.
+On the Rust side, the runtime kernel now also emits the complete
+`cold_store_object` / `post_committed_cold_object` tail itself rather than
+asking `state.rs` to append it after the fact, and the old
+tail-appending witness helpers are no longer public production APIs in
+`uo-core`. The live kernel journal and the proof-side witness validator now
+also share the same runtime-phase transition function rather than maintaining
+separate phase machines. That does not prove full implementation honesty yet,
+but it removes one more post hoc witness-rewriting surface and one more source
+of duplicated witness-shape logic from the trusted path.
 The kernel witness now also carries an explicit public resource-event trace
 covering stack checks plus scratch reservations and wipes. Lean replays that
 trace against the public stack/scratch budgets and fixes one exact replayed

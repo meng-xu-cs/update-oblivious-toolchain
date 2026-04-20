@@ -136,12 +136,25 @@ The runtime/proof bridge now includes:
 - runtime-enforced refinement-witness extraction
 - Lean JSON import and executable validation for the bundle and witness
 - seeded witness-family and paired-certificate validation
+- a family-level proof-grade runtime kernel-interface checker over seeded
+  path-ORAM witness families, so the paper-route runtime/kernel boundary is
+  executable over emitted witness families rather than only over single
+  witnesses
+- a family-level proof-grade runtime paper-main checker over those same seeded
+  families, enforcing exact public-outcome and exact boundary-schedule
+  uniformity at the emitted artifact boundary
 - canonical fresh-coin family and pair validation, with compact and heavy
   artifact modes
+- a paper-facing Lean runtime assumption bundle,
+  `PaperMainRuntimeKernelAssumptions`, and its corresponding checked boundary,
+  `PaperMainRuntimeKernelBoundary`, so the remaining runtime/kernel trust point
+  is explicitly named at the theorem route
 
 What remains is not "build the bridge." It is:
 
 - keep the trusted boundary explicitly at that small emitted kernel
+- discharge `PaperMainRuntimeKernelAssumptions` instead of leaving the
+  runtime/kernel honesty gap trusted
 - justify or import the explicit backend/cryptographic assumptions cleanly
 - avoid overclaiming the rest of the Rust stack as verified
 
@@ -253,8 +266,16 @@ The first implementation step is now present in the codebase:
   secret-bearing execution state sits behind the smaller kernel boundary
 - that confidential execution state is now also slot-lowered and fixed-width:
   `uo-core` lowers admitted confidential entrypoints to a slot program, and
-  `RuntimeKernel` executes that form with a bounded `Vec<Option<Value>>`
-  slot file rather than a `BTreeMap<String, Value>` name environment
+  `RuntimeKernel` executes that form with a bounded fixed-size
+  `Box<[Option<Value>]>` slot file rather than a
+  `BTreeMap<String, Value>` name environment; the fixed-shape confidential
+  array / small-map logical buffers, the boxed UO cell ciphertext slot, the
+  live Path-ORAM entry array, live stash, and live Path-ORAM position map now
+  also use fixed-capacity buffers, the path-bucket payload uses a fixed-shape
+  block buffer, and the fixed public-shape Path-ORAM page arrays plus boxed
+  ORAM counter slot are fixed boxed buffers as well; the raw-backend
+  `RawMapEntry` ciphertext slot is now boxed too, so the runtime object graph
+  no longer keeps secret-bearing ciphertext in growable `Vec<u8>` buffers
 - the emitted kernel-step witness and lower-level runtime phase witness now
   also live inside explicit bounded-capacity journals derived from public
   kernel-op/object bounds, and the remaining public shell-side commit /
@@ -276,6 +297,9 @@ The first implementation step is now present in the codebase:
   `working_stash_capacity(...)` bound, is rebuilt with that headroom up front,
   preserved across cold commits with `.clear()`, and checked before use so the
   runtime no longer depends on a late mid-call stash `reserve(...)`
+- path-bucket rebuilds now also use fixed-shape block buffers keyed by the
+  manifest `blocks_per_bucket` budget rather than transient growable block
+  vectors
 - Path-ORAM clones and refresh now also preserve and reuse the public
   entry / position-map / stash capacities in place rather than replacing them
   with fresh zero-capacity vectors
@@ -302,6 +326,9 @@ The first implementation step is now present in the codebase:
   Path-ORAM fresh-coin routing steps now also live in `runtime/uo-evm/src/state.rs`
   rather than being assembled directly in `runtime/uo-evm/src/kernel.rs`, so
   the kernel body no longer clones committed objects or rewrites shadow maps
+  itself; the long-lived committed/shadow object carrier in `state.rs` has
+  also now been reduced from a generic `BTreeMap<u32, RuntimeObject>` to a
+  boxed fixed-order object table over the public object universe
   itself
 - the theorem side now exposes a proof-grade exactness lemma for that
   lower-level phase witness, and now packages it as an explicit
@@ -325,8 +352,21 @@ The first implementation step is now present in the codebase:
   `shell_boundary_validation.json`
 - that shell-boundary bundle is now sealed on the Rust side as well: the
   witness / contract / trace fields stay private behind explicit accessor
-  methods, and the probe treats any re-publication of those fields or drift in
-  the getter surface as a proof-interface regression
+  methods, the shell contract itself is now accessor-only rather than a public
+  field bag, the internal shell-trace constructor is no longer public, and the
+  probe treats any re-publication of those fields or drift in the getter
+  surface as a proof-interface regression
+- the lower-level runtime-phase witness constructor is now checked as well:
+  malformed phase traces are rejected at construction time before they can be
+  packaged into shell-boundary or larger runtime proof artifacts
+- the proof-grade `RuntimeKernelWitness` now follows the same discipline: its
+  Rust fields are no longer public, the runtime producer uses one checked
+  constructor instead of a field literal, and the probe now treats any return
+  to public-field access or unchecked construction as proof-interface drift
+- the derived `RuntimeKernelScheduleWitness` is now sealed the same way:
+  schedule opcodes/steps are private behind explicit accessors, construction
+  flows through one checked constructor, and the probe treats any new raw
+  schedule-literal path or reopened field access as proof-interface drift
 - the shared DSL/interpreter route now also composes directly through that
   shell interface: `uo-core` exports a
   `RuntimeShellBoundaryLoweringBundle` carrying the shell-boundary bundle plus
@@ -351,9 +391,10 @@ The first implementation step is now present in the codebase:
   the canonical named and slot confidential programs directly from the checked
   manifest entry rather than reconstructing them ad hoc from the IR body
 - the post-call `cold_store_object` / `post_committed_cold_object` tail of
-  that phase witness now also gets finalized behind the runtime state
-  boundary, so `engine.rs` no longer constructs runtime phase-witness events
-  directly
+  that phase witness now also gets finalized inside
+  `runtime/uo-evm/src/kernel.rs`, while `state.rs` only checks that the
+  resulting committed state is cold at the public boundary, so `engine.rs` no
+  longer constructs runtime phase-witness events directly
 - the post-call proof-facing `ExecutionTrace` packaging now also lives in
   `runtime/uo-evm/src/theorem.rs`, so `engine.rs` no longer constructs the
   controller-observer certificate, hidden Path-ORAM certificate, or
@@ -361,8 +402,10 @@ The first implementation step is now present in the codebase:
   `ExecutionTrace` now also keep their stored state private and are exported
   only through explicit accessors / validated reconstruction helpers, so the
   theorem bridge no longer depends on public field mutation after trace
-  materialization; the intermediate `RuntimeExecutionTraceParts` carrier now
-  also uses one explicit constructor instead of a public-field literal surface
+  materialization; `RuntimeKernelRefinementWitness` now likewise keeps its
+  tail-appending mutators private, and the intermediate
+  `RuntimeExecutionTraceParts` carrier now also uses one explicit constructor
+  instead of a public-field literal surface
 - the confidential-path `RuntimeKernel` entrypoints that shadow-load
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot
@@ -414,6 +457,9 @@ The first implementation step is now present in the codebase:
   path across the explicit shell-boundary bundle so the runtime witness,
   shell-boundary bundle, and exact slot schedule are checked together against
   one shared proof-grade kernel witness and runtime phase witness, while
+  `kernel_interface_validation.json` now runs those same representative
+  runtime witnesses through the dedicated paper-facing
+  `checkProofGradeRuntimeKernelInterface` checker, and
   `confidential_core_lowering_validation.json` composes the named and slot
   DSL objects and checks canonical lowering against the same exported witness
 - `confidential_core_shell_boundary_lowering_validation.json` now lifts the
@@ -422,6 +468,10 @@ The first implementation step is now present in the codebase:
   exported object, and Lean proves that those artifacts share one exact
   proof-grade kernel witness and one exact runtime phase witness rather than
   only validating each layer independently
+- the same runtime witness path now also has a direct paper-facing Lean
+  executable, `checkProofGradeRuntimeKernelInterface`, which accepts the full
+  runtime witness JSON and packages the exact shell-boundary / Lean-kernel
+  interface facts consumed by the stronger theorem story
 - the theorem-facing Lean side now also exposes matching runtime bundle
   objects, not only imported JSON checkers:
   `RuntimeShellBoundaryBundle`, `RuntimeShellBoundarySlotBundle`,
@@ -446,7 +496,8 @@ The first implementation step is now present in the codebase:
   report now also pins the exact shell-boundary bridge surface to
   `crates/uo-core/src/shell_boundary.rs`, requires the Rust bridge to derive
   `shell_contract` and `shell_trace` only from the kernel/refinement witness
-  views plus an explicit `refines_contract` guard, requires downstream
+  views plus an explicit `refines_contract` guard while keeping those helper
+  derivations crate-confined to `uo-core`, requires downstream
   confidential-core bundles to reuse `RuntimeShellBoundaryBundle` rather than
   rederive shell summaries, requires the confidential-core theorem bundle
   entrypoints to stay confined to `crates/uo-core/src/confidential_core.rs`
@@ -544,20 +595,25 @@ The first implementation step is now present in the codebase:
 - the generic `uo-store` cell-write path now takes mutable plaintext buffers
   and wipes caller-owned bytes after raw copy / confidential seal, which
   removes one remaining borrowed-slice crypto path from the helper surface
-- dropped logical `Value` trees, hidden ORAM state, injected fresh-coin queues,
+- dropped logical `Value` trees, hidden ORAM state, injected fresh-coin tapes,
   and per-object runtime RNG state now scrub themselves more aggressively, and
   `engine.rs` now keeps only a public `PublicCallSummary` derived from the
   checked manifest's `param_names`, `secret_args`, and manifest-stored
   `entry_input_len` during theorem-trace construction instead of cloning the
   full secret-bearing call-argument vector or recomputing input length from
   those values; `engine.rs` now holds an opaque `ContractRuntime` wrapper
-  rather than the raw committed confidential state, and that wrapper
-  internalizes the remaining raw confidential argument vector into
-  `ConfidentialCallInputs`, whose unwrap surface is restricted to
-  `crate::runtime` and whose buffered `Value`s now wipe on drop; diagnostic
-  fresh-coin plans are now also consumed by
-  value and moved into the live shadow state without cloning the per-object
-  secret leaf tapes first; the hidden traced-call ORAM witness snapshots in
+  rather than the raw committed confidential state, and the theorem/runtime
+  confidential branch now boxes the remaining raw confidential argument vector
+  into `ConfidentialCallInputs` before handing it to that wrapper, with
+  unwrapping restricted to `kernel.rs` and buffered `Value`s wiping on drop;
+  diagnostic
+  fresh-coin plans now also keep per-object secret leaf tapes in fixed-size
+  buffers, are consumed by value, and move into the live shadow state without
+  cloning the per-object secret leaf tapes first, while the live
+  `PathOramLeafCoinSource` now consumes those tapes through a fixed-size
+  `(Box<[usize]>, cursor)` representation rather than a growable queue; the
+  hidden traced-call ORAM
+  witness snapshots in
   `state.rs` now also wipe on drop unless the theorem finalizer explicitly
   consumes them; the theorem-facing certificate constructors plus final
   `ExecutionTrace` assembly are now also confined to

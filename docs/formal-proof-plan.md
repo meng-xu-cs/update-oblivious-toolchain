@@ -731,6 +731,20 @@ Remaining change:
 
 - keep the trusted boundary explicitly at that small certificate-producing
   kernel rather than at the whole trace bundle
+- the remaining trusted runtime/kernel gap is now explicit in Lean as
+  `PaperMainRuntimeKernelAssumptions`, which projects to the checked
+  `PaperMainRuntimeKernelBoundary` at the frozen paper route; the next proof
+  step is to discharge that bundle rather than describe it informally
+- Lean now also has a stronger wrapper,
+  `ProofGradeSeededRuntimePaperMainBundle`, that discharges
+  `PaperMainRuntimeKernelAssumptions` mechanically when the seeded paper-main
+  witness family already carries proof-grade acceptance, shrinking the purely
+  external part of the runtime assumption story
+- the seeded witness-family artifact route now also has an explicit
+  family-level proof-grade runtime kernel-interface checker plus a paper-main
+  family checker that enforces exact public-outcome and exact
+  boundary-schedule uniformity, so that paper boundary is executable over
+  emitted seeded families rather than only over single witnesses
 - if the paper later wants a source-level theorem about the Rust extractor
   itself, add a theorem or separately audited refinement argument for that
   smaller extractor rather than for the whole runtime

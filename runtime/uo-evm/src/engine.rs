@@ -277,7 +277,7 @@ mod tests {
             "prepare_public_shadow(",
             "commit_public_shadow(",
             "replace_with_cold_public_shadow(",
-            "finalize_runtime_kernel_refinement_witness(",
+            "ensure_cold_call_boundary(",
             "build_theorem_trace(",
             "finalize_execution_trace(",
             "output_shape_of(",
@@ -319,8 +319,7 @@ mod tests {
 
         instance
             .state
-            .objects_for_test()
-            .values()
+            .object_values_for_test()
             .find(|object| matches!(object, RuntimeObject::UoCell(_)))
             .expect("expected one UO cell object");
         assert_objects_are_cold(&instance);
@@ -344,10 +343,9 @@ mod tests {
             .unwrap();
 
         let (cell_id, hot_cell) = {
-            let (&cell_id, _) = instance
+            let (cell_id, _) = instance
                 .state
-                .objects_for_test()
-                .iter()
+                .object_entries_for_test()
                 .find(|(_, object)| matches!(object, RuntimeObject::UoCell(_)))
                 .expect("expected one UO cell object");
             let hot_cell = instance
@@ -384,8 +382,7 @@ mod tests {
 
         let committed_map = instance
             .state
-            .objects_for_test()
-            .values()
+            .object_values_for_test()
             .find(|object| matches!(object, RuntimeObject::UoOramMap(_)))
             .expect("expected one UO ORAM map object");
         assert_objects_are_cold(&instance);
@@ -407,8 +404,7 @@ mod tests {
         let instance = ContractInstance::deploy_with_seed(artifact, 13).unwrap();
         let committed_map = instance
             .state
-            .objects_for_test()
-            .values()
+            .object_values_for_test()
             .find(|object| matches!(object, RuntimeObject::UoOramMap(_)))
             .expect("expected one UO ORAM map object");
         assert_objects_are_cold(&instance);

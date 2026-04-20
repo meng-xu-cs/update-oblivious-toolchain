@@ -256,9 +256,9 @@ pub struct RuntimeOramObjectWitness {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelStepWitness {
-    pub opcode: UoOpcode,
+    opcode: UoOpcode,
     #[serde(default)]
-    pub object_id: Option<u32>,
+    object_id: Option<u32>,
 }
 
 impl ConfidentialKernelSlotProgram {
@@ -298,21 +298,21 @@ pub enum RuntimeKernelScratchRegionWitness {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelResourceEventWitness {
-    pub kind: RuntimeKernelResourceEventKindWitness,
+    kind: RuntimeKernelResourceEventKindWitness,
     #[serde(default)]
-    pub region: Option<RuntimeKernelScratchRegionWitness>,
+    region: Option<RuntimeKernelScratchRegionWitness>,
     #[serde(default)]
-    pub words: Option<usize>,
+    words: Option<usize>,
     #[serde(default)]
-    pub bytes: Option<usize>,
+    bytes: Option<usize>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelScheduleWitness {
     #[serde(default)]
-    pub opcodes: Vec<UoOpcode>,
+    opcodes: Vec<UoOpcode>,
     #[serde(default)]
-    pub steps: Vec<RuntimeKernelStepWitness>,
+    steps: Vec<RuntimeKernelStepWitness>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -328,11 +328,11 @@ pub enum RuntimeKernelRefinementEventKindWitness {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelRefinementEventWitness {
-    pub kind: RuntimeKernelRefinementEventKindWitness,
+    kind: RuntimeKernelRefinementEventKindWitness,
     #[serde(default)]
-    pub object_id: Option<u32>,
+    object_id: Option<u32>,
     #[serde(default)]
-    pub opcode: Option<UoOpcode>,
+    opcode: Option<UoOpcode>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -439,30 +439,30 @@ pub struct RuntimeTrustedKernelBundle {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelWitness {
-    pub entrypoint_id: String,
-    pub arena_bytes: usize,
-    pub max_stack_words: usize,
-    pub scratch_bytes: usize,
-    pub peak_stack_words: usize,
-    pub value_scratch_peak_bytes: usize,
-    pub value_scratch_live_bytes_end: usize,
-    pub value_scratch_wipe_count: usize,
-    pub hash_scratch_peak_bytes: usize,
-    pub hash_scratch_live_bytes_end: usize,
-    pub hash_scratch_wipe_count: usize,
-    pub io_scratch_peak_bytes: usize,
-    pub io_scratch_live_bytes_end: usize,
-    pub io_scratch_wipe_count: usize,
+    entrypoint_id: String,
+    arena_bytes: usize,
+    max_stack_words: usize,
+    scratch_bytes: usize,
+    peak_stack_words: usize,
+    value_scratch_peak_bytes: usize,
+    value_scratch_live_bytes_end: usize,
+    value_scratch_wipe_count: usize,
+    hash_scratch_peak_bytes: usize,
+    hash_scratch_live_bytes_end: usize,
+    hash_scratch_wipe_count: usize,
+    io_scratch_peak_bytes: usize,
+    io_scratch_live_bytes_end: usize,
+    io_scratch_wipe_count: usize,
     #[serde(default)]
-    pub resource_events: Vec<RuntimeKernelResourceEventWitness>,
+    resource_events: Vec<RuntimeKernelResourceEventWitness>,
     #[serde(default)]
-    pub expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
+    expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
     #[serde(default)]
-    pub public_object_ids: Vec<u32>,
+    public_object_ids: Vec<u32>,
     #[serde(default)]
-    pub expected_public_object_ids: Option<Vec<u32>>,
+    expected_public_object_ids: Option<Vec<u32>>,
     #[serde(default)]
-    pub kernel_steps: Vec<RuntimeKernelStepWitness>,
+    kernel_steps: Vec<RuntimeKernelStepWitness>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -1556,26 +1556,144 @@ struct RuntimeKernelResourceReplayState {
 }
 
 impl RuntimeKernelWitness {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        entrypoint_id: String,
+        arena_bytes: usize,
+        max_stack_words: usize,
+        scratch_bytes: usize,
+        peak_stack_words: usize,
+        value_scratch_peak_bytes: usize,
+        value_scratch_live_bytes_end: usize,
+        value_scratch_wipe_count: usize,
+        hash_scratch_peak_bytes: usize,
+        hash_scratch_live_bytes_end: usize,
+        hash_scratch_wipe_count: usize,
+        io_scratch_peak_bytes: usize,
+        io_scratch_live_bytes_end: usize,
+        io_scratch_wipe_count: usize,
+        resource_events: Vec<RuntimeKernelResourceEventWitness>,
+        expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
+        public_object_ids: Vec<u32>,
+        expected_public_object_ids: Option<Vec<u32>>,
+        kernel_steps: Vec<RuntimeKernelStepWitness>,
+    ) -> Result<Self, KernelWitnessError> {
+        let witness = Self {
+            entrypoint_id,
+            arena_bytes,
+            max_stack_words,
+            scratch_bytes,
+            peak_stack_words,
+            value_scratch_peak_bytes,
+            value_scratch_live_bytes_end,
+            value_scratch_wipe_count,
+            hash_scratch_peak_bytes,
+            hash_scratch_live_bytes_end,
+            hash_scratch_wipe_count,
+            io_scratch_peak_bytes,
+            io_scratch_live_bytes_end,
+            io_scratch_wipe_count,
+            resource_events,
+            expected_kernel_steps,
+            public_object_ids,
+            expected_public_object_ids,
+            kernel_steps,
+        };
+        witness.validate_shape()?;
+        Ok(witness)
+    }
+
+    pub fn entrypoint_id(&self) -> &str {
+        &self.entrypoint_id
+    }
+
+    pub fn arena_bytes(&self) -> usize {
+        self.arena_bytes
+    }
+
+    pub fn max_stack_words(&self) -> usize {
+        self.max_stack_words
+    }
+
+    pub fn scratch_bytes(&self) -> usize {
+        self.scratch_bytes
+    }
+
+    pub fn peak_stack_words(&self) -> usize {
+        self.peak_stack_words
+    }
+
+    pub fn value_scratch_peak_bytes(&self) -> usize {
+        self.value_scratch_peak_bytes
+    }
+
+    pub fn value_scratch_live_bytes_end(&self) -> usize {
+        self.value_scratch_live_bytes_end
+    }
+
+    pub fn value_scratch_wipe_count(&self) -> usize {
+        self.value_scratch_wipe_count
+    }
+
+    pub fn hash_scratch_peak_bytes(&self) -> usize {
+        self.hash_scratch_peak_bytes
+    }
+
+    pub fn hash_scratch_live_bytes_end(&self) -> usize {
+        self.hash_scratch_live_bytes_end
+    }
+
+    pub fn hash_scratch_wipe_count(&self) -> usize {
+        self.hash_scratch_wipe_count
+    }
+
+    pub fn io_scratch_peak_bytes(&self) -> usize {
+        self.io_scratch_peak_bytes
+    }
+
+    pub fn io_scratch_live_bytes_end(&self) -> usize {
+        self.io_scratch_live_bytes_end
+    }
+
+    pub fn io_scratch_wipe_count(&self) -> usize {
+        self.io_scratch_wipe_count
+    }
+
+    pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {
+        &self.resource_events
+    }
+
+    pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {
+        self.expected_kernel_steps.as_deref()
+    }
+
+    pub fn kernel_steps(&self) -> &[RuntimeKernelStepWitness] {
+        &self.kernel_steps
+    }
+
     pub fn emitted_kernel_schedule(&self) -> RuntimeKernelScheduleWitness {
-        RuntimeKernelScheduleWitness {
-            opcodes: self
-                .kernel_steps
+        RuntimeKernelScheduleWitness::new(
+            self.kernel_steps
                 .iter()
                 .map(RuntimeKernelStepWitness::projected_opcode)
                 .collect(),
-            steps: self.kernel_steps.clone(),
-        }
+            self.kernel_steps.clone(),
+        )
+        .expect("kernel witness already validates emitted schedule shape")
     }
 
     pub fn expected_kernel_schedule(&self) -> Option<RuntimeKernelScheduleWitness> {
         let steps = self.expected_kernel_steps.clone()?;
-        Some(RuntimeKernelScheduleWitness {
-            opcodes: steps
-                .iter()
-                .map(RuntimeKernelStepWitness::projected_opcode)
-                .collect(),
-            steps,
-        })
+        Some(
+            RuntimeKernelScheduleWitness::new(
+                steps
+                    .iter()
+                    .map(RuntimeKernelStepWitness::projected_opcode)
+                    .collect(),
+                steps,
+            )
+            .expect("manifest-backed expected kernel schedule must satisfy shape invariants"),
+        )
     }
 
     pub fn validate_shape(&self) -> Result<(), KernelWitnessError> {
@@ -1927,8 +2045,18 @@ impl RuntimeKernelWitness {
 }
 
 impl RuntimeKernelStepWitness {
+    pub fn new(opcode: UoOpcode, object_id: Option<u32>) -> Result<Self, KernelWitnessError> {
+        let step = Self { opcode, object_id };
+        step.validate_shape()?;
+        Ok(step)
+    }
+
     pub fn projected_opcode(&self) -> UoOpcode {
         self.opcode
+    }
+
+    pub fn object_id(&self) -> Option<u32> {
+        self.object_id
     }
 
     pub fn validate_shape(&self) -> Result<(), KernelWitnessError> {
@@ -1953,19 +2081,15 @@ impl RuntimeKernelStepWitness {
 
 impl From<ConfidentialKernelStep> for RuntimeKernelStepWitness {
     fn from(step: ConfidentialKernelStep) -> Self {
-        Self {
-            opcode: step.opcode,
-            object_id: step.object_id,
-        }
+        Self::new(step.opcode, step.object_id)
+            .expect("confidential kernel step should satisfy runtime witness shape")
     }
 }
 
 impl From<&RuntimeKernelStepManifest> for RuntimeKernelStepWitness {
     fn from(step: &RuntimeKernelStepManifest) -> Self {
-        Self {
-            opcode: step.opcode,
-            object_id: step.object_id,
-        }
+        Self::new(step.opcode, step.object_id)
+            .expect("manifest kernel step should satisfy runtime witness shape")
     }
 }
 
@@ -1995,6 +2119,22 @@ impl RuntimeKernelResourceEventWitness {
             words: None,
             bytes: None,
         }
+    }
+
+    pub fn kind(&self) -> RuntimeKernelResourceEventKindWitness {
+        self.kind
+    }
+
+    pub fn region(&self) -> Option<RuntimeKernelScratchRegionWitness> {
+        self.region
+    }
+
+    pub fn words(&self) -> Option<usize> {
+        self.words
+    }
+
+    pub fn bytes(&self) -> Option<usize> {
+        self.bytes
     }
 
     pub fn validate_shape(&self) -> Result<(), KernelWitnessError> {
@@ -2032,10 +2172,27 @@ impl RuntimeKernelResourceReplayState {
 }
 
 impl RuntimeKernelScheduleWitness {
+    pub fn new(
+        opcodes: Vec<UoOpcode>,
+        steps: Vec<RuntimeKernelStepWitness>,
+    ) -> Result<Self, KernelWitnessError> {
+        let witness = Self { opcodes, steps };
+        witness.validate_shape()?;
+        Ok(witness)
+    }
+
+    pub fn opcodes(&self) -> &[UoOpcode] {
+        &self.opcodes
+    }
+
+    pub fn steps(&self) -> &[RuntimeKernelStepWitness] {
+        &self.steps
+    }
+
     pub fn public_object_schedule(&self) -> Vec<u32> {
         self.steps
             .iter()
-            .filter_map(|step| step.object_id)
+            .filter_map(RuntimeKernelStepWitness::object_id)
             .collect()
     }
 
@@ -2065,6 +2222,10 @@ fn is_canonical_object_id_schedule(object_ids: &[u32]) -> bool {
 }
 
 impl RuntimeKernelRefinementEventWitness {
+    pub fn kind(&self) -> RuntimeKernelRefinementEventKindWitness {
+        self.kind
+    }
+
     pub fn pre_committed_cold_object(object_id: u32) -> Self {
         Self {
             kind: RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject,
@@ -2113,6 +2274,14 @@ impl RuntimeKernelRefinementEventWitness {
         }
     }
 
+    pub fn object_id(&self) -> Option<u32> {
+        self.object_id
+    }
+
+    pub fn opcode(&self) -> Option<UoOpcode> {
+        self.opcode
+    }
+
     pub fn projected_kernel_step(&self) -> Option<RuntimeKernelStepWitness> {
         Some(RuntimeKernelStepWitness {
             opcode: self.opcode?,
@@ -2152,7 +2321,7 @@ impl RuntimeKernelRefinementEventWitness {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RuntimeKernelRefinementPhase {
+pub enum RuntimeKernelRefinementPhase {
     BeforeBegin,
     PreCommittedColdWindow,
     ShadowLoadWindow,
@@ -2163,9 +2332,78 @@ enum RuntimeKernelRefinementPhase {
     PostCommittedColdWindow,
 }
 
+pub fn runtime_kernel_refinement_phase_step(
+    phase: RuntimeKernelRefinementPhase,
+    event: &RuntimeKernelRefinementEventWitness,
+) -> Option<RuntimeKernelRefinementPhase> {
+    event.validate_shape().ok()?;
+    match event.kind() {
+        RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject => match phase {
+            RuntimeKernelRefinementPhase::BeforeBegin
+            | RuntimeKernelRefinementPhase::PreCommittedColdWindow => {
+                Some(RuntimeKernelRefinementPhase::PreCommittedColdWindow)
+            }
+            _ => None,
+        },
+        RuntimeKernelRefinementEventKindWitness::ShadowLoadObject => {
+            (phase == RuntimeKernelRefinementPhase::ShadowLoadWindow).then_some(phase)
+        }
+        RuntimeKernelRefinementEventKindWitness::CommitObject => {
+            (phase == RuntimeKernelRefinementPhase::CommitObjectWindow).then_some(phase)
+        }
+        RuntimeKernelRefinementEventKindWitness::ColdStoreObject => match phase {
+            RuntimeKernelRefinementPhase::AfterWipe
+            | RuntimeKernelRefinementPhase::ColdStoreWindow => {
+                Some(RuntimeKernelRefinementPhase::ColdStoreWindow)
+            }
+            _ => None,
+        },
+        RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject => match phase {
+            RuntimeKernelRefinementPhase::AfterWipe
+            | RuntimeKernelRefinementPhase::ColdStoreWindow
+            | RuntimeKernelRefinementPhase::PostCommittedColdWindow => {
+                Some(RuntimeKernelRefinementPhase::PostCommittedColdWindow)
+            }
+            _ => None,
+        },
+        RuntimeKernelRefinementEventKindWitness::KernelStep => {
+            let step = event.projected_kernel_step()?;
+            match (phase, step.opcode) {
+                (RuntimeKernelRefinementPhase::BeforeBegin, UoOpcode::Begin)
+                | (RuntimeKernelRefinementPhase::PreCommittedColdWindow, UoOpcode::Begin) => {
+                    Some(RuntimeKernelRefinementPhase::ShadowLoadWindow)
+                }
+                (RuntimeKernelRefinementPhase::ShadowLoadWindow, UoOpcode::Commit) => {
+                    Some(RuntimeKernelRefinementPhase::CommitObjectWindow)
+                }
+                (RuntimeKernelRefinementPhase::ShadowLoadWindow, UoOpcode::Wipe) => None,
+                (RuntimeKernelRefinementPhase::ShadowLoadWindow, _) => {
+                    Some(RuntimeKernelRefinementPhase::ActiveKernel)
+                }
+                (RuntimeKernelRefinementPhase::ActiveKernel, UoOpcode::Commit) => {
+                    Some(RuntimeKernelRefinementPhase::CommitObjectWindow)
+                }
+                (RuntimeKernelRefinementPhase::ActiveKernel, UoOpcode::Wipe) => None,
+                (RuntimeKernelRefinementPhase::ActiveKernel, UoOpcode::Begin) => None,
+                (RuntimeKernelRefinementPhase::ActiveKernel, _) => {
+                    Some(RuntimeKernelRefinementPhase::ActiveKernel)
+                }
+                (RuntimeKernelRefinementPhase::CommitObjectWindow, UoOpcode::Wipe) => {
+                    Some(RuntimeKernelRefinementPhase::AfterWipe)
+                }
+                _ => None,
+            }
+        }
+    }
+}
+
 impl RuntimeKernelRefinementWitness {
-    pub fn from_events(events: Vec<RuntimeKernelRefinementEventWitness>) -> Self {
-        Self { events }
+    pub fn from_events(
+        events: Vec<RuntimeKernelRefinementEventWitness>,
+    ) -> Result<Self, RuntimeKernelRefinementWitnessError> {
+        let witness = Self { events };
+        witness.replay_phase()?;
+        Ok(witness)
     }
 
     pub fn events(&self) -> &[RuntimeKernelRefinementEventWitness] {
@@ -2189,134 +2427,18 @@ impl RuntimeKernelRefinementWitness {
     ) -> Result<RuntimeKernelRefinementPhase, RuntimeKernelRefinementWitnessError> {
         let mut phase = RuntimeKernelRefinementPhase::BeforeBegin;
         for event in &self.events {
-            event.validate_shape()?;
-            match event.kind {
-                RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject => {
-                    phase = match phase {
-                        RuntimeKernelRefinementPhase::BeforeBegin
-                        | RuntimeKernelRefinementPhase::PreCommittedColdWindow => {
-                            RuntimeKernelRefinementPhase::PreCommittedColdWindow
-                        }
-                        _ => {
-                            return Err(
-                                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                    witnessed: self.events.clone(),
-                                },
-                            );
-                        }
-                    };
+            phase = runtime_kernel_refinement_phase_step(phase, event).ok_or_else(|| {
+                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                    witnessed: self.events.clone(),
                 }
-                RuntimeKernelRefinementEventKindWitness::ShadowLoadObject => {
-                    if phase != RuntimeKernelRefinementPhase::ShadowLoadWindow {
-                        return Err(
-                            RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                witnessed: self.events.clone(),
-                            },
-                        );
-                    }
-                }
-                RuntimeKernelRefinementEventKindWitness::CommitObject => {
-                    if phase != RuntimeKernelRefinementPhase::CommitObjectWindow {
-                        return Err(
-                            RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                witnessed: self.events.clone(),
-                            },
-                        );
-                    }
-                }
-                RuntimeKernelRefinementEventKindWitness::ColdStoreObject => {
-                    phase = match phase {
-                        RuntimeKernelRefinementPhase::AfterWipe
-                        | RuntimeKernelRefinementPhase::ColdStoreWindow => {
-                            RuntimeKernelRefinementPhase::ColdStoreWindow
-                        }
-                        _ => {
-                            return Err(
-                                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                    witnessed: self.events.clone(),
-                                },
-                            );
-                        }
-                    };
-                }
-                RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject => {
-                    phase = match phase {
-                        RuntimeKernelRefinementPhase::AfterWipe
-                        | RuntimeKernelRefinementPhase::ColdStoreWindow
-                        | RuntimeKernelRefinementPhase::PostCommittedColdWindow => {
-                            RuntimeKernelRefinementPhase::PostCommittedColdWindow
-                        }
-                        _ => {
-                            return Err(
-                                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                    witnessed: self.events.clone(),
-                                },
-                            );
-                        }
-                    };
-                }
-                RuntimeKernelRefinementEventKindWitness::KernelStep => {
-                    let step = event.projected_kernel_step().ok_or_else(|| {
-                        RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                            witnessed: self.events.clone(),
-                        }
-                    })?;
-                    phase = match (phase, step.opcode) {
-                        (RuntimeKernelRefinementPhase::BeforeBegin, UoOpcode::Begin)
-                        | (RuntimeKernelRefinementPhase::PreCommittedColdWindow, UoOpcode::Begin) => {
-                            RuntimeKernelRefinementPhase::ShadowLoadWindow
-                        }
-                        (RuntimeKernelRefinementPhase::ShadowLoadWindow, UoOpcode::Commit) => {
-                            RuntimeKernelRefinementPhase::CommitObjectWindow
-                        }
-                        (RuntimeKernelRefinementPhase::ShadowLoadWindow, UoOpcode::Wipe) => {
-                            return Err(
-                                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                    witnessed: self.events.clone(),
-                                },
-                            );
-                        }
-                        (RuntimeKernelRefinementPhase::ShadowLoadWindow, _) => {
-                            RuntimeKernelRefinementPhase::ActiveKernel
-                        }
-                        (RuntimeKernelRefinementPhase::ActiveKernel, UoOpcode::Commit) => {
-                            RuntimeKernelRefinementPhase::CommitObjectWindow
-                        }
-                        (RuntimeKernelRefinementPhase::ActiveKernel, UoOpcode::Wipe) => {
-                            return Err(
-                                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                    witnessed: self.events.clone(),
-                                },
-                            );
-                        }
-                        (RuntimeKernelRefinementPhase::ActiveKernel, UoOpcode::Begin) => {
-                            return Err(
-                                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                    witnessed: self.events.clone(),
-                                },
-                            );
-                        }
-                        (RuntimeKernelRefinementPhase::ActiveKernel, _) => {
-                            RuntimeKernelRefinementPhase::ActiveKernel
-                        }
-                        (RuntimeKernelRefinementPhase::CommitObjectWindow, UoOpcode::Wipe) => {
-                            RuntimeKernelRefinementPhase::AfterWipe
-                        }
-                        _ => {
-                            return Err(
-                                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                                    witnessed: self.events.clone(),
-                                },
-                            );
-                        }
-                    };
-                }
-            }
+            })?;
         }
         Ok(phase)
     }
 
-    pub fn append_commit_object_schedule<I>(
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn append_commit_object_schedule<I>(
         &mut self,
         object_ids: I,
     ) -> Result<(), RuntimeKernelRefinementWitnessError>
@@ -2338,7 +2460,9 @@ impl RuntimeKernelRefinementWitness {
         Ok(())
     }
 
-    pub fn append_cold_store_window(
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn append_cold_store_window(
         &mut self,
         public_object_ids: &[u32],
     ) -> Result<(), RuntimeKernelRefinementWitnessError> {
@@ -2370,13 +2494,16 @@ impl RuntimeKernelRefinementWitness {
             .iter()
             .filter_map(RuntimeKernelRefinementEventWitness::projected_kernel_step)
             .collect::<Vec<_>>();
-        RuntimeKernelScheduleWitness {
-            opcodes: steps
+        RuntimeKernelScheduleWitness::new(
+            steps
                 .iter()
                 .map(RuntimeKernelStepWitness::projected_opcode)
                 .collect(),
             steps,
-        }
+        )
+        .expect(
+            "projected kernel schedule derived from validated events must satisfy shape invariants",
+        )
     }
 
     pub fn shadow_load_object_schedule(&self) -> Vec<u32> {
@@ -2441,11 +2568,11 @@ impl RuntimeKernelRefinementWitness {
             );
         }
         let projected = self.projected_kernel_schedule();
-        if projected.steps != kernel_witness.kernel_steps {
+        if projected.steps() != kernel_witness.kernel_steps {
             return Err(
                 RuntimeKernelRefinementWitnessError::KernelProjectionMismatch {
                     expected: kernel_witness.kernel_steps.clone(),
-                    witnessed: projected.steps,
+                    witnessed: projected.steps().to_vec(),
                 },
             );
         }
@@ -4761,6 +4888,7 @@ mod tests {
             RuntimeKernelRefinementEventWitness::cold_store_object(7),
             RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
         ])
+        .expect("sample runtime kernel refinement witness should be well-formed")
     }
 
     fn sample_read_miss_oram_object() -> RuntimeOramObjectWitness {
@@ -4914,7 +5042,8 @@ mod tests {
         let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
             RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-        ]);
+        ])
+        .expect("commit-window precondition witness should be well-formed");
         assert_eq!(
             refinement_witness
                 .append_commit_object_schedule(vec![7])
@@ -4935,7 +5064,8 @@ mod tests {
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
             RuntimeKernelRefinementEventWitness::commit_object(7),
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-        ]);
+        ])
+        .expect("cold-store completion witness should be well-formed");
         refinement_witness.append_cold_store_window(&[7]).unwrap();
         assert_eq!(
             refinement_witness,
@@ -4952,7 +5082,8 @@ mod tests {
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
             RuntimeKernelRefinementEventWitness::commit_object(7),
-        ]);
+        ])
+        .expect("after-wipe precondition witness should be well-formed");
         assert_eq!(
             refinement_witness
                 .append_cold_store_window(&[7])
@@ -4974,7 +5105,8 @@ mod tests {
             RuntimeKernelRefinementEventWitness::commit_object(7),
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
             RuntimeKernelRefinementEventWitness::cold_store_object(7),
-        ]);
+        ])
+        .expect("boundary schedule mismatch witness should remain phase-valid");
         assert_eq!(
             refinement_witness
                 .validate_with_kernel_witness(&kernel_witness)
@@ -5005,7 +5137,8 @@ mod tests {
         let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
         refinement_events[3] =
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
-        let refinement_witness = RuntimeKernelRefinementWitness::from_events(refinement_events);
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(refinement_events)
+            .expect("projection drift witness should remain phase-valid");
         trace.runtime_kernel_refinement_witness = Some(refinement_witness);
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -5095,7 +5228,8 @@ mod tests {
             RuntimeKernelRefinementEventWitness::cold_store_object(7),
             RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
             RuntimeKernelRefinementEventWitness::post_committed_cold_object(9),
-        ]);
+        ])
+        .expect("noncanonical schedule witness should remain phase-valid");
         assert_eq!(
             refinement_witness
                 .validate_with_kernel_witness(&kernel_witness)
@@ -5119,7 +5253,8 @@ mod tests {
             RuntimeKernelRefinementEventWitness::commit_object(7),
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
             RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-        ]);
+        ])
+        .expect("missing cold-store witness should remain phase-valid");
         assert_eq!(
             refinement_witness
                 .validate_with_kernel_witness(&kernel_witness)

@@ -29,6 +29,7 @@ enum ReportKind {
     TrustedKernelValidation,
     TamperValidation,
     WitnessValidation,
+    KernelInterfaceValidation,
     SeededWitnessValidation,
     PathoramPairValidation,
     ControllerValidation,
@@ -181,6 +182,15 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "witness_validation.json",
                 "witness_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::KernelInterfaceValidation) => {
+            let report = mplus_probe::run_kernel_interface_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "kernel_interface_validation.json",
+                "kernel_interface_validation",
                 &report,
             )?;
         }
