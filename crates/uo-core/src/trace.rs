@@ -322,6 +322,13 @@ pub struct RuntimeKernelScheduleTracker {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeKernelExecutionTracker {
+    expected_kernel_schedule: RuntimeKernelScheduleTracker,
+    emitted_kernel_steps: Vec<RuntimeKernelStepWitness>,
+    max_kernel_ops: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuntimeKernelRefinementTracker {
     events: Vec<RuntimeKernelRefinementEventWitness>,
     max_event_count: usize,
@@ -720,6 +727,10 @@ pub enum KernelWitnessError {
     ExpectedKernelScheduleIncomplete {
         observed_steps: usize,
         expected_steps: usize,
+    },
+    KernelStepBudgetExceeded {
+        attempted_steps: usize,
+        budget: usize,
     },
     MalformedPublicObjectUniverse {
         witnessed: Vec<u32>,
@@ -1245,6 +1256,14 @@ impl fmt::Display for KernelWitnessError {
                 "runtime kernel stopped after {} admitted steps but {} were required",
                 observed_steps,
                 expected_steps
+            ),
+            Self::KernelStepBudgetExceeded {
+                attempted_steps,
+                budget,
+            } => write!(
+                f,
+                "kernel step trace exceeded public budget: attempted {} steps with budget {}",
+                attempted_steps, budget
             ),
             Self::MalformedPublicObjectUniverse { witnessed } => write!(
                 f,
@@ -2457,6 +2476,57 @@ impl RuntimeKernelScheduleTracker {
 
     pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {
         self.expected_kernel_steps.as_deref()
+    }
+}
+
+impl RuntimeKernelExecutionTracker {
+    pub fn with_kernel_op_budget(max_kernel_ops: usize) -> Self {
+        Self {
+            expected_kernel_schedule: RuntimeKernelScheduleTracker::default(),
+            emitted_kernel_steps: Vec::with_capacity(max_kernel_ops.max(1)),
+            max_kernel_ops,
+        }
+    }
+
+    pub fn bind_expected_kernel_steps(
+        &mut self,
+        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+    ) -> Result<(), KernelWitnessError> {
+        self.expected_kernel_schedule
+            .bind_expected_kernel_steps(expected_kernel_steps)
+    }
+
+    pub fn record_step(
+        &mut self,
+        observed: RuntimeKernelStepWitness,
+    ) -> Result<(), KernelWitnessError> {
+        if self.emitted_kernel_steps.len() >= self.max_kernel_ops {
+            return Err(KernelWitnessError::KernelStepBudgetExceeded {
+                attempted_steps: self.emitted_kernel_steps.len() + 1,
+                budget: self.max_kernel_ops,
+            });
+        }
+        self.expected_kernel_schedule
+            .observe_step(observed.clone())?;
+        self.emitted_kernel_steps.push(observed);
+        Ok(())
+    }
+
+    pub fn ensure_expected_kernel_schedule_consumed(&self) -> Result<(), KernelWitnessError> {
+        self.expected_kernel_schedule
+            .ensure_expected_kernel_schedule_consumed()
+    }
+
+    pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {
+        self.expected_kernel_schedule.expected_kernel_steps()
+    }
+
+    pub fn emitted_kernel_steps(&self) -> &[RuntimeKernelStepWitness] {
+        &self.emitted_kernel_steps
+    }
+
+    pub fn into_emitted_kernel_steps(self) -> Vec<RuntimeKernelStepWitness> {
+        self.emitted_kernel_steps
     }
 }
 
@@ -5005,12 +5075,12 @@ mod tests {
         CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
         LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
         PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace, RefinementWitnessError,
-        RuntimeControllerCertificate, RuntimeKernelRefinementEventWitness,
-        RuntimeKernelRefinementTracker, RuntimeKernelRefinementTrackerError,
-        RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
-        RuntimeKernelStepWitness, RuntimeKernelWitness, RuntimeOramAccessWitness,
-        RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
-        RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
+        RuntimeControllerCertificate, RuntimeKernelExecutionTracker,
+        RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementTracker,
+        RuntimeKernelRefinementTrackerError, RuntimeKernelRefinementWitness,
+        RuntimeKernelRefinementWitnessError, RuntimeKernelStepWitness, RuntimeKernelWitness,
+        RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
+        RuntimeOramObjectWitness, RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
         RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
         SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
         SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
@@ -5046,6 +5116,24 @@ mod tests {
             RuntimeKernelRefinementTrackerError::EventCapacityExceeded {
                 attempted_events: 2,
                 max_events: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_execution_tracker_rejects_push_past_bound() {
+        let mut tracker = RuntimeKernelExecutionTracker::with_kernel_op_budget(1);
+        tracker
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap())
+            .unwrap();
+        let err = tracker
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            err,
+            KernelWitnessError::KernelStepBudgetExceeded {
+                attempted_steps: 2,
+                budget: 1,
             }
         );
     }

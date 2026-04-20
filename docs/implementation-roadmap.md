@@ -277,14 +277,14 @@ The first implementation step is now present in the codebase:
   `RawMapEntry` ciphertext slot is now boxed too, so the runtime object graph
   no longer keeps secret-bearing ciphertext in growable `Vec<u8>` buffers
 - the emitted kernel-step witness and lower-level runtime phase witness now
-  also live inside explicit bounded-capacity journals derived from public
-  kernel-op/object bounds, and the remaining public shell-side commit /
+  also live inside shared `uo-core` execution/refinement trackers derived from
+  public kernel-op/object bounds, and the remaining public shell-side commit /
   witness helper lists start from explicit `Vec::with_capacity(...)` bounds
   rather than plain `Vec::new()`
 - the runtime phase witness commit/cold-store windows now also append through
-  shared `uo-core` phase-aware helpers plus a bounded runtime-phase journal
-  wrapper, so `kernel.rs` / `state.rs` no longer extend those witness tails by
-  mutating raw event vectors directly
+  the shared `uo-core` `RuntimeKernelRefinementTracker`, so `kernel.rs` /
+  `state.rs` no longer extend those witness tails by mutating raw event
+  vectors directly
 - that runtime-phase journal now also lives behind the shared
   `RuntimeKernelRefinementTracker` in `uo-core`, so `kernel.rs` no longer owns
   a separate phase-machine helper or local event-bound calculation for the

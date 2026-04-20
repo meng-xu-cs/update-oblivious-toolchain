@@ -10830,14 +10830,27 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             == vec![String::from("runtime/uo-evm/src/state.rs")];
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
-    let kernel_uses_core_schedule_tracker = kernel_source.contains("RuntimeKernelScheduleTracker")
-        && kernel_source.contains("expected_kernel_schedule: RuntimeKernelScheduleTracker")
-        && kernel_source.contains("RuntimeKernelScheduleTracker::default()")
-        && kernel_source.contains(".bind_expected_kernel_steps(expected_kernel_steps)")
-        && kernel_source.contains(".observe_step(observed.clone())?")
-        && kernel_source.contains(".ensure_expected_kernel_schedule_consumed()?")
+    let kernel_uses_core_schedule_tracker = core_trace_source
+        .contains("pub struct RuntimeKernelScheduleTracker")
+        && core_trace_source.contains("pub struct RuntimeKernelExecutionTracker")
+        && core_trace_source.contains("expected_kernel_schedule: RuntimeKernelScheduleTracker")
+        && core_trace_source.contains(".bind_expected_kernel_steps(expected_kernel_steps)")
+        && core_trace_source.contains(".observe_step(observed.clone())?")
+        && kernel_source.contains("RuntimeKernelExecutionTracker")
+        && !kernel_source.contains("expected_kernel_schedule: RuntimeKernelScheduleTracker")
+        && !kernel_source.contains("RuntimeKernelScheduleTracker::default()")
         && !kernel_source.contains("expected_kernel_step_index:")
         && !kernel_source.contains("fn enforce_expected_kernel_step(");
+    let kernel_uses_core_execution_tracker = kernel_source
+        .contains("RuntimeKernelExecutionTracker")
+        && kernel_source.contains("kernel_execution: RuntimeKernelExecutionTracker")
+        && kernel_source.contains("RuntimeKernelExecutionTracker::with_kernel_op_budget(")
+        && kernel_source.contains(".bind_expected_kernel_steps(expected_kernel_steps)")
+        && kernel_source.contains(".record_step(observed.clone())?")
+        && kernel_source.contains(".ensure_expected_kernel_schedule_consumed()?")
+        && kernel_source.contains(".into_emitted_kernel_steps()")
+        && !kernel_source.contains("kernel_steps: BoundedJournal<RuntimeKernelStepWitness>")
+        && !kernel_source.contains("struct BoundedJournal");
     let kernel_uses_core_refinement_tracker = kernel_source
         .contains("RuntimeKernelRefinementTracker")
         && kernel_source.contains("runtime_phase_events: RuntimeKernelRefinementTracker")
@@ -10887,17 +10900,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && kernel_source.contains("self.note_hash_bytes(self.max_hash_part_bytes)?;")
         && !kernel_source.contains("self.note_hash_bytes(value.canonical_len())?");
     let kernel_bounded_journal_checks = [
-        (
-            "struct BoundedJournal<T>",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
-        ),
+        ("struct BoundedJournal<T>", Vec::<String>::new()),
         (
             "kernel_steps: BoundedJournal<RuntimeKernelStepWitness>",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
+            Vec::<String>::new(),
         ),
         (
             "entries: Vec::with_capacity(max_len.max(1))",
-            vec![String::from("runtime/uo-evm/src/kernel.rs")],
+            Vec::<String>::new(),
         ),
     ]
     .into_iter()
@@ -12778,6 +12788,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
         "kernel_uses_core_schedule_tracker": kernel_uses_core_schedule_tracker,
+        "kernel_uses_core_execution_tracker": kernel_uses_core_execution_tracker,
         "kernel_uses_core_refinement_tracker": kernel_uses_core_refinement_tracker,
         "kernel_confidential_call_inputs_stay_inside_runtime":
             kernel_confidential_call_inputs_stay_inside_runtime,
@@ -13219,6 +13230,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && confidential_entrypoint_plan_surface_restricted
             && kernel_executes_program_body_via_shared_dsl
             && kernel_uses_core_schedule_tracker
+            && kernel_uses_core_execution_tracker
             && kernel_uses_core_refinement_tracker
             && kernel_confidential_call_inputs_stay_inside_runtime
             && kernel_exec_block_uses_confidential_slot_statements

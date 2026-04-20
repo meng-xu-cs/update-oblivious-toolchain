@@ -10,9 +10,9 @@ use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
 use uo_core::{
     BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
-    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement,
-    RuntimeKernelRefinementTracker, RuntimeKernelRefinementWitness, RuntimeKernelScheduleTracker,
-    RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
+    ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement, RuntimeKernelExecutionTracker,
+    RuntimeKernelRefinementTracker, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
+    RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
 
@@ -20,47 +20,12 @@ struct RuntimeKernel {
     allocator: AllocatorSession,
     public_object_ids: Vec<u32>,
     max_hash_part_bytes: usize,
-    expected_kernel_schedule: RuntimeKernelScheduleTracker,
-    kernel_steps: BoundedJournal<RuntimeKernelStepWitness>,
+    kernel_execution: RuntimeKernelExecutionTracker,
     runtime_phase_events: RuntimeKernelRefinementTracker,
 }
 
 pub(in crate::runtime) struct PublicRuntimeKernel {
     inner: RuntimeKernel,
-}
-
-#[derive(Clone, Debug)]
-struct BoundedJournal<T> {
-    entries: Vec<T>,
-    max_len: usize,
-    label: &'static str,
-}
-
-impl<T> BoundedJournal<T> {
-    fn with_capacity(label: &'static str, max_len: usize) -> Self {
-        Self {
-            entries: Vec::with_capacity(max_len.max(1)),
-            max_len,
-            label,
-        }
-    }
-
-    fn push(&mut self, entry: T) -> Result<()> {
-        if self.entries.len() >= self.max_len {
-            return Err(anyhow!(
-                "{} journal exceeded bound: {} >= {}",
-                self.label,
-                self.entries.len(),
-                self.max_len
-            ));
-        }
-        self.entries.push(entry);
-        Ok(())
-    }
-
-    fn into_vec(self) -> Vec<T> {
-        self.entries
-    }
 }
 
 #[derive(Debug)]
@@ -320,9 +285,7 @@ impl RuntimeKernel {
             allocator: AllocatorSession::new(plan),
             public_object_ids,
             max_hash_part_bytes: 0,
-            expected_kernel_schedule: RuntimeKernelScheduleTracker::default(),
-            kernel_steps: BoundedJournal::with_capacity(
-                "runtime-kernel-step",
+            kernel_execution: RuntimeKernelExecutionTracker::with_kernel_op_budget(
                 kernel_step_capacity,
             ),
             runtime_phase_events:
@@ -345,7 +308,7 @@ impl RuntimeKernel {
         expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
         context: &str,
     ) -> Result<()> {
-        self.expected_kernel_schedule
+        self.kernel_execution
             .bind_expected_kernel_steps(expected_kernel_steps)
             .map_err(|err| anyhow!("{context}: {err}"))
     }
@@ -652,14 +615,14 @@ impl RuntimeKernel {
     }
 
     fn expected_shadow_load_object_ids(&self) -> Result<Vec<u32>> {
-        let expected_kernel_steps = self
-            .expected_kernel_schedule
-            .expected_kernel_steps()
-            .ok_or_else(|| {
-                anyhow!(
+        let expected_kernel_steps =
+            self.kernel_execution
+                .expected_kernel_steps()
+                .ok_or_else(|| {
+                    anyhow!(
                     "runtime kernel has no admitted schedule bound when shadow-load set is needed"
                 )
-            })?;
+                })?;
         Ok(expected_kernel_steps
             .iter()
             .filter_map(RuntimeKernelStepWitness::object_id)
@@ -697,17 +660,18 @@ impl RuntimeKernel {
         entrypoint_id: &str,
     ) -> Result<(RuntimeKernelWitness, RuntimeKernelRefinementWitness)> {
         self.record_kernel_step(UoOpcode::Wipe, None)?;
-        self.expected_kernel_schedule
+        self.kernel_execution
             .ensure_expected_kernel_schedule_consumed()?;
         self.allocator.wipe_region(ScratchRegion::ValueScratch);
         self.allocator.wipe_region(ScratchRegion::HashScratch);
         self.allocator.wipe_region(ScratchRegion::IoScratch);
         let allocator = self.allocator.finish()?;
         let expected_kernel_steps = self
-            .expected_kernel_schedule
+            .kernel_execution
             .expected_kernel_steps()
             .map(|steps| steps.to_vec());
         let public_object_ids = self.public_object_ids.clone();
+        let emitted_kernel_steps = self.kernel_execution.into_emitted_kernel_steps();
         let kernel_witness = RuntimeKernelWitness::new(
             entrypoint_id.into(),
             allocator.plan().arena_bytes,
@@ -727,7 +691,7 @@ impl RuntimeKernel {
             expected_kernel_steps,
             public_object_ids.clone(),
             Some(public_object_ids.clone()),
-            self.kernel_steps.into_vec(),
+            emitted_kernel_steps,
         )?;
         self.runtime_phase_events
             .append_cold_store_window(&public_object_ids)?;
@@ -1003,10 +967,8 @@ impl RuntimeKernel {
 
     fn record_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
         let observed = RuntimeKernelStepWitness::new(opcode, object_id)?;
-        self.expected_kernel_schedule
-            .observe_step(observed.clone())?;
+        self.kernel_execution.record_step(observed.clone())?;
         self.allocator.record_kernel_op(opcode)?;
-        self.kernel_steps.push(observed)?;
         self.runtime_phase_events
             .push_kernel_step(opcode, object_id)?;
         Ok(())
@@ -1119,18 +1081,10 @@ fn lhs_bool(value: &Value) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BoundedJournal, RuntimeKernel};
+    use super::RuntimeKernel;
     use uo_allocator::AllocatorPlan;
     use uo_core::{max_runtime_kernel_refinement_event_count, RuntimeKernelStepWitness};
     use uo_precompiles::UoOpcode;
-
-    #[test]
-    fn bounded_journal_rejects_push_past_bound() {
-        let mut journal = BoundedJournal::with_capacity("demo", 1);
-        journal.push(1usize).unwrap();
-        let err = journal.push(2usize).unwrap_err();
-        assert!(err.to_string().contains("demo journal exceeded bound"));
-    }
 
     #[test]
     fn runtime_phase_event_bound_matches_public_objects_and_kernel_ops() {

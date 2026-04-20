@@ -34,8 +34,9 @@ The repository has already closed several important proof-grade gaps.
   `PaperMainPathOramEndToEndBoundary`, so the end-to-end claim surface now
   names the runtime/kernel gap instead of leaving it informal
 - the runtime already enforces the admitted public kernel schedule online for
-  confidential entrypoints, and that online check now routes through a shared
-  core schedule tracker rather than an ad hoc runtime-local cursor
+  confidential entrypoints, and that online check plus emitted kernel-step
+  tracking now route through shared `uo-core` execution/schedule trackers
+  rather than runtime-local cursors or bounded journals
 
 The repository has not yet closed the scientifically strongest end-to-end
 story. The remaining gaps are:
@@ -268,7 +269,9 @@ Concrete tasks:
    witness is materialized, and that live runtime-phase journal now routes
    through a shared `uo-core` refinement tracker rather than a runtime-local
    phase helper, so the old tail-appending witness mutators are no longer part
-   of the production API surface. The production trace finalizer
+   of the production API surface. The emitted kernel-step trace now likewise
+   routes through a shared `uo-core` execution tracker rather than a local
+   bounded journal in `kernel.rs`. The production trace finalizer
    now also re-derives and validates the admitted confidential proof-bearing
    bundle family online for confidential calls: direct kernel DSL / slot /
    lowering bundles, the trusted-kernel slot bundle, and the confidential-core
