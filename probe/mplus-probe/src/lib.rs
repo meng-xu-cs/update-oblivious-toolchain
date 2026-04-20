@@ -10830,6 +10830,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             == vec![String::from("runtime/uo-evm/src/state.rs")];
     let kernel_executes_program_body_via_shared_dsl =
         kernel_source.contains("self.exec_confidential_block(&program.body");
+    let kernel_uses_core_schedule_tracker = kernel_source.contains("RuntimeKernelScheduleTracker")
+        && kernel_source.contains("expected_kernel_schedule: RuntimeKernelScheduleTracker")
+        && kernel_source.contains("RuntimeKernelScheduleTracker::default()")
+        && kernel_source.contains(".bind_expected_kernel_steps(expected_kernel_steps)")
+        && kernel_source.contains(".observe_step(observed.clone())?")
+        && kernel_source.contains(".ensure_expected_kernel_schedule_consumed()?")
+        && !kernel_source.contains("expected_kernel_step_index:")
+        && !kernel_source.contains("fn enforce_expected_kernel_step(");
     let kernel_confidential_call_inputs_stay_inside_runtime = kernel_source
         .contains("raw_args: Box<[Value]>")
         && theorem_source.contains("ConfidentialCallInputs::from_raw_args(args)")
@@ -12768,6 +12776,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             confidential_entrypoint_plan_surface_restricted,
         "kernel_executes_program_body_via_shared_dsl":
             kernel_executes_program_body_via_shared_dsl,
+        "kernel_uses_core_schedule_tracker": kernel_uses_core_schedule_tracker,
         "kernel_confidential_call_inputs_stay_inside_runtime":
             kernel_confidential_call_inputs_stay_inside_runtime,
         "kernel_exec_block_uses_confidential_slot_statements":
@@ -13207,6 +13216,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && state_prepares_confidential_manifest_plan
             && confidential_entrypoint_plan_surface_restricted
             && kernel_executes_program_body_via_shared_dsl
+            && kernel_uses_core_schedule_tracker
             && kernel_confidential_call_inputs_stay_inside_runtime
             && kernel_exec_block_uses_confidential_slot_statements
             && kernel_eval_uses_confidential_slot_exprs
