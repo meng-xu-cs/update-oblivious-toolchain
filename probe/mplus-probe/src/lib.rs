@@ -10727,6 +10727,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && fresh_coins_source.contains(
             "pub(in crate::runtime) fn into_entries(mut self) -> Box<[PathOramFreshCoinEntry]>",
         );
+    let fresh_coin_plan_public_api_uses_boxed_coin_tapes = fresh_coins_source.contains(
+        "pub fn insert_object_coins(\n        &mut self,\n        object_id: u32,\n        coins: Box<[usize]>,\n    ) -> Option<Box<[usize]>> {",
+    ) && !fresh_coins_source
+        .contains("pub fn insert_object_coins(&mut self, object_id: u32, coins: Vec<usize>) -> Option<Vec<usize>> {");
     let path_oram_leaf_coin_source_uses_fixed_tape = !oram_source.contains("VecDeque")
         && oram_source.contains("Injected {\n        coins: Box<[usize]>,\n        next_index: usize,\n    },")
         && oram_source.contains(
@@ -10755,6 +10759,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         ),
         (
             "pub fn from_scaffold_and_values(",
+            vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
+        ),
+        (
+            "pub fn insert_object_coins(",
             vec![String::from("runtime/uo-evm/src/fresh_coins.rs")],
         ),
         (
@@ -13065,6 +13073,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "boundary": "opaque public handle; raw per-object fresh-coin entries stay inside crate::runtime as boxed fixed-size coin tapes ordered by public object id, the handle is non-Clone and consumed by value, and the per-object tapes move into live shadow state without cloning",
             "checked": fresh_coin_plan_surface_restricted
                 && fresh_coin_plan_uses_fixed_coin_slices
+                && fresh_coin_plan_public_api_uses_boxed_coin_tapes
                 && fresh_coin_plan_zeroizes_on_drop
                 && fresh_coin_plan_nonclone
                 && engine_fresh_coin_api_consumes_plan
@@ -13266,6 +13275,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "oram_state_nonderive_clone": oram_state_nonderive_clone,
         "fresh_coin_plan_derive_line": fresh_coin_plan_derive_line,
         "fresh_coin_plan_nonclone": fresh_coin_plan_nonclone,
+        "fresh_coin_plan_public_api_uses_boxed_coin_tapes":
+            fresh_coin_plan_public_api_uses_boxed_coin_tapes,
         "path_oram_leaf_coin_source_uses_fixed_tape":
             path_oram_leaf_coin_source_uses_fixed_tape,
         "contract_instance_clone_uses_cold_runtime_clone":
@@ -13804,6 +13815,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && runtime_object_nonclone
             && oram_state_nonderive_clone
             && fresh_coin_plan_nonclone
+            && fresh_coin_plan_public_api_uses_boxed_coin_tapes
             && contract_instance_clone_uses_cold_runtime_clone
             && state_wrapper_present
             && kernel_finishes_runtime_phase_witness

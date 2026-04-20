@@ -52,13 +52,16 @@ impl PathOramFreshCoinPlan {
     }
 
     #[cfg(feature = "diagnostics")]
-    pub fn insert_object_coins(&mut self, object_id: u32, coins: Vec<usize>) -> Option<Vec<usize>> {
+    pub fn insert_object_coins(
+        &mut self,
+        object_id: u32,
+        coins: Box<[usize]>,
+    ) -> Option<Box<[usize]>> {
         let mut entries = std::mem::take(&mut self.entries).into_vec();
-        let replacement = coins.into_boxed_slice();
         let previous = match entries.binary_search_by_key(&object_id, |entry| entry.object_id) {
-            Ok(index) => Some(std::mem::replace(&mut entries[index].coins, replacement).into_vec()),
+            Ok(index) => Some(std::mem::replace(&mut entries[index].coins, coins)),
             Err(index) => {
-                entries.insert(index, PathOramFreshCoinEntry::new(object_id, replacement));
+                entries.insert(index, PathOramFreshCoinEntry::new(object_id, coins));
                 None
             }
         };

@@ -1349,7 +1349,10 @@ mod tests {
         let baseline_witness = baseline_result.trace.runtime_refinement_witness().unwrap();
         let fresh_coin_scaffold = baseline_witness.path_oram_fresh_coin_scaffold().unwrap();
         let mut short_plan = PathOramFreshCoinPlan::new();
-        short_plan.insert_object_coins(fresh_coin_scaffold[0].object_id, vec![0, 1]);
+        short_plan.insert_object_coins(
+            fresh_coin_scaffold[0].object_id,
+            vec![0, 1].into_boxed_slice(),
+        );
 
         let mut injected = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
         let err = injected
