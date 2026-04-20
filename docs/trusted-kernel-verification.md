@@ -166,7 +166,9 @@ The Rust side now exposes:
 
 - `ExecutionTrace::runtime_trusted_kernel_bundle`
 - `ExecutionTrace::runtime_trusted_kernel_slot_bundle`
+- `ExecutionTrace::runtime_kernel_interface_bundle`
 - `RuntimeTrustedKernelBundle::to_witness`
+- `uo-evm --format kernel-interface`
 - `uo-evm --format trusted-kernel`
 
 The runtime engine now asks `ExecutionTrace` to materialize the
@@ -180,7 +182,12 @@ no longer a reconstruction routine. For the proof-grade
 trusted-kernel path, `ExecutionTrace::runtime_trusted_kernel_slot_bundle` then
 packages that stored bundle together with the admitted slot program from the
 artifact manifest, and `uo-evm --format trusted-kernel` emits that stronger
-slot-wrapped artifact.
+slot-wrapped artifact. That slot bridge now rejects manifest slot-program
+entrypoint drift by construction, and the production runtime finalizer also
+re-derives that slot bundle online together with the direct kernel DSL / slot /
+lowering bundles and the confidential-core direct / slot / lowering /
+shell-boundary slot / shell-boundary lowering family before returning a
+confidential trace.
 
 For confidential entrypoints, the checked manifest now carries the canonical
 named confidential program, the canonical slot confidential program, and the
@@ -189,6 +196,12 @@ runtime loads that stored slot program before execution starts, rejects any
 manifest drift between program and schedule, and then rejects any missing,
 extra, or mismatched step online. The runtime is no longer only "emit then
 compare later" at that kernel boundary.
+
+The paper-facing runtime/kernel boundary is now also explicit on the Rust side
+as `ExecutionTrace::runtime_kernel_interface_bundle`, which packages the
+checked shell-boundary bundle together with the admitted expected kernel steps,
+expected public object universe, and expected kernel schedule from the
+artifact.
 
 The emitted runtime kernel witness now contains:
 
@@ -258,8 +271,9 @@ the slot-wrapped trusted-kernel artifact, not just the bare certificate
 bundle. The new tamper report complements the positive validation reports by
 mutating representative direct controller/hidden certificates, the
 proof-grade translation, kernel, refinement, shell-boundary,
-confidential-core, runtime-witness, and trusted-kernel-slot artifacts, and
-the seeded/canonical witness-family, theorem-input, and pair-certificate
+confidential-core, runtime-witness, runtime kernel-interface bundle,
+trusted-kernel-slot, and seeded paper-main bundle artifacts, and the
+seeded/canonical witness-family, theorem-input, and pair-certificate
 artifacts, then checking that the corresponding Lean executables reject those
 drifted artifacts.
 

@@ -228,8 +228,9 @@ Exit gate:
 
 ## Work Package 3: Prove Runtime-Kernel Refinement And Secret Confinement
 
-Status: active. This is now the next proof-critical work package on the
-critical path.
+Status: active. The runtime-boundary confinement audit is now green, but the
+final runtime-implementation refinement theorem is still the next
+proof-critical obligation on the critical path.
 
 Objective: upgrade from "the runtime emits accepted proof objects" to "the real
 runtime kernel implementation refines the Lean model, and the rest of the
@@ -264,7 +265,22 @@ Concrete tasks:
    itself, with the live journal and the witness validator now sharing the same
    phase-transition function for commit/cold-store progression before the
    witness is materialized, and the old tail-appending witness mutators are no
-   longer part of the production API surface.
+   longer part of the production API surface. The production trace finalizer
+   now also re-derives and validates the admitted confidential proof-bearing
+   bundle family online for confidential calls: direct kernel DSL / slot /
+   lowering bundles, the trusted-kernel slot bundle, and the confidential-core
+   direct / slot / lowering / shell-boundary slot / shell-boundary lowering
+   bundle family all have to agree with the admitted artifact before a trace is
+   returned. The confidential theorem finalizer now also re-derives a
+   single-trace seeded witness, retags it canonically, and rebuilds the
+   explicit `SeededRuntimePaperMainFamilyBundle` online before a confidential
+   trace returns, so the paper-route theorem object is now checked in the
+   production runtime path rather than only by the external probe/checker
+   route. The Rust side now also packages the paper-facing shell-boundary /
+   expected-step / expected-public-object / expected-schedule facts as an
+   explicit `RuntimeKernelInterfaceBundle`, so the runtime/kernel interface is
+   now first-class on both the Lean and Rust sides even though the final
+   implementation-refinement theorem is still open.
 3. Completed in the current proof-grade path: trusted-kernel bundles and
    runtime-kernel refinement witnesses now have exactness theorems for
    schedule, public-object universe, resource state, and boundary projections,
@@ -275,7 +291,7 @@ Concrete tasks:
    public data, and the proof stack now packages the exact schedule /
    public-object / resource / shell facts needed downstream through one
    theorem-facing runtime-kernel boundary interface.
-5. Completed for the Rust/static side: visibility restrictions, wrapper
+5. Completed for the Rust/static side on April 20, 2026: visibility restrictions, wrapper
    elimination, and probe-time confinement assertions now keep secret-bearing
    runtime structures inside the runtime/kernel boundary; this now includes a
    sealed runtime-phase witness API with probe-checked constructor/accessor
@@ -303,10 +319,19 @@ Concrete tasks:
    The intermediate `RuntimeExecutionTraceParts` carrier now also has one
    explicit constructor and one production construction site. The certificate-
    based `RuntimeRefinementWitness` constructors are now internal to `uo-core`
+   The trusted-kernel slot bridge now also rejects manifest slot-program
+   entrypoint drift by construction rather than exposing it only as a post hoc
+   boolean helper.
    rather than a public reassembly surface. On the Lean/imported-JSON side,
-   the paper-facing runtime/kernel interface is now also exposed as a direct
+   the paper-facing runtime/kernel interface now has both the witness-based
    executable checker, `checkProofGradeRuntimeKernelInterface`, over the same
-   runtime witness JSON accepted by `checkProofGradeRuntimeWitness`.
+   runtime witness JSON accepted by `checkProofGradeRuntimeWitness`, and the
+   explicit-bundle checker,
+   `checkProofGradeRuntimeKernelInterfaceBundle`, over the exported
+   `RuntimeKernelInterfaceBundle`. The same audit path,
+   `runtime_boundary_validation.json`, is now green on the current tree while
+   still rejecting any regression that reintroduces secret-bearing runtime
+   work outside the kernel-owned boundary.
 6. Completed on April 20, 2026: the remaining runtime-side trust point is now
    frozen explicitly in Lean as
    `PaperMainRuntimeKernelAssumptions`,
@@ -320,10 +345,11 @@ Concrete tasks:
    `PaperMainRuntimeKernelAssumptions` mechanically whenever a seeded
    paper-main bundle already carries proof-grade witness acceptance. The
    executable artifact path now also has a family-level proof-grade runtime
-   kernel-interface checker plus a paper-main family checker over seeded
-   path-ORAM witness families, so the paper-route runtime/kernel boundary and
-   exact public-outcome / boundary-schedule uniformity are rechecked at the
-   seeded-family level rather than only witness by witness.
+   kernel-interface checker plus an explicit
+   `SeededRuntimePaperMainFamilyBundle` checker over seeded path-ORAM witness
+   families, so the paper-route runtime/kernel boundary and exact
+   public-outcome / boundary-schedule uniformity are rechecked against one
+   exported theorem-facing object rather than only inferred witness by witness.
 8. Mostly completed on the Rust side: non-kernel secret buffers have been
    aggressively removed or put under wipe discipline; the remaining theorem
    work is to connect that discipline to the final formal model. The
@@ -581,6 +607,7 @@ cd proof/lean && lake build \
   checkProofGradeRuntimeKernelRefinementWitness \
   checkProofGradeRuntimeWitness \
   checkProofGradeRuntimeKernelInterface \
+  checkProofGradeRuntimeKernelInterfaceBundle \
   checkProofGradeRuntimeShellBoundary \
   checkProofGradeRuntimeShellBoundarySlot \
   checkProofGradeRuntimeShellBoundaryLowering \

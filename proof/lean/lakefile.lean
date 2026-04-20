@@ -15,12 +15,19 @@ lean_exe checkProofGradeRuntimeKernelInterface where
   root := `CheckProofGradeRuntimeKernelInterface
 
 @[default_target]
+lean_exe checkProofGradeRuntimeKernelInterfaceBundle where
+  root := `CheckProofGradeRuntimeKernelInterfaceBundle
+
+@[default_target]
 lean_exe checkProofGradeRuntimeKernelInterfaceFamily where
   root := `CheckProofGradeRuntimeKernelInterfaceFamily
 
 @[default_target]
 lean_exe checkProofGradeRuntimePaperMainFamily where
   root := `CheckProofGradeRuntimePaperMainFamily
+
+lean_exe checkProofGradeRuntimePaperMainFamilyBundle where
+  root := `CheckProofGradeRuntimePaperMainFamilyBundle
 
 @[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCore where

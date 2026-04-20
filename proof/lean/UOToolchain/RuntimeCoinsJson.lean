@@ -683,6 +683,150 @@ def loadAndCheckImportedProofGradeSeededRuntimePathOramPaperMainFamily
         <| IO.userError
             s!"failed to validate proof-grade seeded path-ORAM runtime paper-main family: {err}"
 
+def importedSeededRuntimePaperMainFamilyBundleFieldNames : List String :=
+  ["family", "public_outcome", "boundary_schedule"]
+
+structure ImportedSeededRuntimePaperMainFamilyBundle where
+  family : ImportedSeededRuntimePathOramWitnessFamily
+  public_outcome : ImportedPublicOutcomeTrace
+  boundary_schedule : List ImportedBoundaryEvent
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedSeededRuntimePaperMainFamilyBundle.runtimePublicOutcome
+  (bundle : ImportedSeededRuntimePaperMainFamilyBundle) : SGXPublicOutcome :=
+  bundle.public_outcome.toPublicOutcome
+
+def ImportedSeededRuntimePaperMainFamilyBundle.runtimeBoundarySchedule
+  (bundle : ImportedSeededRuntimePaperMainFamilyBundle) : List BoundaryEvent :=
+  bundle.boundary_schedule.map ImportedBoundaryEvent.toBoundaryEvent
+
+def ImportedSeededRuntimePaperMainFamilyBundle.Valid
+  (bundle : ImportedSeededRuntimePaperMainFamilyBundle)
+  (modelTags : SGXModelTags) : Prop :=
+  bundle.family.ProofGradeKernelInterfaceAssurance modelTags ∧
+    0 < bundle.family.seed_count ∧
+    ∀ seed, seed < bundle.family.seed_count →
+      (bundle.family.runtimeWitnessAt seed).publicOutcome = bundle.runtimePublicOutcome ∧
+      (bundle.family.runtimeWitnessAt seed).boundarySchedule =
+        bundle.runtimeBoundarySchedule
+
+def ImportedSeededRuntimePaperMainFamilyBundle.checkValid
+  (bundle : ImportedSeededRuntimePaperMainFamilyBundle)
+  (modelTags : SGXModelTags) : Bool :=
+  checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
+      bundle.family
+      modelTags &&
+    decide (0 < bundle.family.seed_count) &&
+    (List.range bundle.family.seed_count).all fun seed =>
+      decide
+          ((bundle.family.runtimeWitnessAt seed).publicOutcome =
+            bundle.runtimePublicOutcome) &&
+        decide
+          ((bundle.family.runtimeWitnessAt seed).boundarySchedule =
+            bundle.runtimeBoundarySchedule)
+
+@[simp] theorem importedSeededRuntimePaperMainFamilyBundle_checkValid_eq_true_iff
+  (bundle : ImportedSeededRuntimePaperMainFamilyBundle)
+  (modelTags : SGXModelTags) :
+  bundle.checkValid modelTags = true ↔ bundle.Valid modelTags := by
+  unfold ImportedSeededRuntimePaperMainFamilyBundle.checkValid
+    ImportedSeededRuntimePaperMainFamilyBundle.Valid
+    ImportedSeededRuntimePaperMainFamilyBundle.runtimePublicOutcome
+    ImportedSeededRuntimePaperMainFamilyBundle.runtimeBoundarySchedule
+  rw [Bool.and_eq_true, Bool.and_eq_true]
+  constructor
+  · intro hCheck
+    rcases hCheck with ⟨hKernelAndSeedPos, hAll⟩
+    rcases hKernelAndSeedPos with ⟨hKernel, hSeedPos⟩
+    refine
+      ⟨ (importedSeededRuntimePathOramKernelInterfaceFamily_check_eq_true_iff
+            bundle.family
+            modelTags).mp hKernel
+      , by simpa [decide_eq_true_eq] using hSeedPos
+      , ?_
+      ⟩
+    intro seed hSeed
+    have hSeedCheck := (List.all_eq_true.mp hAll) seed (List.mem_range.mpr hSeed)
+    rw [Bool.and_eq_true] at hSeedCheck
+    refine ⟨?_, ?_⟩
+    · simpa [decide_eq_true_eq] using hSeedCheck.1
+    · simpa [decide_eq_true_eq] using hSeedCheck.2
+  · intro hValid
+    refine
+      ⟨ ⟨ (importedSeededRuntimePathOramKernelInterfaceFamily_check_eq_true_iff
+              bundle.family
+              modelTags).mpr hValid.1
+        , by simpa [decide_eq_true_eq] using hValid.2.1
+        ⟩
+      , ?_
+      ⟩
+    refine List.all_eq_true.mpr ?_
+    intro seed hSeedMem
+    have hSeed : seed < bundle.family.seed_count := List.mem_range.mp hSeedMem
+    have hExact := hValid.2.2 seed hSeed
+    rw [Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · simpa [decide_eq_true_eq] using hExact.1
+    · simpa [decide_eq_true_eq] using hExact.2
+
+theorem importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_family_assurance
+  {bundle : ImportedSeededRuntimePaperMainFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  bundle.family.ProofGradePaperMainRuntimeAssurance modelTags := by
+  refine ⟨hValid.1, ?_, ?_⟩
+  · refine ⟨hValid.2.1, ?_⟩
+    intro seed hSeed
+    have hSeedOutcome := (hValid.2.2 seed hSeed).1
+    have hZeroOutcome := (hValid.2.2 0 hValid.2.1).1
+    calc
+      (bundle.family.runtimeWitnessAt seed).publicOutcome = bundle.runtimePublicOutcome := hSeedOutcome
+      _ = (bundle.family.runtimeWitnessAt 0).publicOutcome := by
+            simpa using hZeroOutcome.symm
+  · refine ⟨hValid.2.1, ?_⟩
+    intro seed hSeed
+    have hSeedBoundary := (hValid.2.2 seed hSeed).2
+    have hZeroBoundary := (hValid.2.2 0 hValid.2.1).2
+    calc
+      (bundle.family.runtimeWitnessAt seed).boundarySchedule = bundle.runtimeBoundarySchedule :=
+        hSeedBoundary
+      _ = (bundle.family.runtimeWitnessAt 0).boundarySchedule := by
+            simpa using hZeroBoundary.symm
+
+def parseImportedSeededRuntimePaperMainFamilyBundle
+  (input : String) : Except String ImportedSeededRuntimePaperMainFamilyBundle := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedProofGradeSeededRuntimePaperMainFamilyBundle
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedSeededRuntimePaperMainFamilyBundle := do
+  let bundle ← parseImportedSeededRuntimePaperMainFamilyBundle input
+  if bundle.checkValid modelTags then
+    pure bundle
+  else
+    throw
+      "imported proof-grade seeded runtime paper-main family bundle does not satisfy Lean validity checks"
+
+def loadImportedSeededRuntimePaperMainFamilyBundle
+  (path : System.FilePath) : IO ImportedSeededRuntimePaperMainFamilyBundle := do
+  let input ← IO.FS.readFile path
+  match parseImportedSeededRuntimePaperMainFamilyBundle input with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <| IO.userError s!"failed to parse seeded runtime paper-main family bundle: {err}"
+
+def loadAndCheckImportedProofGradeSeededRuntimePaperMainFamilyBundle
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedSeededRuntimePaperMainFamilyBundle := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeSeededRuntimePaperMainFamilyBundle input modelTags with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw
+        <| IO.userError
+            s!"failed to validate proof-grade seeded runtime paper-main family bundle: {err}"
+
 structure ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily where
   seed_count : Nat
   witnesses : List ImportedRuntimeRefinementWitness
@@ -743,6 +887,23 @@ def ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.Valid
         witness.toRuntimeWitness.pathOramFreshCoinValues? =
           some (pathOramLeafValueTraceOfSeed family.projectedPublicFreshCoinScaffold seed)
 
+def ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.ProofGradeValid
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Prop :=
+  family.witnesses.length = family.seed_count ∧
+    family.seed_count =
+      pathOramLeafValueSeedSpaceSize family.projectedPublicFreshCoinScaffold ∧
+    ∀ seed, seed < family.seed_count →
+      ∃ witness,
+        family.witnessAt? seed = some witness ∧
+        witness.ProofGradeValid modelTags ∧
+        witness.toRuntimeWitness.oramLeafPublicScaffold =
+          family.runtimePublicLeafScaffold ∧
+        witness.toRuntimeWitness.pathOramFreshCoinScaffold? =
+          some family.projectedPublicFreshCoinScaffold ∧
+        witness.toRuntimeWitness.pathOramFreshCoinValues? =
+          some (pathOramLeafValueTraceOfSeed family.projectedPublicFreshCoinScaffold seed)
+
 def ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.checkValid
   (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
   (modelTags : SGXModelTags) : Bool :=
@@ -754,6 +915,31 @@ def ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.checkValid
       match family.witnessAt? seed with
       | some witness =>
           witness.checkValid modelTags &&
+            decide
+              (witness.toRuntimeWitness.oramLeafPublicScaffold =
+                family.runtimePublicLeafScaffold) &&
+            decide
+              (witness.toRuntimeWitness.pathOramFreshCoinScaffold? =
+                some family.projectedPublicFreshCoinScaffold) &&
+            decide
+              (witness.toRuntimeWitness.pathOramFreshCoinValues? =
+                some
+                  (pathOramLeafValueTraceOfSeed
+                    family.projectedPublicFreshCoinScaffold
+                    seed))
+      | none => false
+
+def ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.checkProofGrade
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Bool :=
+  decide (family.witnesses.length = family.seed_count) &&
+    decide
+      (family.seed_count =
+        pathOramLeafValueSeedSpaceSize family.projectedPublicFreshCoinScaffold) &&
+    (List.range family.seed_count).all fun seed =>
+      match family.witnessAt? seed with
+      | some witness =>
+          witness.checkProofGrade modelTags &&
             decide
               (witness.toRuntimeWitness.oramLeafPublicScaffold =
                 family.runtimePublicLeafScaffold) &&
@@ -940,6 +1126,102 @@ def loadAndCheckImportedCanonicalFreshCoinRuntimePathOramWitnessFamily
         (importedWitness_checkValid_eq_true_iff witness modelTags).2 hWitnessValid
       simp [hGet, hWitnessCheck, hLeafScaffold, hFreshScaffold, hFreshValues]
 
+@[simp] theorem importedCanonicalFreshCoinRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) :
+  family.checkProofGrade modelTags = true ↔ family.ProofGradeValid modelTags := by
+  constructor
+  · intro hCheck
+    rw [ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.checkProofGrade, Bool.and_eq_true]
+      at hCheck
+    have hLenAndSeed := hCheck.1
+    have hAll := hCheck.2
+    rw [Bool.and_eq_true] at hLenAndSeed
+    refine ⟨?_, ?_, ?_⟩
+    · simpa using hLenAndSeed.1
+    · simpa using hLenAndSeed.2
+    · intro seed hSeed
+      have hSeedCheck :
+          (match family.witnessAt? seed with
+            | some witness =>
+                witness.checkProofGrade modelTags &&
+                  decide
+                    (witness.toRuntimeWitness.oramLeafPublicScaffold =
+                      family.runtimePublicLeafScaffold) &&
+                  decide
+                    (witness.toRuntimeWitness.pathOramFreshCoinScaffold? =
+                      some family.projectedPublicFreshCoinScaffold) &&
+                  decide
+                    (witness.toRuntimeWitness.pathOramFreshCoinValues? =
+                      some
+                        (pathOramLeafValueTraceOfSeed
+                          family.projectedPublicFreshCoinScaffold
+                          seed))
+            | none => false) = true := by
+        exact (List.all_eq_true.mp hAll) seed (List.mem_range.mpr hSeed)
+      cases hGet : family.witnessAt? seed with
+      | none =>
+          simp [hGet] at hSeedCheck
+      | some witness =>
+          have hWitness :
+              witness.ProofGradeValid modelTags ∧
+              witness.toRuntimeWitness.oramLeafPublicScaffold =
+                family.runtimePublicLeafScaffold ∧
+              witness.toRuntimeWitness.pathOramFreshCoinScaffold? =
+                some family.projectedPublicFreshCoinScaffold ∧
+              witness.toRuntimeWitness.pathOramFreshCoinValues? =
+                some
+                  (pathOramLeafValueTraceOfSeed
+                    family.projectedPublicFreshCoinScaffold
+                    seed) := by
+            have hWitnessBool :
+                witness.checkProofGrade modelTags = true ∧
+                witness.toRuntimeWitness.oramLeafPublicScaffold =
+                  family.runtimePublicLeafScaffold ∧
+                witness.toRuntimeWitness.pathOramFreshCoinScaffold? =
+                  some family.projectedPublicFreshCoinScaffold ∧
+                witness.toRuntimeWitness.pathOramFreshCoinValues? =
+                  some
+                    (pathOramLeafValueTraceOfSeed
+                      family.projectedPublicFreshCoinScaffold
+                      seed) := by
+              simpa [hGet, decide_eq_true_eq, and_assoc] using hSeedCheck
+            refine
+              ⟨ (importedWitness_checkProofGrade_eq_true_iff witness modelTags).mp hWitnessBool.1
+              , hWitnessBool.2.1
+              , hWitnessBool.2.2.1
+              , hWitnessBool.2.2.2
+              ⟩
+          refine ⟨witness, rfl, hWitness.1, hWitness.2.1, hWitness.2.2.1, hWitness.2.2.2⟩
+  · intro hValid
+    rw [ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.checkProofGrade, Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · rw [Bool.and_eq_true]
+      exact ⟨by simpa using hValid.1, by simpa using hValid.2.1⟩
+    · refine List.all_eq_true.mpr ?_
+      intro seed hSeedMem
+      have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
+      rcases hValid.2.2 seed hSeed with
+        ⟨witness, hGet, hWitnessValid, hLeafScaffold, hFreshScaffold, hFreshValues⟩
+      have hWitnessCheck :
+          witness.checkProofGrade modelTags = true :=
+        (importedWitness_checkProofGrade_eq_true_iff witness modelTags).2 hWitnessValid
+      simp [hGet, hWitnessCheck, hLeafScaffold, hFreshScaffold, hFreshValues]
+
+theorem importedCanonicalFreshCoinRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+  {family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily}
+  {modelTags : SGXModelTags}
+  (hValid : family.ProofGradeValid modelTags) :
+  family.Valid modelTags := by
+  refine ⟨hValid.1, hValid.2.1, ?_⟩
+  intro seed hSeed
+  rcases hValid.2.2 seed hSeed with
+    ⟨witness, hGet, hWitnessValid, hLeafScaffold, hFreshScaffold, hFreshValues⟩
+  exact
+    ⟨witness, hGet,
+      importedWitness_proofGradeValid_implies_valid witness modelTags hWitnessValid,
+      hLeafScaffold, hFreshScaffold, hFreshValues⟩
+
 structure ImportedCanonicalFreshCoinRuntimePathOramTheoremInput where
   seed_count : Nat
   representative_seed : Nat
@@ -993,10 +1275,48 @@ def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.Valid
           input.projectedPublicFreshCoinScaffold
           input.representative_seed)
 
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.ProofGradeValid
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) : Prop :=
+  input.representative_witness.ProofGradeValid modelTags ∧
+    input.seed_count =
+      pathOramLeafValueSeedSpaceSize input.projectedPublicFreshCoinScaffold ∧
+    input.representative_seed < input.seed_count ∧
+    input.runtimeRepresentativeWitness.oramLeafPublicScaffold =
+      input.runtimePublicLeafScaffold ∧
+    input.runtimeRepresentativeWitness.pathOramFreshCoinScaffold? =
+      some input.projectedPublicFreshCoinScaffold ∧
+    input.runtimeRepresentativeWitness.pathOramFreshCoinValues? =
+      some
+        (pathOramLeafValueTraceOfSeed
+          input.projectedPublicFreshCoinScaffold
+          input.representative_seed)
+
 def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.checkValid
   (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
   (modelTags : SGXModelTags) : Bool :=
   input.representative_witness.checkValid modelTags &&
+    decide
+      (input.seed_count =
+        pathOramLeafValueSeedSpaceSize input.projectedPublicFreshCoinScaffold) &&
+    decide (input.representative_seed < input.seed_count) &&
+    decide
+      (input.runtimeRepresentativeWitness.oramLeafPublicScaffold =
+        input.runtimePublicLeafScaffold) &&
+    decide
+      (input.runtimeRepresentativeWitness.pathOramFreshCoinScaffold? =
+        some input.projectedPublicFreshCoinScaffold) &&
+    decide
+      (input.runtimeRepresentativeWitness.pathOramFreshCoinValues? =
+        some
+          (pathOramLeafValueTraceOfSeed
+            input.projectedPublicFreshCoinScaffold
+            input.representative_seed))
+
+def ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.checkProofGrade
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) : Bool :=
+  input.representative_witness.checkProofGrade modelTags &&
     decide
       (input.seed_count =
         pathOramLeafValueSeedSpaceSize input.projectedPublicFreshCoinScaffold) &&
@@ -1048,6 +1368,29 @@ def loadAndCheckImportedCanonicalFreshCoinRuntimePathOramTheoremInput
       throw <| IO.userError
         s!"failed to validate canonical fresh-coin path-ORAM theorem input: {err}"
 
+def parseAndCheckImportedProofGradeCanonicalFreshCoinRuntimePathOramTheoremInput
+  (input : String)
+  (modelTags : SGXModelTags) :
+  Except String ImportedCanonicalFreshCoinRuntimePathOramTheoremInput := do
+  let theoremInput ← parseImportedCanonicalFreshCoinRuntimePathOramTheoremInput input
+  if theoremInput.checkProofGrade modelTags then
+    pure theoremInput
+  else
+    throw
+      "imported proof-grade canonical fresh-coin path-ORAM theorem input does not satisfy Lean validity checks"
+
+def loadAndCheckImportedProofGradeCanonicalFreshCoinRuntimePathOramTheoremInput
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedCanonicalFreshCoinRuntimePathOramTheoremInput := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeCanonicalFreshCoinRuntimePathOramTheoremInput
+      input
+      modelTags with
+  | .ok theoremInput => pure theoremInput
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate proof-grade canonical fresh-coin path-ORAM theorem input: {err}"
+
 @[simp] theorem importedCanonicalFreshCoinRuntimePathOramTheoremInput_checkValid_eq_true_iff
   (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
   (modelTags : SGXModelTags) :
@@ -1059,6 +1402,36 @@ def loadAndCheckImportedCanonicalFreshCoinRuntimePathOramTheoremInput
     , and_assoc
     , decide_eq_true_eq
     ]
+
+@[simp] theorem importedCanonicalFreshCoinRuntimePathOramTheoremInput_checkProofGrade_eq_true_iff
+  (input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput)
+  (modelTags : SGXModelTags) :
+  input.checkProofGrade modelTags = true ↔ input.ProofGradeValid modelTags := by
+  simp
+    [ ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.checkProofGrade
+    , ImportedCanonicalFreshCoinRuntimePathOramTheoremInput.ProofGradeValid
+    , Bool.and_eq_true
+    , and_assoc
+    , decide_eq_true_eq
+    , importedWitness_checkProofGrade_eq_true_iff
+    ]
+
+theorem importedCanonicalFreshCoinRuntimePathOramTheoremInput_proofGradeValid_implies_valid
+  {input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput}
+  {modelTags : SGXModelTags}
+  (hValid : input.ProofGradeValid modelTags) :
+  input.Valid modelTags := by
+  exact
+    ⟨ importedWitness_proofGradeValid_implies_valid
+        input.representative_witness
+        modelTags
+        hValid.1
+    , hValid.2.1
+    , hValid.2.2.1
+    , hValid.2.2.2.1
+    , hValid.2.2.2.2.1
+    , hValid.2.2.2.2.2
+    ⟩
 
 def sampleImportedCanonicalFreshCoinRuntimePathOramWitnessFamily :
   ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily :=
@@ -1114,6 +1487,24 @@ def sampleImportedSeededRuntimePathOramWitnessFamily :
   { sampleImportedSeededRuntimeWitnessFamily with
     public_leaf_scaffold := []
   }
+
+def sampleImportedSeededRuntimePaperMainFamilyBundle :
+  ImportedSeededRuntimePaperMainFamilyBundle :=
+  { family := sampleImportedSeededRuntimePathOramWitnessFamily
+  , public_outcome := sampleImportedRuntimeRefinementWitness.public_outcome
+  , boundary_schedule := sampleImportedRuntimeRefinementWitness.boundary_schedule
+  }
+
+def sampleImportedSeededRuntimePaperMainFamilyBundleRoundtrip : Bool :=
+  match
+      parseImportedSeededRuntimePaperMainFamilyBundle
+        (Json.compress (toJson sampleImportedSeededRuntimePaperMainFamilyBundle))
+    with
+    | .ok bundle => decide (bundle = sampleImportedSeededRuntimePaperMainFamilyBundle)
+    | .error _ => false
+
+example : sampleImportedSeededRuntimePaperMainFamilyBundleRoundtrip = true := by
+  native_decide
 
 def sampleImportedSeededRuntimePathOramWitnessFamilyRoundtrip : Bool :=
   match

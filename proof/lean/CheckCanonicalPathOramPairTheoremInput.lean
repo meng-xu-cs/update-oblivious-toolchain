@@ -14,9 +14,11 @@ def main (args : List String) : IO UInt32 := do
         , sharedResourceModel := sharedResourceModel
         }
       let theoremInput ←
-        loadAndCheckImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput path modelTags
+        loadAndCheckImportedProofGradeCanonicalFreshCoinRuntimePathOramPairTheoremInput
+          path
+          modelTags
       IO.println
-        s!"validated canonical fresh-coin path-ORAM pair theorem input for {theoremInput.runtimePublicOutcome.entrypointId}"
+        s!"validated proof-grade canonical fresh-coin path-ORAM pair theorem input for {theoremInput.runtimePublicOutcome.entrypointId}"
       pure 0
   | _ =>
       IO.eprintln usage

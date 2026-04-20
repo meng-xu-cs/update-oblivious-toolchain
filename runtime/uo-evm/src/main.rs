@@ -9,6 +9,7 @@ enum OutputFormat {
     KernelSlotDsl,
     KernelLowering,
     KernelRefinementWitness,
+    KernelInterface,
     ShellBoundary,
     ShellBoundarySlot,
     ShellBoundaryLowering,
@@ -83,6 +84,10 @@ fn main() -> Result<()> {
                     anyhow::anyhow!("execution trace is missing runtime kernel refinement witness")
                 })?;
             println!("{}", witness.to_json_pretty());
+        }
+        OutputFormat::KernelInterface => {
+            let bundle = trace.runtime_kernel_interface_bundle(&artifact)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::ShellBoundary => {
             let bundle = trace.runtime_shell_boundary_bundle()?;

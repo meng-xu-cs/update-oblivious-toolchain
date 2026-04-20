@@ -406,10 +406,12 @@ The current runtime has a first hardening layer:
   runtime phase witness, and the explicit exported `RuntimeShellContract` /
   `RuntimeShellTrace` JSON all travel together, Lean checks that those shell
   objects exactly match the witnesses they claim to summarize, checks the
-  shell-event trace replay, the new
-  `checkProofGradeRuntimeKernelInterface` checker exposes the same paper-facing
-  theorem surface directly from the full runtime witness JSON, and the probe
-  validates the explicit shell-boundary artifact separately as
+  shell-event trace replay, the witness-based
+  `checkProofGradeRuntimeKernelInterface` checker still exposes the same
+  paper-facing theorem surface directly from the full runtime witness JSON,
+  the new `checkProofGradeRuntimeKernelInterfaceBundle` checker validates the
+  explicit exported `RuntimeKernelInterfaceBundle`, and the probe validates
+  the explicit shell-boundary artifact separately as
   `shell_boundary_validation.json`
 - that shell-boundary bundle is now also accessor-only on the Rust side: its
   witness / contract / trace fields are private, callers read them through
@@ -548,7 +550,8 @@ The current runtime has a first hardening layer:
   the anti-drift report now also checks that this bridge still sources the
   exact manifest-carried slot DSL, that both `RuntimeTrustedKernelBundle` and
   `RuntimeTrustedKernelSlotBundle` keep their proof-facing fields private
-  behind explicit accessors, and that Lean keeps the proof-grade trusted-kernel
+  behind explicit accessors, that the Rust constructor now rejects slot-program
+  entrypoint drift directly, and that Lean keeps the proof-grade trusted-kernel
   schedule exactness and slot-bundle validity path intact
 - the shell-boundary slot/lowering bridge family is pinned too:
   `RuntimeShellBoundaryLoweringBundle::from_manifest_entry(...)`,
@@ -563,6 +566,10 @@ The current runtime has a first hardening layer:
   exactness, and to-runtime validity theorems for those bundles
 - the direct runtime-kernel bundle family in that same module is pinned too:
   `RuntimeKernelDslBundle::from_manifest_entry(...)`,
+  while the paper-facing runtime/kernel boundary itself is now also explicit on
+  the Rust side as `ExecutionTrace::runtime_kernel_interface_bundle(...)`, with
+  a private constructor that reuses the checked shell-boundary bundle plus the
+  manifest-backed kernel witness exactness checks
   `RuntimeKernelSlotDslBundle::from_manifest_entry(...)`,
   `RuntimeKernelLoweringBundle::from_manifest_entry(...)`, and the
   `runtime_kernel_*_bundle_for_entrypoint(...)` entrypoints stay confined to
@@ -649,9 +656,10 @@ The current runtime has a first hardening layer:
   actually executes; the artifact-derived confidential-fragment witness
   remains in the report as a separate diagnostic summary over the admitted
   fragment, the new `kernel_interface_validation.json` report runs those same
-  representative runtime witnesses through
-  `checkProofGradeRuntimeKernelInterface`, and the confidential-core checker
-  now consumes one serialized confidential-core bundle
+  representative runtime runs through
+  `checkProofGradeRuntimeKernelInterfaceBundle` over the explicit exported
+  `RuntimeKernelInterfaceBundle`, and the confidential-core checker now
+  consumes one serialized confidential-core bundle
 - `confidential_core_slot_validation.json` ties that same proof-grade
   runtime/refinement guarantee directly to the fixed-slot confidential
   program that the concrete runtime executes, while
@@ -668,11 +676,17 @@ The current runtime has a first hardening layer:
   together, and Lean proves that they all share one exact proof-grade kernel
   witness and one exact runtime phase witness rather than being accepted only
   as separate artifacts
-- the proof-grade runtime witness path now also has a dedicated executable
+- the proof-grade runtime witness path still has the dedicated executable
   theorem-surface checker, `checkProofGradeRuntimeKernelInterface`, which
-  accepts the same runtime witness JSON as `checkProofGradeRuntimeWitness` but
-  names the exact shell-boundary / kernel-state interface facts that the paper
-  argument consumes
+  accepts the same runtime witness JSON as `checkProofGradeRuntimeWitness`,
+  and the explicit theorem object now also has
+  `checkProofGradeRuntimeKernelInterfaceBundle`, which accepts the exported
+  `RuntimeKernelInterfaceBundle` and names the exact shell-boundary /
+  kernel-state interface facts that the paper argument consumes; the seeded
+  paper-route artifact path now also has
+  `checkProofGradeRuntimePaperMainFamilyBundle`, which accepts the exported
+  `SeededRuntimePaperMainFamilyBundle` and names the exact paper-route public
+  outcome / boundary schedule that the stronger theorem route consumes
 - the theorem side now also mirrors those exported artifacts directly:
   `RuntimeShellBoundaryBundle`, `RuntimeShellBoundarySlotBundle`,
   `RuntimeShellBoundaryLoweringBundle`,

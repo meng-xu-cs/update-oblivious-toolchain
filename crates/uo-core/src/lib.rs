@@ -49,8 +49,8 @@ pub use manifest::{
 };
 pub use metadata::{BoundsMetadata, ContractMetadata, EntrypointMetadata, StateMetadata};
 pub use shell_boundary::{
-    RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError, RuntimeShellContract,
-    RuntimeShellTrace,
+    RuntimeKernelInterfaceBundle, RuntimeKernelInterfaceBundleError, RuntimeShellBoundaryBundle,
+    RuntimeShellBoundaryBundleError, RuntimeShellContract, RuntimeShellTrace,
 };
 pub use trace::{
     canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
@@ -71,9 +71,10 @@ pub use trace::{
     RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
     RuntimePathOramHiddenCertificate, RuntimePathOramPositionMapWitness,
     RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
-    RuntimeTrustedKernelBundle, SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamily,
-    SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace, TheoremTrace, TraceHashBundle,
-    WriteClass,
+    RuntimeTrustedKernelBundle, SeededRuntimePaperMainFamilyBundle,
+    SeededRuntimePaperMainFamilyBundleError, SeededRuntimePathOramWitnessFamily,
+    SeededRuntimeWitnessFamily, SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace,
+    TheoremTrace, TraceHashBundle, WriteClass,
 };
 pub use translation_validation::{
     ProofRelevantContractView, ProofRelevantEntrypointView, ProofRelevantFunctionView,

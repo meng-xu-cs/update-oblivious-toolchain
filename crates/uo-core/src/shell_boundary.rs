@@ -1,9 +1,9 @@
 use crate::{
-    ExecutionTrace, KernelWitnessError, RefinementWitnessError,
-    RuntimeKernelRefinementEventKindWitness, RuntimeKernelRefinementEventWitness,
-    RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
-    RuntimeKernelScheduleWitness, RuntimeKernelStepWitness, RuntimeKernelWitness,
-    RuntimeRefinementWitness,
+    canonical_runtime_public_object_ids, CompiledArtifact, ExecutionTrace, KernelWitnessError,
+    RefinementWitnessError, RuntimeKernelRefinementEventKindWitness,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
+    RuntimeKernelRefinementWitnessError, RuntimeKernelScheduleWitness, RuntimeKernelStepWitness,
+    RuntimeKernelWitness, RuntimeRefinementWitness,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -35,6 +35,14 @@ pub struct RuntimeShellBoundaryBundle {
     shell_trace: RuntimeShellTrace,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeKernelInterfaceBundle {
+    shell_boundary_bundle: RuntimeShellBoundaryBundle,
+    expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+    expected_public_object_ids: Vec<u32>,
+    expected_kernel_schedule: RuntimeKernelScheduleWitness,
+}
+
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum RuntimeShellBoundaryBundleError {
     #[error("runtime shell-boundary bundle requires a valid runtime refinement witness: {0}")]
@@ -51,6 +59,32 @@ pub enum RuntimeShellBoundaryBundleError {
     RuntimeKernelRefinementWitness(#[from] RuntimeKernelRefinementWitnessError),
     #[error("runtime shell trace does not refine the runtime shell contract")]
     ShellRefinementMismatch,
+}
+
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum RuntimeKernelInterfaceBundleError {
+    #[error("runtime kernel-interface bundle requires a valid runtime shell-boundary bundle: {0}")]
+    ShellBoundary(#[from] RuntimeShellBoundaryBundleError),
+    #[error("artifact is missing confidential entrypoint '{entrypoint}'")]
+    MissingEntrypoint { entrypoint: String },
+    #[error(
+        "runtime kernel-interface bundle requires a valid manifest-matching kernel witness: {0}"
+    )]
+    KernelWitness(#[from] KernelWitnessError),
+    #[error("runtime kernel-interface bundle requires expected kernel steps for '{entrypoint}'")]
+    MissingExpectedKernelSteps { entrypoint: String },
+    #[error(
+        "runtime kernel-interface bundle requires expected public object ids for '{entrypoint}'"
+    )]
+    MissingExpectedPublicObjectIds { entrypoint: String },
+    #[error(
+        "runtime kernel-interface bundle requires an expected kernel schedule for '{entrypoint}'"
+    )]
+    MissingExpectedKernelSchedule { entrypoint: String },
+    #[error(
+        "runtime kernel-interface bundle expected emitted kernel schedule for '{entrypoint}' to equal the admitted expected kernel schedule"
+    )]
+    EmittedKernelScheduleMismatch { entrypoint: String },
 }
 
 impl RuntimeKernelWitness {
@@ -457,6 +491,88 @@ impl RuntimeShellBoundaryBundle {
     }
 }
 
+impl RuntimeKernelInterfaceBundle {
+    pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {
+        &self.shell_boundary_bundle
+    }
+
+    pub fn kernel_witness(&self) -> &RuntimeKernelWitness {
+        self.shell_boundary_bundle.kernel_witness()
+    }
+
+    pub fn expected_kernel_steps(&self) -> &[RuntimeKernelStepWitness] {
+        &self.expected_kernel_steps
+    }
+
+    pub fn expected_public_object_ids(&self) -> &[u32] {
+        &self.expected_public_object_ids
+    }
+
+    pub fn expected_kernel_schedule(&self) -> &RuntimeKernelScheduleWitness {
+        &self.expected_kernel_schedule
+    }
+
+    fn from_shell_boundary_bundle(
+        shell_boundary_bundle: RuntimeShellBoundaryBundle,
+        artifact: &CompiledArtifact,
+    ) -> Result<Self, RuntimeKernelInterfaceBundleError> {
+        let entrypoint = shell_boundary_bundle.entrypoint_id().to_owned();
+        let manifest_entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get(&entrypoint)
+            .ok_or_else(|| RuntimeKernelInterfaceBundleError::MissingEntrypoint {
+                entrypoint: entrypoint.clone(),
+            })?;
+        let expected_public_object_ids =
+            canonical_runtime_public_object_ids(&artifact.contract.state);
+        shell_boundary_bundle
+            .kernel_witness()
+            .validate_for_confidential(&entrypoint, manifest_entry, &expected_public_object_ids)?;
+        let expected_kernel_steps = shell_boundary_bundle
+            .kernel_witness()
+            .expected_kernel_steps()
+            .ok_or_else(
+                || RuntimeKernelInterfaceBundleError::MissingExpectedKernelSteps {
+                    entrypoint: entrypoint.clone(),
+                },
+            )?
+            .to_vec();
+        let expected_public_object_ids = shell_boundary_bundle
+            .kernel_witness()
+            .expected_public_object_schedule()
+            .ok_or_else(
+                || RuntimeKernelInterfaceBundleError::MissingExpectedPublicObjectIds {
+                    entrypoint: entrypoint.clone(),
+                },
+            )?;
+        let expected_kernel_schedule = shell_boundary_bundle
+            .kernel_witness()
+            .expected_kernel_schedule()
+            .ok_or_else(
+                || RuntimeKernelInterfaceBundleError::MissingExpectedKernelSchedule {
+                    entrypoint: entrypoint.clone(),
+                },
+            )?;
+        if shell_boundary_bundle
+            .kernel_witness()
+            .emitted_kernel_schedule()
+            != expected_kernel_schedule
+        {
+            return Err(
+                RuntimeKernelInterfaceBundleError::EmittedKernelScheduleMismatch { entrypoint },
+            );
+        }
+        Ok(Self {
+            shell_boundary_bundle,
+            expected_kernel_steps,
+            expected_public_object_ids,
+            expected_kernel_schedule,
+        })
+    }
+}
+
 impl RuntimeShellContract {
     pub fn public_object_universe(&self) -> &[u32] {
         &self.public_object_universe
@@ -477,6 +593,14 @@ impl ExecutionTrace {
     ) -> Result<RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError> {
         let runtime_witness = self.runtime_refinement_witness()?;
         RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness)
+    }
+
+    pub fn runtime_kernel_interface_bundle(
+        &self,
+        artifact: &CompiledArtifact,
+    ) -> Result<RuntimeKernelInterfaceBundle, RuntimeKernelInterfaceBundleError> {
+        let shell_boundary_bundle = self.runtime_shell_boundary_bundle()?;
+        RuntimeKernelInterfaceBundle::from_shell_boundary_bundle(shell_boundary_bundle, artifact)
     }
 }
 

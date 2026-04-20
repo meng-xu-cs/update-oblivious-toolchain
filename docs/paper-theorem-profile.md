@@ -392,13 +392,25 @@ The runtime-to-Lean witness interface is now fixed in:
   `proof/lean/CheckProofGradeRuntimeKernelInterface.lean` for the paper-facing
   runtime/kernel interface theorem surface extracted from the same accepted
   runtime witness
+- `checkProofGradeRuntimeKernelInterfaceBundle` in
+  `proof/lean/CheckProofGradeRuntimeKernelInterfaceBundle.lean` for the
+  explicit theorem-facing `RuntimeKernelInterfaceBundle` emitted by the Rust
+  runtime/kernel interface bridge
+- `checkProofGradeRuntimePaperMainFamilyBundle` in
+  `proof/lean/CheckProofGradeRuntimePaperMainFamilyBundle.lean` for the
+  explicit theorem-facing `SeededRuntimePaperMainFamilyBundle` emitted by the
+  seeded paper-route bridge
 - `results/kernel_refinement_validation.json` for benchmark-backed validation
   that the lower-level runtime phase witness is accepted directly against the
   exported kernel witness on representative supported paths
 - `results/kernel_interface_validation.json` for benchmark-backed validation
-  that the same proof-grade runtime witnesses are accepted by the dedicated
-  paper-facing runtime/kernel interface checker on representative supported
-  paths
+  that the explicit exported `RuntimeKernelInterfaceBundle` artifacts are
+  accepted by the dedicated paper-facing runtime/kernel interface bundle
+  checker on representative supported paths
+- `results/seeded_witness_validation.json` for benchmark-backed validation
+  that the explicit exported `SeededRuntimePaperMainFamilyBundle` artifacts are
+  accepted by the dedicated paper-facing seeded runtime bundle checker on
+  representative supported paths, alongside the lower seeded-family validators
 - `results/witness_validation.json` for benchmark-backed validation that the
   emitted runtime witnesses are accepted by the Lean checker on representative
   supported paths, including a multi-object ORAM `transferFrom` witness

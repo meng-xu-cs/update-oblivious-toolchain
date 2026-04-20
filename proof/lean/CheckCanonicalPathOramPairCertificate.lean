@@ -14,9 +14,11 @@ def main (args : List String) : IO UInt32 := do
         , sharedResourceModel := sharedResourceModel
         }
       let certificate ←
-        loadAndCheckImportedCanonicalFreshCoinRuntimePathOramPairCertificate path modelTags
+        loadAndCheckImportedProofGradeCanonicalFreshCoinRuntimePathOramPairCertificate
+          path
+          modelTags
       IO.println
-        s!"validated canonical fresh-coin path-ORAM pair certificate for {certificate.runtimePublicOutcome.entrypointId}"
+        s!"validated proof-grade canonical fresh-coin path-ORAM pair certificate for {certificate.runtimePublicOutcome.entrypointId}"
       pure 0
   | _ =>
       IO.eprintln usage

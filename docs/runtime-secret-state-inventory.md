@@ -114,6 +114,11 @@ as a top-level crate module, the `PublicRuntimeKernel` facade is likewise now
 restricted to `pub(in crate::runtime)`, and only
 `runtime/uo-evm/src/theorem.rs` may invoke
 `runtime.run_confidential_entrypoint(...)` inside the traced-call bridge.
+For confidential calls, that same theorem finalizer now also re-derives the
+runtime refinement witness, canonically retags it for the single-seed paper
+route, and rebuilds the explicit `SeededRuntimePaperMainFamilyBundle` before
+returning the trace, so the production runtime path now rechecks the paper
+theorem object instead of leaving it solely to offline probe validation.
 The same report now also pins the residual raw public-field surface in the
 runtime hot path: after the `MapEntry` / `OramState` / `OramTranscript` /
 `OramCommit` / `OramWrite` / `OramStorage` / `OramBlock` / `OramBucket`

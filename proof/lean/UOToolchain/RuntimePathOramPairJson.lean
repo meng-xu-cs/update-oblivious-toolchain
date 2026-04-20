@@ -264,6 +264,46 @@ def ImportedSeededRuntimePathOramPairCertificate.checkValid
     certificate.familyMatchesCheck certificate.lhs_family modelTags &&
     certificate.familyMatchesCheck certificate.rhs_family modelTags
 
+def ImportedSeededRuntimePathOramPairCertificate.proofGradeFamilyMatchesCheck
+  (certificate : ImportedSeededRuntimePathOramPairCertificate)
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Bool :=
+  checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily family modelTags &&
+    (List.range family.seed_count).all fun seed =>
+      match family.toImportedSeededRuntimeWitnessFamily.witnessAt? seed with
+      | some witness =>
+          runtimeWitnessObjectsMatchPublicConfigCheck
+              witness.toRuntimeWitness
+              certificate.runtimeCfg &&
+            decide
+              (pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+                certificate.runtimePublicView) &&
+            decide
+              (pathOramPublicLocationTrace
+                  (pathOramStorageLocationTrace
+                    (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+                certificate.runtimePublicLocation) &&
+            decide
+              (pathOramStorageShape
+                  (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+                certificate.runtimeStorageShape) &&
+            decide (witness.toRuntimeWitness.publicOutcome = certificate.runtimePublicOutcome) &&
+            decide
+              (witness.toRuntimeWitness.boundarySchedule =
+                certificate.runtimeBoundarySchedule) &&
+            decide (witness.toRuntimeWitness.controllerShape = certificate.runtimeControllerShape) &&
+            decide
+              (witness.toRuntimeWitness.normalizedMicroTrace =
+                certificate.runtimeNormalizedMicroTrace)
+      | none => false
+
+def ImportedSeededRuntimePathOramPairCertificate.checkProofGrade
+  (certificate : ImportedSeededRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags) : Bool :=
+  pathOramConfigWellFormedCheck certificate.runtimeCfg &&
+    certificate.proofGradeFamilyMatchesCheck certificate.lhs_family modelTags &&
+    certificate.proofGradeFamilyMatchesCheck certificate.rhs_family modelTags
+
 def parseImportedSeededRuntimePathOramPairCertificate
   (input : String) : Except String ImportedSeededRuntimePathOramPairCertificate := do
   let json ← Lean.Json.parse input
@@ -287,6 +327,26 @@ def loadAndCheckImportedSeededRuntimePathOramPairCertificate
   | .error err =>
       throw <| IO.userError
         s!"failed to validate seeded path-ORAM pair certificate: {err}"
+
+def parseAndCheckImportedProofGradeSeededRuntimePathOramPairCertificate
+  (input : String)
+  (modelTags : SGXModelTags) : Except String ImportedSeededRuntimePathOramPairCertificate := do
+  let certificate ← parseImportedSeededRuntimePathOramPairCertificate input
+  if certificate.checkProofGrade modelTags then
+    pure certificate
+  else
+    throw
+      "imported proof-grade seeded path-ORAM pair certificate does not satisfy Lean validity checks"
+
+def loadAndCheckImportedProofGradeSeededRuntimePathOramPairCertificate
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO ImportedSeededRuntimePathOramPairCertificate := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeSeededRuntimePathOramPairCertificate input modelTags with
+  | .ok certificate => pure certificate
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate proof-grade seeded path-ORAM pair certificate: {err}"
 
 @[simp] theorem importedSeededRuntimePathOramPairCertificate_familyMatchesCheck_eq_true_iff
   (certificate : ImportedSeededRuntimePathOramPairCertificate)
@@ -416,6 +476,181 @@ def loadAndCheckImportedSeededRuntimePathOramPairCertificate
     · exact
         (importedSeededRuntimePathOramPairCertificate_familyMatchesCheck_eq_true_iff
           certificate certificate.rhs_family modelTags).2 hValid.2.2
+
+def ImportedSeededRuntimePathOramPairCertificate.ProofGradeFamilyMatches
+  (certificate : ImportedSeededRuntimePathOramPairCertificate)
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) : Prop :=
+  family.ProofGradeKernelInterfaceAssurance modelTags ∧
+    ∀ seed, seed < family.seed_count →
+      ∃ witness,
+        family.witnessAt? seed = some witness ∧
+        witness.toRuntimeWitness.ObjectsMatchPublicConfig certificate.runtimeCfg ∧
+        pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+          certificate.runtimePublicView ∧
+        pathOramPublicLocationTrace
+            (pathOramStorageLocationTrace (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+          certificate.runtimePublicLocation ∧
+        pathOramStorageShape (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+          certificate.runtimeStorageShape ∧
+        witness.toRuntimeWitness.publicOutcome = certificate.runtimePublicOutcome ∧
+        witness.toRuntimeWitness.boundarySchedule = certificate.runtimeBoundarySchedule ∧
+        witness.toRuntimeWitness.controllerShape = certificate.runtimeControllerShape ∧
+        witness.toRuntimeWitness.normalizedMicroTrace = certificate.runtimeNormalizedMicroTrace
+
+def ImportedSeededRuntimePathOramPairCertificate.ProofGradeValid
+  (certificate : ImportedSeededRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags) : Prop :=
+  PathOramConfigWellFormed certificate.runtimeCfg ∧
+    certificate.ProofGradeFamilyMatches certificate.lhs_family modelTags ∧
+    certificate.ProofGradeFamilyMatches certificate.rhs_family modelTags
+
+@[simp] theorem importedSeededRuntimePathOramPairCertificate_proofGradeFamilyMatchesCheck_eq_true_iff
+  (certificate : ImportedSeededRuntimePathOramPairCertificate)
+  (family : ImportedSeededRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags) :
+  certificate.proofGradeFamilyMatchesCheck family modelTags = true ↔
+    certificate.ProofGradeFamilyMatches family modelTags := by
+  constructor
+  · intro hCheck
+    rw [ImportedSeededRuntimePathOramPairCertificate.proofGradeFamilyMatchesCheck, Bool.and_eq_true]
+      at hCheck
+    refine ⟨?_, ?_⟩
+    · exact
+        (importedSeededRuntimePathOramKernelInterfaceFamily_check_eq_true_iff
+          family modelTags).mp hCheck.1
+    · intro seed hSeed
+      have hSeedCheck :
+          (match family.witnessAt? seed with
+            | some witness =>
+                runtimeWitnessObjectsMatchPublicConfigCheck
+                    witness.toRuntimeWitness
+                    certificate.runtimeCfg &&
+                  decide
+                    (pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+                      certificate.runtimePublicView) &&
+                  decide
+                    (pathOramPublicLocationTrace
+                        (pathOramStorageLocationTrace
+                          (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+                      certificate.runtimePublicLocation) &&
+                  decide
+                    (pathOramStorageShape
+                        (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+                      certificate.runtimeStorageShape) &&
+                  decide
+                    (witness.toRuntimeWitness.publicOutcome =
+                      certificate.runtimePublicOutcome) &&
+                  decide
+                    (witness.toRuntimeWitness.boundarySchedule =
+                      certificate.runtimeBoundarySchedule) &&
+                  decide
+                    (witness.toRuntimeWitness.controllerShape =
+                      certificate.runtimeControllerShape) &&
+                  decide
+                    (witness.toRuntimeWitness.normalizedMicroTrace =
+                      certificate.runtimeNormalizedMicroTrace)
+            | none => false) = true := by
+        exact (List.all_eq_true.mp hCheck.2) seed (List.mem_range.mpr hSeed)
+      cases hGet : family.witnessAt? seed with
+      | none =>
+          simp [hGet] at hSeedCheck
+      | some witness =>
+          have hWitness :
+              runtimeWitnessObjectsMatchPublicConfigCheck
+                  witness.toRuntimeWitness
+                  certificate.runtimeCfg = true ∧
+                pathOramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace) =
+                  certificate.runtimePublicView ∧
+                pathOramPublicLocationTrace
+                    (pathOramStorageLocationTrace
+                      (oramStorageView (viewMPlus witness.toRuntimeWitness.trace))) =
+                  certificate.runtimePublicLocation ∧
+                pathOramStorageShape
+                    (oramStorageView (viewMPlus witness.toRuntimeWitness.trace)) =
+                  certificate.runtimeStorageShape ∧
+                witness.toRuntimeWitness.publicOutcome = certificate.runtimePublicOutcome ∧
+                witness.toRuntimeWitness.boundarySchedule = certificate.runtimeBoundarySchedule ∧
+                witness.toRuntimeWitness.controllerShape = certificate.runtimeControllerShape ∧
+                witness.toRuntimeWitness.normalizedMicroTrace =
+                  certificate.runtimeNormalizedMicroTrace := by
+            simpa [hGet, Bool.and_eq_true, and_assoc] using hSeedCheck
+          rcases hWitness with
+            ⟨hMatchCheck, hView, hLocation, hShape, hOutcome, hBoundary, hController, hMicro⟩
+          exact
+            ⟨witness, rfl,
+              (runtimeWitnessObjectsMatchPublicConfigCheck_eq_true_iff
+                witness.toRuntimeWitness certificate.runtimeCfg).mp hMatchCheck,
+              hView, hLocation, hShape, hOutcome, hBoundary, hController, hMicro⟩
+  · intro hValid
+    rw [ImportedSeededRuntimePathOramPairCertificate.proofGradeFamilyMatchesCheck, Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · exact
+        (importedSeededRuntimePathOramKernelInterfaceFamily_check_eq_true_iff
+          family modelTags).2 hValid.1
+    · refine List.all_eq_true.mpr ?_
+      intro seed hSeedMem
+      have hSeed : seed < family.seed_count := List.mem_range.mp hSeedMem
+      rcases hValid.2 seed hSeed with
+        ⟨witness, hGet, hMatch, hView, hLocation, hShape, hOutcome, hBoundary, hController, hMicro⟩
+      have hViewNormalized :
+          pathOramNormalizePublicPart
+              (oramViewPublicPart (viewMPlus witness.toRuntimeWitness.trace)) =
+            certificate.runtimePublicView := by
+        simpa [pathOramViewPublicPart] using hView
+      have hMatchCheck :
+          runtimeWitnessObjectsMatchPublicConfigCheck
+              witness.toRuntimeWitness
+              certificate.runtimeCfg = true :=
+        (runtimeWitnessObjectsMatchPublicConfigCheck_eq_true_iff
+          witness.toRuntimeWitness certificate.runtimeCfg).2 hMatch
+      simp [hGet, hMatchCheck, hViewNormalized, hLocation, hShape, hOutcome, hBoundary,
+        hController, hMicro]
+
+@[simp] theorem importedSeededRuntimePathOramPairCertificate_checkProofGrade_eq_true_iff
+  (certificate : ImportedSeededRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags) :
+  certificate.checkProofGrade modelTags = true ↔ certificate.ProofGradeValid modelTags := by
+  constructor
+  · intro hCheck
+    rw [ImportedSeededRuntimePathOramPairCertificate.checkProofGrade, Bool.and_eq_true] at hCheck
+    have hHead := hCheck.1
+    rw [Bool.and_eq_true] at hHead
+    refine ⟨?_, ?_, ?_⟩
+    · exact (pathOramConfigWellFormedCheck_eq_true_iff certificate.runtimeCfg).mp hHead.1
+    · exact
+        (importedSeededRuntimePathOramPairCertificate_proofGradeFamilyMatchesCheck_eq_true_iff
+          certificate certificate.lhs_family modelTags).mp hHead.2
+    · exact
+        (importedSeededRuntimePathOramPairCertificate_proofGradeFamilyMatchesCheck_eq_true_iff
+          certificate certificate.rhs_family modelTags).mp hCheck.2
+  · intro hValid
+    rw [ImportedSeededRuntimePathOramPairCertificate.checkProofGrade, Bool.and_eq_true]
+    refine ⟨?_, ?_⟩
+    · rw [Bool.and_eq_true]
+      refine ⟨?_, ?_⟩
+      · exact (pathOramConfigWellFormedCheck_eq_true_iff certificate.runtimeCfg).2 hValid.1
+      · exact
+          (importedSeededRuntimePathOramPairCertificate_proofGradeFamilyMatchesCheck_eq_true_iff
+            certificate certificate.lhs_family modelTags).2 hValid.2.1
+    · exact
+        (importedSeededRuntimePathOramPairCertificate_proofGradeFamilyMatchesCheck_eq_true_iff
+          certificate certificate.rhs_family modelTags).2 hValid.2.2
+
+theorem importedSeededRuntimePathOramPairCertificate_proofGradeValid_implies_valid
+  {certificate : ImportedSeededRuntimePathOramPairCertificate}
+  {modelTags : SGXModelTags}
+  (hValid : certificate.ProofGradeValid modelTags) :
+  certificate.Valid modelTags := by
+  refine ⟨hValid.1, ?_, ?_⟩
+  · exact
+      ⟨ importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid hValid.2.1.1.1
+      , hValid.2.1.2
+      ⟩
+  · exact
+      ⟨ importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid hValid.2.2.1.1
+      , hValid.2.2.2
+      ⟩
 
 theorem importedSeededRuntimePathOramPairCertificate_familyMatches_witnessValid
   (certificate : ImportedSeededRuntimePathOramPairCertificate)

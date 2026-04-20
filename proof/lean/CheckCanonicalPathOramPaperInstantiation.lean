@@ -26,13 +26,19 @@ def main (args : List String) : IO UInt32 := do
         | .error err =>
             throw <| IO.userError
               s!"failed to parse canonical fresh-coin path-ORAM pair certificate: {err}"
-      if hPair : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.checkValid certificate modelTags then
+      if hPair :
+          ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.checkProofGrade
+            certificate
+            modelTags then
         if hLhs : certificate.lhs_family.checkHiddenLeafCoverage then
           if hRhs : certificate.rhs_family.checkHiddenLeafCoverage then
-            have hValid : certificate.Valid modelTags :=
-              (importedCanonicalFreshCoinRuntimePathOramPairCertificate_checkValid_eq_true_iff
+            have hProofValid : certificate.ProofGradeValid modelTags :=
+              (importedCanonicalFreshCoinRuntimePathOramPairCertificate_checkProofGrade_eq_true_iff
                 certificate
                 modelTags).mp (by simpa using hPair)
+            have hValid : certificate.Valid modelTags :=
+              importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeValid_implies_valid
+                hProofValid
             have hLhsCoverage :
                 ∀ hiddenSeed,
                     hiddenSeed <
@@ -75,7 +81,7 @@ def main (args : List String) : IO UInt32 := do
                 hLhsCoverage
                 hRhsCoverage
             IO.println
-              s!"validated concrete local paper-main instantiation for {certificate.runtimePublicOutcome.entrypointId}"
+              s!"validated proof-grade concrete local paper-main instantiation for {certificate.runtimePublicOutcome.entrypointId}"
             pure 0
           else
             IO.eprintln "rhs canonical family does not cover the hidden leaf-value seed space"
@@ -84,7 +90,7 @@ def main (args : List String) : IO UInt32 := do
           IO.eprintln "lhs canonical family does not cover the hidden leaf-value seed space"
           pure 1
       else
-        IO.eprintln "pair certificate failed Lean validity checks"
+        IO.eprintln "pair certificate failed Lean proof-grade validity checks"
         pure 1
   | _ =>
       IO.eprintln usage

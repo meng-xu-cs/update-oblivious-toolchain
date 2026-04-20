@@ -480,6 +480,14 @@ pub struct SeededRuntimePathOramWitnessFamily {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SeededRuntimePaperMainFamilyBundle {
+    family: SeededRuntimePathOramWitnessFamily,
+    public_outcome: PublicOutcomeTrace,
+    #[serde(default)]
+    boundary_schedule: Vec<BoundaryEvent>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
     seed_count: usize,
     witnesses: Vec<RuntimeRefinementWitness>,
@@ -736,6 +744,14 @@ pub enum SeededRuntimeWitnessFamilyError {
     PublicLeafScaffoldMismatch {
         index: usize,
     },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SeededRuntimePaperMainFamilyBundleError {
+    Family(SeededRuntimeWitnessFamilyError),
+    EmptyFamily,
+    PublicOutcomeMismatch { index: usize },
+    BoundaryScheduleMismatch { index: usize },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1181,6 +1197,34 @@ impl fmt::Display for SeededRuntimeWitnessFamilyError {
 
 impl std::error::Error for SeededRuntimeWitnessFamilyError {}
 
+impl fmt::Display for SeededRuntimePaperMainFamilyBundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Family(err) => write!(
+                f,
+                "seeded runtime paper-main family bundle requires a valid seeded runtime family: {}",
+                err
+            ),
+            Self::EmptyFamily => write!(
+                f,
+                "seeded runtime paper-main family bundle requires at least one witness"
+            ),
+            Self::PublicOutcomeMismatch { index } => write!(
+                f,
+                "seeded runtime paper-main family witness at index {} does not match the shared public outcome",
+                index
+            ),
+            Self::BoundaryScheduleMismatch { index } => write!(
+                f,
+                "seeded runtime paper-main family witness at index {} does not match the shared boundary schedule",
+                index
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SeededRuntimePaperMainFamilyBundleError {}
+
 impl fmt::Display for CanonicalFreshCoinWitnessFamilyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1302,6 +1346,12 @@ impl RuntimeRefinementWitness {
 
     pub fn runtime_seed(&self) -> Option<u64> {
         self.runtime_seed
+    }
+
+    pub fn with_runtime_seed(mut self, runtime_seed: u64) -> Result<Self, RefinementWitnessError> {
+        self.runtime_seed = Some(runtime_seed);
+        self.validate()?;
+        Ok(self)
     }
 
     pub fn public_outcome(&self) -> &PublicOutcomeTrace {
@@ -2905,6 +2955,70 @@ impl SeededRuntimePathOramWitnessFamily {
     pub fn to_json_pretty(&self) -> String {
         serde_json::to_string_pretty(self)
             .expect("seeded path-ORAM runtime witness family is JSON serializable")
+    }
+}
+
+impl SeededRuntimePaperMainFamilyBundle {
+    pub fn family(&self) -> &SeededRuntimePathOramWitnessFamily {
+        &self.family
+    }
+
+    pub fn public_outcome(&self) -> &PublicOutcomeTrace {
+        &self.public_outcome
+    }
+
+    pub fn boundary_schedule(&self) -> &[BoundaryEvent] {
+        &self.boundary_schedule
+    }
+
+    pub fn new(
+        family: SeededRuntimePathOramWitnessFamily,
+    ) -> Result<Self, SeededRuntimePaperMainFamilyBundleError> {
+        let first_witness = family
+            .witnesses()
+            .first()
+            .ok_or(SeededRuntimePaperMainFamilyBundleError::EmptyFamily)?;
+        let public_outcome = first_witness.public_outcome().clone();
+        let boundary_schedule = first_witness.boundary_schedule().to_vec();
+        let bundle = Self {
+            family,
+            public_outcome,
+            boundary_schedule,
+        };
+        bundle.validate()?;
+        Ok(bundle)
+    }
+
+    pub fn validate(&self) -> Result<(), SeededRuntimePaperMainFamilyBundleError> {
+        self.family
+            .validate()
+            .map_err(SeededRuntimePaperMainFamilyBundleError::Family)?;
+        if self.family.witnesses().is_empty() {
+            return Err(SeededRuntimePaperMainFamilyBundleError::EmptyFamily);
+        }
+        for (index, witness) in self.family.witnesses().iter().enumerate() {
+            if witness.public_outcome() != &self.public_outcome {
+                return Err(
+                    SeededRuntimePaperMainFamilyBundleError::PublicOutcomeMismatch { index },
+                );
+            }
+            if witness.boundary_schedule() != self.boundary_schedule.as_slice() {
+                return Err(
+                    SeededRuntimePaperMainFamilyBundleError::BoundaryScheduleMismatch { index },
+                );
+            }
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self)
+            .expect("seeded runtime paper-main family bundle is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("seeded runtime paper-main family bundle is JSON serializable")
     }
 }
 
@@ -4562,6 +4676,7 @@ mod tests {
         RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
         RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
         RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
+        SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
         SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
         WriteClass,
     };
@@ -5021,6 +5136,15 @@ mod tests {
     #[test]
     fn runtime_refinement_witness_validate_accepts_sample() {
         let witness = sample_runtime_refinement_witness_with_seed(0);
+        witness.validate().unwrap();
+    }
+
+    #[test]
+    fn runtime_refinement_witness_with_runtime_seed_retains_validity() {
+        let witness = sample_runtime_refinement_witness_with_seed(19)
+            .with_runtime_seed(0)
+            .unwrap();
+        assert_eq!(witness.runtime_seed(), Some(0));
         witness.validate().unwrap();
     }
 
@@ -5661,6 +5785,72 @@ mod tests {
                 index: 1,
                 tagged_seed: 7,
             }
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_family_bundle_accepts_uniform_public_surface() {
+        let bundle = SeededRuntimePaperMainFamilyBundle::new(
+            SeededRuntimePathOramWitnessFamily::new(vec![
+                sample_runtime_refinement_witness_with_seed(0),
+                sample_runtime_refinement_witness_with_seed(1),
+            ])
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(bundle.family().seed_count(), 2);
+        assert_eq!(
+            bundle.public_outcome(),
+            bundle.family().witnesses()[0].public_outcome()
+        );
+        assert_eq!(
+            bundle.boundary_schedule(),
+            bundle.family().witnesses()[0].boundary_schedule()
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_family_bundle_rejects_empty_family() {
+        assert_eq!(
+            SeededRuntimePaperMainFamilyBundle::new(
+                SeededRuntimePathOramWitnessFamily::new(vec![]).unwrap()
+            )
+            .unwrap_err(),
+            SeededRuntimePaperMainFamilyBundleError::EmptyFamily
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_family_bundle_rejects_public_outcome_drift() {
+        let mut second = sample_runtime_refinement_witness_with_seed(1);
+        second.public_outcome.gas_used += 1;
+        assert_eq!(
+            SeededRuntimePaperMainFamilyBundle::new(
+                SeededRuntimePathOramWitnessFamily::new(vec![
+                    sample_runtime_refinement_witness_with_seed(0),
+                    second,
+                ])
+                .unwrap(),
+            )
+            .unwrap_err(),
+            SeededRuntimePaperMainFamilyBundleError::PublicOutcomeMismatch { index: 1 }
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_family_bundle_rejects_boundary_schedule_drift() {
+        let mut second = sample_runtime_refinement_witness_with_seed(1);
+        second.boundary_schedule[0].output_len += 1;
+        assert_eq!(
+            SeededRuntimePaperMainFamilyBundle::new(
+                SeededRuntimePathOramWitnessFamily::new(vec![
+                    sample_runtime_refinement_witness_with_seed(0),
+                    second,
+                ])
+                .unwrap(),
+            )
+            .unwrap_err(),
+            SeededRuntimePaperMainFamilyBundleError::BoundaryScheduleMismatch { index: 1 }
         );
     }
 

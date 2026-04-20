@@ -40,6 +40,13 @@ def importedRuntimeShellBoundaryBundleFieldNames : List String :=
   , "shell_trace"
   ]
 
+def importedRuntimeKernelInterfaceBundleFieldNames : List String :=
+  [ "shell_boundary_bundle"
+  , "expected_kernel_steps"
+  , "expected_public_object_ids"
+  , "expected_kernel_schedule"
+  ]
+
 structure ImportedRuntimeShellContract where
   public_object_universe : List Nat
   canonical_loaded_object_schedule : List Nat
@@ -193,6 +200,13 @@ structure ImportedRuntimeShellBoundaryBundle where
   shell_trace : ImportedRuntimeShellTrace
 deriving Repr, DecidableEq, FromJson, ToJson
 
+structure ImportedRuntimeKernelInterfaceBundle where
+  shell_boundary_bundle : ImportedRuntimeShellBoundaryBundle
+  expected_kernel_steps : List ImportedRuntimeKernelStep
+  expected_public_object_ids : List Nat
+  expected_kernel_schedule : ImportedRuntimeKernelSchedule
+deriving Repr, DecidableEq, FromJson, ToJson
+
 def ImportedRuntimeRefinementWitness.shellBoundaryBundle?
   (witness : ImportedRuntimeRefinementWitness) : Option ImportedRuntimeShellBoundaryBundle := do
   let kernelWitness ← witness.kernel_witness
@@ -204,6 +218,19 @@ def ImportedRuntimeRefinementWitness.shellBoundaryBundle?
     , shell_trace := runtimeKernelRefinementWitness.importedShellTrace
     }
 
+def ImportedRuntimeRefinementWitness.kernelInterfaceBundle?
+  (witness : ImportedRuntimeRefinementWitness) : Option ImportedRuntimeKernelInterfaceBundle := do
+  let shellBoundaryBundle ← witness.shellBoundaryBundle?
+  let expectedKernelSteps ← shellBoundaryBundle.kernel_witness.expected_kernel_steps
+  let expectedPublicObjectIds ← shellBoundaryBundle.kernel_witness.expected_public_object_ids
+  let expectedKernelSchedule ← shellBoundaryBundle.kernel_witness.expectedKernelSchedule?
+  pure
+    { shell_boundary_bundle := shellBoundaryBundle
+    , expected_kernel_steps := expectedKernelSteps
+    , expected_public_object_ids := expectedPublicObjectIds
+    , expected_kernel_schedule := expectedKernelSchedule
+    }
+
 def ImportedRuntimeShellBoundaryBundle.Valid
   (bundle : ImportedRuntimeShellBoundaryBundle) : Prop :=
   bundle.kernel_witness.ProofGradeValid bundle.kernel_witness.entrypoint_id ∧
@@ -211,6 +238,31 @@ def ImportedRuntimeShellBoundaryBundle.Valid
     bundle.shell_contract = bundle.kernel_witness.importedShellContract ∧
     bundle.shell_trace = bundle.runtime_kernel_refinement_witness.importedShellTrace ∧
     bundle.shell_trace.Refines bundle.shell_contract
+
+def ImportedRuntimeKernelInterfaceBundle.Valid
+  (bundle : ImportedRuntimeKernelInterfaceBundle) : Prop :=
+  bundle.shell_boundary_bundle.Valid ∧
+    bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.RefinesLeanKernelState
+      bundle.shell_boundary_bundle.kernel_witness ∧
+    bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+      some bundle.expected_kernel_steps ∧
+    bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+      bundle.expected_kernel_steps ∧
+    bundle.shell_boundary_bundle.kernel_witness.expected_public_object_ids =
+      some bundle.expected_public_object_ids ∧
+    bundle.shell_boundary_bundle.kernel_witness.public_object_ids =
+      bundle.expected_public_object_ids ∧
+    bundle.shell_boundary_bundle.kernel_witness.toRuntimeKernelWitness.replayedResourceState? =
+      some bundle.shell_boundary_bundle.kernel_witness.claimedResourceState ∧
+    bundle.shell_boundary_bundle.kernel_witness.expectedKernelSchedule? =
+      some bundle.expected_kernel_schedule ∧
+    bundle.shell_boundary_bundle.kernel_witness.emittedKernelSchedule =
+      bundle.expected_kernel_schedule ∧
+    bundle.expected_kernel_schedule.toRuntimeKernelSchedule.finalState? =
+      some
+        { phase := .finished
+        , publicObjectSchedule := bundle.expected_kernel_schedule.publicObjectSchedule
+        }
 
 theorem importedRuntimeRefinementWitness_shellBoundaryBundle_exact
   {witness : ImportedRuntimeRefinementWitness}
@@ -248,6 +300,56 @@ theorem importedRuntimeRefinementWitness_shellBoundaryBundle_exact
           cases hBundleEq
           simp
 
+theorem importedRuntimeRefinementWitness_kernelInterfaceBundle_exact
+  {witness : ImportedRuntimeRefinementWitness}
+  {bundle : ImportedRuntimeKernelInterfaceBundle}
+  (hBundle : witness.kernelInterfaceBundle? = some bundle) :
+  witness.shellBoundaryBundle? = some bundle.shell_boundary_bundle ∧
+    bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+      some bundle.expected_kernel_steps ∧
+    bundle.shell_boundary_bundle.kernel_witness.expected_public_object_ids =
+      some bundle.expected_public_object_ids ∧
+    bundle.shell_boundary_bundle.kernel_witness.expectedKernelSchedule? =
+      some bundle.expected_kernel_schedule := by
+  unfold ImportedRuntimeRefinementWitness.kernelInterfaceBundle? at hBundle
+  cases hShell : witness.shellBoundaryBundle? with
+  | none =>
+      simp [hShell] at hBundle
+  | some shellBoundaryBundle =>
+      cases hExpectedSteps : shellBoundaryBundle.kernel_witness.expected_kernel_steps with
+      | none =>
+          simp [hShell, hExpectedSteps] at hBundle
+      | some expectedKernelSteps =>
+          cases hExpectedPublic :
+              shellBoundaryBundle.kernel_witness.expected_public_object_ids with
+          | none =>
+              simp [hShell, hExpectedSteps, hExpectedPublic] at hBundle
+          | some expectedPublicObjectIds =>
+              cases hExpectedSchedule :
+                  shellBoundaryBundle.kernel_witness.expectedKernelSchedule? with
+              | none =>
+                  simp [hShell, hExpectedSteps, hExpectedPublic, hExpectedSchedule] at hBundle
+              | some expectedKernelSchedule =>
+                  have hBundleSome :
+                      some
+                          { shell_boundary_bundle := shellBoundaryBundle
+                          , expected_kernel_steps := expectedKernelSteps
+                          , expected_public_object_ids := expectedPublicObjectIds
+                          , expected_kernel_schedule := expectedKernelSchedule
+                          } =
+                        some bundle := by
+                    simpa [hShell, hExpectedSteps, hExpectedPublic, hExpectedSchedule] using
+                      hBundle
+                  have hBundleEq :
+                      { shell_boundary_bundle := shellBoundaryBundle
+                      , expected_kernel_steps := expectedKernelSteps
+                      , expected_public_object_ids := expectedPublicObjectIds
+                      , expected_kernel_schedule := expectedKernelSchedule
+                      } = bundle := by
+                    exact Option.some.inj hBundleSome
+                  cases hBundleEq
+                  simp [hShell, hExpectedSteps, hExpectedPublic, hExpectedSchedule]
+
 def ImportedRuntimeShellBoundaryBundle.checkValid
   (bundle : ImportedRuntimeShellBoundaryBundle) : Bool :=
   bundle.kernel_witness.checkProofGrade bundle.kernel_witness.entrypoint_id &&
@@ -263,6 +365,95 @@ def ImportedRuntimeShellBoundaryBundle.checkValid
   simp [importedRuntimeKernelWitness_checkProofGrade_eq_true_iff,
     importedRuntimeKernelRefinementWitness_checkValid_eq_true_iff,
     importedRuntimeShellTrace_checkRefines_eq_true_iff, and_assoc]
+
+def ImportedRuntimeKernelInterfaceBundle.checkValid
+  (bundle : ImportedRuntimeKernelInterfaceBundle) : Bool :=
+  bundle.shell_boundary_bundle.checkValid &&
+      (bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+        some bundle.expected_kernel_steps) &&
+    decide
+      (bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+        bundle.expected_kernel_steps) &&
+    decide
+      (bundle.shell_boundary_bundle.kernel_witness.expected_public_object_ids =
+        some bundle.expected_public_object_ids) &&
+    decide
+      (bundle.shell_boundary_bundle.kernel_witness.public_object_ids =
+        bundle.expected_public_object_ids) &&
+    decide
+      (bundle.shell_boundary_bundle.kernel_witness.toRuntimeKernelWitness.replayedResourceState? =
+        some bundle.shell_boundary_bundle.kernel_witness.claimedResourceState) &&
+    decide
+      (bundle.shell_boundary_bundle.kernel_witness.expectedKernelSchedule? =
+        some bundle.expected_kernel_schedule) &&
+    decide
+      (bundle.shell_boundary_bundle.kernel_witness.emittedKernelSchedule =
+        bundle.expected_kernel_schedule) &&
+    decide
+      (bundle.expected_kernel_schedule.toRuntimeKernelSchedule.finalState? =
+        some
+          { phase := .finished
+          , publicObjectSchedule := bundle.expected_kernel_schedule.publicObjectSchedule
+          })
+
+@[simp] theorem importedRuntimeKernelInterfaceBundle_checkValid_eq_true_iff
+  (bundle : ImportedRuntimeKernelInterfaceBundle) :
+  bundle.checkValid = true ↔ bundle.Valid := by
+  constructor
+  · intro hCheck
+    have hChecks :
+        bundle.shell_boundary_bundle.checkValid = true ∧
+          bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps =
+            some bundle.expected_kernel_steps ∧
+          bundle.shell_boundary_bundle.kernel_witness.kernel_steps =
+            bundle.expected_kernel_steps ∧
+          bundle.shell_boundary_bundle.kernel_witness.expected_public_object_ids =
+            some bundle.expected_public_object_ids ∧
+          bundle.shell_boundary_bundle.kernel_witness.public_object_ids =
+            bundle.expected_public_object_ids ∧
+          bundle.shell_boundary_bundle.kernel_witness.toRuntimeKernelWitness.replayedResourceState? =
+            some bundle.shell_boundary_bundle.kernel_witness.claimedResourceState ∧
+          bundle.shell_boundary_bundle.kernel_witness.expectedKernelSchedule? =
+            some bundle.expected_kernel_schedule ∧
+          bundle.shell_boundary_bundle.kernel_witness.emittedKernelSchedule =
+            bundle.expected_kernel_schedule ∧
+          bundle.expected_kernel_schedule.toRuntimeKernelSchedule.finalState? =
+            some
+              { phase := .finished
+              , publicObjectSchedule := bundle.expected_kernel_schedule.publicObjectSchedule
+              } := by
+      simpa [ImportedRuntimeKernelInterfaceBundle.checkValid, and_assoc] using hCheck
+    rcases hChecks with
+      ⟨hShellCheck, hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds,
+        hPublicObjectIds, hResourceState, hExpectedKernelSchedule,
+        hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+    have hShellValid : bundle.shell_boundary_bundle.Valid := by
+      exact
+        (importedRuntimeShellBoundaryBundle_checkValid_eq_true_iff
+          bundle.shell_boundary_bundle).mp hShellCheck
+    have hKernelStateRefinement :
+        bundle.shell_boundary_bundle.runtime_kernel_refinement_witness.RefinesLeanKernelState
+          bundle.shell_boundary_bundle.kernel_witness := by
+      exact
+        importedRuntimeKernelRefinementWitness_refinesLeanKernelState_of_proofGrade
+          hShellValid.1 hShellValid.2.1
+    exact
+      ⟨hShellValid, hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,
+        hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
+        hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+  · intro hValid
+    rcases hValid with
+      ⟨hShellValid, _hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,
+        hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
+        hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+    have hShellCheck : bundle.shell_boundary_bundle.checkValid = true := by
+      exact
+        (importedRuntimeShellBoundaryBundle_checkValid_eq_true_iff
+          bundle.shell_boundary_bundle).mpr hShellValid
+    simp [ImportedRuntimeKernelInterfaceBundle.checkValid, hShellCheck,
+      hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds, hPublicObjectIds,
+      hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
+      hFinalKernelScheduleState, and_assoc]
 
 theorem importedRuntimeShellBoundaryBundle_contract_exact
   {bundle : ImportedRuntimeShellBoundaryBundle}
@@ -310,6 +501,129 @@ theorem importedRuntimeShellBoundaryBundle_witness_proofGradeRefines
     importedRuntimeShellTrace_refines_toRuntime
       (importedRuntimeShellBoundaryBundle_refines hValid)
 
+def ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle
+  (bundle : ImportedRuntimeShellBoundaryBundle) : RuntimeShellBoundaryBundle :=
+  { kernelWitness := bundle.kernel_witness.toRuntimeKernelWitness
+  , runtimeKernelRefinementWitness :=
+      bundle.runtime_kernel_refinement_witness.toRuntimeKernelRefinementWitness
+  , shellContract := bundle.shell_contract.toRuntimeShellContract
+  , shellTrace := bundle.shell_trace.toRuntimeShellTrace
+  }
+
+def ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle
+  (bundle : ImportedRuntimeKernelInterfaceBundle) : RuntimeKernelInterfaceBundle :=
+  { shellBoundaryBundle := bundle.shell_boundary_bundle.toRuntimeShellBoundaryBundle
+  , expectedKernelSteps := bundle.expected_kernel_steps.map
+      ImportedRuntimeKernelStep.toRuntimeKernelStep
+  , expectedPublicObjectIds := bundle.expected_public_object_ids
+  , expectedKernelSchedule := bundle.expected_kernel_schedule.toRuntimeKernelSchedule
+  }
+
+theorem importedRuntimeShellBoundaryBundle_toRuntimeValid
+  (bundle : ImportedRuntimeShellBoundaryBundle)
+  (hValid : bundle.Valid) :
+  bundle.toRuntimeShellBoundaryBundle.Valid := by
+  rcases hValid with
+    ⟨hKernelProofGrade, hRefinementValid, hContractExact, hTraceExact, hRefines⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · exact
+      runtimeKernelWitness_proofGradeValid_self
+        (importedRuntimeKernelWitness_toRuntimeKernelWitness_proofGradeValid
+          bundle.kernel_witness bundle.kernel_witness.entrypoint_id hKernelProofGrade)
+  · simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelRefinementWitness.Valid] using hRefinementValid
+  · simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle, hContractExact] using
+      importedRuntimeKernelWitness_importedShellContract_toRuntime bundle.kernel_witness
+  · simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle, hTraceExact] using
+      importedRuntimeKernelRefinementWitness_importedShellTrace_toRuntime
+        bundle.runtime_kernel_refinement_witness
+  · unfold ImportedRuntimeShellTrace.Refines at hRefines
+    simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelWitness.shellContract,
+      ImportedRuntimeKernelRefinementWitness.shellTrace, hContractExact, hTraceExact] using
+      hRefines
+
+theorem importedRuntimeKernelInterfaceBundle_toRuntimeValid
+  (bundle : ImportedRuntimeKernelInterfaceBundle)
+  (hValid : bundle.Valid) :
+  bundle.toRuntimeKernelInterfaceBundle.Valid := by
+  rcases hValid with
+    ⟨hShellValid, hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,
+      hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
+      hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact
+      importedRuntimeShellBoundaryBundle_toRuntimeValid
+        bundle.shell_boundary_bundle hShellValid
+  · simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+      ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelRefinementWitness.RefinesLeanKernelState] using
+      hKernelStateRefinement
+  · simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+      ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelWitness.toRuntimeKernelWitness] using
+      congrArg
+        (Option.map (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep))
+        hExpectedKernelSteps
+  · simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+      ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelWitness.toRuntimeKernelWitness] using
+      congrArg (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep) hKernelSteps
+  · simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+      ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelWitness.toRuntimeKernelWitness] using
+      hExpectedPublicObjectIds
+  · simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+      ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelWitness.toRuntimeKernelWitness] using
+      hPublicObjectIds
+  · simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+      ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+      ImportedRuntimeKernelWitness.toRuntimeKernelWitness,
+      ImportedRuntimeKernelWitness.claimedResourceState] using
+      hResourceState
+  · have hExpectedKernelScheduleExact :
+        bundle.expected_kernel_schedule =
+          { opcodes := bundle.expected_kernel_steps.map ImportedRuntimeKernelStep.opcode
+          , steps := bundle.expected_kernel_steps
+          } := by
+      have hSchedule := hExpectedKernelSchedule
+      simp [ImportedRuntimeKernelWitness.expectedKernelSchedule?, hExpectedKernelSteps] at hSchedule
+      exact hSchedule.symm
+    change
+      ((Option.map (List.map ImportedRuntimeKernelStep.opcode)
+            bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps).bind
+          fun opcodes =>
+          (Option.map (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep)
+                bundle.shell_boundary_bundle.kernel_witness.expected_kernel_steps).bind
+            fun steps => some { opcodes := opcodes, steps := steps }) =
+        some bundle.expected_kernel_schedule.toRuntimeKernelSchedule
+    rw [hExpectedKernelSteps, hExpectedKernelScheduleExact]
+    simp [ImportedRuntimeKernelSchedule.toRuntimeKernelSchedule]
+  · have hExpectedKernelScheduleExact :
+        bundle.expected_kernel_schedule =
+          { opcodes := bundle.expected_kernel_steps.map ImportedRuntimeKernelStep.opcode
+          , steps := bundle.expected_kernel_steps
+          } := by
+      have hSchedule := hExpectedKernelSchedule
+      simp [ImportedRuntimeKernelWitness.expectedKernelSchedule?, hExpectedKernelSteps] at hSchedule
+      exact hSchedule.symm
+    change
+      { opcodes := bundle.shell_boundary_bundle.kernel_witness.kernel_steps.map ImportedRuntimeKernelStep.opcode
+      , steps := bundle.shell_boundary_bundle.kernel_witness.kernel_steps.map
+          ImportedRuntimeKernelStep.toRuntimeKernelStep
+      } = bundle.expected_kernel_schedule.toRuntimeKernelSchedule
+    rw [hKernelSteps, hExpectedKernelScheduleExact]
+    simp [ImportedRuntimeKernelSchedule.toRuntimeKernelSchedule]
+  · change
+      bundle.expected_kernel_schedule.toRuntimeKernelSchedule.finalState? =
+        some
+          { phase := .finished
+          , publicObjectSchedule :=
+              bundle.expected_kernel_schedule.toRuntimeKernelSchedule.publicObjectSchedule
+          }
+    simpa using hFinalKernelScheduleState
+
 def parseImportedRuntimeShellBoundaryBundle
   (input : String) : Except String ImportedRuntimeShellBoundaryBundle := do
   let json ← Lean.Json.parse input
@@ -339,6 +653,36 @@ def loadAndCheckImportedProofGradeRuntimeShellBoundaryBundle
   | .error err =>
       throw <| IO.userError
         s!"failed to validate proof-grade runtime shell-boundary bundle: {err}"
+
+def parseImportedRuntimeKernelInterfaceBundle
+  (input : String) : Except String ImportedRuntimeKernelInterfaceBundle := do
+  let json ← Lean.Json.parse input
+  fromJson? json
+
+def parseAndCheckImportedProofGradeRuntimeKernelInterfaceBundle
+  (input : String) : Except String ImportedRuntimeKernelInterfaceBundle := do
+  let bundle ← parseImportedRuntimeKernelInterfaceBundle input
+  if bundle.checkValid then
+    pure bundle
+  else
+    throw "imported proof-grade runtime kernel-interface bundle does not satisfy Lean validity checks"
+
+def loadImportedRuntimeKernelInterfaceBundle
+  (path : System.FilePath) : IO ImportedRuntimeKernelInterfaceBundle := do
+  let input ← IO.FS.readFile path
+  match parseImportedRuntimeKernelInterfaceBundle input with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <| IO.userError s!"failed to parse runtime kernel-interface bundle: {err}"
+
+def loadAndCheckImportedProofGradeRuntimeKernelInterfaceBundle
+  (path : System.FilePath) : IO ImportedRuntimeKernelInterfaceBundle := do
+  let input ← IO.FS.readFile path
+  match parseAndCheckImportedProofGradeRuntimeKernelInterfaceBundle input with
+  | .ok bundle => pure bundle
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to validate proof-grade runtime kernel-interface bundle: {err}"
 
 theorem importedWitness_proofGradeShellContractRefinement
   (witness : ImportedRuntimeRefinementWitness)
@@ -611,6 +955,39 @@ theorem importedWitness_proofGradeKernelInterface
       hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds, hPublicObjectIds,
       hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
       hFinalKernelScheduleState⟩
+
+theorem importedWitness_proofGradeKernelInterfaceBundle_valid
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  ∃ bundle, witness.kernelInterfaceBundle? = some bundle ∧ bundle.Valid := by
+  rcases importedWitness_proofGradeKernelInterface witness modelTags hValid with
+    ⟨shellBoundaryBundle, expectedKernelSteps, expectedPublicObjectIds,
+      expectedKernelSchedule, hBundle, hKernelProofGrade, hRefinementWitnessValid,
+      hContractExact, hTraceExact, hShellRefines, hKernelStateRefinement,
+      hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds, hPublicObjectIds,
+      hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
+      hFinalKernelScheduleState⟩
+  let bundle : ImportedRuntimeKernelInterfaceBundle :=
+    { shell_boundary_bundle := shellBoundaryBundle
+    , expected_kernel_steps := expectedKernelSteps
+    , expected_public_object_ids := expectedPublicObjectIds
+    , expected_kernel_schedule := expectedKernelSchedule
+    }
+  have hShellBoundaryValid : shellBoundaryBundle.Valid := by
+    refine
+      ⟨hKernelProofGrade, hRefinementWitnessValid, hContractExact, hTraceExact, ?_⟩
+    unfold ImportedRuntimeShellTrace.Refines
+    simpa [ImportedRuntimeKernelWitness.shellContract,
+      ImportedRuntimeKernelRefinementWitness.shellTrace, hContractExact, hTraceExact] using
+      hShellRefines
+  refine ⟨bundle, ?_, ?_⟩
+  · simpa [ImportedRuntimeRefinementWitness.kernelInterfaceBundle?, hBundle,
+      hExpectedKernelSteps, hExpectedPublicObjectIds, hExpectedKernelSchedule, bundle]
+  · exact
+      ⟨hShellBoundaryValid, hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,
+        hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
+        hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
 
 def ImportedRuntimeProofGradeKernelInterfaceAssurance
   (witness : ImportedRuntimeRefinementWitness)

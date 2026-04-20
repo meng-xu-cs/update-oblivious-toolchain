@@ -18,8 +18,12 @@ mod tests {
     use uo_core::canonical_path_oram_leaf_values_of_seed;
     use uo_core::{
         ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, RefinementWitnessError,
+        RuntimeConfidentialCoreShellBoundaryLoweringBundleError,
+        RuntimeConfidentialCoreShellBoundarySlotBundleError, RuntimeKernelInterfaceBundleError,
         RuntimeKernelRefinementEventKindWitness, RuntimeKernelRefinementEventWitness,
-        RuntimeKernelStepWitness, TheoremTrace, Value, WriteClass,
+        RuntimeKernelStepWitness, RuntimeShellBoundaryLoweringBundleError,
+        RuntimeShellBoundarySlotBundleError, RuntimeTrustedKernelSlotBundleError, TheoremTrace,
+        Value, WriteClass,
     };
     use uo_precompiles::UoOpcode;
 
@@ -694,6 +698,10 @@ mod tests {
         assert_eq!(bundle.entrypoint_id(), "auth(bytes32)");
         assert!(bundle.program_matches_trusted_kernel_entrypoint());
         assert_eq!(
+            bundle.confidential_slot_program().entrypoint_id,
+            bundle.entrypoint_id()
+        );
+        assert_eq!(
             bundle.trusted_kernel_bundle().kernel_witness(),
             result.trace.runtime_kernel_witness()
         );
@@ -708,6 +716,148 @@ mod tests {
                 .unwrap()
                 .kernel_steps()
         );
+    }
+
+    #[test]
+    fn execution_trace_exports_runtime_kernel_interface_bundle() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
+            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+            )
+            .unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+            )
+            .unwrap();
+        let result = instance
+            .call("auth(bytes32)", vec![Value::Bytes32([1u8; 32])])
+            .unwrap();
+        let bundle = result
+            .trace
+            .runtime_kernel_interface_bundle(&artifact)
+            .unwrap();
+
+        assert_eq!(
+            bundle.shell_boundary_bundle().entrypoint_id(),
+            "auth(bytes32)"
+        );
+        assert_eq!(
+            bundle.expected_kernel_steps(),
+            bundle.kernel_witness().kernel_steps()
+        );
+        assert_eq!(
+            bundle.expected_public_object_ids(),
+            bundle
+                .kernel_witness()
+                .expected_public_object_schedule()
+                .unwrap()
+        );
+        assert_eq!(
+            bundle.expected_kernel_schedule(),
+            &bundle.kernel_witness().emitted_kernel_schedule()
+        );
+    }
+
+    #[test]
+    fn trusted_kernel_slot_bundle_rejects_slot_program_entrypoint_drift() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
+            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+            )
+            .unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+            )
+            .unwrap();
+        let result = instance
+            .call("auth(bytes32)", vec![Value::Bytes32([1u8; 32])])
+            .unwrap();
+
+        let mut tampered_artifact = artifact.clone();
+        tampered_artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("auth(bytes32)")
+            .unwrap()
+            .confidential_slot_program
+            .as_mut()
+            .unwrap()
+            .entrypoint_id = "deposit(bytes32,uint256)".into();
+
+        assert_eq!(
+            result
+                .trace
+                .runtime_trusted_kernel_slot_bundle(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeTrustedKernelSlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                expected_entrypoint: "auth(bytes32)".into(),
+                program_entrypoint: "deposit(bytes32,uint256)".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_interface_bundle_rejects_manifest_kernel_step_drift() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
+            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+            )
+            .unwrap();
+        instance
+            .call(
+                "seed(uint256,bytes32)",
+                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+            )
+            .unwrap();
+        let result = instance
+            .call("auth(bytes32)", vec![Value::Bytes32([1u8; 32])])
+            .unwrap();
+
+        let mut tampered_artifact = artifact.clone();
+        tampered_artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("auth(bytes32)")
+            .unwrap()
+            .kernel_steps
+            .pop();
+
+        assert!(matches!(
+            result
+                .trace
+                .runtime_kernel_interface_bundle(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeKernelInterfaceBundleError::KernelWitness(
+                KernelWitnessError::KernelStepTraceMismatch { .. }
+            )
+        ));
     }
 
     #[test]
@@ -754,6 +904,139 @@ mod tests {
         phase_witness
             .validate_with_kernel_witness(&kernel_witness)
             .unwrap();
+    }
+
+    #[test]
+    fn execution_trace_exports_confidential_core_shell_boundary_slot_bundle() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let result = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+        let bundle = result
+            .trace
+            .runtime_confidential_core_shell_boundary_slot_bundle(&artifact)
+            .unwrap();
+        assert_eq!(bundle.entrypoint_id(), "add(bytes32,uint256)");
+        assert!(bundle.program_matches_runtime_entrypoint());
+        assert_eq!(
+            bundle.shell_boundary_bundle().entrypoint_id(),
+            bundle.entrypoint_id()
+        );
+        assert_eq!(
+            bundle.confidential_slot_program().entrypoint_id,
+            bundle.entrypoint_id()
+        );
+    }
+
+    #[test]
+    fn confidential_core_shell_boundary_slot_bundle_rejects_slot_program_entrypoint_drift() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let result = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+
+        let mut tampered_artifact = artifact.clone();
+        tampered_artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("add(bytes32,uint256)")
+            .unwrap()
+            .confidential_slot_program
+            .as_mut()
+            .unwrap()
+            .entrypoint_id = "put(bytes32,uint256)".into();
+
+        assert_eq!(
+            result
+                .trace
+                .runtime_shell_boundary_slot_bundle(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeShellBoundarySlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                expected_entrypoint: "add(bytes32,uint256)".into(),
+                program_entrypoint: "put(bytes32,uint256)".into(),
+            }
+        );
+        assert_eq!(
+            result
+                .trace
+                .runtime_confidential_core_shell_boundary_slot_bundle(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeConfidentialCoreShellBoundarySlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                expected_entrypoint: "add(bytes32,uint256)".into(),
+                program_entrypoint: "put(bytes32,uint256)".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn confidential_core_shell_boundary_lowering_bundle_rejects_named_program_drift() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let result = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+
+        let mut tampered_artifact = artifact.clone();
+        tampered_artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("add(bytes32,uint256)")
+            .unwrap()
+            .confidential_program
+            .as_mut()
+            .unwrap()
+            .body
+            .pop();
+
+        assert_eq!(
+            result
+                .trace
+                .runtime_shell_boundary_lowering_bundle(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeShellBoundaryLoweringBundleError::ConfidentialProgramLoweringMismatch {
+                entrypoint: "add(bytes32,uint256)".into(),
+            }
+        );
+        assert_eq!(
+            result
+                .trace
+                .runtime_confidential_core_shell_boundary_lowering_bundle(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeConfidentialCoreShellBoundaryLoweringBundleError::ConfidentialProgramLoweringMismatch {
+                entrypoint: "add(bytes32,uint256)".into(),
+            }
+        );
     }
 
     #[test]

@@ -15,6 +15,13 @@ pub enum RuntimeTrustedKernelSlotBundleError {
     MissingEntrypoint { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
     MissingConfidentialSlotProgram { entrypoint: String },
+    #[error(
+        "runtime trusted-kernel slot bundle expected confidential_slot_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialSlotProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -61,16 +68,25 @@ impl RuntimeTrustedKernelSlotBundle {
             .ok_or_else(|| RuntimeTrustedKernelSlotBundleError::MissingEntrypoint {
                 entrypoint: entrypoint.clone(),
             })?;
+        let confidential_slot_program = manifest_entry
+            .confidential_slot_program
+            .clone()
+            .ok_or_else(
+                || RuntimeTrustedKernelSlotBundleError::MissingConfidentialSlotProgram {
+                    entrypoint: entrypoint.clone(),
+                },
+            )?;
+        if confidential_slot_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeTrustedKernelSlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint,
+                    program_entrypoint: confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
         Ok(Self {
             trusted_kernel_bundle,
-            confidential_slot_program: manifest_entry
-                .confidential_slot_program
-                .clone()
-                .ok_or_else(|| {
-                    RuntimeTrustedKernelSlotBundleError::MissingConfidentialSlotProgram {
-                        entrypoint,
-                    }
-                })?,
+            confidential_slot_program,
         })
     }
 }

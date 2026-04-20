@@ -12,8 +12,8 @@ use uo_core::trace::{runtime_kernel_refinement_phase_step, RuntimeKernelRefineme
 use uo_core::{
     BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
     ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
-    RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
+    RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
 

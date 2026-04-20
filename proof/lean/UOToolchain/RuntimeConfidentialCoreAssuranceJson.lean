@@ -7,35 +7,6 @@ open Lean
 
 namespace UOToolchain
 
-def ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle
-  (bundle : ImportedRuntimeShellBoundaryBundle) : RuntimeShellBoundaryBundle :=
-  { kernelWitness := bundle.kernel_witness.toRuntimeKernelWitness
-  , runtimeKernelRefinementWitness :=
-      bundle.runtime_kernel_refinement_witness.toRuntimeKernelRefinementWitness
-  , shellContract := bundle.shell_contract.toRuntimeShellContract
-  , shellTrace := bundle.shell_trace.toRuntimeShellTrace
-  }
-
-theorem importedRuntimeShellBoundaryBundle_toRuntimeValid
-  (bundle : ImportedRuntimeShellBoundaryBundle)
-  (hValid : bundle.Valid) :
-  bundle.toRuntimeShellBoundaryBundle.Valid := by
-  unfold ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle
-    RuntimeShellBoundaryBundle.Valid
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · exact
-      importedRuntimeKernelWitness_toRuntimeKernelWitness_proofGradeValid
-        bundle.kernel_witness bundle.kernel_witness.entrypoint_id hValid.1
-  · simpa [ImportedRuntimeKernelRefinementWitness.Valid] using hValid.2.1
-  · simpa using
-      congrArg ImportedRuntimeShellContract.toRuntimeShellContract
-        (importedRuntimeShellBoundaryBundle_contract_exact hValid)
-  · simpa using
-      congrArg ImportedRuntimeShellTrace.toRuntimeShellTrace
-        (importedRuntimeShellBoundaryBundle_trace_exact hValid)
-  · exact importedRuntimeShellTrace_refines_toRuntime
-      (importedRuntimeShellBoundaryBundle_refines hValid)
-
 def ImportedRuntimeConfidentialCoreAssurance
   (runtimeWitness : ImportedRuntimeRefinementWitness)
   (program : ImportedConfidentialKernelProgram)

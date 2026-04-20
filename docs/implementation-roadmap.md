@@ -458,8 +458,9 @@ The first implementation step is now present in the codebase:
   shell-boundary bundle, and exact slot schedule are checked together against
   one shared proof-grade kernel witness and runtime phase witness, while
   `kernel_interface_validation.json` now runs those same representative
-  runtime witnesses through the dedicated paper-facing
-  `checkProofGradeRuntimeKernelInterface` checker, and
+  runtime runs through the dedicated paper-facing
+  `checkProofGradeRuntimeKernelInterfaceBundle` checker over the explicit
+  exported `RuntimeKernelInterfaceBundle`, and
   `confidential_core_lowering_validation.json` composes the named and slot
   DSL objects and checks canonical lowering against the same exported witness
 - `confidential_core_shell_boundary_lowering_validation.json` now lifts the
@@ -468,10 +469,19 @@ The first implementation step is now present in the codebase:
   exported object, and Lean proves that those artifacts share one exact
   proof-grade kernel witness and one exact runtime phase witness rather than
   only validating each layer independently
-- the same runtime witness path now also has a direct paper-facing Lean
-  executable, `checkProofGradeRuntimeKernelInterface`, which accepts the full
-  runtime witness JSON and packages the exact shell-boundary / Lean-kernel
-  interface facts consumed by the stronger theorem story
+- the same runtime witness path still has the direct paper-facing Lean
+  executable, `checkProofGradeRuntimeKernelInterface`, while the stronger
+  explicit theorem surface now also has
+  `checkProofGradeRuntimeKernelInterfaceBundle`, which accepts the exported
+  `RuntimeKernelInterfaceBundle` and checks the exact shell-boundary /
+  Lean-kernel interface facts consumed by the stronger theorem story; the
+  seeded paper-route artifact path now likewise has
+  `checkProofGradeRuntimePaperMainFamilyBundle`, which accepts the exported
+  `SeededRuntimePaperMainFamilyBundle` and checks exact paper-route
+  public-outcome / boundary-schedule agreement across the seeded family, and
+  the confidential theorem finalizer now also rebuilds that explicit seeded
+  paper-main bundle online from the emitted runtime refinement witness before
+  returning the production trace
 - the theorem-facing Lean side now also exposes matching runtime bundle
   objects, not only imported JSON checkers:
   `RuntimeShellBoundaryBundle`, `RuntimeShellBoundarySlotBundle`,
@@ -506,9 +516,10 @@ The first implementation step is now present in the codebase:
   pair accessor-only on the Rust side,
   requires the trusted-kernel slot bundle bridge to stay confined to
   `crates/uo-core/src/trusted_kernel.rs` while continuing to source the exact
-  manifest-carried slot DSL and keep both the trusted-kernel bundle and its
-  slot wrapper accessor-only on the Rust side, requires the shell-boundary
-  slot/lowering bundle bridge family to stay confined to
+  manifest-carried slot DSL, reject slot-program entrypoint drift by
+  construction, and keep both the trusted-kernel bundle and its slot wrapper
+  accessor-only on the Rust side, requires the shell-boundary slot/lowering
+  bundle bridge family to stay confined to
   `crates/uo-core/src/kernel_dsl.rs` while continuing to source the
   manifest-carried named and slot DSL programs and keep those shell-boundary
   slot/lowering bundles accessor-only on the Rust side,

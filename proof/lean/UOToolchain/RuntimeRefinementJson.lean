@@ -1726,6 +1726,57 @@ def loadAndCheckImportedProofGradeRuntimeRefinementWitness
     importedWitness_checkProofGradeKernelWitness_eq_true_iff,
     importedWitness_checkProofGradeRuntimeKernelRefinementWitness_eq_true_iff, and_assoc]
 
+theorem importedWitness_proofGradeValid_implies_valid
+  (witness : ImportedRuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (hValid : witness.ProofGradeValid modelTags) :
+  witness.Valid modelTags := by
+  rcases hValid with ⟨hRuntimeValid, hKernelProofGrade, hRefinementProofGrade⟩
+  refine ⟨hRuntimeValid, ?_, ?_⟩
+  · cases hKernel : witness.kernel_witness with
+    | none =>
+        simp [ImportedRuntimeRefinementWitness.kernelWitnessValid, hKernel]
+    | some kernelWitness =>
+        have hKernelProof :
+            kernelWitness.Valid witness.public_outcome.entrypoint_id ∧
+              (match kernelWitness.expected_kernel_steps with
+              | none => False
+              | some _ =>
+                  match kernelWitness.expected_public_object_ids with
+                  | none => False
+                  | some _ => True) := by
+          simpa
+            [ ImportedRuntimeRefinementWitness.proofGradeKernelWitnessValid
+            , ImportedRuntimeKernelWitness.ProofGradeValid
+            , hKernel
+            ] using hKernelProofGrade
+        simpa [ImportedRuntimeRefinementWitness.kernelWitnessValid, hKernel] using hKernelProof.1
+  · cases hRefinement : witness.runtime_kernel_refinement_witness with
+    | none =>
+        simp [ImportedRuntimeRefinementWitness.runtimeKernelRefinementWitnessValid, hRefinement]
+    | some runtimeKernelRefinementWitness =>
+        cases hKernel : witness.kernel_witness with
+        | none =>
+            simp
+              [ ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid
+              , hKernel
+              , hRefinement
+              ] at hRefinementProofGrade
+        | some kernelWitness =>
+            have hRefinementValid :
+                runtimeKernelRefinementWitness.Valid kernelWitness := by
+              simpa
+                [ ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid
+                , ImportedRuntimeKernelRefinementWitness.ProofGradeValid
+                , hKernel
+                , hRefinement
+                ] using hRefinementProofGrade
+            simpa
+              [ ImportedRuntimeRefinementWitness.runtimeKernelRefinementWitnessValid
+              , hKernel
+              , hRefinement
+              ] using hRefinementValid
+
 theorem importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
   (witness : ImportedRuntimeRefinementWitness)
   (modelTags : SGXModelTags)

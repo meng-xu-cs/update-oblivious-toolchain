@@ -1,7 +1,7 @@
 use crate::{
     artifact::CompiledArtifact, manifest::EntrypointManifest, ConfidentialKernelProgram,
-    ConfidentialKernelSlotProgram, ExecutionTrace, RuntimeKernelWitness,
-    RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError,
+    ConfidentialKernelSlotLoweringError, ConfidentialKernelSlotProgram, ExecutionTrace,
+    RuntimeKernelWitness, RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -12,6 +12,13 @@ pub enum RuntimeKernelDslBundleError {
     MissingEntrypoint { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_program")]
     MissingConfidentialProgram { entrypoint: String },
+    #[error(
+        "runtime kernel DSL bundle expected confidential_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -20,6 +27,13 @@ pub enum RuntimeKernelSlotDslBundleError {
     MissingEntrypoint { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
     MissingConfidentialSlotProgram { entrypoint: String },
+    #[error(
+        "runtime kernel slot DSL bundle expected confidential_slot_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialSlotProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -30,6 +44,26 @@ pub enum RuntimeKernelLoweringBundleError {
     MissingConfidentialProgram { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
     MissingConfidentialSlotProgram { entrypoint: String },
+    #[error(
+        "runtime kernel lowering bundle expected confidential_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
+    #[error(
+        "runtime kernel lowering bundle expected confidential_slot_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialSlotProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
+    #[error("runtime kernel lowering bundle requires a lowerable confidential_program: {0}")]
+    ConfidentialProgramLowering(#[from] ConfidentialKernelSlotLoweringError),
+    #[error(
+        "runtime kernel lowering bundle expected confidential_program for '{entrypoint}' to lower exactly to the stored confidential_slot_program"
+    )]
+    ConfidentialProgramLoweringMismatch { entrypoint: String },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -42,6 +76,28 @@ pub enum RuntimeShellBoundaryLoweringBundleError {
     MissingConfidentialProgram { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
     MissingConfidentialSlotProgram { entrypoint: String },
+    #[error(
+        "runtime shell-boundary lowering bundle expected confidential_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
+    #[error(
+        "runtime shell-boundary lowering bundle expected confidential_slot_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialSlotProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
+    #[error(
+        "runtime shell-boundary lowering bundle requires a lowerable confidential_program: {0}"
+    )]
+    ConfidentialProgramLowering(#[from] ConfidentialKernelSlotLoweringError),
+    #[error(
+        "runtime shell-boundary lowering bundle expected confidential_program for '{entrypoint}' to lower exactly to the stored confidential_slot_program"
+    )]
+    ConfidentialProgramLoweringMismatch { entrypoint: String },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -52,6 +108,13 @@ pub enum RuntimeShellBoundarySlotBundleError {
     MissingEntrypoint { entrypoint: String },
     #[error("artifact manifest entrypoint '{entrypoint}' is missing confidential_slot_program")]
     MissingConfidentialSlotProgram { entrypoint: String },
+    #[error(
+        "runtime shell-boundary slot bundle expected confidential_slot_program for '{expected_entrypoint}' but found program for '{program_entrypoint}'"
+    )]
+    ConfidentialSlotProgramEntrypointMismatch {
+        expected_entrypoint: String,
+        program_entrypoint: String,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -100,13 +163,22 @@ impl RuntimeKernelDslBundle {
         entrypoint: &str,
         entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeKernelDslBundleError> {
+        let confidential_program = entry.confidential_program.clone().ok_or_else(|| {
+            RuntimeKernelDslBundleError::MissingConfidentialProgram {
+                entrypoint: entrypoint.into(),
+            }
+        })?;
+        if confidential_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeKernelDslBundleError::ConfidentialProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint.into(),
+                    program_entrypoint: confidential_program.entrypoint_id.clone(),
+                },
+            );
+        }
         Ok(Self {
             kernel_witness,
-            confidential_program: entry.confidential_program.clone().ok_or_else(|| {
-                RuntimeKernelDslBundleError::MissingConfidentialProgram {
-                    entrypoint: entrypoint.into(),
-                }
-            })?,
+            confidential_program,
         })
     }
 }
@@ -125,13 +197,23 @@ impl RuntimeKernelSlotDslBundle {
         entrypoint: &str,
         entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeKernelSlotDslBundleError> {
+        let confidential_slot_program =
+            entry.confidential_slot_program.clone().ok_or_else(|| {
+                RuntimeKernelSlotDslBundleError::MissingConfidentialSlotProgram {
+                    entrypoint: entrypoint.into(),
+                }
+            })?;
+        if confidential_slot_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeKernelSlotDslBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint.into(),
+                    program_entrypoint: confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
         Ok(Self {
             kernel_witness,
-            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
-                || RuntimeKernelSlotDslBundleError::MissingConfidentialSlotProgram {
-                    entrypoint: entrypoint.into(),
-                },
-            )?,
+            confidential_slot_program,
         })
     }
 }
@@ -154,18 +236,44 @@ impl RuntimeKernelLoweringBundle {
         entrypoint: &str,
         entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeKernelLoweringBundleError> {
-        Ok(Self {
-            kernel_witness,
-            confidential_program: entry.confidential_program.clone().ok_or_else(|| {
-                RuntimeKernelLoweringBundleError::MissingConfidentialProgram {
+        let confidential_program = entry.confidential_program.clone().ok_or_else(|| {
+            RuntimeKernelLoweringBundleError::MissingConfidentialProgram {
+                entrypoint: entrypoint.into(),
+            }
+        })?;
+        if confidential_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeKernelLoweringBundleError::ConfidentialProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint.into(),
+                    program_entrypoint: confidential_program.entrypoint_id.clone(),
+                },
+            );
+        }
+        let confidential_slot_program =
+            entry.confidential_slot_program.clone().ok_or_else(|| {
+                RuntimeKernelLoweringBundleError::MissingConfidentialSlotProgram {
                     entrypoint: entrypoint.into(),
                 }
-            })?,
-            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
-                || RuntimeKernelLoweringBundleError::MissingConfidentialSlotProgram {
+            })?;
+        if confidential_slot_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeKernelLoweringBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint.into(),
+                    program_entrypoint: confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
+        if confidential_program.to_slot_program()? != confidential_slot_program {
+            return Err(
+                RuntimeKernelLoweringBundleError::ConfidentialProgramLoweringMismatch {
                     entrypoint: entrypoint.into(),
                 },
-            )?,
+            );
+        }
+        Ok(Self {
+            kernel_witness,
+            confidential_program,
+            confidential_slot_program,
         })
     }
 }
@@ -197,18 +305,44 @@ impl RuntimeShellBoundaryLoweringBundle {
         entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeShellBoundaryLoweringBundleError> {
         let entrypoint = shell_boundary_bundle.entrypoint_id().to_owned();
-        Ok(Self {
-            shell_boundary_bundle,
-            confidential_program: entry.confidential_program.clone().ok_or_else(|| {
-                RuntimeShellBoundaryLoweringBundleError::MissingConfidentialProgram {
+        let confidential_program = entry.confidential_program.clone().ok_or_else(|| {
+            RuntimeShellBoundaryLoweringBundleError::MissingConfidentialProgram {
+                entrypoint: entrypoint.clone(),
+            }
+        })?;
+        if confidential_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeShellBoundaryLoweringBundleError::ConfidentialProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint.clone(),
+                    program_entrypoint: confidential_program.entrypoint_id.clone(),
+                },
+            );
+        }
+        let confidential_slot_program =
+            entry.confidential_slot_program.clone().ok_or_else(|| {
+                RuntimeShellBoundaryLoweringBundleError::MissingConfidentialSlotProgram {
                     entrypoint: entrypoint.clone(),
                 }
-            })?,
-            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
-                || RuntimeShellBoundaryLoweringBundleError::MissingConfidentialSlotProgram {
-                    entrypoint,
+            })?;
+        if confidential_slot_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeShellBoundaryLoweringBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint.clone(),
+                    program_entrypoint: confidential_slot_program.entrypoint_id.clone(),
                 },
-            )?,
+            );
+        }
+        if confidential_program.to_slot_program()? != confidential_slot_program {
+            return Err(
+                RuntimeShellBoundaryLoweringBundleError::ConfidentialProgramLoweringMismatch {
+                    entrypoint: entrypoint.clone(),
+                },
+            );
+        }
+        Ok(Self {
+            shell_boundary_bundle,
+            confidential_program,
+            confidential_slot_program,
         })
     }
 }
@@ -235,13 +369,23 @@ impl RuntimeShellBoundarySlotBundle {
         entry: &EntrypointManifest,
     ) -> Result<Self, RuntimeShellBoundarySlotBundleError> {
         let entrypoint = shell_boundary_bundle.entrypoint_id().to_owned();
+        let confidential_slot_program =
+            entry.confidential_slot_program.clone().ok_or_else(|| {
+                RuntimeShellBoundarySlotBundleError::MissingConfidentialSlotProgram {
+                    entrypoint: entrypoint.clone(),
+                }
+            })?;
+        if confidential_slot_program.entrypoint_id != entrypoint {
+            return Err(
+                RuntimeShellBoundarySlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                    expected_entrypoint: entrypoint,
+                    program_entrypoint: confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
         Ok(Self {
             shell_boundary_bundle,
-            confidential_slot_program: entry.confidential_slot_program.clone().ok_or_else(
-                || RuntimeShellBoundarySlotBundleError::MissingConfidentialSlotProgram {
-                    entrypoint,
-                },
-            )?,
+            confidential_slot_program,
         })
     }
 }
