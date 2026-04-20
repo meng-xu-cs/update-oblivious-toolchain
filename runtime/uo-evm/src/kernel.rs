@@ -12,17 +12,16 @@ use uo_core::trace::{runtime_kernel_refinement_phase_step, RuntimeKernelRefineme
 use uo_core::{
     BinaryOp, ConfidentialKernelSlotExpr, ConfidentialKernelSlotProgram,
     ConfidentialKernelSlotPureExpr, ConfidentialKernelSlotStatement,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness, RuntimeKernelStepWitness,
-    RuntimeKernelWitness, UnaryOp, Value,
+    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
+    RuntimeKernelScheduleTracker, RuntimeKernelStepWitness, RuntimeKernelWitness, UnaryOp, Value,
 };
 use uo_precompiles::UoOpcode;
 
 struct RuntimeKernel {
     allocator: AllocatorSession,
-    expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
     public_object_ids: Vec<u32>,
     max_hash_part_bytes: usize,
-    expected_kernel_step_index: usize,
+    expected_kernel_schedule: RuntimeKernelScheduleTracker,
     kernel_steps: BoundedJournal<RuntimeKernelStepWitness>,
     runtime_phase_events: RuntimePhaseJournal,
 }
@@ -438,10 +437,9 @@ impl RuntimeKernel {
             max_runtime_phase_event_count(public_object_ids.len(), plan.max_kernel_ops)?;
         let mut kernel = Self {
             allocator: AllocatorSession::new(plan),
-            expected_kernel_steps: None,
             public_object_ids,
             max_hash_part_bytes: 0,
-            expected_kernel_step_index: 0,
+            expected_kernel_schedule: RuntimeKernelScheduleTracker::default(),
             kernel_steps: BoundedJournal::with_capacity(
                 "runtime-kernel-step",
                 kernel_step_capacity,
@@ -462,20 +460,9 @@ impl RuntimeKernel {
         expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
         context: &str,
     ) -> Result<()> {
-        if self.expected_kernel_steps.is_some() {
-            return Ok(());
-        }
-        let Some(begin_step) = expected_kernel_steps.first() else {
-            return Err(anyhow!("{context} emitted no admitted runtime steps"));
-        };
-        if begin_step.projected_opcode() != UoOpcode::Begin || begin_step.object_id().is_some() {
-            return Err(anyhow!(
-                "{context} does not begin with the admitted Begin step"
-            ));
-        }
-        self.expected_kernel_step_index = 1;
-        self.expected_kernel_steps = Some(expected_kernel_steps);
-        Ok(())
+        self.expected_kernel_schedule
+            .bind_expected_kernel_steps(expected_kernel_steps)
+            .map_err(|err| anyhow!("{context}: {err}"))
     }
 
     #[cfg(test)]
@@ -778,9 +765,14 @@ impl RuntimeKernel {
     }
 
     fn expected_shadow_load_object_ids(&self) -> Result<Vec<u32>> {
-        let expected_kernel_steps = self.expected_kernel_steps.as_ref().ok_or_else(|| {
-            anyhow!("runtime kernel has no admitted schedule bound when shadow-load set is needed")
-        })?;
+        let expected_kernel_steps = self
+            .expected_kernel_schedule
+            .expected_kernel_steps()
+            .ok_or_else(|| {
+                anyhow!(
+                    "runtime kernel has no admitted schedule bound when shadow-load set is needed"
+                )
+            })?;
         Ok(expected_kernel_steps
             .iter()
             .filter_map(RuntimeKernelStepWitness::object_id)
@@ -818,12 +810,16 @@ impl RuntimeKernel {
         entrypoint_id: &str,
     ) -> Result<(RuntimeKernelWitness, RuntimeKernelRefinementWitness)> {
         self.record_kernel_step(UoOpcode::Wipe, None)?;
-        self.ensure_expected_kernel_schedule_consumed()?;
+        self.expected_kernel_schedule
+            .ensure_expected_kernel_schedule_consumed()?;
         self.allocator.wipe_region(ScratchRegion::ValueScratch);
         self.allocator.wipe_region(ScratchRegion::HashScratch);
         self.allocator.wipe_region(ScratchRegion::IoScratch);
         let allocator = self.allocator.finish()?;
-        let expected_kernel_steps = self.expected_kernel_steps;
+        let expected_kernel_steps = self
+            .expected_kernel_schedule
+            .expected_kernel_steps()
+            .map(|steps| steps.to_vec());
         let public_object_ids = self.public_object_ids.clone();
         let kernel_witness = RuntimeKernelWitness::new(
             entrypoint_id.into(),
@@ -1119,53 +1115,13 @@ impl RuntimeKernel {
     }
 
     fn record_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
-        self.enforce_expected_kernel_step(opcode, object_id)?;
+        let observed = RuntimeKernelStepWitness::new(opcode, object_id)?;
+        self.expected_kernel_schedule
+            .observe_step(observed.clone())?;
         self.allocator.record_kernel_op(opcode)?;
-        self.kernel_steps
-            .push(RuntimeKernelStepWitness::new(opcode, object_id)?)?;
+        self.kernel_steps.push(observed)?;
         self.runtime_phase_events
             .push_kernel_step(opcode, object_id)?;
-        Ok(())
-    }
-
-    fn enforce_expected_kernel_step(
-        &mut self,
-        opcode: UoOpcode,
-        object_id: Option<u32>,
-    ) -> Result<()> {
-        let Some(expected_kernel_steps) = &self.expected_kernel_steps else {
-            return Ok(());
-        };
-        let observed = RuntimeKernelStepWitness::new(opcode, object_id)?;
-        let Some(expected) = expected_kernel_steps.get(self.expected_kernel_step_index) else {
-            return Err(anyhow!(
-                "runtime kernel emitted unexpected extra step {:?} after exhausting admitted schedule",
-                observed
-            ));
-        };
-        if expected != &observed {
-            return Err(anyhow!(
-                "runtime kernel step schedule mismatch at index {}: expected {:?}, got {:?}",
-                self.expected_kernel_step_index,
-                expected,
-                observed
-            ));
-        }
-        self.expected_kernel_step_index += 1;
-        Ok(())
-    }
-
-    fn ensure_expected_kernel_schedule_consumed(&self) -> Result<()> {
-        let Some(expected_kernel_steps) = &self.expected_kernel_steps else {
-            return Ok(());
-        };
-        if self.expected_kernel_step_index != expected_kernel_steps.len() {
-            return Err(anyhow!(
-                "runtime kernel stopped after {} admitted steps but {} were required",
-                self.expected_kernel_step_index,
-                expected_kernel_steps.len()
-            ));
-        }
         Ok(())
     }
 

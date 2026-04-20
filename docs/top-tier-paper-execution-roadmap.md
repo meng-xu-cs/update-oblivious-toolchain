@@ -34,7 +34,8 @@ The repository has already closed several important proof-grade gaps.
   `PaperMainPathOramEndToEndBoundary`, so the end-to-end claim surface now
   names the runtime/kernel gap instead of leaving it informal
 - the runtime already enforces the admitted public kernel schedule online for
-  confidential entrypoints
+  confidential entrypoints, and that online check now routes through a shared
+  core schedule tracker rather than an ad hoc runtime-local cursor
 
 The repository has not yet closed the scientifically strongest end-to-end
 story. The remaining gaps are:

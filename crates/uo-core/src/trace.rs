@@ -315,6 +315,12 @@ pub struct RuntimeKernelScheduleWitness {
     steps: Vec<RuntimeKernelStepWitness>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RuntimeKernelScheduleTracker {
+    expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
+    expected_kernel_step_index: usize,
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeKernelRefinementEventKindWitness {
@@ -669,6 +675,22 @@ pub enum KernelWitnessError {
     },
     MissingExpectedPublicObjectIds {
         entrypoint: String,
+    },
+    ExpectedKernelScheduleEmpty,
+    ExpectedKernelScheduleMustBegin {
+        witnessed: RuntimeKernelStepWitness,
+    },
+    ExpectedKernelScheduleExtraStep {
+        observed: RuntimeKernelStepWitness,
+    },
+    ExpectedKernelScheduleStepMismatch {
+        index: usize,
+        expected: RuntimeKernelStepWitness,
+        observed: RuntimeKernelStepWitness,
+    },
+    ExpectedKernelScheduleIncomplete {
+        observed_steps: usize,
+        expected_steps: usize,
     },
     MalformedPublicObjectUniverse {
         witnessed: Vec<u32>,
@@ -1112,6 +1134,40 @@ impl fmt::Display for KernelWitnessError {
                 f,
                 "confidential runtime kernel witness for {} is missing the artifact-derived public object universe",
                 entrypoint
+            ),
+            Self::ExpectedKernelScheduleEmpty => write!(
+                f,
+                "runtime kernel admitted schedule was empty"
+            ),
+            Self::ExpectedKernelScheduleMustBegin { witnessed } => write!(
+                f,
+                "runtime kernel admitted schedule does not begin with the admitted Begin step: {:?}",
+                witnessed
+            ),
+            Self::ExpectedKernelScheduleExtraStep { observed } => write!(
+                f,
+                "runtime kernel emitted unexpected extra step {:?} after exhausting admitted schedule",
+                observed
+            ),
+            Self::ExpectedKernelScheduleStepMismatch {
+                index,
+                expected,
+                observed,
+            } => write!(
+                f,
+                "runtime kernel step schedule mismatch at index {}: expected {:?}, got {:?}",
+                index,
+                expected,
+                observed
+            ),
+            Self::ExpectedKernelScheduleIncomplete {
+                observed_steps,
+                expected_steps,
+            } => write!(
+                f,
+                "runtime kernel stopped after {} admitted steps but {} were required",
+                observed_steps,
+                expected_steps
             ),
             Self::MalformedPublicObjectUniverse { witnessed } => write!(
                 f,
@@ -2264,6 +2320,66 @@ impl RuntimeKernelScheduleWitness {
             }
         }
         Ok(())
+    }
+}
+
+impl RuntimeKernelScheduleTracker {
+    pub fn bind_expected_kernel_steps(
+        &mut self,
+        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+    ) -> Result<(), KernelWitnessError> {
+        if self.expected_kernel_steps.is_some() {
+            return Ok(());
+        }
+        let Some(begin_step) = expected_kernel_steps.first() else {
+            return Err(KernelWitnessError::ExpectedKernelScheduleEmpty);
+        };
+        if begin_step.projected_opcode() != UoOpcode::Begin || begin_step.object_id().is_some() {
+            return Err(KernelWitnessError::ExpectedKernelScheduleMustBegin {
+                witnessed: begin_step.clone(),
+            });
+        }
+        self.expected_kernel_step_index = 1;
+        self.expected_kernel_steps = Some(expected_kernel_steps);
+        Ok(())
+    }
+
+    pub fn observe_step(
+        &mut self,
+        observed: RuntimeKernelStepWitness,
+    ) -> Result<(), KernelWitnessError> {
+        let Some(expected_kernel_steps) = &self.expected_kernel_steps else {
+            return Ok(());
+        };
+        let Some(expected) = expected_kernel_steps.get(self.expected_kernel_step_index) else {
+            return Err(KernelWitnessError::ExpectedKernelScheduleExtraStep { observed });
+        };
+        if expected != &observed {
+            return Err(KernelWitnessError::ExpectedKernelScheduleStepMismatch {
+                index: self.expected_kernel_step_index,
+                expected: expected.clone(),
+                observed,
+            });
+        }
+        self.expected_kernel_step_index += 1;
+        Ok(())
+    }
+
+    pub fn ensure_expected_kernel_schedule_consumed(&self) -> Result<(), KernelWitnessError> {
+        let Some(expected_kernel_steps) = &self.expected_kernel_steps else {
+            return Ok(());
+        };
+        if self.expected_kernel_step_index != expected_kernel_steps.len() {
+            return Err(KernelWitnessError::ExpectedKernelScheduleIncomplete {
+                observed_steps: self.expected_kernel_step_index,
+                expected_steps: expected_kernel_steps.len(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {
+        self.expected_kernel_steps.as_deref()
     }
 }
 

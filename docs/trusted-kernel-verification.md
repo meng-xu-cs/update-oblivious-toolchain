@@ -287,10 +287,11 @@ correct in Lean. The trusted Rust surface is instead narrowed to the small
 bundle extractor plus serialization path, and the repo validates the emitted
 artifacts against the mechanized Lean predicate end to end. The strongest
 current kernel-side statement is therefore: the runtime enforces the admitted
-public kernel schedule online and emits a proof-grade kernel witness that is
-checked directly, emits a lower-level runtime phase witness whose projection to
-that kernel schedule is checked directly, and also packages the same kernel
-boundary through the trusted-kernel and refinement-bundle paths, with Lean now
-checking exact schedule equality plus successful modeled small-kernel replay,
+public kernel schedule online through a shared core schedule tracker and emits
+a proof-grade kernel witness that is checked directly, emits a lower-level
+runtime phase witness whose projection to that kernel schedule is checked
+directly, and also packages the same kernel boundary through the trusted-kernel
+and refinement-bundle paths, with Lean now checking exact schedule equality
+plus successful modeled small-kernel replay,
 not that the whole Rust runtime has already been reduced to that model by a
 machine-checked refinement proof.
