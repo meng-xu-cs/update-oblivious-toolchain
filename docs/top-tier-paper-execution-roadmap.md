@@ -427,10 +427,14 @@ Concrete tasks:
    than a generic map, and the kernel/runtime witness path now finishes the
    full runtime-phase tail inside `kernel.rs` rather than through a post-hoc
    state-side append, so the manifest-bounded working-set story is tighter
-   than before even prior to the final refinement theorem. The raw-backend
-   `RawMapEntry` ciphertext slot is
-   now boxed as well, so the runtime object graph no longer keeps
-   secret-bearing ciphertext in growable `Vec<u8>` buffers.
+   than before even prior to the final refinement theorem. The post-call
+   hidden ORAM witness handoff and the proof-facing `ExecutionTrace` runtime
+   witness slices now also stay in boxed fixed-size buffers rather than
+   widening back into growable vectors, and each emitted Path-ORAM
+   position-map witness now stores its leaf array in a boxed fixed-size
+   buffer as well. The raw-backend `RawMapEntry` ciphertext slot is now boxed
+   too, so the runtime object graph no longer keeps secret-bearing ciphertext
+   in growable `Vec<u8>` buffers.
 
 Deliverables:
 

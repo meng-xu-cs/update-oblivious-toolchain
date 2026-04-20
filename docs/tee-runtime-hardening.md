@@ -331,9 +331,10 @@ The current runtime has a first hardening layer:
   ciphertext slot, the live fixed-shape Path-ORAM entry array, the live
   fixed-capacity stash, the fixed-shape bucket block buffer, and the fixed
   public-shape Path-ORAM page arrays plus boxed ORAM counter slot and live
-  position-map buffer; the raw-backend `RawMapEntry` ciphertext slot is now
-  boxed too, so the runtime object graph no longer keeps secret-bearing
-  ciphertext in growable `Vec<u8>` buffers
+  position-map buffer; the hidden Path-ORAM position-map witness now also
+  stores its leaf array in a boxed fixed-size buffer, and the raw-backend
+  `RawMapEntry` ciphertext slot is now boxed too, so the runtime object graph
+  no longer keeps secret-bearing ciphertext in growable `Vec<u8>` buffers
 - the kernel-step witness journal and the lower-level runtime phase witness
   journal are now both explicit bounded-capacity journals derived from the
   public kernel-op/object bounds rather than plain growable `Vec::new()`
@@ -486,7 +487,11 @@ The current runtime has a first hardening layer:
   on `ExecutionTrace` itself now also keep their fields private and expose only
   explicit accessors / validated reconstruction helpers, so post-call theorem
   artifacts cannot be silently rewritten through public field mutation outside
-  `uo-core`; the intermediate `RuntimeExecutionTraceParts` carrier is now also
+  `uo-core`; the hidden runtime ORAM witness slices carried by
+  `ExecutionTrace` and by the intermediate `RuntimeExecutionTraceParts`
+  constructor path now also stay in boxed fixed-size buffers rather than
+  widening back into growable vectors, and the probe keeps that representation
+  pinned; the intermediate `RuntimeExecutionTraceParts` carrier is now also
   constructor-backed rather than a public-field bag, and the probe keeps its
   single production constructor use pinned to `runtime/uo-evm/src/theorem.rs`;
   the certificate-based `RuntimeRefinementWitness` reassembly helpers are now

@@ -1,4 +1,4 @@
-#![recursion_limit = "1024"]
+#![recursion_limit = "2048"]
 
 use anyhow::{anyhow, Context, Result};
 use rayon::prelude::*;
@@ -9375,18 +9375,21 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
         && core_trace_source
             .contains("runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
-        && core_trace_source.contains("runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
-        && core_trace_source.contains("runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source.contains("runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,")
+        && core_trace_source.contains("runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,")
         && core_trace_source.contains(
-            "runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+            "runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,",
+        )
+        && core_trace_source.contains(
+            "runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,",
+        )
+        && core_trace_source.contains(
+            "runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,",
+        )
+        && core_trace_source
+            .contains("runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,")
+        && core_trace_source.contains(
+            "runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,",
         )
         && !core_trace_source.contains("pub runtime_seed: Option<u64>,")
         && !core_trace_source.contains("pub runtime_kernel_witness: Option<RuntimeKernelWitness>,")
@@ -9397,23 +9400,24 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("pub runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
         && !core_trace_source
             .contains("pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
-        && !core_trace_source.contains("pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
         && !core_trace_source
-            .contains("pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+            .contains("pub runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,")
+        && !core_trace_source
+            .contains("pub runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,")
         && !core_trace_source.contains(
-            "pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,",
+            "pub runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,",
+            "pub runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,",
+            "pub runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,",
+            "pub runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+            "pub runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,",
         );
     let execution_trace_runtime_api_is_explicit = core_trace_source
         .contains("pub fn runtime_seed(&self) -> Option<u64> {")
@@ -12530,18 +12534,21 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
         && core_trace_source
             .contains("runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
-        && core_trace_source.contains("runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
-        && core_trace_source.contains("runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,")
-        && core_trace_source
-            .contains("runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source.contains("runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,")
+        && core_trace_source.contains("runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,")
         && core_trace_source.contains(
-            "runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+            "runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,",
+        )
+        && core_trace_source.contains(
+            "runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,",
+        )
+        && core_trace_source.contains(
+            "runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,",
+        )
+        && core_trace_source
+            .contains("runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,")
+        && core_trace_source.contains(
+            "runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,",
         )
         && !core_trace_source.contains("pub runtime_seed: Option<u64>,")
         && !core_trace_source.contains("pub runtime_kernel_witness: Option<RuntimeKernelWitness>,")
@@ -12552,23 +12559,24 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("pub runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,")
         && !core_trace_source
             .contains("pub runtime_controller_certificate: Option<RuntimeControllerCertificate>,")
-        && !core_trace_source.contains("pub runtime_oram_objects: Vec<RuntimeOramObjectWitness>,")
         && !core_trace_source
-            .contains("pub runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,")
+            .contains("pub runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,")
+        && !core_trace_source
+            .contains("pub runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,")
         && !core_trace_source.contains(
-            "pub runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,",
+            "pub runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,",
+            "pub runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,",
+            "pub runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,",
+            "pub runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,",
         )
         && !core_trace_source.contains(
-            "pub runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+            "pub runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,",
         );
     let execution_trace_runtime_api_is_explicit = core_trace_source
         .contains("pub fn runtime_seed(&self) -> Option<u64> {")
@@ -12609,8 +12617,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("runtime_seed: Option<u64>,")
         && core_trace_source.contains("runtime_kernel_witness: Option<RuntimeKernelWitness>,")
         && core_trace_source.contains(
-            "runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,",
+            "runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,",
         );
+    let runtime_path_oram_position_map_witness_uses_boxed_leaf_buffer = core_trace_source
+        .contains("pub struct RuntimePathOramPositionMapWitness {")
+        && core_trace_source.contains("pub leaves: Box<[Option<usize>]>,");
     let runtime_execution_trace_parts_constructor_is_explicit = core_trace_source
         .contains("impl RuntimeExecutionTraceParts {")
         && core_trace_source.contains("pub fn new(")
@@ -13147,6 +13158,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && theorem_finalizes_execution_trace,
         }),
         json!({
+            "name": "RuntimePathOramPositionMapWitness",
+            "owner": "crates/uo-core/src/trace.rs",
+            "boundary": "the hidden Path-ORAM position-map witness now stores its leaf array in a boxed fixed-size buffer rather than a growable vector, so the proof-facing runtime witness path preserves that public-bounded shape all the way into exported theorem artifacts",
+            "checked": runtime_path_oram_position_map_witness_uses_boxed_leaf_buffer,
+        }),
+        json!({
             "name": "RuntimeShadowState / ConfidentialRuntimeShadowState / PublicRuntimeShadowState / CommittedRuntimeState",
             "owner": "runtime/uo-evm/src/state.rs",
             "boundary": "secret-bearing committed/shadow object maps stay inside crate::runtime, with distinct public and confidential shadow wrappers delimiting the shell boundary",
@@ -13664,6 +13681,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             execution_trace_runtime_api_is_explicit,
         "runtime_execution_trace_parts_fields_private":
             runtime_execution_trace_parts_fields_private,
+        "runtime_path_oram_position_map_witness_uses_boxed_leaf_buffer":
+            runtime_path_oram_position_map_witness_uses_boxed_leaf_buffer,
         "runtime_execution_trace_parts_constructor_is_explicit":
             runtime_execution_trace_parts_constructor_is_explicit,
         "runtime_controller_certificate_fields_private":

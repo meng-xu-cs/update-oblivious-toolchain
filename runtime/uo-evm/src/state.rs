@@ -81,12 +81,12 @@ impl CommittedRuntimeWitnessSnapshot {
     fn into_hidden_oram_state(
         mut self,
     ) -> (
-        Vec<RuntimeOramAccessCounterWitness>,
-        Vec<RuntimePathOramPositionMapWitness>,
+        Box<[RuntimeOramAccessCounterWitness]>,
+        Box<[RuntimePathOramPositionMapWitness]>,
     ) {
         (
-            std::mem::take(&mut self.runtime_oram_access_counters).into_vec(),
-            std::mem::take(&mut self.runtime_oram_position_maps).into_vec(),
+            std::mem::take(&mut self.runtime_oram_access_counters),
+            std::mem::take(&mut self.runtime_oram_position_maps),
         )
     }
 }
@@ -245,16 +245,16 @@ impl TracedRuntimeCallWitnessState {
     pub(in crate::runtime) fn into_execution_trace_parts(
         mut self,
     ) -> (
-        Vec<RuntimeOramAccessCounterWitness>,
-        Vec<RuntimeOramAccessCounterWitness>,
-        Vec<RuntimePathOramPositionMapWitness>,
-        Vec<RuntimePathOramPositionMapWitness>,
+        Box<[RuntimeOramAccessCounterWitness]>,
+        Box<[RuntimeOramAccessCounterWitness]>,
+        Box<[RuntimePathOramPositionMapWitness]>,
+        Box<[RuntimePathOramPositionMapWitness]>,
     ) {
         (
-            std::mem::take(&mut self.runtime_oram_access_counters_before).into_vec(),
-            std::mem::take(&mut self.runtime_oram_access_counters_after).into_vec(),
-            std::mem::take(&mut self.runtime_oram_position_map_before).into_vec(),
-            std::mem::take(&mut self.runtime_oram_position_map_after).into_vec(),
+            std::mem::take(&mut self.runtime_oram_access_counters_before),
+            std::mem::take(&mut self.runtime_oram_access_counters_after),
+            std::mem::take(&mut self.runtime_oram_position_map_before),
+            std::mem::take(&mut self.runtime_oram_position_map_after),
         )
     }
 }
@@ -304,13 +304,10 @@ impl TracedRuntimeCallOutcome {
             return_value,
             opcode_trace,
             TracedRuntimeCallWitnessState {
-                runtime_oram_access_counters_before: runtime_oram_access_counters_before
-                    .into_boxed_slice(),
-                runtime_oram_access_counters_after: runtime_oram_access_counters_after
-                    .into_boxed_slice(),
-                runtime_oram_position_map_before: runtime_oram_position_map_before
-                    .into_boxed_slice(),
-                runtime_oram_position_map_after: runtime_oram_position_map_after.into_boxed_slice(),
+                runtime_oram_access_counters_before,
+                runtime_oram_access_counters_after,
+                runtime_oram_position_map_before,
+                runtime_oram_position_map_after,
             },
         )
     }

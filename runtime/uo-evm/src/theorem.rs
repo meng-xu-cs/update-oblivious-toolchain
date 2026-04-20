@@ -173,12 +173,12 @@ fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<Ex
         Some(runtime_kernel_refinement_witness),
         Some(controller_certificate),
         runtime_oram_objects(artifact),
-        oram_leaf_schedule,
+        oram_leaf_schedule.into_boxed_slice(),
         runtime_oram_access_counters_before,
         runtime_oram_access_counters_after,
         runtime_oram_position_map_before,
         runtime_oram_position_map_after,
-        oram_leaf_state_transitions,
+        oram_leaf_state_transitions.into_boxed_slice(),
     ));
     if confidential {
         let runtime_kernel_interface_bundle = trace
@@ -345,7 +345,7 @@ fn finalize_call_trace(
     Ok((return_value, aborted, trace, zero_writes))
 }
 
-fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWitness> {
+fn runtime_oram_objects(artifact: &CompiledArtifact) -> Box<[RuntimeOramObjectWitness]> {
     artifact
         .contract
         .manifest
@@ -371,5 +371,6 @@ fn runtime_oram_objects(artifact: &CompiledArtifact) -> Vec<RuntimeOramObjectWit
                 accesses_per_call: oram.accesses_per_call,
             })
         })
-        .collect()
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
 }

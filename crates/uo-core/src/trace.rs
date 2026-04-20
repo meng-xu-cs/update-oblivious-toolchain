@@ -225,7 +225,7 @@ pub struct RuntimePathOramTransitionWitness {
 pub struct RuntimePathOramPositionMapWitness {
     pub object_id: u32,
     pub object_name: String,
-    pub leaves: Vec<Option<usize>>,
+    pub leaves: Box<[Option<usize>]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -4713,7 +4713,7 @@ fn runtime_path_oram_state_by_object(
             return Err(RefinementWitnessError::OramLeafStateMismatch);
         }
         if by_object
-            .insert(object.object_id, state.leaves.clone())
+            .insert(object.object_id, state.leaves.to_vec())
             .is_some()
         {
             return Err(RefinementWitnessError::OramLeafStateMismatch);
@@ -4905,19 +4905,19 @@ pub struct ExecutionTrace {
     #[serde(default)]
     runtime_controller_certificate: Option<RuntimeControllerCertificate>,
     #[serde(default)]
-    runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
+    runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
     #[serde(default)]
-    runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
     #[serde(default)]
-    runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
     #[serde(default)]
-    runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
     #[serde(default)]
-    runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
     #[serde(default)]
-    runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
     #[serde(default)]
-    runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -4933,13 +4933,13 @@ pub struct RuntimeExecutionTraceParts {
     runtime_kernel_witness: Option<RuntimeKernelWitness>,
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
     runtime_controller_certificate: Option<RuntimeControllerCertificate>,
-    runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
-    runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
-    runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
-    runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
-    runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
-    runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
-    runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
+    runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+    runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
+    runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
+    runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+    runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+    runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
 }
 
 impl RuntimeExecutionTraceParts {
@@ -4956,13 +4956,13 @@ impl RuntimeExecutionTraceParts {
         runtime_kernel_witness: Option<RuntimeKernelWitness>,
         runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
         runtime_controller_certificate: Option<RuntimeControllerCertificate>,
-        runtime_oram_objects: Vec<RuntimeOramObjectWitness>,
-        runtime_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
-        runtime_oram_access_counters_before: Vec<RuntimeOramAccessCounterWitness>,
-        runtime_oram_access_counters_after: Vec<RuntimeOramAccessCounterWitness>,
-        runtime_oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
-        runtime_oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
-        runtime_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+        runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
+        runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+        runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
+        runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
+        runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+        runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+        runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
     ) -> Self {
         Self {
             opcode_trace,
@@ -5156,11 +5156,11 @@ impl ExecutionTrace {
     ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
         RuntimePathOramHiddenCertificate::new(
             self.refinement_trace(),
-            self.runtime_oram_objects.clone(),
-            self.runtime_oram_leaf_schedule.clone(),
-            self.runtime_oram_position_map_before.clone(),
-            self.runtime_oram_position_map_after.clone(),
-            self.runtime_oram_leaf_state_transitions.clone(),
+            self.runtime_oram_objects.to_vec(),
+            self.runtime_oram_leaf_schedule.to_vec(),
+            self.runtime_oram_position_map_before.to_vec(),
+            self.runtime_oram_position_map_after.to_vec(),
+            self.runtime_oram_leaf_state_transitions.to_vec(),
         )
     }
 
@@ -5670,7 +5670,7 @@ mod tests {
         vec![RuntimePathOramPositionMapWitness {
             object_id: 7,
             object_name: "records".into(),
-            leaves,
+            leaves: leaves.into_boxed_slice(),
         }]
     }
 
@@ -5680,7 +5680,7 @@ mod tests {
         vec![RuntimePathOramPositionMapWitness {
             object_id: 7,
             object_name: "records".into(),
-            leaves,
+            leaves: leaves.into_boxed_slice(),
         }]
     }
 
@@ -5738,13 +5738,16 @@ mod tests {
             runtime_kernel_refinement_witness: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()],
-            runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
-            runtime_oram_access_counters_before: vec![],
-            runtime_oram_access_counters_after: vec![],
-            runtime_oram_position_map_before: sample_path_oram_position_map_before(),
-            runtime_oram_position_map_after: sample_path_oram_position_map_after(),
-            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
+            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+            runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
+            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
+            runtime_oram_position_map_before: sample_path_oram_position_map_before()
+                .into_boxed_slice(),
+            runtime_oram_position_map_after: sample_path_oram_position_map_after()
+                .into_boxed_slice(),
+            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
+                .into_boxed_slice(),
         }
     }
 
@@ -5990,25 +5993,28 @@ mod tests {
                 normalized_micro_trace: Some(normalized_micro_trace),
             },
             runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_read_miss_oram_object()],
+            runtime_oram_objects: vec![sample_read_miss_oram_object()].into_boxed_slice(),
             runtime_oram_leaf_schedule: vec![RuntimeOramLeafWitness {
                 object_id: 9,
                 object_name: "tiny_records".into(),
                 bucket_count: 1,
                 leaf: 0,
-            }],
-            runtime_oram_access_counters_before: vec![],
-            runtime_oram_access_counters_after: vec![],
+            }]
+            .into_boxed_slice(),
+            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
             runtime_oram_position_map_before: vec![RuntimePathOramPositionMapWitness {
                 object_id: 9,
                 object_name: "tiny_records".into(),
-                leaves: vec![None; 4],
-            }],
+                leaves: vec![None; 4].into_boxed_slice(),
+            }]
+            .into_boxed_slice(),
             runtime_oram_position_map_after: vec![RuntimePathOramPositionMapWitness {
                 object_id: 9,
                 object_name: "tiny_records".into(),
-                leaves: vec![None; 4],
-            }],
+                leaves: vec![None; 4].into_boxed_slice(),
+            }]
+            .into_boxed_slice(),
             runtime_oram_leaf_state_transitions: vec![RuntimePathOramTransitionWitness {
                 object_id: 9,
                 object_name: "tiny_records".into(),
@@ -6017,7 +6023,8 @@ mod tests {
                 slot_index: None,
                 prior_leaf: None,
                 next_leaf: None,
-            }],
+            }]
+            .into_boxed_slice(),
             ..ExecutionTrace::default()
         };
         trace.runtime_refinement_witness().unwrap()
@@ -6360,7 +6367,7 @@ mod tests {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
         let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
         trace.runtime_trusted_kernel_bundle = Some(bundle);
-        trace.runtime_oram_position_map_after = vec![];
+        trace.runtime_oram_position_map_after = Vec::new().into_boxed_slice();
         assert_eq!(
             trace.runtime_trusted_kernel_bundle().unwrap_err(),
             RefinementWitnessError::OramLeafStateMismatch
@@ -6506,7 +6513,7 @@ mod tests {
                 ),
             },
             runtime_controller_certificate: Some(drifted_certificate),
-            runtime_oram_objects: vec![sample_oram_object()],
+            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
             ..ExecutionTrace::default()
         };
         assert_eq!(
@@ -6532,7 +6539,7 @@ mod tests {
                 normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
             },
             runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()],
+            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
             ..ExecutionTrace::default()
         };
         assert_eq!(
@@ -6590,13 +6597,15 @@ mod tests {
             runtime_kernel_refinement_witness: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()],
-            runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
-            runtime_oram_access_counters_before: vec![],
-            runtime_oram_access_counters_after: vec![],
-            runtime_oram_position_map_before: sample_path_oram_position_map_before(),
-            runtime_oram_position_map_after: drifted_after,
-            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
+            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+            runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
+            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
+            runtime_oram_position_map_before: sample_path_oram_position_map_before()
+                .into_boxed_slice(),
+            runtime_oram_position_map_after: drifted_after.into_boxed_slice(),
+            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
+                .into_boxed_slice(),
         };
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -6649,13 +6658,15 @@ mod tests {
             runtime_kernel_refinement_witness: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()],
-            runtime_oram_leaf_schedule: sample_oram_leaf_schedule(),
-            runtime_oram_access_counters_before: vec![],
-            runtime_oram_access_counters_after: vec![],
-            runtime_oram_position_map_before: sample_path_oram_position_map_before(),
-            runtime_oram_position_map_after: drifted_after,
-            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions(),
+            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+            runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
+            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
+            runtime_oram_position_map_before: sample_path_oram_position_map_before()
+                .into_boxed_slice(),
+            runtime_oram_position_map_after: drifted_after.into_boxed_slice(),
+            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
+                .into_boxed_slice(),
         };
         assert_eq!(
             trace.runtime_path_oram_hidden_certificate().unwrap_err(),

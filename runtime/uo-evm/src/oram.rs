@@ -558,7 +558,7 @@ impl OramState {
         let leaves = if self.is_cold() {
             self.path_position_map_from_storage(spec)?
         } else if self.position_map.len() == self.parameters.capacity {
-            self.position_map.to_vec()
+            self.position_map.clone()
         } else {
             bail!(
                 "live position map length {} mismatched required public bound {} for {}",
@@ -700,7 +700,7 @@ impl OramState {
         self.stash.clear();
     }
 
-    fn path_position_map_from_storage(&self, spec: &StateObject) -> Result<Vec<Option<usize>>> {
+    fn path_position_map_from_storage(&self, spec: &StateObject) -> Result<Box<[Option<usize>]>> {
         let scratch = self.parameters.directory_page_bytes.max(8);
         let mut allocator = AllocatorSession::new(AllocatorPlan {
             arena_bytes: scratch.saturating_mul(4),
@@ -718,7 +718,7 @@ impl OramState {
         allocator
             .finish()
             .expect("position-map decode scratch should be wiped");
-        Ok(position_map)
+        Ok(position_map.into_boxed_slice())
     }
 
     pub(crate) fn instantiate(spec: &StateObject, rng: &mut ChaCha20Rng) -> Result<Self> {
@@ -2938,7 +2938,7 @@ mod tests {
         state.cold_commit();
 
         let witness = state.path_position_map_witness(&spec).unwrap();
-        assert_eq!(witness.leaves, expected_position_map);
+        assert_eq!(witness.leaves, expected_position_map.into_boxed_slice());
     }
 
     #[test]

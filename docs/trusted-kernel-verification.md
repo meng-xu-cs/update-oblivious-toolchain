@@ -222,7 +222,11 @@ The paper-facing runtime/kernel boundary is now also explicit on the Rust side
 as `ExecutionTrace::runtime_kernel_interface_bundle`, which packages the
 checked shell-boundary bundle together with the admitted expected kernel steps,
 expected public object universe, and expected kernel schedule from the
-artifact.
+artifact. The post-call proof-facing `ExecutionTrace` storage for the hidden
+ORAM witness slices now also stays in boxed fixed-size buffers, and each
+emitted Path-ORAM position-map witness stores its leaf array in a boxed
+fixed-size buffer too, so the runtime theorem path no longer widens those
+public-bounded witness arrays back into growable vectors.
 
 The emitted runtime kernel witness now contains:
 
