@@ -72,13 +72,13 @@
       {
         "bytes": 8216346,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[22].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[47].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
         "bytes": 8216346,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[23].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[48].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
@@ -90,8 +90,56 @@
       {
         "bytes": 4105222,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[19].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[44].artifact_json_bytes",
         "report": "tamper_validation"
+      },
+      {
+        "bytes": 2560961,
+        "estimated": false,
+        "metric": "confidential_proof_family_slot_assurance_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_slot_assurance_validation"
+      },
+      {
+        "bytes": 2560880,
+        "estimated": false,
+        "metric": "confidential_proof_family_assurance_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_assurance_validation"
+      },
+      {
+        "bytes": 2560846,
+        "estimated": false,
+        "metric": "confidential_proof_family_finish_slot_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_finish_slot_boundary_validation"
+      },
+      {
+        "bytes": 2560799,
+        "estimated": false,
+        "metric": "confidential_proof_family_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_boundary_validation"
+      },
+      {
+        "bytes": 2560783,
+        "estimated": false,
+        "metric": "confidential_proof_family_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_validation"
+      },
+      {
+        "bytes": 2560765,
+        "estimated": false,
+        "metric": "confidential_proof_family_kernel_interface_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_kernel_interface_validation"
+      },
+      {
+        "bytes": 2560747,
+        "estimated": false,
+        "metric": "confidential_proof_family_refinement_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_refinement_boundary_validation"
+      },
+      {
+        "bytes": 2560718,
+        "estimated": false,
+        "metric": "confidential_proof_family_slot_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_slot_boundary_validation"
       },
       {
         "bytes": 1619968,
@@ -100,76 +148,28 @@
         "report": "pathoram_pair_validation"
       },
       {
-        "bytes": 768398,
+        "bytes": 818754,
         "estimated": false,
-        "metric": "seeded_witness_validation.scenarios[3].witness_family_json_bytes",
-        "report": "seeded_witness_validation"
+        "metric": "confidential_proof_family_kernel_interface_validation.scenarios[14].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_kernel_interface_validation"
       },
       {
-        "bytes": 498341,
+        "bytes": 818734,
         "estimated": false,
-        "metric": "pathoram_pair_validation.scenarios[2].certificate_json_bytes",
-        "report": "pathoram_pair_validation"
+        "metric": "confidential_proof_family_slot_assurance_validation.scenarios[14].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_slot_assurance_validation"
       },
       {
-        "bytes": 468944,
+        "bytes": 818727,
         "estimated": false,
-        "metric": "canonical_pathoram_pair_validation.scenarios[3].theorem_input_json_bytes",
-        "report": "canonical_pathoram_pair_validation"
+        "metric": "confidential_proof_family_assurance_validation.scenarios[14].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_assurance_validation"
       },
       {
-        "bytes": 379834,
+        "bytes": 818727,
         "estimated": false,
-        "metric": "pathoram_pair_validation.scenarios[1].certificate_json_bytes",
-        "report": "pathoram_pair_validation"
-      },
-      {
-        "bytes": 297490,
-        "estimated": false,
-        "metric": "confidential_core_shell_boundary_lowering_validation.scenarios[15].confidential_core_shell_boundary_lowering_bundle_json_bytes",
-        "report": "confidential_core_shell_boundary_lowering_validation"
-      },
-      {
-        "bytes": 295523,
-        "estimated": false,
-        "metric": "confidential_core_shell_boundary_slot_validation.scenarios[15].confidential_core_shell_boundary_slot_bundle_json_bytes",
-        "report": "confidential_core_shell_boundary_slot_validation"
-      },
-      {
-        "bytes": 262697,
-        "estimated": false,
-        "metric": "tamper_validation.scenarios[21].artifact_json_bytes",
-        "report": "tamper_validation"
-      },
-      {
-        "bytes": 262696,
-        "estimated": false,
-        "metric": "pathoram_pair_validation.scenarios[0].certificate_json_bytes",
-        "report": "pathoram_pair_validation"
-      },
-      {
-        "bytes": 237521,
-        "estimated": false,
-        "metric": "seeded_witness_validation.scenarios[2].witness_family_json_bytes",
-        "report": "seeded_witness_validation"
-      },
-      {
-        "bytes": 195533,
-        "estimated": false,
-        "metric": "confidential_core_lowering_validation.scenarios[15].confidential_core_lowering_bundle_json_bytes",
-        "report": "confidential_core_lowering_validation"
-      },
-      {
-        "bytes": 193962,
-        "estimated": false,
-        "metric": "confidential_core_validation.scenarios[15].confidential_core_bundle_json_bytes",
-        "report": "confidential_core_validation"
-      },
-      {
-        "bytes": 193598,
-        "estimated": false,
-        "metric": "confidential_core_slot_validation.scenarios[15].confidential_core_slot_bundle_json_bytes",
-        "report": "confidential_core_slot_validation"
+        "metric": "confidential_proof_family_boundary_validation.scenarios[14].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_boundary_validation"
       }
     ]
   },
@@ -187,7 +187,7 @@
     {
       "component": "Rust runtime kernel plus witness / certificate / bundle extraction and serialization",
       "in_current_proofgrade_tcb": true,
-      "role": "currently trusted for implementation honesty"
+      "role": "currently trusted for implementation honesty; the remaining trust point is now frozen explicitly as PaperMainRuntimeKernelBoundary and the stronger PaperMainRuntimeKernelSlotBoundary route, with PaperMainRuntimeKernelAssumptions retained only as a lower-level projection wrapper"
     },
     {
       "component": "Rust code outside the tiny kernel",
@@ -227,44 +227,69 @@
       "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; not yet fully discharged in-repo"
     },
     {
+      "assumption": "PaperMainRuntimeKernelBoundary / PaperMainRuntimeKernelSlotBoundary",
+      "meaning": "records the exact runtime-side paper boundary: one valid explicit runtime kernel-interface bundle per witness, and in the stronger slot route one fixed confidential slot program whose expected kernel steps match that bundle exactly",
+      "status": "explicit Lean boundaries in PaperPathOramTheoremRoute.lean; they now project mechanically to the native RuntimeProofGradeKernelInterface theorem, the explicit RuntimeKernelConfinementBoundary, and valid native shell-boundary bundles, the top-level paper assumption bundles now carry these boundary facts directly, proof-grade seeded paper-main bundles can discharge them mechanically, but they are not yet discharged for the real runtime by a machine-checked refinement plus confinement theorem"
+    },
+    {
       "assumption": "TEE deployment assumptions",
       "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model",
       "status": "required by the final malicious-host deployment theorem; not yet fully closed in Lean"
     }
   ],
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 56290,
-    "confidential_core_lowering_validation": 2991,
-    "confidential_core_shell_boundary_lowering_validation": 2968,
-    "confidential_core_shell_boundary_slot_validation": 2925,
-    "confidential_core_slot_validation": 2961,
-    "confidential_core_validation": 3242,
+    "canonical_pathoram_pair_validation": 60784,
+    "confidential_core_kernel_finish_slot_validation": 3060,
+    "confidential_core_kernel_interface_slot_finish_boundary_validation": 3328,
+    "confidential_core_kernel_interface_slot_validation": 3231,
+    "confidential_core_lowering_validation": 4511,
+    "confidential_core_shell_boundary_lowering_validation": 4362,
+    "confidential_core_shell_boundary_slot_validation": 4484,
+    "confidential_core_slot_validation": 3108,
+    "confidential_core_validation": 3118,
     "confidential_fragment_validation": 0,
-    "controller_observer_validation": 2835,
-    "correctness": 1205,
-    "fresh_coin_validation": 13569,
-    "kernel_dsl_validation": 2774,
-    "kernel_lowering_validation": 2814,
-    "kernel_model_alignment_validation": 49,
-    "kernel_refinement_validation": 2841,
-    "kernel_slot_dsl_validation": 2861,
-    "kernel_validation": 2694,
-    "leakage_auc": 2541,
-    "mutual_information": 2524,
-    "overheads": 116,
-    "pathoram_hidden_validation": 1970,
-    "pathoram_pair_validation": 6094,
-    "runtime_boundary_validation": 304,
-    "seeded_witness_validation": 3192,
-    "shell_boundary_lowering_validation": 2754,
-    "shell_boundary_slot_validation": 2865,
-    "shell_boundary_validation": 2705,
-    "static_checks": 1760,
-    "tamper_validation": 10160,
-    "total_probe_ms": 147562,
-    "trace_equivalence": 2695,
-    "trusted_kernel_validation": 2828,
-    "witness_validation": 1873
+    "confidential_proof_family_assurance_validation": 3793,
+    "confidential_proof_family_boundary_validation": 3737,
+    "confidential_proof_family_finish_slot_boundary_validation": 3762,
+    "confidential_proof_family_kernel_interface_validation": 3766,
+    "confidential_proof_family_refinement_boundary_validation": 3660,
+    "confidential_proof_family_slot_assurance_validation": 3456,
+    "confidential_proof_family_slot_boundary_validation": 3528,
+    "confidential_proof_family_validation": 3720,
+    "controller_observer_validation": 4203,
+    "correctness": 1338,
+    "fresh_coin_validation": 15566,
+    "kernel_confinement_boundary_validation": 2270,
+    "kernel_dsl_validation": 4550,
+    "kernel_finish_boundary_validation": 2228,
+    "kernel_interface_confinement_boundary_validation": 2290,
+    "kernel_interface_singleton_boundary_validation": 2267,
+    "kernel_interface_validation": 2280,
+    "kernel_lowering_validation": 4274,
+    "kernel_model_alignment_validation": 169,
+    "kernel_refinement_boundary_validation": 2268,
+    "kernel_refinement_validation": 4342,
+    "kernel_slot_boundary_validation": 3182,
+    "kernel_slot_dsl_validation": 4419,
+    "kernel_validation": 4383,
+    "leakage_auc": 2806,
+    "mutual_information": 2805,
+    "overheads": 135,
+    "paper_main_family_boundary_validation": 1,
+    "paper_main_slot_boundary_validation": 0,
+    "pathoram_hidden_validation": 3277,
+    "pathoram_pair_validation": 6813,
+    "runtime_boundary_validation": 837,
+    "seeded_witness_validation": 7316,
+    "shell_boundary_lowering_validation": 4333,
+    "shell_boundary_slot_validation": 4313,
+    "shell_boundary_validation": 4248,
+    "static_checks": 2993,
+    "tamper_validation": 29079,
+    "total_probe_ms": 258365,
+    "trace_equivalence": 3022,
+    "trusted_kernel_validation": 4241,
+    "witness_validation": 2267
   },
   "runtime_overheads": {
     "cases": [
@@ -291,27 +316,39 @@
   },
   "tcb_size": {
     "lean_theorem_checker_repo_surface": {
-      "file_count": 79,
+      "file_count": 108,
       "files": [
         {
           "file": "proof/lean/CheckCanonicalPathOramPairCertificate.lean",
-          "nonempty_loc": 20
+          "nonempty_loc": 22
         },
         {
           "file": "proof/lean/CheckCanonicalPathOramPairTheoremInput.lean",
-          "nonempty_loc": 20
+          "nonempty_loc": 22
         },
         {
           "file": "proof/lean/CheckCanonicalPathOramPaperInstantiation.lean",
-          "nonempty_loc": 87
+          "nonempty_loc": 167
         },
         {
           "file": "proof/lean/CheckPathOramPairCertificate.lean",
-          "nonempty_loc": 19
+          "nonempty_loc": 20
         },
         {
           "file": "proof/lean/CheckProofGradeRuntimeConfidentialCore.lean",
           "nonempty_loc": 20
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreKernelFinishSlot.lean",
+          "nonempty_loc": 55
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlot.lean",
+          "nonempty_loc": 21
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlotFinishBoundary.lean",
+          "nonempty_loc": 68
         },
         {
           "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreLowering.lean",
@@ -330,16 +367,80 @@
           "nonempty_loc": 20
         },
         {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamily.lean",
+          "nonempty_loc": 20
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyAssurance.lean",
+          "nonempty_loc": 27
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyBoundary.lean",
+          "nonempty_loc": 47
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyFinishSlotBoundary.lean",
+          "nonempty_loc": 53
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyKernelInterface.lean",
+          "nonempty_loc": 33
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyRefinementBoundary.lean",
+          "nonempty_loc": 28
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilySlotAssurance.lean",
+          "nonempty_loc": 38
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilySlotBoundary.lean",
+          "nonempty_loc": 48
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelConfinementBoundary.lean",
+          "nonempty_loc": 24
+        },
+        {
           "file": "proof/lean/CheckProofGradeRuntimeKernelDsl.lean",
           "nonempty_loc": 14
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelFinishBoundary.lean",
+          "nonempty_loc": 42
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelInterface.lean",
+          "nonempty_loc": 38
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelInterfaceBundle.lean",
+          "nonempty_loc": 14
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelInterfaceConfinementBoundary.lean",
+          "nonempty_loc": 33
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelInterfaceFamily.lean",
+          "nonempty_loc": 27
         },
         {
           "file": "proof/lean/CheckProofGradeRuntimeKernelLowering.lean",
           "nonempty_loc": 15
         },
         {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelRefinementBoundary.lean",
+          "nonempty_loc": 21
+        },
+        {
           "file": "proof/lean/CheckProofGradeRuntimeKernelRefinementWitness.lean",
           "nonempty_loc": 18
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimeKernelSlotBoundary.lean",
+          "nonempty_loc": 34
         },
         {
           "file": "proof/lean/CheckProofGradeRuntimeKernelSlotDsl.lean",
@@ -348,6 +449,26 @@
         {
           "file": "proof/lean/CheckProofGradeRuntimeKernelWitness.lean",
           "nonempty_loc": 14
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimePaperMainFamily.lean",
+          "nonempty_loc": 27
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimePaperMainFamilyBoundary.lean",
+          "nonempty_loc": 52
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimePaperMainFamilyBundle.lean",
+          "nonempty_loc": 27
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimePaperMainSlotBoundary.lean",
+          "nonempty_loc": 51
+        },
+        {
+          "file": "proof/lean/CheckProofGradeRuntimePaperMainSlotFamilyBundle.lean",
+          "nonempty_loc": 25
         },
         {
           "file": "proof/lean/CheckProofGradeRuntimeShellBoundary.lean",
@@ -370,6 +491,10 @@
           "nonempty_loc": 19
         },
         {
+          "file": "proof/lean/CheckProofGradeRuntimeWitnessFamily.lean",
+          "nonempty_loc": 24
+        },
+        {
           "file": "proof/lean/CheckProofGradeTranslationArtifacts.lean",
           "nonempty_loc": 18
         },
@@ -383,7 +508,7 @@
         },
         {
           "file": "proof/lean/CheckRuntimeFreshCoinTheoremInput.lean",
-          "nonempty_loc": 23
+          "nonempty_loc": 25
         },
         {
           "file": "proof/lean/CheckRuntimePathOramHiddenCertificate.lean",
@@ -411,7 +536,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/ConfidentialKernelDsl.lean",
-          "nonempty_loc": 1198
+          "nonempty_loc": 1599
         },
         {
           "file": "proof/lean/UOToolchain/ExactObjects.lean",
@@ -451,7 +576,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean",
-          "nonempty_loc": 72
+          "nonempty_loc": 878
         },
         {
           "file": "proof/lean/UOToolchain/PathOramJACMTheorem.lean",
@@ -475,27 +600,35 @@
         },
         {
           "file": "proof/lean/UOToolchain/ProofGrade.lean",
-          "nonempty_loc": 45
+          "nonempty_loc": 49
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeCanonicalPathOramPairJson.lean",
-          "nonempty_loc": 502
+          "nonempty_loc": 953
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeCoins.lean",
-          "nonempty_loc": 674
+          "nonempty_loc": 722
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeCoinsJson.lean",
-          "nonempty_loc": 651
+          "nonempty_loc": 1866
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssurance.lean",
-          "nonempty_loc": 420
+          "nonempty_loc": 838
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean",
-          "nonempty_loc": 570
+          "nonempty_loc": 670
+        },
+        {
+          "file": "proof/lean/UOToolchain/RuntimeConfidentialCoreKernelFinishSlotJson.lean",
+          "nonempty_loc": 248
+        },
+        {
+          "file": "proof/lean/UOToolchain/RuntimeConfidentialCoreKernelInterfaceSlotJson.lean",
+          "nonempty_loc": 382
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean",
@@ -503,43 +636,51 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundarySlotJson.lean",
-          "nonempty_loc": 145
+          "nonempty_loc": 207
+        },
+        {
+          "file": "proof/lean/UOToolchain/RuntimeConfidentialProofBundleFamilyJson.lean",
+          "nonempty_loc": 463
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeKernelDslJson.lean",
-          "nonempty_loc": 3613
+          "nonempty_loc": 3745
+        },
+        {
+          "file": "proof/lean/UOToolchain/RuntimeKernelFinishBundleJson.lean",
+          "nonempty_loc": 196
         },
         {
           "file": "proof/lean/UOToolchain/RuntimePaperInstantiation.lean",
-          "nonempty_loc": 883
+          "nonempty_loc": 1453
         },
         {
           "file": "proof/lean/UOToolchain/RuntimePathOramPairJson.lean",
-          "nonempty_loc": 487
+          "nonempty_loc": 713
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeRefinement.lean",
-          "nonempty_loc": 4843
+          "nonempty_loc": 4974
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeRefinementJson.lean",
-          "nonempty_loc": 1997
+          "nonempty_loc": 2110
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeShellBoundary.lean",
-          "nonempty_loc": 324
+          "nonempty_loc": 1513
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean",
-          "nonempty_loc": 311
+          "nonempty_loc": 1226
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean",
-          "nonempty_loc": 189
+          "nonempty_loc": 225
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeShellBoundarySlotJson.lean",
-          "nonempty_loc": 107
+          "nonempty_loc": 124
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeTrustedKernel.lean",
@@ -547,7 +688,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean",
-          "nonempty_loc": 480
+          "nonempty_loc": 481
         },
         {
           "file": "proof/lean/UOToolchain/SgxBoundary.lean",
@@ -603,15 +744,15 @@
         },
         {
           "file": "proof/lean/UOToolchain.lean",
-          "nonempty_loc": 51
+          "nonempty_loc": 52
         },
         {
           "file": "proof/lean/lakefile.lean",
-          "nonempty_loc": 80
+          "nonempty_loc": 154
         }
       ],
       "root": "proof/lean",
-      "total_nonempty_loc": 28083
+      "total_nonempty_loc": 37246
     },
     "measurement": "non-empty source lines",
     "outer_runtime_risk_surface": {
@@ -619,36 +760,36 @@
       "files": [
         {
           "file": "runtime/uo-evm/src/engine.rs",
-          "nonempty_loc": 419
+          "nonempty_loc": 386
         },
         {
           "file": "runtime/uo-evm/src/shell.rs",
-          "nonempty_loc": 515
+          "nonempty_loc": 510
         }
       ],
-      "total_nonempty_loc": 934
+      "total_nonempty_loc": 896
     },
     "trusted_runtime_surface": {
       "file_count": 4,
       "files": [
         {
           "file": "runtime/uo-evm/src/kernel.rs",
-          "nonempty_loc": 1172
+          "nonempty_loc": 586
         },
         {
           "file": "runtime/uo-evm/src/state.rs",
-          "nonempty_loc": 687
+          "nonempty_loc": 666
         },
         {
           "file": "runtime/uo-evm/src/theorem.rs",
-          "nonempty_loc": 312
+          "nonempty_loc": 122
         },
         {
           "file": "crates/uo-core/src/trace.rs",
-          "nonempty_loc": 4797
+          "nonempty_loc": 8998
         }
       ],
-      "total_nonempty_loc": 6968
+      "total_nonempty_loc": 10372
     }
   }
 }

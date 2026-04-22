@@ -1,15 +1,16 @@
 use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::{PathOramFreshCoinEntry, PathOramFreshCoinPlan};
-use crate::runtime::kernel::{ConfidentialCallInputs, PublicRuntimeKernel};
+use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::objects::RuntimeObject;
-use crate::runtime::RuntimeCallOutcome;
 use anyhow::{anyhow, bail, Result};
 use std::cmp::Ordering;
+use std::mem::MaybeUninit;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
-    ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram,
-    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramAccessCounterWitness,
-    RuntimePathOramPositionMapWitness, Value,
+    ir::StateObject, manifest::EntrypointManifest, CommittedRuntimeWitnessSnapshot,
+    CommittedRuntimeWitnessSnapshotBuilder, ConfidentialCallInputs, ConfidentialKernelSlotProgram,
+    RuntimeCallOutcome, RuntimeKernelFinishBundle, TracedRuntimeCallOutcome,
+    TracedRuntimeCallStart, Value,
 };
 
 #[derive(Debug)]
@@ -39,6 +40,12 @@ struct RuntimeObjectTable {
 }
 
 #[derive(Debug)]
+struct FixedBoxBuilder<T> {
+    entries: Box<[MaybeUninit<T>]>,
+    initialized: usize,
+}
+
+#[derive(Debug)]
 pub(in crate::runtime) struct ConfidentialRuntimeShadowState {
     shadow: RuntimeShadowState,
 }
@@ -46,49 +53,6 @@ pub(in crate::runtime) struct ConfidentialRuntimeShadowState {
 #[derive(Debug)]
 pub(in crate::runtime) struct PublicRuntimeShadowState {
     shadow: RuntimeShadowState,
-}
-
-#[derive(Clone, Debug)]
-struct ConfidentialEntrypointPlan {
-    allocator: AllocatorPlan,
-    public_object_ids: Vec<u32>,
-    max_commit_ops: usize,
-    program: ConfidentialKernelSlotProgram,
-    max_hash_part_bytes: usize,
-}
-
-#[derive(Debug)]
-struct CommittedRuntimeWitnessSnapshot {
-    runtime_oram_access_counters: Box<[RuntimeOramAccessCounterWitness]>,
-    runtime_oram_position_maps: Box<[RuntimePathOramPositionMapWitness]>,
-}
-
-fn wipe_runtime_oram_access_counters(witnesses: &mut [RuntimeOramAccessCounterWitness]) {
-    for witness in witnesses.iter_mut() {
-        witness.access_counter = 0;
-    }
-}
-
-fn wipe_runtime_oram_position_maps(witnesses: &mut [RuntimePathOramPositionMapWitness]) {
-    for witness in witnesses.iter_mut() {
-        for leaf in witness.leaves.iter_mut() {
-            *leaf = None;
-        }
-    }
-}
-
-impl CommittedRuntimeWitnessSnapshot {
-    fn into_hidden_oram_state(
-        mut self,
-    ) -> (
-        Box<[RuntimeOramAccessCounterWitness]>,
-        Box<[RuntimePathOramPositionMapWitness]>,
-    ) {
-        (
-            std::mem::take(&mut self.runtime_oram_access_counters),
-            std::mem::take(&mut self.runtime_oram_position_maps),
-        )
-    }
 }
 
 impl RuntimeObjectEntry {
@@ -107,11 +71,47 @@ impl RuntimeObjectEntry {
     }
 }
 
-impl RuntimeObjectTable {
-    fn new(entries: Vec<RuntimeObjectEntry>) -> Self {
+impl<T> FixedBoxBuilder<T> {
+    fn new(len: usize) -> Self {
         Self {
-            entries: entries.into_boxed_slice(),
+            entries: Box::<[T]>::new_uninit_slice(len),
+            initialized: 0,
         }
+    }
+
+    fn push(&mut self, value: T) {
+        assert!(
+            self.initialized < self.entries.len(),
+            "fixed-size boxed builder overflow"
+        );
+        self.entries[self.initialized].write(value);
+        self.initialized += 1;
+    }
+
+    fn finish(mut self) -> Box<[T]> {
+        assert_eq!(
+            self.initialized,
+            self.entries.len(),
+            "fixed-size boxed builder underfilled"
+        );
+        let entries = std::mem::take(&mut self.entries);
+        self.initialized = 0;
+        let raw = Box::into_raw(entries) as *mut [T];
+        unsafe { Box::from_raw(raw) }
+    }
+}
+
+impl<T> Drop for FixedBoxBuilder<T> {
+    fn drop(&mut self) {
+        for entry in &mut self.entries[..self.initialized] {
+            unsafe { entry.assume_init_drop() };
+        }
+    }
+}
+
+impl RuntimeObjectTable {
+    fn new(entries: Box<[RuntimeObjectEntry]>) -> Self {
+        Self { entries }
     }
 
     fn len(&self) -> usize {
@@ -132,8 +132,12 @@ impl RuntimeObjectTable {
         self.entries.iter_mut().map(|entry| &mut entry.object)
     }
 
-    fn object_ids(&self) -> Vec<u32> {
-        self.entries.iter().map(|entry| entry.object_id).collect()
+    fn object_ids(&self) -> Box<[u32]> {
+        self.entries
+            .iter()
+            .map(|entry| entry.object_id)
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
     }
 
     fn get(&self, object_id: u32) -> Option<&RuntimeObject> {
@@ -151,12 +155,11 @@ impl RuntimeObjectTable {
     }
 
     fn clone_committed_cold(&self) -> Self {
-        Self::new(
-            self.entries
-                .iter()
-                .map(RuntimeObjectEntry::clone_committed_cold)
-                .collect(),
-        )
+        let mut entries = FixedBoxBuilder::new(self.entries.len());
+        for entry in self.entries.iter() {
+            entries.push(entry.clone_committed_cold());
+        }
+        Self::new(entries.finish())
     }
 
     fn clone_for_shadow(
@@ -164,7 +167,7 @@ impl RuntimeObjectTable {
         object_ids: &[u32],
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
-        let mut entries = Vec::with_capacity(object_ids.len());
+        let mut entries = FixedBoxBuilder::new(object_ids.len());
         for object_id in object_ids {
             let object = self
                 .get(*object_id)
@@ -174,21 +177,20 @@ impl RuntimeObjectTable {
                 object: object.clone_for_tx(allocator)?,
             });
         }
-        Ok(Self::new(entries))
+        Ok(Self::new(entries.finish()))
     }
 
     fn into_cold_committed(self) -> Self {
-        Self::new(
-            self.entries
-                .into_vec()
-                .into_iter()
-                .map(RuntimeObjectEntry::into_cold_committed)
-                .collect(),
-        )
+        let len = self.entries.len();
+        let mut entries = FixedBoxBuilder::new(len);
+        for entry in std::iter::IntoIterator::into_iter(self.entries) {
+            entries.push(entry.into_cold_committed());
+        }
+        Self::new(entries.finish())
     }
 
-    fn into_entries_vec(self) -> Vec<RuntimeObjectEntry> {
-        self.entries.into_vec()
+    fn into_entries(self) -> Box<[RuntimeObjectEntry]> {
+        self.entries
     }
 
     #[cfg(test)]
@@ -218,98 +220,6 @@ impl RuntimeObjectTable {
         let removed = entries.remove(index).object;
         self.entries = entries.into_boxed_slice();
         Some(removed)
-    }
-}
-
-impl Drop for CommittedRuntimeWitnessSnapshot {
-    fn drop(&mut self) {
-        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters);
-        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_maps);
-    }
-}
-
-#[derive(Debug)]
-pub(in crate::runtime) struct TracedRuntimeCallStart {
-    runtime_state_before: CommittedRuntimeWitnessSnapshot,
-}
-
-#[derive(Debug)]
-pub(in crate::runtime) struct TracedRuntimeCallWitnessState {
-    runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
-    runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
-    runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
-    runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
-}
-
-impl TracedRuntimeCallWitnessState {
-    pub(in crate::runtime) fn into_execution_trace_parts(
-        mut self,
-    ) -> (
-        Box<[RuntimeOramAccessCounterWitness]>,
-        Box<[RuntimeOramAccessCounterWitness]>,
-        Box<[RuntimePathOramPositionMapWitness]>,
-        Box<[RuntimePathOramPositionMapWitness]>,
-    ) {
-        (
-            std::mem::take(&mut self.runtime_oram_access_counters_before),
-            std::mem::take(&mut self.runtime_oram_access_counters_after),
-            std::mem::take(&mut self.runtime_oram_position_map_before),
-            std::mem::take(&mut self.runtime_oram_position_map_after),
-        )
-    }
-}
-
-impl Drop for TracedRuntimeCallWitnessState {
-    fn drop(&mut self) {
-        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_before);
-        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_after);
-        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_before);
-        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_after);
-    }
-}
-
-#[derive(Debug)]
-pub(in crate::runtime) struct TracedRuntimeCallOutcome {
-    call_outcome: RuntimeCallOutcome,
-    runtime_state_after: CommittedRuntimeWitnessSnapshot,
-}
-
-impl TracedRuntimeCallOutcome {
-    pub(in crate::runtime) fn into_finalized_call_trace_parts(
-        self,
-        call_start: TracedRuntimeCallStart,
-    ) -> (
-        RuntimeKernelWitness,
-        RuntimeKernelRefinementWitness,
-        bool,
-        Option<Value>,
-        Vec<String>,
-        TracedRuntimeCallWitnessState,
-    ) {
-        let (runtime_oram_access_counters_before, runtime_oram_position_map_before) =
-            call_start.runtime_state_before.into_hidden_oram_state();
-        let (runtime_oram_access_counters_after, runtime_oram_position_map_after) =
-            self.runtime_state_after.into_hidden_oram_state();
-        let (
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            aborted,
-            return_value,
-            opcode_trace,
-        ) = self.call_outcome.into_theorem_trace_parts();
-        (
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            aborted,
-            return_value,
-            opcode_trace,
-            TracedRuntimeCallWitnessState {
-                runtime_oram_access_counters_before,
-                runtime_oram_access_counters_after,
-                runtime_oram_position_map_before,
-                runtime_oram_position_map_after,
-            },
-        )
     }
 }
 
@@ -347,7 +257,7 @@ impl ContractRuntime {
         self.committed.ensure_cold(expected_object_ids, context)
     }
 
-    pub(in crate::runtime) fn public_object_ids(&self) -> Vec<u32> {
+    pub(in crate::runtime) fn public_object_ids(&self) -> Box<[u32]> {
         self.committed.public_object_ids()
     }
 
@@ -362,9 +272,7 @@ impl ContractRuntime {
         let recorder =
             CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len());
         Ok((
-            TracedRuntimeCallStart {
-                runtime_state_before: self.witness_snapshot()?,
-            },
+            TracedRuntimeCallStart::new(self.witness_snapshot()?),
             public_call,
             recorder,
         ))
@@ -372,17 +280,17 @@ impl ContractRuntime {
 
     fn ensure_ready_for_call(&self, context: &str) -> Result<()> {
         let public_object_ids = self.public_object_ids();
-        self.ensure_cold(&public_object_ids, context)
+        self.ensure_cold(public_object_ids.as_ref(), context)
     }
 
     pub(in crate::runtime) fn finish_traced_call(
         &self,
         call_outcome: RuntimeCallOutcome,
     ) -> Result<TracedRuntimeCallOutcome> {
-        Ok(TracedRuntimeCallOutcome {
+        Ok(TracedRuntimeCallOutcome::new(
             call_outcome,
-            runtime_state_after: self.witness_snapshot()?,
-        })
+            self.witness_snapshot()?,
+        ))
     }
 
     fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
@@ -413,53 +321,46 @@ impl ContractRuntime {
         &mut self,
         entrypoint: &str,
         manifest_entry: &EntrypointManifest,
-        args: ConfidentialCallInputs,
+        raw_args: Box<[Value]>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
     ) -> Result<RuntimeCallOutcome> {
         let public_object_ids = self.public_object_ids();
-        let plan = ConfidentialEntrypointPlan::from_manifest_entry(
-            entrypoint,
-            manifest_entry,
-            public_object_ids,
-        )?;
-        let ConfidentialEntrypointPlan {
-            allocator,
-            public_object_ids,
-            max_commit_ops,
-            program,
-            max_hash_part_bytes,
-        } = plan;
-        let kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.clone())?;
-        let mut opcode_trace = Vec::with_capacity(program.body.len().max(1));
-        let (runtime_kernel_witness, runtime_kernel_refinement_witness, aborted, return_value) =
+        let plan =
+            manifest_entry.runtime_confidential_entrypoint_plan(entrypoint, public_object_ids)?;
+        let mut allocator = AllocatorPlan::from_manifest(manifest_entry);
+        allocator.max_kernel_ops = plan.max_kernel_ops();
+        let kernel = PublicRuntimeKernel::begin(allocator, plan.public_object_ids())?;
+        let mut opcode_trace =
+            Vec::with_capacity(plan.confidential_slot_program().body.len().max(1));
+        let args = ConfidentialCallInputs::from_raw_args(raw_args);
+        let (runtime_kernel_finish_bundle, aborted, return_value) =
             self.committed.run_confidential_call(
                 kernel,
-                &program,
-                max_hash_part_bytes,
+                plan.confidential_slot_program(),
+                plan.max_hash_part_bytes(),
                 args,
                 fresh_coins,
                 recorder,
                 &mut opcode_trace,
             )?;
-        if recorder.physical_write_count() > max_commit_ops {
+        if recorder.physical_write_count() > plan.max_commit_ops() {
             bail!(
                 "entrypoint {} exceeded manifest commit budget: {} > {}",
-                program.entrypoint_id,
+                plan.confidential_slot_program().entrypoint_id,
                 recorder.physical_write_count(),
-                max_commit_ops
+                plan.max_commit_ops()
             );
         }
         self.ensure_cold_call_boundary(
-            &public_object_ids,
+            plan.public_object_ids(),
             "after completing the call and returning to committed storage",
         )?;
         Ok(RuntimeCallOutcome::from_runtime_execution(
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
+            runtime_kernel_finish_bundle,
             aborted,
             return_value,
-            opcode_trace,
+            opcode_trace.into_boxed_slice(),
         ))
     }
 
@@ -503,7 +404,7 @@ impl ContractRuntime {
                 scratch_bytes: 1024,
                 max_kernel_ops: 16,
             },
-            vec![],
+            &[],
         )?;
         let mut shadow = self
             .committed
@@ -516,7 +417,7 @@ impl ContractRuntime {
 
 impl CommittedRuntimeState {
     fn deploy(contract_state: &[StateObject], deploy_seed: u64) -> Result<Self> {
-        let mut objects = Vec::with_capacity(contract_state.len());
+        let mut objects = FixedBoxBuilder::new(contract_state.len());
         let mut master_seed = deploy_seed;
         for spec in contract_state {
             objects.push(RuntimeObjectEntry {
@@ -527,6 +428,7 @@ impl CommittedRuntimeState {
                 .wrapping_mul(0x9E37_79B9_7F4A_7C15)
                 .wrapping_add(0xA5A5_A5A5_A5A5_A5A5);
         }
+        let mut objects = objects.finish();
         objects.sort_by_key(|entry| entry.object_id);
         for pair in objects.windows(2) {
             if pair[0].object_id == pair[1].object_id {
@@ -540,7 +442,7 @@ impl CommittedRuntimeState {
 
     fn ensure_cold(&self, expected_object_ids: &[u32], context: &str) -> Result<()> {
         let witnessed_object_ids = self.objects.object_ids();
-        if witnessed_object_ids != expected_object_ids {
+        if witnessed_object_ids.as_ref() != expected_object_ids {
             bail!(
                 "committed object universe {:?} did not match expected public object universe {:?} {}",
                 witnessed_object_ids,
@@ -558,26 +460,30 @@ impl CommittedRuntimeState {
         Ok(())
     }
 
-    fn public_object_ids(&self) -> Vec<u32> {
+    fn public_object_ids(&self) -> Box<[u32]> {
         self.objects.object_ids()
     }
 
     fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
-        let mut runtime_oram_position_maps = Vec::with_capacity(self.objects.len());
+        let path_oram_object_count = self
+            .objects
+            .values()
+            .filter(|object| object.exposes_path_oram_witnesses())
+            .count();
+        let mut snapshot = CommittedRuntimeWitnessSnapshotBuilder::new(path_oram_object_count);
         for object in self.objects.values() {
-            if let Some(state) = object.path_oram_position_map_witness()? {
-                runtime_oram_position_maps.push(state);
+            if object.exposes_path_oram_witnesses() {
+                snapshot.push(
+                    object
+                        .path_oram_access_counter_witness()
+                        .expect("Path-ORAM object must expose an access-counter witness"),
+                    object
+                        .path_oram_position_map_witness()?
+                        .expect("Path-ORAM object must expose a position-map witness"),
+                )?;
             }
         }
-        Ok(CommittedRuntimeWitnessSnapshot {
-            runtime_oram_access_counters: self
-                .objects
-                .values()
-                .filter_map(RuntimeObject::path_oram_access_counter_witness)
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            runtime_oram_position_maps: runtime_oram_position_maps.into_boxed_slice(),
-        })
+        snapshot.finish().map_err(anyhow::Error::from)
     }
 
     pub(in crate::runtime) fn prepare_public_shadow(
@@ -607,34 +513,19 @@ impl CommittedRuntimeState {
         fresh_coins: Option<PathOramFreshCoinPlan>,
         recorder: &mut CallRecorder,
         opcode_trace: &mut Vec<String>,
-    ) -> Result<(
-        RuntimeKernelWitness,
-        RuntimeKernelRefinementWitness,
-        bool,
-        Option<Value>,
-    )> {
-        let (
-            committed_shadow,
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            aborted,
-            return_value,
-        ) = kernel.run_confidential_call(
-            program,
-            self,
-            max_hash_part_bytes,
-            raw_args,
-            fresh_coins,
-            recorder,
-            opcode_trace,
-        )?;
+    ) -> Result<(RuntimeKernelFinishBundle, bool, Option<Value>)> {
+        let (committed_shadow, runtime_kernel_finish_bundle, aborted, return_value) = kernel
+            .run_confidential_call(
+                program,
+                self,
+                max_hash_part_bytes,
+                raw_args,
+                fresh_coins,
+                recorder,
+                opcode_trace,
+            )?;
         self.objects = committed_shadow.into_cold_committed_state().objects;
-        Ok((
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            aborted,
-            return_value,
-        ))
+        Ok((runtime_kernel_finish_bundle, aborted, return_value))
     }
 
     pub(in crate::runtime) fn replace_with_cold_public_shadow(
@@ -687,37 +578,6 @@ impl CommittedRuntimeState {
     }
 }
 
-impl ConfidentialEntrypointPlan {
-    fn from_manifest_entry(
-        entrypoint: &str,
-        manifest_entry: &EntrypointManifest,
-        public_object_ids: Vec<u32>,
-    ) -> Result<Self> {
-        let mut allocator = AllocatorPlan::from_manifest(manifest_entry);
-        let manifest_expected_kernel_steps = manifest_entry.stored_kernel_step_witnesses();
-        let program = manifest_entry
-            .confidential_slot_program
-            .clone()
-            .ok_or_else(|| {
-                anyhow!("manifest confidential_slot_program missing for {entrypoint}")
-            })?;
-        let program_expected_kernel_steps = program.expected_runtime_step_witnesses();
-        if manifest_expected_kernel_steps != program_expected_kernel_steps {
-            bail!(
-                "manifest kernel step trace drifted from confidential slot program for {entrypoint}"
-            );
-        }
-        allocator.max_kernel_ops = manifest_expected_kernel_steps.len();
-        Ok(Self {
-            allocator,
-            public_object_ids,
-            max_commit_ops: manifest_entry.max_commit_ops,
-            program,
-            max_hash_part_bytes: manifest_entry.max_hash_part_bytes,
-        })
-    }
-}
-
 impl RuntimeShadowState {
     pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
         self.objects
@@ -736,7 +596,7 @@ impl RuntimeShadowState {
         fresh_coins_by_object: Box<[PathOramFreshCoinEntry]>,
     ) -> Result<()> {
         self.enable_injected_path_oram_leaf_coins();
-        for entry in fresh_coins_by_object.into_vec() {
+        for entry in std::iter::IntoIterator::into_iter(fresh_coins_by_object) {
             let (object_id, coins) = entry.into_parts();
             self.object_mut(object_id)?
                 .install_path_oram_leaf_coins(coins)?;
@@ -757,13 +617,13 @@ impl RuntimeShadowState {
         aborted: bool,
         recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
-    ) -> Result<Vec<u32>> {
-        let mut shadow = std::mem::take(&mut self.objects)
-            .into_entries_vec()
-            .into_iter()
-            .peekable();
-        let mut next_objects = Vec::with_capacity(committed.objects.len());
-        let mut committed_object_ids = Vec::with_capacity(committed.objects.len());
+    ) -> Result<Box<[u32]>> {
+        let shadow_len = self.objects.len();
+        let mut shadow =
+            std::iter::IntoIterator::into_iter(std::mem::take(&mut self.objects).into_entries())
+                .peekable();
+        let mut next_objects = FixedBoxBuilder::new(committed.objects.len());
+        let mut committed_object_ids = FixedBoxBuilder::new(shadow_len);
         for (id, old) in committed.objects.iter() {
             match shadow.peek().map(|entry| entry.object_id.cmp(&id)) {
                 Some(Ordering::Less) => {
@@ -800,8 +660,8 @@ impl RuntimeShadowState {
                 unexpected.object_id
             ));
         }
-        self.objects = RuntimeObjectTable::new(next_objects);
-        Ok(committed_object_ids)
+        self.objects = RuntimeObjectTable::new(next_objects.finish());
+        Ok(committed_object_ids.finish())
     }
 
     pub(in crate::runtime) fn into_cold_committed_state(self) -> CommittedRuntimeState {
@@ -843,7 +703,7 @@ impl ConfidentialRuntimeShadowState {
         aborted: bool,
         recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
-    ) -> Result<Vec<u32>> {
+    ) -> Result<Box<[u32]>> {
         self.shadow
             .commit_against(committed, aborted, recorder, allocator)
     }
@@ -873,7 +733,7 @@ impl PublicRuntimeShadowState {
         aborted: bool,
         recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
-    ) -> Result<Vec<u32>> {
+    ) -> Result<Box<[u32]>> {
         self.shadow
             .commit_against(committed, aborted, recorder, allocator)
     }

@@ -29,7 +29,7 @@ pub struct CallTelemetry {
     pub zero_writes: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct CallResult {
     pub return_value: Option<Value>,
     pub aborted: bool,
@@ -37,7 +37,7 @@ pub struct CallResult {
 }
 
 #[cfg(feature = "diagnostics")]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct DiagnosticCallResult {
     pub call: CallResult,
     pub telemetry: CallTelemetry,
@@ -106,6 +106,7 @@ impl ContractInstance {
                 args.len()
             );
         }
+        let args = args.into_boxed_slice();
         let (return_value, aborted, trace, zero_writes) = run_contract_call(
             &mut self.state,
             &self.artifact,

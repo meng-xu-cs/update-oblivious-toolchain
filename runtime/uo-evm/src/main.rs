@@ -4,6 +4,7 @@ use clap::{Parser, ValueEnum};
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
     Trace,
+    KernelFinish,
     KernelWitness,
     KernelDsl,
     KernelSlotDsl,
@@ -14,11 +15,13 @@ enum OutputFormat {
     ShellBoundarySlot,
     ShellBoundaryLowering,
     TrustedKernel,
+    ConfidentialProofFamily,
     PaperMainFamily,
     PaperMainSlotFamily,
     RefinementWitness,
     ConfidentialCore,
     ConfidentialCoreSlot,
+    ConfidentialCoreKernelFinishSlot,
     ConfidentialCoreKernelInterfaceSlot,
     ConfidentialCoreShellBoundarySlot,
     ConfidentialCoreLowering,
@@ -49,43 +52,34 @@ fn main() -> Result<()> {
         OutputFormat::Trace => {
             println!("{}", serde_json::to_string_pretty(&trace)?);
         }
+        OutputFormat::KernelFinish => {
+            let bundle = trace.exact_runtime_kernel_finish_bundle()?;
+            println!("{}", bundle.to_json_pretty());
+        }
         OutputFormat::KernelWitness => {
-            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
-                anyhow::anyhow!("execution trace is missing runtime kernel witness")
-            })?;
+            let witness = trace.exact_runtime_kernel_witness()?;
             println!("{}", witness.to_json_pretty());
         }
         OutputFormat::KernelDsl => {
-            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
-                anyhow::anyhow!("execution trace is missing runtime kernel witness")
-            })?;
+            let witness = trace.exact_runtime_kernel_witness()?;
             let bundle =
                 artifact.runtime_kernel_dsl_bundle_for_entrypoint(witness, &cli.entrypoint)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::KernelSlotDsl => {
-            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
-                anyhow::anyhow!("execution trace is missing runtime kernel witness")
-            })?;
+            let witness = trace.exact_runtime_kernel_witness()?;
             let bundle =
                 artifact.runtime_kernel_slot_dsl_bundle_for_entrypoint(witness, &cli.entrypoint)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::KernelLowering => {
-            let witness = trace.runtime_kernel_witness().cloned().ok_or_else(|| {
-                anyhow::anyhow!("execution trace is missing runtime kernel witness")
-            })?;
+            let witness = trace.exact_runtime_kernel_witness()?;
             let bundle =
                 artifact.runtime_kernel_lowering_bundle_for_entrypoint(witness, &cli.entrypoint)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::KernelRefinementWitness => {
-            let witness = trace
-                .runtime_kernel_refinement_witness()
-                .cloned()
-                .ok_or_else(|| {
-                    anyhow::anyhow!("execution trace is missing runtime kernel refinement witness")
-                })?;
+            let witness = trace.exact_runtime_kernel_refinement_witness()?;
             println!("{}", witness.to_json_pretty());
         }
         OutputFormat::KernelInterface => {
@@ -110,6 +104,10 @@ fn main() -> Result<()> {
             let bundle = trace.runtime_trusted_kernel_slot_bundle(&artifact)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
+        OutputFormat::ConfidentialProofFamily => {
+            let bundle = trace.runtime_confidential_proof_bundle_family(&artifact)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
         OutputFormat::PaperMainFamily => {
             let bundle = trace.runtime_paper_main_family_bundle()?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
@@ -128,6 +126,10 @@ fn main() -> Result<()> {
         }
         OutputFormat::ConfidentialCoreSlot => {
             let bundle = trace.runtime_confidential_core_slot_bundle(&artifact)?;
+            println!("{}", serde_json::to_string_pretty(&bundle)?);
+        }
+        OutputFormat::ConfidentialCoreKernelFinishSlot => {
+            let bundle = trace.runtime_confidential_core_kernel_finish_slot_bundle(&artifact)?;
             println!("{}", serde_json::to_string_pretty(&bundle)?);
         }
         OutputFormat::ConfidentialCoreKernelInterfaceSlot => {

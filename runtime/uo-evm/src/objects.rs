@@ -433,16 +433,14 @@ impl RuntimeObject {
                     .capacity
                     .ok_or_else(|| anyhow!("array {} is missing capacity", spec.name))?;
                 let zero_value = Value::zero_for_type(&spec.value_type);
-                let zero_payload = zero_value.canonical_bytes();
+                let zero_payload = zero_value.canonical_bytes_boxed();
                 let values = vec![zero_value; capacity].into_boxed_slice();
                 let cipher = StoreCipher::from_rng(&mut rng);
                 let physical_slots = (0..capacity)
                     .map(|index| {
                         let aad = array_slot_aad(&spec.name, index);
                         let mut payload = zero_payload.clone();
-                        cipher
-                            .seal_and_wipe(aad.as_bytes(), &mut payload, &mut rng)
-                            .into_boxed_slice()
+                        cipher.seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
                     })
                     .collect::<Vec<_>>()
                     .into_boxed_slice();
@@ -481,9 +479,7 @@ impl RuntimeObject {
                     .map(|index| {
                         let aad = small_map_slot_aad(&spec.name, index);
                         let mut payload = zero_record.clone();
-                        cipher
-                            .seal_and_wipe(aad.as_bytes(), &mut payload, &mut rng)
-                            .into_boxed_slice()
+                        cipher.seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
                     })
                     .collect::<Vec<_>>()
                     .into_boxed_slice();
@@ -609,6 +605,13 @@ impl RuntimeObject {
             }
             _ => Ok(None),
         }
+    }
+
+    pub(in crate::runtime) fn exposes_path_oram_witnesses(&self) -> bool {
+        matches!(
+            self,
+            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME
+        )
     }
 
     pub(in crate::runtime) fn path_oram_access_counter_witness(
@@ -995,7 +998,7 @@ impl RuntimeObject {
                         ScratchRegion::IoScratch,
                         next.spec.value_type.canonical_len(),
                     )?;
-                    let mut payload = committed_value.canonical_bytes();
+                    let mut payload = committed_value.canonical_bytes_boxed();
                     if !next.cipher.seal_and_wipe_into_slice(
                         aad.as_bytes(),
                         &mut payload,
@@ -1053,7 +1056,7 @@ impl RuntimeObject {
                             ScratchRegion::IoScratch,
                             next.spec.value_type.canonical_len(),
                         )?;
-                        let mut payload = value.canonical_bytes();
+                        let mut payload = value.canonical_bytes_boxed();
                         if !next.cipher.seal_and_wipe_into_slice(
                             aad.as_bytes(),
                             &mut payload,
@@ -1245,20 +1248,18 @@ fn raw_encode(value: &Value) -> Box<[u8]> {
     if value.is_zero_like() {
         vec![0u8; 32].into_boxed_slice()
     } else {
-        let bytes = value.canonical_bytes();
+        let bytes = value.canonical_bytes_boxed();
         if bytes.iter().all(|byte| *byte == 0) {
             vec![1u8; 32].into_boxed_slice()
         } else {
-            bytes.into_boxed_slice()
+            bytes
         }
     }
 }
 
 fn seal_value(cipher: &StoreCipher, aad: &[u8], value: &Value, rng: &mut ChaCha20Rng) -> Box<[u8]> {
-    let mut payload = value.canonical_bytes();
-    cipher
-        .seal_and_wipe(aad, &mut payload, rng)
-        .into_boxed_slice()
+    let mut payload = value.canonical_bytes_boxed();
+    cipher.seal_and_wipe_boxed(aad, &mut payload, rng)
 }
 
 fn decode_sealed_value(
@@ -1339,13 +1340,16 @@ mod tests {
     }
 
     fn nested_nonzero_value() -> Value {
-        Value::Struct(vec![
-            ("flag".into(), Value::Bool(true)),
-            (
-                "items".into(),
-                Value::Array(vec![Value::Uint(7), Value::Uint(9)]),
-            ),
-        ])
+        Value::Struct(
+            vec![
+                ("flag".into(), Value::Bool(true)),
+                (
+                    "items".into(),
+                    Value::Array(vec![Value::Uint(7), Value::Uint(9)].into_boxed_slice()),
+                ),
+            ]
+            .into_boxed_slice(),
+        )
     }
 
     fn cell_spec() -> StateObject {
@@ -1469,18 +1473,27 @@ mod tests {
         match &mut object {
             RuntimeObject::UoArray(array) => {
                 array.values = vec![
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x11; 20])),
-                        ("count".into(), Value::Uint(3)),
-                    ]),
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x22; 20])),
-                        ("count".into(), Value::Uint(5)),
-                    ]),
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x33; 20])),
-                        ("count".into(), Value::Uint(7)),
-                    ]),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x11; 20])),
+                            ("count".into(), Value::Uint(3)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x22; 20])),
+                            ("count".into(), Value::Uint(5)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x33; 20])),
+                            ("count".into(), Value::Uint(7)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
                 ]
                 .into_boxed_slice();
                 array.accessed = true;
@@ -1519,25 +1532,36 @@ mod tests {
             RuntimeObject::UoSmallMap(map) => {
                 map.entries[0] = MapEntry::new(
                     true,
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x44; 20])),
-                        ("nonce".into(), Value::Uint(1)),
-                    ]),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x44; 20])),
+                            ("nonce".into(), Value::Uint(1)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
                     nested_nonzero_value(),
                 );
                 map.entries[1] = MapEntry::new(
                     true,
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x55; 20])),
-                        ("nonce".into(), Value::Uint(2)),
-                    ]),
-                    Value::Struct(vec![
-                        ("flag".into(), Value::Bool(true)),
-                        (
-                            "items".into(),
-                            Value::Array(vec![Value::Uint(11), Value::Uint(13)]),
-                        ),
-                    ]),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x55; 20])),
+                            ("nonce".into(), Value::Uint(2)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                    Value::Struct(
+                        vec![
+                            ("flag".into(), Value::Bool(true)),
+                            (
+                                "items".into(),
+                                Value::Array(
+                                    vec![Value::Uint(11), Value::Uint(13)].into_boxed_slice(),
+                                ),
+                            ),
+                        ]
+                        .into_boxed_slice(),
+                    ),
                 );
                 map.accessed = true;
                 map.dirty = true;
@@ -1584,13 +1608,16 @@ mod tests {
         shadow_allocator.finish().unwrap();
         match &mut new {
             RuntimeObject::UoCell(cell) => {
-                cell.value = Value::Struct(vec![
-                    ("flag".into(), Value::Bool(true)),
-                    (
-                        "items".into(),
-                        Value::Array(vec![Value::Uint(21), Value::Uint(34)]),
-                    ),
-                ]);
+                cell.value = Value::Struct(
+                    vec![
+                        ("flag".into(), Value::Bool(true)),
+                        (
+                            "items".into(),
+                            Value::Array(vec![Value::Uint(21), Value::Uint(34)].into_boxed_slice()),
+                        ),
+                    ]
+                    .into_boxed_slice(),
+                );
                 cell.accessed = true;
                 cell.written = true;
             }
@@ -1691,18 +1718,27 @@ mod tests {
         match &mut old {
             RuntimeObject::UoArray(array) => {
                 array.values = vec![
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x91; 20])),
-                        ("count".into(), Value::Uint(8)),
-                    ]),
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x92; 20])),
-                        ("count".into(), Value::Uint(9)),
-                    ]),
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x93; 20])),
-                        ("count".into(), Value::Uint(10)),
-                    ]),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x91; 20])),
+                            ("count".into(), Value::Uint(8)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x92; 20])),
+                            ("count".into(), Value::Uint(9)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x93; 20])),
+                            ("count".into(), Value::Uint(10)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
                 ]
                 .into_boxed_slice();
             }
@@ -1748,10 +1784,13 @@ mod tests {
             RuntimeObject::UoArray(array) => array.physical_slots[1].as_ptr(),
             _ => unreachable!(),
         };
-        let committed_value = Value::Struct(vec![
-            ("owner".into(), Value::Address([0xA1; 20])),
-            ("count".into(), Value::Uint(17)),
-        ]);
+        let committed_value = Value::Struct(
+            vec![
+                ("owner".into(), Value::Address([0xA1; 20])),
+                ("count".into(), Value::Uint(17)),
+            ]
+            .into_boxed_slice(),
+        );
         match &mut new {
             RuntimeObject::UoArray(array) => {
                 array.values[1] = committed_value.clone();
@@ -1789,10 +1828,13 @@ mod tests {
             RuntimeObject::UoSmallMap(map) => {
                 map.entries[0] = MapEntry::new(
                     true,
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x77; 20])),
-                        ("nonce".into(), Value::Uint(4)),
-                    ]),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x77; 20])),
+                            ("nonce".into(), Value::Uint(4)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
                     nested_nonzero_value(),
                 );
             }
@@ -1806,17 +1848,25 @@ mod tests {
             RuntimeObject::UoSmallMap(map) => {
                 map.entries[0] = MapEntry::new(
                     true,
-                    Value::Struct(vec![
-                        ("owner".into(), Value::Address([0x88; 20])),
-                        ("nonce".into(), Value::Uint(5)),
-                    ]),
-                    Value::Struct(vec![
-                        ("flag".into(), Value::Bool(true)),
-                        (
-                            "items".into(),
-                            Value::Array(vec![Value::Uint(15), Value::Uint(16)]),
-                        ),
-                    ]),
+                    Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0x88; 20])),
+                            ("nonce".into(), Value::Uint(5)),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                    Value::Struct(
+                        vec![
+                            ("flag".into(), Value::Bool(true)),
+                            (
+                                "items".into(),
+                                Value::Array(
+                                    vec![Value::Uint(15), Value::Uint(16)].into_boxed_slice(),
+                                ),
+                            ),
+                        ]
+                        .into_boxed_slice(),
+                    ),
                 );
                 map.accessed = true;
                 map.dirty = true;
@@ -1868,10 +1918,13 @@ mod tests {
         };
         let committed_entry = MapEntry::new(
             true,
-            Value::Struct(vec![
-                ("owner".into(), Value::Address([0x99; 20])),
-                ("nonce".into(), Value::Uint(6)),
-            ]),
+            Value::Struct(
+                vec![
+                    ("owner".into(), Value::Address([0x99; 20])),
+                    ("nonce".into(), Value::Uint(6)),
+                ]
+                .into_boxed_slice(),
+            ),
             nested_nonzero_value(),
         );
         match &mut new {

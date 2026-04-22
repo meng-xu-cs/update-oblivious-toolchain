@@ -1,4 +1,5 @@
 import UOToolchain.PathOramLocalPosmapV1StandardTheorem
+import UOToolchain.PaperPathOramTheoremRoute
 import UOToolchain.RuntimeCanonicalPathOramPairJson
 
 namespace UOToolchain
@@ -261,6 +262,90 @@ structure ConcreteRuntimePathOramConfigSlice (modelTags : SGXModelTags) where
     ∀ seed, seed < family.seedCount →
       ((family.witnessAt seed).boundarySchedule) = boundarySchedule
 
+structure ProofGradeConcreteRuntimePathOramConfigSlice (modelTags : SGXModelTags)
+    extends ConcreteRuntimePathOramConfigSlice modelTags where
+  runtimeKernelBoundary :
+    ∀ seed, seed < toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeProofGradeKernelInterfaceBundle
+        ((toConcreteRuntimePathOramConfigSlice.family).witnessAt seed)
+
+theorem ProofGradeConcreteRuntimePathOramConfigSlice.runtimeKernelBoundaryFacts
+  {modelTags : SGXModelTags}
+  (slice : ProofGradeConcreteRuntimePathOramConfigSlice modelTags) :
+  ∀ seed, seed < slice.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+  RuntimeProofGradeKernelBoundaryFacts
+      ((slice.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed) := by
+  intro seed hSeed
+  exact runtimeProofGradeKernelInterfaceBundle_toKernelBoundaryFacts
+    (slice.runtimeKernelBoundary seed hSeed)
+
+theorem ProofGradeConcreteRuntimePathOramConfigSlice.runtimeKernelInterface
+  {modelTags : SGXModelTags}
+  (slice : ProofGradeConcreteRuntimePathOramConfigSlice modelTags) :
+  ∀ seed, seed < slice.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeProofGradeKernelInterface
+      ((slice.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed) := by
+  intro seed hSeed
+  exact runtimeProofGradeKernelInterfaceBundle_toProofGradeKernelInterface
+    (slice.runtimeKernelBoundary seed hSeed)
+
+noncomputable def ProofGradeConcreteRuntimePathOramConfigSlice.runtimeKernelConfinementBoundary
+  {modelTags : SGXModelTags}
+  (slice : ProofGradeConcreteRuntimePathOramConfigSlice modelTags) :
+  ∀ seed, seed < slice.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeKernelConfinementBoundary := by
+  intro seed hSeed
+  exact RuntimeProofGradeKernelInterfaceBundle.confinementBoundary
+    (slice.runtimeKernelBoundary seed hSeed)
+
+theorem ProofGradeConcreteRuntimePathOramConfigSlice.paperMainRuntimeKernelBoundaryAt
+  {modelTags : SGXModelTags}
+  (slice : ProofGradeConcreteRuntimePathOramConfigSlice modelTags) :
+  PaperMainRuntimeKernelBoundaryAt
+    slice.toConcreteRuntimePathOramConfigSlice.family := by
+  intro seed hSeed
+  exact slice.runtimeKernelBoundary seed hSeed
+
+structure ProofGradeConcreteRuntimePathOramConfigSlotSlice (modelTags : SGXModelTags)
+    extends ProofGradeConcreteRuntimePathOramConfigSlice modelTags where
+  confidentialSlotProgram : ConfidentialKernelSlotProgram
+  runtimeKernelSlotAssurance :
+    ∀ seed, seed < toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeConfidentialCoreKernelInterfaceSlotAssurance
+        ((toConcreteRuntimePathOramConfigSlice.family).witnessAt seed)
+        confidentialSlotProgram
+        modelTags
+
+theorem ProofGradeConcreteRuntimePathOramConfigSlotSlice.paperMainRuntimeKernelSlotBoundaryAt
+  {modelTags : SGXModelTags}
+  (slice : ProofGradeConcreteRuntimePathOramConfigSlotSlice modelTags) :
+  PaperMainRuntimeKernelSlotBoundaryAt
+    slice.toConcreteRuntimePathOramConfigSlice.family
+    slice.confidentialSlotProgram := by
+  intro seed hSeed
+  rcases slice.runtimeKernelSlotAssurance seed hSeed with
+    ⟨_hRuntimeProofGrade, _hRuntimeNormalForm, kernelInterfaceBundle,
+      hBundle, hBundleValid, hExpectedSteps, hKernelSteps⟩
+  exact ⟨kernelInterfaceBundle, hBundle, hBundleValid, hExpectedSteps, hKernelSteps⟩
+
+noncomputable def ProofGradeConcreteRuntimePathOramConfigSlotSlice.runtimeKernelConfinementBoundary
+  {modelTags : SGXModelTags}
+  (slice : ProofGradeConcreteRuntimePathOramConfigSlotSlice modelTags) :
+  ∀ seed, seed < slice.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeKernelConfinementBoundary := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelConfinementBoundary
+      slice.paperMainRuntimeKernelSlotBoundaryAt
+
+noncomputable def ProofGradeConcreteRuntimePathOramConfigSlotSlice.runtimeKernelInterfaceSlotBoundary
+  {modelTags : SGXModelTags}
+  (slice : ProofGradeConcreteRuntimePathOramConfigSlotSlice modelTags) :
+  ∀ seed, seed < slice.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeKernelInterfaceSlotBoundary := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelInterfaceSlotBoundary
+      slice.paperMainRuntimeKernelSlotBoundaryAt
+
 def ConcreteRuntimePathOramConfigSlice.run
   {modelTags : SGXModelTags}
   (slice : ConcreteRuntimePathOramConfigSlice modelTags) : Distribution ViewMPlus :=
@@ -451,6 +536,241 @@ structure ConcreteRuntimePathOramPairSlice (modelTags : SGXModelTags) where
   samePublicOutcome : lhs.publicOutcome = rhs.publicOutcome
   sameBoundarySchedule : lhs.boundarySchedule = rhs.boundarySchedule
 
+structure ProofGradeConcreteRuntimePathOramPairSlice (modelTags : SGXModelTags) where
+  lhs : ProofGradeConcreteRuntimePathOramConfigSlice modelTags
+  rhs : ProofGradeConcreteRuntimePathOramConfigSlice modelTags
+  sameCfg :
+    lhs.toConcreteRuntimePathOramConfigSlice.cfg =
+      rhs.toConcreteRuntimePathOramConfigSlice.cfg
+  samePublicView :
+    lhs.toConcreteRuntimePathOramConfigSlice.publicView =
+      rhs.toConcreteRuntimePathOramConfigSlice.publicView
+  samePublicLocation :
+    lhs.toConcreteRuntimePathOramConfigSlice.publicLocation =
+      rhs.toConcreteRuntimePathOramConfigSlice.publicLocation
+  sameStorageShape :
+    lhs.toConcreteRuntimePathOramConfigSlice.storageShape =
+      rhs.toConcreteRuntimePathOramConfigSlice.storageShape
+  samePublicOutcome :
+    lhs.toConcreteRuntimePathOramConfigSlice.publicOutcome =
+      rhs.toConcreteRuntimePathOramConfigSlice.publicOutcome
+  sameBoundarySchedule :
+    lhs.toConcreteRuntimePathOramConfigSlice.boundarySchedule =
+      rhs.toConcreteRuntimePathOramConfigSlice.boundarySchedule
+
+structure ProofGradeConcreteRuntimePathOramPairSlotSlice (modelTags : SGXModelTags) where
+  lhs : ProofGradeConcreteRuntimePathOramConfigSlotSlice modelTags
+  rhs : ProofGradeConcreteRuntimePathOramConfigSlotSlice modelTags
+  sameCfg :
+    lhs.toConcreteRuntimePathOramConfigSlice.cfg =
+      rhs.toConcreteRuntimePathOramConfigSlice.cfg
+  samePublicView :
+    lhs.toConcreteRuntimePathOramConfigSlice.publicView =
+      rhs.toConcreteRuntimePathOramConfigSlice.publicView
+  samePublicLocation :
+    lhs.toConcreteRuntimePathOramConfigSlice.publicLocation =
+      rhs.toConcreteRuntimePathOramConfigSlice.publicLocation
+  sameStorageShape :
+    lhs.toConcreteRuntimePathOramConfigSlice.storageShape =
+      rhs.toConcreteRuntimePathOramConfigSlice.storageShape
+  samePublicOutcome :
+    lhs.toConcreteRuntimePathOramConfigSlice.publicOutcome =
+      rhs.toConcreteRuntimePathOramConfigSlice.publicOutcome
+  sameBoundarySchedule :
+    lhs.toConcreteRuntimePathOramConfigSlice.boundarySchedule =
+      rhs.toConcreteRuntimePathOramConfigSlice.boundarySchedule
+  sameConfidentialSlotProgram :
+    lhs.confidentialSlotProgram = rhs.confidentialSlotProgram
+
+def ProofGradeConcreteRuntimePathOramPairSlotSlice.toProofGradePairSlice
+  {modelTags : SGXModelTags}
+  (pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags) :
+  ProofGradeConcreteRuntimePathOramPairSlice modelTags :=
+  { lhs := pair.lhs.toProofGradeConcreteRuntimePathOramConfigSlice
+  , rhs := pair.rhs.toProofGradeConcreteRuntimePathOramConfigSlice
+  , sameCfg := pair.sameCfg
+  , samePublicView := pair.samePublicView
+  , samePublicLocation := pair.samePublicLocation
+  , sameStorageShape := pair.sameStorageShape
+  , samePublicOutcome := pair.samePublicOutcome
+  , sameBoundarySchedule := pair.sameBoundarySchedule
+  }
+
+def ProofGradeConcreteRuntimePathOramPairSlice.toConcretePairSlice
+  {modelTags : SGXModelTags}
+  (pair : ProofGradeConcreteRuntimePathOramPairSlice modelTags) :
+  ConcreteRuntimePathOramPairSlice modelTags :=
+  { lhs := pair.lhs.toConcreteRuntimePathOramConfigSlice
+  , rhs := pair.rhs.toConcreteRuntimePathOramConfigSlice
+  , sameCfg := pair.sameCfg
+  , samePublicView := pair.samePublicView
+  , samePublicLocation := pair.samePublicLocation
+  , sameStorageShape := pair.sameStorageShape
+  , samePublicOutcome := pair.samePublicOutcome
+  , sameBoundarySchedule := pair.sameBoundarySchedule
+  }
+
+structure ConcreteRuntimePathOramProofGradePairBoundary
+    (modelTags : SGXModelTags)
+    (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+    (pair : ProofGradeConcreteRuntimePathOramPairSlice modelTags) where
+  paperBoundary :
+    ConcreteRuntimePathOramPaperPairBoundary
+      (modelTags := modelTags)
+      assumptions
+      pair.lhs.toConcreteRuntimePathOramConfigSlice.cfg
+      pair.lhs.toConcreteRuntimePathOramConfigSlice.publicOutcome
+      pair.lhs.toConcreteRuntimePathOramConfigSlice.boundarySchedule
+      pair.lhs.toConcreteRuntimePathOramConfigSlice.run
+      pair.rhs.toConcreteRuntimePathOramConfigSlice.run
+  lhsRuntimeKernelBoundary :
+    PaperMainRuntimeKernelBoundaryAt
+      pair.lhs.toConcreteRuntimePathOramConfigSlice.family
+  rhsRuntimeKernelBoundary :
+    PaperMainRuntimeKernelBoundaryAt
+      pair.rhs.toConcreteRuntimePathOramConfigSlice.family
+  lhsRuntimeKernelInterface :
+    ∀ seed, seed < pair.lhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeProofGradeKernelInterface
+        ((pair.lhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed)
+  rhsRuntimeKernelInterface :
+    ∀ seed, seed < pair.rhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeProofGradeKernelInterface
+        ((pair.rhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed)
+  lhsRuntimeKernelBoundaryFacts :
+    ∀ seed, seed < pair.lhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeProofGradeKernelBoundaryFacts
+        ((pair.lhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed)
+  rhsRuntimeKernelBoundaryFacts :
+    ∀ seed, seed < pair.rhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeProofGradeKernelBoundaryFacts
+        ((pair.rhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed)
+
+structure ConcreteRuntimePathOramProofGradeSlotPairBoundary
+    (modelTags : SGXModelTags)
+    (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+    (pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags) where
+  proofGradePairBoundary :
+    ConcreteRuntimePathOramProofGradePairBoundary
+      modelTags
+      assumptions
+      pair.toProofGradePairSlice
+  lhsRuntimeKernelSlotBoundary :
+    PaperMainRuntimeKernelSlotBoundaryAt
+      pair.lhs.toConcreteRuntimePathOramConfigSlice.family
+      pair.lhs.confidentialSlotProgram
+  rhsRuntimeKernelSlotBoundary :
+    PaperMainRuntimeKernelSlotBoundaryAt
+      pair.rhs.toConcreteRuntimePathOramConfigSlice.family
+      pair.rhs.confidentialSlotProgram
+  lhsRuntimeKernelConfinementBoundary :
+    ∀ seed, seed < pair.lhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeKernelConfinementBoundary
+  rhsRuntimeKernelConfinementBoundary :
+    ∀ seed, seed < pair.rhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+      RuntimeKernelConfinementBoundary
+
+def ConcreteRuntimePathOramProofGradeSlotPairBoundary.toProofGradePairBoundary
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  ConcreteRuntimePathOramProofGradePairBoundary
+    modelTags
+    assumptions
+    pair.toProofGradePairSlice :=
+  boundary.proofGradePairBoundary
+
+theorem ConcreteRuntimePathOramProofGradeSlotPairBoundary.lhsRuntimeKernelBoundary
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  PaperMainRuntimeKernelBoundaryAt pair.lhs.toConcreteRuntimePathOramConfigSlice.family := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.toRuntimeKernelBoundaryAt
+      boundary.lhsRuntimeKernelSlotBoundary
+
+theorem ConcreteRuntimePathOramProofGradeSlotPairBoundary.rhsRuntimeKernelBoundary
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  PaperMainRuntimeKernelBoundaryAt pair.rhs.toConcreteRuntimePathOramConfigSlice.family := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.toRuntimeKernelBoundaryAt
+      boundary.rhsRuntimeKernelSlotBoundary
+
+theorem ConcreteRuntimePathOramProofGradeSlotPairBoundary.lhsRuntimeKernelInterface
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  ∀ seed, seed < pair.lhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeProofGradeKernelInterface
+      ((pair.lhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed) := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelInterface
+      boundary.lhsRuntimeKernelSlotBoundary
+
+theorem ConcreteRuntimePathOramProofGradeSlotPairBoundary.rhsRuntimeKernelInterface
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  ∀ seed, seed < pair.rhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeProofGradeKernelInterface
+      ((pair.rhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed) := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelInterface
+      boundary.rhsRuntimeKernelSlotBoundary
+
+noncomputable def ConcreteRuntimePathOramProofGradeSlotPairBoundary.lhsRuntimeKernelInterfaceSlotBoundary
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  ∀ seed, seed < pair.lhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeKernelInterfaceSlotBoundary := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelInterfaceSlotBoundary
+      boundary.lhsRuntimeKernelSlotBoundary
+
+noncomputable def ConcreteRuntimePathOramProofGradeSlotPairBoundary.rhsRuntimeKernelInterfaceSlotBoundary
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  ∀ seed, seed < pair.rhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeKernelInterfaceSlotBoundary := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelInterfaceSlotBoundary
+      boundary.rhsRuntimeKernelSlotBoundary
+
+theorem ConcreteRuntimePathOramProofGradeSlotPairBoundary.lhsRuntimeKernelBoundaryFacts
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  ∀ seed, seed < pair.lhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeProofGradeKernelBoundaryFacts
+      ((pair.lhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed) := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelBoundaryFacts
+      boundary.lhsRuntimeKernelSlotBoundary
+
+theorem ConcreteRuntimePathOramProofGradeSlotPairBoundary.rhsRuntimeKernelBoundaryFacts
+  {modelTags : SGXModelTags}
+  {assumptions : PathOramLocalPosmapV1SecurityAssumptions}
+  {pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags}
+  (boundary : ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair) :
+  ∀ seed, seed < pair.rhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+    RuntimeProofGradeKernelBoundaryFacts
+      ((pair.rhs.toConcreteRuntimePathOramConfigSlice.family).witnessAt seed) := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelBoundaryFacts
+      boundary.rhsRuntimeKernelSlotBoundary
+
 theorem ConcreteRuntimePathOramPairSlice.localPathOramViewRelation
   {modelTags : SGXModelTags}
   (pair : ConcreteRuntimePathOramPairSlice modelTags)
@@ -601,6 +921,34 @@ theorem ConcreteRuntimePathOramPairSlice.paperPairBoundary
         (sameOramPublicProjection_refl pair.lhs.cfg)
         (pair.localPathOramViewRelation assumptions)
 
+theorem ProofGradeConcreteRuntimePathOramPairSlice.proofGradePairBoundary
+  {modelTags : SGXModelTags}
+  (pair : ProofGradeConcreteRuntimePathOramPairSlice modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+  ConcreteRuntimePathOramProofGradePairBoundary modelTags assumptions pair := by
+  refine
+    ⟨ pair.toConcretePairSlice.paperPairBoundary assumptions
+    , pair.lhs.paperMainRuntimeKernelBoundaryAt
+    , pair.rhs.paperMainRuntimeKernelBoundaryAt
+    , pair.lhs.runtimeKernelInterface
+    , pair.rhs.runtimeKernelInterface
+    , pair.lhs.runtimeKernelBoundaryFacts
+    , pair.rhs.runtimeKernelBoundaryFacts
+    ⟩
+
+noncomputable def ProofGradeConcreteRuntimePathOramPairSlotSlice.proofGradeSlotPairBoundary
+  {modelTags : SGXModelTags}
+  (pair : ProofGradeConcreteRuntimePathOramPairSlotSlice modelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+  ConcreteRuntimePathOramProofGradeSlotPairBoundary modelTags assumptions pair := by
+  refine
+    ⟨ pair.toProofGradePairSlice.proofGradePairBoundary assumptions
+    , pair.lhs.paperMainRuntimeKernelSlotBoundaryAt
+    , pair.rhs.paperMainRuntimeKernelSlotBoundaryAt
+    , pair.lhs.runtimeKernelConfinementBoundary
+    , pair.rhs.runtimeKernelConfinementBoundary
+    ⟩
+
 noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toLhsConcreteSlice
   (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
   (modelTags : SGXModelTags)
@@ -720,6 +1068,96 @@ noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toLhs
       rcases hSelected hiddenSeed hSeed with
         ⟨witness, hRuntime, _hCfgMatch, _hView, _hLocation, _hShape, _hOutcome, hBoundary⟩
       simpa [hRuntime] using hBoundary
+  }
+
+noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toProofGradeLhsConcreteSlice
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags)
+  (hValid : certificate.ProofGradeValid modelTags)
+  (hCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.lhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.lhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.lhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.lhs_family.projectedPublicLeafScaffold
+                hiddenSeed) :
+  ProofGradeConcreteRuntimePathOramConfigSlice modelTags :=
+  let hBaseValid :
+      certificate.Valid modelTags :=
+    importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeValid_implies_valid hValid
+  let base := certificate.toLhsConcreteSlice modelTags hBaseValid hCoverage
+  let hFamValid : certificate.lhs_family.Valid modelTags := hBaseValid.2.1.1
+  let runtimeFamily :=
+    certificate.lhs_family.toCanonicalFreshCoinRuntimePathOramWitnessFamily modelTags hFamValid
+  let hRuntimeCover :=
+    certificate.lhs_family.toCanonicalFreshCoinRuntimePathOramWitnessFamily_hiddenLeafCoverage
+      modelTags
+      hFamValid
+      hCoverage
+  let family := runtimeFamily.toHiddenLeafSeededRuntimePathOramWitnessFamily hRuntimeCover
+  let hSelected :
+      ∀ hiddenSeed, hiddenSeed < family.seedCount →
+        ∃ witness : ImportedRuntimeRefinementWitness,
+          family.witnessAt hiddenSeed =
+            { ImportedRuntimeRefinementWitness.toRuntimeWitness witness with runtimeSeed := some hiddenSeed } ∧
+          witness.ProofGradeValid modelTags := by
+    intro hiddenSeed hSeed
+    let freshSeed :=
+      runtimeFamily.hiddenLeafRepresentativeSeed hRuntimeCover hiddenSeed
+    have hFresh : freshSeed < certificate.lhs_family.seed_count := by
+      simpa [runtimeFamily, freshSeed] using
+        runtimeFamily.hiddenLeafRepresentativeSeed_lt hRuntimeCover hSeed
+    rcases hValid.2.1.1.2.2 freshSeed hFresh with
+      ⟨witness, hGet, hWitnessValid, _hLeafScaffold, _hFreshScaffold, _hFreshValues⟩
+    have hRuntime0 :
+        runtimeFamily.witnessAt freshSeed = ImportedRuntimeRefinementWitness.toRuntimeWitness witness := by
+      simp
+        [ runtimeFamily
+        , ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.toCanonicalFreshCoinRuntimePathOramWitnessFamily
+        , ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.runtimeWitnessAt
+        , hGet
+        ]
+    have hChosen :
+        runtimeFamily.witnessAt
+            (runtimeFamily.hiddenLeafRepresentativeSeed hRuntimeCover hiddenSeed) =
+          ImportedRuntimeRefinementWitness.toRuntimeWitness witness := by
+      simpa [freshSeed] using hRuntime0
+    have hRuntime :
+        family.witnessAt hiddenSeed =
+          { ImportedRuntimeRefinementWitness.toRuntimeWitness witness with runtimeSeed := some hiddenSeed } := by
+      simp
+        [ family
+        , CanonicalFreshCoinRuntimePathOramWitnessFamily.toHiddenLeafSeededRuntimePathOramWitnessFamily
+        , hChosen
+        ]
+    exact ⟨witness, hRuntime, hWitnessValid⟩
+  { toConcreteRuntimePathOramConfigSlice := base
+  , runtimeKernelBoundary := by
+      intro hiddenSeed hSeed
+      rcases hSelected hiddenSeed hSeed with ⟨witness, hRuntime, hWitnessValid⟩
+      have hOriginal :
+          RuntimeProofGradeKernelInterfaceBundle
+            (ImportedRuntimeRefinementWitness.toRuntimeWitness witness) := by
+        exact runtimeWitness_proofGradeKernelInterfaceBundle
+          (ImportedRuntimeRefinementWitness.toRuntimeWitness witness)
+          modelTags
+          (importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
+            witness
+            modelTags
+            hWitnessValid)
+      have hRetagged :
+          RuntimeProofGradeKernelInterfaceBundle
+            { ImportedRuntimeRefinementWitness.toRuntimeWitness witness with
+              runtimeSeed := some hiddenSeed } := by
+        simpa using
+          (runtimeProofGradeKernelInterfaceBundle_runtimeSeed_iff
+            (ImportedRuntimeRefinementWitness.toRuntimeWitness witness)
+            (some hiddenSeed)).2 hOriginal
+      change RuntimeProofGradeKernelInterfaceBundle (family.witnessAt hiddenSeed)
+      simpa [hRuntime] using hRetagged
   }
 
 noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toRhsConcreteSlice
@@ -843,6 +1281,96 @@ noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toRhs
       simpa [hRuntime] using hBoundary
   }
 
+noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toProofGradeRhsConcreteSlice
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags)
+  (hValid : certificate.ProofGradeValid modelTags)
+  (hCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.rhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.rhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.rhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.rhs_family.projectedPublicLeafScaffold
+                hiddenSeed) :
+  ProofGradeConcreteRuntimePathOramConfigSlice modelTags :=
+  let hBaseValid :
+      certificate.Valid modelTags :=
+    importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeValid_implies_valid hValid
+  let base := certificate.toRhsConcreteSlice modelTags hBaseValid hCoverage
+  let hFamValid : certificate.rhs_family.Valid modelTags := hBaseValid.2.2.1
+  let runtimeFamily :=
+    certificate.rhs_family.toCanonicalFreshCoinRuntimePathOramWitnessFamily modelTags hFamValid
+  let hRuntimeCover :=
+    certificate.rhs_family.toCanonicalFreshCoinRuntimePathOramWitnessFamily_hiddenLeafCoverage
+      modelTags
+      hFamValid
+      hCoverage
+  let family := runtimeFamily.toHiddenLeafSeededRuntimePathOramWitnessFamily hRuntimeCover
+  let hSelected :
+      ∀ hiddenSeed, hiddenSeed < family.seedCount →
+        ∃ witness : ImportedRuntimeRefinementWitness,
+          family.witnessAt hiddenSeed =
+            { ImportedRuntimeRefinementWitness.toRuntimeWitness witness with runtimeSeed := some hiddenSeed } ∧
+          witness.ProofGradeValid modelTags := by
+    intro hiddenSeed hSeed
+    let freshSeed :=
+      runtimeFamily.hiddenLeafRepresentativeSeed hRuntimeCover hiddenSeed
+    have hFresh : freshSeed < certificate.rhs_family.seed_count := by
+      simpa [runtimeFamily, freshSeed] using
+        runtimeFamily.hiddenLeafRepresentativeSeed_lt hRuntimeCover hSeed
+    rcases hValid.2.2.1.2.2 freshSeed hFresh with
+      ⟨witness, hGet, hWitnessValid, _hLeafScaffold, _hFreshScaffold, _hFreshValues⟩
+    have hRuntime0 :
+        runtimeFamily.witnessAt freshSeed = ImportedRuntimeRefinementWitness.toRuntimeWitness witness := by
+      simp
+        [ runtimeFamily
+        , ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.toCanonicalFreshCoinRuntimePathOramWitnessFamily
+        , ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily.runtimeWitnessAt
+        , hGet
+        ]
+    have hChosen :
+        runtimeFamily.witnessAt
+            (runtimeFamily.hiddenLeafRepresentativeSeed hRuntimeCover hiddenSeed) =
+          ImportedRuntimeRefinementWitness.toRuntimeWitness witness := by
+      simpa [freshSeed] using hRuntime0
+    have hRuntime :
+        family.witnessAt hiddenSeed =
+          { ImportedRuntimeRefinementWitness.toRuntimeWitness witness with runtimeSeed := some hiddenSeed } := by
+      simp
+        [ family
+        , CanonicalFreshCoinRuntimePathOramWitnessFamily.toHiddenLeafSeededRuntimePathOramWitnessFamily
+        , hChosen
+        ]
+    exact ⟨witness, hRuntime, hWitnessValid⟩
+  { toConcreteRuntimePathOramConfigSlice := base
+  , runtimeKernelBoundary := by
+      intro hiddenSeed hSeed
+      rcases hSelected hiddenSeed hSeed with ⟨witness, hRuntime, hWitnessValid⟩
+      have hOriginal :
+          RuntimeProofGradeKernelInterfaceBundle
+            (ImportedRuntimeRefinementWitness.toRuntimeWitness witness) := by
+        exact runtimeWitness_proofGradeKernelInterfaceBundle
+          (ImportedRuntimeRefinementWitness.toRuntimeWitness witness)
+          modelTags
+          (importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
+            witness
+            modelTags
+            hWitnessValid)
+      have hRetagged :
+          RuntimeProofGradeKernelInterfaceBundle
+            { ImportedRuntimeRefinementWitness.toRuntimeWitness witness with
+              runtimeSeed := some hiddenSeed } := by
+        simpa using
+          (runtimeProofGradeKernelInterfaceBundle_runtimeSeed_iff
+            (ImportedRuntimeRefinementWitness.toRuntimeWitness witness)
+            (some hiddenSeed)).2 hOriginal
+      change RuntimeProofGradeKernelInterfaceBundle (family.witnessAt hiddenSeed)
+      simpa [hRuntime] using hRetagged
+  }
+
 noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toConcretePairSlice
   (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
   (modelTags : SGXModelTags)
@@ -870,6 +1398,41 @@ noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toCon
   ConcreteRuntimePathOramPairSlice modelTags :=
   { lhs := certificate.toLhsConcreteSlice modelTags hValid hLhsCoverage
   , rhs := certificate.toRhsConcreteSlice modelTags hValid hRhsCoverage
+  , sameCfg := rfl
+  , samePublicView := rfl
+  , samePublicLocation := rfl
+  , sameStorageShape := rfl
+  , samePublicOutcome := rfl
+  , sameBoundarySchedule := rfl
+  }
+
+noncomputable def ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.toProofGradeConcretePairSlice
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags)
+  (hValid : certificate.ProofGradeValid modelTags)
+  (hLhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.lhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.lhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.lhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.lhs_family.projectedPublicLeafScaffold
+                hiddenSeed)
+  (hRhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.rhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.rhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.rhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.rhs_family.projectedPublicLeafScaffold
+                hiddenSeed) :
+  ProofGradeConcreteRuntimePathOramPairSlice modelTags :=
+  { lhs := certificate.toProofGradeLhsConcreteSlice modelTags hValid hLhsCoverage
+  , rhs := certificate.toProofGradeRhsConcreteSlice modelTags hValid hRhsCoverage
   , sameCfg := rfl
   , samePublicView := rfl
   , samePublicLocation := rfl
@@ -913,6 +1476,43 @@ theorem ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.paperPairBounda
     ((certificate.toRhsConcreteSlice modelTags hValid hRhsCoverage).run) := by
   exact
     (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).paperPairBoundary
+      assumptions
+
+theorem ImportedCanonicalFreshCoinRuntimePathOramPairCertificate.proofGradePairBoundary
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags)
+  (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
+  (hValid : certificate.ProofGradeValid modelTags)
+  (hLhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.lhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.lhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.lhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.lhs_family.projectedPublicLeafScaffold
+                hiddenSeed)
+  (hRhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.rhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.rhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.rhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.rhs_family.projectedPublicLeafScaffold
+                hiddenSeed) :
+  ConcreteRuntimePathOramProofGradePairBoundary
+    modelTags
+    assumptions
+    (certificate.toProofGradeConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage) := by
+  exact
+    (certificate.toProofGradeConcretePairSlice
+      modelTags
+      hValid
+      hLhsCoverage
+      hRhsCoverage).proofGradePairBoundary
       assumptions
 
 end UOToolchain

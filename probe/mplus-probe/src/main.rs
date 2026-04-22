@@ -30,7 +30,14 @@ enum ReportKind {
     TamperValidation,
     WitnessValidation,
     KernelInterfaceValidation,
+    KernelInterfaceSingletonBoundaryValidation,
+    KernelInterfaceConfinementBoundaryValidation,
+    KernelFinishBoundaryValidation,
+    KernelRefinementBoundaryValidation,
+    KernelConfinementBoundaryValidation,
     SeededWitnessValidation,
+    PaperMainFamilyBoundaryValidation,
+    PaperMainSlotBoundaryValidation,
     PathoramPairValidation,
     ControllerValidation,
     PathoramHiddenValidation,
@@ -45,8 +52,19 @@ enum ReportKind {
     KernelLoweringValidation,
     ConfidentialCoreValidation,
     ConfidentialCoreSlotValidation,
+    ConfidentialCoreKernelFinishSlotValidation,
     ConfidentialCoreShellBoundarySlotValidation,
     ConfidentialCoreKernelInterfaceSlotValidation,
+    ConfidentialCoreKernelInterfaceSlotFinishBoundaryValidation,
+    KernelSlotBoundaryValidation,
+    ConfidentialProofFamilyValidation,
+    ConfidentialProofFamilyBoundaryValidation,
+    ConfidentialProofFamilyAssuranceValidation,
+    ConfidentialProofFamilyKernelInterfaceValidation,
+    ConfidentialProofFamilySlotAssuranceValidation,
+    ConfidentialProofFamilySlotBoundaryValidation,
+    ConfidentialProofFamilyFinishSlotBoundaryValidation,
+    ConfidentialProofFamilyRefinementBoundaryValidation,
     ConfidentialCoreLoweringValidation,
     ConfidentialCoreShellBoundaryLoweringValidation,
     CanonicalPathoramPairValidation,
@@ -195,12 +213,76 @@ fn main() -> Result<()> {
                 &report,
             )?;
         }
+        Some(ReportKind::KernelInterfaceSingletonBoundaryValidation) => {
+            let report = mplus_probe::run_kernel_interface_singleton_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "kernel_interface_singleton_boundary_validation.json",
+                "kernel_interface_singleton_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::KernelInterfaceConfinementBoundaryValidation) => {
+            let report =
+                mplus_probe::run_kernel_interface_confinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "kernel_interface_confinement_boundary_validation.json",
+                "kernel_interface_confinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::KernelFinishBoundaryValidation) => {
+            let report = mplus_probe::run_kernel_finish_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "kernel_finish_boundary_validation.json",
+                "kernel_finish_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::KernelRefinementBoundaryValidation) => {
+            let report = mplus_probe::run_kernel_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "kernel_refinement_boundary_validation.json",
+                "kernel_refinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::KernelConfinementBoundaryValidation) => {
+            let report = mplus_probe::run_kernel_confinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "kernel_confinement_boundary_validation.json",
+                "kernel_confinement_boundary_validation",
+                &report,
+            )?;
+        }
         Some(ReportKind::SeededWitnessValidation) => {
             let report = mplus_probe::run_seeded_witness_validation_report()?;
             write_single_report(
                 &cli.out_dir,
                 "seeded_witness_validation.json",
                 "seeded_witness_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::PaperMainFamilyBoundaryValidation) => {
+            let report = mplus_probe::run_paper_main_family_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "paper_main_family_boundary_validation.json",
+                "paper_main_family_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::PaperMainSlotBoundaryValidation) => {
+            let report = mplus_probe::run_paper_main_slot_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "paper_main_slot_boundary_validation.json",
+                "paper_main_slot_boundary_validation",
                 &report,
             )?;
         }
@@ -330,6 +412,15 @@ fn main() -> Result<()> {
                 &report,
             )?;
         }
+        Some(ReportKind::ConfidentialCoreKernelFinishSlotValidation) => {
+            let report = mplus_probe::run_confidential_core_kernel_finish_slot_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_core_kernel_finish_slot_validation.json",
+                "confidential_core_kernel_finish_slot_validation",
+                &report,
+            )?;
+        }
         Some(ReportKind::ConfidentialCoreShellBoundarySlotValidation) => {
             let report =
                 mplus_probe::run_confidential_core_shell_boundary_slot_validation_report()?;
@@ -347,6 +438,103 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "confidential_core_kernel_interface_slot_validation.json",
                 "confidential_core_kernel_interface_slot_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialCoreKernelInterfaceSlotFinishBoundaryValidation) => {
+            let report = mplus_probe::
+                run_confidential_core_kernel_interface_slot_finish_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_core_kernel_interface_slot_finish_boundary_validation.json",
+                "confidential_core_kernel_interface_slot_finish_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::KernelSlotBoundaryValidation) => {
+            let report = mplus_probe::run_kernel_slot_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "kernel_slot_boundary_validation.json",
+                "kernel_slot_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilyValidation) => {
+            let report = mplus_probe::run_confidential_proof_family_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_validation.json",
+                "confidential_proof_family_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilyBoundaryValidation) => {
+            let report = mplus_probe::run_confidential_proof_family_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_boundary_validation.json",
+                "confidential_proof_family_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilyAssuranceValidation) => {
+            let report = mplus_probe::run_confidential_proof_family_assurance_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_assurance_validation.json",
+                "confidential_proof_family_assurance_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilyKernelInterfaceValidation) => {
+            let report =
+                mplus_probe::run_confidential_proof_family_kernel_interface_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_kernel_interface_validation.json",
+                "confidential_proof_family_kernel_interface_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilySlotAssuranceValidation) => {
+            let report =
+                mplus_probe::run_confidential_proof_family_slot_assurance_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_slot_assurance_validation.json",
+                "confidential_proof_family_slot_assurance_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilySlotBoundaryValidation) => {
+            let report =
+                mplus_probe::run_confidential_proof_family_slot_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_slot_boundary_validation.json",
+                "confidential_proof_family_slot_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilyFinishSlotBoundaryValidation) => {
+            let report =
+                mplus_probe::run_confidential_proof_family_finish_slot_boundary_validation_report(
+                )?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_finish_slot_boundary_validation.json",
+                "confidential_proof_family_finish_slot_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::ConfidentialProofFamilyRefinementBoundaryValidation) => {
+            let report =
+                mplus_probe::run_confidential_proof_family_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "confidential_proof_family_refinement_boundary_validation.json",
+                "confidential_proof_family_refinement_boundary_validation",
                 &report,
             )?;
         }

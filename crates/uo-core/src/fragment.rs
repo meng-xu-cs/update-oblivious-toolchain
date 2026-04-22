@@ -295,16 +295,17 @@ mod tests {
                     name: "x".into(),
                     ty: Type::Scalar(crate::ScalarType::Uint(256)),
                     value: Expr::StructField {
-                        base: Box::new(Expr::Literal(Value::Struct(vec![(
-                            "flag".into(),
-                            Value::Bool(true),
-                        )]))),
+                        base: Box::new(Expr::Literal(Value::Struct(
+                            vec![("flag".into(), Value::Bool(true))].into_boxed_slice(),
+                        ))),
                         field: "flag".into(),
                     },
                 },
                 Statement::Return {
                     value: Some(Expr::ArrayIndex {
-                        base: Box::new(Expr::Literal(Value::Array(vec![Value::Uint(1)]))),
+                        base: Box::new(Expr::Literal(Value::Array(
+                            vec![Value::Uint(1)].into_boxed_slice(),
+                        ))),
                         index: Box::new(Expr::Literal(Value::Uint(0))),
                     }),
                 },

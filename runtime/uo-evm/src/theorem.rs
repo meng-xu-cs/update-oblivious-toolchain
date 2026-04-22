@@ -1,16 +1,10 @@
-use crate::controller::{output_shape_of, CallRecorder, PublicCallSummary};
+use crate::controller::{finalize_public_call_trace, CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
-use crate::runtime::kernel::ConfidentialCallInputs;
-use crate::runtime::shell::run_public_entrypoint;
-use crate::runtime::state::{
-    ContractRuntime, TracedRuntimeCallOutcome, TracedRuntimeCallStart,
-    TracedRuntimeCallWitnessState,
-};
+use crate::runtime::state::ContractRuntime;
 use anyhow::{anyhow, Result};
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
-    CompiledArtifact, ExecutionTrace, OutputShape, RuntimeExecutionTraceParts,
-    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramObjectWitness, Value,
+    CompiledArtifact, ExecutionTrace, TracedRuntimeCallOutcome, TracedRuntimeCallStart, Value,
 };
 
 struct CallTraceContext {
@@ -40,23 +34,9 @@ impl CallTraceContext {
     }
 }
 
-struct FinalizeExecutionTraceInput<'a> {
-    artifact: &'a CompiledArtifact,
-    entrypoint: &'a str,
-    confidential: bool,
-    deploy_seed: u64,
-    opcode_trace: Vec<String>,
-    gas_used: u64,
-    trace_bundle: crate::controller::CallTraceBundle,
-    runtime_kernel_witness: RuntimeKernelWitness,
-    runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
-    runtime_witness_state: TracedRuntimeCallWitnessState,
-}
-
 struct FinalizeCallTraceInput<'a> {
     context: CallTraceContext,
     artifact: &'a CompiledArtifact,
-    entrypoint: &'a str,
     confidential: bool,
     deploy_seed: u64,
     manifest_entry: &'a EntrypointManifest,
@@ -70,7 +50,7 @@ pub(in crate::runtime) fn run_traced_call(
     entrypoint: &str,
     confidential: bool,
     deploy_seed: u64,
-    args: Vec<Value>,
+    args: Box<[Value]>,
     fresh_coins: Option<PathOramFreshCoinPlan>,
 ) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
     let manifest_entry = artifact
@@ -80,29 +60,20 @@ pub(in crate::runtime) fn run_traced_call(
         .get(entrypoint)
         .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
     let mut context = begin_call_trace(&*runtime, entrypoint, manifest_entry, &args)?;
-    let call_outcome = if confidential {
-        runtime.run_confidential_entrypoint(
-            entrypoint,
-            manifest_entry,
-            ConfidentialCallInputs::from_raw_args(args),
-            fresh_coins,
-            context.recorder_mut(),
-        )?
-    } else {
-        run_public_entrypoint(
-            runtime,
-            &artifact.contract,
-            entrypoint,
-            manifest_entry,
-            args,
-            context.recorder_mut(),
-        )?
-    };
+    let call_outcome = super::run_runtime_entrypoint(
+        runtime,
+        &artifact.contract,
+        entrypoint,
+        manifest_entry,
+        confidential,
+        args,
+        fresh_coins,
+        context.recorder_mut(),
+    )?;
     let traced_outcome = runtime.finish_traced_call(call_outcome)?;
     finalize_call_trace(FinalizeCallTraceInput {
         context,
         artifact,
-        entrypoint,
         confidential,
         deploy_seed,
         manifest_entry,
@@ -111,194 +82,12 @@ pub(in crate::runtime) fn run_traced_call(
     })
 }
 
-fn build_theorem_trace(
-    recorder: CallRecorder,
-    manifest_entry: &EntrypointManifest,
-    manifest_objects: &[StateObjectManifest],
-    public_call: PublicCallSummary,
-    output_shape: OutputShape,
-    aborted: bool,
-    gas_used: u64,
-) -> Result<crate::controller::CallTraceBundle> {
-    recorder.finish(
-        manifest_entry,
-        manifest_objects,
-        public_call,
-        output_shape,
-        aborted,
-        gas_used,
-    )
-}
-
-fn finalize_execution_trace(input: FinalizeExecutionTraceInput<'_>) -> Result<ExecutionTrace> {
-    let FinalizeExecutionTraceInput {
-        artifact,
-        entrypoint,
-        confidential,
-        deploy_seed,
-        opcode_trace,
-        gas_used,
-        trace_bundle,
-        runtime_kernel_witness,
-        runtime_kernel_refinement_witness,
-        runtime_witness_state,
-    } = input;
-    let (
-        logical_accesses,
-        logical_writes,
-        physical_reads,
-        physical_writes,
-        theorem_trace,
-        controller_certificate,
-        oram_leaf_schedule,
-        oram_leaf_state_transitions,
-    ) = trace_bundle.into_execution_trace_parts();
-    let (
-        runtime_oram_access_counters_before,
-        runtime_oram_access_counters_after,
-        runtime_oram_position_map_before,
-        runtime_oram_position_map_after,
-    ) = runtime_witness_state.into_execution_trace_parts();
-
-    let mut trace = ExecutionTrace::from_runtime_trace_parts(RuntimeExecutionTraceParts::new(
-        opcode_trace,
-        logical_accesses,
-        logical_writes,
-        physical_reads,
-        physical_writes,
-        gas_used,
-        theorem_trace,
-        Some(deploy_seed),
-        Some(runtime_kernel_witness.clone()),
-        Some(runtime_kernel_refinement_witness),
-        Some(controller_certificate),
-        runtime_oram_objects(artifact),
-        oram_leaf_schedule.into_boxed_slice(),
-        runtime_oram_access_counters_before,
-        runtime_oram_access_counters_after,
-        runtime_oram_position_map_before,
-        runtime_oram_position_map_after,
-        oram_leaf_state_transitions.into_boxed_slice(),
-    ));
-    if confidential {
-        let runtime_kernel_interface_bundle = trace
-            .runtime_kernel_interface_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!("runtime kernel interface drifted from admitted artifact: {err}")
-            })?;
-        trace
-            .runtime_confidential_core_kernel_interface_slot_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime confidential-core/kernel-interface/slot interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        let runtime_kernel_witness = runtime_kernel_interface_bundle.kernel_witness().clone();
-        artifact
-            .runtime_kernel_dsl_bundle_for_entrypoint(runtime_kernel_witness.clone(), entrypoint)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime kernel/DSL interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        artifact
-            .runtime_kernel_slot_dsl_bundle_for_entrypoint(
-                runtime_kernel_witness.clone(),
-                entrypoint,
-            )
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime kernel/slot interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        artifact
-            .runtime_kernel_lowering_bundle_for_entrypoint(runtime_kernel_witness, entrypoint)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime kernel/lowering interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        trace
-            .runtime_trusted_kernel_slot_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime trusted-kernel/slot interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        trace
-            .runtime_confidential_core_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime confidential-core interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        trace
-            .runtime_confidential_core_slot_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime confidential-core/slot interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        trace
-            .runtime_confidential_core_lowering_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime confidential-core/lowering interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        trace
-            .runtime_confidential_core_shell_boundary_slot_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime shell-boundary/slot interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        trace
-            .runtime_confidential_core_shell_boundary_lowering_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime shell-boundary/lowering interface drifted from admitted artifact: {err}"
-                )
-            })?;
-        trace.runtime_paper_main_family_bundle().map_err(|err| {
-            anyhow::anyhow!(
-                "runtime seeded paper-main bundle drifted from admitted artifact: {err}"
-            )
-        })?;
-        trace
-            .runtime_paper_main_slot_family_bundle(artifact)
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "runtime seeded paper-main slot bundle drifted from admitted artifact: {err}"
-                )
-            })?;
-    }
-    trace.materialize_runtime_trusted_kernel_bundle()?;
-    Ok(trace)
-}
-
-fn gas_used_of(
-    recorder: &CallRecorder,
-    manifest_entry: &EntrypointManifest,
-    confidential: bool,
-) -> u64 {
-    if confidential {
-        return manifest_entry.public_gas_budget;
-    }
-    let mut gas_used = 0u64;
-    gas_used += recorder.metrics().logical_reads as u64 * 3;
-    gas_used += recorder.metrics().logical_writes as u64 * 5;
-    gas_used += recorder.metrics().physical_writes as u64 * 17;
-    gas_used
-}
-
 fn finalize_call_trace(
     input: FinalizeCallTraceInput<'_>,
 ) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
     let FinalizeCallTraceInput {
         context,
         artifact,
-        entrypoint,
         confidential,
         deploy_seed,
         manifest_entry,
@@ -310,67 +99,30 @@ fn finalize_call_trace(
         public_call,
         recorder,
     } = context;
-    let (
-        runtime_kernel_witness,
-        runtime_kernel_refinement_witness,
-        aborted,
-        return_value,
-        opcode_trace,
-        runtime_witness_state,
-    ) = traced_outcome.into_finalized_call_trace_parts(runtime_call_start);
-    let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
-    let output_shape = output_shape_of(manifest_entry, &return_value)?;
-    let trace_bundle = build_theorem_trace(
+    let (runtime_kernel_finish_bundle, aborted, return_value, opcode_trace, runtime_witness_state) =
+        traced_outcome
+            .into_finalized_call_trace_parts(runtime_call_start)
+            .into_execution_trace_inputs();
+    let (gas_used, zero_writes, trace_bundle) = finalize_public_call_trace(
         recorder,
         manifest_entry,
         manifest_objects,
         public_call,
-        output_shape,
+        &return_value,
         aborted,
-        gas_used,
-    )?;
-    let zero_writes = trace_bundle.zero_writes();
-    let trace = finalize_execution_trace(FinalizeExecutionTraceInput {
-        artifact,
-        entrypoint,
         confidential,
-        deploy_seed,
-        opcode_trace,
-        gas_used,
-        trace_bundle,
-        runtime_kernel_witness,
-        runtime_kernel_refinement_witness,
-        runtime_witness_state,
-    })?;
+    )?;
+    let trace = ExecutionTrace::from_runtime_finalization_input(
+        artifact,
+        confidential,
+        trace_bundle.into_runtime_finalization_input(
+            opcode_trace,
+            gas_used,
+            Some(deploy_seed),
+            runtime_kernel_finish_bundle,
+            runtime_witness_state,
+        ),
+    )
+    .map_err(anyhow::Error::from)?;
     Ok((return_value, aborted, trace, zero_writes))
-}
-
-fn runtime_oram_objects(artifact: &CompiledArtifact) -> Box<[RuntimeOramObjectWitness]> {
-    artifact
-        .contract
-        .manifest
-        .objects
-        .iter()
-        .filter_map(|object| {
-            let oram = object.oram.as_ref()?;
-            Some(RuntimeOramObjectWitness {
-                object_id: object.id,
-                object_name: object.name.clone(),
-                scheme: oram.scheme.clone(),
-                capacity: object.capacity.unwrap_or_default(),
-                block_size: oram.block_size,
-                bucket_size: oram.bucket_size,
-                bucket_count: oram.bucket_count,
-                blocks_per_bucket: oram.blocks_per_bucket,
-                tree_height: oram.tree_height,
-                stash_bound: oram.stash_bound,
-                recursion_depth: oram.recursion_depth,
-                metadata_pages: oram.metadata_pages,
-                metadata_pages_per_access: oram.metadata_pages_per_access,
-                buckets_per_access: oram.buckets_per_access,
-                accesses_per_call: oram.accesses_per_call,
-            })
-        })
-        .collect::<Vec<_>>()
-        .into_boxed_slice()
 }

@@ -1,136 +1,94 @@
 use crate::controller::CallRecorder;
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
+use crate::runtime::objects::RuntimeObject;
 use crate::runtime::state::{
     CommittedRuntimeState, ConfidentialRuntimeShadowState, PublicRuntimeShadowState,
     RuntimeShadowState,
 };
 use anyhow::{anyhow, Result};
-use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
 use uo_core::{
-    execute_confidential_kernel_slot_program, ConfidentialKernelExecutionOutcome,
-    ConfidentialKernelSlotProgram, ConfidentialKernelSlotRuntime, ConfidentialKernelSlotStatement,
-    RuntimeKernelExecutionTracker, RuntimeKernelRefinementTracker, RuntimeKernelRefinementWitness,
-    RuntimeKernelStepWitness, RuntimeKernelWitness, Value,
+    execute_confidential_kernel_slot_call, ConfidentialCallInputs, ConfidentialKernelEffectRuntime,
+    ConfidentialKernelSlotProgram, ConfidentialKernelSlotStatement, RuntimeKernelBoundaryTracker,
+    RuntimeKernelFinishBundle, Value,
 };
 use uo_precompiles::UoOpcode;
 
+#[cfg(test)]
+use uo_core::RuntimeKernelStepWitness;
+
 struct RuntimeKernel {
     allocator: AllocatorSession,
-    public_object_ids: Vec<u32>,
     max_hash_part_bytes: usize,
-    kernel_execution: RuntimeKernelExecutionTracker,
-    runtime_phase_events: RuntimeKernelRefinementTracker,
+    boundary: RuntimeKernelBoundaryTracker,
 }
 
 pub(in crate::runtime) struct PublicRuntimeKernel {
     inner: RuntimeKernel,
 }
 
-#[derive(Debug)]
-struct ConfidentialExecState {
-    slots: Box<[Option<Value>]>,
-    initialized_slots: usize,
-}
-
-#[derive(Debug)]
-struct ConfidentialExecutionOutcome {
-    aborted: bool,
-    return_value: Option<Value>,
-}
-
-struct RuntimeKernelSlotInterpreter<'a> {
+struct RuntimeKernelSlotEffects<'a> {
     kernel: &'a mut RuntimeKernel,
     objects: &'a mut ConfidentialRuntimeShadowState,
-    state: &'a mut ConfidentialExecState,
     recorder: &'a mut CallRecorder,
     opcode_trace: &'a mut Vec<String>,
 }
 
-#[derive(Debug)]
-pub(in crate::runtime) struct ConfidentialCallInputs {
-    raw_args: Box<[Value]>,
+trait RuntimeShadowObjectStore {
+    fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject>;
+
+    fn commit_against(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        aborted: bool,
+        recorder: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Box<[u32]>>;
 }
 
-impl ConfidentialCallInputs {
-    pub(in crate::runtime) fn from_raw_args(args: Vec<Value>) -> Self {
-        Self {
-            raw_args: args.into_boxed_slice(),
-        }
+impl RuntimeShadowObjectStore for ConfidentialRuntimeShadowState {
+    fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
+        ConfidentialRuntimeShadowState::object_mut(self, object_id)
     }
 
-    fn into_raw_args(mut self) -> std::vec::IntoIter<Value> {
-        std::mem::take(&mut self.raw_args).into_vec().into_iter()
-    }
-}
-
-impl Drop for ConfidentialCallInputs {
-    fn drop(&mut self) {
-        for value in self.raw_args.iter_mut() {
-            value.wipe_secrets();
-        }
-    }
-}
-
-impl ConfidentialExecState {
-    fn new(slot_count: usize) -> Self {
-        Self {
-            slots: vec![None; slot_count].into_boxed_slice(),
-            initialized_slots: 0,
-        }
-    }
-
-    fn load_slot(&self, slot: usize) -> Result<Value> {
-        self.slots
-            .get(slot)
-            .and_then(Option::as_ref)
-            .cloned()
-            .ok_or_else(|| anyhow!("unknown slot {slot}"))
-    }
-
-    fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {
-        let cell = self
-            .slots
-            .get_mut(slot)
-            .ok_or_else(|| anyhow!("unknown slot {slot}"))?;
-        if cell.is_none() {
-            self.initialized_slots += 1;
-        }
-        *cell = Some(value);
-        Ok(())
-    }
-
-    fn live_slot_words(&self) -> usize {
-        self.initialized_slots
+    fn commit_against(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        aborted: bool,
+        recorder: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Box<[u32]>> {
+        ConfidentialRuntimeShadowState::commit_against(
+            self, committed, aborted, recorder, allocator,
+        )
     }
 }
 
-impl Drop for ConfidentialExecState {
-    fn drop(&mut self) {
-        for slot in &mut self.slots {
-            if let Some(value) = slot.as_mut() {
-                value.wipe_secrets();
-            }
-            *slot = None;
-        }
-        self.initialized_slots = 0;
+impl RuntimeShadowObjectStore for PublicRuntimeShadowState {
+    fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
+        PublicRuntimeShadowState::object_mut(self, object_id)
+    }
+
+    fn commit_against(
+        &mut self,
+        committed: &CommittedRuntimeState,
+        aborted: bool,
+        recorder: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Box<[u32]>> {
+        PublicRuntimeShadowState::commit_against(self, committed, aborted, recorder, allocator)
     }
 }
 
-impl ConfidentialKernelSlotRuntime for RuntimeKernelSlotInterpreter<'_> {
+impl ConfidentialKernelEffectRuntime for RuntimeKernelSlotEffects<'_> {
     fn note_statement(&mut self, statement: &ConfidentialKernelSlotStatement) -> Result<()> {
         self.opcode_trace.push(statement.trace_name().into());
         Ok(())
     }
 
-    fn load_slot(&self, slot: usize) -> Result<Value> {
-        self.state.load_slot(slot)
-    }
-
-    fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {
-        self.kernel
-            .store_confidential_slot_value(self.state, slot, value)
+    fn note_live_slot_words(&mut self, words: usize) -> Result<()> {
+        self.kernel.enforce_stack_words(words)
     }
 
     fn cell_get(&mut self, object_id: u32) -> Result<Value> {
@@ -186,7 +144,7 @@ impl ConfidentialKernelSlotRuntime for RuntimeKernelSlotInterpreter<'_> {
         )
     }
 
-    fn keccak256(&mut self, parts: Vec<Value>) -> Result<Value> {
+    fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {
         self.kernel.keccak256_values(parts)
     }
 }
@@ -194,7 +152,7 @@ impl ConfidentialKernelSlotRuntime for RuntimeKernelSlotInterpreter<'_> {
 impl PublicRuntimeKernel {
     pub(in crate::runtime) fn begin(
         plan: AllocatorPlan,
-        public_object_ids: Vec<u32>,
+        public_object_ids: &[u32],
     ) -> Result<Self> {
         Ok(Self {
             inner: RuntimeKernel::begin(plan, public_object_ids)?,
@@ -219,7 +177,7 @@ impl PublicRuntimeKernel {
         recorder: &mut CallRecorder,
         object_id: u32,
     ) -> Result<Value> {
-        self.inner.cell_get_public(objects, recorder, object_id)
+        self.inner.cell_get(objects, recorder, object_id)
     }
 
     pub(in crate::runtime) fn cell_set(
@@ -231,7 +189,7 @@ impl PublicRuntimeKernel {
         predicate: Option<bool>,
     ) -> Result<()> {
         self.inner
-            .cell_set_public(objects, recorder, object_id, value, predicate)
+            .cell_set(objects, recorder, object_id, value, predicate)
     }
 
     pub(in crate::runtime) fn array_get(
@@ -241,8 +199,7 @@ impl PublicRuntimeKernel {
         object_id: u32,
         index: usize,
     ) -> Result<Value> {
-        self.inner
-            .array_get_public(objects, recorder, object_id, index)
+        self.inner.array_get(objects, recorder, object_id, index)
     }
 
     pub(in crate::runtime) fn array_set(
@@ -255,7 +212,7 @@ impl PublicRuntimeKernel {
         predicate: Option<bool>,
     ) -> Result<()> {
         self.inner
-            .array_set_public(objects, recorder, object_id, index, value, predicate)
+            .array_set(objects, recorder, object_id, index, value, predicate)
     }
 
     pub(in crate::runtime) fn map_get(
@@ -265,7 +222,7 @@ impl PublicRuntimeKernel {
         object_id: u32,
         key: &Value,
     ) -> Result<Value> {
-        self.inner.map_get_public(objects, recorder, object_id, key)
+        self.inner.map_get(objects, recorder, object_id, key)
     }
 
     pub(in crate::runtime) fn map_put(
@@ -278,13 +235,13 @@ impl PublicRuntimeKernel {
         predicate: Option<bool>,
     ) -> Result<()> {
         self.inner
-            .map_put_public(objects, recorder, object_id, key, value, predicate)
+            .map_put(objects, recorder, object_id, key, value, predicate)
     }
 
     pub(in crate::runtime) fn finish(
         self,
         entrypoint_id: &str,
-    ) -> Result<(RuntimeKernelWitness, RuntimeKernelRefinementWitness)> {
+    ) -> Result<RuntimeKernelFinishBundle> {
         self.inner.finish(entrypoint_id)
     }
 
@@ -305,7 +262,7 @@ impl PublicRuntimeKernel {
         recorder: &mut CallRecorder,
     ) -> Result<()> {
         self.inner
-            .commit_public_objects(objects, committed, aborted, recorder)
+            .commit_objects(objects, committed, aborted, recorder)
     }
 
     pub(in crate::runtime) fn run_confidential_call(
@@ -319,8 +276,7 @@ impl PublicRuntimeKernel {
         opcode_trace: &mut Vec<String>,
     ) -> Result<(
         ConfidentialRuntimeShadowState,
-        RuntimeKernelWitness,
-        RuntimeKernelRefinementWitness,
+        RuntimeKernelFinishBundle,
         bool,
         Option<Value>,
     )> {
@@ -347,49 +303,26 @@ impl PublicRuntimeKernel {
 }
 
 impl RuntimeKernel {
-    fn begin(plan: AllocatorPlan, public_object_ids: Vec<u32>) -> Result<Self> {
+    fn begin(plan: AllocatorPlan, public_object_ids: &[u32]) -> Result<Self> {
         let kernel_step_capacity = plan.max_kernel_ops;
-        let public_object_count = public_object_ids.len();
-        let mut kernel = Self {
+        Ok(Self {
             allocator: AllocatorSession::new(plan),
-            public_object_ids,
             max_hash_part_bytes: 0,
-            kernel_execution: RuntimeKernelExecutionTracker::with_kernel_op_budget(
-                kernel_step_capacity,
-            ),
-            runtime_phase_events:
-                RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(
-                    public_object_count,
-                    kernel_step_capacity,
-                )?,
-        };
-        for object_id in kernel.public_object_ids.clone() {
-            kernel
-                .runtime_phase_events
-                .push_pre_committed_cold_object(object_id)?;
-        }
-        kernel.record_kernel_step(UoOpcode::Begin, None)?;
-        Ok(kernel)
-    }
-
-    fn bind_expected_kernel_steps(
-        &mut self,
-        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
-        context: &str,
-    ) -> Result<()> {
-        self.kernel_execution
-            .bind_expected_kernel_steps(expected_kernel_steps)
-            .map_err(|err| anyhow!("{context}: {err}"))
+            boundary: RuntimeKernelBoundaryTracker::begin(public_object_ids, kernel_step_capacity)?,
+        })
     }
 
     #[cfg(test)]
     fn begin_with_expected_kernel_steps(
         plan: AllocatorPlan,
         expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
-        public_object_ids: Vec<u32>,
+        public_object_ids: &[u32],
     ) -> Result<Self> {
         let mut kernel = Self::begin(plan, public_object_ids)?;
-        kernel.bind_expected_kernel_steps(expected_kernel_steps, "test runtime schedule")?;
+        kernel
+            .boundary
+            .bind_expected_kernel_steps(expected_kernel_steps.into_boxed_slice())
+            .map_err(|err| anyhow!("test runtime schedule: {err}"))?;
         Ok(kernel)
     }
 
@@ -406,15 +339,9 @@ impl RuntimeKernel {
         self.allocator.wipe_region(ScratchRegion::HashScratch);
     }
 
-    fn record_shadow_load_object(&mut self, object_id: u32) -> Result<()> {
-        Ok(self
-            .runtime_phase_events
-            .push_shadow_load_object(object_id)?)
-    }
-
-    fn cell_get(
+    fn cell_get<S: RuntimeShadowObjectStore>(
         &mut self,
-        objects: &mut ConfidentialRuntimeShadowState,
+        objects: &mut S,
         recorder: &mut CallRecorder,
         object_id: u32,
     ) -> Result<Value> {
@@ -422,19 +349,9 @@ impl RuntimeKernel {
         objects.object_mut(object_id)?.get_cell(recorder)
     }
 
-    fn cell_get_public(
+    fn cell_set<S: RuntimeShadowObjectStore>(
         &mut self,
-        objects: &mut PublicRuntimeShadowState,
-        recorder: &mut CallRecorder,
-        object_id: u32,
-    ) -> Result<Value> {
-        self.record_kernel_step(UoOpcode::CellGet, Some(object_id))?;
-        objects.object_mut(object_id)?.get_cell(recorder)
-    }
-
-    fn cell_set(
-        &mut self,
-        objects: &mut ConfidentialRuntimeShadowState,
+        objects: &mut S,
         recorder: &mut CallRecorder,
         object_id: u32,
         value: Value,
@@ -448,25 +365,9 @@ impl RuntimeKernel {
             .set_cell(value, predicate, recorder)
     }
 
-    fn cell_set_public(
+    fn array_get<S: RuntimeShadowObjectStore>(
         &mut self,
-        objects: &mut PublicRuntimeShadowState,
-        recorder: &mut CallRecorder,
-        object_id: u32,
-        value: Value,
-        predicate: Option<bool>,
-    ) -> Result<()> {
-        self.record_kernel_step(UoOpcode::CellSet, Some(object_id))?;
-        let value_len = objects.object_mut(object_id)?.value_canonical_len();
-        self.touch_value_scratch(value_len)?;
-        objects
-            .object_mut(object_id)?
-            .set_cell(value, predicate, recorder)
-    }
-
-    fn array_get(
-        &mut self,
-        objects: &mut ConfidentialRuntimeShadowState,
+        objects: &mut S,
         recorder: &mut CallRecorder,
         object_id: u32,
         index: usize,
@@ -476,21 +377,9 @@ impl RuntimeKernel {
         objects.object_mut(object_id)?.get_array(index, recorder)
     }
 
-    fn array_get_public(
+    fn array_set<S: RuntimeShadowObjectStore>(
         &mut self,
-        objects: &mut PublicRuntimeShadowState,
-        recorder: &mut CallRecorder,
-        object_id: u32,
-        index: usize,
-    ) -> Result<Value> {
-        self.record_kernel_step(UoOpcode::ArrayGet, Some(object_id))?;
-        self.touch_value_scratch(32)?;
-        objects.object_mut(object_id)?.get_array(index, recorder)
-    }
-
-    fn array_set(
-        &mut self,
-        objects: &mut ConfidentialRuntimeShadowState,
+        objects: &mut S,
         recorder: &mut CallRecorder,
         object_id: u32,
         index: usize,
@@ -505,26 +394,9 @@ impl RuntimeKernel {
             .set_array(index, value, predicate, recorder)
     }
 
-    fn array_set_public(
+    fn map_get<S: RuntimeShadowObjectStore>(
         &mut self,
-        objects: &mut PublicRuntimeShadowState,
-        recorder: &mut CallRecorder,
-        object_id: u32,
-        index: usize,
-        value: Value,
-        predicate: Option<bool>,
-    ) -> Result<()> {
-        self.record_kernel_step(UoOpcode::ArraySet, Some(object_id))?;
-        let value_len = objects.object_mut(object_id)?.value_canonical_len();
-        self.touch_value_scratch(value_len.max(32))?;
-        objects
-            .object_mut(object_id)?
-            .set_array(index, value, predicate, recorder)
-    }
-
-    fn map_get(
-        &mut self,
-        objects: &mut ConfidentialRuntimeShadowState,
+        objects: &mut S,
         recorder: &mut CallRecorder,
         object_id: u32,
         key: &Value,
@@ -537,24 +409,9 @@ impl RuntimeKernel {
             .get_map(key, recorder, &mut self.allocator)
     }
 
-    fn map_get_public(
+    fn map_put<S: RuntimeShadowObjectStore>(
         &mut self,
-        objects: &mut PublicRuntimeShadowState,
-        recorder: &mut CallRecorder,
-        object_id: u32,
-        key: &Value,
-    ) -> Result<Value> {
-        self.record_kernel_step(UoOpcode::MapGet, Some(object_id))?;
-        let key_len = objects.object_mut(object_id)?.key_canonical_len()?;
-        self.touch_value_scratch(key_len)?;
-        objects
-            .object_mut(object_id)?
-            .get_map(key, recorder, &mut self.allocator)
-    }
-
-    fn map_put(
-        &mut self,
-        objects: &mut ConfidentialRuntimeShadowState,
+        objects: &mut S,
         recorder: &mut CallRecorder,
         object_id: u32,
         key: Value,
@@ -572,29 +429,9 @@ impl RuntimeKernel {
             .put_map(key, value, predicate, recorder, &mut self.allocator)
     }
 
-    fn map_put_public(
+    fn commit_objects<S: RuntimeShadowObjectStore>(
         &mut self,
-        objects: &mut PublicRuntimeShadowState,
-        recorder: &mut CallRecorder,
-        object_id: u32,
-        key: Value,
-        value: Value,
-        predicate: Option<bool>,
-    ) -> Result<()> {
-        self.record_kernel_step(UoOpcode::MapPut, Some(object_id))?;
-        let (key_len, value_len) = {
-            let object = objects.object_mut(object_id)?;
-            (object.key_canonical_len()?, object.value_canonical_len())
-        };
-        self.touch_value_scratch(key_len.max(value_len))?;
-        objects
-            .object_mut(object_id)?
-            .put_map(key, value, predicate, recorder, &mut self.allocator)
-    }
-
-    fn commit_objects(
-        &mut self,
-        objects: &mut ConfidentialRuntimeShadowState,
+        objects: &mut S,
         committed: &CommittedRuntimeState,
         aborted: bool,
         recorder: &mut CallRecorder,
@@ -602,22 +439,7 @@ impl RuntimeKernel {
         self.record_kernel_step(UoOpcode::Commit, None)?;
         let committed_object_ids =
             objects.commit_against(committed, aborted, recorder, &mut self.allocator)?;
-        self.runtime_phase_events
-            .append_commit_object_schedule(committed_object_ids)?;
-        Ok(())
-    }
-
-    fn commit_public_objects(
-        &mut self,
-        objects: &mut PublicRuntimeShadowState,
-        committed: &CommittedRuntimeState,
-        aborted: bool,
-        recorder: &mut CallRecorder,
-    ) -> Result<()> {
-        self.record_kernel_step(UoOpcode::Commit, None)?;
-        let committed_object_ids =
-            objects.commit_against(committed, aborted, recorder, &mut self.allocator)?;
-        self.runtime_phase_events
+        self.boundary
             .append_commit_object_schedule(committed_object_ids)?;
         Ok(())
     }
@@ -633,126 +455,55 @@ impl RuntimeKernel {
         opcode_trace: &mut Vec<String>,
     ) -> Result<(
         ConfidentialRuntimeShadowState,
-        RuntimeKernelWitness,
-        RuntimeKernelRefinementWitness,
+        RuntimeKernelFinishBundle,
         bool,
         Option<Value>,
     )> {
-        if !program.is_runtime_normal_form() {
-            return Err(anyhow!(
-                "confidential slot program {} is not in runtime normal form",
-                program.entrypoint_id
-            ));
-        }
         self.max_hash_part_bytes = max_hash_part_bytes;
-        self.bind_expected_kernel_program(program)?;
-        let shadow_load_object_ids = self.expected_shadow_load_object_ids()?;
+        self.boundary
+            .bind_expected_kernel_program(program)
+            .map_err(|err| {
+                anyhow!(
+                    "confidential kernel program {}: {err}",
+                    program.entrypoint_id
+                )
+            })?;
+        let shadow_load_object_ids = self.boundary.expected_loaded_object_schedule_required()?;
         let mut shadow =
-            self.shadow_load_confidential_objects(committed, &shadow_load_object_ids)?;
+            self.shadow_load_confidential_objects(committed, shadow_load_object_ids.as_ref())?;
         let had_injected_fresh_coins = fresh_coins.is_some();
         self.install_path_oram_fresh_coins(&mut shadow, fresh_coins)?;
-        let outcome = self.execute_confidential_call(
-            program,
-            &mut shadow,
-            call_inputs,
-            recorder,
-            opcode_trace,
-        )?;
-        if had_injected_fresh_coins {
-            self.ensure_path_oram_fresh_coins_consumed(&shadow)?;
-        }
-        self.commit_objects(&mut shadow, committed, outcome.aborted, recorder)?;
-        let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
-            self.finish(&program.entrypoint_id)?;
-        Ok((
-            shadow,
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            outcome.aborted,
-            outcome.return_value,
-        ))
-    }
-
-    fn bind_expected_kernel_program(
-        &mut self,
-        program: &ConfidentialKernelSlotProgram,
-    ) -> Result<()> {
-        self.bind_expected_kernel_steps(
-            program.expected_runtime_step_witnesses(),
-            &format!("confidential kernel program {}", program.entrypoint_id),
-        )
-    }
-
-    fn expected_shadow_load_object_ids(&self) -> Result<Vec<u32>> {
-        let expected_kernel_steps =
-            self.kernel_execution
-                .expected_kernel_steps()
-                .ok_or_else(|| {
-                    anyhow!(
-                    "runtime kernel has no admitted schedule bound when shadow-load set is needed"
-                )
-                })?;
-        Ok(expected_kernel_steps
-            .iter()
-            .filter_map(RuntimeKernelStepWitness::object_id)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect())
-    }
-
-    fn execute_confidential_call(
-        &mut self,
-        program: &ConfidentialKernelSlotProgram,
-        objects: &mut ConfidentialRuntimeShadowState,
-        call_inputs: ConfidentialCallInputs,
-        recorder: &mut CallRecorder,
-        opcode_trace: &mut Vec<String>,
-    ) -> Result<ConfidentialExecutionOutcome> {
-        let mut state = ConfidentialExecState::new(program.slot_count);
-        for (slot, arg) in call_inputs.into_raw_args().enumerate() {
-            self.store_confidential_slot_value(&mut state, slot, arg)?;
-        }
-        let outcome = {
-            let mut interpreter = RuntimeKernelSlotInterpreter {
-                kernel: self,
-                objects,
-                state: &mut state,
+        let (aborted, return_value) = {
+            let mut runtime_effects = RuntimeKernelSlotEffects {
+                kernel: &mut self,
+                objects: &mut shadow,
                 recorder,
                 opcode_trace,
             };
-            execute_confidential_kernel_slot_program(&mut interpreter, program)?
+            let outcome =
+                execute_confidential_kernel_slot_call(&mut runtime_effects, program, call_inputs)?;
+            let (aborted, return_value) = outcome.into_parts();
+            (aborted, if aborted { None } else { return_value })
         };
-        let ConfidentialKernelExecutionOutcome {
-            aborted,
-            return_value,
-        } = outcome;
-        Ok(ConfidentialExecutionOutcome {
-            aborted,
-            return_value: if aborted { None } else { return_value },
-        })
+        if had_injected_fresh_coins {
+            self.ensure_path_oram_fresh_coins_consumed(&shadow)?;
+        }
+        self.commit_objects(&mut shadow, committed, aborted, recorder)?;
+        let runtime_kernel_finish_bundle = self.finish(&program.entrypoint_id)?;
+        Ok((shadow, runtime_kernel_finish_bundle, aborted, return_value))
     }
 
-    fn finish(
-        mut self,
-        entrypoint_id: &str,
-    ) -> Result<(RuntimeKernelWitness, RuntimeKernelRefinementWitness)> {
+    fn finish(mut self, entrypoint_id: &str) -> Result<RuntimeKernelFinishBundle> {
         self.record_kernel_step(UoOpcode::Wipe, None)?;
-        self.kernel_execution
-            .ensure_expected_kernel_schedule_consumed()?;
         self.allocator.wipe_region(ScratchRegion::ValueScratch);
         self.allocator.wipe_region(ScratchRegion::HashScratch);
         self.allocator.wipe_region(ScratchRegion::IoScratch);
-        let public_object_ids = self.public_object_ids.clone();
-        let kernel_witness = RuntimeKernelWitness::from_telemetry_and_execution_tracker(
-            entrypoint_id.into(),
-            self.allocator.finish()?,
-            self.kernel_execution,
-            public_object_ids.clone(),
-            Some(public_object_ids.clone()),
-        )?;
-        self.runtime_phase_events
-            .append_cold_store_window(&public_object_ids)?;
-        Ok((kernel_witness, self.runtime_phase_events.into_witness()?))
+        let finish_snapshot = self
+            .boundary
+            .into_finish_snapshot(entrypoint_id.into(), self.allocator.finish()?);
+        finish_snapshot
+            .into_finish_bundle()
+            .map_err(anyhow::Error::from)
     }
 
     fn touch_value_scratch(&mut self, bytes: usize) -> Result<()> {
@@ -762,11 +513,13 @@ impl RuntimeKernel {
         Ok(())
     }
 
-    fn keccak256_values(&mut self, parts: Vec<Value>) -> Result<Value> {
+    fn keccak256_values(&mut self, parts: Box<[Value]>) -> Result<Value> {
         let mut hasher = Keccak::v256();
-        for part in parts {
+        let mut parts = parts;
+        for part in parts.iter_mut() {
             self.note_hash_bytes(self.max_hash_part_bytes)?;
             part.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));
+            part.wipe_secrets();
             self.wipe_hash_scratch();
         }
         let mut out = [0u8; 32];
@@ -774,22 +527,9 @@ impl RuntimeKernel {
         Ok(Value::Bytes32(out))
     }
 
-    fn store_confidential_slot_value(
-        &mut self,
-        state: &mut ConfidentialExecState,
-        slot: usize,
-        value: Value,
-    ) -> Result<()> {
-        state.store_slot(slot, value)?;
-        self.enforce_stack_words(state.live_slot_words())
-    }
-
     fn record_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {
-        let observed = RuntimeKernelStepWitness::new(opcode, object_id)?;
-        self.kernel_execution.record_step(observed.clone())?;
+        self.boundary.record_opcode(opcode, object_id)?;
         self.allocator.record_kernel_op()?;
-        self.runtime_phase_events
-            .push_kernel_step(opcode, object_id)?;
         Ok(())
     }
 
@@ -800,7 +540,7 @@ impl RuntimeKernel {
     ) -> Result<RuntimeShadowState> {
         let shadow = committed.shadow_load(shadow_load_object_ids, &mut self.allocator)?;
         for object_id in shadow_load_object_ids {
-            self.record_shadow_load_object(*object_id)?;
+            self.boundary.record_shadow_load_object(*object_id)?;
         }
         Ok(shadow)
     }
@@ -873,7 +613,7 @@ mod tests {
                 scratch_bytes: 1024,
                 max_kernel_ops: 1,
             },
-            vec![],
+            &[],
         )
         .unwrap();
         assert!(kernel.finish("demo()").is_err());
@@ -894,7 +634,7 @@ mod tests {
                 RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
                 RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
             ],
-            vec![7],
+            &[7],
         )
         .unwrap();
 
@@ -904,35 +644,5 @@ mod tests {
         assert!(err
             .to_string()
             .contains("runtime kernel step schedule mismatch"));
-    }
-
-    #[test]
-    fn kernel_exports_matching_expected_schedule_when_enforced_online() {
-        let mut kernel = RuntimeKernel::begin_with_expected_kernel_steps(
-            AllocatorPlan {
-                arena_bytes: 4096,
-                max_stack_words: 64,
-                scratch_bytes: 1024,
-                max_kernel_ops: 3,
-            },
-            vec![
-                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
-                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
-                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
-            ],
-            vec![],
-        )
-        .unwrap();
-
-        kernel.record_kernel_step(UoOpcode::Commit, None).unwrap();
-        let (witness, refinement_witness) = kernel.finish("demo()").unwrap();
-        assert_eq!(
-            witness.expected_kernel_steps(),
-            Some(witness.kernel_steps())
-        );
-        assert_eq!(
-            refinement_witness.projected_kernel_schedule(),
-            witness.emitted_kernel_schedule()
-        );
     }
 }

@@ -18,7 +18,7 @@ pub struct StoreExecutionMetrics {
 }
 
 pub trait ObjectStore {
-    fn read_cell(&mut self, object: &str) -> Result<Vec<u8>>;
+    fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>>;
     fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()>;
     fn physical_writes(&self) -> &[PhysicalWriteEvent];
     fn logical_events(&self) -> &[LogicalEvent];
@@ -27,7 +27,7 @@ pub trait ObjectStore {
 
 #[derive(Clone, Debug)]
 pub struct RawObjectStore {
-    slots: BTreeMap<String, Vec<u8>>,
+    slots: BTreeMap<String, Box<[u8]>>,
     physical_writes: Vec<PhysicalWriteEvent>,
     logical_events: Vec<LogicalEvent>,
     metrics: StoreExecutionMetrics,
@@ -46,14 +46,14 @@ impl RawObjectStore {
     pub fn with_zeroed_slots(objects: impl IntoIterator<Item = String>) -> Self {
         let mut store = Self::new();
         for object in objects {
-            store.slots.insert(object, vec![0u8; 32]);
+            store.slots.insert(object, vec![0u8; 32].into_boxed_slice());
         }
         store
     }
 }
 
 impl ObjectStore for RawObjectStore {
-    fn read_cell(&mut self, object: &str) -> Result<Vec<u8>> {
+    fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>> {
         self.metrics.logical_reads += 1;
         self.metrics.physical_reads += 1;
         self.logical_events.push(LogicalEvent {
@@ -64,7 +64,7 @@ impl ObjectStore for RawObjectStore {
         Ok(self
             .slots
             .entry(object.into())
-            .or_insert_with(|| vec![0u8; 32])
+            .or_insert_with(|| vec![0u8; 32].into_boxed_slice())
             .clone())
     }
 
@@ -77,9 +77,9 @@ impl ObjectStore for RawObjectStore {
         let old = self
             .slots
             .entry(object.into())
-            .or_insert_with(|| vec![0u8; value.len()])
+            .or_insert_with(|| vec![0u8; value.len()].into_boxed_slice())
             .clone();
-        let new = value.to_vec();
+        let new = value.to_vec().into_boxed_slice();
         value.zeroize();
         self.slots.insert(object.into(), new.clone());
         self.logical_events.push(LogicalEvent {
@@ -107,7 +107,7 @@ impl ObjectStore for RawObjectStore {
 
 #[derive(Clone, Debug)]
 pub struct UoObjectStore {
-    slots: BTreeMap<String, Vec<u8>>,
+    slots: BTreeMap<String, Box<[u8]>>,
     physical_writes: Vec<PhysicalWriteEvent>,
     logical_events: Vec<LogicalEvent>,
     metrics: StoreExecutionMetrics,
@@ -122,7 +122,10 @@ impl UoObjectStore {
         let mut slots = BTreeMap::new();
         for (object, logical_len) in objects {
             let aad = format!("uo_store:{object}");
-            slots.insert(object, cipher.filler(aad.as_bytes(), logical_len, &mut rng));
+            slots.insert(
+                object,
+                cipher.filler_boxed(aad.as_bytes(), logical_len, &mut rng),
+            );
         }
         Self {
             slots,
@@ -147,7 +150,7 @@ impl UoObjectStore {
 }
 
 impl ObjectStore for UoObjectStore {
-    fn read_cell(&mut self, object: &str) -> Result<Vec<u8>> {
+    fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>> {
         self.metrics.logical_reads += 1;
         self.metrics.physical_reads += 1;
         self.logical_events.push(LogicalEvent {
@@ -173,7 +176,7 @@ impl ObjectStore for UoObjectStore {
         let value_len = value.len();
         if !self
             .cipher
-            .seal_and_wipe_into(aad.as_bytes(), value, &mut self.rng, slot)
+            .seal_and_wipe_into_slice(aad.as_bytes(), value, &mut self.rng, slot)
         {
             return Err(anyhow!(
                 "sealed slot buffer for {object} fell below required public ciphertext size"

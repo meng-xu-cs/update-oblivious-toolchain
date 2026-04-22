@@ -539,6 +539,69 @@ theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatches_w
   cases hGet'
   exact hValid
 
+theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeFamilyMatches_projects_to_runtimeKernelBoundary
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags)
+  (hMatch : certificate.ProofGradeFamilyMatches family modelTags)
+  {seed : Nat}
+  (hSeed : seed < family.seed_count) :
+  ∃ witness,
+    family.witnessAt? seed = some witness ∧
+      RuntimeProofGradeKernelInterfaceBundle witness.toRuntimeWitness := by
+  rcases hMatch.1.2.2 seed hSeed with
+    ⟨witness, hGet, hWitnessValid, _hLeafScaffold, _hFreshScaffold, _hFreshValues⟩
+  exact
+    ⟨witness, hGet,
+      runtimeWitness_proofGradeKernelInterfaceBundle
+        witness.toRuntimeWitness
+        modelTags
+        (importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
+          witness
+          modelTags
+          hWitnessValid)⟩
+
+theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeFamilyMatches_projects_to_runtimeKernelBoundaryFacts
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags)
+  (hMatch : certificate.ProofGradeFamilyMatches family modelTags)
+  {seed : Nat}
+  (hSeed : seed < family.seed_count) :
+  ∃ witness,
+    family.witnessAt? seed = some witness ∧
+      RuntimeProofGradeKernelBoundaryFacts witness.toRuntimeWitness := by
+  rcases
+      importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeFamilyMatches_projects_to_runtimeKernelBoundary
+        certificate
+        family
+        modelTags
+        hMatch
+        hSeed
+    with ⟨witness, hGet, hBoundary⟩
+  exact
+    ⟨witness, hGet,
+      runtimeProofGradeKernelInterfaceBundle_toKernelBoundaryFacts hBoundary⟩
+
+noncomputable def importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeFamilyMatches_to_runtimeKernelConfinementBoundary
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)
+  (modelTags : SGXModelTags)
+  (hMatch : certificate.ProofGradeFamilyMatches family modelTags)
+  {seed : Nat}
+  (hSeed : seed < family.seed_count) :
+  RuntimeKernelConfinementBoundary := by
+  let hBoundary :=
+    importedCanonicalFreshCoinRuntimePathOramPairCertificate_proofGradeFamilyMatches_projects_to_runtimeKernelBoundary
+      certificate
+      family
+      modelTags
+      hMatch
+      hSeed
+  let witness := Classical.choose hBoundary
+  let hWitness := Classical.choose_spec hBoundary
+  exact RuntimeProofGradeKernelInterfaceBundle.confinementBoundary hWitness.2
+
 theorem importedCanonicalFreshCoinRuntimePathOramPairCertificate_familyMatches_projects_to_certificate_observer
   (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
   (family : ImportedCanonicalFreshCoinRuntimePathOramWitnessFamily)

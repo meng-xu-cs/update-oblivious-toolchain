@@ -72,12 +72,61 @@ pub struct EntrypointManifest {
     pub oram_accesses: BTreeMap<u32, usize>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct RuntimeConfidentialEntrypointPlan {
+    public_object_ids: Box<[u32]>,
+    max_kernel_ops: usize,
+    max_commit_ops: usize,
+    confidential_slot_program: ConfidentialKernelSlotProgram,
+    max_hash_part_bytes: usize,
+}
+
 impl EntrypointManifest {
-    pub fn canonical_kernel_step_manifest(&self) -> Vec<RuntimeKernelStepManifest> {
+    pub fn canonical_kernel_step_manifest(&self) -> Box<[RuntimeKernelStepManifest]> {
         self.confidential_slot_program
             .as_ref()
             .map(ConfidentialKernelSlotProgram::expected_runtime_step_manifest)
-            .unwrap_or_else(|| self.kernel_steps.clone())
+            .unwrap_or_else(|| self.kernel_steps.clone().into_boxed_slice())
+    }
+
+    pub fn runtime_confidential_entrypoint_plan(
+        &self,
+        entrypoint: &str,
+        public_object_ids: Box<[u32]>,
+    ) -> Result<RuntimeConfidentialEntrypointPlan> {
+        let confidential_slot_program = self.checked_confidential_slot_program(entrypoint)?;
+        let max_kernel_ops = confidential_slot_program
+            .expected_runtime_step_witnesses()
+            .len();
+        Ok(RuntimeConfidentialEntrypointPlan {
+            public_object_ids,
+            max_kernel_ops,
+            max_commit_ops: self.max_commit_ops,
+            confidential_slot_program,
+            max_hash_part_bytes: self.max_hash_part_bytes,
+        })
+    }
+}
+
+impl RuntimeConfidentialEntrypointPlan {
+    pub fn public_object_ids(&self) -> &[u32] {
+        &self.public_object_ids
+    }
+
+    pub fn max_kernel_ops(&self) -> usize {
+        self.max_kernel_ops
+    }
+
+    pub fn max_commit_ops(&self) -> usize {
+        self.max_commit_ops
+    }
+
+    pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
+        &self.confidential_slot_program
+    }
+
+    pub fn max_hash_part_bytes(&self) -> usize {
+        self.max_hash_part_bytes
     }
 }
 
@@ -98,14 +147,15 @@ pub struct OramManifest {
 }
 
 impl ConfidentialKernelSlotProgram {
-    pub fn expected_runtime_step_manifest(&self) -> Vec<RuntimeKernelStepManifest> {
+    pub fn expected_runtime_step_manifest(&self) -> Box<[RuntimeKernelStepManifest]> {
         self.expected_runtime_steps()
-            .into_iter()
+            .iter()
             .map(|step| RuntimeKernelStepManifest {
                 opcode: step.opcode,
                 object_id: step.object_id,
             })
-            .collect()
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
     }
 }
 
@@ -393,6 +443,7 @@ mod tests {
                     object_id: None,
                 },
             ]
+            .into_boxed_slice()
         );
     }
 

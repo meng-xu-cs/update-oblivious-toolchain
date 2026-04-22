@@ -1086,7 +1086,9 @@ fn build_manifest_entry(
     let (confidential_program, confidential_slot_program, kernel_steps) = if function.confidential {
         let confidential_program = function.confidential_kernel_program()?;
         let confidential_slot_program = confidential_program.to_slot_program()?;
-        let kernel_steps = confidential_slot_program.expected_runtime_step_manifest();
+        let kernel_steps = confidential_slot_program
+            .expected_runtime_step_manifest()
+            .into_vec();
         (
             Some(confidential_program),
             Some(confidential_slot_program),

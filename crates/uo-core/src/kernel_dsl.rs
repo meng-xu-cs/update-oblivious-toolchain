@@ -136,14 +136,14 @@ pub struct RuntimeKernelLoweringBundle {
     confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellBoundaryLoweringBundle {
     shell_boundary_bundle: RuntimeShellBoundaryBundle,
     confidential_program: ConfidentialKernelProgram,
     confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellBoundarySlotBundle {
     shell_boundary_bundle: RuntimeShellBoundaryBundle,
     confidential_slot_program: ConfidentialKernelSlotProgram,

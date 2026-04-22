@@ -31,8 +31,8 @@ pub enum Value {
     Uint(u128),
     Bytes32([u8; 32]),
     Address([u8; 20]),
-    Struct(Vec<(String, Value)>),
-    Array(Vec<Value>),
+    Struct(Box<[(String, Value)]>),
+    Array(Box<[Value]>),
 }
 
 #[derive(Deserialize)]
@@ -122,11 +122,15 @@ impl Value {
                 fields
                     .iter()
                     .map(|field| (field.name.clone(), Value::zero_for_type(&field.ty)))
-                    .collect(),
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
             ),
-            Type::Array(element, len) => {
-                Value::Array((0..*len).map(|_| Value::zero_for_type(element)).collect())
-            }
+            Type::Array(element, len) => Value::Array(
+                (0..*len)
+                    .map(|_| Value::zero_for_type(element))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
         }
     }
 
@@ -189,6 +193,12 @@ impl Value {
         let mut out = Vec::with_capacity(self.canonical_len());
         self.visit_canonical_chunks(&mut |chunk| out.extend_from_slice(chunk));
         out
+    }
+
+    pub fn canonical_bytes_boxed(&self) -> Box<[u8]> {
+        let mut out = Vec::with_capacity(self.canonical_len());
+        self.visit_canonical_chunks(&mut |chunk| out.extend_from_slice(chunk));
+        out.into_boxed_slice()
     }
 
     pub fn decode_canonical(ty: &Type, bytes: &[u8]) -> Result<Self> {
@@ -270,9 +280,9 @@ impl Value {
                 let when_true_fields = std::mem::take(when_true_fields);
                 let when_false_fields = std::mem::take(when_false_fields);
                 let mut selected = Vec::with_capacity(when_true_fields.len());
-                for ((true_name, true_value), (false_name, false_value)) in when_true_fields
-                    .into_iter()
-                    .zip(when_false_fields.into_iter())
+                for ((true_name, true_value), (false_name, false_value)) in
+                    std::iter::IntoIterator::into_iter(when_true_fields)
+                        .zip(std::iter::IntoIterator::into_iter(when_false_fields))
                 {
                     if true_name != false_name {
                         bail!(
@@ -286,7 +296,7 @@ impl Value {
                         Value::confidential_select(cond, true_value, false_value)?,
                     ));
                 }
-                Ok(Value::Struct(selected))
+                Ok(Value::Struct(selected.into_boxed_slice()))
             }
             (Value::Array(when_true_values), Value::Array(when_false_values)) => {
                 if when_true_values.len() != when_false_values.len() {
@@ -299,13 +309,13 @@ impl Value {
                 let when_true_values = std::mem::take(when_true_values);
                 let when_false_values = std::mem::take(when_false_values);
                 let mut selected = Vec::with_capacity(when_true_values.len());
-                for (true_value, false_value) in when_true_values
-                    .into_iter()
-                    .zip(when_false_values.into_iter())
+                for (true_value, false_value) in
+                    std::iter::IntoIterator::into_iter(when_true_values)
+                        .zip(std::iter::IntoIterator::into_iter(when_false_values))
                 {
                     selected.push(Value::confidential_select(cond, true_value, false_value)?);
                 }
-                Ok(Value::Array(selected))
+                Ok(Value::Array(selected.into_boxed_slice()))
             }
             _ => bail!(
                 "confidential select mismatched value variants: {} vs {}",
@@ -413,7 +423,7 @@ impl Value {
                     decoded.push((field.name.clone(), value));
                     offset = value_end;
                 }
-                Ok((Value::Struct(decoded), offset))
+                Ok((Value::Struct(decoded.into_boxed_slice()), offset))
             }
             Type::Array(element, len) => {
                 let mut offset = 0usize;
@@ -436,7 +446,7 @@ impl Value {
                     decoded.push(value);
                     offset = value_end;
                 }
-                Ok((Value::Array(decoded), offset))
+                Ok((Value::Array(decoded.into_boxed_slice()), offset))
             }
         }
     }
@@ -579,31 +589,48 @@ mod tests {
         let value = Value::zero_for_type(&ty);
         assert_eq!(
             value,
-            Value::Array(vec![
-                Value::Struct(vec![
-                    ("flag".into(), Value::Bool(false)),
-                    ("counter".into(), Value::Uint(0))
-                ]),
-                Value::Struct(vec![
-                    ("flag".into(), Value::Bool(false)),
-                    ("counter".into(), Value::Uint(0))
-                ]),
-            ])
+            Value::Array(
+                vec![
+                    Value::Struct(
+                        vec![
+                            ("flag".into(), Value::Bool(false)),
+                            ("counter".into(), Value::Uint(0))
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                    Value::Struct(
+                        vec![
+                            ("flag".into(), Value::Bool(false)),
+                            ("counter".into(), Value::Uint(0))
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                ]
+                .into_boxed_slice()
+            )
         );
     }
 
     #[test]
     fn canonical_bytes_match_chunk_visitor() {
-        let value = Value::Struct(vec![
-            ("flag".into(), Value::Bool(true)),
-            (
-                "items".into(),
-                Value::Array(vec![
-                    Value::Uint(7),
-                    Value::Struct(vec![("addr".into(), Value::Address([9u8; 20]))]),
-                ]),
-            ),
-        ]);
+        let value = Value::Struct(
+            vec![
+                ("flag".into(), Value::Bool(true)),
+                (
+                    "items".into(),
+                    Value::Array(
+                        vec![
+                            Value::Uint(7),
+                            Value::Struct(
+                                vec![("addr".into(), Value::Address([9u8; 20]))].into_boxed_slice(),
+                            ),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                ),
+            ]
+            .into_boxed_slice(),
+        );
         let expected = value.canonical_bytes();
         let mut streamed = Vec::with_capacity(value.canonical_len());
         value.visit_canonical_chunks(&mut |chunk| streamed.extend_from_slice(chunk));
@@ -623,13 +650,16 @@ mod tests {
                 ty: Type::Array(Box::new(Type::Scalar(ScalarType::Uint(256))), 2),
             },
         ]);
-        let value = Value::Struct(vec![
-            ("flag".into(), Value::Bool(true)),
-            (
-                "items".into(),
-                Value::Array(vec![Value::Uint(7), Value::Uint(9)]),
-            ),
-        ]);
+        let value = Value::Struct(
+            vec![
+                ("flag".into(), Value::Bool(true)),
+                (
+                    "items".into(),
+                    Value::Array(vec![Value::Uint(7), Value::Uint(9)].into_boxed_slice()),
+                ),
+            ]
+            .into_boxed_slice(),
+        );
         let encoded = value.canonical_bytes();
         assert_eq!(Value::decode_canonical(&ty, &encoded).unwrap(), value);
     }
@@ -663,35 +693,53 @@ mod tests {
 
     #[test]
     fn wipe_secrets_zeroes_nested_values() {
-        let mut value = Value::Struct(vec![
-            ("flag".into(), Value::Bool(true)),
-            (
-                "items".into(),
-                Value::Array(vec![
-                    Value::Uint(7),
-                    Value::Struct(vec![
-                        ("addr".into(), Value::Address([9u8; 20])),
-                        ("bytes".into(), Value::Bytes32([4u8; 32])),
-                    ]),
-                ]),
-            ),
-        ]);
+        let mut value = Value::Struct(
+            vec![
+                ("flag".into(), Value::Bool(true)),
+                (
+                    "items".into(),
+                    Value::Array(
+                        vec![
+                            Value::Uint(7),
+                            Value::Struct(
+                                vec![
+                                    ("addr".into(), Value::Address([9u8; 20])),
+                                    ("bytes".into(), Value::Bytes32([4u8; 32])),
+                                ]
+                                .into_boxed_slice(),
+                            ),
+                        ]
+                        .into_boxed_slice(),
+                    ),
+                ),
+            ]
+            .into_boxed_slice(),
+        );
         value.wipe_secrets();
         assert_eq!(
             value,
-            Value::Struct(vec![
-                ("flag".into(), Value::Bool(false)),
-                (
-                    "items".into(),
-                    Value::Array(vec![
-                        Value::Uint(0),
-                        Value::Struct(vec![
-                            ("addr".into(), Value::Address([0u8; 20])),
-                            ("bytes".into(), Value::Bytes32([0u8; 32])),
-                        ]),
-                    ]),
-                ),
-            ])
+            Value::Struct(
+                vec![
+                    ("flag".into(), Value::Bool(false)),
+                    (
+                        "items".into(),
+                        Value::Array(
+                            vec![
+                                Value::Uint(0),
+                                Value::Struct(
+                                    vec![
+                                        ("addr".into(), Value::Address([0u8; 20])),
+                                        ("bytes".into(), Value::Bytes32([0u8; 32])),
+                                    ]
+                                    .into_boxed_slice(),
+                                ),
+                            ]
+                            .into_boxed_slice(),
+                        ),
+                    ),
+                ]
+                .into_boxed_slice(),
+            )
         );
     }
 
@@ -699,31 +747,46 @@ mod tests {
     fn confidential_select_recurses_without_shape_drift() {
         let selected = Value::confidential_select(
             true,
-            Value::Struct(vec![
-                ("flag".into(), Value::Bool(true)),
-                (
-                    "items".into(),
-                    Value::Array(vec![Value::Uint(7), Value::Bytes32([9u8; 32])]),
-                ),
-            ]),
-            Value::Struct(vec![
-                ("flag".into(), Value::Bool(false)),
-                (
-                    "items".into(),
-                    Value::Array(vec![Value::Uint(1), Value::Bytes32([2u8; 32])]),
-                ),
-            ]),
+            Value::Struct(
+                vec![
+                    ("flag".into(), Value::Bool(true)),
+                    (
+                        "items".into(),
+                        Value::Array(
+                            vec![Value::Uint(7), Value::Bytes32([9u8; 32])].into_boxed_slice(),
+                        ),
+                    ),
+                ]
+                .into_boxed_slice(),
+            ),
+            Value::Struct(
+                vec![
+                    ("flag".into(), Value::Bool(false)),
+                    (
+                        "items".into(),
+                        Value::Array(
+                            vec![Value::Uint(1), Value::Bytes32([2u8; 32])].into_boxed_slice(),
+                        ),
+                    ),
+                ]
+                .into_boxed_slice(),
+            ),
         )
         .unwrap();
         assert_eq!(
             selected,
-            Value::Struct(vec![
-                ("flag".into(), Value::Bool(true)),
-                (
-                    "items".into(),
-                    Value::Array(vec![Value::Uint(7), Value::Bytes32([9u8; 32])]),
-                ),
-            ])
+            Value::Struct(
+                vec![
+                    ("flag".into(), Value::Bool(true)),
+                    (
+                        "items".into(),
+                        Value::Array(
+                            vec![Value::Uint(7), Value::Bytes32([9u8; 32])].into_boxed_slice(),
+                        ),
+                    ),
+                ]
+                .into_boxed_slice()
+            )
         );
     }
 
@@ -731,8 +794,8 @@ mod tests {
     fn confidential_select_rejects_mismatched_shapes() {
         let err = Value::confidential_select(
             false,
-            Value::Array(vec![Value::Uint(1)]),
-            Value::Struct(vec![("flag".into(), Value::Bool(false))]),
+            Value::Array(vec![Value::Uint(1)].into_boxed_slice()),
+            Value::Struct(vec![("flag".into(), Value::Bool(false))].into_boxed_slice()),
         )
         .unwrap_err();
         assert!(err

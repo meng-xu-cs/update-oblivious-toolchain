@@ -214,7 +214,9 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                     function.signature
                 );
             }
-            witnessed_slot_program.expected_runtime_step_manifest()
+            witnessed_slot_program
+                .expected_runtime_step_manifest()
+                .into_vec()
         } else {
             if entry.confidential_program.is_some() {
                 bail!(
@@ -1094,7 +1096,9 @@ bounds:
         let expr = Expr::Select {
             cond: Box::new(Expr::Var("cond".into())),
             when_true: Box::new(Expr::ArrayIndex {
-                base: Box::new(Expr::Literal(Value::Array(vec![Value::Uint(1)]))),
+                base: Box::new(Expr::Literal(Value::Array(
+                    vec![Value::Uint(1)].into_boxed_slice(),
+                ))),
                 index: Box::new(Expr::Literal(Value::Uint(0))),
             }),
             when_false: Box::new(Expr::Literal(Value::Uint(0))),
@@ -1108,7 +1112,9 @@ bounds:
     #[test]
     fn checker_rejects_confidential_array_index() {
         let expr = Expr::ArrayIndex {
-            base: Box::new(Expr::Literal(Value::Array(vec![Value::Uint(1)]))),
+            base: Box::new(Expr::Literal(Value::Array(
+                vec![Value::Uint(1)].into_boxed_slice(),
+            ))),
             index: Box::new(Expr::Literal(Value::Uint(0))),
         };
         let err = forbid_raw_expr(&expr, "confidentialArrayIndex()").unwrap_err();
@@ -1120,10 +1126,9 @@ bounds:
     #[test]
     fn checker_rejects_confidential_struct_field() {
         let expr = Expr::StructField {
-            base: Box::new(Expr::Literal(Value::Struct(vec![(
-                "flag".into(),
-                Value::Bool(true),
-            )]))),
+            base: Box::new(Expr::Literal(Value::Struct(
+                vec![("flag".into(), Value::Bool(true))].into_boxed_slice(),
+            ))),
             field: "flag".into(),
         };
         let err = forbid_raw_expr(&expr, "confidentialStructField()").unwrap_err();

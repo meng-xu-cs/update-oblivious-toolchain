@@ -11,6 +11,82 @@ def checkerAssumptions : PathOramLocalPosmapV1SecurityAssumptions :=
   , stashOverflowBounded := True
   }
 
+noncomputable def importedCertificateProjectsToLhsRuntimeKernelConfinementBoundary
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags)
+  (hProofValid : certificate.ProofGradeValid modelTags)
+  (hLhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.lhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.lhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.lhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.lhs_family.projectedPublicLeafScaffold
+                hiddenSeed)
+  (hRhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.rhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.rhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.rhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.rhs_family.projectedPublicLeafScaffold
+                hiddenSeed) :
+  ∀ seed,
+      seed <
+          (certificate.toProofGradeConcretePairSlice
+            modelTags
+            hProofValid
+            hLhsCoverage
+            hRhsCoverage).lhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+        RuntimeKernelConfinementBoundary :=
+  (certificate.toProofGradeConcretePairSlice
+    modelTags
+    hProofValid
+    hLhsCoverage
+    hRhsCoverage).lhs.runtimeKernelConfinementBoundary
+
+noncomputable def importedCertificateProjectsToRhsRuntimeKernelConfinementBoundary
+  (certificate : ImportedCanonicalFreshCoinRuntimePathOramPairCertificate)
+  (modelTags : SGXModelTags)
+  (hProofValid : certificate.ProofGradeValid modelTags)
+  (hLhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.lhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.lhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.lhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.lhs_family.projectedPublicLeafScaffold
+                hiddenSeed)
+  (hRhsCoverage :
+    ∀ hiddenSeed,
+        hiddenSeed <
+            pathOramLeafValueSeedSpaceSize certificate.rhs_family.projectedPublicLeafScaffold →
+          ∃ freshSeed, freshSeed < certificate.rhs_family.seed_count ∧
+            pathOramLeafValues
+                (certificate.rhs_family.runtimeWitnessAt freshSeed).pathOramLeafScheduleTrace =
+              pathOramLeafValueTraceOfSeed
+                certificate.rhs_family.projectedPublicLeafScaffold
+                hiddenSeed) :
+  ∀ seed,
+      seed <
+          (certificate.toProofGradeConcretePairSlice
+            modelTags
+            hProofValid
+            hLhsCoverage
+            hRhsCoverage).rhs.toConcreteRuntimePathOramConfigSlice.family.seedCount →
+        RuntimeKernelConfinementBoundary :=
+  (certificate.toProofGradeConcretePairSlice
+    modelTags
+    hProofValid
+    hLhsCoverage
+    hRhsCoverage).rhs.runtimeKernelConfinementBoundary
+
 def main (args : List String) : IO UInt32 := do
   match args with
   | [path, pageModel, exitModel, sharedResourceModel] =>

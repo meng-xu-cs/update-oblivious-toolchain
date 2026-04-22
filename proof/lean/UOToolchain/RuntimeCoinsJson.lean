@@ -1,4 +1,5 @@
 import Lean.Data.Json
+import UOToolchain.PaperPathOramTheoremRoute
 import UOToolchain.RuntimeCoins
 import UOToolchain.RuntimeConfidentialCoreAssuranceJson
 import UOToolchain.RuntimeRefinementJson
@@ -516,6 +517,57 @@ def checkImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
       (importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
         family modelTags).mpr hAssurance.1
 
+theorem ImportedSeededRuntimePathOramWitnessFamily.proofGradeKernelInterfaceAssurance_projects_to_kernelBoundaryFacts
+  {family : ImportedSeededRuntimePathOramWitnessFamily}
+  {modelTags : SGXModelTags}
+  (hAssurance : family.ProofGradeKernelInterfaceAssurance modelTags) :
+  ∀ seed, seed < family.seed_count →
+    ∃ witness,
+      family.witnessAt? seed = some witness ∧
+        ImportedRuntimeProofGradeKernelBoundaryFacts witness := by
+  intro seed hSeed
+  rcases hAssurance.2 seed hSeed with ⟨witness, hWitness, hBundle⟩
+  exact
+    ⟨witness, hWitness,
+      importedRuntimeProofGradeKernelInterfaceBundle_toKernelBoundaryFacts hBundle⟩
+
+theorem ImportedSeededRuntimePathOramWitnessFamily.proofGradeKernelInterfaceAssurance_projects_to_runtimeKernelBoundaryAt
+  {family : ImportedSeededRuntimePathOramWitnessFamily}
+  {modelTags : SGXModelTags}
+  (hAssurance : family.ProofGradeKernelInterfaceAssurance modelTags) :
+  PaperMainRuntimeKernelBoundaryAt
+    (family.toSeededRuntimePathOramWitnessFamily
+      modelTags
+      (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+        hAssurance.1)) := by
+  intro seed hSeed
+  rcases hAssurance.2 seed hSeed with ⟨witness, hWitness, hBundle⟩
+  change RuntimeProofGradeKernelInterfaceBundle
+    (family.toImportedSeededRuntimeWitnessFamily.runtimeWitnessAt seed)
+  rw [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt, hWitness]
+  exact
+    importedRuntimeProofGradeKernelInterfaceBundle_toRuntimeProofGradeKernelInterfaceBundle
+      hBundle
+
+theorem ImportedSeededRuntimePathOramWitnessFamily.proofGradeKernelInterfaceAssurance_projects_to_runtimeKernelInterface
+  {family : ImportedSeededRuntimePathOramWitnessFamily}
+  {modelTags : SGXModelTags}
+  (hAssurance : family.ProofGradeKernelInterfaceAssurance modelTags) :
+  ∀ seed, seed < family.seed_count →
+    RuntimeProofGradeKernelInterface
+      ((family.toSeededRuntimePathOramWitnessFamily
+        modelTags
+        (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+          hAssurance.1)).witnessAt seed) := by
+  intro seed hSeed
+  rcases hAssurance.2 seed hSeed with ⟨witness, hWitness, hBundle⟩
+  change RuntimeProofGradeKernelInterface
+    (family.toImportedSeededRuntimeWitnessFamily.runtimeWitnessAt seed)
+  rw [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt, hWitness]
+  exact
+    importedRuntimeProofGradeKernelInterfaceBundle_toRuntimeProofGradeKernelInterface
+      hBundle
+
 def parseAndCheckImportedProofGradeSeededRuntimePathOramKernelInterfaceFamily
   (input : String)
   (modelTags : SGXModelTags) : Except String ImportedSeededRuntimePathOramWitnessFamily := do
@@ -794,6 +846,71 @@ theorem importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_family_assu
       _ = (bundle.family.runtimeWitnessAt 0).boundarySchedule := by
             simpa using hZeroBoundary.symm
 
+theorem importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_runtimeKernelBoundaryAt
+  {bundle : ImportedSeededRuntimePaperMainFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  PaperMainRuntimeKernelBoundaryAt
+    (bundle.family.toSeededRuntimePathOramWitnessFamily
+      modelTags
+      (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+        hValid.1.1)) := by
+  exact
+    ImportedSeededRuntimePathOramWitnessFamily.proofGradeKernelInterfaceAssurance_projects_to_runtimeKernelBoundaryAt
+      hValid.1
+
+theorem importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_runtimeKernelInterface
+  {bundle : ImportedSeededRuntimePaperMainFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  ∀ seed, seed < bundle.family.seed_count →
+    RuntimeProofGradeKernelInterface
+      ((bundle.family.toSeededRuntimePathOramWitnessFamily
+        modelTags
+        (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+          hValid.1.1)).witnessAt seed) := by
+  exact
+    ImportedSeededRuntimePathOramWitnessFamily.proofGradeKernelInterfaceAssurance_projects_to_runtimeKernelInterface
+      hValid.1
+
+theorem importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_runtimeShellBoundaryBundle
+  {bundle : ImportedSeededRuntimePaperMainFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  ∀ seed,
+      seed <
+          (bundle.family.toSeededRuntimePathOramWitnessFamily
+            modelTags
+            (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+              hValid.1.1)).seedCount →
+        ∃ shellBoundaryBundle,
+          ((bundle.family.toSeededRuntimePathOramWitnessFamily
+            modelTags
+            (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+              hValid.1.1)).witnessAt seed).shellBoundaryBundle? =
+              some shellBoundaryBundle ∧
+            shellBoundaryBundle.Valid := by
+  exact
+    PaperMainRuntimeKernelBoundaryAt.projects_to_shellBoundaryBundle
+      (importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_runtimeKernelBoundaryAt
+        hValid)
+
+noncomputable def importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_runtimeKernelConfinementBoundary
+  {bundle : ImportedSeededRuntimePaperMainFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  ∀ seed,
+      seed <
+          (bundle.family.toSeededRuntimePathOramWitnessFamily
+            modelTags
+            (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+              hValid.1.1)).seedCount →
+        RuntimeKernelConfinementBoundary := by
+  exact
+    PaperMainRuntimeKernelBoundaryAt.projects_to_runtimeKernelConfinementBoundary
+      (importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_runtimeKernelBoundaryAt
+        hValid)
+
 def parseImportedSeededRuntimePaperMainFamilyBundle
   (input : String) : Except String ImportedSeededRuntimePaperMainFamilyBundle := do
   let json ← Lean.Json.parse input
@@ -1047,6 +1164,120 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
     rcases hValid.2.2.2.2 seed hSeed with
       ⟨witness, hWitness, hSlot, _hOutcome, _hBoundary⟩
     exact ⟨witness, hWitness, hSlot⟩
+
+theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelSlotBoundaryAt
+  {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  PaperMainRuntimeKernelSlotBoundaryAt
+    (bundle.family.toSeededRuntimePathOramWitnessFamily
+      modelTags
+      (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid hValid.1))
+    bundle.confidential_slot_program.toConfidentialKernelSlotProgram := by
+  intro seed hSeed
+  rcases hValid.2.2.2.2 seed hSeed with
+    ⟨witness, hWitness, hSlot, _hOutcome, _hBoundary⟩
+  rcases
+      importedWitness_toRuntimeWitness_proofGradeConfidentialCoreKernelInterfaceSlotAssurance
+        witness
+        bundle.confidential_slot_program
+        modelTags
+        hSlot with
+    ⟨_hRuntimeProofGrade, _hRuntimeNormalForm, kernelInterfaceBundle, hBundle, hBundleValid,
+      hExpectedSteps, hKernelSteps⟩
+  change
+    ∃ kernelInterfaceBundle,
+      (bundle.family.toImportedSeededRuntimeWitnessFamily.runtimeWitnessAt seed).kernelInterfaceBundle? =
+          some kernelInterfaceBundle ∧
+        kernelInterfaceBundle.Valid ∧
+        kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+          some bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps ∧
+        kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+          bundle.confidential_slot_program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps
+  simp [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt, hWitness]
+  exact ⟨kernelInterfaceBundle, hBundle, hBundleValid, hExpectedSteps, hKernelSteps⟩
+
+theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelBoundaryAt
+  {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  PaperMainRuntimeKernelBoundaryAt
+    (bundle.family.toSeededRuntimePathOramWitnessFamily
+      modelTags
+      (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid hValid.1)) := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.toRuntimeKernelBoundaryAt
+      (importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelSlotBoundaryAt
+        hValid)
+
+theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelInterface
+  {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  ∀ seed, seed < bundle.family.seed_count →
+    RuntimeProofGradeKernelInterface
+      ((bundle.family.toSeededRuntimePathOramWitnessFamily
+        modelTags
+        (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+          hValid.1)).witnessAt seed) := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelInterface
+      (importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelSlotBoundaryAt
+        hValid)
+
+theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeShellBoundaryBundle
+  {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  ∀ seed,
+      seed <
+          (bundle.family.toSeededRuntimePathOramWitnessFamily
+            modelTags
+            (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+              hValid.1)).seedCount →
+        ∃ shellBoundaryBundle,
+          ((bundle.family.toSeededRuntimePathOramWitnessFamily
+            modelTags
+            (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+              hValid.1)).witnessAt seed).shellBoundaryBundle? =
+              some shellBoundaryBundle ∧
+            shellBoundaryBundle.Valid := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_shellBoundaryBundle
+      (importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelSlotBoundaryAt
+        hValid)
+
+noncomputable def importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelInterfaceSlotBoundary
+  {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  ∀ seed,
+      seed <
+          (bundle.family.toSeededRuntimePathOramWitnessFamily
+            modelTags
+            (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+              hValid.1)).seedCount →
+        RuntimeKernelInterfaceSlotBoundary := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelInterfaceSlotBoundary
+      (importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelSlotBoundaryAt
+        hValid)
+
+noncomputable def importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelConfinementBoundary
+  {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  ∀ seed,
+      seed <
+          (bundle.family.toSeededRuntimePathOramWitnessFamily
+            modelTags
+            (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid
+              hValid.1)).seedCount →
+        RuntimeKernelConfinementBoundary := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.projects_to_runtimeKernelConfinementBoundary
+      (importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtimeKernelSlotBoundaryAt
+        hValid)
 
 def parseImportedSeededRuntimePaperMainSlotFamilyBundle
   (input : String) : Except String ImportedSeededRuntimePaperMainSlotFamilyBundle := do

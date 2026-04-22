@@ -21,6 +21,58 @@ structure SeededRuntimePathOramWitnessFamily (modelTags : SGXModelTags)
     ∀ seed, seed < seedCount →
       (witnessAt seed).projectedPublicPathOramLeafScaffold = publicLeafScaffold
 
+@[simp] theorem runtimeWitness_valid_runtimeSeed_iff
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (runtimeSeed : Option Nat) :
+  ({ witness with runtimeSeed := runtimeSeed }).Valid modelTags ↔
+    witness.Valid modelTags := by
+  cases witness <;> rfl
+
+@[simp] theorem runtimeWitness_proofGradeValid_runtimeSeed_iff
+  (witness : RuntimeRefinementWitness)
+  (modelTags : SGXModelTags)
+  (runtimeSeed : Option Nat) :
+  ({ witness with runtimeSeed := runtimeSeed }).ProofGradeValid modelTags ↔
+    witness.ProofGradeValid modelTags := by
+  cases witness <;> rfl
+
+def RuntimeRefinementWitness.toSingletonSeededRuntimeWitnessFamily
+  {modelTags : SGXModelTags}
+  (witness : RuntimeRefinementWitness)
+  (hValid : witness.Valid modelTags) :
+  SeededRuntimeWitnessFamily modelTags :=
+  { seedCount := 1
+  , witnessAt := fun _ => { witness with runtimeSeed := some 0 }
+  , seedTagged := by
+      intro seed hSeed
+      change seed < 1 at hSeed
+      have hZero : seed = 0 := by omega
+      subst hZero
+      rfl
+  , valid := by
+      intro seed hSeed
+      change seed < 1 at hSeed
+      have hZero : seed = 0 := by omega
+      subst hZero
+      simpa using hValid
+  }
+
+def RuntimeRefinementWitness.toSingletonSeededRuntimePathOramWitnessFamily
+  {modelTags : SGXModelTags}
+  (witness : RuntimeRefinementWitness)
+  (hValid : witness.Valid modelTags) :
+  SeededRuntimePathOramWitnessFamily modelTags :=
+  { witness.toSingletonSeededRuntimeWitnessFamily hValid with
+    publicLeafScaffold := witness.projectedPublicPathOramLeafScaffold
+    publicLeafScaffoldExact := by
+      intro seed hSeed
+      change seed < 1 at hSeed
+      have hZero : seed = 0 := by omega
+      subst hZero
+      cases witness <;> rfl
+  }
+
 def SeededRuntimeWitnessFamily.witnessDistribution
   {modelTags : SGXModelTags}
   (family : SeededRuntimeWitnessFamily modelTags) : Distribution RuntimeRefinementWitness :=

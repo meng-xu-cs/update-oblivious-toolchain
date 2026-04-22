@@ -3,6 +3,7 @@ use crate::types::{Type, Value};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::mem::MaybeUninit;
 use thiserror::Error;
 use uo_precompiles::UoOpcode;
 
@@ -342,13 +343,303 @@ pub trait ConfidentialKernelSlotRuntime {
         predicate: Option<bool>,
     ) -> Result<()>;
 
-    fn keccak256(&mut self, parts: Vec<Value>) -> Result<Value>;
+    fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value>;
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub trait ConfidentialKernelEffectRuntime {
+    fn note_statement(&mut self, _statement: &ConfidentialKernelSlotStatement) -> Result<()> {
+        Ok(())
+    }
+
+    fn note_live_slot_words(&mut self, _words: usize) -> Result<()> {
+        Ok(())
+    }
+
+    fn cell_get(&mut self, object_id: u32) -> Result<Value>;
+
+    fn cell_set(&mut self, object_id: u32, value: Value, predicate: Option<bool>) -> Result<()>;
+
+    fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value>;
+
+    fn array_set(
+        &mut self,
+        object_id: u32,
+        index: usize,
+        value: Value,
+        predicate: Option<bool>,
+    ) -> Result<()>;
+
+    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value>;
+
+    fn map_put(
+        &mut self,
+        object_id: u32,
+        key: Value,
+        value: Value,
+        predicate: Option<bool>,
+    ) -> Result<()>;
+
+    fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value>;
+}
+
+struct ConfidentialKernelSlotExecutor<'a, R> {
+    runtime: &'a mut R,
+    state: ConfidentialKernelSlotState,
+}
+
+impl<'a, R: ConfidentialKernelEffectRuntime> ConfidentialKernelSlotExecutor<'a, R> {
+    fn new(runtime: &'a mut R, slot_count: usize) -> Self {
+        Self {
+            runtime,
+            state: ConfidentialKernelSlotState::new(slot_count),
+        }
+    }
+
+    fn store_call_inputs(
+        &mut self,
+        program: &ConfidentialKernelSlotProgram,
+        call_inputs: ConfidentialCallInputs,
+    ) -> Result<()> {
+        let mut supplied_args = 0usize;
+        for (slot, arg) in call_inputs.into_raw_args().enumerate() {
+            supplied_args = slot + 1;
+            if slot >= program.param_count {
+                bail!(
+                    "confidential slot program {} expected {} confidential arguments but runtime supplied {}",
+                    program.entrypoint_id,
+                    program.param_count,
+                    supplied_args
+                );
+            }
+            self.store_slot(slot, arg)?;
+        }
+        if supplied_args != program.param_count {
+            bail!(
+                "confidential slot program {} expected {} confidential arguments but runtime supplied {}",
+                program.entrypoint_id,
+                program.param_count,
+                supplied_args
+            );
+        }
+        Ok(())
+    }
+}
+
+impl<R: ConfidentialKernelEffectRuntime> ConfidentialKernelSlotRuntime
+    for ConfidentialKernelSlotExecutor<'_, R>
+{
+    fn note_statement(&mut self, statement: &ConfidentialKernelSlotStatement) -> Result<()> {
+        self.runtime.note_statement(statement)
+    }
+
+    fn load_slot(&self, slot: usize) -> Result<Value> {
+        self.state.load_slot(slot)
+    }
+
+    fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {
+        self.state.store_slot(slot, value)?;
+        self.runtime
+            .note_live_slot_words(self.state.live_slot_words())?;
+        Ok(())
+    }
+
+    fn cell_get(&mut self, object_id: u32) -> Result<Value> {
+        self.runtime.cell_get(object_id)
+    }
+
+    fn cell_set(&mut self, object_id: u32, value: Value, predicate: Option<bool>) -> Result<()> {
+        self.runtime.cell_set(object_id, value, predicate)
+    }
+
+    fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value> {
+        self.runtime.array_get(object_id, index)
+    }
+
+    fn array_set(
+        &mut self,
+        object_id: u32,
+        index: usize,
+        value: Value,
+        predicate: Option<bool>,
+    ) -> Result<()> {
+        self.runtime.array_set(object_id, index, value, predicate)
+    }
+
+    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value> {
+        self.runtime.map_get(object_id, key)
+    }
+
+    fn map_put(
+        &mut self,
+        object_id: u32,
+        key: Value,
+        value: Value,
+        predicate: Option<bool>,
+    ) -> Result<()> {
+        self.runtime.map_put(object_id, key, value, predicate)
+    }
+
+    fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {
+        self.runtime.keccak256(parts)
+    }
+}
+
+struct FixedConfidentialValueBuffer {
+    values: Box<[MaybeUninit<Value>]>,
+    initialized: usize,
+}
+
+impl FixedConfidentialValueBuffer {
+    fn new(len: usize) -> Self {
+        Self {
+            values: Box::<[Value]>::new_uninit_slice(len),
+            initialized: 0,
+        }
+    }
+
+    fn push(&mut self, value: Value) {
+        assert!(
+            self.initialized < self.values.len(),
+            "fixed confidential value buffer overflow"
+        );
+        self.values[self.initialized].write(value);
+        self.initialized += 1;
+    }
+
+    fn finish(mut self) -> Box<[Value]> {
+        assert_eq!(
+            self.initialized,
+            self.values.len(),
+            "fixed confidential value buffer underfilled"
+        );
+        let values = std::mem::take(&mut self.values);
+        self.initialized = 0;
+        let raw = Box::into_raw(values) as *mut [Value];
+        unsafe { Box::from_raw(raw) }
+    }
+}
+
+impl Drop for FixedConfidentialValueBuffer {
+    fn drop(&mut self) {
+        for value in &mut self.values[..self.initialized] {
+            unsafe {
+                value.assume_init_mut().wipe_secrets();
+                value.assume_init_drop();
+            }
+        }
+    }
+}
+
+fn collect_confidential_hash_parts(
+    len: usize,
+    parts: impl IntoIterator<Item = Result<Value>>,
+) -> Result<Box<[Value]>> {
+    let mut values = FixedConfidentialValueBuffer::new(len);
+    for part in parts {
+        values.push(part?);
+    }
+    Ok(values.finish())
+}
+
+#[derive(Debug)]
+pub struct ConfidentialCallInputs {
+    raw_args: Box<[Value]>,
+}
+
+impl ConfidentialCallInputs {
+    pub fn from_raw_args(args: Box<[Value]>) -> Self {
+        Self { raw_args: args }
+    }
+
+    pub fn into_raw_args(mut self) -> impl Iterator<Item = Value> {
+        std::iter::IntoIterator::into_iter(std::mem::take(&mut self.raw_args))
+    }
+}
+
+impl Drop for ConfidentialCallInputs {
+    fn drop(&mut self) {
+        for value in self.raw_args.iter_mut() {
+            value.wipe_secrets();
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ConfidentialKernelSlotState {
+    slots: Box<[Option<Value>]>,
+    initialized_slots: usize,
+}
+
+impl ConfidentialKernelSlotState {
+    pub fn new(slot_count: usize) -> Self {
+        Self {
+            slots: vec![None; slot_count].into_boxed_slice(),
+            initialized_slots: 0,
+        }
+    }
+
+    pub fn load_slot(&self, slot: usize) -> Result<Value> {
+        self.slots
+            .get(slot)
+            .and_then(Option::as_ref)
+            .cloned()
+            .ok_or_else(|| anyhow!("unknown slot {slot}"))
+    }
+
+    pub fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {
+        let cell = self
+            .slots
+            .get_mut(slot)
+            .ok_or_else(|| anyhow!("unknown slot {slot}"))?;
+        if cell.is_none() {
+            self.initialized_slots += 1;
+        }
+        *cell = Some(value);
+        Ok(())
+    }
+
+    pub fn live_slot_words(&self) -> usize {
+        self.initialized_slots
+    }
+}
+
+impl Drop for ConfidentialKernelSlotState {
+    fn drop(&mut self) {
+        for slot in &mut self.slots {
+            if let Some(value) = slot.as_mut() {
+                value.wipe_secrets();
+            }
+            *slot = None;
+        }
+        self.initialized_slots = 0;
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct ConfidentialKernelExecutionOutcome {
-    pub aborted: bool,
-    pub return_value: Option<Value>,
+    aborted: bool,
+    return_value: Option<Value>,
+}
+
+impl ConfidentialKernelExecutionOutcome {
+    pub fn new(aborted: bool, return_value: Option<Value>) -> Self {
+        Self {
+            aborted,
+            return_value,
+        }
+    }
+
+    pub fn aborted(&self) -> bool {
+        self.aborted
+    }
+
+    pub fn return_value(&self) -> Option<&Value> {
+        self.return_value.as_ref()
+    }
+
+    pub fn into_parts(self) -> (bool, Option<Value>) {
+        (self.aborted, self.return_value)
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -370,10 +661,20 @@ pub fn execute_confidential_kernel_slot_program<R: ConfidentialKernelSlotRuntime
     }
     let mut state = ConfidentialKernelInterpreterState::default();
     execute_confidential_kernel_slot_block(runtime, &program.body, &mut state)?;
-    Ok(ConfidentialKernelExecutionOutcome {
-        aborted: state.aborted,
-        return_value: state.return_value,
-    })
+    Ok(ConfidentialKernelExecutionOutcome::new(
+        state.aborted,
+        state.return_value,
+    ))
+}
+
+pub fn execute_confidential_kernel_slot_call<R: ConfidentialKernelEffectRuntime>(
+    runtime: &mut R,
+    program: &ConfidentialKernelSlotProgram,
+    call_inputs: ConfidentialCallInputs,
+) -> Result<ConfidentialKernelExecutionOutcome> {
+    let mut executor = ConfidentialKernelSlotExecutor::new(runtime, program.slot_count);
+    executor.store_call_inputs(program, call_inputs)?;
+    execute_confidential_kernel_slot_program(&mut executor, program)
 }
 
 fn execute_confidential_kernel_slot_block<R: ConfidentialKernelSlotRuntime>(
@@ -518,10 +819,12 @@ fn eval_confidential_kernel_slot_expr<R: ConfidentialKernelSlotRuntime>(
             runtime.map_get(*object_id, &key)
         }
         ConfidentialKernelSlotExpr::Keccak256 { parts } => {
-            let mut values = Vec::with_capacity(parts.len());
-            for part in parts {
-                values.push(eval_confidential_kernel_slot_expr(runtime, part)?);
-            }
+            let values = collect_confidential_hash_parts(
+                parts.len(),
+                parts
+                    .iter()
+                    .map(|part| eval_confidential_kernel_slot_expr(runtime, part)),
+            )?;
             runtime.keccak256(values)
         }
     }
@@ -556,10 +859,12 @@ fn eval_confidential_kernel_slot_pure_expr<R: ConfidentialKernelSlotRuntime>(
             Value::confidential_select(cond, when_true, when_false)
         }
         ConfidentialKernelSlotPureExpr::Keccak256 { parts } => {
-            let mut values = Vec::with_capacity(parts.len());
-            for part in parts {
-                values.push(eval_confidential_kernel_slot_pure_expr(runtime, part)?);
-            }
+            let values = collect_confidential_hash_parts(
+                parts.len(),
+                parts
+                    .iter()
+                    .map(|part| eval_confidential_kernel_slot_pure_expr(runtime, part)),
+            )?;
             runtime.keccak256(values)
         }
     }
@@ -659,7 +964,7 @@ impl CompiledFunction {
 }
 
 impl ConfidentialKernelProgram {
-    pub fn expected_runtime_steps(&self) -> Vec<ConfidentialKernelStep> {
+    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
         let mut steps = vec![ConfidentialKernelStep {
             opcode: UoOpcode::Begin,
             object_id: None,
@@ -677,7 +982,7 @@ impl ConfidentialKernelProgram {
                 object_id: None,
             },
         ]);
-        steps
+        steps.into_boxed_slice()
     }
 
     pub fn to_slot_program(
@@ -725,7 +1030,7 @@ impl ConfidentialKernelProgram {
 }
 
 impl ConfidentialKernelSlotProgram {
-    pub fn expected_runtime_steps(&self) -> Vec<ConfidentialKernelStep> {
+    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
         let mut steps = vec![ConfidentialKernelStep {
             opcode: UoOpcode::Begin,
             object_id: None,
@@ -743,7 +1048,7 @@ impl ConfidentialKernelSlotProgram {
                 object_id: None,
             },
         ]);
-        steps
+        steps.into_boxed_slice()
     }
 
     pub fn is_runtime_normal_form(&self) -> bool {
@@ -767,10 +1072,10 @@ impl ConfidentialKernelStatement {
         }
     }
 
-    pub fn expected_runtime_steps(&self) -> Vec<ConfidentialKernelStep> {
+    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
         let mut steps = Vec::new();
         self.collect_kernel_steps(&mut steps);
-        steps
+        steps.into_boxed_slice()
     }
 
     fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
@@ -854,10 +1159,10 @@ impl ConfidentialKernelSlotStatement {
         }
     }
 
-    pub fn expected_runtime_steps(&self) -> Vec<ConfidentialKernelStep> {
+    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
         let mut steps = Vec::new();
         self.collect_kernel_steps(&mut steps);
-        steps
+        steps.into_boxed_slice()
     }
 
     fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
@@ -924,10 +1229,10 @@ impl ConfidentialKernelSlotStatement {
 }
 
 impl ConfidentialKernelExpr {
-    pub fn kernel_steps(&self) -> Vec<ConfidentialKernelStep> {
+    pub fn kernel_steps(&self) -> Box<[ConfidentialKernelStep]> {
         let mut steps = Vec::new();
         self.collect_kernel_steps(&mut steps);
-        steps
+        steps.into_boxed_slice()
     }
 
     fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
@@ -967,10 +1272,10 @@ impl ConfidentialKernelExpr {
 }
 
 impl ConfidentialKernelSlotExpr {
-    pub fn kernel_steps(&self) -> Vec<ConfidentialKernelStep> {
+    pub fn kernel_steps(&self) -> Box<[ConfidentialKernelStep]> {
         let mut steps = Vec::new();
         self.collect_kernel_steps(&mut steps);
-        steps
+        steps.into_boxed_slice()
     }
 
     fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
@@ -1734,10 +2039,11 @@ fn expr_contains_kernel_access(expr: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        execute_confidential_kernel_slot_program, ConfidentialKernelExecutionOutcome,
-        ConfidentialKernelSlotExpr, ConfidentialKernelSlotLoweringError,
-        ConfidentialKernelSlotProgram, ConfidentialKernelSlotRuntime,
-        ConfidentialKernelSlotStatement,
+        execute_confidential_kernel_slot_call, execute_confidential_kernel_slot_program,
+        ConfidentialCallInputs, ConfidentialKernelEffectRuntime,
+        ConfidentialKernelExecutionOutcome, ConfidentialKernelSlotExpr,
+        ConfidentialKernelSlotLoweringError, ConfidentialKernelSlotProgram,
+        ConfidentialKernelSlotRuntime, ConfidentialKernelSlotStatement,
     };
     use crate::{
         ir::StateObject, BackendKind, BinaryOp, CompiledFunction, ContainerKind, Expr, ScalarType,
@@ -1892,7 +2198,68 @@ mod tests {
             ))
         }
 
-        fn keccak256(&mut self, parts: Vec<Value>) -> Result<Value> {
+        fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {
+            Err(anyhow!("unexpected keccak256({parts:?}) in mock runtime"))
+        }
+    }
+
+    impl ConfidentialKernelEffectRuntime for MockRuntime {
+        fn note_statement(&mut self, statement: &ConfidentialKernelSlotStatement) -> Result<()> {
+            self.statements.push(statement.trace_name());
+            Ok(())
+        }
+
+        fn cell_get(&mut self, object_id: u32) -> Result<Value> {
+            Err(anyhow!("unexpected cell_get({object_id}) in mock runtime"))
+        }
+
+        fn cell_set(
+            &mut self,
+            object_id: u32,
+            value: Value,
+            predicate: Option<bool>,
+        ) -> Result<()> {
+            self.cell_sets.push((object_id, value, predicate));
+            Ok(())
+        }
+
+        fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value> {
+            Err(anyhow!(
+                "unexpected array_get({object_id}, {index}) in mock runtime"
+            ))
+        }
+
+        fn array_set(
+            &mut self,
+            object_id: u32,
+            index: usize,
+            _value: Value,
+            _predicate: Option<bool>,
+        ) -> Result<()> {
+            Err(anyhow!(
+                "unexpected array_set({object_id}, {index}) in mock runtime"
+            ))
+        }
+
+        fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value> {
+            Err(anyhow!(
+                "unexpected map_get({object_id}, {key:?}) in mock runtime"
+            ))
+        }
+
+        fn map_put(
+            &mut self,
+            object_id: u32,
+            key: Value,
+            value: Value,
+            predicate: Option<bool>,
+        ) -> Result<()> {
+            Err(anyhow!(
+                "unexpected map_put({object_id}, {key:?}, {value:?}, {predicate:?}) in mock runtime"
+            ))
+        }
+
+        fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {
             Err(anyhow!("unexpected keccak256({parts:?}) in mock runtime"))
         }
     }
@@ -2089,6 +2456,92 @@ mod tests {
 
         let err = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap_err();
         assert!(err.to_string().contains("not in runtime normal form"));
+    }
+
+    #[test]
+    fn shared_slot_call_executor_stages_args_inside_uo_core() {
+        let mut runtime = MockRuntime::default();
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "demo(uint256)".into(),
+            param_count: 1,
+            return_type: Some(uint_type()),
+            secret_args: vec![0],
+            slot_count: 2,
+            body: vec![
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 1,
+                    value: ConfidentialKernelSlotExpr::Binary {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(ConfidentialKernelSlotExpr::Slot { slot: 0 }),
+                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(2),
+                        }),
+                    },
+                },
+                ConfidentialKernelSlotStatement::CellSet {
+                    object_id: 7,
+                    value: ConfidentialKernelSlotExpr::Slot { slot: 1 },
+                    predicate: Some(ConfidentialKernelSlotExpr::Literal {
+                        value: Value::Bool(true),
+                    }),
+                },
+                ConfidentialKernelSlotStatement::Return {
+                    value: Some(ConfidentialKernelSlotExpr::Slot { slot: 1 }),
+                },
+            ],
+        };
+
+        let outcome = execute_confidential_kernel_slot_call(
+            &mut runtime,
+            &program,
+            ConfidentialCallInputs::from_raw_args(vec![Value::Uint(5)].into_boxed_slice()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome,
+            ConfidentialKernelExecutionOutcome {
+                aborted: false,
+                return_value: Some(Value::Uint(7)),
+            }
+        );
+        assert_eq!(runtime.cell_sets, vec![(7, Value::Uint(7), Some(true))]);
+        assert_eq!(runtime.statements, vec!["declare", "cell_set", "return"]);
+    }
+
+    #[test]
+    fn shared_slot_call_executor_rejects_confidential_arg_count_mismatch() {
+        let mut runtime = MockRuntime::default();
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "demo(uint256)".into(),
+            param_count: 1,
+            return_type: None,
+            secret_args: vec![0],
+            slot_count: 1,
+            body: vec![ConfidentialKernelSlotStatement::Return { value: None }],
+        };
+
+        let err = execute_confidential_kernel_slot_call(
+            &mut runtime,
+            &program,
+            ConfidentialCallInputs::from_raw_args(vec![].into_boxed_slice()),
+        )
+        .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("expected 1 confidential arguments but runtime supplied 0"));
+
+        let err = execute_confidential_kernel_slot_call(
+            &mut runtime,
+            &program,
+            ConfidentialCallInputs::from_raw_args(
+                vec![Value::Uint(1), Value::Uint(2)].into_boxed_slice(),
+            ),
+        )
+        .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("expected 1 confidential arguments but runtime supplied 2"));
     }
 
     #[test]

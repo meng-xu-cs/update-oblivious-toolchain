@@ -1,3 +1,5 @@
+use crate::artifact::CompiledArtifact;
+use crate::confidential_core::RuntimeConfidentialProofBundleFamilyError;
 use crate::confidential_kernel::{
     ConfidentialKernelLoweringError, ConfidentialKernelSlotProgram, ConfidentialKernelStep,
 };
@@ -5,11 +7,15 @@ use crate::ir::StateObject;
 use crate::manifest::{
     EntrypointManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
 };
+use crate::types::Value;
+use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::mem::MaybeUninit;
+use thiserror::Error;
 use uo_precompiles::UoOpcode;
 
 #[cfg(test)]
@@ -102,19 +108,107 @@ pub struct BoundaryEvent {
     pub output_len: usize,
 }
 
+impl BoundaryEvent {
+    pub fn enter(api_id: impl Into<String>, input_len: usize) -> Self {
+        Self {
+            direction: BoundaryDirection::Enter,
+            api_id: api_id.into(),
+            input_len,
+            output_len: 0,
+        }
+    }
+
+    pub fn exit(api_id: impl Into<String>, output_len: usize) -> Self {
+        Self {
+            direction: BoundaryDirection::Exit,
+            api_id: api_id.into(),
+            input_len: 0,
+            output_len,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct OutputShape {
     pub return_present: bool,
     pub return_length: usize,
 }
 
+impl OutputShape {
+    pub fn returned(return_length: usize) -> Self {
+        Self {
+            return_present: true,
+            return_length,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct PublicOutcomeTrace {
     pub entrypoint_id: String,
-    pub public_args: Vec<String>,
+    pub public_args: Box<[String]>,
     pub termination_status: bool,
     pub output_shape: OutputShape,
     pub gas_used: u64,
+}
+
+impl PublicOutcomeTrace {
+    pub fn new(
+        entrypoint_id: impl Into<String>,
+        public_args: Box<[String]>,
+        termination_status: bool,
+        output_shape: OutputShape,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            entrypoint_id: entrypoint_id.into(),
+            public_args,
+            termination_status,
+            output_shape,
+            gas_used,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PublicCallSummary {
+    entry_input_len: usize,
+    public_args: Box<[String]>,
+}
+
+impl PublicCallSummary {
+    pub fn from_manifest_entry(
+        manifest_entry: &EntrypointManifest,
+        args: &[Value],
+    ) -> Result<Self> {
+        if manifest_entry.param_names.len() != args.len() {
+            bail!(
+                "manifest param_names length mismatch: {} != {}",
+                manifest_entry.param_names.len(),
+                args.len()
+            );
+        }
+        Ok(Self {
+            entry_input_len: manifest_entry.entry_input_len,
+            public_args: manifest_entry
+                .param_names
+                .iter()
+                .zip(args.iter())
+                .enumerate()
+                .filter(|(index, _)| !manifest_entry.secret_args.contains(index))
+                .map(|(_, (name, value))| format!("{name}={value}"))
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        })
+    }
+
+    pub fn entry_input_len(&self) -> usize {
+        self.entry_input_len
+    }
+
+    pub fn into_public_args(self) -> Box<[String]> {
+        self.public_args
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -153,9 +247,9 @@ pub enum ExitEvent {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct SgxControllerShapeTrace {
     pub boundary_event_budget: usize,
-    pub controller_phase_order: Vec<ControllerPhase>,
-    pub page_trace_regions: Vec<ControllerPageBudget>,
-    pub workset_regions: Vec<ControllerPageBudget>,
+    pub controller_phase_order: Box<[ControllerPhase]>,
+    pub page_trace_regions: Box<[ControllerPageBudget]>,
+    pub workset_regions: Box<[ControllerPageBudget]>,
     pub exit_trace_budget: usize,
     pub shared_resource_budget: usize,
     pub recursive_position_map_depth: usize,
@@ -170,9 +264,9 @@ pub struct NormalizedPageEvent {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct NormalizedMicroTrace {
-    pub page_trace: Vec<NormalizedPageEvent>,
-    pub exit_pattern: Vec<ExitEvent>,
-    pub shared_resource_pattern: Vec<String>,
+    pub page_trace: Box<[NormalizedPageEvent]>,
+    pub exit_pattern: Box<[ExitEvent]>,
+    pub shared_resource_pattern: Box<[String]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -183,6 +277,88 @@ pub struct RuntimeOramAccessWitness {
     pub buckets_per_access: usize,
     pub recursion_depth: usize,
     pub stash_bound: usize,
+}
+
+impl RuntimeOramAccessWitness {
+    pub fn new(
+        object_id: u32,
+        scheme: impl Into<String>,
+        metadata_pages_per_access: usize,
+        buckets_per_access: usize,
+        recursion_depth: usize,
+        stash_bound: usize,
+    ) -> Self {
+        Self {
+            object_id,
+            scheme: scheme.into(),
+            metadata_pages_per_access,
+            buckets_per_access,
+            recursion_depth,
+            stash_bound,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeObservedOramAccessWitness {
+    pub object_id: u32,
+    pub scheme: String,
+    pub block_size: usize,
+    pub bucket_size: usize,
+    pub bucket_count: usize,
+    pub blocks_per_bucket: usize,
+    pub tree_height: usize,
+    pub stash_bound: usize,
+    pub recursion_depth: usize,
+    pub metadata_pages: usize,
+    pub metadata_pages_per_access: usize,
+    pub buckets_per_access: usize,
+    pub accesses_per_call: usize,
+}
+
+impl RuntimeObservedOramAccessWitness {
+    pub fn new(
+        object_id: u32,
+        scheme: impl Into<String>,
+        block_size: usize,
+        bucket_size: usize,
+        bucket_count: usize,
+        blocks_per_bucket: usize,
+        tree_height: usize,
+        stash_bound: usize,
+        recursion_depth: usize,
+        metadata_pages: usize,
+        metadata_pages_per_access: usize,
+        buckets_per_access: usize,
+        accesses_per_call: usize,
+    ) -> Self {
+        Self {
+            object_id,
+            scheme: scheme.into(),
+            block_size,
+            bucket_size,
+            bucket_count,
+            blocks_per_bucket,
+            tree_height,
+            stash_bound,
+            recursion_depth,
+            metadata_pages,
+            metadata_pages_per_access,
+            buckets_per_access,
+            accesses_per_call,
+        }
+    }
+
+    pub fn controller_access_witness(&self) -> RuntimeOramAccessWitness {
+        RuntimeOramAccessWitness::new(
+            self.object_id,
+            self.scheme.clone(),
+            self.metadata_pages_per_access,
+            self.buckets_per_access,
+            self.recursion_depth,
+            self.stash_bound,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -262,21 +438,56 @@ pub struct RuntimeKernelStepWitness {
 }
 
 impl ConfidentialKernelSlotProgram {
-    pub fn expected_runtime_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
+    pub fn expected_runtime_step_witnesses(&self) -> Box<[RuntimeKernelStepWitness]> {
         self.expected_runtime_steps()
-            .into_iter()
+            .iter()
             .map(RuntimeKernelStepWitness::from)
-            .collect()
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
     }
 }
 
 impl EntrypointManifest {
-    pub fn stored_kernel_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
+    pub fn stored_kernel_step_witnesses(&self) -> Box<[RuntimeKernelStepWitness]> {
         manifest_kernel_steps_as_witness(&self.kernel_steps)
     }
 
-    pub fn kernel_step_witnesses(&self) -> Vec<RuntimeKernelStepWitness> {
+    pub fn kernel_step_witnesses(&self) -> Box<[RuntimeKernelStepWitness]> {
         manifest_kernel_steps_as_witness(&self.canonical_kernel_step_manifest())
+    }
+
+    pub fn checked_confidential_slot_program(
+        &self,
+        entrypoint: &str,
+    ) -> anyhow::Result<ConfidentialKernelSlotProgram> {
+        let program = self.confidential_slot_program.clone().ok_or_else(|| {
+            anyhow!(
+                "manifest confidential entrypoint {} is missing confidential_slot_program",
+                entrypoint
+            )
+        })?;
+        if program.entrypoint_id != entrypoint {
+            bail!(
+                "manifest confidential slot program expected entrypoint '{}' but found program for '{}'",
+                entrypoint,
+                program.entrypoint_id
+            );
+        }
+        if !program.is_runtime_normal_form() {
+            bail!(
+                "confidential slot program {} is not in runtime normal form",
+                entrypoint
+            );
+        }
+        let manifest_expected_kernel_steps = self.stored_kernel_step_witnesses();
+        let program_expected_kernel_steps = program.expected_runtime_step_witnesses();
+        if manifest_expected_kernel_steps != program_expected_kernel_steps {
+            bail!(
+                "manifest kernel step trace drifted from confidential slot program for {}",
+                entrypoint
+            );
+        }
+        Ok(program)
     }
 }
 
@@ -310,14 +521,14 @@ pub struct RuntimeKernelResourceEventWitness {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelScheduleWitness {
     #[serde(default)]
-    opcodes: Vec<UoOpcode>,
+    opcodes: Box<[UoOpcode]>,
     #[serde(default)]
-    steps: Vec<RuntimeKernelStepWitness>,
+    steps: Box<[RuntimeKernelStepWitness]>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RuntimeKernelScheduleTracker {
-    expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
+    expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
     expected_kernel_step_index: usize,
 }
 
@@ -326,6 +537,13 @@ pub struct RuntimeKernelExecutionTracker {
     expected_kernel_schedule: RuntimeKernelScheduleTracker,
     emitted_kernel_steps: Vec<RuntimeKernelStepWitness>,
     max_kernel_ops: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeKernelBoundaryTracker {
+    public_object_ids: Box<[u32]>,
+    kernel_execution: RuntimeKernelExecutionTracker,
+    runtime_phase_events: RuntimeKernelRefinementTracker,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -358,19 +576,19 @@ pub struct RuntimeKernelRefinementEventWitness {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct RuntimeKernelRefinementWitness {
     #[serde(default)]
-    events: Vec<RuntimeKernelRefinementEventWitness>,
+    events: Box<[RuntimeKernelRefinementEventWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct RuntimeControllerCertificate {
     entry_input_len: usize,
-    observed_oram_accesses: Vec<RuntimeOramAccessWitness>,
+    observed_oram_accesses: Box<[RuntimeOramAccessWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeControllerObserverCertificate {
     public_outcome: PublicOutcomeTrace,
-    boundary_schedule: Vec<BoundaryEvent>,
+    boundary_schedule: Box<[BoundaryEvent]>,
     controller_shape: SgxControllerShapeTrace,
     normalized_micro_trace: NormalizedMicroTrace,
     controller_certificate: RuntimeControllerCertificate,
@@ -379,17 +597,17 @@ pub struct RuntimeControllerObserverCertificate {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimePathOramHiddenCertificate {
     trace: RefinementTrace,
-    oram_objects: Vec<RuntimeOramObjectWitness>,
+    oram_objects: Box<[RuntimeOramObjectWitness]>,
     #[serde(default)]
-    oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    oram_leaf_public_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
     #[serde(default)]
-    oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
     #[serde(default)]
-    oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
     #[serde(default)]
-    oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
     #[serde(default)]
-    oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
@@ -397,11 +615,27 @@ pub struct TheoremTrace {
     #[serde(default)]
     pub public_outcome: Option<PublicOutcomeTrace>,
     #[serde(default)]
-    pub boundary_schedule: Vec<BoundaryEvent>,
+    pub boundary_schedule: Box<[BoundaryEvent]>,
     #[serde(default)]
     pub controller_shape: Option<SgxControllerShapeTrace>,
     #[serde(default)]
     pub normalized_micro_trace: Option<NormalizedMicroTrace>,
+}
+
+impl TheoremTrace {
+    pub fn from_public_observer_parts(
+        public_outcome: PublicOutcomeTrace,
+        boundary_schedule: Box<[BoundaryEvent]>,
+        controller_shape: SgxControllerShapeTrace,
+    ) -> Self {
+        let normalized_micro_trace = controller_shape.normalized_micro_trace();
+        Self {
+            public_outcome: Some(public_outcome),
+            boundary_schedule,
+            controller_shape: Some(controller_shape),
+            normalized_micro_trace: Some(normalized_micro_trace),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -414,11 +648,11 @@ pub struct RefinementPhysicalWrite {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct RefinementTrace {
-    pub opcode_trace: Vec<String>,
-    pub logical_accesses: Vec<LogicalEvent>,
-    pub logical_writes: Vec<LogicalEvent>,
-    pub physical_reads: Vec<PhysicalReadEvent>,
-    pub physical_writes: Vec<RefinementPhysicalWrite>,
+    pub opcode_trace: Box<[String]>,
+    pub logical_accesses: Box<[LogicalEvent]>,
+    pub logical_writes: Box<[LogicalEvent]>,
+    pub physical_reads: Box<[PhysicalReadEvent]>,
+    pub physical_writes: Box<[RefinementPhysicalWrite]>,
     pub gas_used: u64,
 }
 
@@ -431,24 +665,24 @@ pub struct RuntimeRefinementWitness {
     kernel_witness: Option<RuntimeKernelWitness>,
     #[serde(default)]
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
-    boundary_schedule: Vec<BoundaryEvent>,
+    boundary_schedule: Box<[BoundaryEvent]>,
     controller_shape: SgxControllerShapeTrace,
     normalized_micro_trace: NormalizedMicroTrace,
     controller_certificate: RuntimeControllerCertificate,
-    oram_objects: Vec<RuntimeOramObjectWitness>,
+    oram_objects: Box<[RuntimeOramObjectWitness]>,
     #[serde(default)]
-    oram_leaf_public_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    oram_leaf_public_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
     #[serde(default)]
-    oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
+    oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
     #[serde(default)]
-    oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
     #[serde(default)]
-    oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
+    oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
     #[serde(default)]
-    oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+    oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeTrustedKernelBundle {
     runtime_seed: Option<u64>,
     controller_observer: RuntimeControllerObserverCertificate,
@@ -474,15 +708,15 @@ pub struct RuntimeKernelWitness {
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
     #[serde(default)]
-    resource_events: Vec<RuntimeKernelResourceEventWitness>,
+    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
     #[serde(default)]
-    expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
+    expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
     #[serde(default)]
-    public_object_ids: Vec<u32>,
+    public_object_ids: Box<[u32]>,
     #[serde(default)]
-    expected_public_object_ids: Option<Vec<u32>>,
+    expected_public_object_ids: Option<Box<[u32]>>,
     #[serde(default)]
-    kernel_steps: Vec<RuntimeKernelStepWitness>,
+    kernel_steps: Box<[RuntimeKernelStepWitness]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -503,18 +737,58 @@ pub struct RuntimeKernelTelemetrySnapshot {
     resource_events: Vec<RuntimeKernelResourceEventWitness>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct RuntimeKernelFinishSnapshot {
+    entrypoint_id: String,
+    telemetry: RuntimeKernelTelemetrySnapshot,
+    kernel_execution: RuntimeKernelExecutionTracker,
+    runtime_phase_events: RuntimeKernelRefinementTracker,
+    public_object_ids: Box<[u32]>,
+    expected_public_object_ids: Option<Box<[u32]>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeKernelFinishBundle {
+    entrypoint_id: String,
+    arena_bytes: usize,
+    max_stack_words: usize,
+    scratch_bytes: usize,
+    peak_stack_words: usize,
+    value_scratch_peak_bytes: usize,
+    value_scratch_live_bytes_end: usize,
+    value_scratch_wipe_count: usize,
+    hash_scratch_peak_bytes: usize,
+    hash_scratch_live_bytes_end: usize,
+    hash_scratch_wipe_count: usize,
+    io_scratch_peak_bytes: usize,
+    io_scratch_live_bytes_end: usize,
+    io_scratch_wipe_count: usize,
+    #[serde(default)]
+    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+    #[serde(default)]
+    expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
+    #[serde(default)]
+    public_object_ids: Box<[u32]>,
+    #[serde(default)]
+    expected_public_object_ids: Option<Box<[u32]>>,
+    #[serde(default)]
+    kernel_steps: Box<[RuntimeKernelStepWitness]>,
+    #[serde(default)]
+    runtime_phase_events_before_finish: Box<[RuntimeKernelRefinementEventWitness]>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SeededRuntimeWitnessFamily {
     seed_count: usize,
-    witnesses: Vec<RuntimeRefinementWitness>,
+    witnesses: Box<[RuntimeRefinementWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SeededRuntimePathOramWitnessFamily {
     seed_count: usize,
-    witnesses: Vec<RuntimeRefinementWitness>,
+    witnesses: Box<[RuntimeRefinementWitness]>,
     #[serde(default)]
-    public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_leaf_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -522,7 +796,7 @@ pub struct SeededRuntimePaperMainFamilyBundle {
     family: SeededRuntimePathOramWitnessFamily,
     public_outcome: PublicOutcomeTrace,
     #[serde(default)]
-    boundary_schedule: Vec<BoundaryEvent>,
+    boundary_schedule: Box<[BoundaryEvent]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -530,18 +804,18 @@ pub struct SeededRuntimePaperMainSlotFamilyBundle {
     family: SeededRuntimePathOramWitnessFamily,
     public_outcome: PublicOutcomeTrace,
     #[serde(default)]
-    boundary_schedule: Vec<BoundaryEvent>,
+    boundary_schedule: Box<[BoundaryEvent]>,
     confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
     seed_count: usize,
-    witnesses: Vec<RuntimeRefinementWitness>,
+    witnesses: Box<[RuntimeRefinementWitness]>,
     #[serde(default)]
-    public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_leaf_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
     #[serde(default)]
-    public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_fresh_coin_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -550,9 +824,9 @@ pub struct CanonicalFreshCoinRuntimePathOramTheoremInput {
     representative_seed: usize,
     representative_witness: RuntimeRefinementWitness,
     #[serde(default)]
-    public_leaf_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_leaf_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
     #[serde(default)]
-    public_fresh_coin_scaffold: Vec<RuntimeOramLeafScaffoldWitness>,
+    public_fresh_coin_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -565,6 +839,8 @@ pub enum RefinementWitnessError {
     HiddenCertificateTraceMismatch,
     TrustedKernelBundleTraceMismatch,
     KernelWitnessTraceMismatch,
+    KernelWitnessFinishBundleMismatch,
+    RuntimeKernelRefinementWitnessFinishBundleMismatch,
     KernelWitness(KernelWitnessError),
     RuntimeKernelRefinement(RuntimeKernelRefinementWitnessError),
     UnknownOramLogicalObject {
@@ -597,6 +873,8 @@ pub enum RefinementWitnessError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuntimeKernelRefinementWitnessError {
     MissingKernelWitness,
+    MissingRuntimeKernelRefinementWitness,
+    FinishBundleMismatch,
     MalformedRuntimePhaseTrace {
         witnessed: Vec<RuntimeKernelRefinementEventWitness>,
     },
@@ -652,6 +930,7 @@ pub enum RuntimeKernelRefinementTrackerError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum KernelWitnessError {
     MissingKernelWitness,
+    FinishBundleMismatch,
     UnknownEntrypoint {
         entrypoint: String,
     },
@@ -755,6 +1034,7 @@ pub enum KernelWitnessError {
         observed_steps: usize,
         expected_steps: usize,
     },
+    ExpectedKernelScheduleUnbound,
     KernelStepBudgetExceeded {
         attempted_steps: usize,
         budget: usize,
@@ -785,6 +1065,32 @@ pub enum KernelWitnessError {
     },
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimeKernelFinishSnapshotError {
+    KernelWitness(KernelWitnessError),
+    RuntimePhase(RuntimeKernelRefinementTrackerError),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimeKernelBoundaryTrackerError {
+    KernelWitness(KernelWitnessError),
+    RuntimePhase(RuntimeKernelRefinementTrackerError),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimeKernelFinishBundleError {
+    KernelWitness(KernelWitnessError),
+    RuntimePhase(RuntimeKernelRefinementWitnessError),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimeKernelFinishBundleAccessError {
+    MissingRuntimeKernelFinishBundle,
+    KernelWitnessFinishBundleMismatch,
+    RuntimeKernelRefinementWitnessFinishBundleMismatch,
+    InvalidRuntimeKernelFinishBundle(RuntimeKernelFinishBundleError),
+}
+
 impl From<ConfidentialKernelLoweringError> for KernelWitnessError {
     fn from(err: ConfidentialKernelLoweringError) -> Self {
         match err {
@@ -811,6 +1117,18 @@ impl From<ConfidentialKernelLoweringError> for KernelWitnessError {
                 Self::ConfidentialArrayIndex { entrypoint }
             }
         }
+    }
+}
+
+impl From<KernelWitnessError> for RuntimeKernelBoundaryTrackerError {
+    fn from(err: KernelWitnessError) -> Self {
+        Self::KernelWitness(err)
+    }
+}
+
+impl From<RuntimeKernelRefinementTrackerError> for RuntimeKernelBoundaryTrackerError {
+    fn from(err: RuntimeKernelRefinementTrackerError) -> Self {
+        Self::RuntimePhase(err)
     }
 }
 
@@ -960,6 +1278,14 @@ impl fmt::Display for RefinementWitnessError {
                 f,
                 "stored runtime trusted kernel bundle disagrees with execution trace kernel witness"
             ),
+            Self::KernelWitnessFinishBundleMismatch => write!(
+                f,
+                "stored runtime kernel witness disagrees with stored runtime kernel finish bundle"
+            ),
+            Self::RuntimeKernelRefinementWitnessFinishBundleMismatch => write!(
+                f,
+                "stored runtime kernel refinement witness disagrees with stored runtime kernel finish bundle"
+            ),
             Self::KernelWitness(err) => {
                 write!(f, "runtime refinement witness carries an invalid kernel witness: {err}")
             }
@@ -1040,6 +1366,14 @@ impl fmt::Display for RuntimeKernelRefinementWitnessError {
             Self::MissingKernelWitness => write!(
                 f,
                 "runtime-phase witness requires the public kernel witness to be present"
+            ),
+            Self::MissingRuntimeKernelRefinementWitness => write!(
+                f,
+                "execution trace is missing runtime kernel refinement witness"
+            ),
+            Self::FinishBundleMismatch => write!(
+                f,
+                "stored runtime-phase witness does not match the exact witness reconstructed from the runtime kernel finish bundle"
             ),
             Self::MalformedRuntimePhaseTrace { witnessed } => write!(
                 f,
@@ -1141,6 +1475,10 @@ impl fmt::Display for KernelWitnessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingKernelWitness => write!(f, "execution trace is missing runtime kernel witness"),
+            Self::FinishBundleMismatch => write!(
+                f,
+                "stored runtime kernel witness does not match the exact witness reconstructed from the runtime kernel finish bundle"
+            ),
             Self::UnknownEntrypoint { entrypoint } => {
                 write!(f, "artifact is missing entrypoint {}", entrypoint)
             }
@@ -1320,6 +1658,10 @@ impl fmt::Display for KernelWitnessError {
                 observed_steps,
                 expected_steps
             ),
+            Self::ExpectedKernelScheduleUnbound => write!(
+                f,
+                "runtime kernel has no admitted schedule bound when a derived loaded-object schedule is required"
+            ),
             Self::KernelStepBudgetExceeded {
                 attempted_steps,
                 budget,
@@ -1376,6 +1718,88 @@ impl fmt::Display for KernelWitnessError {
 }
 
 impl std::error::Error for KernelWitnessError {}
+
+impl fmt::Display for RuntimeKernelFinishSnapshotError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KernelWitness(err) => err.fmt(f),
+            Self::RuntimePhase(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RuntimeKernelFinishSnapshotError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::KernelWitness(err) => Some(err),
+            Self::RuntimePhase(err) => Some(err),
+        }
+    }
+}
+
+impl fmt::Display for RuntimeKernelBoundaryTrackerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KernelWitness(err) => err.fmt(f),
+            Self::RuntimePhase(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RuntimeKernelBoundaryTrackerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::KernelWitness(err) => Some(err),
+            Self::RuntimePhase(err) => Some(err),
+        }
+    }
+}
+
+impl fmt::Display for RuntimeKernelFinishBundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KernelWitness(err) => err.fmt(f),
+            Self::RuntimePhase(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RuntimeKernelFinishBundleError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::KernelWitness(err) => Some(err),
+            Self::RuntimePhase(err) => Some(err),
+        }
+    }
+}
+
+impl fmt::Display for RuntimeKernelFinishBundleAccessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingRuntimeKernelFinishBundle => {
+                write!(f, "execution trace is missing runtime kernel finish bundle")
+            }
+            Self::KernelWitnessFinishBundleMismatch => write!(
+                f,
+                "stored runtime kernel witness disagrees with stored runtime kernel finish bundle"
+            ),
+            Self::RuntimeKernelRefinementWitnessFinishBundleMismatch => write!(
+                f,
+                "stored runtime kernel refinement witness disagrees with stored runtime kernel finish bundle"
+            ),
+            Self::InvalidRuntimeKernelFinishBundle(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RuntimeKernelFinishBundleAccessError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::InvalidRuntimeKernelFinishBundle(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 impl fmt::Display for SeededRuntimeWitnessFamilyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1815,7 +2239,9 @@ impl RuntimeRefinementWitness {
                 .validate_with_kernel_witness(kernel_witness)
                 .map_err(RefinementWitnessError::RuntimeKernelRefinement)?;
         }
-        if self.controller_certificate.observed_oram_accesses != reconstructed_accesses {
+        if self.controller_certificate.observed_oram_accesses.as_ref()
+            != reconstructed_accesses.as_slice()
+        {
             return Err(RefinementWitnessError::OramAccessScheduleMismatch);
         }
         Ok(())
@@ -1829,14 +2255,14 @@ impl RuntimeRefinementWitness {
         serde_json::to_string_pretty(self).expect("runtime refinement witness is JSON serializable")
     }
 
-    pub fn path_oram_fresh_coin_scaffold(&self) -> Option<Vec<RuntimeOramLeafScaffoldWitness>> {
+    pub fn path_oram_fresh_coin_scaffold(&self) -> Option<Box<[RuntimeOramLeafScaffoldWitness]>> {
         extract_runtime_path_oram_fresh_coin_scaffold(
             &self.oram_leaf_schedule,
             &self.oram_leaf_state_transitions,
         )
     }
 
-    pub fn path_oram_fresh_coin_values(&self) -> Option<Vec<usize>> {
+    pub fn path_oram_fresh_coin_values(&self) -> Option<Box<[usize]>> {
         extract_runtime_path_oram_fresh_coin_values(
             &self.oram_leaf_schedule,
             &self.oram_leaf_state_transitions,
@@ -1845,6 +2271,15 @@ impl RuntimeRefinementWitness {
 }
 
 impl RuntimeTrustedKernelBundle {
+    fn duplicate(&self) -> Self {
+        Self {
+            runtime_seed: self.runtime_seed,
+            controller_observer: self.controller_observer.clone(),
+            kernel_witness: self.kernel_witness.clone(),
+            hidden_certificate: self.hidden_certificate.clone(),
+        }
+    }
+
     pub fn runtime_seed(&self) -> Option<u64> {
         self.runtime_seed
     }
@@ -1956,17 +2391,255 @@ impl RuntimeKernelTelemetrySnapshot {
     }
 }
 
+impl RuntimeKernelFinishSnapshot {
+    pub fn into_finish_products(
+        self,
+    ) -> Result<
+        (
+            RuntimeKernelFinishBundle,
+            RuntimeKernelWitness,
+            RuntimeKernelRefinementWitness,
+        ),
+        RuntimeKernelFinishSnapshotError,
+    > {
+        let finish_bundle = self.into_finish_bundle()?;
+        let (kernel_witness, runtime_kernel_refinement_witness) =
+            finish_bundle
+                .to_witness_pair()
+                .map_err(RuntimeKernelFinishSnapshotError::from_finish_bundle_error)?;
+        Ok((
+            finish_bundle,
+            kernel_witness,
+            runtime_kernel_refinement_witness,
+        ))
+    }
+
+    pub fn into_finish_bundle(
+        self,
+    ) -> Result<RuntimeKernelFinishBundle, RuntimeKernelFinishSnapshotError> {
+        self.kernel_execution
+            .ensure_expected_kernel_schedule_consumed()
+            .map_err(RuntimeKernelFinishSnapshotError::KernelWitness)?;
+        let expected_kernel_steps = self
+            .kernel_execution
+            .expected_kernel_schedule
+            .expected_kernel_steps
+            .clone();
+        let kernel_steps = self.kernel_execution.into_emitted_kernel_steps();
+        let runtime_phase_events_before_finish = self.runtime_phase_events.into_events();
+        Ok(RuntimeKernelFinishBundle {
+            entrypoint_id: self.entrypoint_id,
+            arena_bytes: self.telemetry.arena_bytes,
+            max_stack_words: self.telemetry.max_stack_words,
+            scratch_bytes: self.telemetry.scratch_bytes,
+            peak_stack_words: self.telemetry.peak_stack_words,
+            value_scratch_peak_bytes: self.telemetry.value_scratch_peak_bytes,
+            value_scratch_live_bytes_end: self.telemetry.value_scratch_live_bytes_end,
+            value_scratch_wipe_count: self.telemetry.value_scratch_wipe_count,
+            hash_scratch_peak_bytes: self.telemetry.hash_scratch_peak_bytes,
+            hash_scratch_live_bytes_end: self.telemetry.hash_scratch_live_bytes_end,
+            hash_scratch_wipe_count: self.telemetry.hash_scratch_wipe_count,
+            io_scratch_peak_bytes: self.telemetry.io_scratch_peak_bytes,
+            io_scratch_live_bytes_end: self.telemetry.io_scratch_live_bytes_end,
+            io_scratch_wipe_count: self.telemetry.io_scratch_wipe_count,
+            resource_events: self.telemetry.resource_events.into_boxed_slice(),
+            expected_kernel_steps,
+            public_object_ids: self.public_object_ids,
+            expected_public_object_ids: self.expected_public_object_ids,
+            kernel_steps,
+            runtime_phase_events_before_finish,
+        })
+    }
+
+    pub fn new(
+        entrypoint_id: String,
+        telemetry: RuntimeKernelTelemetrySnapshot,
+        kernel_execution: RuntimeKernelExecutionTracker,
+        runtime_phase_events: RuntimeKernelRefinementTracker,
+        public_object_ids: Box<[u32]>,
+        expected_public_object_ids: Option<Box<[u32]>>,
+    ) -> Self {
+        Self {
+            entrypoint_id,
+            telemetry,
+            kernel_execution,
+            runtime_phase_events,
+            public_object_ids,
+            expected_public_object_ids,
+        }
+    }
+
+    pub fn into_witness_pair(
+        self,
+    ) -> Result<
+        (RuntimeKernelWitness, RuntimeKernelRefinementWitness),
+        RuntimeKernelFinishSnapshotError,
+    > {
+        let (_, kernel_witness, runtime_phase_witness) = self.into_finish_products()?;
+        Ok((kernel_witness, runtime_phase_witness))
+    }
+}
+
+impl RuntimeKernelFinishBundle {
+    fn duplicate(&self) -> Self {
+        Self {
+            entrypoint_id: self.entrypoint_id.clone(),
+            arena_bytes: self.arena_bytes,
+            max_stack_words: self.max_stack_words,
+            scratch_bytes: self.scratch_bytes,
+            peak_stack_words: self.peak_stack_words,
+            value_scratch_peak_bytes: self.value_scratch_peak_bytes,
+            value_scratch_live_bytes_end: self.value_scratch_live_bytes_end,
+            value_scratch_wipe_count: self.value_scratch_wipe_count,
+            hash_scratch_peak_bytes: self.hash_scratch_peak_bytes,
+            hash_scratch_live_bytes_end: self.hash_scratch_live_bytes_end,
+            hash_scratch_wipe_count: self.hash_scratch_wipe_count,
+            io_scratch_peak_bytes: self.io_scratch_peak_bytes,
+            io_scratch_live_bytes_end: self.io_scratch_live_bytes_end,
+            io_scratch_wipe_count: self.io_scratch_wipe_count,
+            resource_events: self.resource_events.clone(),
+            expected_kernel_steps: self.expected_kernel_steps.clone(),
+            public_object_ids: self.public_object_ids.clone(),
+            expected_public_object_ids: self.expected_public_object_ids.clone(),
+            kernel_steps: self.kernel_steps.clone(),
+            runtime_phase_events_before_finish: self.runtime_phase_events_before_finish.clone(),
+        }
+    }
+
+    pub fn entrypoint_id(&self) -> &str {
+        &self.entrypoint_id
+    }
+
+    pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {
+        &self.resource_events
+    }
+
+    pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {
+        self.expected_kernel_steps.as_deref()
+    }
+
+    pub fn public_object_ids(&self) -> &[u32] {
+        &self.public_object_ids
+    }
+
+    pub fn expected_public_object_ids(&self) -> Option<&[u32]> {
+        self.expected_public_object_ids.as_deref()
+    }
+
+    pub fn kernel_steps(&self) -> &[RuntimeKernelStepWitness] {
+        &self.kernel_steps
+    }
+
+    pub fn runtime_phase_events_before_finish(&self) -> &[RuntimeKernelRefinementEventWitness] {
+        &self.runtime_phase_events_before_finish
+    }
+
+    fn completed_runtime_phase_events(&self) -> Box<[RuntimeKernelRefinementEventWitness]> {
+        let mut events = self.runtime_phase_events_before_finish.to_vec();
+        let cold_stored_object_ids = self
+            .runtime_phase_events_before_finish
+            .iter()
+            .filter(|event| {
+                event.kind() == RuntimeKernelRefinementEventKindWitness::ShadowLoadObject
+            })
+            .filter_map(RuntimeKernelRefinementEventWitness::object_id)
+            .collect::<Vec<_>>();
+        events.extend(
+            cold_stored_object_ids
+                .into_iter()
+                .map(RuntimeKernelRefinementEventWitness::cold_store_object),
+        );
+        events.extend(
+            self.public_object_ids
+                .iter()
+                .copied()
+                .map(RuntimeKernelRefinementEventWitness::post_committed_cold_object),
+        );
+        events.into_boxed_slice()
+    }
+
+    pub(crate) fn to_kernel_witness(
+        &self,
+    ) -> Result<RuntimeKernelWitness, RuntimeKernelFinishBundleError> {
+        RuntimeKernelWitness::new(
+            self.entrypoint_id.clone(),
+            self.arena_bytes,
+            self.max_stack_words,
+            self.scratch_bytes,
+            self.peak_stack_words,
+            self.value_scratch_peak_bytes,
+            self.value_scratch_live_bytes_end,
+            self.value_scratch_wipe_count,
+            self.hash_scratch_peak_bytes,
+            self.hash_scratch_live_bytes_end,
+            self.hash_scratch_wipe_count,
+            self.io_scratch_peak_bytes,
+            self.io_scratch_live_bytes_end,
+            self.io_scratch_wipe_count,
+            self.resource_events.clone(),
+            self.expected_kernel_steps.clone(),
+            self.public_object_ids.clone(),
+            self.expected_public_object_ids.clone(),
+            self.kernel_steps.clone(),
+        )
+        .map_err(RuntimeKernelFinishBundleError::KernelWitness)
+    }
+
+    pub(crate) fn to_runtime_kernel_refinement_witness(
+        &self,
+    ) -> Result<RuntimeKernelRefinementWitness, RuntimeKernelFinishBundleError> {
+        RuntimeKernelRefinementWitness::from_events(self.completed_runtime_phase_events())
+            .map_err(RuntimeKernelFinishBundleError::RuntimePhase)
+    }
+
+    pub(crate) fn to_witness_pair(
+        &self,
+    ) -> Result<
+        (RuntimeKernelWitness, RuntimeKernelRefinementWitness),
+        RuntimeKernelFinishBundleError,
+    > {
+        let kernel_witness = self.to_kernel_witness()?;
+        let runtime_kernel_refinement_witness = self.to_runtime_kernel_refinement_witness()?;
+        Ok((kernel_witness, runtime_kernel_refinement_witness))
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeKernelFinishBundleError> {
+        self.to_witness_pair().map(|_| ())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("runtime kernel finish bundle is JSON serializable")
+    }
+
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self)
+            .expect("runtime kernel finish bundle is JSON serializable")
+    }
+}
+
+impl RuntimeKernelFinishSnapshotError {
+    fn from_finish_bundle_error(err: RuntimeKernelFinishBundleError) -> Self {
+        match err {
+            RuntimeKernelFinishBundleError::KernelWitness(err) => Self::KernelWitness(err),
+            RuntimeKernelFinishBundleError::RuntimePhase(err) => {
+                Self::RuntimePhase(RuntimeKernelRefinementTrackerError::Witness(err))
+            }
+        }
+    }
+}
+
 impl RuntimeKernelWitness {
     pub fn from_telemetry_and_execution_tracker(
         entrypoint_id: String,
         telemetry: RuntimeKernelTelemetrySnapshot,
         kernel_execution: RuntimeKernelExecutionTracker,
-        public_object_ids: Vec<u32>,
-        expected_public_object_ids: Option<Vec<u32>>,
+        public_object_ids: Box<[u32]>,
+        expected_public_object_ids: Option<Box<[u32]>>,
     ) -> Result<Self, KernelWitnessError> {
         let expected_kernel_steps = kernel_execution
-            .expected_kernel_steps()
-            .map(|steps| steps.to_vec());
+            .expected_kernel_schedule
+            .expected_kernel_steps
+            .clone();
         let kernel_steps = kernel_execution.into_emitted_kernel_steps();
         Self::new(
             entrypoint_id,
@@ -1983,7 +2656,7 @@ impl RuntimeKernelWitness {
             telemetry.io_scratch_peak_bytes,
             telemetry.io_scratch_live_bytes_end,
             telemetry.io_scratch_wipe_count,
-            telemetry.resource_events,
+            telemetry.resource_events.into_boxed_slice(),
             expected_kernel_steps,
             public_object_ids,
             expected_public_object_ids,
@@ -2007,11 +2680,11 @@ impl RuntimeKernelWitness {
         io_scratch_peak_bytes: usize,
         io_scratch_live_bytes_end: usize,
         io_scratch_wipe_count: usize,
-        resource_events: Vec<RuntimeKernelResourceEventWitness>,
-        expected_kernel_steps: Option<Vec<RuntimeKernelStepWitness>>,
-        public_object_ids: Vec<u32>,
-        expected_public_object_ids: Option<Vec<u32>>,
-        kernel_steps: Vec<RuntimeKernelStepWitness>,
+        resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+        expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
+        public_object_ids: Box<[u32]>,
+        expected_public_object_ids: Option<Box<[u32]>>,
+        kernel_steps: Box<[RuntimeKernelStepWitness]>,
     ) -> Result<Self, KernelWitnessError> {
         let witness = Self {
             entrypoint_id,
@@ -2112,20 +2785,20 @@ impl RuntimeKernelWitness {
                 .iter()
                 .map(RuntimeKernelStepWitness::projected_opcode)
                 .collect(),
-            self.kernel_steps.clone(),
+            self.kernel_steps.to_vec(),
         )
         .expect("kernel witness already validates emitted schedule shape")
     }
 
     pub fn expected_kernel_schedule(&self) -> Option<RuntimeKernelScheduleWitness> {
-        let steps = self.expected_kernel_steps.clone()?;
+        let steps = self.expected_kernel_steps.as_ref()?;
         Some(
             RuntimeKernelScheduleWitness::new(
                 steps
                     .iter()
                     .map(RuntimeKernelStepWitness::projected_opcode)
                     .collect(),
-                steps,
+                steps.to_vec(),
             )
             .expect("manifest-backed expected kernel schedule must satisfy shape invariants"),
         )
@@ -2205,28 +2878,28 @@ impl RuntimeKernelWitness {
             expected_schedule.validate_shape()?;
         }
         if let Some(expected) = &self.expected_kernel_steps {
-            if &self.kernel_steps != expected {
+            if self.kernel_steps.as_ref() != expected.as_ref() {
                 return Err(KernelWitnessError::KernelStepTraceMismatch {
-                    expected: expected.clone(),
-                    witnessed: self.kernel_steps.clone(),
+                    expected: expected.to_vec(),
+                    witnessed: self.kernel_steps.to_vec(),
                 });
             }
         }
         if !is_canonical_object_id_schedule(&self.public_object_ids) {
             return Err(KernelWitnessError::MalformedPublicObjectUniverse {
-                witnessed: self.public_object_ids.clone(),
+                witnessed: self.public_object_ids.to_vec(),
             });
         }
         if let Some(expected_public_object_ids) = &self.expected_public_object_ids {
             if !is_canonical_object_id_schedule(expected_public_object_ids) {
                 return Err(KernelWitnessError::MalformedPublicObjectUniverse {
-                    witnessed: expected_public_object_ids.clone(),
+                    witnessed: expected_public_object_ids.to_vec(),
                 });
             }
-            if &self.public_object_ids != expected_public_object_ids {
+            if self.public_object_ids.as_ref() != expected_public_object_ids.as_ref() {
                 return Err(KernelWitnessError::PublicObjectUniverseMismatch {
-                    expected: expected_public_object_ids.clone(),
-                    witnessed: self.public_object_ids.clone(),
+                    expected: expected_public_object_ids.to_vec(),
+                    witnessed: self.public_object_ids.to_vec(),
                 });
             }
         }
@@ -2239,7 +2912,7 @@ impl RuntimeKernelWitness {
             if !public_object_ids.contains(&object_id) {
                 return Err(KernelWitnessError::KernelObjectOutsidePublicUniverse {
                     object_id,
-                    public_object_ids: self.public_object_ids.clone(),
+                    public_object_ids: self.public_object_ids.to_vec(),
                 });
             }
         }
@@ -2287,10 +2960,10 @@ impl RuntimeKernelWitness {
                 },
             )?;
         let expected_steps = manifest_slot_program.expected_runtime_step_manifest();
-        if manifest_entry.kernel_steps != expected_steps {
+        if manifest_entry.kernel_steps.as_slice() != expected_steps.as_ref() {
             return Err(KernelWitnessError::KernelStepTraceMismatch {
-                expected: manifest_kernel_steps_as_witness(&expected_steps),
-                witnessed: manifest_kernel_steps_as_witness(&manifest_entry.kernel_steps),
+                expected: manifest_kernel_steps_as_witness(&expected_steps).to_vec(),
+                witnessed: manifest_kernel_steps_as_witness(&manifest_entry.kernel_steps).to_vec(),
             });
         }
         let manifest_expected_steps = manifest_entry.kernel_step_witnesses();
@@ -2299,16 +2972,16 @@ impl RuntimeKernelWitness {
                 entrypoint: entrypoint.into(),
             }
         })?;
-        if witness_expected_steps != &manifest_expected_steps {
+        if witness_expected_steps.as_ref() != manifest_expected_steps.as_ref() {
             return Err(KernelWitnessError::KernelStepTraceMismatch {
-                expected: manifest_expected_steps.clone(),
-                witnessed: witness_expected_steps.clone(),
+                expected: manifest_expected_steps.to_vec(),
+                witnessed: witness_expected_steps.to_vec(),
             });
         }
-        if self.kernel_steps != manifest_expected_steps {
+        if self.kernel_steps.as_ref() != manifest_expected_steps.as_ref() {
             return Err(KernelWitnessError::KernelStepTraceMismatch {
-                expected: witness_expected_steps.clone(),
-                witnessed: self.kernel_steps.clone(),
+                expected: witness_expected_steps.to_vec(),
+                witnessed: self.kernel_steps.to_vec(),
             });
         }
         let witness_expected_public_object_ids = self
@@ -2317,16 +2990,16 @@ impl RuntimeKernelWitness {
             .ok_or_else(|| KernelWitnessError::MissingExpectedPublicObjectIds {
                 entrypoint: entrypoint.into(),
             })?;
-        if witness_expected_public_object_ids != public_object_ids {
+        if witness_expected_public_object_ids.as_ref() != public_object_ids {
             return Err(KernelWitnessError::PublicObjectUniverseMismatch {
                 expected: public_object_ids.to_vec(),
-                witnessed: witness_expected_public_object_ids.clone(),
+                witnessed: witness_expected_public_object_ids.to_vec(),
             });
         }
-        if self.public_object_ids != public_object_ids {
+        if self.public_object_ids.as_ref() != public_object_ids {
             return Err(KernelWitnessError::PublicObjectUniverseMismatch {
                 expected: public_object_ids.to_vec(),
-                witnessed: self.public_object_ids.clone(),
+                witnessed: self.public_object_ids.to_vec(),
             });
         }
         Ok(())
@@ -2521,6 +3194,13 @@ impl From<ConfidentialKernelStep> for RuntimeKernelStepWitness {
     }
 }
 
+impl From<&ConfidentialKernelStep> for RuntimeKernelStepWitness {
+    fn from(step: &ConfidentialKernelStep) -> Self {
+        Self::new(step.opcode, step.object_id)
+            .expect("confidential kernel step should satisfy runtime witness shape")
+    }
+}
+
 impl From<&RuntimeKernelStepManifest> for RuntimeKernelStepWitness {
     fn from(step: &RuntimeKernelStepManifest) -> Self {
         Self::new(step.opcode, step.object_id)
@@ -2611,7 +3291,10 @@ impl RuntimeKernelScheduleWitness {
         opcodes: Vec<UoOpcode>,
         steps: Vec<RuntimeKernelStepWitness>,
     ) -> Result<Self, KernelWitnessError> {
-        let witness = Self { opcodes, steps };
+        let witness = Self {
+            opcodes: opcodes.into_boxed_slice(),
+            steps: steps.into_boxed_slice(),
+        };
         witness.validate_shape()?;
         Ok(witness)
     }
@@ -2624,11 +3307,12 @@ impl RuntimeKernelScheduleWitness {
         &self.steps
     }
 
-    pub fn public_object_schedule(&self) -> Vec<u32> {
+    pub fn public_object_schedule(&self) -> Box<[u32]> {
         self.steps
             .iter()
             .filter_map(RuntimeKernelStepWitness::object_id)
-            .collect()
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
     }
 
     pub fn validate_shape(&self) -> Result<(), KernelWitnessError> {
@@ -2641,10 +3325,10 @@ impl RuntimeKernelScheduleWitness {
                 .iter()
                 .map(RuntimeKernelStepWitness::projected_opcode)
                 .collect::<Vec<_>>();
-            if projected != self.opcodes {
+            if projected.as_slice() != self.opcodes() {
                 return Err(KernelWitnessError::KernelOpcodeTraceMismatch {
                     expected: projected,
-                    witnessed: self.opcodes.clone(),
+                    witnessed: self.opcodes.to_vec(),
                 });
             }
         }
@@ -2655,7 +3339,7 @@ impl RuntimeKernelScheduleWitness {
 impl RuntimeKernelScheduleTracker {
     pub fn bind_expected_kernel_steps(
         &mut self,
-        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+        expected_kernel_steps: Box<[RuntimeKernelStepWitness]>,
     ) -> Result<(), KernelWitnessError> {
         if self.expected_kernel_steps.is_some() {
             return Ok(());
@@ -2723,7 +3407,7 @@ impl RuntimeKernelExecutionTracker {
 
     pub fn bind_expected_kernel_steps(
         &mut self,
-        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+        expected_kernel_steps: Box<[RuntimeKernelStepWitness]>,
     ) -> Result<(), KernelWitnessError> {
         self.expected_kernel_schedule
             .bind_expected_kernel_steps(expected_kernel_steps)
@@ -2754,12 +3438,123 @@ impl RuntimeKernelExecutionTracker {
         self.expected_kernel_schedule.expected_kernel_steps()
     }
 
+    pub fn expected_loaded_object_schedule(&self) -> Option<Box<[u32]>> {
+        self.expected_kernel_steps()
+            .map(canonical_runtime_kernel_step_object_schedule)
+    }
+
     pub fn emitted_kernel_steps(&self) -> &[RuntimeKernelStepWitness] {
         &self.emitted_kernel_steps
     }
 
-    pub fn into_emitted_kernel_steps(self) -> Vec<RuntimeKernelStepWitness> {
-        self.emitted_kernel_steps
+    pub fn into_emitted_kernel_steps(self) -> Box<[RuntimeKernelStepWitness]> {
+        self.emitted_kernel_steps.into_boxed_slice()
+    }
+}
+
+impl RuntimeKernelBoundaryTracker {
+    pub fn begin(
+        public_object_ids: &[u32],
+        max_kernel_ops: usize,
+    ) -> Result<Self, RuntimeKernelBoundaryTrackerError> {
+        let public_object_ids = public_object_ids.to_vec().into_boxed_slice();
+        let public_object_count = public_object_ids.len();
+        let mut tracker = Self {
+            public_object_ids,
+            kernel_execution: RuntimeKernelExecutionTracker::with_kernel_op_budget(max_kernel_ops),
+            runtime_phase_events:
+                RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(
+                    public_object_count,
+                    max_kernel_ops,
+                )?,
+        };
+        for object_id in tracker.public_object_ids.iter().copied() {
+            tracker
+                .runtime_phase_events
+                .push_pre_committed_cold_object(object_id)?;
+        }
+        tracker.record_opcode(UoOpcode::Begin, None)?;
+        Ok(tracker)
+    }
+
+    pub fn bind_expected_kernel_steps(
+        &mut self,
+        expected_kernel_steps: Box<[RuntimeKernelStepWitness]>,
+    ) -> Result<(), RuntimeKernelBoundaryTrackerError> {
+        self.kernel_execution
+            .bind_expected_kernel_steps(expected_kernel_steps)?;
+        Ok(())
+    }
+
+    pub fn bind_expected_kernel_program(
+        &mut self,
+        program: &ConfidentialKernelSlotProgram,
+    ) -> Result<(), RuntimeKernelBoundaryTrackerError> {
+        self.bind_expected_kernel_steps(program.expected_runtime_step_witnesses())
+    }
+
+    pub fn record_opcode(
+        &mut self,
+        opcode: UoOpcode,
+        object_id: Option<u32>,
+    ) -> Result<(), RuntimeKernelBoundaryTrackerError> {
+        let observed = RuntimeKernelStepWitness::new(opcode, object_id)?;
+        self.kernel_execution.record_step(observed)?;
+        self.runtime_phase_events
+            .push_kernel_step(opcode, object_id)?;
+        Ok(())
+    }
+
+    pub fn record_shadow_load_object(
+        &mut self,
+        object_id: u32,
+    ) -> Result<(), RuntimeKernelBoundaryTrackerError> {
+        self.runtime_phase_events
+            .push_shadow_load_object(object_id)?;
+        Ok(())
+    }
+
+    pub fn append_commit_object_schedule<I>(
+        &mut self,
+        object_ids: I,
+    ) -> Result<(), RuntimeKernelBoundaryTrackerError>
+    where
+        I: IntoIterator<Item = u32>,
+    {
+        self.runtime_phase_events
+            .append_commit_object_schedule(object_ids)?;
+        Ok(())
+    }
+
+    pub fn expected_loaded_object_schedule(&self) -> Option<Box<[u32]>> {
+        self.kernel_execution.expected_loaded_object_schedule()
+    }
+
+    pub fn expected_loaded_object_schedule_required(
+        &self,
+    ) -> Result<Box<[u32]>, RuntimeKernelBoundaryTrackerError> {
+        self.expected_loaded_object_schedule()
+            .ok_or(KernelWitnessError::ExpectedKernelScheduleUnbound.into())
+    }
+
+    pub fn public_object_ids(&self) -> &[u32] {
+        &self.public_object_ids
+    }
+
+    pub fn into_finish_snapshot(
+        self,
+        entrypoint_id: String,
+        telemetry: RuntimeKernelTelemetrySnapshot,
+    ) -> RuntimeKernelFinishSnapshot {
+        let public_object_ids = self.public_object_ids;
+        RuntimeKernelFinishSnapshot::new(
+            entrypoint_id,
+            telemetry,
+            self.kernel_execution,
+            self.runtime_phase_events,
+            public_object_ids.clone(),
+            Some(public_object_ids),
+        )
     }
 }
 
@@ -2887,26 +3682,49 @@ impl RuntimeKernelRefinementTracker {
         Ok(())
     }
 
-    pub fn shadow_load_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| {
-                event.kind() == RuntimeKernelRefinementEventKindWitness::ShadowLoadObject
-            })
-            .filter_map(RuntimeKernelRefinementEventWitness::object_id)
-            .collect()
+    pub fn shadow_load_object_schedule(&self) -> Box<[u32]> {
+        runtime_kernel_refinement_event_object_schedule(
+            &self.events,
+            RuntimeKernelRefinementEventKindWitness::ShadowLoadObject,
+        )
     }
 
     pub fn into_witness(
         self,
     ) -> Result<RuntimeKernelRefinementWitness, RuntimeKernelRefinementTrackerError> {
-        RuntimeKernelRefinementWitness::from_events(self.events)
+        RuntimeKernelRefinementWitness::from_events(self.events.into_boxed_slice())
             .map_err(RuntimeKernelRefinementTrackerError::Witness)
+    }
+
+    pub fn into_events(self) -> Box<[RuntimeKernelRefinementEventWitness]> {
+        self.events.into_boxed_slice()
     }
 }
 
 fn is_canonical_object_id_schedule(object_ids: &[u32]) -> bool {
     object_ids.windows(2).all(|window| window[0] < window[1])
+}
+
+fn canonical_runtime_kernel_step_object_schedule(steps: &[RuntimeKernelStepWitness]) -> Box<[u32]> {
+    steps
+        .iter()
+        .filter_map(RuntimeKernelStepWitness::object_id)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
+}
+
+fn runtime_kernel_refinement_event_object_schedule(
+    events: &[RuntimeKernelRefinementEventWitness],
+    kind: RuntimeKernelRefinementEventKindWitness,
+) -> Box<[u32]> {
+    events
+        .iter()
+        .filter(|event| event.kind == kind)
+        .filter_map(|event| event.object_id)
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
 }
 
 impl RuntimeKernelRefinementEventWitness {
@@ -3087,7 +3905,7 @@ pub fn runtime_kernel_refinement_phase_step(
 
 impl RuntimeKernelRefinementWitness {
     pub fn from_events(
-        events: Vec<RuntimeKernelRefinementEventWitness>,
+        events: Box<[RuntimeKernelRefinementEventWitness]>,
     ) -> Result<Self, RuntimeKernelRefinementWitnessError> {
         let witness = Self { events };
         witness.replay_phase()?;
@@ -3117,7 +3935,7 @@ impl RuntimeKernelRefinementWitness {
         for event in &self.events {
             phase = runtime_kernel_refinement_phase_step(phase, event).ok_or_else(|| {
                 RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                    witnessed: self.events.clone(),
+                    witnessed: self.events.to_vec(),
                 }
             })?;
         }
@@ -3136,15 +3954,17 @@ impl RuntimeKernelRefinementWitness {
         if self.replay_phase()? != RuntimeKernelRefinementPhase::CommitObjectWindow {
             return Err(
                 RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                    witnessed: self.events.clone(),
+                    witnessed: self.events.to_vec(),
                 },
             );
         }
-        self.events.extend(
+        let mut events = self.events.to_vec();
+        events.extend(
             object_ids
                 .into_iter()
                 .map(RuntimeKernelRefinementEventWitness::commit_object),
         );
+        self.events = events.into_boxed_slice();
         Ok(())
     }
 
@@ -3157,22 +3977,25 @@ impl RuntimeKernelRefinementWitness {
         if self.replay_phase()? != RuntimeKernelRefinementPhase::AfterWipe {
             return Err(
                 RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                    witnessed: self.events.clone(),
+                    witnessed: self.events.to_vec(),
                 },
             );
         }
         let cold_stored_object_ids = self.shadow_load_object_schedule();
-        self.events.extend(
+        let mut events = self.events.to_vec();
+        events.extend(
             cold_stored_object_ids
-                .into_iter()
+                .iter()
+                .copied()
                 .map(RuntimeKernelRefinementEventWitness::cold_store_object),
         );
-        self.events.extend(
+        events.extend(
             public_object_ids
                 .iter()
                 .copied()
                 .map(RuntimeKernelRefinementEventWitness::post_committed_cold_object),
         );
+        self.events = events.into_boxed_slice();
         Ok(())
     }
 
@@ -3194,48 +4017,39 @@ impl RuntimeKernelRefinementWitness {
         )
     }
 
-    pub fn shadow_load_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::ShadowLoadObject)
-            .filter_map(|event| event.object_id)
-            .collect()
+    pub fn shadow_load_object_schedule(&self) -> Box<[u32]> {
+        runtime_kernel_refinement_event_object_schedule(
+            &self.events,
+            RuntimeKernelRefinementEventKindWitness::ShadowLoadObject,
+        )
     }
 
-    pub fn pre_committed_cold_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| {
-                event.kind == RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject
-            })
-            .filter_map(|event| event.object_id)
-            .collect()
+    pub fn pre_committed_cold_object_schedule(&self) -> Box<[u32]> {
+        runtime_kernel_refinement_event_object_schedule(
+            &self.events,
+            RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject,
+        )
     }
 
-    pub fn commit_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::CommitObject)
-            .filter_map(|event| event.object_id)
-            .collect()
+    pub fn commit_object_schedule(&self) -> Box<[u32]> {
+        runtime_kernel_refinement_event_object_schedule(
+            &self.events,
+            RuntimeKernelRefinementEventKindWitness::CommitObject,
+        )
     }
 
-    pub fn cold_store_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| event.kind == RuntimeKernelRefinementEventKindWitness::ColdStoreObject)
-            .filter_map(|event| event.object_id)
-            .collect()
+    pub fn cold_store_object_schedule(&self) -> Box<[u32]> {
+        runtime_kernel_refinement_event_object_schedule(
+            &self.events,
+            RuntimeKernelRefinementEventKindWitness::ColdStoreObject,
+        )
     }
 
-    pub fn post_committed_cold_object_schedule(&self) -> Vec<u32> {
-        self.events
-            .iter()
-            .filter(|event| {
-                event.kind == RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject
-            })
-            .filter_map(|event| event.object_id)
-            .collect()
+    pub fn post_committed_cold_object_schedule(&self) -> Box<[u32]> {
+        runtime_kernel_refinement_event_object_schedule(
+            &self.events,
+            RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject,
+        )
     }
 
     pub fn validate_with_kernel_witness(
@@ -3251,15 +4065,15 @@ impl RuntimeKernelRefinementWitness {
         ) {
             return Err(
                 RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
-                    witnessed: self.events.clone(),
+                    witnessed: self.events.to_vec(),
                 },
             );
         }
         let projected = self.projected_kernel_schedule();
-        if projected.steps() != kernel_witness.kernel_steps {
+        if projected.steps() != kernel_witness.kernel_steps.as_ref() {
             return Err(
                 RuntimeKernelRefinementWitnessError::KernelProjectionMismatch {
-                    expected: kernel_witness.kernel_steps.clone(),
+                    expected: kernel_witness.kernel_steps.to_vec(),
                     witnessed: projected.steps().to_vec(),
                 },
             );
@@ -3267,39 +4081,39 @@ impl RuntimeKernelRefinementWitness {
         let loaded = self.shadow_load_object_schedule();
         let committed = self.commit_object_schedule();
         let cold_stored = self.cold_store_object_schedule();
-        if loaded != committed || loaded != cold_stored {
+        if loaded.as_ref() != committed.as_ref() || loaded.as_ref() != cold_stored.as_ref() {
             return Err(
                 RuntimeKernelRefinementWitnessError::ObjectScheduleMismatch {
-                    loaded,
-                    committed,
-                    cold_stored,
+                    loaded: loaded.to_vec(),
+                    committed: committed.to_vec(),
+                    cold_stored: cold_stored.to_vec(),
                 },
             );
         }
         let canonical_loaded_objects = kernel_witness.canonical_loaded_object_schedule();
-        if loaded != canonical_loaded_objects {
+        if loaded.as_ref() != canonical_loaded_objects.as_ref() {
             return Err(
                 RuntimeKernelRefinementWitnessError::CanonicalObjectScheduleMismatch {
-                    expected: canonical_loaded_objects,
-                    witnessed: loaded,
+                    expected: canonical_loaded_objects.to_vec(),
+                    witnessed: loaded.to_vec(),
                 },
             );
         }
         let pre_committed_cold = self.pre_committed_cold_object_schedule();
-        if pre_committed_cold != kernel_witness.public_object_ids {
+        if pre_committed_cold.as_ref() != kernel_witness.public_object_ids.as_ref() {
             return Err(
                 RuntimeKernelRefinementWitnessError::PreCommittedColdObjectScheduleMismatch {
-                    expected: kernel_witness.public_object_ids.clone(),
-                    witnessed: pre_committed_cold,
+                    expected: kernel_witness.public_object_ids.to_vec(),
+                    witnessed: pre_committed_cold.to_vec(),
                 },
             );
         }
         let post_committed_cold = self.post_committed_cold_object_schedule();
-        if post_committed_cold != kernel_witness.public_object_ids {
+        if post_committed_cold.as_ref() != kernel_witness.public_object_ids.as_ref() {
             return Err(
                 RuntimeKernelRefinementWitnessError::PostCommittedColdObjectScheduleMismatch {
-                    expected: kernel_witness.public_object_ids.clone(),
-                    witnessed: post_committed_cold,
+                    expected: kernel_witness.public_object_ids.to_vec(),
+                    witnessed: post_committed_cold.to_vec(),
                 },
             );
         }
@@ -3317,7 +4131,7 @@ impl RuntimeKernelRefinementWitness {
             return Err(
                 RuntimeKernelRefinementWitnessError::KernelObjectCoverageMismatch {
                     kernel_objects,
-                    loaded_objects,
+                    loaded_objects: loaded_objects.to_vec(),
                 },
             );
         }
@@ -3335,37 +4149,37 @@ impl RuntimeKernelRefinementWitness {
 }
 
 impl RuntimeKernelWitness {
-    pub fn emitted_public_object_schedule(&self) -> Vec<u32> {
-        self.public_object_ids.clone()
+    pub fn emitted_public_object_schedule(&self) -> &[u32] {
+        &self.public_object_ids
     }
 
-    pub fn canonical_loaded_object_schedule(&self) -> Vec<u32> {
-        self.kernel_steps
-            .iter()
-            .filter_map(|step| step.object_id)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect()
+    pub fn canonical_loaded_object_schedule(&self) -> Box<[u32]> {
+        canonical_runtime_kernel_step_object_schedule(&self.kernel_steps)
     }
 
-    pub fn expected_public_object_schedule(&self) -> Option<Vec<u32>> {
-        self.expected_public_object_ids.clone()
+    pub fn expected_public_object_schedule(&self) -> Option<&[u32]> {
+        self.expected_public_object_ids.as_deref()
     }
 }
 
-pub fn canonical_runtime_public_object_ids(state: &[StateObject]) -> Vec<u32> {
+pub fn canonical_runtime_public_object_ids(state: &[StateObject]) -> Box<[u32]> {
     state
         .iter()
         .map(|object| object.id)
         .collect::<BTreeSet<_>>()
         .into_iter()
-        .collect()
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
 }
 
 fn manifest_kernel_steps_as_witness(
     steps: &[RuntimeKernelStepManifest],
-) -> Vec<RuntimeKernelStepWitness> {
-    steps.iter().map(RuntimeKernelStepWitness::from).collect()
+) -> Box<[RuntimeKernelStepWitness]> {
+    steps
+        .iter()
+        .map(RuntimeKernelStepWitness::from)
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
 }
 
 impl RuntimePathOramHiddenCertificate {
@@ -3399,11 +4213,11 @@ impl RuntimePathOramHiddenCertificate {
 
     fn new(
         trace: RefinementTrace,
-        oram_objects: Vec<RuntimeOramObjectWitness>,
-        oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
-        oram_position_map_before: Vec<RuntimePathOramPositionMapWitness>,
-        oram_position_map_after: Vec<RuntimePathOramPositionMapWitness>,
-        oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
+        oram_objects: Box<[RuntimeOramObjectWitness]>,
+        oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+        oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+        oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+        oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
     ) -> Result<Self, RefinementWitnessError> {
         let physical_writes = refinement_physical_writes_as_shape_events(&trace)?;
         let oram_leaf_public_scaffold = validate_path_oram_leaf_schedule(
@@ -3423,7 +4237,7 @@ impl RuntimePathOramHiddenCertificate {
         Ok(Self {
             trace,
             oram_objects,
-            oram_leaf_public_scaffold,
+            oram_leaf_public_scaffold: oram_leaf_public_scaffold.into_boxed_slice(),
             oram_leaf_schedule,
             oram_position_map_before,
             oram_position_map_after,
@@ -3450,7 +4264,7 @@ impl RuntimePathOramHiddenCertificate {
             &physical_writes,
             &self.oram_objects,
         )?;
-        if scaffold != self.oram_leaf_public_scaffold {
+        if scaffold.as_slice() != self.oram_leaf_public_scaffold.as_ref() {
             return Err(RefinementWitnessError::OramLeafScheduleMismatch);
         }
         validate_path_oram_leaf_state(
@@ -3524,9 +4338,10 @@ impl SeededRuntimeWitnessFamily {
     pub fn new(
         witnesses: Vec<RuntimeRefinementWitness>,
     ) -> Result<Self, SeededRuntimeWitnessFamilyError> {
+        let seed_count = witnesses.len();
         let family = Self {
-            seed_count: witnesses.len(),
-            witnesses,
+            seed_count,
+            witnesses: witnesses.into_boxed_slice(),
         };
         family.validate()?;
         Ok(family)
@@ -3562,13 +4377,14 @@ impl SeededRuntimePathOramWitnessFamily {
     pub fn new(
         witnesses: Vec<RuntimeRefinementWitness>,
     ) -> Result<Self, SeededRuntimeWitnessFamilyError> {
+        let seed_count = witnesses.len();
         let public_leaf_scaffold = witnesses
             .first()
             .map(|witness| witness.oram_leaf_public_scaffold.clone())
             .unwrap_or_default();
         let family = Self {
-            seed_count: witnesses.len(),
-            witnesses,
+            seed_count,
+            witnesses: witnesses.into_boxed_slice(),
             public_leaf_scaffold,
         };
         family.validate()?;
@@ -3578,7 +4394,7 @@ impl SeededRuntimePathOramWitnessFamily {
     pub fn validate(&self) -> Result<(), SeededRuntimeWitnessFamilyError> {
         validate_seeded_runtime_witnesses(self.seed_count, &self.witnesses)?;
         for (index, witness) in self.witnesses.iter().enumerate() {
-            if witness.oram_leaf_public_scaffold != self.public_leaf_scaffold {
+            if witness.oram_leaf_public_scaffold.as_ref() != self.public_leaf_scaffold.as_ref() {
                 return Err(SeededRuntimeWitnessFamilyError::PublicLeafScaffoldMismatch { index });
             }
         }
@@ -3617,7 +4433,10 @@ impl SeededRuntimePaperMainFamilyBundle {
             .first()
             .ok_or(SeededRuntimePaperMainFamilyBundleError::EmptyFamily)?;
         let public_outcome = first_witness.public_outcome().clone();
-        let boundary_schedule = first_witness.boundary_schedule().to_vec();
+        let boundary_schedule = first_witness
+            .boundary_schedule()
+            .to_vec()
+            .into_boxed_slice();
         let bundle = Self {
             family,
             public_outcome,
@@ -3640,7 +4459,7 @@ impl SeededRuntimePaperMainFamilyBundle {
                     SeededRuntimePaperMainFamilyBundleError::PublicOutcomeMismatch { index },
                 );
             }
-            if witness.boundary_schedule() != self.boundary_schedule.as_slice() {
+            if witness.boundary_schedule() != self.boundary_schedule.as_ref() {
                 return Err(
                     SeededRuntimePaperMainFamilyBundleError::BoundaryScheduleMismatch { index },
                 );
@@ -3719,14 +4538,14 @@ impl SeededRuntimePaperMainSlotFamilyBundle {
             let kernel_witness = witness.kernel_witness().ok_or(
                 SeededRuntimePaperMainSlotFamilyBundleError::MissingKernelWitness { index },
             )?;
-            if kernel_witness.expected_kernel_steps() != Some(expected_kernel_steps.as_slice()) {
+            if kernel_witness.expected_kernel_steps() != Some(expected_kernel_steps.as_ref()) {
                 return Err(
                     SeededRuntimePaperMainSlotFamilyBundleError::ExpectedKernelStepsMismatch {
                         index,
                     },
                 );
             }
-            if kernel_witness.kernel_steps() != expected_kernel_steps.as_slice() {
+            if kernel_witness.kernel_steps() != expected_kernel_steps.as_ref() {
                 return Err(
                     SeededRuntimePaperMainSlotFamilyBundleError::EmittedKernelStepsMismatch {
                         index,
@@ -3768,6 +4587,7 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
     pub fn new(
         witnesses: Vec<RuntimeRefinementWitness>,
     ) -> Result<Self, CanonicalFreshCoinWitnessFamilyError> {
+        let seed_count = witnesses.len();
         let public_leaf_scaffold = witnesses
             .first()
             .map(|witness| witness.oram_leaf_public_scaffold.clone())
@@ -3777,8 +4597,8 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
             .and_then(RuntimeRefinementWitness::path_oram_fresh_coin_scaffold)
             .unwrap_or_default();
         let family = Self {
-            seed_count: witnesses.len(),
-            witnesses,
+            seed_count,
+            witnesses: witnesses.into_boxed_slice(),
             public_leaf_scaffold,
             public_fresh_coin_scaffold,
         };
@@ -3803,7 +4623,7 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
         let mut by_seed = vec![None; canonical_seed_count];
 
         for (index, witness) in witnesses.into_iter().enumerate() {
-            if witness.oram_leaf_public_scaffold != public_leaf_scaffold {
+            if witness.oram_leaf_public_scaffold.as_ref() != public_leaf_scaffold.as_ref() {
                 return Err(
                     CanonicalFreshCoinWitnessFamilyError::PublicLeafScaffoldMismatch { index },
                 );
@@ -3870,7 +4690,7 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
             );
         }
         for (index, witness) in self.witnesses.iter().enumerate() {
-            if witness.oram_leaf_public_scaffold != self.public_leaf_scaffold {
+            if witness.oram_leaf_public_scaffold.as_ref() != self.public_leaf_scaffold.as_ref() {
                 return Err(
                     CanonicalFreshCoinWitnessFamilyError::PublicLeafScaffoldMismatch { index },
                 );
@@ -3972,7 +4792,12 @@ impl CanonicalFreshCoinRuntimePathOramTheoremInput {
                 },
             );
         }
-        if self.representative_witness.oram_leaf_public_scaffold != self.public_leaf_scaffold {
+        if self
+            .representative_witness
+            .oram_leaf_public_scaffold
+            .as_ref()
+            != self.public_leaf_scaffold.as_ref()
+        {
             return Err(CanonicalFreshCoinTheoremInputError::PublicLeafScaffoldMismatch);
         }
         let extracted_scaffold = self
@@ -4019,14 +4844,14 @@ const STASH_REGION: &str = "stash";
 
 impl RuntimeOramObjectWitness {
     pub fn access_witness(&self) -> RuntimeOramAccessWitness {
-        RuntimeOramAccessWitness {
-            object_id: self.object_id,
-            scheme: self.scheme.clone(),
-            metadata_pages_per_access: self.metadata_pages_per_access,
-            buckets_per_access: self.buckets_per_access,
-            recursion_depth: self.recursion_depth,
-            stash_bound: self.stash_bound,
-        }
+        RuntimeOramAccessWitness::new(
+            self.object_id,
+            self.scheme.clone(),
+            self.metadata_pages_per_access,
+            self.buckets_per_access,
+            self.recursion_depth,
+            self.stash_bound,
+        )
     }
 
     fn metadata_event_kind(&self) -> Result<&'static str, RefinementWitnessError> {
@@ -4051,13 +4876,16 @@ impl RuntimeOramObjectWitness {
 }
 
 impl RuntimeControllerCertificate {
-    pub fn new(
+    pub fn from_observed_oram_accesses(
         entry_input_len: usize,
-        observed_oram_accesses: Vec<RuntimeOramAccessWitness>,
+        observed_oram_accesses: impl IntoIterator<Item = RuntimeOramAccessWitness>,
     ) -> Self {
         Self {
             entry_input_len,
-            observed_oram_accesses,
+            observed_oram_accesses: observed_oram_accesses
+                .into_iter()
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
         }
     }
 
@@ -4069,7 +4897,7 @@ impl RuntimeControllerCertificate {
         &self.observed_oram_accesses
     }
 
-    pub fn boundary_schedule(&self, public_outcome: &PublicOutcomeTrace) -> Vec<BoundaryEvent> {
+    pub fn boundary_schedule(&self, public_outcome: &PublicOutcomeTrace) -> Box<[BoundaryEvent]> {
         let mut schedule = Vec::with_capacity(2 * self.observed_oram_accesses.len() + 2);
         schedule.push(BoundaryEvent {
             direction: BoundaryDirection::Enter,
@@ -4097,7 +4925,7 @@ impl RuntimeControllerCertificate {
             input_len: 0,
             output_len: public_outcome.output_shape.return_length,
         });
-        schedule
+        schedule.into_boxed_slice()
     }
 
     pub fn controller_shape(&self) -> SgxControllerShapeTrace {
@@ -4165,7 +4993,8 @@ impl RuntimeControllerCertificate {
                 page_kind: STASH_REGION.into(),
                 event_budget: stash_budget,
             },
-        ];
+        ]
+        .into_boxed_slice();
         let workset_regions = vec![
             ControllerPageBudget {
                 page_kind: METADATA_REGION.into(),
@@ -4183,18 +5012,20 @@ impl RuntimeControllerCertificate {
                 page_kind: STASH_REGION.into(),
                 event_budget: stash_workset,
             },
-        ];
+        ]
+        .into_boxed_slice();
         let total_oram_accesses = self.observed_oram_accesses.len();
         let page_trace_budget = page_trace_regions
             .iter()
             .map(|region| region.event_budget)
             .sum::<usize>();
+        let controller_phase_count = controller_phase_order.len();
         SgxControllerShapeTrace {
             boundary_event_budget: 2 * total_oram_accesses + 2,
-            controller_phase_order: controller_phase_order.clone(),
+            controller_phase_order: controller_phase_order.into_boxed_slice(),
             page_trace_regions,
             workset_regions,
-            exit_trace_budget: controller_phase_order.len() + total_oram_accesses + 1,
+            exit_trace_budget: controller_phase_count + total_oram_accesses + 1,
             shared_resource_budget: 0, // overwritten below
             recursive_position_map_depth,
             stash_bound,
@@ -4204,12 +5035,12 @@ impl RuntimeControllerCertificate {
 
     pub fn theorem_trace(&self, public_outcome: PublicOutcomeTrace) -> TheoremTrace {
         let controller_shape = self.controller_shape();
-        TheoremTrace {
-            public_outcome: Some(public_outcome.clone()),
-            boundary_schedule: self.boundary_schedule(&public_outcome),
-            normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
-            controller_shape: Some(controller_shape),
-        }
+        let boundary_schedule = self.boundary_schedule(&public_outcome);
+        TheoremTrace::from_public_observer_parts(
+            public_outcome,
+            boundary_schedule,
+            controller_shape,
+        )
     }
 }
 
@@ -4234,9 +5065,76 @@ impl RuntimeControllerObserverCertificate {
         &self.controller_certificate
     }
 
+    pub fn theorem_trace(&self) -> TheoremTrace {
+        TheoremTrace::from_public_observer_parts(
+            self.public_outcome.clone(),
+            self.boundary_schedule.clone(),
+            self.controller_shape.clone(),
+        )
+    }
+
+    pub fn from_runtime_observer_parts(
+        public_outcome: PublicOutcomeTrace,
+        boundary_schedule: Box<[BoundaryEvent]>,
+        controller_phase_order: Box<[ControllerPhase]>,
+        page_trace_regions: Box<[ControllerPageBudget]>,
+        workset_regions: Box<[ControllerPageBudget]>,
+        total_oram_accesses: usize,
+        recursive_position_map_depth: usize,
+        stash_bound: usize,
+        controller_certificate: RuntimeControllerCertificate,
+    ) -> Result<Self, RefinementWitnessError> {
+        let controller_shape = SgxControllerShapeTrace::from_runtime_observer_parts(
+            boundary_schedule.len(),
+            controller_phase_order,
+            page_trace_regions,
+            workset_regions,
+            total_oram_accesses,
+            recursive_position_map_depth,
+            stash_bound,
+        );
+        let normalized_micro_trace = controller_shape.normalized_micro_trace();
+        Self::new(
+            public_outcome,
+            boundary_schedule,
+            controller_shape,
+            normalized_micro_trace,
+            controller_certificate,
+        )
+    }
+
+    pub fn from_runtime_observer_with_oram_accesses(
+        public_outcome: PublicOutcomeTrace,
+        boundary_schedule: Box<[BoundaryEvent]>,
+        controller_phase_order: Box<[ControllerPhase]>,
+        page_trace_regions: Box<[ControllerPageBudget]>,
+        workset_regions: Box<[ControllerPageBudget]>,
+        total_oram_accesses: usize,
+        recursive_position_map_depth: usize,
+        stash_bound: usize,
+        entry_input_len: usize,
+        observed_oram_accesses: impl IntoIterator<Item = RuntimeOramAccessWitness>,
+    ) -> Result<Self, RefinementWitnessError> {
+        let controller_certificate = RuntimeControllerCertificate::from_observed_oram_accesses(
+            entry_input_len,
+            observed_oram_accesses,
+        );
+        Self::from_runtime_observer_parts(
+            public_outcome,
+            boundary_schedule,
+            controller_phase_order,
+            page_trace_regions,
+            workset_regions,
+            total_oram_accesses,
+            recursive_position_map_depth,
+            stash_bound,
+            controller_certificate,
+        )
+    }
+
     fn new(
         public_outcome: PublicOutcomeTrace,
-        boundary_schedule: Vec<BoundaryEvent>,
+        boundary_schedule: Box<[BoundaryEvent]>,
         controller_shape: SgxControllerShapeTrace,
         normalized_micro_trace: NormalizedMicroTrace,
         controller_certificate: RuntimeControllerCertificate,
@@ -4259,10 +5157,11 @@ impl RuntimeControllerObserverCertificate {
                 boundary_budget: self.controller_shape.boundary_event_budget,
             });
         }
-        if self.boundary_schedule
+        if self.boundary_schedule.as_ref()
             != self
                 .controller_certificate
                 .boundary_schedule(&self.public_outcome)
+                .as_ref()
         {
             return Err(RefinementWitnessError::BoundaryScheduleMismatch);
         }
@@ -4507,7 +5406,7 @@ fn path_oram_leaf_choice_count(bucket_count: usize) -> usize {
 fn runtime_path_oram_fresh_coin_scaffold_of_step(
     leaf: &RuntimeOramLeafWitness,
     transition: &RuntimePathOramTransitionWitness,
-) -> Option<Vec<RuntimeOramLeafScaffoldWitness>> {
+) -> Option<Box<[RuntimeOramLeafScaffoldWitness]>> {
     if transition.object_id != leaf.object_id
         || transition.object_name != leaf.object_name
         || transition.bucket_count != leaf.bucket_count
@@ -4520,27 +5419,31 @@ fn runtime_path_oram_fresh_coin_scaffold_of_step(
         bucket_count: leaf.bucket_count,
     };
     match transition.kind {
-        RuntimePathOramTransitionKind::ReadMiss => Some(vec![scaffold_step]),
-        RuntimePathOramTransitionKind::ReadHit => transition.next_leaf.map(|_| vec![scaffold_step]),
+        RuntimePathOramTransitionKind::ReadMiss => Some(Box::from([scaffold_step])),
+        RuntimePathOramTransitionKind::ReadHit => {
+            transition.next_leaf.map(|_| Box::from([scaffold_step]))
+        }
         RuntimePathOramTransitionKind::WriteNoop => Some(if transition.slot_index.is_some() {
-            vec![]
+            Box::<[RuntimeOramLeafScaffoldWitness]>::default()
         } else {
-            vec![scaffold_step]
+            Box::from([scaffold_step])
         }),
         RuntimePathOramTransitionKind::WriteInsert => transition
             .next_leaf
-            .map(|_| vec![scaffold_step.clone(), scaffold_step]),
+            .map(|_| Box::from([scaffold_step.clone(), scaffold_step])),
         RuntimePathOramTransitionKind::WriteUpdate => {
-            transition.next_leaf.map(|_| vec![scaffold_step])
+            transition.next_leaf.map(|_| Box::from([scaffold_step]))
         }
-        RuntimePathOramTransitionKind::WriteDelete => Some(vec![]),
+        RuntimePathOramTransitionKind::WriteDelete => {
+            Some(Box::<[RuntimeOramLeafScaffoldWitness]>::default())
+        }
     }
 }
 
 fn runtime_path_oram_fresh_coin_values_of_step(
     leaf: &RuntimeOramLeafWitness,
     transition: &RuntimePathOramTransitionWitness,
-) -> Option<Vec<usize>> {
+) -> Option<Box<[usize]>> {
     if transition.object_id != leaf.object_id
         || transition.object_name != leaf.object_name
         || transition.bucket_count != leaf.bucket_count
@@ -4548,55 +5451,59 @@ fn runtime_path_oram_fresh_coin_values_of_step(
         return None;
     }
     match transition.kind {
-        RuntimePathOramTransitionKind::ReadMiss => Some(vec![leaf.leaf]),
+        RuntimePathOramTransitionKind::ReadMiss => Some(Box::from([leaf.leaf])),
         RuntimePathOramTransitionKind::ReadHit => {
-            transition.next_leaf.map(|next_leaf| vec![next_leaf])
+            transition.next_leaf.map(|next_leaf| Box::from([next_leaf]))
         }
         RuntimePathOramTransitionKind::WriteNoop => Some(if transition.slot_index.is_some() {
-            vec![]
+            Box::<[usize]>::default()
         } else {
-            vec![leaf.leaf]
+            Box::from([leaf.leaf])
         }),
         RuntimePathOramTransitionKind::WriteInsert => transition
             .next_leaf
-            .map(|next_leaf| vec![leaf.leaf, next_leaf]),
+            .map(|next_leaf| Box::from([leaf.leaf, next_leaf])),
         RuntimePathOramTransitionKind::WriteUpdate => {
-            transition.next_leaf.map(|next_leaf| vec![next_leaf])
+            transition.next_leaf.map(|next_leaf| Box::from([next_leaf]))
         }
-        RuntimePathOramTransitionKind::WriteDelete => Some(vec![]),
+        RuntimePathOramTransitionKind::WriteDelete => Some(Box::<[usize]>::default()),
     }
 }
 
 pub fn extract_runtime_path_oram_fresh_coin_scaffold(
     leaf_schedule: &[RuntimeOramLeafWitness],
     transitions: &[RuntimePathOramTransitionWitness],
-) -> Option<Vec<RuntimeOramLeafScaffoldWitness>> {
+) -> Option<Box<[RuntimeOramLeafScaffoldWitness]>> {
     if leaf_schedule.len() != transitions.len() {
         return None;
     }
-    let mut scaffold = Vec::new();
+    let mut scaffold = Vec::with_capacity(leaf_schedule.len().saturating_mul(2));
     for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
-        scaffold.extend(runtime_path_oram_fresh_coin_scaffold_of_step(
-            leaf, transition,
-        )?);
+        scaffold.extend(
+            runtime_path_oram_fresh_coin_scaffold_of_step(leaf, transition)?
+                .iter()
+                .cloned(),
+        );
     }
-    Some(scaffold)
+    Some(scaffold.into_boxed_slice())
 }
 
 pub fn extract_runtime_path_oram_fresh_coin_values(
     leaf_schedule: &[RuntimeOramLeafWitness],
     transitions: &[RuntimePathOramTransitionWitness],
-) -> Option<Vec<usize>> {
+) -> Option<Box<[usize]>> {
     if leaf_schedule.len() != transitions.len() {
         return None;
     }
-    let mut values = Vec::new();
+    let mut values = Vec::with_capacity(leaf_schedule.len().saturating_mul(2));
     for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
-        values.extend(runtime_path_oram_fresh_coin_values_of_step(
-            leaf, transition,
-        )?);
+        values.extend(
+            runtime_path_oram_fresh_coin_values_of_step(leaf, transition)?
+                .iter()
+                .copied(),
+        );
     }
-    Some(values)
+    Some(values.into_boxed_slice())
 }
 
 pub fn canonical_path_oram_leaf_seed_space_size(
@@ -4610,7 +5517,7 @@ pub fn canonical_path_oram_leaf_seed_space_size(
 pub fn canonical_path_oram_leaf_values_of_seed(
     scaffold: &[RuntimeOramLeafScaffoldWitness],
     seed: usize,
-) -> Vec<usize> {
+) -> Box<[usize]> {
     fn go(scaffold: &[RuntimeOramLeafScaffoldWitness], seed: usize, output: &mut Vec<usize>) {
         if let Some((head, tail)) = scaffold.split_first() {
             let tail_size = canonical_path_oram_leaf_seed_space_size(tail)
@@ -4624,7 +5531,7 @@ pub fn canonical_path_oram_leaf_values_of_seed(
 
     let mut values = Vec::with_capacity(scaffold.len());
     go(scaffold, seed, &mut values);
-    values
+    values.into_boxed_slice()
 }
 
 pub fn canonical_path_oram_seed_of_leaf_values(
@@ -4690,7 +5597,7 @@ fn validate_path_oram_leaf_schedule(
 fn runtime_path_oram_state_by_object(
     states: &[RuntimePathOramPositionMapWitness],
     oram_objects: &[RuntimeOramObjectWitness],
-) -> Result<BTreeMap<u32, Vec<Option<usize>>>, RefinementWitnessError> {
+) -> Result<BTreeMap<u32, Box<[Option<usize>]>>, RefinementWitnessError> {
     let mut by_object = BTreeMap::new();
     for object in oram_objects
         .iter()
@@ -4713,7 +5620,7 @@ fn runtime_path_oram_state_by_object(
             return Err(RefinementWitnessError::OramLeafStateMismatch);
         }
         if by_object
-            .insert(object.object_id, state.leaves.to_vec())
+            .insert(object.object_id, state.leaves.clone())
             .is_some()
         {
             return Err(RefinementWitnessError::OramLeafStateMismatch);
@@ -4862,6 +5769,33 @@ fn validate_path_oram_leaf_state(
 }
 
 impl SgxControllerShapeTrace {
+    pub fn from_runtime_observer_parts(
+        boundary_event_budget: usize,
+        controller_phase_order: Box<[ControllerPhase]>,
+        page_trace_regions: Box<[ControllerPageBudget]>,
+        workset_regions: Box<[ControllerPageBudget]>,
+        total_oram_accesses: usize,
+        recursive_position_map_depth: usize,
+        stash_bound: usize,
+    ) -> Self {
+        let page_trace_budget = page_trace_regions
+            .iter()
+            .map(|region| region.event_budget)
+            .sum::<usize>();
+        let exit_trace_budget = controller_phase_order.len() + total_oram_accesses + 1;
+        let shared_resource_budget = controller_phase_order.len() + page_trace_budget;
+        Self {
+            boundary_event_budget,
+            controller_phase_order,
+            page_trace_regions,
+            workset_regions,
+            exit_trace_budget,
+            shared_resource_budget,
+            recursive_position_map_depth,
+            stash_bound,
+        }
+    }
+
     fn with_shared_resource_budget(mut self, page_trace_budget: usize) -> Self {
         self.shared_resource_budget = self.controller_phase_order.len() + page_trace_budget;
         self
@@ -4878,28 +5812,30 @@ pub struct TraceHashBundle {
     pub physical_access_trace_hash: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct ExecutionTrace {
     #[serde(default)]
-    pub opcode_trace: Vec<String>,
+    pub opcode_trace: Box<[String]>,
     #[serde(default)]
-    pub logical_accesses: Vec<LogicalEvent>,
+    pub logical_accesses: Box<[LogicalEvent]>,
     #[serde(default)]
-    pub logical_writes: Vec<LogicalEvent>,
+    pub logical_writes: Box<[LogicalEvent]>,
     #[serde(default)]
-    pub physical_reads: Vec<PhysicalReadEvent>,
+    pub physical_reads: Box<[PhysicalReadEvent]>,
     #[serde(default)]
-    pub physical_writes: Vec<PhysicalWriteEvent>,
+    pub physical_writes: Box<[PhysicalWriteEvent]>,
     #[serde(default)]
     pub gas_used: u64,
     #[serde(default)]
     pub theorem_trace: TheoremTrace,
     #[serde(default)]
     runtime_seed: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     runtime_kernel_witness: Option<RuntimeKernelWitness>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    #[serde(default)]
+    runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
     #[serde(default)]
     runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,
     #[serde(default)]
@@ -4920,18 +5856,440 @@ pub struct ExecutionTrace {
     runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct RuntimeExecutionTraceParts {
-    opcode_trace: Vec<String>,
-    logical_accesses: Vec<LogicalEvent>,
-    logical_writes: Vec<LogicalEvent>,
-    physical_reads: Vec<PhysicalReadEvent>,
-    physical_writes: Vec<PhysicalWriteEvent>,
+#[derive(Debug, Error)]
+pub enum RuntimeExecutionTraceFinalizationError {
+    #[error("invalid runtime execution trace parts: {0}")]
+    RefinementWitness(#[from] RefinementWitnessError),
+    #[error("runtime confidential proof bundle family drifted from admitted artifact: {0}")]
+    ConfidentialProofBundleFamily(#[from] RuntimeConfidentialProofBundleFamilyError),
+}
+
+fn wipe_runtime_oram_access_counters(witnesses: &mut [RuntimeOramAccessCounterWitness]) {
+    for witness in witnesses.iter_mut() {
+        witness.access_counter = 0;
+    }
+}
+
+fn wipe_runtime_oram_position_maps(witnesses: &mut [RuntimePathOramPositionMapWitness]) {
+    for witness in witnesses.iter_mut() {
+        for leaf in witness.leaves.iter_mut() {
+            *leaf = None;
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CommittedRuntimeWitnessSnapshot {
+    runtime_oram_access_counters: Box<[RuntimeOramAccessCounterWitness]>,
+    runtime_oram_position_maps: Box<[RuntimePathOramPositionMapWitness]>,
+}
+
+impl CommittedRuntimeWitnessSnapshot {
+    pub fn new(
+        runtime_oram_access_counters: Box<[RuntimeOramAccessCounterWitness]>,
+        runtime_oram_position_maps: Box<[RuntimePathOramPositionMapWitness]>,
+    ) -> Self {
+        Self {
+            runtime_oram_access_counters,
+            runtime_oram_position_maps,
+        }
+    }
+
+    pub fn into_hidden_oram_state(
+        mut self,
+    ) -> (
+        Box<[RuntimeOramAccessCounterWitness]>,
+        Box<[RuntimePathOramPositionMapWitness]>,
+    ) {
+        (
+            std::mem::take(&mut self.runtime_oram_access_counters),
+            std::mem::take(&mut self.runtime_oram_position_maps),
+        )
+    }
+}
+
+impl Drop for CommittedRuntimeWitnessSnapshot {
+    fn drop(&mut self) {
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_maps);
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum CommittedRuntimeWitnessSnapshotBuilderError {
+    #[error("committed runtime witness snapshot builder overflow")]
+    Overflow,
+    #[error(
+        "committed runtime witness snapshot builder underfilled: initialized {initialized} of {capacity} entries"
+    )]
+    Underfilled { initialized: usize, capacity: usize },
+}
+
+#[derive(Debug)]
+pub struct CommittedRuntimeWitnessSnapshotBuilder {
+    runtime_oram_access_counters: Box<[MaybeUninit<RuntimeOramAccessCounterWitness>]>,
+    runtime_oram_position_maps: Box<[MaybeUninit<RuntimePathOramPositionMapWitness>]>,
+    initialized: usize,
+}
+
+impl CommittedRuntimeWitnessSnapshotBuilder {
+    pub fn new(len: usize) -> Self {
+        Self {
+            runtime_oram_access_counters:
+                Box::<[RuntimeOramAccessCounterWitness]>::new_uninit_slice(len),
+            runtime_oram_position_maps:
+                Box::<[RuntimePathOramPositionMapWitness]>::new_uninit_slice(len),
+            initialized: 0,
+        }
+    }
+
+    pub fn push(
+        &mut self,
+        runtime_oram_access_counter: RuntimeOramAccessCounterWitness,
+        runtime_oram_position_map: RuntimePathOramPositionMapWitness,
+    ) -> Result<(), CommittedRuntimeWitnessSnapshotBuilderError> {
+        if self.initialized >= self.runtime_oram_access_counters.len() {
+            return Err(CommittedRuntimeWitnessSnapshotBuilderError::Overflow);
+        }
+        self.runtime_oram_access_counters[self.initialized].write(runtime_oram_access_counter);
+        self.runtime_oram_position_maps[self.initialized].write(runtime_oram_position_map);
+        self.initialized += 1;
+        Ok(())
+    }
+
+    pub fn finish(
+        mut self,
+    ) -> Result<CommittedRuntimeWitnessSnapshot, CommittedRuntimeWitnessSnapshotBuilderError> {
+        let capacity = self.runtime_oram_access_counters.len();
+        if self.initialized != capacity {
+            return Err(CommittedRuntimeWitnessSnapshotBuilderError::Underfilled {
+                initialized: self.initialized,
+                capacity,
+            });
+        }
+        let runtime_oram_access_counters =
+            assume_init_boxed_slice(std::mem::take(&mut self.runtime_oram_access_counters));
+        let runtime_oram_position_maps =
+            assume_init_boxed_slice(std::mem::take(&mut self.runtime_oram_position_maps));
+        self.initialized = 0;
+        Ok(CommittedRuntimeWitnessSnapshot::new(
+            runtime_oram_access_counters,
+            runtime_oram_position_maps,
+        ))
+    }
+}
+
+impl Drop for CommittedRuntimeWitnessSnapshotBuilder {
+    fn drop(&mut self) {
+        for entry in &mut self.runtime_oram_access_counters[..self.initialized] {
+            unsafe { entry.assume_init_drop() };
+        }
+        for entry in &mut self.runtime_oram_position_maps[..self.initialized] {
+            unsafe { entry.assume_init_drop() };
+        }
+    }
+}
+
+fn assume_init_boxed_slice<T>(entries: Box<[MaybeUninit<T>]>) -> Box<[T]> {
+    let raw = Box::into_raw(entries) as *mut [T];
+    unsafe { Box::from_raw(raw) }
+}
+
+#[derive(Debug)]
+pub struct TracedRuntimeCallStart {
+    runtime_state_before: CommittedRuntimeWitnessSnapshot,
+}
+
+impl TracedRuntimeCallStart {
+    pub fn new(runtime_state_before: CommittedRuntimeWitnessSnapshot) -> Self {
+        Self {
+            runtime_state_before,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TracedRuntimeCallOutcome {
+    call_outcome: RuntimeCallOutcome,
+    runtime_state_after: CommittedRuntimeWitnessSnapshot,
+}
+
+impl TracedRuntimeCallOutcome {
+    pub fn new(
+        call_outcome: RuntimeCallOutcome,
+        runtime_state_after: CommittedRuntimeWitnessSnapshot,
+    ) -> Self {
+        Self {
+            call_outcome,
+            runtime_state_after,
+        }
+    }
+
+    pub fn into_finalized_call_trace_parts(
+        self,
+        call_start: TracedRuntimeCallStart,
+    ) -> FinalizedRuntimeCallTraceParts {
+        let (runtime_oram_access_counters_before, runtime_oram_position_map_before) =
+            call_start.runtime_state_before.into_hidden_oram_state();
+        let (runtime_oram_access_counters_after, runtime_oram_position_map_after) =
+            self.runtime_state_after.into_hidden_oram_state();
+        FinalizedRuntimeCallTraceParts::new(
+            self.call_outcome,
+            TracedRuntimeCallWitnessState::new(
+                runtime_oram_access_counters_before,
+                runtime_oram_access_counters_after,
+                runtime_oram_position_map_before,
+                runtime_oram_position_map_after,
+            ),
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct RuntimeCallOutcome {
+    runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
+    aborted: bool,
+    return_value: Option<Value>,
+    opcode_trace: Box<[String]>,
+}
+
+impl RuntimeCallOutcome {
+    pub fn from_runtime_execution(
+        runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
+        aborted: bool,
+        return_value: Option<Value>,
+        opcode_trace: Box<[String]>,
+    ) -> Self {
+        Self {
+            runtime_kernel_finish_bundle,
+            aborted,
+            return_value,
+            opcode_trace,
+        }
+    }
+
+    pub fn into_theorem_trace_parts(
+        self,
+    ) -> (
+        RuntimeKernelFinishBundle,
+        bool,
+        Option<Value>,
+        Box<[String]>,
+    ) {
+        (
+            self.runtime_kernel_finish_bundle,
+            self.aborted,
+            self.return_value,
+            self.opcode_trace,
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct TracedRuntimeCallWitnessState {
+    runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
+    runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
+    runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+    runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+}
+
+impl TracedRuntimeCallWitnessState {
+    pub fn new(
+        runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
+        runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
+        runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+        runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+    ) -> Self {
+        Self {
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+        }
+    }
+
+    pub fn into_execution_trace_parts(
+        mut self,
+    ) -> (
+        Box<[RuntimeOramAccessCounterWitness]>,
+        Box<[RuntimeOramAccessCounterWitness]>,
+        Box<[RuntimePathOramPositionMapWitness]>,
+        Box<[RuntimePathOramPositionMapWitness]>,
+    ) {
+        (
+            std::mem::take(&mut self.runtime_oram_access_counters_before),
+            std::mem::take(&mut self.runtime_oram_access_counters_after),
+            std::mem::take(&mut self.runtime_oram_position_map_before),
+            std::mem::take(&mut self.runtime_oram_position_map_after),
+        )
+    }
+}
+
+impl Drop for TracedRuntimeCallWitnessState {
+    fn drop(&mut self) {
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_before);
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_after);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_before);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_after);
+    }
+}
+
+#[derive(Debug)]
+pub struct FinalizedRuntimeCallTraceParts {
+    runtime_call_outcome: RuntimeCallOutcome,
+    runtime_witness_state: TracedRuntimeCallWitnessState,
+}
+
+impl FinalizedRuntimeCallTraceParts {
+    pub fn new(
+        runtime_call_outcome: RuntimeCallOutcome,
+        runtime_witness_state: TracedRuntimeCallWitnessState,
+    ) -> Self {
+        Self {
+            runtime_call_outcome,
+            runtime_witness_state,
+        }
+    }
+
+    pub fn into_execution_trace_inputs(
+        self,
+    ) -> (
+        RuntimeKernelFinishBundle,
+        bool,
+        Option<Value>,
+        Box<[String]>,
+        TracedRuntimeCallWitnessState,
+    ) {
+        let Self {
+            runtime_call_outcome,
+            runtime_witness_state,
+        } = self;
+        let (runtime_kernel_finish_bundle, aborted, return_value, opcode_trace) =
+            runtime_call_outcome.into_theorem_trace_parts();
+        (
+            runtime_kernel_finish_bundle,
+            aborted,
+            return_value,
+            opcode_trace,
+            runtime_witness_state,
+        )
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RuntimePublicCallTraceBundle {
+    logical_accesses: Box<[LogicalEvent]>,
+    logical_writes: Box<[LogicalEvent]>,
+    physical_reads: Box<[PhysicalReadEvent]>,
+    physical_writes: Box<[PhysicalWriteEvent]>,
+    theorem_trace: TheoremTrace,
+    runtime_controller_certificate: RuntimeControllerCertificate,
+    runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+    runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+}
+
+impl RuntimePublicCallTraceBundle {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        logical_accesses: Box<[LogicalEvent]>,
+        logical_writes: Box<[LogicalEvent]>,
+        physical_reads: Box<[PhysicalReadEvent]>,
+        physical_writes: Box<[PhysicalWriteEvent]>,
+        theorem_trace: TheoremTrace,
+        runtime_controller_certificate: RuntimeControllerCertificate,
+        runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+        runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+    ) -> Self {
+        Self {
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            theorem_trace,
+            runtime_controller_certificate,
+            runtime_oram_leaf_schedule,
+            runtime_oram_leaf_state_transitions,
+        }
+    }
+
+    pub fn into_runtime_finalization_input(
+        self,
+        opcode_trace: Box<[String]>,
+        gas_used: u64,
+        runtime_seed: Option<u64>,
+        runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
+        runtime_witness_state: TracedRuntimeCallWitnessState,
+    ) -> RuntimeExecutionTraceFinalizationInput {
+        let Self {
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            theorem_trace,
+            runtime_controller_certificate,
+            runtime_oram_leaf_schedule,
+            runtime_oram_leaf_state_transitions,
+        } = self;
+        let (
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+        ) = runtime_witness_state.into_execution_trace_parts();
+        RuntimeExecutionTraceFinalizationInput::new(
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            gas_used,
+            theorem_trace,
+            runtime_seed,
+            runtime_kernel_finish_bundle,
+            runtime_controller_certificate,
+            runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions,
+        )
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RuntimeExecutionTraceFinalizationInput {
+    opcode_trace: Box<[String]>,
+    logical_accesses: Box<[LogicalEvent]>,
+    logical_writes: Box<[LogicalEvent]>,
+    physical_reads: Box<[PhysicalReadEvent]>,
+    physical_writes: Box<[PhysicalWriteEvent]>,
+    gas_used: u64,
+    theorem_trace: TheoremTrace,
+    runtime_seed: Option<u64>,
+    runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
+    runtime_controller_certificate: RuntimeControllerCertificate,
+    runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+    runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
+    runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
+    runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+    runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+    runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct RuntimeExecutionTraceParts {
+    opcode_trace: Box<[String]>,
+    logical_accesses: Box<[LogicalEvent]>,
+    logical_writes: Box<[LogicalEvent]>,
+    physical_reads: Box<[PhysicalReadEvent]>,
+    physical_writes: Box<[PhysicalWriteEvent]>,
     gas_used: u64,
     theorem_trace: TheoremTrace,
     runtime_seed: Option<u64>,
     runtime_kernel_witness: Option<RuntimeKernelWitness>,
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
     runtime_controller_certificate: Option<RuntimeControllerCertificate>,
     runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
     runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
@@ -4943,20 +6301,104 @@ pub struct RuntimeExecutionTraceParts {
 }
 
 impl RuntimeExecutionTraceParts {
+    fn validate_runtime_kernel_witness_pair_against_finish_bundle(
+        runtime_kernel_witness: Option<RuntimeKernelWitness>,
+        runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+        runtime_kernel_finish_bundle: Option<&RuntimeKernelFinishBundle>,
+    ) -> Result<(), RefinementWitnessError> {
+        let Some(runtime_kernel_finish_bundle) = runtime_kernel_finish_bundle else {
+            return Ok(());
+        };
+        let (checked_kernel_witness, checked_runtime_kernel_refinement_witness) =
+            runtime_kernel_finish_bundle
+                .to_witness_pair()
+                .map_err(|err| match err {
+                    RuntimeKernelFinishBundleError::KernelWitness(err) => {
+                        RefinementWitnessError::KernelWitness(err)
+                    }
+                    RuntimeKernelFinishBundleError::RuntimePhase(err) => {
+                        RefinementWitnessError::RuntimeKernelRefinement(err)
+                    }
+                })?;
+        if runtime_kernel_witness
+            .as_ref()
+            .is_some_and(|witness| witness != &checked_kernel_witness)
+        {
+            return Err(RefinementWitnessError::KernelWitnessFinishBundleMismatch);
+        }
+        if runtime_kernel_refinement_witness
+            .as_ref()
+            .is_some_and(|witness| witness != &checked_runtime_kernel_refinement_witness)
+        {
+            return Err(RefinementWitnessError::RuntimeKernelRefinementWitnessFinishBundleMismatch);
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        opcode_trace: Vec<String>,
-        logical_accesses: Vec<LogicalEvent>,
-        logical_writes: Vec<LogicalEvent>,
-        physical_reads: Vec<PhysicalReadEvent>,
-        physical_writes: Vec<PhysicalWriteEvent>,
+    pub(crate) fn new(
+        opcode_trace: Box<[String]>,
+        logical_accesses: Box<[LogicalEvent]>,
+        logical_writes: Box<[LogicalEvent]>,
+        physical_reads: Box<[PhysicalReadEvent]>,
+        physical_writes: Box<[PhysicalWriteEvent]>,
         gas_used: u64,
         theorem_trace: TheoremTrace,
         runtime_seed: Option<u64>,
         runtime_kernel_witness: Option<RuntimeKernelWitness>,
         runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+        runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
         runtime_controller_certificate: Option<RuntimeControllerCertificate>,
         runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
+        runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+        runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
+        runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
+        runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+        runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+        runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+    ) -> Result<Self, RefinementWitnessError> {
+        Self::validate_runtime_kernel_witness_pair_against_finish_bundle(
+            runtime_kernel_witness.clone(),
+            runtime_kernel_refinement_witness.clone(),
+            runtime_kernel_finish_bundle.as_ref(),
+        )?;
+        Ok(Self {
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            gas_used,
+            theorem_trace,
+            runtime_seed,
+            runtime_kernel_witness,
+            runtime_kernel_refinement_witness,
+            runtime_kernel_finish_bundle,
+            runtime_controller_certificate,
+            runtime_oram_objects,
+            runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions,
+        })
+    }
+}
+
+impl RuntimeExecutionTraceFinalizationInput {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        opcode_trace: Box<[String]>,
+        logical_accesses: Box<[LogicalEvent]>,
+        logical_writes: Box<[LogicalEvent]>,
+        physical_reads: Box<[PhysicalReadEvent]>,
+        physical_writes: Box<[PhysicalWriteEvent]>,
+        gas_used: u64,
+        theorem_trace: TheoremTrace,
+        runtime_seed: Option<u64>,
+        runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
+        runtime_controller_certificate: RuntimeControllerCertificate,
         runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
         runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
         runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
@@ -4973,10 +6415,8 @@ impl RuntimeExecutionTraceParts {
             gas_used,
             theorem_trace,
             runtime_seed,
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
+            runtime_kernel_finish_bundle,
             runtime_controller_certificate,
-            runtime_oram_objects,
             runtime_oram_leaf_schedule,
             runtime_oram_access_counters_before,
             runtime_oram_access_counters_after,
@@ -4992,51 +6432,65 @@ impl ExecutionTrace {
         self.runtime_seed
     }
 
-    pub fn runtime_kernel_witness(&self) -> Option<&RuntimeKernelWitness> {
-        self.runtime_kernel_witness.as_ref()
+    pub(crate) fn stored_runtime_kernel_finish_bundle(&self) -> Option<&RuntimeKernelFinishBundle> {
+        self.runtime_kernel_finish_bundle.as_ref()
     }
 
-    pub fn runtime_kernel_refinement_witness(&self) -> Option<&RuntimeKernelRefinementWitness> {
-        self.runtime_kernel_refinement_witness.as_ref()
+    pub fn exact_runtime_kernel_finish_bundle(
+        &self,
+    ) -> Result<RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError> {
+        let runtime_kernel_finish_bundle = self
+            .runtime_kernel_finish_bundle
+            .as_ref()
+            .map(RuntimeKernelFinishBundle::duplicate)
+            .ok_or(RuntimeKernelFinishBundleAccessError::MissingRuntimeKernelFinishBundle)?;
+        RuntimeExecutionTraceParts::validate_runtime_kernel_witness_pair_against_finish_bundle(
+            self.runtime_kernel_witness.clone(),
+            self.runtime_kernel_refinement_witness.clone(),
+            Some(&runtime_kernel_finish_bundle),
+        )
+        .map_err(|err| match err {
+            RefinementWitnessError::KernelWitnessFinishBundleMismatch => {
+                RuntimeKernelFinishBundleAccessError::KernelWitnessFinishBundleMismatch
+            }
+            RefinementWitnessError::RuntimeKernelRefinementWitnessFinishBundleMismatch => {
+                RuntimeKernelFinishBundleAccessError::RuntimeKernelRefinementWitnessFinishBundleMismatch
+            }
+            RefinementWitnessError::KernelWitness(err) => {
+                RuntimeKernelFinishBundleAccessError::InvalidRuntimeKernelFinishBundle(
+                    RuntimeKernelFinishBundleError::KernelWitness(err),
+                )
+            }
+            RefinementWitnessError::RuntimeKernelRefinement(err) => {
+                RuntimeKernelFinishBundleAccessError::InvalidRuntimeKernelFinishBundle(
+                    RuntimeKernelFinishBundleError::RuntimePhase(err),
+                )
+            }
+            _ => unreachable!("finish-bundle pair validation only reports finish-bundle errors"),
+        })?;
+        Ok(runtime_kernel_finish_bundle)
     }
 
-    pub fn stored_runtime_trusted_kernel_bundle(&self) -> Option<&RuntimeTrustedKernelBundle> {
-        self.runtime_trusted_kernel_bundle.as_ref()
+    pub fn exact_runtime_kernel_witness(&self) -> Result<RuntimeKernelWitness, KernelWitnessError> {
+        self.checked_exported_runtime_kernel_witness()?
+            .ok_or(KernelWitnessError::MissingKernelWitness)
     }
 
-    pub fn stored_runtime_controller_certificate(&self) -> Option<&RuntimeControllerCertificate> {
-        self.runtime_controller_certificate.as_ref()
+    pub fn exact_runtime_kernel_refinement_witness(
+        &self,
+    ) -> Result<RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError> {
+        self.checked_exported_runtime_kernel_refinement_witness()?
+            .ok_or(RuntimeKernelRefinementWitnessError::MissingRuntimeKernelRefinementWitness)
     }
 
-    pub fn runtime_oram_objects(&self) -> &[RuntimeOramObjectWitness] {
-        &self.runtime_oram_objects
+    pub fn runtime_public_oram_access_counters_before(&self) -> BTreeMap<u32, u64> {
+        self.runtime_oram_access_counters_before
+            .iter()
+            .map(|counter| (counter.object_id, counter.access_counter))
+            .collect()
     }
 
-    pub fn runtime_oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {
-        &self.runtime_oram_leaf_schedule
-    }
-
-    pub fn runtime_oram_access_counters_before(&self) -> &[RuntimeOramAccessCounterWitness] {
-        &self.runtime_oram_access_counters_before
-    }
-
-    pub fn runtime_oram_access_counters_after(&self) -> &[RuntimeOramAccessCounterWitness] {
-        &self.runtime_oram_access_counters_after
-    }
-
-    pub fn runtime_oram_position_map_before(&self) -> &[RuntimePathOramPositionMapWitness] {
-        &self.runtime_oram_position_map_before
-    }
-
-    pub fn runtime_oram_position_map_after(&self) -> &[RuntimePathOramPositionMapWitness] {
-        &self.runtime_oram_position_map_after
-    }
-
-    pub fn runtime_oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {
-        &self.runtime_oram_leaf_state_transitions
-    }
-
-    pub fn from_runtime_trace_parts(parts: RuntimeExecutionTraceParts) -> Self {
+    pub(crate) fn from_runtime_trace_parts(parts: RuntimeExecutionTraceParts) -> Self {
         let RuntimeExecutionTraceParts {
             opcode_trace,
             logical_accesses,
@@ -5048,6 +6502,7 @@ impl ExecutionTrace {
             runtime_seed,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
+            runtime_kernel_finish_bundle,
             runtime_controller_certificate,
             runtime_oram_objects,
             runtime_oram_leaf_schedule,
@@ -5068,6 +6523,7 @@ impl ExecutionTrace {
             runtime_seed,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
+            runtime_kernel_finish_bundle,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate,
             runtime_oram_objects,
@@ -5078,6 +6534,57 @@ impl ExecutionTrace {
             runtime_oram_position_map_after,
             runtime_oram_leaf_state_transitions,
         }
+    }
+
+    pub fn from_runtime_finalization_input(
+        artifact: &CompiledArtifact,
+        confidential: bool,
+        input: RuntimeExecutionTraceFinalizationInput,
+    ) -> Result<Self, RuntimeExecutionTraceFinalizationError> {
+        let RuntimeExecutionTraceFinalizationInput {
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            gas_used,
+            theorem_trace,
+            runtime_seed,
+            runtime_kernel_finish_bundle,
+            runtime_controller_certificate,
+            runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions,
+        } = input;
+        let mut trace = Self::from_runtime_trace_parts(RuntimeExecutionTraceParts::new(
+            opcode_trace,
+            logical_accesses,
+            logical_writes,
+            physical_reads,
+            physical_writes,
+            gas_used,
+            theorem_trace,
+            runtime_seed,
+            None,
+            None,
+            Some(runtime_kernel_finish_bundle),
+            Some(runtime_controller_certificate),
+            runtime_oram_objects(artifact),
+            runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after,
+            runtime_oram_position_map_before,
+            runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions,
+        )?);
+        if confidential {
+            trace.runtime_confidential_proof_bundle_family(artifact)?;
+        }
+        trace.materialize_runtime_trusted_kernel_bundle()?;
+        Ok(trace)
     }
 
     pub fn hashes(&self) -> TraceHashBundle {
@@ -5108,7 +6615,7 @@ impl ExecutionTrace {
         }
     }
 
-    pub fn refinement_trace(&self) -> RefinementTrace {
+    fn refinement_trace(&self) -> RefinementTrace {
         RefinementTrace {
             opcode_trace: self.opcode_trace.clone(),
             logical_accesses: self.logical_accesses.clone(),
@@ -5156,21 +6663,22 @@ impl ExecutionTrace {
     ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
         RuntimePathOramHiddenCertificate::new(
             self.refinement_trace(),
-            self.runtime_oram_objects.to_vec(),
-            self.runtime_oram_leaf_schedule.to_vec(),
-            self.runtime_oram_position_map_before.to_vec(),
-            self.runtime_oram_position_map_after.to_vec(),
-            self.runtime_oram_leaf_state_transitions.to_vec(),
+            self.runtime_oram_objects.clone(),
+            self.runtime_oram_leaf_schedule.clone(),
+            self.runtime_oram_position_map_before.clone(),
+            self.runtime_oram_position_map_after.clone(),
+            self.runtime_oram_leaf_state_transitions.clone(),
         )
     }
 
     fn reconstructed_runtime_trusted_kernel_bundle(
         &self,
     ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
+        let kernel_witness = self.checked_runtime_kernel_witness()?;
         RuntimeTrustedKernelBundle::new_with_kernel_witness(
             self.runtime_seed,
             self.reconstructed_runtime_controller_observer_certificate()?,
-            self.runtime_kernel_witness.clone(),
+            kernel_witness,
             self.reconstructed_runtime_path_oram_hidden_certificate()?,
         )
     }
@@ -5207,10 +6715,11 @@ impl ExecutionTrace {
         &mut self,
         mut bundle: RuntimeTrustedKernelBundle,
     ) -> Result<(), RefinementWitnessError> {
-        if let Some(trace_kernel_witness) = &self.runtime_kernel_witness {
+        let checked_kernel_witness = self.checked_runtime_kernel_witness()?;
+        if let Some(trace_kernel_witness) = &checked_kernel_witness {
             match &bundle.kernel_witness {
                 Some(bundle_kernel_witness) if bundle_kernel_witness != trace_kernel_witness => {
-                    return Err(RefinementWitnessError::KernelWitnessTraceMismatch);
+                    return Err(self.checked_runtime_kernel_witness_mismatch_error());
                 }
                 None => {
                     bundle.kernel_witness = Some(trace_kernel_witness.clone());
@@ -5227,25 +6736,133 @@ impl ExecutionTrace {
         Ok(())
     }
 
-    pub fn materialize_runtime_trusted_kernel_bundle(
+    pub(crate) fn materialize_runtime_trusted_kernel_bundle(
         &mut self,
     ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
         let bundle = self.reconstructed_runtime_trusted_kernel_bundle()?;
-        self.store_runtime_trusted_kernel_bundle(bundle.clone())?;
+        self.store_runtime_trusted_kernel_bundle(bundle.duplicate())?;
         Ok(bundle)
+    }
+
+    fn checked_runtime_kernel_witness_pair(
+        &self,
+    ) -> Result<
+        (
+            Option<RuntimeKernelWitness>,
+            Option<RuntimeKernelRefinementWitness>,
+        ),
+        RefinementWitnessError,
+    > {
+        if let Some(runtime_kernel_finish_bundle) = &self.runtime_kernel_finish_bundle {
+            let (kernel_witness, runtime_kernel_refinement_witness) = runtime_kernel_finish_bundle
+                .to_witness_pair()
+                .map_err(|err| match err {
+                    RuntimeKernelFinishBundleError::KernelWitness(err) => {
+                        RefinementWitnessError::KernelWitness(err)
+                    }
+                    RuntimeKernelFinishBundleError::RuntimePhase(err) => {
+                        RefinementWitnessError::RuntimeKernelRefinement(err)
+                    }
+                })?;
+            if let Some(trace_kernel_witness) = &self.runtime_kernel_witness {
+                if trace_kernel_witness != &kernel_witness {
+                    return Err(RefinementWitnessError::KernelWitnessFinishBundleMismatch);
+                }
+            }
+            if let Some(trace_runtime_kernel_refinement_witness) =
+                &self.runtime_kernel_refinement_witness
+            {
+                if trace_runtime_kernel_refinement_witness != &runtime_kernel_refinement_witness {
+                    return Err(
+                        RefinementWitnessError::RuntimeKernelRefinementWitnessFinishBundleMismatch,
+                    );
+                }
+            }
+            return Ok((
+                Some(kernel_witness),
+                Some(runtime_kernel_refinement_witness),
+            ));
+        }
+        Ok((
+            self.runtime_kernel_witness.clone(),
+            self.runtime_kernel_refinement_witness.clone(),
+        ))
+    }
+
+    fn checked_exported_runtime_kernel_witness(
+        &self,
+    ) -> Result<Option<RuntimeKernelWitness>, KernelWitnessError> {
+        if let Some(runtime_kernel_finish_bundle) = &self.runtime_kernel_finish_bundle {
+            let kernel_witness =
+                runtime_kernel_finish_bundle
+                    .to_kernel_witness()
+                    .map_err(|err| match err {
+                        RuntimeKernelFinishBundleError::KernelWitness(err) => err,
+                        RuntimeKernelFinishBundleError::RuntimePhase(_) => {
+                            KernelWitnessError::FinishBundleMismatch
+                        }
+                    })?;
+            if let Some(trace_kernel_witness) = &self.runtime_kernel_witness {
+                if trace_kernel_witness != &kernel_witness {
+                    return Err(KernelWitnessError::FinishBundleMismatch);
+                }
+            }
+            return Ok(Some(kernel_witness));
+        }
+        Ok(self.runtime_kernel_witness.clone())
+    }
+
+    fn checked_exported_runtime_kernel_refinement_witness(
+        &self,
+    ) -> Result<Option<RuntimeKernelRefinementWitness>, RuntimeKernelRefinementWitnessError> {
+        if let Some(runtime_kernel_finish_bundle) = &self.runtime_kernel_finish_bundle {
+            let runtime_kernel_refinement_witness = runtime_kernel_finish_bundle
+                .to_runtime_kernel_refinement_witness()
+                .map_err(|err| match err {
+                    RuntimeKernelFinishBundleError::RuntimePhase(err) => err,
+                    RuntimeKernelFinishBundleError::KernelWitness(_) => {
+                        RuntimeKernelRefinementWitnessError::FinishBundleMismatch
+                    }
+                })?;
+            if let Some(trace_runtime_kernel_refinement_witness) =
+                &self.runtime_kernel_refinement_witness
+            {
+                if trace_runtime_kernel_refinement_witness != &runtime_kernel_refinement_witness {
+                    return Err(RuntimeKernelRefinementWitnessError::FinishBundleMismatch);
+                }
+            }
+            return Ok(Some(runtime_kernel_refinement_witness));
+        }
+        Ok(self.runtime_kernel_refinement_witness.clone())
+    }
+
+    fn checked_runtime_kernel_witness(
+        &self,
+    ) -> Result<Option<RuntimeKernelWitness>, RefinementWitnessError> {
+        let (kernel_witness, _) = self.checked_runtime_kernel_witness_pair()?;
+        Ok(kernel_witness)
+    }
+
+    fn checked_runtime_kernel_witness_mismatch_error(&self) -> RefinementWitnessError {
+        if self.runtime_kernel_finish_bundle.is_some() {
+            RefinementWitnessError::KernelWitnessFinishBundleMismatch
+        } else {
+            RefinementWitnessError::KernelWitnessTraceMismatch
+        }
     }
 
     pub fn runtime_trusted_kernel_bundle(
         &self,
     ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
         if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
-            let mut bundle = bundle.clone();
-            if let Some(trace_kernel_witness) = &self.runtime_kernel_witness {
+            let mut bundle = bundle.duplicate();
+            let checked_kernel_witness = self.checked_runtime_kernel_witness()?;
+            if let Some(trace_kernel_witness) = &checked_kernel_witness {
                 match &bundle.kernel_witness {
                     Some(bundle_kernel_witness)
                         if bundle_kernel_witness != trace_kernel_witness =>
                     {
-                        return Err(RefinementWitnessError::KernelWitnessTraceMismatch);
+                        return Err(self.checked_runtime_kernel_witness_mismatch_error());
                     }
                     None => {
                         bundle.kernel_witness = Some(trace_kernel_witness.clone());
@@ -5267,11 +6884,13 @@ impl ExecutionTrace {
         &self,
     ) -> Result<RuntimeRefinementWitness, RefinementWitnessError> {
         let bundle = self.runtime_trusted_kernel_bundle()?;
+        let (kernel_witness, runtime_kernel_refinement_witness) =
+            self.checked_runtime_kernel_witness_pair()?;
         RuntimeRefinementWitness::from_certificates_with_runtime_witnesses(
             bundle.runtime_seed,
             bundle.controller_observer,
-            bundle.kernel_witness,
-            self.runtime_kernel_refinement_witness.clone(),
+            kernel_witness.or(bundle.kernel_witness),
+            runtime_kernel_refinement_witness,
             bundle.hidden_certificate,
         )
     }
@@ -5327,10 +6946,7 @@ impl ExecutionTrace {
         artifact: &crate::CompiledArtifact,
         entrypoint: &str,
     ) -> Result<RuntimeKernelWitness, KernelWitnessError> {
-        let witness = self
-            .runtime_kernel_witness
-            .clone()
-            .ok_or(KernelWitnessError::MissingKernelWitness)?;
+        let witness = self.exact_runtime_kernel_witness()?;
         let function = artifact
             .contract
             .functions
@@ -5358,6 +6974,36 @@ impl ExecutionTrace {
     }
 }
 
+fn runtime_oram_objects(artifact: &CompiledArtifact) -> Box<[RuntimeOramObjectWitness]> {
+    artifact
+        .contract
+        .manifest
+        .objects
+        .iter()
+        .filter_map(|object| {
+            let oram = object.oram.as_ref()?;
+            Some(RuntimeOramObjectWitness {
+                object_id: object.id,
+                object_name: object.name.clone(),
+                scheme: oram.scheme.clone(),
+                capacity: object.capacity.unwrap_or_default(),
+                block_size: oram.block_size,
+                bucket_size: oram.bucket_size,
+                bucket_count: oram.bucket_count,
+                blocks_per_bucket: oram.blocks_per_bucket,
+                tree_height: oram.tree_height,
+                stash_bound: oram.stash_bound,
+                recursion_depth: oram.recursion_depth,
+                metadata_pages: oram.metadata_pages,
+                metadata_pages_per_access: oram.metadata_pages_per_access,
+                buckets_per_access: oram.buckets_per_access,
+                accesses_per_call: oram.accesses_per_call,
+            })
+        })
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
+}
+
 #[cfg(test)]
 fn collect_kernel_steps_from_expr(
     expr: &Expr,
@@ -5368,7 +7014,7 @@ fn collect_kernel_steps_from_expr(
         lower_confidential_kernel_expr(expr, entrypoint)
             .map_err(KernelWitnessError::from)?
             .kernel_steps()
-            .into_iter()
+            .iter()
             .map(RuntimeKernelStepWitness::from),
     );
     Ok(())
@@ -5399,11 +7045,12 @@ impl SgxControllerShapeTrace {
                     ExitEvent::InterruptExit
                 }
             })
-            .collect();
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
         let shared_resource_pattern =
-            vec!["shared_resource_tick".into(); self.shared_resource_budget];
+            vec!["shared_resource_tick".into(); self.shared_resource_budget].into_boxed_slice();
         NormalizedMicroTrace {
-            page_trace,
+            page_trace: page_trace.into_boxed_slice(),
             exit_pattern,
             shared_resource_pattern,
         }
@@ -5442,10 +7089,14 @@ mod tests {
         CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
         LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
         PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace, RefinementWitnessError,
-        RuntimeControllerCertificate, RuntimeKernelExecutionTracker,
-        RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementTracker,
-        RuntimeKernelRefinementTrackerError, RuntimeKernelRefinementWitness,
-        RuntimeKernelRefinementWitnessError, RuntimeKernelStepWitness, RuntimeKernelWitness,
+        RuntimeControllerCertificate, RuntimeExecutionTraceParts, RuntimeKernelBoundaryTracker,
+        RuntimeKernelBoundaryTrackerError, RuntimeKernelExecutionTracker,
+        RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError,
+        RuntimeKernelFinishBundleError, RuntimeKernelFinishSnapshot,
+        RuntimeKernelFinishSnapshotError, RuntimeKernelRefinementEventWitness,
+        RuntimeKernelRefinementTracker, RuntimeKernelRefinementTrackerError,
+        RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
+        RuntimeKernelStepWitness, RuntimeKernelTelemetrySnapshot, RuntimeKernelWitness,
         RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
         RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
         RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
@@ -5513,11 +7164,565 @@ mod tests {
     }
 
     #[test]
+    fn runtime_kernel_boundary_tracker_centralizes_live_boundary_state() {
+        let mut tracker = RuntimeKernelBoundaryTracker::begin(&[7], 4).unwrap();
+        tracker
+            .bind_expected_kernel_steps(
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+                ]
+                .into_boxed_slice(),
+            )
+            .unwrap();
+        assert_eq!(tracker.public_object_ids(), &[7]);
+        assert_eq!(
+            tracker.expected_loaded_object_schedule(),
+            Some(vec![7].into_boxed_slice())
+        );
+        tracker.record_shadow_load_object(7).unwrap();
+        tracker.record_opcode(UoOpcode::CellGet, Some(7)).unwrap();
+        tracker.record_opcode(UoOpcode::Commit, None).unwrap();
+        tracker.append_commit_object_schedule([7]).unwrap();
+        tracker.record_opcode(UoOpcode::Wipe, None).unwrap();
+
+        let finish_bundle = tracker
+            .into_finish_snapshot(
+                "demo()".into(),
+                RuntimeKernelTelemetrySnapshot::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, vec![]),
+            )
+            .into_finish_bundle()
+            .unwrap();
+        let (kernel_witness, refinement_witness) = finish_bundle.to_witness_pair().unwrap();
+
+        assert_eq!(kernel_witness.public_object_ids.as_ref(), &[7]);
+        assert_eq!(
+            kernel_witness.kernel_steps(),
+            &[
+                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+            ]
+        );
+        assert_eq!(
+            refinement_witness,
+            sample_runtime_kernel_refinement_witness()
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_boundary_tracker_requires_bound_schedule_for_loaded_objects() {
+        let tracker = RuntimeKernelBoundaryTracker::begin(&[7], 4).unwrap();
+        assert_eq!(
+            tracker.expected_loaded_object_schedule_required(),
+            Err(RuntimeKernelBoundaryTrackerError::KernelWitness(
+                KernelWitnessError::ExpectedKernelScheduleUnbound,
+            ))
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_finish_snapshot_emits_matching_witness_pair() {
+        let mut kernel_execution = RuntimeKernelExecutionTracker::with_kernel_op_budget(4);
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap())
+            .unwrap();
+        kernel_execution
+            .bind_expected_kernel_steps(
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+                ]
+                .into_boxed_slice(),
+            )
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap())
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap())
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap())
+            .unwrap();
+
+        let mut runtime_phase_events =
+            RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(1, 4).unwrap();
+        runtime_phase_events
+            .push_pre_committed_cold_object(7)
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Begin, None)
+            .unwrap();
+        runtime_phase_events.push_shadow_load_object(7).unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::CellGet, Some(7))
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Commit, None)
+            .unwrap();
+        runtime_phase_events
+            .append_commit_object_schedule([7])
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Wipe, None)
+            .unwrap();
+
+        let finish_snapshot = RuntimeKernelFinishSnapshot::new(
+            "demo()".into(),
+            RuntimeKernelTelemetrySnapshot::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, vec![]),
+            kernel_execution,
+            runtime_phase_events,
+            vec![7].into_boxed_slice(),
+            Some(vec![7].into_boxed_slice()),
+        );
+        let (kernel_witness, refinement_witness) = finish_snapshot.into_witness_pair().unwrap();
+
+        assert_eq!(
+            kernel_witness.kernel_steps(),
+            &[
+                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+            ]
+        );
+        assert_eq!(
+            refinement_witness,
+            sample_runtime_kernel_refinement_witness()
+        );
+        refinement_witness
+            .validate_with_kernel_witness(&kernel_witness)
+            .unwrap();
+    }
+
+    #[test]
+    fn runtime_kernel_finish_bundle_builds_checked_witness_pair() {
+        let mut kernel_execution = RuntimeKernelExecutionTracker::with_kernel_op_budget(4);
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap())
+            .unwrap();
+        kernel_execution
+            .bind_expected_kernel_steps(
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+                ]
+                .into_boxed_slice(),
+            )
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap())
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap())
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap())
+            .unwrap();
+
+        let mut runtime_phase_events =
+            RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(1, 4).unwrap();
+        runtime_phase_events
+            .push_pre_committed_cold_object(7)
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Begin, None)
+            .unwrap();
+        runtime_phase_events.push_shadow_load_object(7).unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::CellGet, Some(7))
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Commit, None)
+            .unwrap();
+        runtime_phase_events
+            .append_commit_object_schedule([7])
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Wipe, None)
+            .unwrap();
+
+        let finish_bundle = RuntimeKernelFinishSnapshot::new(
+            "demo()".into(),
+            RuntimeKernelTelemetrySnapshot::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, vec![]),
+            kernel_execution,
+            runtime_phase_events,
+            vec![7].into_boxed_slice(),
+            Some(vec![7].into_boxed_slice()),
+        )
+        .into_finish_bundle()
+        .unwrap();
+        let (kernel_witness, refinement_witness) = finish_bundle.to_witness_pair().unwrap();
+
+        assert_eq!(
+            kernel_witness.kernel_steps(),
+            &[
+                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+            ]
+        );
+        assert_eq!(
+            refinement_witness,
+            sample_runtime_kernel_refinement_witness()
+        );
+    }
+
+    #[test]
+    fn execution_trace_shell_boundary_bundle_uses_stored_finish_bundle() {
+        let mut kernel_execution = RuntimeKernelExecutionTracker::with_kernel_op_budget(4);
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap())
+            .unwrap();
+        kernel_execution
+            .bind_expected_kernel_steps(
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+                ]
+                .into_boxed_slice(),
+            )
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap())
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap())
+            .unwrap();
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap())
+            .unwrap();
+
+        let mut runtime_phase_events =
+            RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(1, 4).unwrap();
+        runtime_phase_events
+            .push_pre_committed_cold_object(7)
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Begin, None)
+            .unwrap();
+        runtime_phase_events.push_shadow_load_object(7).unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::CellGet, Some(7))
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Commit, None)
+            .unwrap();
+        runtime_phase_events
+            .append_commit_object_schedule([7])
+            .unwrap();
+        runtime_phase_events
+            .push_kernel_step(UoOpcode::Wipe, None)
+            .unwrap();
+
+        let finish_bundle = RuntimeKernelFinishSnapshot::new(
+            "demo()".into(),
+            RuntimeKernelTelemetrySnapshot::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, vec![]),
+            kernel_execution,
+            runtime_phase_events,
+            vec![7].into_boxed_slice(),
+            Some(vec![7].into_boxed_slice()),
+        )
+        .into_finish_bundle()
+        .unwrap();
+
+        let trace = ExecutionTrace::from_runtime_trace_parts(
+            RuntimeExecutionTraceParts::new(
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                0,
+                TheoremTrace::default(),
+                None,
+                None,
+                None,
+                Some(finish_bundle),
+                None,
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+            )
+            .unwrap(),
+        );
+        let shell_boundary_bundle = trace.runtime_shell_boundary_bundle().unwrap();
+
+        assert_eq!(shell_boundary_bundle.entrypoint_id(), "demo()");
+        assert_eq!(
+            shell_boundary_bundle.kernel_witness().kernel_steps(),
+            &[
+                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+            ]
+        );
+        assert_eq!(
+            shell_boundary_bundle
+                .shell_trace()
+                .post_committed_cold_object_schedule(),
+            &[7]
+        );
+    }
+
+    #[test]
+    fn runtime_execution_trace_parts_preserve_absent_witness_pair_from_finish_bundle() {
+        let trace = ExecutionTrace::from_runtime_trace_parts(
+            RuntimeExecutionTraceParts::new(
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                0,
+                TheoremTrace::default(),
+                None,
+                None,
+                None,
+                Some(sample_runtime_kernel_finish_bundle()),
+                None,
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(trace.runtime_kernel_witness, None);
+        assert_eq!(trace.runtime_kernel_refinement_witness, None);
+        assert_eq!(
+            trace.exact_runtime_kernel_witness().unwrap(),
+            sample_runtime_kernel_witness()
+        );
+        assert_eq!(
+            trace.exact_runtime_kernel_refinement_witness().unwrap(),
+            sample_runtime_kernel_refinement_witness()
+        );
+    }
+
+    #[test]
+    fn runtime_execution_trace_parts_reject_kernel_witness_drift_from_finish_bundle() {
+        let mut drifted_kernel_witness = sample_runtime_kernel_witness();
+        let drifted_steps = vec![
+            RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(9)).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+        ];
+        drifted_kernel_witness.expected_kernel_steps =
+            Some(drifted_steps.clone().into_boxed_slice());
+        drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
+        drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
+        drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
+
+        assert_eq!(
+            RuntimeExecutionTraceParts::new(
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                0,
+                TheoremTrace::default(),
+                None,
+                Some(drifted_kernel_witness),
+                None,
+                Some(sample_runtime_kernel_finish_bundle()),
+                None,
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+            )
+            .unwrap_err(),
+            RefinementWitnessError::KernelWitnessFinishBundleMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_execution_trace_parts_reject_refinement_witness_drift_from_finish_bundle() {
+        let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
+        refinement_events[0] = RuntimeKernelRefinementEventWitness::pre_committed_cold_object(9);
+        let drifted_runtime_kernel_refinement_witness =
+            RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
+                .unwrap();
+
+        assert_eq!(
+            RuntimeExecutionTraceParts::new(
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                0,
+                TheoremTrace::default(),
+                None,
+                None,
+                Some(drifted_runtime_kernel_refinement_witness),
+                Some(sample_runtime_kernel_finish_bundle()),
+                None,
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+                vec![].into_boxed_slice(),
+            )
+            .unwrap_err(),
+            RefinementWitnessError::RuntimeKernelRefinementWitnessFinishBundleMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_finish_bundle_rejects_malformed_phase_prefix() {
+        let bundle = RuntimeKernelFinishBundle {
+            entrypoint_id: "demo()".into(),
+            arena_bytes: 0,
+            max_stack_words: 0,
+            scratch_bytes: 0,
+            peak_stack_words: 0,
+            value_scratch_peak_bytes: 0,
+            value_scratch_live_bytes_end: 0,
+            value_scratch_wipe_count: 0,
+            hash_scratch_peak_bytes: 0,
+            hash_scratch_live_bytes_end: 0,
+            hash_scratch_wipe_count: 0,
+            io_scratch_peak_bytes: 0,
+            io_scratch_live_bytes_end: 0,
+            io_scratch_wipe_count: 0,
+            resource_events: vec![].into_boxed_slice(),
+            expected_kernel_steps: Some(
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+                ]
+                .into_boxed_slice(),
+            ),
+            public_object_ids: vec![7].into_boxed_slice(),
+            expected_public_object_ids: Some(vec![7].into_boxed_slice()),
+            kernel_steps: vec![
+                RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+            ]
+            .into_boxed_slice(),
+            runtime_phase_events_before_finish: vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+            ]
+            .into_boxed_slice(),
+        };
+
+        let err = bundle.to_witness_pair().unwrap_err();
+        assert_eq!(
+            err,
+            RuntimeKernelFinishBundleError::RuntimePhase(
+                RuntimeKernelRefinementWitnessError::MalformedRuntimePhaseTrace {
+                    witnessed: vec![
+                        RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                        RuntimeKernelRefinementEventWitness::commit_object(7),
+                        RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
+                    ]
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_finish_snapshot_rejects_unfinished_phase_tail() {
+        let kernel_execution = RuntimeKernelExecutionTracker::with_kernel_op_budget(1);
+        let runtime_phase_events =
+            RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(1, 1).unwrap();
+        let finish_snapshot = RuntimeKernelFinishSnapshot::new(
+            "demo()".into(),
+            RuntimeKernelTelemetrySnapshot::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, vec![]),
+            kernel_execution,
+            runtime_phase_events,
+            vec![7].into_boxed_slice(),
+            Some(vec![7].into_boxed_slice()),
+        );
+        let err = finish_snapshot.into_witness_pair().unwrap_err();
+        assert_eq!(
+            err,
+            RuntimeKernelFinishSnapshotError::KernelWitness(
+                KernelWitnessError::MalformedKernelOpcodeEnvelope { witnessed: vec![] }
+            )
+        );
+    }
+
+    #[test]
+    fn runtime_kernel_finish_snapshot_rejects_incomplete_expected_schedule() {
+        let mut kernel_execution = RuntimeKernelExecutionTracker::with_kernel_op_budget(3);
+        kernel_execution
+            .record_step(RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap())
+            .unwrap();
+        kernel_execution
+            .bind_expected_kernel_steps(
+                vec![
+                    RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+                    RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+                ]
+                .into_boxed_slice(),
+            )
+            .unwrap();
+        let runtime_phase_events =
+            RuntimeKernelRefinementTracker::with_public_object_count_and_kernel_ops(1, 3).unwrap();
+        let finish_snapshot = RuntimeKernelFinishSnapshot::new(
+            "demo()".into(),
+            RuntimeKernelTelemetrySnapshot::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, vec![]),
+            kernel_execution,
+            runtime_phase_events,
+            vec![7].into_boxed_slice(),
+            Some(vec![7].into_boxed_slice()),
+        );
+        let err = finish_snapshot.into_witness_pair().unwrap_err();
+        assert_eq!(
+            err,
+            RuntimeKernelFinishSnapshotError::KernelWitness(
+                KernelWitnessError::ExpectedKernelScheduleIncomplete {
+                    observed_steps: 1,
+                    expected_steps: 3,
+                }
+            )
+        );
+    }
+
+    #[test]
     fn kernel_witness_validation_rejects_select_arm_outside_branchless_fragment() {
         let expr = Expr::Select {
             cond: Box::new(Expr::Var("cond".into())),
             when_true: Box::new(Expr::ArrayIndex {
-                base: Box::new(Expr::Literal(Value::Array(vec![Value::Uint(1)]))),
+                base: Box::new(Expr::Literal(Value::Array(
+                    vec![Value::Uint(1)].into_boxed_slice(),
+                ))),
                 index: Box::new(Expr::Literal(Value::Uint(0))),
             }),
             when_false: Box::new(Expr::Literal(Value::Uint(0))),
@@ -5535,7 +7740,9 @@ mod tests {
     #[test]
     fn kernel_witness_validation_rejects_confidential_array_index() {
         let expr = Expr::ArrayIndex {
-            base: Box::new(Expr::Literal(Value::Array(vec![Value::Uint(1)]))),
+            base: Box::new(Expr::Literal(Value::Array(
+                vec![Value::Uint(1)].into_boxed_slice(),
+            ))),
             index: Box::new(Expr::Literal(Value::Uint(0))),
         };
         let err =
@@ -5551,10 +7758,9 @@ mod tests {
     #[test]
     fn kernel_witness_validation_rejects_confidential_struct_field() {
         let expr = Expr::StructField {
-            base: Box::new(Expr::Literal(Value::Struct(vec![(
-                "flag".into(),
-                Value::Bool(true),
-            )]))),
+            base: Box::new(Expr::Literal(Value::Struct(
+                vec![("flag".into(), Value::Bool(true))].into_boxed_slice(),
+            ))),
             field: "flag".into(),
         };
         let err =
@@ -5570,7 +7776,7 @@ mod tests {
     fn sample_public_outcome(gas_used: u64) -> PublicOutcomeTrace {
         PublicOutcomeTrace {
             entrypoint_id: "put(bytes32,uint256)".into(),
-            public_args: vec![],
+            public_args: Box::default(),
             termination_status: true,
             output_shape: OutputShape::default(),
             gas_used,
@@ -5587,7 +7793,8 @@ mod tests {
                 buckets_per_access: 5,
                 recursion_depth: 1,
                 stash_bound: 4,
-            }],
+            }]
+            .into_boxed_slice(),
         }
     }
 
@@ -5703,9 +7910,9 @@ mod tests {
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let path = sample_path_bucket_indices();
         ExecutionTrace {
-            opcode_trace: vec!["declare".into()],
-            logical_accesses: sample_oram_logical_accesses(),
-            logical_writes: vec![],
+            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+            logical_writes: vec![].into_boxed_slice(),
             physical_reads: path
                 .iter()
                 .map(|index| PhysicalReadEvent {
@@ -5713,7 +7920,8 @@ mod tests {
                     location: format!("records@bucket{index}"),
                     len: 64,
                 })
-                .collect(),
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             physical_writes: path
                 .iter()
                 .rev()
@@ -5725,7 +7933,8 @@ mod tests {
                         WriteClass::Update,
                     )
                 })
-                .collect(),
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             gas_used: 99,
             theorem_trace: TheoremTrace {
                 public_outcome: Some(public_outcome.clone()),
@@ -5736,6 +7945,7 @@ mod tests {
             runtime_seed: Some(seed),
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
+            runtime_kernel_finish_bundle: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
@@ -5783,27 +7993,30 @@ mod tests {
             io_scratch_peak_bytes: 0,
             io_scratch_live_bytes_end: 0,
             io_scratch_wipe_count: 0,
-            resource_events: vec![],
-            expected_kernel_steps: Some(vec![
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Begin,
-                    object_id: None,
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::CellGet,
-                    object_id: Some(7),
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Commit,
-                    object_id: None,
-                },
-                RuntimeKernelStepWitness {
-                    opcode: UoOpcode::Wipe,
-                    object_id: None,
-                },
-            ]),
-            public_object_ids: vec![7],
-            expected_public_object_ids: Some(vec![7]),
+            resource_events: vec![].into_boxed_slice(),
+            expected_kernel_steps: Some(
+                vec![
+                    RuntimeKernelStepWitness {
+                        opcode: UoOpcode::Begin,
+                        object_id: None,
+                    },
+                    RuntimeKernelStepWitness {
+                        opcode: UoOpcode::CellGet,
+                        object_id: Some(7),
+                    },
+                    RuntimeKernelStepWitness {
+                        opcode: UoOpcode::Commit,
+                        object_id: None,
+                    },
+                    RuntimeKernelStepWitness {
+                        opcode: UoOpcode::Wipe,
+                        object_id: None,
+                    },
+                ]
+                .into_boxed_slice(),
+            ),
+            public_object_ids: vec![7].into_boxed_slice(),
+            expected_public_object_ids: Some(vec![7].into_boxed_slice()),
             kernel_steps: vec![
                 RuntimeKernelStepWitness {
                     opcode: UoOpcode::Begin,
@@ -5821,7 +8034,8 @@ mod tests {
                     opcode: UoOpcode::Wipe,
                     object_id: None,
                 },
-            ],
+            ]
+            .into_boxed_slice(),
         }
     }
 
@@ -5839,6 +8053,33 @@ mod tests {
                 },
                 ConfidentialKernelSlotStatement::Return { value: None },
             ],
+        }
+    }
+
+    fn sample_checked_confidential_entrypoint_manifest() -> EntrypointManifest {
+        let confidential_slot_program = sample_runtime_paper_main_slot_program();
+        EntrypointManifest {
+            secret_args: vec![],
+            param_names: vec![],
+            entry_input_len: 0,
+            public_gas_budget: 99,
+            arena_bytes: 0,
+            max_stack_words: 0,
+            max_hash_part_bytes: 0,
+            return_canonical_len: None,
+            confidential_program: None,
+            kernel_steps: confidential_slot_program
+                .expected_runtime_step_manifest()
+                .into_vec(),
+            confidential_slot_program: Some(confidential_slot_program),
+            uocell_reads: 0,
+            uocell_writes: 0,
+            uoarray_reads: 0,
+            uoarray_writes: 0,
+            uomap_reads: 0,
+            uomap_writes: 0,
+            max_commit_ops: 0,
+            oram_accesses: BTreeMap::new(),
         }
     }
 
@@ -5900,19 +8141,121 @@ mod tests {
         }
     }
 
+    #[test]
+    fn checked_confidential_slot_program_accepts_matching_manifest_schedule() {
+        let manifest_entry = sample_checked_confidential_entrypoint_manifest();
+        let program = manifest_entry
+            .checked_confidential_slot_program("put(bytes32,uint256)")
+            .unwrap();
+
+        assert_eq!(program, sample_runtime_paper_main_slot_program());
+    }
+
+    #[test]
+    fn checked_confidential_slot_program_rejects_missing_program() {
+        let mut manifest_entry = sample_checked_confidential_entrypoint_manifest();
+        manifest_entry.confidential_slot_program = None;
+
+        let err = manifest_entry
+            .checked_confidential_slot_program("put(bytes32,uint256)")
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("missing confidential_slot_program"));
+    }
+
+    #[test]
+    fn checked_confidential_slot_program_rejects_entrypoint_drift() {
+        let mut manifest_entry = sample_checked_confidential_entrypoint_manifest();
+        manifest_entry
+            .confidential_slot_program
+            .as_mut()
+            .unwrap()
+            .entrypoint_id = "tampered()".into();
+
+        let err = manifest_entry
+            .checked_confidential_slot_program("put(bytes32,uint256)")
+            .unwrap_err();
+        assert!(err.to_string().contains(
+            "expected entrypoint 'put(bytes32,uint256)' but found program for 'tampered()'"
+        ));
+    }
+
+    #[test]
+    fn checked_confidential_slot_program_rejects_non_normal_form_programs() {
+        let mut manifest_entry = sample_checked_confidential_entrypoint_manifest();
+        let program = manifest_entry.confidential_slot_program.as_mut().unwrap();
+        program.body = vec![ConfidentialKernelSlotStatement::Require {
+            cond: ConfidentialKernelSlotExpr::Literal {
+                value: Value::Bool(true),
+            },
+        }];
+        manifest_entry.kernel_steps = program.expected_runtime_step_manifest().into_vec();
+
+        let err = manifest_entry
+            .checked_confidential_slot_program("put(bytes32,uint256)")
+            .unwrap_err();
+        assert!(err.to_string().contains("not in runtime normal form"));
+    }
+
+    #[test]
+    fn checked_confidential_slot_program_rejects_schedule_drift() {
+        let mut manifest_entry = sample_checked_confidential_entrypoint_manifest();
+        manifest_entry.kernel_steps.pop();
+
+        let err = manifest_entry
+            .checked_confidential_slot_program("put(bytes32,uint256)")
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest kernel step trace drifted from confidential slot program"));
+    }
+
     fn sample_runtime_kernel_refinement_witness() -> RuntimeKernelRefinementWitness {
-        RuntimeKernelRefinementWitness::from_events(vec![
-            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-            RuntimeKernelRefinementEventWitness::commit_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-            RuntimeKernelRefinementEventWitness::cold_store_object(7),
-            RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-        ])
+        RuntimeKernelRefinementWitness::from_events(
+            vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+                RuntimeKernelRefinementEventWitness::cold_store_object(7),
+                RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
+            ]
+            .into_boxed_slice(),
+        )
         .expect("sample runtime kernel refinement witness should be well-formed")
+    }
+
+    fn sample_runtime_kernel_finish_bundle() -> RuntimeKernelFinishBundle {
+        let kernel_witness = sample_runtime_kernel_witness();
+        let refinement_witness = sample_runtime_kernel_refinement_witness();
+        RuntimeKernelFinishBundle {
+            entrypoint_id: kernel_witness.entrypoint_id.clone(),
+            arena_bytes: kernel_witness.arena_bytes,
+            max_stack_words: kernel_witness.max_stack_words,
+            scratch_bytes: kernel_witness.scratch_bytes,
+            peak_stack_words: kernel_witness.peak_stack_words,
+            value_scratch_peak_bytes: kernel_witness.value_scratch_peak_bytes,
+            value_scratch_live_bytes_end: kernel_witness.value_scratch_live_bytes_end,
+            value_scratch_wipe_count: kernel_witness.value_scratch_wipe_count,
+            hash_scratch_peak_bytes: kernel_witness.hash_scratch_peak_bytes,
+            hash_scratch_live_bytes_end: kernel_witness.hash_scratch_live_bytes_end,
+            hash_scratch_wipe_count: kernel_witness.hash_scratch_wipe_count,
+            io_scratch_peak_bytes: kernel_witness.io_scratch_peak_bytes,
+            io_scratch_live_bytes_end: kernel_witness.io_scratch_live_bytes_end,
+            io_scratch_wipe_count: kernel_witness.io_scratch_wipe_count,
+            resource_events: kernel_witness.resource_events.clone(),
+            expected_kernel_steps: kernel_witness.expected_kernel_steps.clone(),
+            public_object_ids: kernel_witness.public_object_ids.clone(),
+            expected_public_object_ids: kernel_witness.expected_public_object_ids.clone(),
+            kernel_steps: kernel_witness.kernel_steps.clone(),
+            runtime_phase_events_before_finish: refinement_witness.events()[..7]
+                .to_vec()
+                .into_boxed_slice(),
+        }
     }
 
     fn sample_read_miss_oram_object() -> RuntimeOramObjectWitness {
@@ -5965,26 +8308,29 @@ mod tests {
                 buckets_per_access: 1,
                 recursion_depth: 1,
                 stash_bound: 4,
-            }],
+            }]
+            .into_boxed_slice(),
         };
         let public_outcome = sample_public_outcome(7);
         let controller_shape = controller_certificate.controller_shape();
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into()],
-            logical_accesses: sample_read_miss_logical_accesses(),
-            logical_writes: vec![],
+            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            logical_accesses: sample_read_miss_logical_accesses().into_boxed_slice(),
+            logical_writes: vec![].into_boxed_slice(),
             physical_reads: vec![PhysicalReadEvent {
                 object: "tiny_records".into(),
                 location: "tiny_records@bucket0".into(),
                 len: 64,
-            }],
+            }]
+            .into_boxed_slice(),
             physical_writes: vec![PhysicalWriteEvent::from_shape(
                 "tiny_records",
                 "tiny_records@bucket0",
                 1,
                 WriteClass::Update,
-            )],
+            )]
+            .into_boxed_slice(),
             gas_used: 7,
             theorem_trace: TheoremTrace {
                 public_outcome: Some(public_outcome.clone()),
@@ -6043,7 +8389,10 @@ mod tests {
         assert_eq!(witness.controller_shape, controller_shape);
         assert_eq!(witness.normalized_micro_trace, normalized_micro_trace);
         assert_eq!(witness.controller_certificate, controller_certificate);
-        assert_eq!(witness.oram_objects, vec![sample_oram_object()]);
+        assert_eq!(
+            witness.oram_objects,
+            vec![sample_oram_object()].into_boxed_slice()
+        );
     }
 
     #[test]
@@ -6076,10 +8425,13 @@ mod tests {
 
     #[test]
     fn runtime_kernel_refinement_witness_append_commit_object_schedule_requires_commit_window() {
-        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
-            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-        ])
+        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(
+            vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+            ]
+            .into_boxed_slice(),
+        )
         .expect("commit-window precondition witness should be well-formed");
         assert_eq!(
             refinement_witness
@@ -6093,15 +8445,18 @@ mod tests {
 
     #[test]
     fn runtime_kernel_refinement_witness_append_cold_store_window_completes_tail() {
-        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
-            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-            RuntimeKernelRefinementEventWitness::commit_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-        ])
+        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(
+            vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+            ]
+            .into_boxed_slice(),
+        )
         .expect("cold-store completion witness should be well-formed");
         refinement_witness.append_cold_store_window(&[7]).unwrap();
         assert_eq!(
@@ -6112,14 +8467,17 @@ mod tests {
 
     #[test]
     fn runtime_kernel_refinement_witness_append_cold_store_window_requires_after_wipe() {
-        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
-            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-            RuntimeKernelRefinementEventWitness::commit_object(7),
-        ])
+        let mut refinement_witness = RuntimeKernelRefinementWitness::from_events(
+            vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+            ]
+            .into_boxed_slice(),
+        )
         .expect("after-wipe precondition witness should be well-formed");
         assert_eq!(
             refinement_witness
@@ -6134,15 +8492,18 @@ mod tests {
     #[test]
     fn runtime_kernel_refinement_witness_rejects_missing_boundary_cold_schedules() {
         let kernel_witness = sample_runtime_kernel_witness();
-        let refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-            RuntimeKernelRefinementEventWitness::commit_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-            RuntimeKernelRefinementEventWitness::cold_store_object(7),
-        ])
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(
+            vec![
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+                RuntimeKernelRefinementEventWitness::cold_store_object(7),
+            ]
+            .into_boxed_slice(),
+        )
         .expect("boundary schedule mismatch witness should remain phase-valid");
         assert_eq!(
             refinement_witness
@@ -6168,20 +8529,209 @@ mod tests {
     }
 
     #[test]
+    fn runtime_refinement_witness_uses_stored_finish_bundle_when_kernel_witnesses_missing() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+
+        let witness = trace.runtime_refinement_witness().unwrap();
+        assert_eq!(
+            witness.kernel_witness,
+            Some(sample_runtime_kernel_witness())
+        );
+        assert_eq!(
+            witness.runtime_kernel_refinement_witness,
+            Some(sample_runtime_kernel_refinement_witness())
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_finish_bundle_uses_stored_finish_bundle_when_present() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+
+        assert_eq!(
+            trace.exact_runtime_kernel_finish_bundle().unwrap(),
+            sample_runtime_kernel_finish_bundle()
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_finish_bundle_rejects_missing_finish_bundle() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = None;
+
+        assert_eq!(
+            trace.exact_runtime_kernel_finish_bundle().unwrap_err(),
+            RuntimeKernelFinishBundleAccessError::MissingRuntimeKernelFinishBundle
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_finish_bundle_rejects_stored_kernel_witness_drift() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        let mut drifted_kernel_witness = sample_runtime_kernel_witness();
+        let drifted_steps = vec![
+            RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(9)).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+        ];
+        drifted_kernel_witness.expected_kernel_steps =
+            Some(drifted_steps.clone().into_boxed_slice());
+        drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
+        drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
+        drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
+        trace.runtime_kernel_witness = Some(drifted_kernel_witness);
+
+        assert_eq!(
+            trace.exact_runtime_kernel_finish_bundle().unwrap_err(),
+            RuntimeKernelFinishBundleAccessError::KernelWitnessFinishBundleMismatch
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_finish_bundle_rejects_stored_phase_drift() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
+        refinement_events[3] =
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
+        trace.runtime_kernel_refinement_witness = Some(
+            RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
+                .expect("drifted refinement witness should remain phase-valid"),
+        );
+
+        assert_eq!(
+            trace.exact_runtime_kernel_finish_bundle().unwrap_err(),
+            RuntimeKernelFinishBundleAccessError::RuntimeKernelRefinementWitnessFinishBundleMismatch
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_witness_uses_stored_finish_bundle_when_kernel_witness_missing() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_witness = None;
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+
+        assert_eq!(
+            trace.exact_runtime_kernel_witness().unwrap(),
+            sample_runtime_kernel_witness()
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_witness_rejects_stored_kernel_witness_drift_from_finish_bundle() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        let mut drifted_kernel_witness = sample_runtime_kernel_witness();
+        let drifted_steps = vec![
+            RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(9)).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+        ];
+        drifted_kernel_witness.expected_kernel_steps =
+            Some(drifted_steps.clone().into_boxed_slice());
+        drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
+        drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
+        drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
+        trace.runtime_kernel_witness = Some(drifted_kernel_witness);
+
+        assert_eq!(
+            trace.exact_runtime_kernel_witness().unwrap_err(),
+            KernelWitnessError::FinishBundleMismatch
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_refinement_witness_uses_stored_finish_bundle_when_phase_missing() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_refinement_witness = None;
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+
+        assert_eq!(
+            trace.exact_runtime_kernel_refinement_witness().unwrap(),
+            sample_runtime_kernel_refinement_witness()
+        );
+    }
+
+    #[test]
+    fn exact_runtime_kernel_refinement_witness_rejects_stored_phase_drift_from_finish_bundle() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
+        refinement_events[3] =
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
+        trace.runtime_kernel_refinement_witness = Some(
+            RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
+                .expect("drifted refinement witness should remain phase-valid"),
+        );
+
+        assert_eq!(
+            trace.exact_runtime_kernel_refinement_witness().unwrap_err(),
+            RuntimeKernelRefinementWitnessError::FinishBundleMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_refinement_witness_rejects_stored_kernel_witness_drift_from_finish_bundle() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        let mut drifted_kernel_witness = sample_runtime_kernel_witness();
+        let drifted_steps = vec![
+            RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(9)).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+        ];
+        drifted_kernel_witness.expected_kernel_steps =
+            Some(drifted_steps.clone().into_boxed_slice());
+        drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
+        drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
+        drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
+        trace.runtime_kernel_witness = Some(drifted_kernel_witness);
+
+        assert_eq!(
+            trace.runtime_refinement_witness().unwrap_err(),
+            RefinementWitnessError::KernelWitnessFinishBundleMismatch
+        );
+    }
+
+    #[test]
+    fn runtime_refinement_witness_rejects_stored_runtime_phase_drift_from_finish_bundle() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
+        refinement_events[3] =
+            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
+        trace.runtime_kernel_refinement_witness = Some(
+            RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
+                .expect("drifted refinement witness should remain phase-valid"),
+        );
+
+        assert_eq!(
+            trace.runtime_refinement_witness().unwrap_err(),
+            RefinementWitnessError::RuntimeKernelRefinementWitnessFinishBundleMismatch
+        );
+    }
+
+    #[test]
     fn runtime_refinement_witness_rejects_runtime_phase_projection_drift() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
         trace.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
         let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
         refinement_events[3] =
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
-        let refinement_witness = RuntimeKernelRefinementWitness::from_events(refinement_events)
-            .expect("projection drift witness should remain phase-valid");
+        let refinement_witness =
+            RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
+                .expect("projection drift witness should remain phase-valid");
         trace.runtime_kernel_refinement_witness = Some(refinement_witness);
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
             RefinementWitnessError::RuntimeKernelRefinement(
                 RuntimeKernelRefinementWitnessError::KernelProjectionMismatch {
-                    expected: sample_runtime_kernel_witness().kernel_steps,
+                    expected: sample_runtime_kernel_witness().kernel_steps.to_vec(),
                     witnessed: vec![
                         RuntimeKernelStepWitness {
                             opcode: UoOpcode::Begin,
@@ -6222,9 +8772,9 @@ mod tests {
             io_scratch_peak_bytes: 0,
             io_scratch_live_bytes_end: 0,
             io_scratch_wipe_count: 0,
-            resource_events: vec![],
+            resource_events: vec![].into_boxed_slice(),
             expected_kernel_steps: None,
-            public_object_ids: vec![7, 9],
+            public_object_ids: vec![7, 9].into_boxed_slice(),
             expected_public_object_ids: None,
             kernel_steps: vec![
                 RuntimeKernelStepWitness {
@@ -6247,25 +8797,29 @@ mod tests {
                     opcode: UoOpcode::Wipe,
                     object_id: None,
                 },
-            ],
+            ]
+            .into_boxed_slice(),
         };
-        let refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
-            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(9),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-            RuntimeKernelRefinementEventWitness::shadow_load_object(9),
-            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(9)),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::MapGet, Some(7)),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-            RuntimeKernelRefinementEventWitness::commit_object(9),
-            RuntimeKernelRefinementEventWitness::commit_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-            RuntimeKernelRefinementEventWitness::cold_store_object(9),
-            RuntimeKernelRefinementEventWitness::cold_store_object(7),
-            RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-            RuntimeKernelRefinementEventWitness::post_committed_cold_object(9),
-        ])
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(
+            vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(9),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(9),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(9)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::MapGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(9),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+                RuntimeKernelRefinementEventWitness::cold_store_object(9),
+                RuntimeKernelRefinementEventWitness::cold_store_object(7),
+                RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::post_committed_cold_object(9),
+            ]
+            .into_boxed_slice(),
+        )
         .expect("noncanonical schedule witness should remain phase-valid");
         assert_eq!(
             refinement_witness
@@ -6281,16 +8835,19 @@ mod tests {
     #[test]
     fn runtime_kernel_refinement_witness_rejects_missing_cold_store_schedule() {
         let kernel_witness = sample_runtime_kernel_witness();
-        let refinement_witness = RuntimeKernelRefinementWitness::from_events(vec![
-            RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
-            RuntimeKernelRefinementEventWitness::shadow_load_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
-            RuntimeKernelRefinementEventWitness::commit_object(7),
-            RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
-            RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-        ])
+        let refinement_witness = RuntimeKernelRefinementWitness::from_events(
+            vec![
+                RuntimeKernelRefinementEventWitness::pre_committed_cold_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Begin, None),
+                RuntimeKernelRefinementEventWitness::shadow_load_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellGet, Some(7)),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Commit, None),
+                RuntimeKernelRefinementEventWitness::commit_object(7),
+                RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
+                RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
+            ]
+            .into_boxed_slice(),
+        )
         .expect("missing cold-store witness should remain phase-valid");
         assert_eq!(
             refinement_witness
@@ -6340,12 +8897,64 @@ mod tests {
     #[test]
     fn runtime_trusted_kernel_bundle_uses_stored_kernel_on_matching_trace() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
+        let expected_bundle = sample_runtime_execution_trace_with_seed(0)
+            .runtime_trusted_kernel_bundle()
+            .unwrap();
+        let expected_witness = expected_bundle.to_witness().unwrap();
+        trace.runtime_trusted_kernel_bundle = Some(
+            sample_runtime_execution_trace_with_seed(0)
+                .runtime_trusted_kernel_bundle()
+                .unwrap(),
+        );
         let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
-        trace.runtime_trusted_kernel_bundle = Some(bundle.clone());
-        assert_eq!(trace.runtime_trusted_kernel_bundle().unwrap(), bundle);
         assert_eq!(
-            trace.runtime_refinement_witness().unwrap(),
-            bundle.to_witness().unwrap()
+            bundle.controller_observer,
+            expected_bundle.controller_observer
+        );
+        assert_eq!(
+            bundle.hidden_certificate,
+            expected_bundle.hidden_certificate
+        );
+        assert_eq!(bundle.to_witness().unwrap(), expected_witness);
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_uses_stored_finish_bundle_when_kernel_witness_missing() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_witness = None;
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+
+        let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        assert_eq!(
+            bundle.kernel_witness(),
+            Some(&sample_runtime_kernel_witness())
+        );
+    }
+
+    #[test]
+    fn runtime_trusted_kernel_bundle_rejects_stored_kernel_drift_from_finish_bundle() {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.runtime_kernel_witness = None;
+        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
+        let mut drifted_kernel_witness = sample_runtime_kernel_witness();
+        let drifted_steps = vec![
+            RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(9)).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
+            RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
+        ];
+        drifted_kernel_witness.expected_kernel_steps =
+            Some(drifted_steps.clone().into_boxed_slice());
+        drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
+        drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
+        drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
+        bundle.kernel_witness = Some(drifted_kernel_witness);
+        trace.runtime_trusted_kernel_bundle = Some(bundle);
+
+        assert_eq!(
+            trace.runtime_trusted_kernel_bundle().unwrap_err(),
+            RefinementWitnessError::KernelWitnessFinishBundleMismatch
         );
     }
 
@@ -6444,8 +9053,14 @@ mod tests {
     fn execution_trace_exports_path_oram_hidden_certificate() {
         let trace = sample_runtime_execution_trace_with_seed(0);
         let certificate = trace.runtime_path_oram_hidden_certificate().unwrap();
-        assert_eq!(certificate.oram_objects, vec![sample_oram_object()]);
-        assert_eq!(certificate.oram_leaf_schedule, sample_oram_leaf_schedule());
+        assert_eq!(
+            certificate.oram_objects,
+            vec![sample_oram_object()].into_boxed_slice()
+        );
+        assert_eq!(
+            certificate.oram_leaf_schedule,
+            sample_oram_leaf_schedule().into_boxed_slice()
+        );
         assert_eq!(
             certificate.oram_leaf_public_scaffold,
             vec![RuntimeOramLeafScaffoldWitness {
@@ -6453,6 +9068,7 @@ mod tests {
                 object_name: "records".into(),
                 bucket_count: 31,
             }]
+            .into_boxed_slice()
         );
         certificate.validate().unwrap();
     }
@@ -6462,7 +9078,7 @@ mod tests {
         let controller_certificate = RuntimeControllerCertificate::default();
         let public_outcome = PublicOutcomeTrace {
             entrypoint_id: "f()".into(),
-            public_args: vec![],
+            public_args: Box::default(),
             termination_status: true,
             output_shape: OutputShape::default(),
             gas_used: 1,
@@ -6478,9 +9094,10 @@ mod tests {
                     page_trace: vec![NormalizedPageEvent {
                         page_kind: "metadata".into(),
                         kind: PageEventKind::EvictOut,
-                    }],
-                    exit_pattern: vec![ExitEvent::Terminate],
-                    shared_resource_pattern: vec![],
+                    }]
+                    .into_boxed_slice(),
+                    exit_pattern: vec![ExitEvent::Terminate].into_boxed_slice(),
+                    shared_resource_pattern: Box::default(),
                 }),
             },
             runtime_controller_certificate: Some(controller_certificate),
@@ -6501,7 +9118,7 @@ mod tests {
         let controller_shape = controller_certificate.controller_shape();
         let trace = ExecutionTrace {
             gas_used: 7,
-            logical_accesses: sample_oram_logical_accesses(),
+            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
             theorem_trace: TheoremTrace {
                 public_outcome: Some(public_outcome.clone()),
                 boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
@@ -6531,7 +9148,7 @@ mod tests {
         logical_accesses.remove(1);
         let trace = ExecutionTrace {
             gas_used: 7,
-            logical_accesses,
+            logical_accesses: logical_accesses.into_boxed_slice(),
             theorem_trace: TheoremTrace {
                 public_outcome: Some(public_outcome.clone()),
                 boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
@@ -6562,9 +9179,9 @@ mod tests {
         let mut drifted_after = sample_path_oram_position_map_after();
         drifted_after[0].leaves[0] = Some(2);
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into()],
-            logical_accesses: sample_oram_logical_accesses(),
-            logical_writes: vec![],
+            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+            logical_writes: vec![].into_boxed_slice(),
             physical_reads: path
                 .iter()
                 .map(|index| PhysicalReadEvent {
@@ -6572,7 +9189,8 @@ mod tests {
                     location: format!("records@bucket{index}"),
                     len: 64,
                 })
-                .collect(),
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             physical_writes: path
                 .iter()
                 .rev()
@@ -6584,7 +9202,8 @@ mod tests {
                         WriteClass::Update,
                     )
                 })
-                .collect(),
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             gas_used: 99,
             theorem_trace: TheoremTrace {
                 public_outcome: Some(public_outcome.clone()),
@@ -6595,6 +9214,7 @@ mod tests {
             runtime_seed: None,
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
+            runtime_kernel_finish_bundle: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
@@ -6623,9 +9243,9 @@ mod tests {
         let mut drifted_after = sample_path_oram_position_map_after();
         drifted_after[0].leaves[0] = Some(2);
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into()],
-            logical_accesses: sample_oram_logical_accesses(),
-            logical_writes: vec![],
+            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+            logical_writes: vec![].into_boxed_slice(),
             physical_reads: path
                 .iter()
                 .map(|index| PhysicalReadEvent {
@@ -6633,7 +9253,8 @@ mod tests {
                     location: format!("records@bucket{index}"),
                     len: 64,
                 })
-                .collect(),
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             physical_writes: path
                 .iter()
                 .rev()
@@ -6645,7 +9266,8 @@ mod tests {
                         WriteClass::Update,
                     )
                 })
-                .collect(),
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             gas_used: 99,
             theorem_trace: TheoremTrace {
                 public_outcome: Some(public_outcome.clone()),
@@ -6656,6 +9278,7 @@ mod tests {
             runtime_seed: None,
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
+            runtime_kernel_finish_bundle: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
             runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
@@ -6684,7 +9307,7 @@ mod tests {
         assert_eq!(family.seed_count, 2);
         assert_eq!(
             family.public_leaf_scaffold,
-            family.witnesses[0].oram_leaf_public_scaffold
+            family.witnesses[0].oram_leaf_public_scaffold.clone()
         );
     }
 
@@ -6786,12 +9409,12 @@ mod tests {
         assert_eq!(
             bundle
                 .confidential_slot_program()
-                .expected_runtime_step_witnesses(),
+                .expected_runtime_step_witnesses()
+                .as_ref(),
             bundle.family().witnesses()[0]
                 .kernel_witness()
                 .unwrap()
                 .kernel_steps()
-                .to_vec()
         );
     }
 
@@ -6918,13 +9541,13 @@ mod tests {
         .unwrap();
         assert_eq!(
             scaffold,
-            vec![RuntimeOramLeafScaffoldWitness {
+            Box::from([RuntimeOramLeafScaffoldWitness {
                 object_id: 7,
                 object_name: "records".into(),
                 bucket_count: 31,
-            }]
+            }])
         );
-        assert_eq!(values, vec![3]);
+        assert_eq!(values, Box::from([3]));
     }
 
     #[test]

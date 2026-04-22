@@ -1,5 +1,5 @@
-use chacha20poly1305::aead::{Aead, AeadInPlace, Payload};
-use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce};
+use chacha20poly1305::aead::AeadInPlace;
+use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use rand_chacha::ChaCha20Rng;
@@ -10,9 +10,12 @@ use zeroize::Zeroize;
 struct NonZeroCodec;
 
 impl NonZeroCodec {
+    #[cfg(test)]
     fn encode_bytes(payload: &[u8]) -> Vec<u8> {
-        let mut out = Vec::with_capacity(payload.len() * 2);
-        push_nonzero_encoded(&mut out, payload);
+        let mut out = vec![0u8; payload.len() * 2];
+        let mut cursor = 0usize;
+        write_nonzero_encoded(&mut out, &mut cursor, payload);
+        debug_assert_eq!(cursor, out.len());
         out
     }
 
@@ -20,10 +23,8 @@ impl NonZeroCodec {
         if encoded.len() != byte_len * 2 {
             return None;
         }
-        let decoded = decode_nonzero(encoded)?;
-        if decoded.len() != byte_len {
-            return None;
-        }
+        let mut decoded = vec![0u8; byte_len];
+        decode_nonzero_into(encoded, &mut decoded)?;
         Some(decoded)
     }
 }
@@ -87,27 +88,29 @@ impl StoreCipher {
         Self::from_rng(&mut rng)
     }
 
+    #[cfg(test)]
     fn seal(&self, aad: &[u8], payload: &[u8], rng: &mut ChaCha20Rng) -> Vec<u8> {
-        let mut nonce_bytes = [0u8; SEALED_NONCE_BYTES];
-        rng.fill_bytes(&mut nonce_bytes);
-        let cipher = ChaCha20Poly1305::new_from_slice(&self.key).expect("fixed-size key");
-        let ciphertext = cipher
-            .encrypt(
-                Nonce::from_slice(&nonce_bytes),
-                Payload { msg: payload, aad },
-            )
-            .expect("fixed-size nonce");
-        let mut sealed =
-            Vec::with_capacity(SEALED_MAGIC.len() + nonce_bytes.len() + ciphertext.len());
-        sealed.extend_from_slice(&SEALED_MAGIC);
-        sealed.extend_from_slice(&nonce_bytes);
-        sealed.extend_from_slice(&ciphertext);
-        NonZeroCodec::encode_bytes(&sealed)
+        let mut payload = payload.to_vec();
+        self.seal_and_wipe(aad, &mut payload, rng)
     }
 
     pub fn seal_and_wipe(&self, aad: &[u8], payload: &mut [u8], rng: &mut ChaCha20Rng) -> Vec<u8> {
-        let payload = WipeOnDrop { bytes: payload };
-        self.seal(aad, payload.as_slice(), rng)
+        let mut encoded = vec![0u8; Self::sealed_encoded_len(payload.len())];
+        let sealed = self.seal_and_wipe_into_slice(aad, payload, rng, &mut encoded);
+        debug_assert!(sealed, "exact-size sealed output buffer must fit");
+        encoded
+    }
+
+    pub fn seal_and_wipe_boxed(
+        &self,
+        aad: &[u8],
+        payload: &mut [u8],
+        rng: &mut ChaCha20Rng,
+    ) -> Box<[u8]> {
+        let mut encoded = vec![0u8; Self::sealed_encoded_len(payload.len())].into_boxed_slice();
+        let sealed = self.seal_and_wipe_into_slice(aad, payload, rng, &mut encoded);
+        debug_assert!(sealed, "exact-size sealed output buffer must fit");
+        encoded
     }
 
     pub fn seal_and_wipe_into(
@@ -129,10 +132,13 @@ impl StoreCipher {
             .encrypt_in_place_detached(Nonce::from_slice(&nonce_bytes), aad, payload.as_mut_slice())
             .expect("fixed-size nonce");
         out.clear();
-        push_nonzero_encoded(out, &SEALED_MAGIC);
-        push_nonzero_encoded(out, &nonce_bytes);
-        push_nonzero_encoded(out, payload.as_slice());
-        push_nonzero_encoded(out, tag.as_slice());
+        out.resize(required_len, 0);
+        let mut cursor = 0usize;
+        write_nonzero_encoded(out.as_mut_slice(), &mut cursor, &SEALED_MAGIC);
+        write_nonzero_encoded(out.as_mut_slice(), &mut cursor, &nonce_bytes);
+        write_nonzero_encoded(out.as_mut_slice(), &mut cursor, payload.as_slice());
+        write_nonzero_encoded(out.as_mut_slice(), &mut cursor, tag.as_slice());
+        debug_assert_eq!(cursor, out.len());
         true
     }
 
@@ -168,6 +174,11 @@ impl StoreCipher {
         self.seal_and_wipe(aad, &mut filler, rng)
     }
 
+    pub fn filler_boxed(&self, aad: &[u8], len: usize, rng: &mut ChaCha20Rng) -> Box<[u8]> {
+        let mut filler = vec![0u8; len].into_boxed_slice();
+        self.seal_and_wipe_boxed(aad, &mut filler, rng)
+    }
+
     fn open(&self, aad: &[u8], payload_len: usize, encoded: &[u8]) -> Option<Vec<u8>> {
         let sealed_len = SEALED_MAGIC.len() + SEALED_NONCE_BYTES + payload_len + SEALED_TAG_BYTES;
         let sealed = NonZeroCodec::decode_bytes(sealed_len, encoded)?;
@@ -175,17 +186,20 @@ impl StoreCipher {
         if magic != SEALED_MAGIC {
             return None;
         }
-        let (nonce_bytes, ciphertext) = rest.split_at(SEALED_NONCE_BYTES);
+        let (nonce_bytes, ciphertext_and_tag) = rest.split_at(SEALED_NONCE_BYTES);
+        let (ciphertext, tag_bytes) = ciphertext_and_tag.split_at(payload_len);
+        let mut payload = vec![0u8; payload_len];
+        payload.copy_from_slice(ciphertext);
         let cipher = ChaCha20Poly1305::new_from_slice(&self.key).ok()?;
         cipher
-            .decrypt(
+            .decrypt_in_place_detached(
                 Nonce::from_slice(nonce_bytes),
-                Payload {
-                    msg: ciphertext,
-                    aad,
-                },
+                aad,
+                payload.as_mut_slice(),
+                Tag::from_slice(tag_bytes),
             )
-            .ok()
+            .ok()?;
+        Some(payload)
     }
 
     pub fn with_opened_payload<T>(
@@ -203,13 +217,6 @@ impl StoreCipher {
     }
 }
 
-fn push_nonzero_encoded(out: &mut Vec<u8>, bytes: &[u8]) {
-    for byte in bytes {
-        out.push((byte >> 4) + 1);
-        out.push((byte & 0x0F) + 1);
-    }
-}
-
 fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) {
     let end = *cursor + bytes.len() * 2;
     let out = &mut out[*cursor..end];
@@ -220,20 +227,19 @@ fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) {
     *cursor = end;
 }
 
-fn decode_nonzero(encoded: &[u8]) -> Option<Vec<u8>> {
-    if encoded.len() % 2 != 0 {
+fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()> {
+    if encoded.len() != out.len() * 2 {
         return None;
     }
-    let mut out = Vec::with_capacity(encoded.len() / 2);
-    for chunk in encoded.chunks_exact(2) {
+    for (index, chunk) in encoded.chunks_exact(2).enumerate() {
         let hi = *chunk.first()?;
         let lo = *chunk.get(1)?;
         if hi == 0 || hi > 16 || lo == 0 || lo > 16 {
             return None;
         }
-        out.push(((hi - 1) << 4) | (lo - 1));
+        out[index] = ((hi - 1) << 4) | (lo - 1);
     }
-    Some(out)
+    Some(())
 }
 
 #[cfg(test)]

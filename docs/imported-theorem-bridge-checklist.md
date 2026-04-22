@@ -22,8 +22,9 @@ The repo path here is:
   bundle together with the admitted confidential slot DSL object
 - direct runtime witness reconstruction from that trusted-kernel bundle after
   revalidating it against the surrounding execution trace, while the
-  standalone confidential kernel witness remains sourced from the dedicated
-  `runtime_kernel_witness` field
+  standalone confidential kernel witness is now reconstructed on demand from
+  the stored finish bundle on the production path rather than sourced from a
+  separate serialized `runtime_kernel_witness` field
 - Lean-checked theorem-facing validation of the resulting witness artifacts
 
 Status labels:
@@ -143,6 +144,20 @@ Status labels:
   `RuntimeTrustedKernelSlotBundle`, and the Lean checker validates that
   stronger artifact directly on the benchmark-backed runtime scenarios.
 
+- `cleared` Check the fully shared proof-bearing confidential runtime bundle
+  family rather than validating only its individual sub-bundles in isolation.
+  Evidence:
+  `crates/uo-core/src/confidential_core.rs`,
+  `proof/lean/UOToolchain/RuntimeConfidentialProofBundleFamilyJson.lean`,
+  `proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamily.lean`,
+  `results/confidential_proof_family_validation.json`.
+  The runtime now re-derives the whole
+  `RuntimeConfidentialProofBundleFamily` through one shared `uo-core`
+  constructor, the imported Lean route projects that family back to the exact
+  runtime-kernel refinement boundary plus the paper-main family / slot-family
+  runtime assurances, and the probe validates the serialized shared-family
+  artifact directly on the benchmark-backed runtime scenarios.
+
 - `cleared` Validate the theorem-facing bridge artifacts with Lean-backed
   checkers.
   Evidence:
@@ -154,7 +169,9 @@ Status labels:
   now also emits `tamper_validation.json`, which mutates representative direct
   controller/hidden certificates, every proof-grade translation/runtime bridge
   artifact, the stronger confidential-core/kernel-interface/slot composite
-  artifact, the theorem-facing runtime kernel-interface bundle, seeded
+  artifact, the theorem-facing runtime kernel-interface bundle, the exact
+  runtime-kernel refinement-boundary route over that same exported bundle,
+  seeded
   paper-main family and slot-family bundles, seeded/canonical witness-family,
   theorem-input, and pair-certificate artifacts, then checks that the shipped
   Lean executables reject those semantically drifted but still parseable
@@ -163,7 +180,10 @@ Status labels:
   `importedSeededRuntimePaperMainFamilyBundle_valid_projects_to_family_assurance`
   and
   `importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_slot_assurance`,
-  so accepted paper-main artifacts do not stop at checker acceptance alone.
+  and the imported shell-boundary bridge now also exposes
+  `importedRuntimeKernelInterfaceBundle_valid_projects_to_runtimeKernelRefinementBoundary`,
+  so accepted runtime-kernel interface artifacts do not stop at bundle
+  acceptance alone either.
 
 - `cleared` Provide a dedicated bridge-validation report rather than forcing
   users to infer bridge status from the full probe bundle.

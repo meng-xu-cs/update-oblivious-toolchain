@@ -1,9 +1,10 @@
 use crate::{
     canonical_runtime_public_object_ids, CompiledArtifact, ExecutionTrace, KernelWitnessError,
-    RefinementWitnessError, RuntimeKernelRefinementEventKindWitness,
-    RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementWitness,
-    RuntimeKernelRefinementWitnessError, RuntimeKernelScheduleWitness, RuntimeKernelStepWitness,
-    RuntimeKernelWitness, RuntimeRefinementWitness,
+    RefinementWitnessError, RuntimeKernelFinishBundle, RuntimeKernelFinishBundleError,
+    RuntimeKernelRefinementEventKindWitness, RuntimeKernelRefinementEventWitness,
+    RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
+    RuntimeKernelScheduleWitness, RuntimeKernelStepWitness, RuntimeKernelWitness,
+    RuntimeRefinementWitness,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -11,23 +12,23 @@ use uo_precompiles::UoOpcode;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellContract {
-    public_object_universe: Vec<u32>,
-    canonical_loaded_object_schedule: Vec<u32>,
+    public_object_universe: Box<[u32]>,
+    canonical_loaded_object_schedule: Box<[u32]>,
     kernel_schedule: RuntimeKernelScheduleWitness,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellTrace {
-    events: Vec<RuntimeKernelRefinementEventWitness>,
+    events: Box<[RuntimeKernelRefinementEventWitness]>,
     projected_kernel_schedule: RuntimeKernelScheduleWitness,
-    pre_committed_cold_object_schedule: Vec<u32>,
-    shadow_load_object_schedule: Vec<u32>,
-    commit_object_schedule: Vec<u32>,
-    cold_store_object_schedule: Vec<u32>,
-    post_committed_cold_object_schedule: Vec<u32>,
+    pre_committed_cold_object_schedule: Box<[u32]>,
+    shadow_load_object_schedule: Box<[u32]>,
+    commit_object_schedule: Box<[u32]>,
+    cold_store_object_schedule: Box<[u32]>,
+    post_committed_cold_object_schedule: Box<[u32]>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeShellBoundaryBundle {
     kernel_witness: RuntimeKernelWitness,
     runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
@@ -35,11 +36,11 @@ pub struct RuntimeShellBoundaryBundle {
     shell_trace: RuntimeShellTrace,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeKernelInterfaceBundle {
     shell_boundary_bundle: RuntimeShellBoundaryBundle,
-    expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
-    expected_public_object_ids: Vec<u32>,
+    expected_kernel_steps: Box<[RuntimeKernelStepWitness]>,
+    expected_public_object_ids: Box<[u32]>,
     expected_kernel_schedule: RuntimeKernelScheduleWitness,
 }
 
@@ -47,6 +48,8 @@ pub struct RuntimeKernelInterfaceBundle {
 pub enum RuntimeShellBoundaryBundleError {
     #[error("runtime shell-boundary bundle requires a valid runtime refinement witness: {0}")]
     RuntimeWitness(#[from] RefinementWitnessError),
+    #[error("runtime shell-boundary bundle requires a valid runtime kernel finish bundle: {0}")]
+    RuntimeKernelFinishBundle(#[from] RuntimeKernelFinishBundleError),
     #[error("runtime shell-boundary bundle requires a runtime kernel witness")]
     MissingKernelWitness,
     #[error("runtime shell-boundary bundle requires a runtime kernel refinement witness")]
@@ -90,7 +93,10 @@ pub enum RuntimeKernelInterfaceBundleError {
 impl RuntimeKernelWitness {
     pub(crate) fn shell_contract(&self) -> RuntimeShellContract {
         RuntimeShellContract {
-            public_object_universe: self.emitted_public_object_schedule(),
+            public_object_universe: self
+                .emitted_public_object_schedule()
+                .to_vec()
+                .into_boxed_slice(),
             canonical_loaded_object_schedule: self.canonical_loaded_object_schedule(),
             kernel_schedule: self.emitted_kernel_schedule(),
         }
@@ -100,7 +106,7 @@ impl RuntimeKernelWitness {
 impl RuntimeKernelRefinementWitness {
     pub(crate) fn shell_trace(&self) -> RuntimeShellTrace {
         RuntimeShellTrace::from_components(
-            self.events().to_vec(),
+            self.events().to_vec().into_boxed_slice(),
             self.projected_kernel_schedule(),
             self.pre_committed_cold_object_schedule(),
             self.shadow_load_object_schedule(),
@@ -135,13 +141,13 @@ struct RuntimeShellReplayProgress {
 
 impl RuntimeShellTrace {
     fn from_components(
-        events: Vec<RuntimeKernelRefinementEventWitness>,
+        events: Box<[RuntimeKernelRefinementEventWitness]>,
         projected_kernel_schedule: RuntimeKernelScheduleWitness,
-        pre_committed_cold_object_schedule: Vec<u32>,
-        shadow_load_object_schedule: Vec<u32>,
-        commit_object_schedule: Vec<u32>,
-        cold_store_object_schedule: Vec<u32>,
-        post_committed_cold_object_schedule: Vec<u32>,
+        pre_committed_cold_object_schedule: Box<[u32]>,
+        shadow_load_object_schedule: Box<[u32]>,
+        commit_object_schedule: Box<[u32]>,
+        cold_store_object_schedule: Box<[u32]>,
+        post_committed_cold_object_schedule: Box<[u32]>,
     ) -> Self {
         Self {
             events,
@@ -207,33 +213,34 @@ impl RuntimeShellTrace {
     fn object_schedule_from_events(
         &self,
         kind: RuntimeKernelRefinementEventKindWitness,
-    ) -> Vec<u32> {
+    ) -> Box<[u32]> {
         self.events()
             .iter()
             .filter(|event| event.kind() == kind)
             .filter_map(RuntimeKernelRefinementEventWitness::object_id)
-            .collect()
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
     }
 
-    pub fn pre_committed_cold_object_schedule_from_events(&self) -> Vec<u32> {
+    pub fn pre_committed_cold_object_schedule_from_events(&self) -> Box<[u32]> {
         self.object_schedule_from_events(
             RuntimeKernelRefinementEventKindWitness::PreCommittedColdObject,
         )
     }
 
-    pub fn shadow_load_object_schedule_from_events(&self) -> Vec<u32> {
+    pub fn shadow_load_object_schedule_from_events(&self) -> Box<[u32]> {
         self.object_schedule_from_events(RuntimeKernelRefinementEventKindWitness::ShadowLoadObject)
     }
 
-    pub fn commit_object_schedule_from_events(&self) -> Vec<u32> {
+    pub fn commit_object_schedule_from_events(&self) -> Box<[u32]> {
         self.object_schedule_from_events(RuntimeKernelRefinementEventKindWitness::CommitObject)
     }
 
-    pub fn cold_store_object_schedule_from_events(&self) -> Vec<u32> {
+    pub fn cold_store_object_schedule_from_events(&self) -> Box<[u32]> {
         self.object_schedule_from_events(RuntimeKernelRefinementEventKindWitness::ColdStoreObject)
     }
 
-    pub fn post_committed_cold_object_schedule_from_events(&self) -> Vec<u32> {
+    pub fn post_committed_cold_object_schedule_from_events(&self) -> Box<[u32]> {
         self.object_schedule_from_events(
             RuntimeKernelRefinementEventKindWitness::PostCommittedColdObject,
         )
@@ -242,12 +249,18 @@ impl RuntimeShellTrace {
     pub fn summaries_match_events(&self) -> bool {
         self.projected_kernel_schedule() == &self.projected_kernel_schedule_from_events()
             && self.pre_committed_cold_object_schedule()
-                == self.pre_committed_cold_object_schedule_from_events()
-            && self.shadow_load_object_schedule() == self.shadow_load_object_schedule_from_events()
-            && self.commit_object_schedule() == self.commit_object_schedule_from_events()
-            && self.cold_store_object_schedule() == self.cold_store_object_schedule_from_events()
+                == self
+                    .pre_committed_cold_object_schedule_from_events()
+                    .as_ref()
+            && self.shadow_load_object_schedule()
+                == self.shadow_load_object_schedule_from_events().as_ref()
+            && self.commit_object_schedule() == self.commit_object_schedule_from_events().as_ref()
+            && self.cold_store_object_schedule()
+                == self.cold_store_object_schedule_from_events().as_ref()
             && self.post_committed_cold_object_schedule()
-                == self.post_committed_cold_object_schedule_from_events()
+                == self
+                    .post_committed_cold_object_schedule_from_events()
+                    .as_ref()
     }
 
     pub fn replays_contract(&self, contract: &RuntimeShellContract) -> bool {
@@ -475,8 +488,8 @@ impl RuntimeShellBoundaryBundle {
         })
     }
 
-    pub(crate) fn from_runtime_witness(
-        runtime_witness: RuntimeRefinementWitness,
+    pub(crate) fn from_runtime_witness_ref(
+        runtime_witness: &RuntimeRefinementWitness,
     ) -> Result<Self, RuntimeShellBoundaryBundleError> {
         runtime_witness.validate()?;
         let kernel_witness = runtime_witness
@@ -487,6 +500,14 @@ impl RuntimeShellBoundaryBundle {
             .runtime_kernel_refinement_witness()
             .cloned()
             .ok_or(RuntimeShellBoundaryBundleError::MissingRuntimeKernelRefinementWitness)?;
+        Self::from_witnesses(kernel_witness, runtime_kernel_refinement_witness)
+    }
+
+    pub(crate) fn from_runtime_kernel_finish_bundle_ref(
+        runtime_kernel_finish_bundle: &RuntimeKernelFinishBundle,
+    ) -> Result<Self, RuntimeShellBoundaryBundleError> {
+        let (kernel_witness, runtime_kernel_refinement_witness) =
+            runtime_kernel_finish_bundle.to_witness_pair()?;
         Self::from_witnesses(kernel_witness, runtime_kernel_refinement_witness)
     }
 }
@@ -516,12 +537,14 @@ impl RuntimeKernelInterfaceBundle {
         &self.expected_kernel_schedule
     }
 
-    pub(crate) fn from_runtime_witness(
-        runtime_witness: RuntimeRefinementWitness,
+    pub(crate) fn from_runtime_kernel_finish_bundle_ref(
+        runtime_kernel_finish_bundle: &RuntimeKernelFinishBundle,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeKernelInterfaceBundleError> {
         let shell_boundary_bundle =
-            RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness)?;
+            RuntimeShellBoundaryBundle::from_runtime_kernel_finish_bundle_ref(
+                runtime_kernel_finish_bundle,
+            )?;
         Self::from_shell_boundary_bundle(shell_boundary_bundle, artifact)
     }
 
@@ -551,7 +574,8 @@ impl RuntimeKernelInterfaceBundle {
                     entrypoint: entrypoint.clone(),
                 },
             )?
-            .to_vec();
+            .to_vec()
+            .into_boxed_slice();
         let expected_public_object_ids = shell_boundary_bundle
             .kernel_witness()
             .expected_public_object_schedule()
@@ -559,7 +583,9 @@ impl RuntimeKernelInterfaceBundle {
                 || RuntimeKernelInterfaceBundleError::MissingExpectedPublicObjectIds {
                     entrypoint: entrypoint.clone(),
                 },
-            )?;
+            )?
+            .to_vec()
+            .into_boxed_slice();
         let expected_kernel_schedule = shell_boundary_bundle
             .kernel_witness()
             .expected_kernel_schedule()
@@ -604,14 +630,25 @@ impl ExecutionTrace {
     pub fn runtime_shell_boundary_bundle(
         &self,
     ) -> Result<RuntimeShellBoundaryBundle, RuntimeShellBoundaryBundleError> {
+        if let Some(runtime_kernel_finish_bundle) = self.stored_runtime_kernel_finish_bundle() {
+            return RuntimeShellBoundaryBundle::from_runtime_kernel_finish_bundle_ref(
+                runtime_kernel_finish_bundle,
+            );
+        }
         let runtime_witness = self.runtime_refinement_witness()?;
-        RuntimeShellBoundaryBundle::from_runtime_witness(runtime_witness)
+        RuntimeShellBoundaryBundle::from_runtime_witness_ref(&runtime_witness)
     }
 
     pub fn runtime_kernel_interface_bundle(
         &self,
         artifact: &CompiledArtifact,
     ) -> Result<RuntimeKernelInterfaceBundle, RuntimeKernelInterfaceBundleError> {
+        if let Some(runtime_kernel_finish_bundle) = self.stored_runtime_kernel_finish_bundle() {
+            return RuntimeKernelInterfaceBundle::from_runtime_kernel_finish_bundle_ref(
+                runtime_kernel_finish_bundle,
+                artifact,
+            );
+        }
         let shell_boundary_bundle = self.runtime_shell_boundary_bundle()?;
         RuntimeKernelInterfaceBundle::from_shell_boundary_bundle(shell_boundary_bundle, artifact)
     }
@@ -627,8 +664,8 @@ mod tests {
 
     fn sample_contract() -> RuntimeShellContract {
         RuntimeShellContract {
-            public_object_universe: vec![7],
-            canonical_loaded_object_schedule: vec![7],
+            public_object_universe: vec![7].into_boxed_slice(),
+            canonical_loaded_object_schedule: vec![7].into_boxed_slice(),
             kernel_schedule: RuntimeKernelScheduleWitness::new(
                 vec![
                     UoOpcode::Begin,
@@ -659,7 +696,8 @@ mod tests {
                 RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::Wipe, None),
                 RuntimeKernelRefinementEventWitness::cold_store_object(7),
                 RuntimeKernelRefinementEventWitness::post_committed_cold_object(7),
-            ],
+            ]
+            .into_boxed_slice(),
             projected_kernel_schedule: RuntimeKernelScheduleWitness::new(
                 vec![
                     UoOpcode::Begin,
@@ -675,11 +713,11 @@ mod tests {
                 ],
             )
             .unwrap(),
-            pre_committed_cold_object_schedule: vec![7],
-            shadow_load_object_schedule: vec![7],
-            commit_object_schedule: vec![7],
-            cold_store_object_schedule: vec![7],
-            post_committed_cold_object_schedule: vec![7],
+            pre_committed_cold_object_schedule: vec![7].into_boxed_slice(),
+            shadow_load_object_schedule: vec![7].into_boxed_slice(),
+            commit_object_schedule: vec![7].into_boxed_slice(),
+            cold_store_object_schedule: vec![7].into_boxed_slice(),
+            post_committed_cold_object_schedule: vec![7].into_boxed_slice(),
         }
     }
 
@@ -696,7 +734,7 @@ mod tests {
     fn shell_trace_rejects_tampered_summary_projection() {
         let contract = sample_contract();
         let mut trace = sample_shell_trace();
-        trace.commit_object_schedule = vec![];
+        trace.commit_object_schedule = vec![].into_boxed_slice();
         assert!(!trace.summaries_match_events());
         assert!(!trace.replays_contract(&contract));
         assert!(!trace.refines_contract(&contract));

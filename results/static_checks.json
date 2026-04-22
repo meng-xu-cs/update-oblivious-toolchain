@@ -86,6 +86,24 @@
       "uses_proofgrade_umbrella": true
     },
     {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreKernelFinishSlot.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlot.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlotFinishBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
       "file": "proof/lean/CheckProofGradeRuntimeConfidentialCoreLowering.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
@@ -110,7 +128,91 @@
       "uses_proofgrade_umbrella": true
     },
     {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamily.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyAssurance.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyFinishSlotBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyKernelInterface.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilySlotAssurance.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilySlotBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelConfinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
       "file": "proof/lean/CheckProofGradeRuntimeKernelDsl.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelFinishBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelInterface.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelInterfaceBundle.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelInterfaceConfinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelInterfaceFamily.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true
@@ -122,7 +224,19 @@
       "uses_proofgrade_umbrella": true
     },
     {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
       "file": "proof/lean/CheckProofGradeRuntimeKernelRefinementWitness.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelSlotBoundary.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true
@@ -135,6 +249,36 @@
     },
     {
       "file": "proof/lean/CheckProofGradeRuntimeKernelWitness.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimePaperMainFamily.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimePaperMainFamilyBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimePaperMainFamilyBundle.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimePaperMainSlotBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimePaperMainSlotFamilyBundle.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true
@@ -165,6 +309,12 @@
     },
     {
       "file": "proof/lean/CheckProofGradeRuntimeWitness.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeWitnessFamily.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true

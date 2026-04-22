@@ -3,11 +3,12 @@ use anyhow::{bail, Result};
 use std::collections::BTreeMap;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
+pub(crate) use uo_core::PublicCallSummary;
 use uo_core::{
-    BoundaryDirection, BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape,
-    PublicOutcomeTrace, RuntimeControllerCertificate, RuntimeOramAccessWitness,
-    RuntimeOramLeafWitness, RuntimePathOramTransitionWitness, SgxControllerShapeTrace,
-    TheoremTrace, Value,
+    BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape, PublicOutcomeTrace,
+    RuntimeControllerObserverCertificate, RuntimeObservedOramAccessWitness,
+    RuntimeOramAccessWitness, RuntimeOramLeafWitness, RuntimePathOramTransitionWitness,
+    RuntimePublicCallTraceBundle, Value,
 };
 use uo_store::StoreExecutionMetrics;
 
@@ -16,56 +17,7 @@ const POSITION_MAP_REGION: &str = "position_map";
 const PATH_REGION: &str = "path";
 const STASH_REGION: &str = "stash";
 
-#[derive(Clone, Debug)]
-pub(crate) struct CallTraceBundle {
-    logical_accesses: Vec<LogicalEvent>,
-    logical_writes: Vec<LogicalEvent>,
-    physical_reads: Vec<PhysicalReadEvent>,
-    physical_writes: Vec<PhysicalWriteEvent>,
-    metrics: StoreExecutionMetrics,
-    theorem_trace: TheoremTrace,
-    controller_certificate: RuntimeControllerCertificate,
-    oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
-    oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
-}
-
-impl CallTraceBundle {
-    pub(crate) fn zero_writes(&self) -> usize {
-        self.metrics.zero_writes
-    }
-
-    pub(crate) fn into_execution_trace_parts(
-        self,
-    ) -> (
-        Vec<LogicalEvent>,
-        Vec<LogicalEvent>,
-        Vec<PhysicalReadEvent>,
-        Vec<PhysicalWriteEvent>,
-        TheoremTrace,
-        RuntimeControllerCertificate,
-        Vec<RuntimeOramLeafWitness>,
-        Vec<RuntimePathOramTransitionWitness>,
-    ) {
-        (
-            self.logical_accesses,
-            self.logical_writes,
-            self.physical_reads,
-            self.physical_writes,
-            self.theorem_trace,
-            self.controller_certificate,
-            self.oram_leaf_schedule,
-            self.oram_leaf_state_transitions,
-        )
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct ObservedOramAccess {
-    object_id: u32,
-    parameters: OramParameters,
-}
-
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub(crate) struct CallRecorder {
     entrypoint: String,
     logical_accesses: Vec<LogicalEvent>,
@@ -78,52 +30,12 @@ pub(crate) struct CallRecorder {
     page_trace_regions: BTreeMap<&'static str, usize>,
     workset_regions: BTreeMap<&'static str, usize>,
     total_oram_accesses: usize,
-    observed_oram_schedule: Vec<ObservedOramAccess>,
+    observed_oram_schedule: Vec<RuntimeObservedOramAccessWitness>,
     observed_oram_accesses: BTreeMap<u32, usize>,
     path_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
     path_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
     recursive_position_map_depth: usize,
     stash_bound: usize,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct PublicCallSummary {
-    entry_input_len: usize,
-    public_args: Vec<String>,
-}
-
-impl PublicCallSummary {
-    pub(crate) fn from_manifest_entry(
-        manifest_entry: &EntrypointManifest,
-        args: &[Value],
-    ) -> Result<Self> {
-        if manifest_entry.param_names.len() != args.len() {
-            bail!(
-                "manifest param_names length mismatch: {} != {}",
-                manifest_entry.param_names.len(),
-                args.len()
-            );
-        }
-        Ok(Self {
-            entry_input_len: manifest_entry.entry_input_len,
-            public_args: manifest_entry
-                .param_names
-                .iter()
-                .zip(args.iter())
-                .enumerate()
-                .filter(|(index, _)| !manifest_entry.secret_args.contains(index))
-                .map(|(_, (name, value))| format!("{name}={value}"))
-                .collect(),
-        })
-    }
-
-    pub(crate) fn entry_input_len(&self) -> usize {
-        self.entry_input_len
-    }
-
-    pub(crate) fn into_public_args(self) -> Vec<String> {
-        self.public_args
-    }
 }
 
 impl CallRecorder {
@@ -146,12 +58,9 @@ impl CallRecorder {
         recorder.workset_regions.insert(POSITION_MAP_REGION, 0);
         recorder.workset_regions.insert(PATH_REGION, 0);
         recorder.workset_regions.insert(STASH_REGION, 0);
-        recorder.boundary_schedule.push(BoundaryEvent {
-            direction: BoundaryDirection::Enter,
-            api_id: entrypoint.into(),
-            input_len: total_input_len,
-            output_len: 0,
-        });
+        recorder
+            .boundary_schedule
+            .push(BoundaryEvent::enter(entrypoint, total_input_len));
         recorder
             .controller_phase_order
             .push(ControllerPhase::EnclaveEnter);
@@ -211,23 +120,27 @@ impl CallRecorder {
 
     pub(crate) fn record_oram_access(&mut self, object_id: u32, parameters: &OramParameters) {
         self.total_oram_accesses += 1;
-        self.observed_oram_schedule.push(ObservedOramAccess {
-            object_id,
-            parameters: parameters.clone(),
-        });
+        self.observed_oram_schedule
+            .push(RuntimeObservedOramAccessWitness::new(
+                object_id,
+                parameters.scheme.clone(),
+                parameters.block_size,
+                parameters.bucket_size,
+                parameters.bucket_count,
+                parameters.blocks_per_bucket,
+                parameters.tree_height,
+                parameters.stash_bound,
+                parameters.recursion_depth,
+                parameters.metadata_pages,
+                parameters.metadata_pages_per_access,
+                parameters.buckets_per_access,
+                parameters.accesses_per_call,
+            ));
         *self.observed_oram_accesses.entry(object_id).or_default() += 1;
-        self.boundary_schedule.push(BoundaryEvent {
-            direction: BoundaryDirection::Exit,
-            api_id: "oram_access".into(),
-            input_len: 0,
-            output_len: 0,
-        });
-        self.boundary_schedule.push(BoundaryEvent {
-            direction: BoundaryDirection::Enter,
-            api_id: "oram_access".into(),
-            input_len: 0,
-            output_len: 0,
-        });
+        self.boundary_schedule
+            .push(BoundaryEvent::exit("oram_access", 0));
+        self.boundary_schedule
+            .push(BoundaryEvent::enter("oram_access", 0));
         self.controller_phase_order
             .push(ControllerPhase::StageRequest);
         self.controller_phase_order.extend(std::iter::repeat_n(
@@ -298,51 +211,52 @@ impl CallRecorder {
         output_shape: OutputShape,
         aborted: bool,
         gas_used: u64,
-    ) -> Result<CallTraceBundle> {
+    ) -> Result<(usize, RuntimePublicCallTraceBundle)> {
         self.assert_manifest_exactness(manifest_entry)?;
         self.assert_oram_parameter_exactness(manifest_objects)?;
         self.controller_phase_order.extend([
             ControllerPhase::SealPersistentState,
             ControllerPhase::EnclaveExit,
         ]);
-        self.boundary_schedule.push(BoundaryEvent {
-            direction: BoundaryDirection::Exit,
-            api_id: self.entrypoint.clone(),
-            input_len: 0,
-            output_len: output_shape.return_length,
-        });
-        let controller_shape = self.controller_shape();
+        self.boundary_schedule.push(BoundaryEvent::exit(
+            self.entrypoint.clone(),
+            output_shape.return_length,
+        ));
         let entry_input_len = public_call.entry_input_len();
-        let public_outcome = PublicOutcomeTrace {
-            entrypoint_id: self.entrypoint.clone(),
-            public_args: public_call.into_public_args(),
-            termination_status: !aborted,
+        let public_outcome = PublicOutcomeTrace::new(
+            self.entrypoint.clone(),
+            public_call.into_public_args(),
+            !aborted,
             output_shape,
             gas_used,
-        };
-        let controller_certificate =
-            controller_certificate(entry_input_len, &self.observed_oram_schedule);
-        let theorem_trace = TheoremTrace {
-            public_outcome: Some(public_outcome.clone()),
-            boundary_schedule: self.boundary_schedule,
-            controller_shape: Some(controller_shape.clone()),
-            normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
-        };
-        let expected_theorem_trace = controller_certificate.theorem_trace(public_outcome);
-        if theorem_trace != expected_theorem_trace {
-            bail!("runtime theorem trace drifted from independent public observer reconstruction");
-        }
-        Ok(CallTraceBundle {
-            logical_accesses: self.logical_accesses,
-            logical_writes: self.logical_writes,
-            physical_reads: self.physical_reads,
-            physical_writes: self.physical_writes,
-            metrics: self.metrics,
-            theorem_trace: expected_theorem_trace,
-            controller_certificate,
-            oram_leaf_schedule: self.path_oram_leaf_schedule,
-            oram_leaf_state_transitions: self.path_oram_leaf_state_transitions,
-        })
+        );
+        let controller_observer =
+            RuntimeControllerObserverCertificate::from_runtime_observer_with_oram_accesses(
+                public_outcome,
+                self.boundary_schedule.into_boxed_slice(),
+                self.controller_phase_order.into_boxed_slice(),
+                controller_region_budgets(&self.page_trace_regions),
+                controller_region_budgets(&self.workset_regions),
+                self.total_oram_accesses,
+                self.recursive_position_map_depth,
+                self.stash_bound,
+                entry_input_len,
+                observed_oram_access_witnesses(&self.observed_oram_schedule),
+            )?;
+        let zero_writes = self.metrics.zero_writes;
+        Ok((
+            zero_writes,
+            RuntimePublicCallTraceBundle::new(
+                self.logical_accesses.into_boxed_slice(),
+                self.logical_writes.into_boxed_slice(),
+                self.physical_reads.into_boxed_slice(),
+                self.physical_writes.into_boxed_slice(),
+                controller_observer.theorem_trace(),
+                controller_observer.controller_certificate().clone(),
+                self.path_oram_leaf_schedule.into_boxed_slice(),
+                self.path_oram_leaf_state_transitions.into_boxed_slice(),
+            ),
+        ))
     }
 
     pub(crate) fn metrics(&self) -> &StoreExecutionMetrics {
@@ -404,117 +318,86 @@ impl CallRecorder {
             assert_oram_field_eq(
                 access.object_id,
                 "scheme",
-                access.parameters.scheme.as_str(),
+                access.scheme.as_str(),
                 manifest_oram.scheme.as_str(),
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "block_size",
-                access.parameters.block_size,
+                access.block_size,
                 manifest_oram.block_size,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "bucket_size",
-                access.parameters.bucket_size,
+                access.bucket_size,
                 manifest_oram.bucket_size,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "bucket_count",
-                access.parameters.bucket_count,
+                access.bucket_count,
                 manifest_oram.bucket_count,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "blocks_per_bucket",
-                access.parameters.blocks_per_bucket,
+                access.blocks_per_bucket,
                 manifest_oram.blocks_per_bucket,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "tree_height",
-                access.parameters.tree_height,
+                access.tree_height,
                 manifest_oram.tree_height,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "stash_bound",
-                access.parameters.stash_bound,
+                access.stash_bound,
                 manifest_oram.stash_bound,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "recursion_depth",
-                access.parameters.recursion_depth,
+                access.recursion_depth,
                 manifest_oram.recursion_depth,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "metadata_pages",
-                access.parameters.metadata_pages,
+                access.metadata_pages,
                 manifest_oram.metadata_pages,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "metadata_pages_per_access",
-                access.parameters.metadata_pages_per_access,
+                access.metadata_pages_per_access,
                 manifest_oram.metadata_pages_per_access,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "buckets_per_access",
-                access.parameters.buckets_per_access,
+                access.buckets_per_access,
                 manifest_oram.buckets_per_access,
             )?;
             assert_oram_field_eq(
                 access.object_id,
                 "accesses_per_call",
-                access.parameters.accesses_per_call,
+                access.accesses_per_call,
                 manifest_oram.accesses_per_call,
             )?;
         }
         Ok(())
     }
-
-    fn controller_shape(&self) -> SgxControllerShapeTrace {
-        let page_trace_regions = controller_region_budgets(&self.page_trace_regions);
-        let workset_regions = controller_region_budgets(&self.workset_regions);
-        let page_trace_budget = page_trace_regions
-            .iter()
-            .map(|region| region.event_budget)
-            .sum::<usize>();
-        SgxControllerShapeTrace {
-            boundary_event_budget: self.boundary_schedule.len(),
-            controller_phase_order: self.controller_phase_order.clone(),
-            page_trace_regions,
-            workset_regions,
-            exit_trace_budget: self.controller_phase_order.len() + self.total_oram_accesses + 1,
-            shared_resource_budget: self.controller_phase_order.len() + page_trace_budget,
-            recursive_position_map_depth: self.recursive_position_map_depth,
-            stash_bound: self.stash_bound,
-        }
-    }
 }
 
-fn controller_certificate(
-    entry_input_len: usize,
-    observed_oram_schedule: &[ObservedOramAccess],
-) -> RuntimeControllerCertificate {
-    RuntimeControllerCertificate::new(
-        entry_input_len,
-        observed_oram_schedule
-            .iter()
-            .map(|access| RuntimeOramAccessWitness {
-                object_id: access.object_id,
-                scheme: access.parameters.scheme.clone(),
-                metadata_pages_per_access: access.parameters.metadata_pages_per_access,
-                buckets_per_access: access.parameters.buckets_per_access,
-                recursion_depth: access.parameters.recursion_depth,
-                stash_bound: access.parameters.stash_bound,
-            })
-            .collect(),
-    )
+fn observed_oram_access_witnesses(
+    observed_oram_schedule: &[RuntimeObservedOramAccessWitness],
+) -> impl Iterator<Item = RuntimeOramAccessWitness> + '_ {
+    observed_oram_schedule
+        .iter()
+        .map(RuntimeObservedOramAccessWitness::controller_access_witness)
 }
 
 fn assert_oram_field_eq<T>(object_id: u32, field: &str, observed: T, manifest: T) -> Result<()>
@@ -533,7 +416,9 @@ where
     Ok(())
 }
 
-fn controller_region_budgets(regions: &BTreeMap<&'static str, usize>) -> Vec<ControllerPageBudget> {
+fn controller_region_budgets(
+    regions: &BTreeMap<&'static str, usize>,
+) -> Box<[ControllerPageBudget]> {
     [
         METADATA_REGION,
         POSITION_MAP_REGION,
@@ -545,7 +430,23 @@ fn controller_region_budgets(regions: &BTreeMap<&'static str, usize>) -> Vec<Con
         page_kind: region.into(),
         event_budget: regions.get(region).copied().unwrap_or_default(),
     })
-    .collect()
+    .collect::<Vec<_>>()
+    .into_boxed_slice()
+}
+
+fn gas_used_of(
+    recorder: &CallRecorder,
+    manifest_entry: &EntrypointManifest,
+    confidential: bool,
+) -> u64 {
+    if confidential {
+        return manifest_entry.public_gas_budget;
+    }
+    let mut gas_used = 0u64;
+    gas_used += recorder.metrics().logical_reads as u64 * 3;
+    gas_used += recorder.metrics().logical_writes as u64 * 5;
+    gas_used += recorder.metrics().physical_writes as u64 * 17;
+    gas_used
 }
 
 pub(crate) fn output_shape_of(
@@ -553,14 +454,35 @@ pub(crate) fn output_shape_of(
     return_value: &Option<Value>,
 ) -> Result<OutputShape> {
     match return_value {
-        Some(_) => Ok(OutputShape {
-            return_present: true,
-            return_length: manifest_entry.return_canonical_len.ok_or_else(|| {
+        Some(_) => Ok(OutputShape::returned(
+            manifest_entry.return_canonical_len.ok_or_else(|| {
                 anyhow::anyhow!(
                     "manifest return_canonical_len missing for entrypoint with return value"
                 )
             })?,
-        }),
+        )),
         None => Ok(OutputShape::default()),
     }
+}
+
+pub(crate) fn finalize_public_call_trace(
+    recorder: CallRecorder,
+    manifest_entry: &EntrypointManifest,
+    manifest_objects: &[StateObjectManifest],
+    public_call: PublicCallSummary,
+    return_value: &Option<Value>,
+    aborted: bool,
+    confidential: bool,
+) -> Result<(u64, usize, RuntimePublicCallTraceBundle)> {
+    let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
+    let output_shape = output_shape_of(manifest_entry, return_value)?;
+    let (zero_writes, trace_bundle) = recorder.finish(
+        manifest_entry,
+        manifest_objects,
+        public_call,
+        output_shape,
+        aborted,
+        gas_used,
+    )?;
+    Ok((gas_used, zero_writes, trace_bundle))
 }

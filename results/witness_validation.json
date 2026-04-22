@@ -25,6 +25,64 @@
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
       "gas_used": 4096,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 9,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 3887,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -150,6 +208,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for classify(uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -214,6 +274,64 @@
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
       "gas_used": 4096,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 9,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 3887,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -339,6 +457,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for classify(uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -393,7 +513,7 @@
       "scenario": "FixedSlotClassifier/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 3905
+      "witness_json_bytes": 3903
     },
     {
       "accepted": true,
@@ -403,6 +523,88 @@
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
       "gas_used": 8192,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 8,
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 2,
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_opcode_count": 8,
+          "kernel_step_count": 8,
+          "kernel_step_public_object_schedule": [
+            1,
+            1,
+            1,
+            1,
+            2
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1,
+            2
+          ],
+          "commit_object_schedule": [
+            1,
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 18,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 8,
+          "projected_kernel_step_count": 8,
+          "projected_kernel_step_count_from_events": 8,
+          "projected_kernel_step_public_object_schedule": [
+            1,
+            1,
+            1,
+            1,
+            2
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1,
+            1,
+            1,
+            1,
+            2
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1,
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 7958,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -713,6 +915,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 6
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for auth(bytes32)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -784,7 +988,7 @@
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 8146
+      "witness_json_bytes": 8145
     },
     {
       "accepted": true,
@@ -794,6 +998,88 @@
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
       "gas_used": 8192,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 8,
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 2,
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_opcode_count": 8,
+          "kernel_step_count": 8,
+          "kernel_step_public_object_schedule": [
+            1,
+            1,
+            1,
+            1,
+            2
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1,
+            2
+          ],
+          "commit_object_schedule": [
+            1,
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 18,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 8,
+          "projected_kernel_step_count": 8,
+          "projected_kernel_step_count_from_events": 8,
+          "projected_kernel_step_public_object_schedule": [
+            1,
+            1,
+            1,
+            1,
+            2
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1,
+            1,
+            1,
+            1,
+            2
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1,
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 7958,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1104,6 +1390,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 6
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for auth(bytes32)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -1185,6 +1473,64 @@
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
       "gas_used": 12288,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 9,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 5913,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1478,6 +1824,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for upsert(bytes32,uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -1542,6 +1890,64 @@
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
       "gas_used": 12288,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 9,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 5913,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1835,6 +2241,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for upsert(bytes32,uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -1889,7 +2297,7 @@
       "scenario": "RegistryCRUD/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7361
+      "witness_json_bytes": 7360
     },
     {
       "accepted": true,
@@ -1899,6 +2307,84 @@
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
       "gas_used": 16384,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 7,
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 2,
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_opcode_count": 7,
+          "kernel_step_count": 7,
+          "kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1,
+            2
+          ],
+          "commit_object_schedule": [
+            1,
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 17,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 7,
+          "projected_kernel_step_count": 7,
+          "projected_kernel_step_count_from_events": 7,
+          "projected_kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1,
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 8229,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2260,6 +2746,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 4
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for deposit(bytes32,uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -2329,7 +2817,7 @@
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 9953
+      "witness_json_bytes": 9952
     },
     {
       "accepted": true,
@@ -2339,6 +2827,84 @@
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
       "gas_used": 16384,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 7,
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 2,
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_opcode_count": 7,
+          "kernel_step_count": 7,
+          "kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1,
+            2
+          ],
+          "commit_object_schedule": [
+            1,
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 17,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 7,
+          "projected_kernel_step_count": 7,
+          "projected_kernel_step_count_from_events": 7,
+          "projected_kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1,
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 8229,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2700,6 +3266,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 4
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for deposit(bytes32,uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -2779,6 +3347,68 @@
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
       "gas_used": 20480,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            2
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            2
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            2
+          ],
+          "commit_object_schedule": [
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 11,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            2
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            2
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 8935,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -3303,6 +3933,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for approve(address,address,uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -3361,7 +3993,7 @@
       "scenario": "ERC20Lite/fullscan/class0",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 12062
+      "witness_json_bytes": 12061
     },
     {
       "accepted": true,
@@ -3371,6 +4003,68 @@
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
       "gas_used": 20480,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            2
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            2
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            2
+          ],
+          "commit_object_schedule": [
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 11,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            2
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            2
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 8935,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -3895,6 +4589,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for approve(address,address,uint256)",
       "page_trace_events": 0,
       "runtime_kernel_refinement_witness": {
@@ -3963,6 +4659,64 @@
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
       "gas_used": 2322,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 9,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 11033,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4676,6 +5430,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for put(bytes32,uint256)",
       "page_trace_events": 26,
       "runtime_kernel_refinement_witness": {
@@ -4730,7 +5486,7 @@
       "scenario": "SingleAccessMap/pathoram/put-class0",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 16052
+      "witness_json_bytes": 16051
     },
     {
       "accepted": true,
@@ -4740,6 +5496,64 @@
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
       "gas_used": 2322,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 4,
+        "expected_kernel_step_public_object_schedule": [
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 4,
+          "kernel_step_count": 4,
+          "kernel_step_public_object_schedule": [
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 9,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 4,
+          "projected_kernel_step_count": 4,
+          "projected_kernel_step_count_from_events": 4,
+          "projected_kernel_step_public_object_schedule": [
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 11033,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5453,6 +6267,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 2
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for put(bytes32,uint256)",
       "page_trace_events": 26,
       "runtime_kernel_refinement_witness": {
@@ -5507,7 +6323,7 @@
       "scenario": "SingleAccessMap/pathoram/put-class1",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 16050
+      "witness_json_bytes": 16055
     },
     {
       "accepted": true,
@@ -5517,6 +6333,68 @@
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
       "gas_used": 2651,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 5,
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 5,
+          "kernel_step_count": 5,
+          "kernel_step_public_object_schedule": [
+            1,
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 10,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 5,
+          "projected_kernel_step_count": 5,
+          "projected_kernel_step_count_from_events": 5,
+          "projected_kernel_step_public_object_schedule": [
+            1,
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1,
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 13773,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -6431,6 +7309,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 3
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for add(bytes32,uint256)",
       "page_trace_events": 52,
       "runtime_kernel_refinement_witness": {
@@ -6487,7 +7367,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class0",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 23126
+      "witness_json_bytes": 23124
     },
     {
       "accepted": true,
@@ -6497,6 +7377,68 @@
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
       "gas_used": 2651,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 5,
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1
+        ],
+        "expected_public_object_universe": [
+          1
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 1,
+          "canonical_loaded_object_schedule": [
+            1
+          ],
+          "kernel_opcode_count": 5,
+          "kernel_step_count": 5,
+          "kernel_step_public_object_schedule": [
+            1,
+            1
+          ],
+          "public_object_count": 1,
+          "public_object_universe": [
+            1
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1
+          ],
+          "commit_object_schedule": [
+            1
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 10,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1
+          ],
+          "pre_committed_cold_object_schedule": [
+            1
+          ],
+          "projected_kernel_opcode_count": 5,
+          "projected_kernel_step_count": 5,
+          "projected_kernel_step_count_from_events": 5,
+          "projected_kernel_step_public_object_schedule": [
+            1,
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1,
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 13773,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -7411,6 +8353,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 3
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for add(bytes32,uint256)",
       "page_trace_events": 52,
       "runtime_kernel_refinement_witness": {
@@ -7467,7 +8411,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class1",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 23123
+      "witness_json_bytes": 23124
     },
     {
       "accepted": true,
@@ -7477,6 +8421,84 @@
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
       "gas_used": 12288,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 7,
+        "expected_kernel_step_public_object_schedule": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 2,
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_opcode_count": 7,
+          "kernel_step_count": 7,
+          "kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1,
+            2
+          ],
+          "commit_object_schedule": [
+            1,
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 17,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 7,
+          "projected_kernel_step_count": 7,
+          "projected_kernel_step_count_from_events": 7,
+          "projected_kernel_step_public_object_schedule": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1,
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 35981,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -10118,6 +11140,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 4
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for deposit(bytes32,uint256)",
       "page_trace_events": 176,
       "runtime_kernel_refinement_witness": {
@@ -10187,7 +11211,7 @@
       "scenario": "ConfidentialMixer/pathoram/deposit",
       "setup_calls": 0,
       "shared_resource_events": 189,
-      "witness_json_bytes": 59348
+      "witness_json_bytes": 59361
     },
     {
       "accepted": true,
@@ -10197,6 +11221,92 @@
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
       "gas_used": 16384,
+      "kernel_interface_bundle": {
+        "expected_kernel_step_count": 9,
+        "expected_kernel_step_public_object_schedule": [
+          2,
+          1,
+          2,
+          1,
+          1,
+          1
+        ],
+        "expected_public_object_universe": [
+          1,
+          2
+        ],
+        "shell_contract": {
+          "canonical_loaded_object_count": 2,
+          "canonical_loaded_object_schedule": [
+            1,
+            2
+          ],
+          "kernel_opcode_count": 9,
+          "kernel_step_count": 9,
+          "kernel_step_public_object_schedule": [
+            2,
+            1,
+            2,
+            1,
+            1,
+            1
+          ],
+          "public_object_count": 2,
+          "public_object_universe": [
+            1,
+            2
+          ]
+        },
+        "shell_trace": {
+          "cold_store_object_schedule": [
+            1,
+            2
+          ],
+          "commit_object_schedule": [
+            1,
+            2
+          ],
+          "committed_equals_cold_stored": true,
+          "event_count": 19,
+          "loaded_equals_cold_stored": true,
+          "loaded_equals_committed": true,
+          "post_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "pre_committed_cold_object_schedule": [
+            1,
+            2
+          ],
+          "projected_kernel_opcode_count": 9,
+          "projected_kernel_step_count": 9,
+          "projected_kernel_step_count_from_events": 9,
+          "projected_kernel_step_public_object_schedule": [
+            2,
+            1,
+            2,
+            1,
+            1,
+            1
+          ],
+          "projected_kernel_step_public_object_schedule_from_events": [
+            2,
+            1,
+            2,
+            1,
+            1,
+            1
+          ],
+          "refines_shell_contract": true,
+          "replays_shell_contract": true,
+          "shadow_load_object_schedule": [
+            1,
+            2
+          ],
+          "summaries_match_events": true
+        }
+      },
+      "kernel_interface_bundle_json_bytes": 102762,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -18280,6 +19390,8 @@
         "value_scratch_peak_bytes": 32,
         "value_scratch_wipe_count": 7
       },
+      "lean_checker_input": "witness",
+      "lean_checker_kind": "witness",
       "lean_stdout": "validated proof-grade runtime refinement witness for transferFrom(address,address,address,uint256)",
       "page_trace_events": 690,
       "runtime_kernel_refinement_witness": {
@@ -18353,7 +19465,7 @@
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
       "shared_resource_events": 723,
-      "witness_json_bytes": 192002
+      "witness_json_bytes": 191998
     }
   ]
 }

@@ -623,6 +623,120 @@ def RuntimeKernelInterfaceBundle.Valid
         , publicObjectSchedule := bundle.expectedKernelSchedule.publicObjectSchedule
         }
 
+/--
+Explicit theorem object for the runtime-to-Lean kernel refinement boundary.
+This packages the exact finished Lean schedule state witnessed by the shared
+runtime/kernel interface, rather than leaving that relation only as an
+existential proposition. This is the local proof target that a future
+Rust-to-Lean implementation-refinement theorem should refine directly.
+-/
+structure RuntimeKernelRefinementBoundary where
+  kernelWitness : RuntimeKernelWitness
+  runtimeKernelRefinementWitness : RuntimeKernelRefinementWitness
+  expectedKernelSchedule : RuntimeKernelSchedule
+  kernelWitnessProofGrade :
+    kernelWitness.ProofGradeValid kernelWitness.entrypointId
+  refinementValid :
+    runtimeKernelRefinementWitness.Valid kernelWitness
+  resourceStateExact :
+    kernelWitness.replayedResourceState? = some kernelWitness.claimedResourceState
+  expectedKernelScheduleExact :
+    kernelWitness.expectedKernelSchedule? = some expectedKernelSchedule
+  emittedKernelScheduleExact :
+    kernelWitness.emittedKernelSchedule = expectedKernelSchedule
+  finalKernelScheduleStateExact :
+    expectedKernelSchedule.finalState? =
+      some
+        { phase := .finished
+        , publicObjectSchedule := expectedKernelSchedule.publicObjectSchedule
+        }
+  projectedKernelScheduleExact :
+    runtimeKernelRefinementWitness.projectedKernelSchedule =
+      kernelWitness.emittedKernelSchedule
+  preCommittedColdObjectScheduleExact :
+    runtimeKernelRefinementWitness.preCommittedColdObjectSchedule =
+      kernelWitness.publicObjectIds
+  postCommittedColdObjectScheduleExact :
+    runtimeKernelRefinementWitness.postCommittedColdObjectSchedule =
+      kernelWitness.publicObjectIds
+  shadowLoadObjectScheduleExact :
+    runtimeKernelRefinementWitness.shadowLoadObjectSchedule =
+      kernelWitness.canonicalLoadedObjectSchedule
+  commitObjectScheduleExact :
+    runtimeKernelRefinementWitness.commitObjectSchedule =
+      kernelWitness.canonicalLoadedObjectSchedule
+  coldStoreObjectScheduleExact :
+    runtimeKernelRefinementWitness.coldStoreObjectSchedule =
+      kernelWitness.canonicalLoadedObjectSchedule
+
+theorem RuntimeKernelRefinementBoundary.toRefinesLeanKernelState
+  (boundary : RuntimeKernelRefinementBoundary) :
+  boundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    boundary.kernelWitness := by
+  refine ⟨boundary.expectedKernelSchedule, boundary.kernelWitnessProofGrade,
+    boundary.refinementValid, boundary.resourceStateExact,
+    boundary.expectedKernelScheduleExact, boundary.emittedKernelScheduleExact,
+    boundary.finalKernelScheduleStateExact, boundary.projectedKernelScheduleExact,
+    boundary.preCommittedColdObjectScheduleExact,
+    boundary.postCommittedColdObjectScheduleExact,
+    boundary.shadowLoadObjectScheduleExact, boundary.commitObjectScheduleExact,
+    boundary.coldStoreObjectScheduleExact⟩
+
+noncomputable def RuntimeKernelInterfaceBundle.refinementBoundary
+  {bundle : RuntimeKernelInterfaceBundle}
+  (hValid : bundle.Valid) : RuntimeKernelRefinementBoundary := by
+  classical
+  rcases hValid with
+    ⟨hShellValid, hKernelStateRefinement, _hExpectedKernelSteps, _hKernelSteps,
+      _hExpectedPublicObjectIds, _hPublicObjectIds, hResourceState,
+      hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+  rcases hShellValid with
+    ⟨hKernelProofGrade, hRefinementValid, _hShellContractExact, _hShellTraceExact,
+      _hShellProofGrade⟩
+  let expectedKernelScheduleFromRefinement := Classical.choose hKernelStateRefinement
+  have hKernelStateRefinement' := Classical.choose_spec hKernelStateRefinement
+  rcases hKernelStateRefinement' with
+    ⟨_hKernelProofGradeFromRefinement, _hRefinementValidFromRefinement,
+      _hResourceStateFromRefinement, hExpectedKernelScheduleFromRefinement,
+      _hEmittedKernelScheduleFromRefinement, _hFinalKernelScheduleStateFromRefinement,
+      hProjectedKernelSchedule, hPreCommittedColdObjectSchedule,
+      hPostCommittedColdObjectSchedule, hShadowLoadObjectSchedule,
+      hCommitObjectSchedule, hColdStoreObjectSchedule⟩
+  have hExpectedKernelScheduleEq :
+      expectedKernelScheduleFromRefinement = bundle.expectedKernelSchedule := by
+    apply Option.some.inj
+    calc
+      some expectedKernelScheduleFromRefinement =
+          bundle.shellBoundaryBundle.kernelWitness.expectedKernelSchedule? := by
+            simpa using hExpectedKernelScheduleFromRefinement.symm
+      _ = some bundle.expectedKernelSchedule := hExpectedKernelSchedule
+  subst expectedKernelScheduleFromRefinement
+  exact
+    { kernelWitness := bundle.shellBoundaryBundle.kernelWitness
+    , runtimeKernelRefinementWitness := bundle.shellBoundaryBundle.runtimeKernelRefinementWitness
+    , expectedKernelSchedule := bundle.expectedKernelSchedule
+    , kernelWitnessProofGrade := hKernelProofGrade
+    , refinementValid := hRefinementValid
+    , resourceStateExact := hResourceState
+    , expectedKernelScheduleExact := hExpectedKernelSchedule
+    , emittedKernelScheduleExact := hEmittedKernelSchedule
+    , finalKernelScheduleStateExact := hFinalKernelScheduleState
+    , projectedKernelScheduleExact := hProjectedKernelSchedule
+    , preCommittedColdObjectScheduleExact := hPreCommittedColdObjectSchedule
+    , postCommittedColdObjectScheduleExact := hPostCommittedColdObjectSchedule
+    , shadowLoadObjectScheduleExact := hShadowLoadObjectSchedule
+    , commitObjectScheduleExact := hCommitObjectSchedule
+    , coldStoreObjectScheduleExact := hColdStoreObjectSchedule
+    }
+
+theorem runtimeKernelInterfaceBundle_valid_projects_to_runtimeKernelRefinementBoundary
+  {bundle : RuntimeKernelInterfaceBundle}
+  (hValid : bundle.Valid) :
+  RuntimeKernelRefinementWitness.RefinesLeanKernelState
+      (bundle.refinementBoundary hValid).runtimeKernelRefinementWitness
+      (bundle.refinementBoundary hValid).kernelWitness := by
+  exact RuntimeKernelRefinementBoundary.toRefinesLeanKernelState _
+
 theorem runtimeRefinementWitness_shellBoundaryBundle_exact
   {witness : RuntimeRefinementWitness}
   {bundle : RuntimeShellBoundaryBundle}
@@ -1024,6 +1138,76 @@ theorem runtimeShellBoundaryBundle_witness_proofGradeRefines
   simpa [hContractExact, hTraceExact] using hRefines
 
 /--
+Explicit theorem object for the full runtime-side confinement boundary.
+This packages both halves of the runtime story that the paper route now needs:
+the lower-level runtime phase witness refines one exact finished Lean kernel
+state, and the shell trace outside the confidential kernel refines the public
+shell contract induced by that same witness.
+-/
+structure RuntimeKernelConfinementBoundary where
+  refinementBoundary : RuntimeKernelRefinementBoundary
+  shellContract : RuntimeShellContract
+  shellTrace : RuntimeShellTrace
+  shellContractExact :
+    shellContract = refinementBoundary.kernelWitness.shellContract
+  shellTraceExact :
+    shellTrace = refinementBoundary.runtimeKernelRefinementWitness.shellTrace
+  shellTraceProofGradeRefines :
+    shellTrace.ProofGradeRefines shellContract
+
+theorem RuntimeKernelConfinementBoundary.toRefinesLeanKernelState
+  (boundary : RuntimeKernelConfinementBoundary) :
+  boundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    boundary.refinementBoundary.kernelWitness := by
+  exact RuntimeKernelRefinementBoundary.toRefinesLeanKernelState
+    boundary.refinementBoundary
+
+theorem RuntimeKernelConfinementBoundary.toProofGradeRefinesShellContract
+  (boundary : RuntimeKernelConfinementBoundary) :
+  boundary.shellTrace.ProofGradeRefines boundary.shellContract := by
+  exact boundary.shellTraceProofGradeRefines
+
+theorem RuntimeKernelConfinementBoundary.toRefinesShellContract
+  (boundary : RuntimeKernelConfinementBoundary) :
+  boundary.shellTrace.Refines boundary.shellContract := by
+  exact boundary.shellTraceProofGradeRefines.2.2
+
+theorem RuntimeKernelConfinementBoundary.witness_refinesShellContract
+  (boundary : RuntimeKernelConfinementBoundary) :
+  boundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+    boundary.refinementBoundary.kernelWitness.shellContract := by
+  simpa [boundary.shellContractExact, boundary.shellTraceExact] using
+    boundary.toRefinesShellContract
+
+noncomputable def RuntimeKernelInterfaceBundle.confinementBoundary
+  {bundle : RuntimeKernelInterfaceBundle}
+  (hValid : bundle.Valid) : RuntimeKernelConfinementBoundary := by
+  let refinementBoundary := bundle.refinementBoundary hValid
+  refine
+    { refinementBoundary := refinementBoundary
+    , shellContract := refinementBoundary.kernelWitness.shellContract
+    , shellTrace := refinementBoundary.runtimeKernelRefinementWitness.shellTrace
+    , shellContractExact := rfl
+    , shellTraceExact := rfl
+    , shellTraceProofGradeRefines := ?_
+    }
+  exact runtimeKernelRefinementWitness_valid_proofGradeRefinesShellContract
+    refinementBoundary.refinementValid
+
+theorem runtimeKernelInterfaceBundle_valid_projects_to_runtimeKernelConfinementBoundary
+  {bundle : RuntimeKernelInterfaceBundle}
+  (hValid : bundle.Valid) :
+  let boundary := bundle.confinementBoundary hValid
+  boundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.refinementBoundary.kernelWitness ∧
+    boundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.refinementBoundary.kernelWitness.shellContract := by
+  let boundary := bundle.confinementBoundary hValid
+  exact
+    ⟨RuntimeKernelConfinementBoundary.toRefinesLeanKernelState boundary,
+      RuntimeKernelConfinementBoundary.witness_refinesShellContract boundary⟩
+
+/--
 Packaged proof-grade facts for the runtime/kernel boundary. This bundles the
 exact kernel schedule, public object universe, resource-state replay, runtime
 phase projection, and proof-grade shell-boundary refinement results that the
@@ -1097,6 +1281,28 @@ def RuntimeProofGradeKernelInterfaceBundle
   (witness : RuntimeRefinementWitness) : Prop :=
   ∃ bundle, witness.kernelInterfaceBundle? = some bundle ∧ bundle.Valid
 
+@[simp] theorem runtimeRefinementWitness_shellBoundaryBundle_runtimeSeed
+  (witness : RuntimeRefinementWitness)
+  (runtimeSeed : Option Nat) :
+  ({ witness with runtimeSeed := runtimeSeed }).shellBoundaryBundle? =
+    witness.shellBoundaryBundle? := by
+  cases witness <;> rfl
+
+@[simp] theorem runtimeRefinementWitness_kernelInterfaceBundle_runtimeSeed
+  (witness : RuntimeRefinementWitness)
+  (runtimeSeed : Option Nat) :
+  ({ witness with runtimeSeed := runtimeSeed }).kernelInterfaceBundle? =
+    witness.kernelInterfaceBundle? := by
+  cases witness <;> rfl
+
+@[simp] theorem runtimeProofGradeKernelInterfaceBundle_runtimeSeed_iff
+  (witness : RuntimeRefinementWitness)
+  (runtimeSeed : Option Nat) :
+  RuntimeProofGradeKernelInterfaceBundle { witness with runtimeSeed := runtimeSeed } ↔
+    RuntimeProofGradeKernelInterfaceBundle witness := by
+  unfold RuntimeProofGradeKernelInterfaceBundle
+  simp
+
 theorem runtimeKernelInterfaceBundle_toProofGradeKernelInterface
   {witness : RuntimeRefinementWitness}
   {bundle : RuntimeKernelInterfaceBundle}
@@ -1116,12 +1322,102 @@ theorem runtimeKernelInterfaceBundle_toProofGradeKernelInterface
       hFinalKernelScheduleState⟩
   exact runtimeShellBoundaryBundle_proofGradeRefines hShellValid
 
+theorem runtimeKernelInterfaceBundle_toShellBoundaryBundle
+  {witness : RuntimeRefinementWitness}
+  {bundle : RuntimeKernelInterfaceBundle}
+  (hBundle : witness.kernelInterfaceBundle? = some bundle)
+  (hValid : bundle.Valid) :
+  ∃ shellBoundaryBundle,
+    witness.shellBoundaryBundle? = some shellBoundaryBundle ∧
+      shellBoundaryBundle.Valid := by
+  exact ⟨bundle.shellBoundaryBundle,
+    (runtimeRefinementWitness_kernelInterfaceBundle_exact hBundle).1,
+    hValid.1⟩
+
 theorem runtimeProofGradeKernelInterfaceBundle_toProofGradeKernelInterface
   {witness : RuntimeRefinementWitness}
   (hBundle : RuntimeProofGradeKernelInterfaceBundle witness) :
   RuntimeProofGradeKernelInterface witness := by
   rcases hBundle with ⟨bundle, hExact, hValid⟩
   exact runtimeKernelInterfaceBundle_toProofGradeKernelInterface hExact hValid
+
+theorem runtimeProofGradeKernelInterfaceBundle_toShellBoundaryBundle
+  {witness : RuntimeRefinementWitness}
+  (hBundle : RuntimeProofGradeKernelInterfaceBundle witness) :
+  ∃ shellBoundaryBundle,
+    witness.shellBoundaryBundle? = some shellBoundaryBundle ∧
+      shellBoundaryBundle.Valid := by
+  rcases hBundle with ⟨bundle, hExact, hValid⟩
+  exact runtimeKernelInterfaceBundle_toShellBoundaryBundle hExact hValid
+
+noncomputable def RuntimeProofGradeKernelInterfaceBundle.confinementBoundary
+  {witness : RuntimeRefinementWitness}
+  (hBundle : RuntimeProofGradeKernelInterfaceBundle witness) :
+  RuntimeKernelConfinementBoundary := by
+  let bundle := Classical.choose hBundle
+  let hBundleSpec := Classical.choose_spec hBundle
+  exact bundle.confinementBoundary hBundleSpec.2
+
+theorem runtimeProofGradeKernelInterface_toShellBoundaryBundle
+  {witness : RuntimeRefinementWitness}
+  (hInterface : RuntimeProofGradeKernelInterface witness) :
+  ∃ shellBoundaryBundle,
+    witness.shellBoundaryBundle? = some shellBoundaryBundle ∧
+      shellBoundaryBundle.Valid := by
+  rcases hInterface with
+    ⟨shellBoundaryBundle, _expectedKernelSteps, _expectedPublicObjectIds,
+      _expectedKernelSchedule, hBundle, hValid, _hShellProofGradeRefinement,
+      _hKernelStateRefinement, _hExpectedKernelSteps, _hKernelSteps,
+      _hExpectedPublicObjectIds, _hPublicObjectIds, _hResourceState,
+      _hExpectedKernelSchedule, _hEmittedKernelSchedule, _hFinalKernelScheduleState⟩
+  exact ⟨shellBoundaryBundle, hBundle, hValid⟩
+
+theorem runtimeProofGradeKernelInterface_toKernelBoundaryFacts
+  {witness : RuntimeRefinementWitness}
+  (hInterface : RuntimeProofGradeKernelInterface witness) :
+  RuntimeProofGradeKernelBoundaryFacts witness := by
+  rcases hInterface with
+    ⟨shellBoundaryBundle, expectedKernelSteps, expectedPublicObjectIds, expectedKernelSchedule,
+      hBundle, hBundleValid, _hShellProofGradeRefinement, hKernelStateRefinement,
+      hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds, hPublicObjectIds,
+      hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
+      hFinalKernelScheduleState⟩
+  have hBundleExact := runtimeRefinementWitness_shellBoundaryBundle_exact hBundle
+  rcases hKernelStateRefinement with
+    ⟨expectedKernelScheduleFromRefinement, _hKernelProofGrade, _hRefinementValid,
+      _hResourceStateFromRefinement, hExpectedKernelScheduleFromRefinement,
+      _hEmittedKernelScheduleFromRefinement, _hFinalKernelScheduleStateFromRefinement,
+      hProjectedKernelSchedule, hPreCommittedColdObjectSchedule,
+      hPostCommittedColdObjectSchedule, _hShadowLoadObjectSchedule,
+      _hCommitObjectSchedule, _hColdStoreObjectSchedule⟩
+  have hExpectedKernelScheduleEq :
+      some expectedKernelScheduleFromRefinement = some expectedKernelSchedule := by
+    calc
+      some expectedKernelScheduleFromRefinement =
+          shellBoundaryBundle.kernelWitness.expectedKernelSchedule? := by
+            symm
+            exact hExpectedKernelScheduleFromRefinement
+      _ = some expectedKernelSchedule := hExpectedKernelSchedule
+  have hExpectedKernelScheduleEq' :
+      expectedKernelScheduleFromRefinement = expectedKernelSchedule := by
+    exact Option.some.inj hExpectedKernelScheduleEq
+  subst expectedKernelScheduleFromRefinement
+  exact
+    ⟨shellBoundaryBundle.kernelWitness, shellBoundaryBundle.runtimeKernelRefinementWitness,
+      expectedKernelSteps, expectedPublicObjectIds, expectedKernelSchedule,
+      hBundleExact.1, hBundleExact.2.1, hExpectedKernelSteps, hKernelSteps,
+      hExpectedPublicObjectIds, hPublicObjectIds, hResourceState,
+      hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState,
+      hProjectedKernelSchedule, hPreCommittedColdObjectSchedule,
+      hPostCommittedColdObjectSchedule,
+      runtimeShellBoundaryBundle_witness_proofGradeRefines hBundleValid⟩
+
+theorem runtimeProofGradeKernelInterfaceBundle_toKernelBoundaryFacts
+  {witness : RuntimeRefinementWitness}
+  (hBundle : RuntimeProofGradeKernelInterfaceBundle witness) :
+  RuntimeProofGradeKernelBoundaryFacts witness := by
+  exact runtimeProofGradeKernelInterface_toKernelBoundaryFacts
+    (runtimeProofGradeKernelInterfaceBundle_toProofGradeKernelInterface hBundle)
 
 theorem runtimeWitness_proofGradeKernelBoundaryFacts
   (witness : RuntimeRefinementWitness)

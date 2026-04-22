@@ -349,6 +349,65 @@ def checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
         importedRuntimeKernelInterfaceBundle_checkValid_eq_true_iff,
         decide_eq_true_eq, and_assoc]
 
+theorem importedWitness_toRuntimeWitness_proofGradeConfidentialCoreKernelInterfaceSlotAssurance
+  (runtimeWitness : ImportedRuntimeRefinementWitness)
+  (program : ImportedConfidentialKernelSlotProgram)
+  (modelTags : SGXModelTags)
+  (hAssured :
+    ImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
+      runtimeWitness program modelTags) :
+  RuntimeConfidentialCoreKernelInterfaceSlotAssurance
+    runtimeWitness.toRuntimeWitness
+    program.toConfidentialKernelSlotProgram
+    modelTags := by
+  rcases hAssured with
+    ⟨hRuntimeValid, hRuntimeNormalForm, kernelInterfaceBundle, hBundle, hBundleValid,
+      hExpectedSteps, hKernelSteps⟩
+  have hRuntimeProofGrade :
+      runtimeWitness.toRuntimeWitness.ProofGradeValid modelTags := by
+    exact
+      importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
+        runtimeWitness modelTags hRuntimeValid
+  have hRuntimeBundle :
+      runtimeWitness.toRuntimeWitness.kernelInterfaceBundle? =
+          some kernelInterfaceBundle.toRuntimeKernelInterfaceBundle ∧
+        kernelInterfaceBundle.toRuntimeKernelInterfaceBundle.Valid := by
+    exact
+      importedRuntimeKernelInterfaceBundle_projects_toRuntime
+        hBundle
+        hBundleValid
+  have hExpectedStepsRuntime :
+      kernelInterfaceBundle.toRuntimeKernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+        some program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
+    simpa
+      [ ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle
+      , ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle
+      , ImportedRuntimeKernelWitness.toRuntimeKernelWitness
+      , importedConfidentialKernelSlotProgram_expectedRuntimeKernelSteps_toRuntime program
+      ] using
+      congrArg (Option.map (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep))
+        hExpectedSteps
+  have hKernelStepsRuntime :
+      kernelInterfaceBundle.toRuntimeKernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+        program.toConfidentialKernelSlotProgram.expectedRuntimeKernelSteps := by
+    simpa
+      [ ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle
+      , ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle
+      , ImportedRuntimeKernelWitness.toRuntimeKernelWitness
+      , importedConfidentialKernelSlotProgram_expectedRuntimeKernelSteps_toRuntime program
+      ] using
+      congrArg (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep)
+        hKernelSteps
+  exact
+    ⟨ hRuntimeProofGrade
+    , hRuntimeNormalForm
+    , kernelInterfaceBundle.toRuntimeKernelInterfaceBundle
+    , hRuntimeBundle.1
+    , hRuntimeBundle.2
+    , hExpectedStepsRuntime
+    , hKernelStepsRuntime
+    ⟩
+
 def importedRuntimeConfidentialCoreSlotBundleFieldNames : List String :=
   ["runtime_witness", "confidential_slot_program"]
 

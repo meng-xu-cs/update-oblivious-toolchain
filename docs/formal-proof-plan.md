@@ -7,11 +7,12 @@ from the current mechanized boundary.
 The goal is not to overclaim. The current repository can realistically target a
 mechanized proof for the instrumented abstract machine used by this workspace,
 and it has already frozen the hostile-host `View_SGX` observer that the final
-deployment theorem must use. What it still lacks is the refinement and
-confinement work needed to justify that final theorem from the real Rust
-implementation. It cannot honestly target a universal theorem over all
+deployment theorem must use. The repository now also exposes and
+benchmark-checks an explicit runtime-kernel refinement/confinement boundary
+over emitted runtime proof objects. It still cannot honestly target a universal theorem over all
 downstream Rust machine code, host runtime effects, or microarchitectural
-observers without that additional refinement work.
+observers; the remaining work is source-to-kernel compiler correctness,
+backend-assumption discharge, and the final malicious-host deployment theorem.
 
 ## 0. Frozen Final Theorem Target
 
@@ -36,8 +37,6 @@ The repository has already frozen:
 The repository has not yet closed:
 
 - source-to-kernel compiler correctness
-- runtime-kernel refinement for the real Rust implementation
-- secret confinement outside the kernel
 - full discharge of the concrete backend assumption bundle
 - the final malicious-host deployment theorem for the real runtime
 
@@ -732,13 +731,16 @@ Remaining change:
 - keep the trusted boundary explicitly at that small certificate-producing
   kernel rather than at the whole trace bundle
 - the remaining trusted runtime/kernel gap is now explicit in Lean as
-  `PaperMainRuntimeKernelAssumptions`, which projects to the checked
-  `PaperMainRuntimeKernelBoundary` at the frozen paper route, now phrased over
-  the explicit runtime kernel-interface bundle; the next proof step is to
-  discharge that bundle rather than describe it informally
+  the checked `PaperMainRuntimeKernelBoundary` at the frozen paper route, now
+  phrased over the explicit runtime kernel-interface bundle; the stronger
+  witness-acceptance wrapper `PaperMainRuntimeKernelAssumptions` remains
+  available below that route to discharge the same boundary mechanically when
+  proof-grade seeded runtime bundles are already in hand. The next proof step
+  is to discharge that checked boundary for the real runtime rather than
+  describe it informally
 - Lean now also has a stronger wrapper,
   `ProofGradeSeededRuntimePaperMainBundle`, that discharges
-  `PaperMainRuntimeKernelAssumptions` mechanically when the seeded paper-main
+  the paper-route runtime boundary mechanically when the seeded paper-main
   witness family already carries proof-grade acceptance, shrinking the purely
   external part of the runtime assumption story
 - the seeded witness-family artifact route now also has an explicit

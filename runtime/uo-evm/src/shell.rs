@@ -1,14 +1,13 @@
 use crate::controller::CallRecorder;
 use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::state::{ContractRuntime, PublicRuntimeShadowState};
-use crate::runtime::RuntimeCallOutcome;
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::manifest::EntrypointManifest;
-use uo_core::Value;
+use uo_core::{RuntimeCallOutcome, Value};
 
 #[derive(Clone, Debug)]
 struct PublicExecutionOutcome {
@@ -40,8 +39,8 @@ pub(in crate::runtime) fn run_public_entrypoint(
         .ok_or_else(|| anyhow!("unknown public entrypoint: {entrypoint}"))?;
     let allocator = AllocatorPlan::from_manifest(manifest_entry);
     let public_object_ids = runtime.public_object_ids();
-    let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.clone())?;
-    let mut shadow = runtime.prepare_public_shadow(&mut kernel, &public_object_ids)?;
+    let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.as_ref())?;
+    let mut shadow = runtime.prepare_public_shadow(&mut kernel, public_object_ids.as_ref())?;
     let execution = interpret_public_entrypoint(
         contract,
         function,
@@ -51,19 +50,17 @@ pub(in crate::runtime) fn run_public_entrypoint(
         &mut kernel,
     )?;
     runtime.commit_public_shadow(&mut kernel, &mut shadow, execution.aborted, recorder)?;
-    let (runtime_kernel_witness, runtime_kernel_refinement_witness) =
-        kernel.finish(&function.signature)?;
+    let runtime_kernel_finish_bundle = kernel.finish(&function.signature)?;
     runtime.replace_with_cold_public_shadow(shadow);
     runtime.ensure_cold_call_boundary(
         &public_object_ids,
         "after completing the call and returning to committed storage",
     )?;
     Ok(RuntimeCallOutcome::from_runtime_execution(
-        runtime_kernel_witness,
-        runtime_kernel_refinement_witness,
+        runtime_kernel_finish_bundle,
         execution.aborted,
         execution.return_value,
-        execution.opcode_trace,
+        execution.opcode_trace.into_boxed_slice(),
     ))
 }
 

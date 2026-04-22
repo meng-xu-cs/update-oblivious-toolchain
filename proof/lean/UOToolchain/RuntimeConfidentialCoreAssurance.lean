@@ -139,6 +139,178 @@ theorem runtimeConfidentialCoreKernelInterfaceSlotAssurance_of_slotAssurance
     ⟨hRuntimeValid, hRuntimeNormalForm, kernelInterfaceBundle, hBundle, hBundleValid,
       hExpectedSteps, hKernelSteps⟩
 
+/--
+Witness-free shared slot-kernel interface boundary: one valid explicit
+runtime-kernel interface bundle together with the fixed confidential slot
+program whose expected/emitted steps match that bundle exactly. This is the
+small common theorem object where the witness-facing route, the smaller
+finish-boundary route, and the paper-facing shared-slot route can all meet.
+-/
+structure RuntimeKernelInterfaceSlotBoundary where
+  kernelInterfaceBundle : RuntimeKernelInterfaceBundle
+  confidentialSlotProgram : ConfidentialKernelSlotProgram
+  kernelInterfaceValid : kernelInterfaceBundle.Valid
+  expectedKernelStepsExact :
+    kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+      some confidentialSlotProgram.expectedRuntimeKernelSteps
+  emittedKernelStepsExact :
+    kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+      confidentialSlotProgram.expectedRuntimeKernelSteps
+
+noncomputable def RuntimeKernelInterfaceSlotBoundary.refinementBoundary
+  (boundary : RuntimeKernelInterfaceSlotBoundary) : RuntimeKernelRefinementBoundary :=
+  boundary.kernelInterfaceBundle.refinementBoundary boundary.kernelInterfaceValid
+
+theorem RuntimeKernelInterfaceSlotBoundary.toRefinesLeanKernelState
+  (boundary : RuntimeKernelInterfaceSlotBoundary) :
+  boundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    boundary.refinementBoundary.kernelWitness := by
+  simpa [RuntimeKernelInterfaceSlotBoundary.refinementBoundary] using
+    (runtimeKernelInterfaceBundle_valid_projects_to_runtimeKernelRefinementBoundary
+      boundary.kernelInterfaceValid)
+
+theorem RuntimeKernelInterfaceSlotBoundary.shellBoundaryBundle_valid
+  (boundary : RuntimeKernelInterfaceSlotBoundary) :
+  boundary.kernelInterfaceBundle.shellBoundaryBundle.Valid := by
+  exact boundary.kernelInterfaceValid.1
+
+noncomputable def RuntimeKernelInterfaceSlotBoundary.confinementBoundary
+  (boundary : RuntimeKernelInterfaceSlotBoundary) : RuntimeKernelConfinementBoundary :=
+  boundary.kernelInterfaceBundle.confinementBoundary boundary.kernelInterfaceValid
+
+theorem RuntimeKernelInterfaceSlotBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeKernelInterfaceSlotBoundary) :
+  boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.confinementBoundary.refinementBoundary.kernelWitness ∧
+    boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  simpa [RuntimeKernelInterfaceSlotBoundary.confinementBoundary] using
+    (runtimeKernelInterfaceBundle_valid_projects_to_runtimeKernelConfinementBoundary
+      boundary.kernelInterfaceValid)
+
+noncomputable def runtimeConfidentialCoreKernelInterfaceSlotAssurance_projects_to_runtimeKernelInterfaceSlotBoundary
+  (runtimeWitness : RuntimeRefinementWitness)
+  (program : ConfidentialKernelSlotProgram)
+  (modelTags : SGXModelTags)
+  (hAssured :
+    RuntimeConfidentialCoreKernelInterfaceSlotAssurance
+      runtimeWitness
+      program
+      modelTags) :
+  RuntimeKernelInterfaceSlotBoundary := by
+  let hBundleExists :
+      ∃ kernelInterfaceBundle,
+        runtimeWitness.kernelInterfaceBundle? = some kernelInterfaceBundle ∧
+          kernelInterfaceBundle.Valid ∧
+          kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+            some program.expectedRuntimeKernelSteps ∧
+          kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+            program.expectedRuntimeKernelSteps := hAssured.2.2
+  let kernelInterfaceBundle := Classical.choose hBundleExists
+  have hBundleSpec := Classical.choose_spec hBundleExists
+  exact
+    { kernelInterfaceBundle := kernelInterfaceBundle
+    , confidentialSlotProgram := program
+    , kernelInterfaceValid := hBundleSpec.2.1
+    , expectedKernelStepsExact := hBundleSpec.2.2.1
+    , emittedKernelStepsExact := hBundleSpec.2.2.2
+    }
+
+/--
+Kernel-local theorem object for the stronger pre-witness runtime boundary:
+one exact finished Lean kernel-refinement boundary together with the fixed slot
+program that the concrete runtime is supposed to execute.
+-/
+structure RuntimeKernelFinishSlotBoundary where
+  runtimeKernelBoundary : RuntimeKernelRefinementBoundary
+  confidentialSlotProgram : ConfidentialKernelSlotProgram
+  runtimeNormalForm : confidentialSlotProgram.RuntimeNormalForm
+  expectedKernelStepsExact :
+    runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+      some confidentialSlotProgram.expectedRuntimeKernelSteps
+  emittedKernelStepsExact :
+    runtimeKernelBoundary.kernelWitness.kernelSteps =
+      confidentialSlotProgram.expectedRuntimeKernelSteps
+
+theorem RuntimeKernelFinishSlotBoundary.toRefinesLeanKernelState
+  (boundary : RuntimeKernelFinishSlotBoundary) :
+  boundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    boundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelRefinementBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelBoundary
+
+noncomputable def RuntimeKernelFinishSlotBoundary.kernelInterfaceBundle
+  (boundary : RuntimeKernelFinishSlotBoundary) : RuntimeKernelInterfaceBundle :=
+  let expectedPublicObjectIds :=
+    Classical.choose
+      (runtimeKernelWitness_proofGradePublicObjectUniverse_exact
+        boundary.runtimeKernelBoundary.kernelWitnessProofGrade)
+  { shellBoundaryBundle :=
+      { kernelWitness := boundary.runtimeKernelBoundary.kernelWitness
+      , runtimeKernelRefinementWitness :=
+          boundary.runtimeKernelBoundary.runtimeKernelRefinementWitness
+      , shellContract := boundary.runtimeKernelBoundary.kernelWitness.shellContract
+      , shellTrace := boundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.shellTrace
+      }
+  , expectedKernelSteps := boundary.confidentialSlotProgram.expectedRuntimeKernelSteps
+  , expectedPublicObjectIds := expectedPublicObjectIds
+  , expectedKernelSchedule := boundary.runtimeKernelBoundary.expectedKernelSchedule
+  }
+
+theorem RuntimeKernelFinishSlotBoundary.kernelInterfaceBundle_valid
+  (boundary : RuntimeKernelFinishSlotBoundary) :
+  boundary.kernelInterfaceBundle.Valid := by
+  let hPublicExact :=
+    Classical.choose_spec
+      (runtimeKernelWitness_proofGradePublicObjectUniverse_exact
+        boundary.runtimeKernelBoundary.kernelWitnessProofGrade)
+  refine
+    ⟨?_, boundary.toRefinesLeanKernelState, boundary.expectedKernelStepsExact,
+      boundary.emittedKernelStepsExact, ?_, ?_,
+      boundary.runtimeKernelBoundary.resourceStateExact,
+      boundary.runtimeKernelBoundary.expectedKernelScheduleExact,
+      boundary.runtimeKernelBoundary.emittedKernelScheduleExact,
+      boundary.runtimeKernelBoundary.finalKernelScheduleStateExact⟩
+  · refine ⟨boundary.runtimeKernelBoundary.kernelWitnessProofGrade,
+      boundary.runtimeKernelBoundary.refinementValid, rfl, rfl, ?_⟩
+    exact runtimeKernelRefinementWitness_valid_proofGradeRefinesShellContract
+      boundary.runtimeKernelBoundary.refinementValid
+  · exact hPublicExact.1
+  · exact hPublicExact.2
+
+theorem RuntimeKernelFinishSlotBoundary.shellBoundaryBundle_valid
+  (boundary : RuntimeKernelFinishSlotBoundary) :
+  boundary.kernelInterfaceBundle.shellBoundaryBundle.Valid := by
+  exact boundary.kernelInterfaceBundle_valid.1
+
+noncomputable def RuntimeKernelFinishSlotBoundary.confinementBoundary
+  (boundary : RuntimeKernelFinishSlotBoundary) : RuntimeKernelConfinementBoundary :=
+  boundary.kernelInterfaceBundle.confinementBoundary
+    boundary.kernelInterfaceBundle_valid
+
+theorem RuntimeKernelFinishSlotBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeKernelFinishSlotBoundary) :
+  boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.confinementBoundary.refinementBoundary.kernelWitness ∧
+    boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    runtimeKernelInterfaceBundle_valid_projects_to_runtimeKernelConfinementBoundary
+      boundary.kernelInterfaceBundle_valid
+
+noncomputable def RuntimeKernelFinishSlotBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeKernelFinishSlotBoundary) : RuntimeKernelInterfaceSlotBoundary :=
+  { kernelInterfaceBundle := boundary.kernelInterfaceBundle
+  , confidentialSlotProgram := boundary.confidentialSlotProgram
+  , kernelInterfaceValid := boundary.kernelInterfaceBundle_valid
+  , expectedKernelStepsExact := by
+      simpa [RuntimeKernelFinishSlotBoundary.kernelInterfaceBundle] using
+        boundary.expectedKernelStepsExact
+  , emittedKernelStepsExact := by
+      simpa [RuntimeKernelFinishSlotBoundary.kernelInterfaceBundle] using
+        boundary.emittedKernelStepsExact
+  }
+
 theorem runtimeConfidentialCoreAssurance_slotAssurance_of_lowering
   (runtimeWitness : RuntimeRefinementWitness)
   (program : ConfidentialKernelProgram)
@@ -566,5 +738,157 @@ theorem runtimeConfidentialCoreKernelInterfaceSlotBundle_proofGradeAssurance
     exact hRuntimeKernel.symm.trans hShellExact.1
   subst hKernelEq
   exact ⟨hBundleExact, hInterfaceValid, hRuntimeExpected, hRuntimeSteps⟩
+
+/--
+Exact native midpoint where the stronger runtime-witness/kernel-interface/slot
+bundle is collapsed back down to the smaller finish-slot theorem object. This
+lets the larger witness-facing route and the smaller pre-witness finish route
+meet on one shared exact boundary rather than only agreeing indirectly on
+schedule facts.
+-/
+noncomputable def RuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelFinishSlotBoundary
+  {bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) : RuntimeKernelFinishSlotBoundary := by
+  classical
+  have hProofGrade :=
+    runtimeConfidentialCoreKernelInterfaceSlotBundle_proofGradeAssurance
+      bundle
+      modelTags
+      hValid
+  rcases hValid with ⟨hCoreValid, hInterfaceValid, _hBundleExact⟩
+  rcases hInterfaceValid with
+    ⟨hShellValid, hKernelStateRefinement, _hExpectedKernelSteps, _hKernelSteps,
+      _hExpectedPublicObjectIds, _hPublicObjectIds, hResourceState,
+      hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
+  rcases hShellValid with
+    ⟨hKernelWitnessProofGrade, hRefinementValid, _hShellContractExact, _hShellTraceExact,
+      _hShellProofGrade⟩
+  let expectedKernelSchedule := Classical.choose hKernelStateRefinement
+  have hKernelStateRefinementSpec := Classical.choose_spec hKernelStateRefinement
+  rcases hKernelStateRefinementSpec with
+    ⟨_hKernelWitnessProofGradeFromRefinement, _hRefinementValidFromRefinement,
+      _hResourceStateFromRefinement, hExpectedKernelScheduleFromRefinement,
+      _hEmittedKernelScheduleFromRefinement, _hFinalKernelScheduleStateFromRefinement,
+      hProjectedKernelSchedule, hPreCommittedColdObjectSchedule,
+      hPostCommittedColdObjectSchedule, hShadowLoadObjectSchedule,
+      hCommitObjectSchedule, hColdStoreObjectSchedule⟩
+  have hExpectedKernelScheduleEq :
+      expectedKernelSchedule = bundle.kernelInterfaceBundle.expectedKernelSchedule := by
+    apply Option.some.inj
+    calc
+      some expectedKernelSchedule =
+          bundle.kernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSchedule? := by
+            simpa using hExpectedKernelScheduleFromRefinement.symm
+      _ = some bundle.kernelInterfaceBundle.expectedKernelSchedule := hExpectedKernelSchedule
+  subst expectedKernelSchedule
+  exact
+    { runtimeKernelBoundary :=
+        { kernelWitness := bundle.kernelInterfaceBundle.shellBoundaryBundle.kernelWitness
+        , runtimeKernelRefinementWitness :=
+            bundle.kernelInterfaceBundle.shellBoundaryBundle.runtimeKernelRefinementWitness
+        , expectedKernelSchedule := bundle.kernelInterfaceBundle.expectedKernelSchedule
+        , kernelWitnessProofGrade := hKernelWitnessProofGrade
+        , refinementValid := hRefinementValid
+        , resourceStateExact := hResourceState
+        , expectedKernelScheduleExact := hExpectedKernelSchedule
+        , emittedKernelScheduleExact := hEmittedKernelSchedule
+        , finalKernelScheduleStateExact := hFinalKernelScheduleState
+        , projectedKernelScheduleExact := hProjectedKernelSchedule
+        , preCommittedColdObjectScheduleExact := hPreCommittedColdObjectSchedule
+        , postCommittedColdObjectScheduleExact := hPostCommittedColdObjectSchedule
+        , shadowLoadObjectScheduleExact := hShadowLoadObjectSchedule
+        , commitObjectScheduleExact := hCommitObjectSchedule
+        , coldStoreObjectScheduleExact := hColdStoreObjectSchedule
+        }
+    , confidentialSlotProgram := bundle.confidentialSlotProgram
+    , runtimeNormalForm := hCoreValid.2.1
+    , expectedKernelStepsExact := hProofGrade.2.2.1
+    , emittedKernelStepsExact := hProofGrade.2.2.2
+    }
+
+theorem
+  RuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelFinishSlotBoundary_refinesLeanKernelState
+  {bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.runtimeKernelFinishSlotBoundary hValid
+  boundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    boundary.runtimeKernelBoundary.kernelWitness := by
+  intro boundary
+  exact RuntimeKernelFinishSlotBoundary.toRefinesLeanKernelState boundary
+
+theorem
+  RuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelFinishSlotBoundary_kernelInterfaceBundle_valid
+  {bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.runtimeKernelFinishSlotBoundary hValid
+  ∃ runtimeKernelInterfaceBundle : RuntimeKernelInterfaceBundle,
+    runtimeKernelInterfaceBundle.Valid ∧
+      runtimeKernelInterfaceBundle.expectedKernelSteps =
+        boundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      runtimeKernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+        some boundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      runtimeKernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+        boundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  intro boundary
+  refine
+    ⟨boundary.kernelInterfaceBundle, boundary.kernelInterfaceBundle_valid, ?_, ?_, ?_⟩
+  · simp [RuntimeKernelFinishSlotBoundary.kernelInterfaceBundle]
+  · simpa [RuntimeKernelFinishSlotBoundary.kernelInterfaceBundle] using
+      boundary.expectedKernelStepsExact
+  · simpa [RuntimeKernelFinishSlotBoundary.kernelInterfaceBundle] using
+      boundary.emittedKernelStepsExact
+
+theorem
+  RuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelFinishSlotBoundary_projects_to_runtimeKernelConfinementBoundary
+  {bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.runtimeKernelFinishSlotBoundary hValid
+  boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.confinementBoundary.refinementBoundary.kernelWitness ∧
+    boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  intro boundary
+  exact RuntimeKernelFinishSlotBoundary.projects_to_runtimeKernelConfinementBoundary boundary
+
+noncomputable def RuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelInterfaceSlotBoundary
+  {bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) : RuntimeKernelInterfaceSlotBoundary := by
+  have hAssurance :
+      RuntimeConfidentialCoreKernelInterfaceSlotAssurance
+        bundle.runtimeWitness
+        bundle.confidentialSlotProgram
+        modelTags := by
+    rcases
+        runtimeConfidentialCoreKernelInterfaceSlotBundle_proofGradeAssurance
+          bundle
+          modelTags
+          hValid with
+      ⟨hBundle, hBundleValid, hExpectedSteps, hKernelSteps⟩
+    exact ⟨hValid.1.1, hValid.1.2.1, bundle.kernelInterfaceBundle, hBundle, hBundleValid,
+      hExpectedSteps, hKernelSteps⟩
+  exact
+    runtimeConfidentialCoreKernelInterfaceSlotAssurance_projects_to_runtimeKernelInterfaceSlotBoundary
+      bundle.runtimeWitness
+      bundle.confidentialSlotProgram
+      modelTags
+      hAssurance
+
+theorem
+  RuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelInterfaceSlotBoundary_projects_to_runtimeKernelConfinementBoundary
+  {bundle : RuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.runtimeKernelInterfaceSlotBoundary hValid
+  boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.confinementBoundary.refinementBoundary.kernelWitness ∧
+    boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  intro boundary
+  exact RuntimeKernelInterfaceSlotBoundary.projects_to_runtimeKernelConfinementBoundary boundary
 
 end UOToolchain

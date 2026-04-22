@@ -24,7 +24,7 @@ pub enum RuntimeTrustedKernelSlotBundleError {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeTrustedKernelSlotBundle {
     trusted_kernel_bundle: RuntimeTrustedKernelBundle,
     confidential_slot_program: ConfidentialKernelSlotProgram,

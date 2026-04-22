@@ -1,4 +1,5 @@
 import Lean.Data.Json
+import UOToolchain.PaperPathOramTheoremRoute
 import UOToolchain.RuntimeConfidentialCoreAssuranceJson
 import UOToolchain.RuntimeShellBoundaryJson
 
@@ -214,6 +215,133 @@ theorem importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_proofGradeAssur
   subst hKernelEq
   exact ⟨hBundleExact, hInterfaceValid, hRuntimeExpected, hRuntimeSteps⟩
 
+theorem importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_singletonRuntimeKernelSlotBoundaryAt
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  PaperMainRuntimeKernelSlotBoundaryAt
+    (bundle.runtime_witness.toRuntimeWitness.toSingletonSeededRuntimePathOramWitnessFamily
+      (importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
+        bundle.runtime_witness
+        modelTags
+        hValid.1.1).1)
+    bundle.confidential_slot_program.toConfidentialKernelSlotProgram := by
+  exact
+    runtimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_singletonRuntimeKernelSlotBoundaryAt
+      (importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_toRuntimeValid
+        bundle
+        modelTags
+        hValid)
+
+theorem importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_singletonRuntimeKernelBoundaryAt
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  PaperMainRuntimeKernelBoundaryAt
+    (bundle.runtime_witness.toRuntimeWitness.toSingletonSeededRuntimePathOramWitnessFamily
+      (importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
+        bundle.runtime_witness
+        modelTags
+        hValid.1.1).1) := by
+  exact
+    PaperMainRuntimeKernelSlotBoundaryAt.toRuntimeKernelBoundaryAt
+      (importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_singletonRuntimeKernelSlotBoundaryAt
+        hValid)
+
+noncomputable def
+  ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle.toRuntimeKernelInterfaceSlotBoundary
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) : RuntimeKernelInterfaceSlotBoundary :=
+  bundle.toRuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelInterfaceSlotBoundary
+    (importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_toRuntimeValid
+      bundle
+      modelTags
+      hValid)
+
+noncomputable def
+  ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle.toRuntimeKernelFinishSlotBoundary
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) : RuntimeKernelFinishSlotBoundary :=
+  bundle.toRuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelFinishSlotBoundary
+    (importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_toRuntimeValid
+      bundle
+      modelTags
+      hValid)
+
+theorem
+  importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_runtimeKernelFinishSlotBoundary
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.toRuntimeKernelFinishSlotBoundary hValid
+  boundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    boundary.runtimeKernelBoundary.kernelWitness := by
+  intro boundary
+  exact RuntimeKernelFinishSlotBoundary.toRefinesLeanKernelState boundary
+
+theorem
+  importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_runtimeKernelInterfaceBundle
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.toRuntimeKernelFinishSlotBoundary hValid
+  ∃ runtimeKernelInterfaceBundle : RuntimeKernelInterfaceBundle,
+    runtimeKernelInterfaceBundle.Valid ∧
+      runtimeKernelInterfaceBundle.expectedKernelSteps =
+        boundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      runtimeKernelInterfaceBundle.shellBoundaryBundle.kernelWitness.expectedKernelSteps =
+        some boundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      runtimeKernelInterfaceBundle.shellBoundaryBundle.kernelWitness.kernelSteps =
+        boundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  intro boundary
+  exact
+    RuntimeConfidentialCoreKernelInterfaceSlotBundle.runtimeKernelFinishSlotBoundary_kernelInterfaceBundle_valid
+      (bundle :=
+        bundle.toRuntimeConfidentialCoreKernelInterfaceSlotBundle)
+      (modelTags := modelTags)
+      (importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_toRuntimeValid
+        bundle
+        modelTags
+        hValid)
+
+theorem
+  importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_runtimeShellBoundaryBundle
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.toRuntimeKernelFinishSlotBoundary hValid
+  boundary.kernelInterfaceBundle.shellBoundaryBundle.Valid := by
+  intro boundary
+  exact RuntimeKernelFinishSlotBoundary.shellBoundaryBundle_valid boundary
+
+theorem
+  importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_runtimeKernelConfinementBoundary
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.toRuntimeKernelFinishSlotBoundary hValid
+  boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.confinementBoundary.refinementBoundary.kernelWitness ∧
+    boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  intro boundary
+  exact RuntimeKernelFinishSlotBoundary.projects_to_runtimeKernelConfinementBoundary boundary
+
+theorem
+  importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_valid_projects_to_runtimeKernelInterfaceSlotBoundary
+  {bundle : ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle}
+  {modelTags : SGXModelTags}
+  (hValid : bundle.Valid modelTags) :
+  let boundary := bundle.toRuntimeKernelInterfaceSlotBoundary hValid
+  boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.confinementBoundary.refinementBoundary.kernelWitness ∧
+    boundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  intro boundary
+  exact RuntimeKernelInterfaceSlotBoundary.projects_to_runtimeKernelConfinementBoundary boundary
+
 def parseImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle
   (input : String) : Except String ImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle := do
   let json ← Lean.Json.parse input
@@ -256,5 +384,26 @@ def loadAndCheckImportedProofGradeRuntimeConfidentialCoreKernelInterfaceSlotBund
   let bundle ←
     loadAndCheckImportedProofGradeRuntimeConfidentialCoreKernelInterfaceSlotBundle path modelTags
   pure bundle.toRuntimeConfidentialCoreKernelInterfaceSlotBundle
+
+noncomputable def
+  loadAndCheckImportedProofGradeRuntimeConfidentialCoreKernelInterfaceSlotBundleToRuntimeBoundary
+  (path : System.FilePath)
+  (modelTags : SGXModelTags) : IO RuntimeKernelFinishSlotBoundary := do
+  let input ← IO.FS.readFile path
+  match parseImportedRuntimeConfidentialCoreKernelInterfaceSlotBundle input with
+  | .error err =>
+      throw <| IO.userError
+        s!"failed to parse runtime confidential-core kernel-interface slot bundle: {err}"
+  | .ok bundle =>
+      if hCheck : bundle.checkValid modelTags then
+        let hValid :
+            bundle.Valid modelTags :=
+          (importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_checkValid_eq_true_iff
+            bundle
+            modelTags).mp hCheck
+        pure <| bundle.toRuntimeKernelFinishSlotBoundary hValid
+      else
+        throw <| IO.userError
+          "failed to validate proof-grade runtime confidential-core kernel-interface slot bundle"
 
 end UOToolchain

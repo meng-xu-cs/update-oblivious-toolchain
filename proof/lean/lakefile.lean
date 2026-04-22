@@ -19,6 +19,22 @@ lean_exe checkProofGradeRuntimeKernelInterfaceBundle where
   root := `CheckProofGradeRuntimeKernelInterfaceBundle
 
 @[default_target]
+lean_exe checkProofGradeRuntimeKernelInterfaceConfinementBoundary where
+  root := `CheckProofGradeRuntimeKernelInterfaceConfinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelRefinementBoundary where
+  root := `CheckProofGradeRuntimeKernelRefinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelConfinementBoundary where
+  root := `CheckProofGradeRuntimeKernelConfinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelFinishBoundary where
+  root := `CheckProofGradeRuntimeKernelFinishBoundary
+
+@[default_target]
 lean_exe checkProofGradeRuntimeKernelInterfaceFamily where
   root := `CheckProofGradeRuntimeKernelInterfaceFamily
 
@@ -30,8 +46,16 @@ lean_exe checkProofGradeRuntimePaperMainFamilyBundle where
   root := `CheckProofGradeRuntimePaperMainFamilyBundle
 
 @[default_target]
+lean_exe checkProofGradeRuntimePaperMainFamilyBoundary where
+  root := `CheckProofGradeRuntimePaperMainFamilyBoundary
+
+@[default_target]
 lean_exe checkProofGradeRuntimePaperMainSlotFamilyBundle where
   root := `CheckProofGradeRuntimePaperMainSlotFamilyBundle
+
+@[default_target]
+lean_exe checkProofGradeRuntimePaperMainSlotBoundary where
+  root := `CheckProofGradeRuntimePaperMainSlotBoundary
 
 @[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCore where
@@ -46,8 +70,52 @@ lean_exe checkProofGradeRuntimeConfidentialCoreShellBoundarySlot where
   root := `CheckProofGradeRuntimeConfidentialCoreShellBoundarySlot
 
 @[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCoreKernelFinishSlot where
+  root := `CheckProofGradeRuntimeConfidentialCoreKernelFinishSlot
+
+@[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot where
   root := `CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlot
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlotFinishBoundary where
+  root := `CheckProofGradeRuntimeConfidentialCoreKernelInterfaceSlotFinishBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelSlotBoundary where
+  root := `CheckProofGradeRuntimeKernelSlotBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamily where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamily
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamilySlotBoundary where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamilySlotBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamilyBoundary where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamilyBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamilyAssurance where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamilyAssurance
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamilySlotAssurance where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamilySlotAssurance
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamilyKernelInterface where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamilyKernelInterface
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamilyFinishSlotBoundary where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamilyFinishSlotBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialProofBundleFamilyRefinementBoundary where
+  root := `CheckProofGradeRuntimeConfidentialProofBundleFamilyRefinementBoundary
 
 @[default_target]
 lean_exe checkProofGradeRuntimeConfidentialCoreLowering where

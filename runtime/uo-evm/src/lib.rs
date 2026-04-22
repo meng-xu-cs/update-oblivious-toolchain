@@ -20,7 +20,8 @@ mod tests {
         ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, RefinementWitnessError,
         RuntimeConfidentialCoreKernelInterfaceSlotBundleError,
         RuntimeConfidentialCoreShellBoundaryLoweringBundleError,
-        RuntimeConfidentialCoreShellBoundarySlotBundleError, RuntimeKernelInterfaceBundleError,
+        RuntimeConfidentialCoreShellBoundarySlotBundleError,
+        RuntimeConfidentialProofBundleFamilyError, RuntimeKernelInterfaceBundleError,
         RuntimeKernelRefinementEventKindWitness, RuntimeKernelRefinementEventWitness,
         RuntimeKernelStepWitness, RuntimeShellBoundaryLoweringBundleError,
         RuntimeShellBoundarySlotBundleError, RuntimeTrustedKernelSlotBundleError,
@@ -618,12 +619,10 @@ mod tests {
             )
             .unwrap();
         let witness = result.trace.runtime_refinement_witness().unwrap();
+        let kernel_witness = result.trace.exact_runtime_kernel_witness().unwrap();
         assert_eq!(witness.public_outcome().gas_used, result.trace.gas_used);
         assert_eq!(witness.trace().gas_used, result.trace.gas_used);
-        assert_eq!(
-            witness.kernel_witness(),
-            result.trace.runtime_kernel_witness()
-        );
+        assert_eq!(witness.kernel_witness(), Some(&kernel_witness));
         assert_eq!(
             witness.boundary_schedule().len(),
             witness.controller_shape().boundary_event_budget
@@ -680,11 +679,11 @@ mod tests {
         let manifest_expected_kernel_steps = manifest_entry.kernel_step_witnesses();
         assert_eq!(
             witness.expected_kernel_steps(),
-            Some(manifest_expected_kernel_steps.as_slice())
+            Some(manifest_expected_kernel_steps.as_ref())
         );
         assert_eq!(
             witness.kernel_steps(),
-            manifest_expected_kernel_steps.as_slice()
+            manifest_expected_kernel_steps.as_ref()
         );
         let emitted_kernel_schedule = witness.emitted_kernel_schedule();
         assert_eq!(
@@ -738,6 +737,7 @@ mod tests {
             .trace
             .runtime_trusted_kernel_slot_bundle(&artifact)
             .unwrap();
+        let kernel_witness = result.trace.exact_runtime_kernel_witness().unwrap();
 
         assert_eq!(bundle.entrypoint_id(), "auth(bytes32)");
         assert!(bundle.program_matches_trusted_kernel_entrypoint());
@@ -747,12 +747,13 @@ mod tests {
         );
         assert_eq!(
             bundle.trusted_kernel_bundle().kernel_witness(),
-            result.trace.runtime_kernel_witness()
+            Some(&kernel_witness)
         );
         assert_eq!(
             bundle
                 .confidential_slot_program()
-                .expected_runtime_step_witnesses(),
+                .expected_runtime_step_witnesses()
+                .as_ref(),
             bundle
                 .trusted_kernel_bundle()
                 .kernel_witness()
@@ -920,19 +921,18 @@ mod tests {
                 vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
             )
             .unwrap();
-        let kernel_witness = result.trace.runtime_kernel_witness().cloned().unwrap();
+        let kernel_witness = result.trace.exact_runtime_kernel_witness().unwrap();
         let phase_witness = result
             .trace
-            .runtime_kernel_refinement_witness()
-            .cloned()
+            .exact_runtime_kernel_refinement_witness()
             .unwrap();
         assert_eq!(
             phase_witness.projected_kernel_schedule(),
             kernel_witness.emitted_kernel_schedule()
         );
-        assert_eq!(phase_witness.shadow_load_object_schedule(), vec![1]);
-        assert_eq!(phase_witness.commit_object_schedule(), vec![1]);
-        assert_eq!(phase_witness.cold_store_object_schedule(), vec![1]);
+        assert_eq!(phase_witness.shadow_load_object_schedule().as_ref(), &[1]);
+        assert_eq!(phase_witness.commit_object_schedule().as_ref(), &[1]);
+        assert_eq!(phase_witness.cold_store_object_schedule().as_ref(), &[1]);
         assert_eq!(
             phase_witness
                 .first_event()
@@ -1021,6 +1021,57 @@ mod tests {
             bundle
                 .confidential_slot_program()
                 .expected_runtime_step_witnesses()
+                .as_ref()
+        );
+    }
+
+    #[test]
+    fn execution_trace_exports_runtime_confidential_proof_bundle_family() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let result = instance
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+            )
+            .unwrap();
+        let bundle_family = result
+            .trace
+            .runtime_confidential_proof_bundle_family(&artifact)
+            .unwrap();
+
+        assert_eq!(bundle_family.entrypoint_id(), "add(bytes32,uint256)");
+        assert_eq!(
+            bundle_family
+                .runtime_kernel_interface_bundle()
+                .entrypoint_id(),
+            bundle_family.entrypoint_id()
+        );
+        assert_eq!(
+            bundle_family
+                .runtime_confidential_core_kernel_interface_slot_bundle()
+                .entrypoint_id(),
+            bundle_family.entrypoint_id()
+        );
+        assert_eq!(
+            bundle_family
+                .runtime_paper_main_family_bundle()
+                .public_outcome()
+                .entrypoint_id,
+            bundle_family.entrypoint_id()
+        );
+        assert_eq!(
+            bundle_family
+                .runtime_paper_main_slot_family_bundle()
+                .confidential_slot_program()
+                .entrypoint_id,
+            bundle_family.entrypoint_id()
         );
     }
 
@@ -1082,6 +1133,18 @@ mod tests {
                 expected_entrypoint: "add(bytes32,uint256)".into(),
                 program_entrypoint: "put(bytes32,uint256)".into(),
             }
+        );
+        assert_eq!(
+            result
+                .trace
+                .runtime_confidential_proof_bundle_family(&tampered_artifact)
+                .unwrap_err(),
+            RuntimeConfidentialProofBundleFamilyError::KernelInterfaceSlot(
+                RuntimeConfidentialCoreKernelInterfaceSlotBundleError::ConfidentialSlotProgramEntrypointMismatch {
+                    expected_entrypoint: "add(bytes32,uint256)".into(),
+                    program_entrypoint: "put(bytes32,uint256)".into(),
+                }
+            )
         );
     }
 
@@ -1164,8 +1227,9 @@ mod tests {
             .unwrap_err();
         let err = err.to_string();
         assert!(
-            err.contains("runtime kernel interface drifted from admitted artifact")
-                || err.contains("entrypoint mismatch"),
+            err.contains("drifted from admitted artifact")
+                || err.contains("entrypoint mismatch")
+                || err.contains("manifest confidential slot program expected entrypoint"),
             "unexpected error: {err}"
         );
     }
@@ -1191,23 +1255,35 @@ mod tests {
             .trace
             .runtime_kernel_witness_for_confidential(&artifact, "add(bytes32,uint256)")
             .unwrap();
-        assert!(result
-            .trace
-            .stored_runtime_trusted_kernel_bundle()
-            .is_some());
-        assert!(result.trace.runtime_kernel_witness().is_some());
+        assert_eq!(
+            result.trace.runtime_trusted_kernel_bundle().unwrap(),
+            bundle
+        );
+        assert!(result.trace.exact_runtime_kernel_witness().is_ok());
         assert_eq!(bundle.kernel_witness(), Some(&kernel_witness));
 
         let encoded = serde_json::to_vec(&result.trace).unwrap();
-        let decoded: ExecutionTrace = serde_json::from_slice(&encoded).unwrap();
-        assert_eq!(
-            decoded.stored_runtime_trusted_kernel_bundle(),
-            Some(&bundle)
+        let encoded_json: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+        let encoded_object = encoded_json.as_object().unwrap();
+        assert!(
+            !encoded_object.contains_key("runtime_kernel_witness"),
+            "production execution traces should not serialize a redundant raw kernel witness when the finish bundle is present"
         );
-        assert_eq!(decoded.runtime_kernel_witness(), Some(&kernel_witness));
+        assert!(
+            !encoded_object.contains_key("runtime_kernel_refinement_witness"),
+            "production execution traces should not serialize a redundant raw runtime-phase witness when the finish bundle is present"
+        );
+        let decoded: ExecutionTrace = serde_json::from_slice(&encoded).unwrap();
+        let decoded_kernel_witness = decoded.exact_runtime_kernel_witness().unwrap();
+        let decoded_phase_witness = decoded.exact_runtime_kernel_refinement_witness().unwrap();
+        assert_eq!(decoded.runtime_trusted_kernel_bundle().unwrap(), bundle);
+        assert_eq!(decoded_kernel_witness, kernel_witness);
         assert_eq!(
-            decoded.runtime_kernel_refinement_witness(),
-            result.trace.runtime_kernel_refinement_witness()
+            decoded_phase_witness,
+            result
+                .trace
+                .exact_runtime_kernel_refinement_witness()
+                .unwrap()
         );
         assert_eq!(decoded.runtime_trusted_kernel_bundle().unwrap(), bundle);
         assert_eq!(
@@ -1241,8 +1317,8 @@ mod tests {
         assert_eq!(
             decoded
                 .runtime_kernel_witness_for_confidential(&artifact, "add(bytes32,uint256)")
-                .unwrap_err(),
-            KernelWitnessError::MissingKernelWitness
+                .unwrap(),
+            kernel_witness
         );
         assert_eq!(
             decoded.runtime_refinement_witness().unwrap_err(),
@@ -1435,26 +1511,21 @@ mod tests {
             .runtime_kernel_refinement_witness()
             .cloned()
             .expect("runtime refinement witness should carry the lower-level phase witness");
+        let expected_object_schedule = [
+            allowances_id.min(balances_id),
+            allowances_id.max(balances_id),
+        ];
         assert_eq!(
-            phase_witness.shadow_load_object_schedule(),
-            vec![
-                allowances_id.min(balances_id),
-                allowances_id.max(balances_id)
-            ]
+            phase_witness.shadow_load_object_schedule().as_ref(),
+            &expected_object_schedule
         );
         assert_eq!(
-            phase_witness.commit_object_schedule(),
-            vec![
-                allowances_id.min(balances_id),
-                allowances_id.max(balances_id)
-            ]
+            phase_witness.commit_object_schedule().as_ref(),
+            &expected_object_schedule
         );
         assert_eq!(
-            phase_witness.cold_store_object_schedule(),
-            vec![
-                allowances_id.min(balances_id),
-                allowances_id.max(balances_id)
-            ]
+            phase_witness.cold_store_object_schedule().as_ref(),
+            &expected_object_schedule
         );
     }
 

@@ -57,6 +57,7 @@ Status labels:
   `results/confidential_core_validation.json`,
   `results/confidential_core_slot_validation.json`,
   `results/confidential_core_kernel_interface_slot_validation.json`,
+  `results/kernel_slot_boundary_validation.json`,
   `results/confidential_core_shell_boundary_slot_validation.json`,
   `results/confidential_core_lowering_validation.json`,
   `results/confidential_core_shell_boundary_lowering_validation.json`,
@@ -70,11 +71,26 @@ Status labels:
   `proof/lean/UOToolchain/RuntimeConfidentialCoreKernelInterfaceSlotJson.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundarySlotJson.lean`,
   `proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean`.
+  The same proof-facing path now also checks the fully shared
+  `RuntimeConfidentialProofBundleFamily` directly through
+  `results/confidential_proof_family_validation.json`,
+  `results/confidential_proof_family_slot_boundary_validation.json`,
+  `results/confidential_proof_family_refinement_boundary_validation.json`,
+  `proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamily.lean`, and
+  `proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilySlotBoundary.lean`,
+  `proof/lean/CheckProofGradeRuntimeConfidentialProofBundleFamilyRefinementBoundary.lean`,
+  so the runtime/kernel interface, trusted-kernel slot bundle,
+  confidential-core composites, and singleton paper-main family / slot-family
+  bundles are now exercised together both as one theorem-facing artifact and
+  at the exact family-level slot-boundary and refinement-boundary theorem
+  surfaces.
 
 - `cleared` Checked seeded runtime witness families and paired Path-ORAM proof
   inputs.
   Evidence:
   `results/seeded_witness_validation.json`,
+  `results/paper_main_family_boundary_validation.json`,
+  `results/paper_main_slot_boundary_validation.json`,
   `results/pathoram_pair_validation.json`,
   `proof/lean/CheckRuntimeWitnessFamily.lean`,
   `proof/lean/CheckPathOramPairCertificate.lean`.
@@ -128,6 +144,8 @@ Status labels:
   Evidence:
   `results/witness_validation.json`,
   `results/seeded_witness_validation.json`,
+  `results/paper_main_family_boundary_validation.json`,
+  `results/paper_main_slot_boundary_validation.json`,
   `results/controller_observer_validation.json`,
   `results/pathoram_hidden_validation.json`.
   The current reports cover multi-access `ConfidentialMixer/pathoram/deposit`
