@@ -42,6 +42,8 @@ enum ReportKind {
     ControllerValidation,
     PathoramHiddenValidation,
     RuntimeBoundaryValidation,
+    RuntimeImplementationInterfaceValidation,
+    RuntimeImplementationConfinementBoundaryValidation,
     KernelModelAlignmentValidation,
     ShellBoundaryValidation,
     ShellBoundarySlotValidation,
@@ -319,6 +321,25 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "runtime_boundary_validation.json",
                 "runtime_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationInterfaceValidation) => {
+            let report = mplus_probe::run_runtime_implementation_interface_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_interface_validation.json",
+                "runtime_implementation_interface_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationConfinementBoundaryValidation) => {
+            let report =
+                mplus_probe::run_runtime_implementation_confinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_confinement_boundary_validation.json",
+                "runtime_implementation_confinement_boundary_validation",
                 &report,
             )?;
         }

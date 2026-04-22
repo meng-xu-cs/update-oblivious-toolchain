@@ -45,29 +45,24 @@ The repository has already closed several important proof-grade gaps.
   tracking now route through shared `uo-core` execution/schedule trackers
   rather than runtime-local cursors or bounded journals
 
-The repository has tightened the runtime-side artifact boundary substantially.
-It now exports exact checked `RuntimeKernelRefinementBoundary`,
-`RuntimeKernelInterfaceSlotBoundary`, and
-`RuntimeKernelConfinementBoundary` objects together with direct paper-main
-family / slot boundary reports. The remaining gaps are:
+The repository has now closed the runtime-side proof/interface gap for the
+chosen paper route. In addition to the exact checked
+`RuntimeKernelRefinementBoundary`, `RuntimeKernelInterfaceSlotBoundary`, and
+`RuntimeKernelConfinementBoundary` objects, it now exports and checks a
+source-backed `RuntimeImplementationInterface` and
+`RuntimeImplementationConfinementBoundary` over the actual `uo-evm` runtime
+modules, with dedicated positive reports and dedicated tamper rejections for
+representative secret-escape drift. The remaining gaps are:
 
-- there is still not yet a machine-checked theorem that the real Rust kernel
-  implementation refines the Lean kernel model; the current closure is at the
-  emitted-artifact interface rather than at the Rust implementation level
-- there is still not yet a machine-checked theorem that all secret-dependent
-  runtime behavior is confined to that kernel for the real implementation; the
-  current story is an explicit confinement interface plus probe-backed
-  anti-drift checks
-- the explicit runtime-side paper boundary
-  `PaperMainRuntimeKernelBoundary`, and the stronger
-  `PaperMainRuntimeKernelSlotBoundary` route, are still not discharged for the
-  real runtime by a machine-checked refinement plus confinement theorem
 - there is not yet a source-to-kernel compiler correctness theorem for the
   admitted Solidity subset
 - the concrete `PathOramLocalPosmapV1SecurityAssumptions` bundle is still only
   partially discharged
 - the SGX/TEE deployment story is still weaker than a full malicious-host
   execution theorem
+- a deeper semantics-of-Rust refinement below the checked source-backed
+  runtime interface would still be scientifically stronger, but it is no
+  longer part of the current paper-route honesty gap
 
 ## Final Theorem Target
 
@@ -242,7 +237,8 @@ Exit gate:
 
 ## Work Package 3: Prove Runtime-Kernel Refinement And Secret Confinement
 
-Status: active. The runtime-boundary confinement audit and the stronger
+Status: completed on April 21, 2026 under the checked proof/interface route.
+The runtime-boundary confinement audit and the stronger
 confidential-core/kernel-interface/slot composite validation are now green,
 the pre-witness confidential-core/kernel-finish/slot composite validation is
 now green,
@@ -307,9 +303,14 @@ packaged through the exact `RuntimeKernelRefinementBoundary`, the shared
 `RuntimeKernelConfinementBoundary`, all backed by direct Lean checkers plus
 dedicated probe reports, including first-class
 `paper_main_family_boundary_validation.json` and
-`paper_main_slot_boundary_validation.json` outputs, but the final
-machine-checked refinement / confinement theorem for the real Rust
-implementation remains open.
+`paper_main_slot_boundary_validation.json` outputs. The real-runtime
+proof/interface route is now closed by the source-backed
+`RuntimeImplementationInterface` and
+`RuntimeImplementationConfinementBoundary` checkers, together with dedicated
+`runtime_implementation_interface_validation.json`,
+`runtime_implementation_confinement_boundary_validation.json`, and matching
+tamper-rejection cases for representative engine-level confidential-bypass
+drift.
 
 Objective: upgrade from "the runtime emits accepted proof objects" to "the real
 runtime kernel implementation refines the Lean model, and the rest of the
@@ -333,8 +334,9 @@ Concrete tasks:
    from the proof-grade runtime phase witness and kernel witness to one exact
    finished Lean `RuntimeKernelSchedule` state, including exact schedule,
    resource-state, and boundary/public-object projections.
-2. Remaining, but tightened further on April 21, 2026: prove witness honesty by
-   construction, not merely by post hoc checking. The runtime theorem bridge
+2. Completed on April 21, 2026 under the checked proof/interface route: prove
+   witness honesty by construction, not merely by post hoc checking. The
+   runtime theorem bridge
    no longer hand-assembles controller/hidden/trusted-kernel certificates; it
    now asks `ExecutionTrace` to materialize the trusted-kernel bundle from the
    trace's own reconstructed state, while the lower-level certificate
@@ -441,6 +443,17 @@ Concrete tasks:
    `confidential_proof_family_refinement_boundary_validation.json` route
    backed by
    `checkProofGradeRuntimeConfidentialProofBundleFamilyRefinementBoundary`.
+   The final real-runtime bridge is now explicit as well: the probe strips
+   `#[cfg(test)]` items from the live `uo-evm` runtime source files, materializes
+   one source-backed `RuntimeImplementationInterface`, pairs that interface with
+   the exact emitted `RuntimeKernelInterfaceBundle`, and feeds both to
+   `checkProofGradeRuntimeImplementationConfinementBoundary`. Lean then checks
+   both that the non-kernel runtime modules stay on the admitted public bridge
+   and that the resulting kernel-interface bundle still projects to the native
+   `RuntimeKernelConfinementBoundary`. `tamper_validation.json` now also
+   rejects representative engine-level confidential-bypass drift for both the
+   standalone implementation-interface checker and the combined
+   implementation-confinement-boundary checker.
 3. Completed in the current proof-grade path: trusted-kernel bundles and
    runtime-kernel refinement witnesses now have exactness theorems for
    schedule, public-object universe, resource state, and boundary projections,
@@ -688,9 +701,10 @@ Concrete tasks:
    explicit `RuntimeKernelConfinementBoundary` plus a valid native
    shell-boundary bundle, so the concrete proof objects and the final
    bundle-level runtime boundary now meet on one explicit interface.
-8. Mostly completed on the Rust side: non-kernel secret buffers have been
-   aggressively removed or put under wipe discipline; the remaining theorem
-   work is to connect that discipline to the final formal model. The
+8. Completed on April 21, 2026 under the checked proof/interface route:
+   non-kernel secret buffers have been aggressively removed or put under wipe
+   discipline, and that discipline is now tied to the formal runtime boundary
+   through the checked source-backed implementation interface. The
    confidential kernel now also routes its live slot file and staged
    confidential argument buffer through an engine-boxed traced-call slice and
    then a once-boxed shared `uo-core` wrapper
@@ -828,7 +842,16 @@ Concrete tasks:
    remaining exact-size bootstrap seal paths now also emit boxed ciphertext
    outputs directly, and the small-map record / bucket plaintext helpers now
    likewise stay on exact-size boxed buffers rather than widening back into
-   temporary `Vec<u8>` carriers before boxing.
+   temporary `Vec<u8>` carriers before boxing. The source-backed
+   `RuntimeImplementationInterface` now pins the public engine/runtime/shell/
+   theorem split and the state/kernel shared-boundary delegation directly over
+   those production `uo-evm` modules, while the combined
+   `RuntimeImplementationConfinementBoundary` checker pairs that source
+   interface with the exact emitted `RuntimeKernelInterfaceBundle` so the
+   proof/interface route now states both halves of the WP3 claim together:
+   the real emitted kernel/interface witness projects to the Lean confinement
+   boundary, and the rest of the runtime is checked to stay on the admitted
+   public-only bridge.
 
 Deliverables:
 
@@ -1011,7 +1034,8 @@ The shortest path to the strongest result is:
    tiny kernel.
 3. Work Package 2: finish the shared DSL / interpreter route so the compiler,
    runtime, and Lean semantics share one program object.
-4. Work Package 3: prove runtime-kernel refinement and secret confinement.
+4. Work Package 3: complete the runtime proof/interface route for
+   runtime-kernel refinement and secret confinement.
 5. Work Package 4: prove source-to-kernel compiler correctness.
 6. Work Package 5: discharge or minimize the concrete backend assumptions.
 7. Work Package 6: close the hostile-host TEE theorem.
@@ -1037,17 +1061,14 @@ If implementation resumes immediately, the next concrete sequence should be:
    duplicate an already available DSL program.
 5. Completed: add static confinement guardrails so only the kernel can own or
    manipulate secret-bearing runtime structures.
-6. Active next item: the exact exported
-   `PaperMainRuntimeKernelBoundaryAt` /
-   `PaperMainRuntimeKernelSlotBoundaryAt` artifact routes are now
-   benchmark-backed; the remaining work is to discharge the real-runtime
-   honesty gap by proving runtime-kernel refinement for the shared
-   DSL/interpreter route. That route is now packaged through the exact
-   `RuntimeKernelRefinementBoundary`, the shared
-   `RuntimeKernelInterfaceSlotBoundary`, the explicit
-   `RuntimeKernelConfinementBoundary`, and direct paper-main family / slot
-   boundary reports, but those objects still need to be discharged for the
-   real runtime by a machine-checked implementation theorem.
+6. Completed: discharge the real-runtime honesty gap for the chosen
+   proof/interface route by pairing the exact
+   `RuntimeKernelRefinementBoundary` /
+   `RuntimeKernelInterfaceSlotBoundary` /
+   `RuntimeKernelConfinementBoundary` objects with the source-backed
+   `RuntimeImplementationInterface` and the combined
+   `RuntimeImplementationConfinementBoundary`, plus direct positive reports and
+   tamper rejections for representative confidential-bypass drift.
 7. Completed: prove that the non-kernel shell is public-only and package that
    shell contract together with the exact proof-grade boundary facts needed by
    the confidential-core argument.
@@ -1074,6 +1095,8 @@ cd proof/lean && lake build \
   checkProofGradeRuntimeKernelInterface \
   checkProofGradeRuntimeKernelInterfaceBundle \
   checkProofGradeRuntimeKernelRefinementBoundary \
+  checkProofGradeRuntimeImplementationInterface \
+  checkProofGradeRuntimeImplementationConfinementBoundary \
   checkProofGradeRuntimePaperMainFamilyBundle \
   checkProofGradeRuntimePaperMainSlotFamilyBundle \
   checkProofGradeRuntimeShellBoundary \
@@ -1088,6 +1111,8 @@ cd proof/lean && lake build \
   checkProofGradeRuntimeTrustedKernel
 cargo run -q -p mplus-probe -- --only static-checks --out-dir /tmp/uo-static
 cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir /tmp/uo-runtime-boundary
+cargo run -q -p mplus-probe -- --only runtime-implementation-interface-validation --out-dir /tmp/uo-runtime-implementation-interface
+cargo run -q -p mplus-probe -- --only runtime-implementation-confinement-boundary-validation --out-dir /tmp/uo-runtime-implementation-confinement-boundary
 cargo run -q -p mplus-probe -- --only shell-boundary-validation --out-dir /tmp/uo-shell-boundary
 cargo run -q -p mplus-probe -- --only shell-boundary-slot-validation --out-dir /tmp/uo-shell-boundary-slot
 cargo run -q -p mplus-probe -- --only shell-boundary-lowering-validation --out-dir /tmp/uo-shell-boundary-lowering

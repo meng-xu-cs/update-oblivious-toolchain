@@ -23,6 +23,14 @@ lean_exe checkProofGradeRuntimeKernelInterfaceConfinementBoundary where
   root := `CheckProofGradeRuntimeKernelInterfaceConfinementBoundary
 
 @[default_target]
+lean_exe checkProofGradeRuntimeImplementationInterface where
+  root := `CheckProofGradeRuntimeImplementationInterface
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationConfinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationConfinementBoundary
+
+@[default_target]
 lean_exe checkProofGradeRuntimeKernelRefinementBoundary where
   root := `CheckProofGradeRuntimeKernelRefinementBoundary
 

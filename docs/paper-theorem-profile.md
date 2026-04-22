@@ -33,6 +33,12 @@ What is already established at the frozen interface:
 - Lean-side proof-grade predicates and executable checkers for the runtime
   kernel witness, runtime refinement witness, and runtime trusted-kernel
   bundle
+- a source-backed runtime implementation interface,
+  `RuntimeImplementationInterface`, and a combined checked runtime
+  implementation confinement boundary,
+  `RuntimeImplementationConfinementBoundary`, over the real
+  `runtime/uo-evm/src/{lib,engine,runtime,shell,state,kernel,theorem}.rs`
+  modules
 - an explicit paper-facing runtime boundary and end-to-end route in Lean,
   `PaperMainRuntimeKernelBoundary`,
   `PaperMainPathOramAssumptions`, and
@@ -59,21 +65,19 @@ What is already established at the frozen interface:
   `UOToolchain.ProofGrade` umbrella
 - runtime enforcement of the admitted public kernel schedule for accepted
   confidential entrypoints
+- dedicated positive reports and dedicated tamper rejections for the
+  source-backed implementation-interface and combined
+  implementation-confinement-boundary routes
 
 What is still open:
 
 - a machine-checked source-to-kernel compiler correctness theorem
-- a machine-checked refinement proof from the real Rust kernel to the Lean
-  kernel model
-- a machine-checked proof that secret-dependent runtime behavior is confined to
-  that kernel
-- discharge of the explicit paper-route runtime boundary
-  `PaperMainRuntimeKernelBoundary`, and of the stronger
-  `PaperMainRuntimeKernelSlotBoundary` route, which are now the named Lean
-  boundaries for the remaining implementation-honesty gap
 - full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
 - the final malicious-host SGX / TEE deployment theorem for the real runtime
+- a deeper semantics-of-Rust refinement below the checked source-backed
+  runtime interface, if the paper later chooses to push below the current
+  proof/interface claim surface
 
 ## Main Choice
 
@@ -98,7 +102,7 @@ implicit in prose.
 | `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents in the concrete `path_oram_local_posmap_v1` backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages in the local-posmap wrapper | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
 | `stashOverflowBounded` | bounds stash-overflow failure for the deployed local-posmap parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet fully discharged in-repo |
-| `PaperMainRuntimeKernelBoundary` / `PaperMainRuntimeKernelSlotBoundary` | the exact runtime-side boundary facts required by the frozen paper route: one valid explicit runtime kernel-interface bundle per witness, and in the stronger slot route one fixed confidential slot program whose expected kernel steps match that bundle exactly | explicit Lean boundaries in `PaperPathOramTheoremRoute.lean`; they now project mechanically to the native `RuntimeProofGradeKernelInterface` theorem, to the explicit native `RuntimeKernelConfinementBoundary`, and to valid native shell-boundary bundles, the top-level paper assumption bundles now carry these boundary facts directly, and proof-grade seeded paper-main bundles can discharge them mechanically, but they are not yet discharged for the real runtime by a machine-checked refinement plus confinement theorem |
+| `PaperMainRuntimeKernelBoundary` / `PaperMainRuntimeKernelSlotBoundary` | the exact runtime-side boundary facts required by the frozen paper route: one valid explicit runtime kernel-interface bundle per witness, and in the stronger slot route one fixed confidential slot program whose expected kernel steps match that bundle exactly | explicit Lean boundaries in `PaperPathOramTheoremRoute.lean`; they now project mechanically to the native `RuntimeProofGradeKernelInterface` theorem, to the explicit native `RuntimeKernelConfinementBoundary`, and to valid native shell-boundary bundles, the top-level paper assumption bundles now carry these boundary facts directly, proof-grade seeded paper-main bundles can discharge them mechanically, and the checked source-backed `RuntimeImplementationInterface` / `RuntimeImplementationConfinementBoundary` route now ties those same boundaries to the real `uo-evm` bridge/interface split |
 | `RuntimeKernelInterfaceSlotBoundary` | the witness-free shared middle interface for the stronger slot route: one valid explicit runtime kernel-interface bundle together with one fixed slot program whose expected/emitted kernel steps match exactly | explicit Lean boundary in `RuntimeConfidentialCoreAssurance.lean`; the smaller finish-slot theorem object, the runtime witness-facing kernel-interface-slot bundle, the paper-route slot boundary, and the imported shared proof-family slot route now all project to this same object before projecting onward to `RuntimeKernelConfinementBoundary` |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model | required by the final malicious-host theorem; not yet fully closed in Lean |
 
@@ -115,8 +119,8 @@ interface and the hidden-leaf coverage proof/checker path.
 | `uo-check` | not in the proof-grade TCB | not in the TCB |
 | `mplus-probe` | not in the proof-grade TCB | not in the TCB |
 | `uo-solc` | not trusted for current artifact-level acceptance, but source-level compiler correctness is still unproved | remove from TCB by proving compiler correctness |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for implementation honesty; the remaining trust point is now frozen explicitly as `PaperMainRuntimeKernelBoundary` and the stronger `PaperMainRuntimeKernelSlotBoundary` route | shrink to the smallest kernel and prove it refines the Lean model |
-| Rust code outside the tiny kernel | still part of the implementation risk until confinement and refinement are proved | prove public-only or remove from the confidential path |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for the implementation side of the checked runtime proof/interface route, now frozen explicitly through `PaperMainRuntimeKernelBoundary`, `PaperMainRuntimeKernelSlotBoundary`, `RuntimeImplementationInterface`, and `RuntimeImplementationConfinementBoundary` | keep the kernel tiny and, if desired, push to a deeper semantics-of-Rust refinement below the checked source interface |
+| Rust code outside the tiny kernel | no longer part of the current confidential-work claim; the checked source-backed implementation interface pins it to the public bridge side and tamper validation rejects representative drift | keep it public-only or remove it from the runtime path entirely |
 
 ## Observer Shape
 

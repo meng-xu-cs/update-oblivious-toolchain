@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "file_count": 56,
+  "file_count": 58,
   "files": [
     {
       "path": "artifact_configuration.json",
@@ -14,8 +14,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 17614171,
-      "sha256": "b1e952d41d1041780a37057aebdc399d49d7c0bf29b71a1dc8fa5f7c0f34d1a2"
+      "bytes": 18127568,
+      "sha256": "5f2a176ca1af62aaa3ee354e34384a05cf971867224aacf507e60e88a8e7d183"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -238,6 +238,16 @@
       "sha256": "39a52052e97dda0ac06da522d771bb656b60ceaf097d9cd39aaaff0dd513d377"
     },
     {
+      "path": "runtime_implementation_confinement_boundary_validation.json",
+      "bytes": 474664,
+      "sha256": "cc6609c7205c55fc921b1bac516d07c646c435fe7ae72ebb61512694eaf0fc95"
+    },
+    {
+      "path": "runtime_implementation_interface_validation.json",
+      "bytes": 848,
+      "sha256": "1706a6733b4d538c004bed6f493726911738e41add84d9bd8bd1e5f8933ee6b7"
+    },
+    {
       "path": "seeded_witness_validation.json",
       "bytes": 10486,
       "sha256": "63b159d47b4a575d56731ae00c83100bebb0e1f5e72a2a40a15bc66833f8b79f"
@@ -264,8 +274,8 @@
     },
     {
       "path": "tamper_validation.json",
-      "bytes": 42122,
-      "sha256": "650f6b51d79b722981e5dbf1997524700be35a0e8d3f7c6e58ddf7430453e1a4"
+      "bytes": 43661,
+      "sha256": "c071e29c312c9017181c041a2f3e874d3bf64c131067bbf9175121f42db3534e"
     },
     {
       "path": "trace_equivalence.json",

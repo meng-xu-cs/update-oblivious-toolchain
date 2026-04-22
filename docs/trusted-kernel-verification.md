@@ -34,8 +34,8 @@ The current runtime-side TCB should be read explicitly rather than inferred.
 | Lean kernel plus Lean theorem/checker development | yes | proof checker and theorem body |
 | Explicit backend / cryptographic assumptions | yes | they are the named remaining assumptions |
 | `RuntimeTrustedKernelBundle` / `RuntimeTrustedKernelSlotBundle` acceptance predicates and imported JSON checker | yes | theorem-facing validation boundary |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | this remains part of the implementation TCB; the repo now packages and checks the theorem-facing runtime boundary through explicit `RuntimeKernelRefinementBoundary`, `RuntimeKernelInterfaceSlotBoundary`, and `RuntimeKernelConfinementBoundary` objects, plus direct paper-main family / slot boundary reports, but implementation honesty is still not derived by a machine-checked refinement proof |
-| Rust shell/object code outside the tiny kernel | partially | the confidential surface is narrower and the public shell is now pinned to the explicit `RuntimeKernelConfinementBoundary`; remaining work is source-to-kernel and deployment lifting rather than reopening the runtime boundary interface |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | yes | this remains the implementation-side TCB for the current route; the repo now packages and checks that boundary through explicit `RuntimeKernelRefinementBoundary`, `RuntimeKernelInterfaceSlotBoundary`, `RuntimeKernelConfinementBoundary`, `RuntimeImplementationInterface`, and `RuntimeImplementationConfinementBoundary` objects |
+| Rust shell/object code outside the tiny kernel | no, for the current confidential-work claim | the source-backed `RuntimeImplementationInterface` checker now pins the public engine/runtime/shell/theorem bridge split directly over the real `uo-evm` modules, and `tamper_validation.json` rejects representative confidential-bypass drift on that route |
 | `uo-check` | no | removed from the proof-grade acceptance path |
 | `mplus-probe` | no | validation/reporting only |
 
@@ -86,7 +86,10 @@ the canonical theorem interface rather than only a serialization convenience.
 
 At the paper theorem route, the runtime-side boundary is now named explicitly
 in Lean and discharged mechanically for the emitted runtime artifact routes,
-but not yet for the real Rust implementation.
+and the real `uo-evm` bridge/interface split is now checked through the
+source-backed `RuntimeImplementationInterface` /
+`RuntimeImplementationConfinementBoundary` route rather than left as a prose-
+only implementation honesty gap.
 The frozen paper route now carries the checked
 `PaperMainRuntimeKernelBoundary` directly, phrased over the explicit
 `RuntimeKernelInterfaceBundle` exported by the runtime/kernel interface, and
@@ -209,9 +212,9 @@ asking `state.rs` to append it after the fact, and the old
 tail-appending witness helpers are no longer public production APIs in
 `uo-core`. The live kernel journal and the proof-side witness validator now
 also share the same runtime-phase transition function rather than maintaining
-separate phase machines. That does not prove full implementation honesty yet,
-but it removes one more post hoc witness-rewriting surface and one more source
-of duplicated witness-shape logic from the trusted path.
+separate phase machines. The current route does not claim a full semantics-of-
+Rust proof below the checked source interface, but it no longer leaves the
+real-runtime bridge split as an unchecked implementation-honesty gap either.
 The kernel witness now also carries an explicit public resource-event trace
 covering stack checks plus scratch reservations and wipes. Lean replays that
 trace against the public stack/scratch budgets and fixes one exact replayed

@@ -1,0 +1,26 @@
+{
+  "accepted": true,
+  "artifact_json_bytes": 69133,
+  "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeImplementationInterface",
+  "lean_checker_input": "source-backed runtime implementation interface",
+  "lean_checker_kind": "runtime implementation interface",
+  "lean_stdout": "validated runtime implementation interface for source-backed uo-evm boundary (3951 engine bytes)",
+  "source_bytes": {
+    "engine": 3951,
+    "kernel": 17944,
+    "runtime_evm_lib": 298,
+    "runtime_module": 1928,
+    "shell": 17723,
+    "state": 21126,
+    "theorem": 3807
+  },
+  "source_files": [
+    "runtime/uo-evm/src/lib.rs",
+    "runtime/uo-evm/src/engine.rs",
+    "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/shell.rs",
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-evm/src/kernel.rs",
+    "runtime/uo-evm/src/theorem.rs"
+  ]
+}

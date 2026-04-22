@@ -17,10 +17,11 @@ use uo_core::{
     BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
     CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact, ContractMetadata,
     LogicalEvent, NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
-    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramLeafScaffoldWitness,
-    RuntimeOramObjectWitness, RuntimeRefinementWitness, RuntimeShellContract, RuntimeShellTrace,
-    SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainSlotFamilyBundle,
-    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value, WriteClass,
+    RuntimeKernelInterfaceBundle, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
+    RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimeRefinementWitness,
+    RuntimeShellContract, RuntimeShellTrace, SeededRuntimePaperMainFamilyBundle,
+    SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePathOramWitnessFamily,
+    SgxControllerShapeTrace, Value, WriteClass,
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
 
@@ -134,6 +135,23 @@ struct ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput {
     boundary_schedule: Vec<BoundaryEvent>,
     controller_shape: SgxControllerShapeTrace,
     normalized_micro_trace: NormalizedMicroTrace,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ImportedRuntimeImplementationInterface {
+    runtime_evm_lib_source: String,
+    engine_source: String,
+    runtime_module_source: String,
+    shell_source: String,
+    state_source: String,
+    kernel_source: String,
+    theorem_source: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ImportedRuntimeImplementationConfinementBoundary {
+    implementation_interface: ImportedRuntimeImplementationInterface,
+    kernel_interface_bundle: RuntimeKernelInterfaceBundle,
 }
 
 #[derive(Clone)]
@@ -303,6 +321,20 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
     })?;
     let (runtime_boundary_validation, runtime_boundary_validation_ms) = timed_report(|| {
         run_runtime_boundary_validation().context("running runtime_boundary_validation report")
+    })?;
+    let (
+        runtime_implementation_interface_validation,
+        runtime_implementation_interface_validation_ms,
+    ) = timed_report(|| {
+        run_runtime_implementation_interface_validation()
+            .context("running runtime_implementation_interface_validation report")
+    })?;
+    let (
+        runtime_implementation_confinement_boundary_validation,
+        runtime_implementation_confinement_boundary_validation_ms,
+    ) = timed_report(|| {
+        run_runtime_implementation_confinement_boundary_validation(&suite)
+            .context("running runtime_implementation_confinement_boundary_validation report")
     })?;
     let (kernel_model_alignment_validation, kernel_model_alignment_validation_ms) =
         timed_report(|| {
@@ -534,6 +566,10 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "controller_observer_validation": controller_observer_validation,
         "pathoram_hidden_validation": pathoram_hidden_validation,
         "runtime_boundary_validation": runtime_boundary_validation,
+        "runtime_implementation_interface_validation":
+            runtime_implementation_interface_validation,
+        "runtime_implementation_confinement_boundary_validation":
+            runtime_implementation_confinement_boundary_validation,
         "kernel_model_alignment_validation": kernel_model_alignment_validation,
         "shell_boundary_validation": shell_boundary_validation,
         "shell_boundary_slot_validation": shell_boundary_slot_validation,
@@ -650,6 +686,10 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
             "controller_observer_validation": controller_observer_validation_ms,
             "pathoram_hidden_validation": pathoram_hidden_validation_ms,
             "runtime_boundary_validation": runtime_boundary_validation_ms,
+            "runtime_implementation_interface_validation":
+                runtime_implementation_interface_validation_ms,
+            "runtime_implementation_confinement_boundary_validation":
+                runtime_implementation_confinement_boundary_validation_ms,
             "kernel_model_alignment_validation": kernel_model_alignment_validation_ms,
             "shell_boundary_validation": shell_boundary_validation_ms,
             "shell_boundary_slot_validation": shell_boundary_slot_validation_ms,
@@ -727,6 +767,10 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "controller_observer_validation": controller_observer_validation,
         "pathoram_hidden_validation": pathoram_hidden_validation,
         "runtime_boundary_validation": runtime_boundary_validation,
+        "runtime_implementation_interface_validation":
+            runtime_implementation_interface_validation,
+        "runtime_implementation_confinement_boundary_validation":
+            runtime_implementation_confinement_boundary_validation,
         "kernel_model_alignment_validation": kernel_model_alignment_validation,
         "shell_boundary_validation": shell_boundary_validation,
         "shell_boundary_slot_validation": shell_boundary_slot_validation,
@@ -807,6 +851,10 @@ pub fn run_bridge_validation_report() -> Result<JsonValue> {
     let controller_observer_validation = run_controller_observer_validation(&suite)?;
     let pathoram_hidden_validation = run_pathoram_hidden_validation()?;
     let runtime_boundary_validation = run_runtime_boundary_validation()?;
+    let runtime_implementation_interface_validation =
+        run_runtime_implementation_interface_validation()?;
+    let runtime_implementation_confinement_boundary_validation =
+        run_runtime_implementation_confinement_boundary_validation(&suite)?;
     let kernel_model_alignment_validation = run_kernel_model_alignment_validation()?;
     let shell_boundary_validation = run_shell_boundary_validation(&suite)?;
     let shell_boundary_slot_validation = run_shell_boundary_slot_validation(&suite)?;
@@ -880,6 +928,10 @@ pub fn run_bridge_validation_report() -> Result<JsonValue> {
         "controller_observer_validation": controller_observer_validation,
         "pathoram_hidden_validation": pathoram_hidden_validation,
         "runtime_boundary_validation": runtime_boundary_validation,
+        "runtime_implementation_interface_validation":
+            runtime_implementation_interface_validation,
+        "runtime_implementation_confinement_boundary_validation":
+            runtime_implementation_confinement_boundary_validation,
         "kernel_model_alignment_validation": kernel_model_alignment_validation,
         "shell_boundary_validation": shell_boundary_validation,
         "shell_boundary_slot_validation": shell_boundary_slot_validation,
@@ -1211,6 +1263,15 @@ pub fn run_runtime_boundary_validation_report() -> Result<JsonValue> {
     run_runtime_boundary_validation()
 }
 
+pub fn run_runtime_implementation_interface_validation_report() -> Result<JsonValue> {
+    run_runtime_implementation_interface_validation()
+}
+
+pub fn run_runtime_implementation_confinement_boundary_validation_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_runtime_implementation_confinement_boundary_validation(&suite)
+}
+
 pub fn run_kernel_model_alignment_validation_report() -> Result<JsonValue> {
     run_kernel_model_alignment_validation()
 }
@@ -1374,6 +1435,8 @@ pub fn write_results(out_dir: &str, results: &JsonValue) -> Result<()> {
         "controller_observer_validation",
         "pathoram_hidden_validation",
         "runtime_boundary_validation",
+        "runtime_implementation_interface_validation",
+        "runtime_implementation_confinement_boundary_validation",
         "kernel_model_alignment_validation",
         "shell_boundary_validation",
         "shell_boundary_slot_validation",
@@ -2988,6 +3051,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
     let runtime_witness = trace.runtime_refinement_witness()?;
     let shell_boundary_bundle = trace.runtime_shell_boundary_bundle()?;
     let kernel_interface_bundle = trace.runtime_kernel_interface_bundle(&artifact)?;
+    let runtime_implementation_interface = runtime_implementation_interface_artifact()?;
     let kernel_dsl_bundle = artifact
         .runtime_kernel_dsl_bundle_for_entrypoint(kernel_witness.clone(), target.entrypoint)?;
     let kernel_slot_dsl_bundle = artifact
@@ -3064,6 +3128,10 @@ fn run_tamper_validation() -> Result<JsonValue> {
         lean_proofgrade_kernel_refinement_boundary_checker_path()?;
     let kernel_confinement_boundary_checker =
         lean_proofgrade_kernel_confinement_boundary_checker_path()?;
+    let runtime_implementation_interface_checker =
+        lean_proofgrade_runtime_implementation_interface_checker_path()?;
+    let runtime_implementation_confinement_boundary_checker =
+        lean_proofgrade_runtime_implementation_confinement_boundary_checker_path()?;
     let trusted_kernel_checker = lean_proofgrade_trusted_kernel_checker_path()?;
     let witness_family_checker = lean_witness_family_checker_path()?;
     let paper_main_family_bundle_checker = lean_proofgrade_paper_main_family_bundle_checker_path()?;
@@ -4188,6 +4256,47 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "erase the explicit expected_public_object_ids list while checking the exact runtime-kernel confinement boundary route",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_interface = runtime_implementation_interface.clone();
+    tampered_runtime_implementation_interface
+        .engine_source
+        .push_str("\nrun_confidential_entrypoint(\n");
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/engine_confidential_bypass_drift",
+        &tampered_runtime_implementation_interface,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/engine_confidential_bypass_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "append a direct run_confidential_entrypoint(...) marker to engine.rs so the public engine no longer stays behind the runtime-owned theorem bridge",
+        }),
+    )?);
+    let tampered_runtime_implementation_confinement_boundary =
+        ImportedRuntimeImplementationConfinementBoundary {
+            implementation_interface: tampered_runtime_implementation_interface,
+            kernel_interface_bundle: trace.runtime_kernel_interface_bundle(&artifact)?,
+        };
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_confinement_boundary/engine_confidential_bypass_drift",
+        &tampered_runtime_implementation_confinement_boundary,
+        |boundary_path| {
+            Ok(Command::new(&runtime_implementation_confinement_boundary_checker)
+                .arg(boundary_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_confinement_boundary/engine_confidential_bypass_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "append a direct run_confidential_entrypoint(...) marker to engine.rs while keeping the kernel-interface bundle fixed, so the combined source-backed confinement boundary must reject the secret-escape drift",
         }),
     )?);
 
@@ -5495,6 +5604,40 @@ fn run_kernel_interface_confinement_boundary_validation(
             "exit_model": "exit_v1",
             "shared_resource_model": "shared_v1"
         },
+        "scenario_count": scenarios.len(),
+        "scenarios": scenarios,
+        "excluded_scenarios": excluded_scenarios,
+    }))
+}
+
+fn run_runtime_implementation_confinement_boundary_validation(
+    suite: &BTreeMap<&'static str, BenchArtifacts>,
+) -> Result<JsonValue> {
+    let checker = lean_proofgrade_runtime_implementation_confinement_boundary_checker_path()?;
+    let implementation_interface = runtime_implementation_interface_artifact()?;
+    let (scenarios, excluded_scenarios) =
+        collect_proofgrade_runtime_validation_scenarios(suite, |name, artifact, setup, target| {
+            validate_runtime_implementation_confinement_boundary_case(
+                name,
+                artifact,
+                setup,
+                target,
+                &checker,
+                &implementation_interface,
+            )
+        })?;
+
+    Ok(json!({
+        "checker": display_report_path(&checker),
+        "source_files": [
+            display_report_path(&repo_root().join("runtime/uo-evm/src/lib.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/engine.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/runtime.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/shell.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/state.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/kernel.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/theorem.rs")),
+        ],
         "scenario_count": scenarios.len(),
         "scenarios": scenarios,
         "excluded_scenarios": excluded_scenarios,
@@ -6922,6 +7065,246 @@ fn validate_runtime_interface_case(
         "witness_json_bytes": witness_json_bytes,
         "lean_checker_kind": checker_label,
         "lean_checker_input": checker_input_label,
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "accepted": true,
+    }))
+}
+
+fn count_char(source: &str, needle: char) -> isize {
+    source.chars().filter(|ch| *ch == needle).count() as isize
+}
+
+fn strip_cfg_test_items(source: &str) -> String {
+    let lines: Vec<&str> = source.split_inclusive('\n').collect();
+    let mut stripped = String::with_capacity(source.len());
+    let mut index = 0usize;
+
+    while index < lines.len() {
+        if lines[index].trim_start().starts_with("#[cfg(test)]") {
+            index += 1;
+            while index < lines.len() && lines[index].trim().is_empty() {
+                index += 1;
+            }
+            let mut brace_depth = 0isize;
+            let mut saw_body = false;
+            while index < lines.len() {
+                let line = lines[index];
+                brace_depth += count_char(line, '{');
+                brace_depth -= count_char(line, '}');
+                saw_body |= line.contains('{');
+                index += 1;
+                if !saw_body {
+                    if line.trim_end().ends_with(';') {
+                        break;
+                    }
+                    continue;
+                }
+                if brace_depth <= 0 {
+                    break;
+                }
+            }
+            continue;
+        }
+        stripped.push_str(lines[index]);
+        index += 1;
+    }
+
+    stripped
+}
+
+fn read_runtime_production_source(path: &Path) -> Result<String> {
+    let source = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    Ok(strip_cfg_test_items(&source))
+}
+
+fn runtime_implementation_interface_artifact() -> Result<ImportedRuntimeImplementationInterface> {
+    let root = repo_root();
+    let runtime_evm_lib_source =
+        read_runtime_production_source(&root.join("runtime/uo-evm/src/lib.rs"))?;
+    let engine_source = read_runtime_production_source(&root.join("runtime/uo-evm/src/engine.rs"))?;
+    let runtime_module_source =
+        read_runtime_production_source(&root.join("runtime/uo-evm/src/runtime.rs"))?;
+    let shell_source = read_runtime_production_source(&root.join("runtime/uo-evm/src/shell.rs"))?;
+    let state_source = read_runtime_production_source(&root.join("runtime/uo-evm/src/state.rs"))?;
+    let kernel_source = read_runtime_production_source(&root.join("runtime/uo-evm/src/kernel.rs"))?;
+    let theorem_source =
+        read_runtime_production_source(&root.join("runtime/uo-evm/src/theorem.rs"))?;
+    Ok(ImportedRuntimeImplementationInterface {
+        runtime_evm_lib_source,
+        engine_source,
+        runtime_module_source,
+        shell_source,
+        state_source,
+        kernel_source,
+        theorem_source,
+    })
+}
+
+fn run_runtime_implementation_interface_validation() -> Result<JsonValue> {
+    let checker = lean_proofgrade_runtime_implementation_interface_checker_path()?;
+    let interface = runtime_implementation_interface_artifact()?;
+    let engine_bytes = interface.engine_source.len();
+    let runtime_module_bytes = interface.runtime_module_source.len();
+    let shell_bytes = interface.shell_source.len();
+    let state_bytes = interface.state_source.len();
+    let kernel_bytes = interface.kernel_source.len();
+    let theorem_bytes = interface.theorem_source.len();
+    let runtime_evm_lib_bytes = interface.runtime_evm_lib_source.len();
+    let (interface_path, interface_json_bytes) =
+        write_temp_json("runtime-implementation-interface", &interface)?;
+    let output = Command::new(&checker).arg(&interface_path).output()?;
+    let _ = fs::remove_file(&interface_path);
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean runtime implementation interface validation failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(json!({
+        "checker": display_report_path(&checker),
+        "source_files": [
+            display_report_path(&repo_root().join("runtime/uo-evm/src/lib.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/engine.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/runtime.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/shell.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/state.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/kernel.rs")),
+            display_report_path(&repo_root().join("runtime/uo-evm/src/theorem.rs")),
+        ],
+        "source_bytes": {
+            "runtime_evm_lib": runtime_evm_lib_bytes,
+            "engine": engine_bytes,
+            "runtime_module": runtime_module_bytes,
+            "shell": shell_bytes,
+            "state": state_bytes,
+            "kernel": kernel_bytes,
+            "theorem": theorem_bytes,
+        },
+        "artifact_json_bytes": interface_json_bytes,
+        "lean_checker_kind": "runtime implementation interface",
+        "lean_checker_input": "source-backed runtime implementation interface",
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "accepted": true,
+    }))
+}
+
+fn validate_runtime_implementation_confinement_boundary_case(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    checker: &Path,
+    implementation_interface: &ImportedRuntimeImplementationInterface,
+) -> Result<JsonValue> {
+    let trace = run_target_call(artifact, setup, target.entrypoint, target.args.clone())?;
+    let witness = trace.runtime_refinement_witness()?;
+    let kernel_interface_bundle = trace.runtime_kernel_interface_bundle(artifact)?;
+    let exact_kernel_witness =
+        exact_confidential_kernel_witness(&trace, artifact, target.entrypoint)?;
+    if witness.kernel_witness() != exact_kernel_witness.as_ref() {
+        return Err(anyhow!(
+            "runtime refinement witness for {} does not preserve the exact kernel witness",
+            name
+        ));
+    }
+    if kernel_interface_bundle.kernel_witness() != exact_kernel_witness.as_ref().unwrap() {
+        return Err(anyhow!(
+            "runtime implementation confinement boundary for {} does not preserve the exact kernel witness",
+            name
+        ));
+    }
+    let exact_runtime_kernel_refinement_witness =
+        trace.exact_runtime_kernel_refinement_witness()?;
+    if witness.runtime_kernel_refinement_witness() != Some(&exact_runtime_kernel_refinement_witness)
+    {
+        return Err(anyhow!(
+            "runtime refinement witness for {} does not preserve the runtime phase witness",
+            name
+        ));
+    }
+    if kernel_interface_bundle.expected_kernel_steps()
+        != kernel_interface_bundle.kernel_witness().kernel_steps()
+    {
+        return Err(anyhow!(
+            "runtime implementation confinement boundary for {} does not preserve the exact expected kernel steps",
+            name
+        ));
+    }
+    if kernel_interface_bundle.expected_public_object_ids()
+        != kernel_interface_bundle
+            .kernel_witness()
+            .expected_public_object_schedule()
+            .as_deref()
+            .unwrap_or(&[])
+    {
+        return Err(anyhow!(
+            "runtime implementation confinement boundary for {} does not preserve the exact expected public object universe",
+            name
+        ));
+    }
+    if kernel_interface_bundle.expected_kernel_schedule()
+        != &kernel_interface_bundle
+            .kernel_witness()
+            .emitted_kernel_schedule()
+    {
+        return Err(anyhow!(
+            "runtime implementation confinement boundary for {} does not preserve the exact expected kernel schedule",
+            name
+        ));
+    }
+    let boundary = ImportedRuntimeImplementationConfinementBoundary {
+        implementation_interface: implementation_interface.clone(),
+        kernel_interface_bundle,
+    };
+    let kernel_interface_bundle_json_bytes =
+        serde_json::to_vec(&boundary.kernel_interface_bundle)?.len();
+    let (boundary_path, boundary_json_bytes) = write_temp_json(name, &boundary)?;
+    let output = Command::new(checker).arg(&boundary_path).output()?;
+    let _ = fs::remove_file(&boundary_path);
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean runtime implementation confinement boundary validation failed for {}: {}",
+            name,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(json!({
+        "scenario": name,
+        "entrypoint": target.entrypoint,
+        "setup_calls": setup.len(),
+        "gas_used": trace.gas_used,
+        "boundary_events": witness.boundary_schedule().len(),
+        "kernel_witness": kernel_witness_summary(exact_kernel_witness.as_ref()),
+        "runtime_kernel_refinement_witness": runtime_kernel_refinement_witness_summary(
+            witness.runtime_kernel_refinement_witness(),
+            exact_kernel_witness.as_ref(),
+        ),
+        "kernel_interface_bundle": {
+            "expected_kernel_step_count": boundary
+                .kernel_interface_bundle
+                .expected_kernel_steps()
+                .len(),
+            "expected_public_object_universe":
+                boundary.kernel_interface_bundle.expected_public_object_ids(),
+            "expected_kernel_step_public_object_schedule":
+                boundary
+                    .kernel_interface_bundle
+                    .expected_kernel_schedule()
+                    .public_object_schedule(),
+        },
+        "implementation_interface_source_bytes": {
+            "runtime_evm_lib": implementation_interface.runtime_evm_lib_source.len(),
+            "engine": implementation_interface.engine_source.len(),
+            "runtime_module": implementation_interface.runtime_module_source.len(),
+            "shell": implementation_interface.shell_source.len(),
+            "state": implementation_interface.state_source.len(),
+            "kernel": implementation_interface.kernel_source.len(),
+            "theorem": implementation_interface.theorem_source.len(),
+        },
+        "kernel_interface_bundle_json_bytes": kernel_interface_bundle_json_bytes,
+        "boundary_json_bytes": boundary_json_bytes,
+        "lean_checker_kind": "runtime implementation confinement boundary",
+        "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
     }))
@@ -19704,6 +20087,20 @@ fn lean_proofgrade_kernel_interface_confinement_boundary_checker_path() -> Resul
     )
 }
 
+fn lean_proofgrade_runtime_implementation_interface_checker_path() -> Result<PathBuf> {
+    ensure_lean_checker(
+        "checkProofGradeRuntimeImplementationInterface",
+        "source-backed runtime implementation interface",
+    )
+}
+
+fn lean_proofgrade_runtime_implementation_confinement_boundary_checker_path() -> Result<PathBuf> {
+    ensure_lean_checker(
+        "checkProofGradeRuntimeImplementationConfinementBoundary",
+        "source-backed runtime implementation confinement boundary",
+    )
+}
+
 fn lean_proofgrade_kernel_interface_bundle_checker_path() -> Result<PathBuf> {
     ensure_lean_checker(
         "checkProofGradeRuntimeKernelInterfaceBundle",
@@ -22044,7 +22441,8 @@ stronger slot-boundary routes.
 report: it bundles the source-to-artifact translation checks together with the
 direct controller certificate, direct hidden-state certificate, direct kernel
 witness, direct runtime-phase refinement witness, explicit trusted-kernel
-bundle, runtime refinement witness, and seeded witness-family
+bundle, runtime refinement witness, the source-backed runtime implementation
+interface, the combined runtime implementation confinement boundary, and seeded witness-family
 validators so the bridge status can be checked without inferring it from the
 full artifact bundle.
 `tamper_validation.json` complements those positive checks with end-to-end
@@ -22052,7 +22450,8 @@ negative evidence: it mutates representative direct controller/hidden
 certificates, every proof-grade translation/runtime bridge artifact, and the
 theorem-facing runtime kernel-interface bundle, seeded paper-main bundle,
 seeded/canonical witness-family, theorem-input, and pair-certificate
-artifacts, including the witness-fed
+artifacts, including both source-backed runtime implementation-interface
+routes and the witness-fed
 `checkProofGradeRuntimeKernelInterfaceConfinementBoundary` route, then checks
 that the shipped Lean executables reject those semantically drifted but still
 parseable artifacts.

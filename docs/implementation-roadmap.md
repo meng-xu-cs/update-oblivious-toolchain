@@ -133,9 +133,7 @@ than from a runtime-local theorem/controller reconstruction path.
 
 ### M6. Runtime refinement and trusted kernel
 
-Status: largely implemented; the emitted-artifact boundary is now much tighter,
-but the final machine-checked implementation-refinement / confinement theorem
-is still open.
+Status: completed on April 21, 2026 under the explicit proof/interface route.
 
 The runtime/proof bridge now includes:
 
@@ -161,6 +159,18 @@ The runtime/proof bridge now includes:
   the canonical single-seed paper-main family and slot-family artifacts, so
   the theorem-facing family objects are first-class runtime outputs rather than
   probe-only reconstructions
+- a source-backed `RuntimeImplementationInterface` over the actual
+  `runtime/uo-evm/src/{lib,engine,runtime,shell,state,kernel,theorem}.rs`
+  modules, with the probe stripping `#[cfg(test)]` items before Lean checks the
+  production bridge/interface split
+- a combined `RuntimeImplementationConfinementBoundary` that pairs that
+  source-backed runtime interface with the exact emitted
+  `RuntimeKernelInterfaceBundle`, so the real runtime proof/interface route
+  speaks about both the emitted kernel witness path and the non-kernel public
+  bridge in one checked object
+- dedicated positive reports and dedicated tamper rejections for both the
+  standalone implementation-interface checker and the combined
+  implementation-confinement-boundary checker
 - canonical fresh-coin family and pair validation, with compact and heavy
   artifact modes
 - a paper-facing Lean runtime boundary,
@@ -178,41 +188,15 @@ The runtime/proof bridge now includes:
   route to discharge the boundary mechanically from proof-grade witness
   acceptance
 
-This milestone is not yet fully closed. The bridge is now much tighter at the
-runtime artifact boundary. What remains is:
+This milestone is now closed on the repository's runtime proof/interface route.
+What remains above this layer is:
 
-- keep the trusted boundary explicitly at that small emitted kernel while
-  lifting it upward into the source-to-kernel theorem
-- discharge `PaperMainRuntimeKernelBoundary`, and then the stronger
-  `PaperMainRuntimeKernelSlotBoundary`, for the real runtime rather than only
-  for emitted proof artifacts and benchmark-backed reports
-- keep pushing the canonical fresh-coin instantiation route upward: the
-  concrete hidden-seed quotient path now preserves proof-grade runtime-kernel
-  boundary facts through `ProofGradeConcreteRuntimePathOramConfigSlice` and
-  `ConcreteRuntimePathOramProofGradePairBoundary`, which now also carries the
-  per-side native `RuntimeProofGradeKernelInterface` theorem and the local
-  `PaperMainRuntimeKernelBoundaryAt` interface; the stronger native slot route
-  now mirrors that concrete path through
-  `ProofGradeConcreteRuntimePathOramConfigSlotSlice`,
-  `ProofGradeConcreteRuntimePathOramPairSlotSlice`, and
-  `ConcreteRuntimePathOramProofGradeSlotPairBoundary`, so the concrete route
-  now also carries per-side native slot-boundary and confinement-boundary
-  objects rather than only the weaker non-slot runtime boundary. The paper
-  theorem route now exposes matching per-configuration boundaries
-  `PaperMainRuntimeKernelBoundaryAt` /
-  `PaperMainRuntimeKernelSlotBoundaryAt`; the imported kernel-interface family
-  route and the imported paper-main family / slot-family bundles now project
-  directly to those local boundary interfaces and to the native
-  `RuntimeProofGradeKernelInterface` theorem as well, and those paper-route
-  boundaries now also project to the explicit native
-  `RuntimeKernelConfinementBoundary` and to valid native shell-boundary
-  bundles, while the Rust shell-boundary / kernel-interface bundle family and
-  the downstream shell-boundary theorem bundles that carry it are now move-only
-  rather than `Clone`; the strengthened pairwise route now needs to be lifted
-  into the source theorem after the real runtime-side honesty gap is closed
-- prove source-to-kernel compiler correctness
+- lift the now-checked runtime boundary upward into a source-to-kernel
+  compiler-correctness theorem
 - justify or import the explicit backend/cryptographic assumptions cleanly
-- avoid overclaiming the rest of the Rust stack as verified
+- close the final malicious-host SGX/TEE theorem over the frozen observer
+- avoid overclaiming lower-level verified semantics beneath the checked
+  source-backed runtime interface
 
 ### M7. Paper-main standard-theorem route
 
@@ -241,7 +225,9 @@ The remaining work should be treated as theorem-strengthening:
 1. keep `path_oram_local_posmap_v1` as the only proof-grade backend path in
    docs and claim language
 2. keep the trusted boundary at emitted certificates, the trusted-kernel
-   bundle, and witnesses reconstructed from that bundle
+   bundle, witnesses reconstructed from that bundle, and the checked
+   source-backed runtime implementation interface over the real `uo-evm`
+   bridge modules
 3. keep the compiler bridge on the explicit direct-artifact-plus-Lean-check
    path, and keep any remaining Rust-side bundle emission isolated as
    convenience/debug tooling rather than part of proof-grade acceptance
@@ -260,7 +246,8 @@ There is now a separate active strengthening track for the case where `uo-evm`
 itself, even inside a TEE, must be pushed toward the hostile-host adversary
 model rather than treated as an opaque enclave interior.
 
-Status: started, but far from closed.
+Status: completed for the current proof/interface route; deeper semantics-of-
+Rust and deployment lifting remain future strengthening steps.
 
 The first implementation step is now present in the codebase:
 
@@ -305,9 +292,11 @@ The first implementation step is now present in the codebase:
   induced by the admitted `{ opcode, object_id? }` trace, so the proof-grade
   boundary fixes both successful replay and the resulting public object-order
 - the runtime phase witness now also has a first-class theorem-facing
-  refinement relation to that finished Lean kernel state, so the remaining
-  proof gap is no longer "define the relation" but "prove the real runtime
-  implementation always emits witnesses honest to that relation"
+  refinement relation to that finished Lean kernel state, and the checked
+  source-backed `RuntimeImplementationInterface` now closes the corresponding
+  non-kernel honesty gap at the real `uo-evm` module boundary by pairing that
+  interface with the exact emitted `RuntimeKernelInterfaceBundle` inside the
+  explicit `RuntimeImplementationConfinementBoundary`
 - the runtime now also emits a lower-level
   `RuntimeKernelRefinementWitness` under the public kernel witness: it records
   the concrete runtime phase order `pre-committed-cold objects* -> Begin ->

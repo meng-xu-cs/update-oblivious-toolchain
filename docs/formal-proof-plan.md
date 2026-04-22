@@ -9,10 +9,12 @@ mechanized proof for the instrumented abstract machine used by this workspace,
 and it has already frozen the hostile-host `View_SGX` observer that the final
 deployment theorem must use. The repository now also exposes and
 benchmark-checks an explicit runtime-kernel refinement/confinement boundary
-over emitted runtime proof objects. It still cannot honestly target a universal theorem over all
-downstream Rust machine code, host runtime effects, or microarchitectural
-observers; the remaining work is source-to-kernel compiler correctness,
-backend-assumption discharge, and the final malicious-host deployment theorem.
+over emitted runtime proof objects together with a source-backed runtime
+implementation interface over the actual `uo-evm` bridge modules. It still
+cannot honestly target a universal theorem over all downstream Rust machine
+code, host runtime effects, or microarchitectural observers; the remaining
+work is source-to-kernel compiler correctness, backend-assumption discharge,
+and the final malicious-host deployment theorem.
 
 ## 0. Frozen Final Theorem Target
 
@@ -32,7 +34,10 @@ The repository has already frozen:
 - the proof-grade translation boundary: direct Lean checking of separately
   materialized source/candidate artifacts
 - the runtime proof boundary: the emitted kernel / refinement /
-  trusted-kernel proof objects
+  trusted-kernel proof objects together with the source-backed
+  `RuntimeImplementationInterface` /
+  `RuntimeImplementationConfinementBoundary` over the real `uo-evm` runtime
+  modules
 
 The repository has not yet closed:
 
