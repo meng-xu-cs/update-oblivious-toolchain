@@ -1554,7 +1554,37 @@ Current status update:
   `EvaluatorPublicGasSafe` predicate over `IR.OperationalConfig`).
   The original trace-side statements remain so the abstract composition
   theorems still consume them directly.
-- Subtask W4.3 (definitions only) landed (commit `4f30757`,
+- Subtask W4.3 (full theorem) landed (commit `08f669a`,
+  [proof/lean/UOToolchain/ConfidentialFragment.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ConfidentialFragment.lean)
+  and
+  [proof/lean/UOToolchain/ProofGrade.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)):
+  the iff characterization
+  `(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+  fn.fragmentValid = true` is now a Lean-proved, semantics-
+  preserving theorem. The proof stack is three mutual `theorem`
+  blocks (`Expr.fragmentStats_valid_iff` /
+  `Expr.fragmentStatsList_valid_iff`,
+  `Statement.fragmentStats_valid_iff` /
+  `Statement.fragmentStatsList_valid_iff`,
+  `confidentialFragmentEntrypointWitnessOf_valid_iff`) plus a paper-
+  facing facade
+  `proofGrade_confidential_fragment_valid_iff_structurally_valid` in
+  `ProofGrade.lean`. The select-case `Expr.fragmentStats` definition
+  now uses the global `cond : Bool → α → α → α` primitive instead of
+  `if ... then ... else ...` on a Bool to avoid Lean's Decidable
+  elaboration silently inserting `decide` wrappers. A
+  `FragmentStats.forbidden_zero` predicate plus its
+  `forbidden_zero_empty` / `forbidden_zero_add` simp lemmas factor
+  the recurring "all three forbidden counts are zero" conjunction.
+  The W4.3 charter task therefore moves from "Lean-defined
+  classifier surface, deferred theorem" to "Lean-proved, semantics-
+  preserving"; `uo-solc`'s Rust classifier is still the source of
+  the classifier in production artifacts, so the trusted-surface
+  change is "Lean now has a proved characterization theorem against
+  a Lean-side mirror"; the Rust / Lean classifier agreement remains
+  a source-freeze obligation (handled by the existing static-drift
+  checks).
+- Subtask W4.3 (definitions only) landed earlier (commit `4f30757`,
   [proof/lean/UOToolchain/ConfidentialFragment.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ConfidentialFragment.lean)):
   the structural confidential-fragment classifier surface is now
   Lean-defined.
@@ -1578,13 +1608,11 @@ Current status update:
   does not support for nested-inductive types; the follow-up commit
   will use `Expr.recOn` / `Statement.recOn` directly or restructure
   the IR data types as explicitly mutual inductives.
-- Still open: completing the W4.3 characterization theorem (the iff
-  proof, not just the definitions), the *real* source-to-IR
-  correctness theorem (W4.2), the IR-to-kernel correctness theorem
-  (W4.4), the manifest-exactness semantics-preserving lift (W4.5),
-  and the direct artifact checker demotion (W4.6). The evaluator
-  coverage of W4.1 also still leaves
-  `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
+- Still open: the *real* source-to-IR correctness theorem (W4.2),
+  the IR-to-kernel correctness theorem (W4.4), the manifest-
+  exactness semantics-preserving lift (W4.5), and the direct
+  artifact checker demotion (W4.6). The evaluator coverage of W4.1
+  also still leaves `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
   `Expr.{arrayGet,mapGet,structField,arrayIndex,keccak256}`
   reporting `EvalStatus.unsupported`; those will be admitted
   incrementally as W4.2-W4.4 work proves the corresponding

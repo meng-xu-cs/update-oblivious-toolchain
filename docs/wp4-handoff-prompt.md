@@ -21,10 +21,12 @@ a TEE under a hostile-host adversary (M+ model).
 You are now picking up **Work Package 4: Prove Source-To-Kernel
 Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
 **W4.1** (real operational evaluator surface), **W4.1b** (secrecy-
-lemma re-statement against the new evaluator), and the **W4.3
-definitions side** (structural and count-based confidential-fragment
-classifiers, definitions only) are landed as commits `6e234df`,
-`267dc89`, `63cdd36`, and `4f30757`.
+lemma re-statement against the new evaluator), and **W4.3** (the
+full confidential-fragment characterization theorem
+`(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+fn.fragmentValid = true` plus paper-facing facade) are landed as
+commits `6e234df`, `267dc89`, `63cdd36`, `4f30757`, `5ef3bdd`, and
+`08f669a`.
 
 ## First, Read These Files In This Exact Order
 
@@ -57,12 +59,19 @@ Pay special attention to:
 - `proof/lean/UOToolchain/CompilerInvariant.lean` — both the
   trace-side `compilerSecrecyPreservation` and the new evaluator-side
   `evaluatorCompilerSecrecyPreservation`.
-- `proof/lean/UOToolchain/ConfidentialFragment.lean` — the count-
-  based witness that W4.3 will lift to a structural characterization.
-- `crates/uo-core/src/ir.rs` — the canonical surface the Lean IR
-  mirror tracks.
-- `crates/uo-core/src/fragment.rs` — the Rust confidential-fragment
-  classifier whose Lean mirror is part of W4.3.
+- `proof/lean/UOToolchain/ConfidentialFragment.lean` — the
+  W4.3-landed structural classifier and characterization theorem;
+  the W4.4 lowering theorem will use the `Expr.fragmentValid`
+  predicate as the lowering precondition.
+- `proof/lean/UOToolchain/RuntimeKernelDslJson.lean` — the kernel-
+  DSL Lean mirror (`ImportedConfidentialKernelStatement` /
+  `Expr` / `PureExpr` mutual inductives); W4.4 adds an operational
+  semantics on top.
+- `crates/uo-core/src/ir.rs` — the canonical IR surface the Lean
+  IR mirror tracks.
+- `crates/uo-core/src/confidential_kernel.rs` — the Rust kernel-DSL
+  data types and the lowering function `lower_confidential_kernel_*`
+  that W4.4 mirrors and proves correct.
 
 ## Operating Posture
 
@@ -111,60 +120,57 @@ land in:
 
 ## Recommended Next Subtask
 
-The W4.3 *definitions* side is landed; the next subtask is the
-**W4.3 iff theorem proper**:
-`(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
-fn.fragmentValid = true`. The classifier
-(`IR.confidentialFragmentEntrypointWitnessOf`), the structural
-predicate (`IR.CompiledFunction.fragmentValid`), and the count-
-based classifier (`IR.CompiledFunction.fragmentStats`) all exist.
-What is missing is the iff proof.
+W4.3 is fully landed; the next subtask per the runbook's deliverable
+ordering is **W4.4** (charter task 4: IR-to-kernel correctness).
+W4.4 has a clearer structural path than W4.2 because the kernel-DSL
+Lean mirror already exists (`ImportedConfidentialKernelStatement`
+etc. in `RuntimeKernelDslJson.lean`).
 
-**Subtask W4.3 (theorem): prove the confidential-fragment iff
-characterization.**
+**Subtask W4.4: Prove the IR-to-kernel correctness theorem.**
 
-The natural proof strategy is structural induction on `Expr` and
-`Statement`. Lean 4.30.0-rc2's default `induction` tactic does not
-support nested-inductive types, so the proof needs one of:
+Concretely:
 
-1. **Mutual recursive `def`-style proof** — define the iff proof as
-   a `def` returning `Iff` propositions, structured with mutual
-   recursion (mirroring the existing
-   `Expr.fragmentValid` / `Expr.fragmentValidList` mutual pair).
-   Lean's structural recursion accepts this form. Probably the
-   cleanest path.
-2. **Manual recursor application** — use `Expr.recOn` /
-   `Statement.recOn` directly via `refine` with explicit motives for
-   `Expr`/`Statement` and the nested `List Expr`/`List Statement`.
-3. **Restructure the IR types** — replace nested-inductive
-   `Statement.ifStmt cond (List Statement) (List Statement)` with
-   explicit mutual `Statement` / `StatementList` inductives. Higher
-   churn but enables the standard `induction` tactic.
+1. Define a Lean-side semantics for
+   `ImportedConfidentialKernelStatement` (kernel-DSL operational
+   evaluator over the existing mutual inductives) producing an
+   `IR.Outcome`-shaped result. Probably lands in a new
+   `RuntimeKernelDslSemantics.lean` file.
+2. Mirror the Rust lowering function
+   `lower_confidential_kernel_*` from
+   `crates/uo-core/src/confidential_kernel.rs` as a Lean-side
+   `lowerToKernel : IR.CompiledFunction → Except Error
+   ImportedConfidentialKernelProgram`. The lowering is partial:
+   `IR.Statement.{ifStmt,forLoop}` cannot lower to the straight-
+   line kernel DSL. The W4.3 `Expr.fragmentValid` predicate is
+   precisely the precondition for the expression-side lowering;
+   the statement-side adds "no `ifStmt`, no `forLoop`."
+3. Prove the IR-to-kernel correctness theorem:
+   `lowerToKernel fn = .ok kp →
+     ∀ cfg, evalContract cfg = evalKernel kp cfg`
+   (suitably projected — public projections must agree, secret-side
+   side effects are folded into the kernel evaluator's outcome).
+4. Project through `ProofGrade.lean` as
+   `proofGrade_ir_to_kernel_correctness` (or similar).
 
-Recommendation: try approach (1) first.
+W4.4 is a multi-session effort (~2× the size of W4.3). Recommend
+splitting into:
 
-Prove three lemmas in sequence (see the runbook's "Recommended
-Starting Subtask" section for the exact statements):
+- Session A: kernel-DSL semantics (`RuntimeKernelDslSemantics.lean`)
+  + lowering definitions + lowering succeeds-iff-precondition
+  theorem. No semantics-preservation theorem yet — that's session B.
+- Session B: semantics-preservation theorem proper, proved by
+  mutual recursion mirroring the W4.3 proof structure.
+- Session C: `ProofGrade.lean` projection + status / handoff doc
+  updates.
 
-1. `Expr.fragmentStats_valid_iff` per expression.
-2. `Statement.fragmentStats_valid_iff` per statement.
-3. `confidentialFragmentEntrypointWitnessOf_valid_iff` per function.
+If you would prefer to drive **W4.2** (source-to-IR correctness)
+instead, see the runbook's "Recommended Starting Subtask" section
+for the AST-pull-back framing. W4.2 is roughly 2-3× the effort of
+W4.4 because it requires a partial Lean Solidity parser AST mirror.
 
-Project through `ProofGrade.lean` as
-`proofGrade_confidential_fragment_valid_iff_structurally_valid` (or
-similar). Optionally also prove that `fragmentValid → evalContract`
-never returns `EvalStatus.unsupported`, which establishes that the
-W4.1 evaluator covers the confidential-fragment surface.
-
-If you would prefer to drive W4.2 (source-to-IR correctness)
-instead, the runbook's "Recommended Starting Subtask" section
-explains the AST-pull-back framing that makes W4.2 tractable. W4.2
-is roughly 2-3× the effort of completing W4.3.
-
-After W4.3 (theorem) lands, the natural sequence is:
+After W4.4 lands, the natural sequence is:
 
 - W4.2 — source-to-IR correctness theorem (deliverable 1).
-- W4.4 — IR-to-kernel correctness theorem (deliverable 2).
 - W4.5 — manifest-exactness lift (from exactness/export to
   semantics-preserving, per field).
 - W4.6 — demote the direct artifact checker (charter task 6).
@@ -263,7 +269,7 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The first technical step is the W4.3 iff
-theorem (its definitions side is already landed). If you prefer
-strict deliverable order, the runbook's "Recommended Starting
-Subtask" section also documents the W4.2 AST-pull-back framing.
+Begin with the runbook. The first technical step is W4.4 (IR-to-
+kernel correctness). If you prefer strict deliverable order, the
+runbook's "Recommended Starting Subtask" section also documents the
+W4.2 source-to-IR AST-pull-back framing.
