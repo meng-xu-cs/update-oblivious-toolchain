@@ -2048,6 +2048,27 @@ If implementation resumes immediately, the next concrete sequence should be:
    `oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_unique_position_map_bounded_theorem_checked`,
    and
    `oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
+   Lean now also models the runtime decoded-bucket callback fold directly
+   through `reconstructPathDecodedBucketsListState` /
+   `reconstructPathDecodedBucketsListFailed` over a `List DecodedBucket`
+   (each carrying a public bucket index plus a codec-decoded payload), with
+   `DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets` capturing the
+   per-bucket admission hypothesis. Under that hypothesis the list-level
+   state and final failure collapse exactly to the flat-list state and
+   failure over the bridged stash blocks; companion theorems expose
+   `reconstructPathBucketBlocks_append`, `reconstructPathBlocks_append`,
+   prior-failure absorption, success acceptance, and the no-buckets initial
+   state. These facts land at every layer and are emitted as
+   `oram_helper_reconstruct_path_bucket_blocks_append_theorem_checked`,
+   `oram_helper_reconstruct_path_blocks_append_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_blocks_bucket_blocks_of_decoded_buckets_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_list_state_live_on_bucket_path_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_list_failed_live_on_bucket_path_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_list_failed_prior_failure_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_list_failed_success_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_list_state_no_buckets_theorem_checked`,
+   and
+   `oram_helper_reconstruct_path_decoded_buckets_list_failed_no_buckets_theorem_checked`.
    Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,

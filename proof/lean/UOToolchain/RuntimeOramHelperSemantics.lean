@@ -2581,6 +2581,263 @@ theorem reconstructPathDecodedBucketsFailed_decodedPathBucketUniquePositionMapBo
   rw [reconstructPathDecodedBucketsState_decodedPathBucketUniquePositionMapBounded
     hDecode positionMap stashBlocks]
 
+/-! ### Decoded-bucket runtime fold model -/
+
+theorem reconstructPathBucketBlocks_append
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState)
+      (xs ys : List BucketBlock),
+      reconstructPathBucketBlocks
+          capacity leafCount positionMap state (xs ++ ys) =
+        reconstructPathBucketBlocks capacity leafCount positionMap
+          (reconstructPathBucketBlocks
+            capacity leafCount positionMap state xs)
+          ys := by
+  intro state xs ys
+  induction xs generalizing state with
+  | nil =>
+      simp [reconstructPathBucketBlocks]
+  | cons x xs ih =>
+      simp [reconstructPathBucketBlocks, ih]
+
+theorem reconstructPathBlocks_append
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState)
+      (xs ys : List StashBlock),
+      reconstructPathBlocks
+          capacity leafCount positionMap state (xs ++ ys) =
+        reconstructPathBlocks capacity leafCount positionMap
+          (reconstructPathBlocks capacity leafCount positionMap state xs)
+          ys := by
+  intro state xs ys
+  induction xs generalizing state with
+  | nil =>
+      simp [reconstructPathBlocks]
+  | cons x xs ih =>
+      simp [reconstructPathBlocks, ih]
+
+structure DecodedBucket where
+  bucketIndex : Nat
+  payload : RuntimeOramCodecSemantics.DecodedBucketPayload
+deriving Repr, DecidableEq
+
+def bucketBlocksOfDecodedBucket (b : DecodedBucket) : List BucketBlock :=
+  bucketBlocksOfCodecBlocks b.bucketIndex b.payload.blocks
+
+def stashBlocksOfDecodedBucket (b : DecodedBucket) : List StashBlock :=
+  stashBlocksOfCodecBlocks b.payload.blocks
+
+def bucketBlocksOfDecodedBuckets :
+    List DecodedBucket → List BucketBlock
+  | [] => []
+  | b :: bs =>
+      bucketBlocksOfDecodedBucket b ++ bucketBlocksOfDecodedBuckets bs
+
+def stashBlocksOfDecodedBuckets :
+    List DecodedBucket → List StashBlock
+  | [] => []
+  | b :: bs =>
+      stashBlocksOfDecodedBucket b ++ stashBlocksOfDecodedBuckets bs
+
+def DecodedBucket.LiveOnBucketPath
+    (leafCount : Nat) (b : DecodedBucket) : Prop :=
+  ∀ block, block ∈ b.payload.blocks →
+    block.LiveOnBucketPath leafCount b.bucketIndex
+
+def DecodedBuckets.LiveOnBucketPath
+    (leafCount : Nat) (decodedBuckets : List DecodedBucket) : Prop :=
+  ∀ b, b ∈ decodedBuckets → b.LiveOnBucketPath leafCount
+
+def reconstructPathDecodedBucketsListState
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket) : ReconstructionState :=
+  reconstructPathDecodedBucketsState capacity leafCount positionMap
+    stashBlocks (bucketBlocksOfDecodedBuckets decodedBuckets)
+
+def reconstructPathDecodedBucketsListFailed
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket) : Bool :=
+  reconstructPathDecodedBucketsFailed capacity leafCount positionMap
+    stashBlocks (bucketBlocksOfDecodedBuckets decodedBuckets)
+
+theorem bucketBlocksOfDecodedBucket_def
+    (b : DecodedBucket) :
+    bucketBlocksOfDecodedBucket b =
+      bucketBlocksOfCodecBlocks b.bucketIndex b.payload.blocks := rfl
+
+theorem stashBlocksOfDecodedBucket_def
+    (b : DecodedBucket) :
+    stashBlocksOfDecodedBucket b =
+      stashBlocksOfCodecBlocks b.payload.blocks := rfl
+
+theorem bucketBlocksOfDecodedBuckets_nil :
+    bucketBlocksOfDecodedBuckets [] = [] := rfl
+
+theorem bucketBlocksOfDecodedBuckets_cons
+    (b : DecodedBucket) (bs : List DecodedBucket) :
+    bucketBlocksOfDecodedBuckets (b :: bs) =
+      bucketBlocksOfDecodedBucket b ++ bucketBlocksOfDecodedBuckets bs := rfl
+
+theorem stashBlocksOfDecodedBuckets_nil :
+    stashBlocksOfDecodedBuckets [] = [] := rfl
+
+theorem stashBlocksOfDecodedBuckets_cons
+    (b : DecodedBucket) (bs : List DecodedBucket) :
+    stashBlocksOfDecodedBuckets (b :: bs) =
+      stashBlocksOfDecodedBucket b ++ stashBlocksOfDecodedBuckets bs := rfl
+
+theorem decodedBuckets_liveOnBucketPath_nil
+    (leafCount : Nat) :
+    DecodedBuckets.LiveOnBucketPath leafCount [] := by
+  intro b hMem
+  simp at hMem
+
+theorem decodedBuckets_liveOnBucketPath_head
+    {leafCount : Nat}
+    {b : DecodedBucket}
+    {bs : List DecodedBucket}
+    (hLive : DecodedBuckets.LiveOnBucketPath leafCount (b :: bs)) :
+    b.LiveOnBucketPath leafCount :=
+  hLive b (by simp)
+
+theorem decodedBuckets_liveOnBucketPath_tail
+    {leafCount : Nat}
+    {b : DecodedBucket}
+    {bs : List DecodedBucket}
+    (hLive : DecodedBuckets.LiveOnBucketPath leafCount (b :: bs)) :
+    DecodedBuckets.LiveOnBucketPath leafCount bs := by
+  intro b' hMem
+  exact hLive b' (List.mem_cons_of_mem _ hMem)
+
+theorem reconstructPathBucketBlocks_bucketBlocksOfDecodedBuckets
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState)
+      (decodedBuckets : List DecodedBucket),
+      DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets →
+      reconstructPathBucketBlocks capacity leafCount positionMap state
+          (bucketBlocksOfDecodedBuckets decodedBuckets) =
+        reconstructPathBlocks capacity leafCount positionMap state
+          (stashBlocksOfDecodedBuckets decodedBuckets) := by
+  intro state decodedBuckets
+  induction decodedBuckets generalizing state with
+  | nil =>
+      intro _hLive
+      simp [bucketBlocksOfDecodedBuckets, stashBlocksOfDecodedBuckets,
+        reconstructPathBucketBlocks, reconstructPathBlocks]
+  | cons b bs ih =>
+      intro hLive
+      have hHead : b.LiveOnBucketPath leafCount :=
+        decodedBuckets_liveOnBucketPath_head hLive
+      have hTail : DecodedBuckets.LiveOnBucketPath leafCount bs :=
+        decodedBuckets_liveOnBucketPath_tail hLive
+      rw [bucketBlocksOfDecodedBuckets_cons,
+        reconstructPathBucketBlocks_append,
+        bucketBlocksOfDecodedBucket_def,
+        reconstructPathBucketBlocks_bucketBlocksOfCodecBlocks
+          (bucketIndex := b.bucketIndex)
+          positionMap state b.payload.blocks hHead,
+        stashBlocksOfDecodedBuckets_cons,
+        reconstructPathBlocks_append,
+        stashBlocksOfDecodedBucket_def]
+      exact ih _ hTail
+
+theorem reconstructPathDecodedBucketsListState_liveOnBucketPath
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket)
+    (hLive : DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets) :
+    reconstructPathDecodedBucketsListState capacity leafCount positionMap
+        stashBlocks decodedBuckets =
+      reconstructPathDecodedBlocksState capacity leafCount positionMap
+        stashBlocks (stashBlocksOfDecodedBuckets decodedBuckets) := by
+  unfold reconstructPathDecodedBucketsListState
+    reconstructPathDecodedBucketsState reconstructPathDecodedBlocksState
+  exact reconstructPathBucketBlocks_bucketBlocksOfDecodedBuckets
+    capacity leafCount positionMap _ decodedBuckets hLive
+
+theorem reconstructPathDecodedBucketsListFailed_liveOnBucketPath
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket)
+    (hLive : DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets) :
+    reconstructPathDecodedBucketsListFailed capacity leafCount positionMap
+        stashBlocks decodedBuckets =
+      reconstructPathDecodedBlocksFailed capacity leafCount positionMap
+        stashBlocks (stashBlocksOfDecodedBuckets decodedBuckets) := by
+  have hState :=
+    reconstructPathDecodedBucketsListState_liveOnBucketPath
+      capacity leafCount positionMap stashBlocks decodedBuckets hLive
+  unfold reconstructPathDecodedBucketsListState at hState
+  unfold reconstructPathDecodedBucketsListFailed
+    reconstructPathDecodedBucketsFailed reconstructPathDecodedBlocksFailed
+  rw [hState]
+
+theorem reconstructPathDecodedBucketsListFailed_priorFailure
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket)
+    (hFailed :
+      (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+        stashBlocks decodedBuckets).failed = true) :
+    reconstructPathDecodedBucketsListFailed capacity leafCount positionMap
+        stashBlocks decodedBuckets = true := by
+  unfold reconstructPathDecodedBucketsListFailed
+  exact reconstructPathDecodedBucketsFailed_priorFailure
+    capacity leafCount positionMap stashBlocks
+    (bucketBlocksOfDecodedBuckets decodedBuckets) hFailed
+
+theorem reconstructPathDecodedBucketsListFailed_success
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket)
+    (hFailed :
+      (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+        stashBlocks decodedBuckets).failed = false)
+    (hCoverage :
+      liveSlotCoverageFailed positionMap
+        (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+          stashBlocks decodedBuckets).liveSlots = false) :
+    reconstructPathDecodedBucketsListFailed capacity leafCount positionMap
+        stashBlocks decodedBuckets = false := by
+  unfold reconstructPathDecodedBucketsListFailed
+  exact reconstructPathDecodedBucketsFailed_success
+    capacity leafCount positionMap stashBlocks
+    (bucketBlocksOfDecodedBuckets decodedBuckets) hFailed hCoverage
+
+theorem reconstructPathDecodedBucketsListState_noBuckets
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    reconstructPathDecodedBucketsListState capacity leafCount positionMap
+        [] [] =
+      initialReconstructionState capacity := by
+  unfold reconstructPathDecodedBucketsListState
+  rw [bucketBlocksOfDecodedBuckets_nil]
+  exact reconstructPathDecodedBucketsState_noBlocks
+    capacity leafCount positionMap
+
+theorem reconstructPathDecodedBucketsListFailed_noBuckets
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    reconstructPathDecodedBucketsListFailed capacity leafCount positionMap
+        [] [] =
+      liveSlotCoverageFailed positionMap
+        (List.replicate capacity noneOption) := by
+  unfold reconstructPathDecodedBucketsListFailed
+  rw [bucketBlocksOfDecodedBuckets_nil]
+  exact reconstructPathDecodedBucketsFailed_noBlocks
+    capacity leafCount positionMap
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

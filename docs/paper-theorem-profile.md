@@ -840,6 +840,31 @@ emitted as
 `oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_unique_position_map_bounded_theorem_checked`,
 and
 `oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
+Lean now also models the runtime callback fold itself:
+`reconstructPathDecodedBucketsListState` and `reconstructPathDecodedBucketsListFailed`
+take a `List DecodedBucket` (each carrying a public bucket index plus a
+decoded codec payload), flatten through `bucketBlocksOfDecodedBuckets` /
+`stashBlocksOfDecodedBuckets`, and feed into the existing decoded-block
+reconstruction. The fold-level `LiveOnBucketPath` predicate
+`DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets` requires every
+block of every decoded bucket to satisfy `CodecBlock.LiveOnBucketPath
+leafCount b.bucketIndex`, and under that hypothesis the list-level
+reconstruction state and final failure predicate collapse exactly to the
+flat-list state and failure over the bridged stash blocks. Companion theorems
+expose `reconstructPathBucketBlocks_append`,
+`reconstructPathBlocks_append`, prior-failure absorption, success
+acceptance, and the no-buckets initial-state shape. These facts are
+projected through both checker boundaries and emitted as
+`oram_helper_reconstruct_path_bucket_blocks_append_theorem_checked`,
+`oram_helper_reconstruct_path_blocks_append_theorem_checked`,
+`oram_helper_reconstruct_path_bucket_blocks_bucket_blocks_of_decoded_buckets_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_list_state_live_on_bucket_path_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_list_failed_live_on_bucket_path_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_list_failed_prior_failure_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_list_failed_success_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_list_state_no_buckets_theorem_checked`,
+and
+`oram_helper_reconstruct_path_decoded_buckets_list_failed_no_buckets_theorem_checked`.
 The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it

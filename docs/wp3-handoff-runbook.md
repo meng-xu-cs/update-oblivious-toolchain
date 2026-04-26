@@ -72,6 +72,16 @@ This checkpoint completed:
   reconstruction state/failure on the bridged bucket-block list collapses to
   the flat-list reconstruction state/failure on the bridged stash-block list
   without restating `LiveOnBucketPath` at the call site.
+- Runtime callback fold: a new `DecodedBucket` Lean structure plus
+  `reconstructPathDecodedBucketsListState` /
+  `reconstructPathDecodedBucketsListFailed` shells model the runtime
+  `for index in 0..bucket_count: open + decode + admit per-block` chain.
+  Under `DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets` the
+  list-level state and final failure collapse to the flat-list reconstruction
+  state and failure over the bridged stash blocks. List-append fold lemmas
+  for both `reconstructPathBucketBlocks` and `reconstructPathBlocks` plus
+  prior-failure absorption, success acceptance, and the no-buckets initial
+  state are exposed at every layer.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,
@@ -147,16 +157,21 @@ checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
 Recommended next steps:
 
-1. Model the exact runtime callback structure:
-   `with_opened_oram_payload` -> `decode_bucket_payload` -> per-block admission
-   -> validation/update -> install. Tie each callback edge to the matching
-   composed bridge theorem so the residual-helper-shell theorem chain reaches
-   "decoded path bucket bytes accept" as a single hypothesis at the runtime
-   boundary, not just at the helper layer.
-2. Move any remaining public-only but currently handwritten reconstruction
+1. Tie the runtime decoded-bucket callback fold to the composed codec
+   acceptance hypotheses at every site: build a `List DecodedBucket` whose
+   `LiveOnBucketPath` predicate is discharged by per-bucket invocations of
+   `decodePathBucketPathBoundedExact_some_shape` /
+   `decodePathBucketPositionMapBoundedExact_some_shape` /
+   `decodePathBucketUniquePositionMapBoundedExact_some_shape`, and pass that
+   directly into `reconstructPathDecodedBucketsListFailed_liveOnBucketPath`.
+2. Push the runtime stash phase, position-map coverage check, and live-slot
+   buffer initialization into the same Lean shell so the entire
+   `reconstruct_path_entries_from_storage_into` body is modeled by one
+   theorem rather than the current per-step facts.
+3. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.
-3. Extend the static drift suite to reject reintroduction of direct indexing,
+4. Extend the static drift suite to reject reintroduction of direct indexing,
    variable-size buffers, or secret-dependent control flow in those paths.
 
 ## End-To-End Completion Path

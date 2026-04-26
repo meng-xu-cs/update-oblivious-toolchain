@@ -1988,6 +1988,168 @@ theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsFailed
     importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsFailedDecodedPathBucketUniquePositionMapBounded
       hValid hDecode positionMap stashBlocks
 
+theorem importedBoundaryPaperNativeOramHelperReconstructPathBucketBlocksAppend
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (xs ys : List RuntimeOramHelperSemantics.BucketBlock) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state (xs ++ ys) =
+    RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+        capacity leafCount positionMap state xs)
+      ys := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathBucketBlocksAppend
+      hValid capacity leafCount positionMap state xs ys
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathBlocksAppend
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (xs ys : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state (xs ++ ys) =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlocks
+        capacity leafCount positionMap state xs)
+      ys := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathBlocksAppend
+      hValid capacity leafCount positionMap state xs ys
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathBucketBlocksBucketBlocksOfDecodedBuckets
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket)
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets
+        decodedBuckets) =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.stashBlocksOfDecodedBuckets
+        decodedBuckets) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathBucketBlocksBucketBlocksOfDecodedBuckets
+      hValid capacity leafCount positionMap state decodedBuckets hLive
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListStateLiveOnBucketPath
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket)
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListState
+      capacity leafCount positionMap stashBlocks decodedBuckets =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfDecodedBuckets
+        decodedBuckets) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListStateLiveOnBucketPath
+      hValid capacity leafCount positionMap stashBlocks decodedBuckets hLive
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListFailedLiveOnBucketPath
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket)
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListFailed
+      capacity leafCount positionMap stashBlocks decodedBuckets =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfDecodedBuckets
+        decodedBuckets) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListFailedLiveOnBucketPath
+      hValid capacity leafCount positionMap stashBlocks decodedBuckets hLive
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListFailedPriorFailure
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListState
+      capacity leafCount positionMap stashBlocks decodedBuckets).failed =
+        true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListFailed
+      capacity leafCount positionMap stashBlocks decodedBuckets = true := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListFailedPriorFailure
+      hValid capacity leafCount positionMap stashBlocks decodedBuckets hFailed
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListFailedSuccess
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListState
+      capacity leafCount positionMap stashBlocks decodedBuckets).failed =
+        false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListState
+        capacity leafCount positionMap stashBlocks decodedBuckets).liveSlots =
+        false) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListFailed
+      capacity leafCount positionMap stashBlocks decodedBuckets = false := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListFailedSuccess
+      hValid capacity leafCount positionMap stashBlocks decodedBuckets hFailed hCoverage
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListStateNoBuckets
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListState
+      capacity leafCount positionMap [] [] =
+    RuntimeOramHelperSemantics.initialReconstructionState capacity := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListStateNoBuckets
+      hValid capacity leafCount positionMap
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListFailedNoBuckets
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListFailed
+      capacity leafCount positionMap [] [] =
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (List.replicate capacity RuntimeOramHelperSemantics.noneOption) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListFailedNoBuckets
+      hValid capacity leafCount positionMap
+
 theorem importedBoundaryPaperNativeOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
