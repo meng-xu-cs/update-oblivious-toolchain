@@ -3083,6 +3083,45 @@ theorem reconstructPathDecodedBucketsListState_entries_length
     capacity leafCount positionMap stashBlocks
     (bucketBlocksOfDecodedBuckets decodedBuckets)
 
+/-! ### Per-step non-failure preservation -/
+
+theorem reconstructPathBlockStep_preservesNonFailure
+    {capacity leafCount : Nat}
+    {positionMap : List MaskedUsizeOption}
+    {state : ReconstructionState}
+    {block : StashBlock}
+    (hState : state.failed = false)
+    (hValidation :
+      livePathBlockValidationFailed capacity leafCount positionMap
+        state.liveSlots block = false)
+    (hInstall :
+      installPathEntryFailed state.entries block = false) :
+    (reconstructPathBlockStep capacity leafCount positionMap state
+        block).failed = false := by
+  rcases state with ⟨liveSlots, entries, failed⟩
+  simp at hState hValidation hInstall
+  simp [reconstructPathBlockStep, hState, hValidation, hInstall]
+
+theorem reconstructPathBucketBlockStep_preservesNonFailure_admitted
+    {capacity leafCount : Nat}
+    {positionMap : List MaskedUsizeOption}
+    {state : ReconstructionState}
+    {bucketBlock : BucketBlock}
+    (hState : state.failed = false)
+    (hAdmission :
+      bucketBlockAdmissionFailed leafCount bucketBlock = false)
+    (hValidation :
+      livePathBlockValidationFailed capacity leafCount positionMap
+        state.liveSlots bucketBlock.block = false)
+    (hInstall :
+      installPathEntryFailed state.entries bucketBlock.block = false) :
+    (reconstructPathBucketBlockStep capacity leafCount positionMap state
+        bucketBlock).failed = false := by
+  rw [reconstructPathBucketBlockStep_admitted
+    capacity leafCount positionMap hState hAdmission]
+  exact reconstructPathBlockStep_preservesNonFailure
+    hState hValidation hInstall
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

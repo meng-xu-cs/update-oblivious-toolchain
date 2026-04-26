@@ -900,6 +900,14 @@ are exposed at every layer and emitted as
 `oram_helper_reconstruct_path_decoded_buckets_list_state_live_slots_length_theorem_checked`,
 and
 `oram_helper_reconstruct_path_decoded_buckets_list_state_entries_length_theorem_checked`.
+Per-step non-failure is also preserved: starting from a non-failed state,
+when validation and install both succeed for the running buffers, the
+post-step state remains non-failed. This holds for the basic block step
+and, under bucket-on-leaf-path admission, for the bucket-block step. These
+facts are emitted as
+`oram_helper_reconstruct_path_block_step_preserves_non_failure_theorem_checked`
+and
+`oram_helper_reconstruct_path_bucket_block_step_preserves_non_failure_admitted_theorem_checked`.
 The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it

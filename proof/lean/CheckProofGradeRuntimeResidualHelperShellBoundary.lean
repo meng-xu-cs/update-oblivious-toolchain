@@ -2843,6 +2843,54 @@ theorem importedBoundaryOramHelperReconstructPathDecodedBucketsListStateEntriesL
       (importedBoundaryResidualShellBoundary hValid)
       capacity leafCount positionMap stashBlocks decodedBuckets
 
+theorem importedBoundaryOramHelperReconstructPathBlockStepPreservesNonFailure
+  {boundary : ImportedRuntimeImplementationResidualHelperShellBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount : Nat}
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots block = false)
+  (hInstall :
+    RuntimeOramHelperSemantics.installPathEntryFailed
+      state.entries block = false) :
+  (RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block).failed = false := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepPreservesNonFailure
+      (importedBoundaryResidualIface hValid)
+      (importedBoundaryResidualShellBoundary hValid)
+      hState hValidation hInstall
+
+theorem importedBoundaryOramHelperReconstructPathBucketBlockStepPreservesNonFailureAdmitted
+  {boundary : ImportedRuntimeImplementationResidualHelperShellBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount : Nat}
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {bucketBlock : RuntimeOramHelperSemantics.BucketBlock}
+  (hState : state.failed = false)
+  (hAdmission :
+    RuntimeOramHelperSemantics.bucketBlockAdmissionFailed
+      leafCount bucketBlock = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots
+      bucketBlock.block = false)
+  (hInstall :
+    RuntimeOramHelperSemantics.installPathEntryFailed
+      state.entries bucketBlock.block = false) :
+  (RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock).failed = false := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlockStepPreservesNonFailureAdmitted
+      (importedBoundaryResidualIface hValid)
+      (importedBoundaryResidualShellBoundary hValid)
+      hState hAdmission hValidation hInstall
+
 theorem importedBoundaryOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationResidualHelperShellBoundary}
   (hValid : boundary.Valid)

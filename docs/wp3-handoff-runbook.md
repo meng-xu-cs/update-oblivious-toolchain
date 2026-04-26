@@ -97,6 +97,12 @@ This checkpoint completed:
   matching the runtime's coverage check that iterates
   `position_map.iter().enumerate()` in lockstep with `live_slots.get(...)` at
   the same length.
+- Per-step non-failure preservation:
+  `reconstructPathBlockStep_preservesNonFailure` and
+  `reconstructPathBucketBlockStep_preservesNonFailure_admitted` show that a
+  non-failed state stays non-failed when validation and install both succeed
+  for the running buffers (and admission also succeeds for bucket-blocks).
+  These match the runtime's per-block `?` propagation pattern.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,
@@ -172,14 +178,13 @@ checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
 Recommended next steps:
 
-1. Strengthen the decoded-buckets list-state with a non-failure preservation
-   theorem family: starting from the initial reconstruction state, processing
-   a stash whose blocks satisfy the well-formedness predicate
-   (`livePathBlockValidationFailed = false` and
-   `installPathEntryFailed = false` for every block, given the running
-   live-slot buffer) yields a non-failed state, and similarly for the bucket
-   phase. Combined with the existing length invariants this gives a clean
-   "valid input → reconstruction success" shell theorem.
+1. Lift the per-step non-failure preservation to the fold level: introduce a
+   well-formedness predicate
+   `reconstructPathBlocksWellFormed state blocks` (resp.
+   `reconstructPathBucketBlocksWellFormed state bucketBlocks`) that recursively
+   asks for validation+install (and admission) success at the running
+   reconstruction state, and prove the corresponding fold-level
+   `*_preservesNonFailure_of_wellFormed` theorems by induction on the list.
 2. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.

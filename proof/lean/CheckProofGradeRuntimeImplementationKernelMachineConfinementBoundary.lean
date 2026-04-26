@@ -2394,6 +2394,50 @@ theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListSt
     importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListStateEntriesLength
       hValid capacity leafCount positionMap stashBlocks decodedBuckets
 
+theorem importedBoundaryPaperNativeOramHelperReconstructPathBlockStepPreservesNonFailure
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount : Nat}
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots block = false)
+  (hInstall :
+    RuntimeOramHelperSemantics.installPathEntryFailed
+      state.entries block = false) :
+  (RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block).failed = false := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathBlockStepPreservesNonFailure
+      hValid hState hValidation hInstall
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathBucketBlockStepPreservesNonFailureAdmitted
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount : Nat}
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {bucketBlock : RuntimeOramHelperSemantics.BucketBlock}
+  (hState : state.failed = false)
+  (hAdmission :
+    RuntimeOramHelperSemantics.bucketBlockAdmissionFailed
+      leafCount bucketBlock = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots
+      bucketBlock.block = false)
+  (hInstall :
+    RuntimeOramHelperSemantics.installPathEntryFailed
+      state.entries bucketBlock.block = false) :
+  (RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock).failed = false := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathBucketBlockStepPreservesNonFailureAdmitted
+      hValid hState hAdmission hValidation hInstall
+
 theorem importedBoundaryPaperNativeOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
