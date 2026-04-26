@@ -790,8 +790,41 @@ the final Boolean failure predicate is exposed for both prior-failure and
 success cases. That shell now has a bucket-indexed variant as well, matching
 the runtime gate that rejects any occupied decoded bucket block whose leaf is
 not on that public bucket path before the block enters reconstruction; admitted
-bucket blocks then reduce to the ordinary block-step semantics. The checked
-helper shell therefore rejects metadata,
+bucket blocks then reduce to the ordinary block-step semantics. The bridge
+between codec-level decoded path bucket payloads and that bucket-indexed
+helper reconstruction is now also explicit in Lean: each
+`RuntimeOramCodecSemantics.CodecBlock` lifts to a `RuntimeOramHelperSemantics.StashBlock`
+through `stashBlockOfCodecBlock` (canonicalising occupancy and decoding
+slot/leaf fields), each codec block paired with a public bucket index lifts to
+a helper `BucketBlock` through `bucketBlockOfCodecBlock`, and the
+`bucketBlocksOfCodecBlocks` map preserves that public bucket index across the
+full block list while the corresponding `stashBlocksOfCodecBlocks` list keeps
+the same length and composes with `BucketBlock.block` projection. The bridge
+discharges admission directly: codec blocks proven to satisfy
+`CodecBlock.LiveOnBucketPath` admit into the helper bucket-block reconstruction
+without short-circuit, and all-`LiveOnBucketPath` lifted bucket-block lists
+admit pointwise. Once admitted, the bucket-indexed reconstruction reduces
+mechanically to the flat decoded-block reconstruction over the bridged stash
+block list, so the bucket-indexed reconstruction state and final failure
+predicate over a decoded path bucket payload coincide with the flat
+reconstruction state and predicate over the bridged blocks. These bridge
+theorems are projected through both the standalone residual-helper-shell
+boundary and the direct machine-confinement route, exposed in the imported
+JSON checker, and emitted as
+`oram_helper_bucket_block_of_codec_block_bucket_index_theorem_checked`,
+`oram_helper_bucket_block_of_codec_block_block_theorem_checked`,
+`oram_helper_stash_blocks_of_codec_blocks_length_theorem_checked`,
+`oram_helper_bucket_blocks_of_codec_blocks_length_theorem_checked`,
+`oram_helper_bucket_blocks_of_codec_blocks_map_block_theorem_checked`,
+`oram_helper_bucket_block_admission_failed_bridge_unoccupied_theorem_checked`,
+`oram_helper_bucket_block_admission_failed_bridge_live_on_bucket_path_theorem_checked`,
+`oram_helper_bucket_blocks_of_codec_blocks_admitted_of_live_on_bucket_path_theorem_checked`,
+`oram_helper_reconstruct_path_bucket_blocks_eq_reconstruct_path_blocks_of_admitted_theorem_checked`,
+`oram_helper_reconstruct_path_bucket_blocks_bucket_blocks_of_codec_blocks_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_state_bucket_blocks_of_codec_blocks_theorem_checked`,
+and
+`oram_helper_reconstruct_path_decoded_buckets_failed_bucket_blocks_of_codec_blocks_theorem_checked`.
+The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it
 rejects reintroducing direct fixed-offset ORAM byte indexing/slicing in the

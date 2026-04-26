@@ -2182,6 +2182,262 @@ theorem rewritePathSummary_noFailure
   exact rewritePathUpdateFailed_noFailure parameters postUpdateStashLen
     postRebuildStashLen hPostUpdate hPostRebuild
 
+/-! ### Bridge: codec decoded path bucket blocks to helper bucket blocks -/
+
+def stashBlockOfCodecBlock
+    (block : RuntimeOramCodecSemantics.CodecBlock) : StashBlock :=
+  { occupied := decide (block.occupiedTag = 1)
+  , slotIndex :=
+      RuntimeOramCodecSemantics.decodeNatField block.slotIndexField
+  , leaf :=
+      RuntimeOramCodecSemantics.decodeNatField block.leafLabelField
+  }
+
+def bucketBlockOfCodecBlock
+    (bucketIndex : Nat)
+    (block : RuntimeOramCodecSemantics.CodecBlock) : BucketBlock :=
+  { bucketIndex
+  , block := stashBlockOfCodecBlock block
+  }
+
+def stashBlocksOfCodecBlocks
+    (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+    List StashBlock :=
+  blocks.map stashBlockOfCodecBlock
+
+def bucketBlocksOfCodecBlocks
+    (bucketIndex : Nat)
+    (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+    List BucketBlock :=
+  blocks.map (bucketBlockOfCodecBlock bucketIndex)
+
+theorem stashBlockOfCodecBlock_occupied
+    (block : RuntimeOramCodecSemantics.CodecBlock) :
+    (stashBlockOfCodecBlock block).occupied =
+      decide (block.occupiedTag = 1) := by
+  simp [stashBlockOfCodecBlock]
+
+theorem stashBlockOfCodecBlock_occupied_iff
+    (block : RuntimeOramCodecSemantics.CodecBlock) :
+    (stashBlockOfCodecBlock block).occupied = true ↔
+      block.occupiedTag = 1 := by
+  simp [stashBlockOfCodecBlock_occupied]
+
+theorem stashBlockOfCodecBlock_slotIndex
+    (block : RuntimeOramCodecSemantics.CodecBlock) :
+    (stashBlockOfCodecBlock block).slotIndex =
+      RuntimeOramCodecSemantics.decodeNatField block.slotIndexField := by
+  rfl
+
+theorem stashBlockOfCodecBlock_leaf
+    (block : RuntimeOramCodecSemantics.CodecBlock) :
+    (stashBlockOfCodecBlock block).leaf =
+      RuntimeOramCodecSemantics.decodeNatField block.leafLabelField := by
+  rfl
+
+theorem bucketBlockOfCodecBlock_bucketIndex
+    (bucketIndex : Nat)
+    (block : RuntimeOramCodecSemantics.CodecBlock) :
+    (bucketBlockOfCodecBlock bucketIndex block).bucketIndex = bucketIndex := by
+  rfl
+
+theorem bucketBlockOfCodecBlock_block
+    (bucketIndex : Nat)
+    (block : RuntimeOramCodecSemantics.CodecBlock) :
+    (bucketBlockOfCodecBlock bucketIndex block).block =
+      stashBlockOfCodecBlock block := by
+  rfl
+
+theorem stashBlocksOfCodecBlocks_length
+    (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+    (stashBlocksOfCodecBlocks blocks).length = blocks.length := by
+  simp [stashBlocksOfCodecBlocks]
+
+theorem bucketBlocksOfCodecBlocks_length
+    (bucketIndex : Nat)
+    (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+    (bucketBlocksOfCodecBlocks bucketIndex blocks).length = blocks.length := by
+  simp [bucketBlocksOfCodecBlocks]
+
+theorem bucketBlocksOfCodecBlocks_map_block
+    (bucketIndex : Nat)
+    (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+    (bucketBlocksOfCodecBlocks bucketIndex blocks).map BucketBlock.block =
+      stashBlocksOfCodecBlocks blocks := by
+  simp [bucketBlocksOfCodecBlocks, stashBlocksOfCodecBlocks,
+    bucketBlockOfCodecBlock]
+
+theorem bucketBlocksOfCodecBlocks_nil
+    (bucketIndex : Nat) :
+    bucketBlocksOfCodecBlocks bucketIndex [] = [] := by
+  rfl
+
+theorem bucketBlocksOfCodecBlocks_cons
+    (bucketIndex : Nat)
+    (block : RuntimeOramCodecSemantics.CodecBlock)
+    (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+    bucketBlocksOfCodecBlocks bucketIndex (block :: blocks) =
+      bucketBlockOfCodecBlock bucketIndex block ::
+        bucketBlocksOfCodecBlocks bucketIndex blocks := by
+  simp [bucketBlocksOfCodecBlocks]
+
+theorem stashBlocksOfCodecBlocks_nil :
+    stashBlocksOfCodecBlocks [] = [] := by
+  rfl
+
+theorem stashBlocksOfCodecBlocks_cons
+    (block : RuntimeOramCodecSemantics.CodecBlock)
+    (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+    stashBlocksOfCodecBlocks (block :: blocks) =
+      stashBlockOfCodecBlock block :: stashBlocksOfCodecBlocks blocks := by
+  simp [stashBlocksOfCodecBlocks]
+
+theorem bucketBlockAdmissionFailed_bridge_unoccupied
+    {leafCount bucketIndex : Nat}
+    {block : RuntimeOramCodecSemantics.CodecBlock}
+    (hUnoccupied : block.occupiedTag ≠ 1) :
+    bucketBlockAdmissionFailed leafCount
+        (bucketBlockOfCodecBlock bucketIndex block) = false := by
+  simp [bucketBlockAdmissionFailed, bucketBlockOfCodecBlock,
+    stashBlockOfCodecBlock]
+  intro hOcc
+  exact (hUnoccupied hOcc).elim
+
+theorem bucketBlockAdmissionFailed_bridge_liveOnBucketPath
+    {leafCount bucketIndex : Nat}
+    {block : RuntimeOramCodecSemantics.CodecBlock}
+    (hLive : block.LiveOnBucketPath leafCount bucketIndex) :
+    bucketBlockAdmissionFailed leafCount
+        (bucketBlockOfCodecBlock bucketIndex block) = false := by
+  by_cases hOcc : block.occupiedTag = 1
+  · have hPath := hLive hOcc
+    simp [bucketBlockAdmissionFailed, bucketBlockOfCodecBlock,
+      stashBlockOfCodecBlock, hOcc, hPath]
+  · exact bucketBlockAdmissionFailed_bridge_unoccupied (bucketIndex := bucketIndex)
+      hOcc
+
+theorem bucketBlocksOfCodecBlocks_admitted_of_liveOnBucketPath
+    {leafCount bucketIndex : Nat}
+    {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+    (hLive :
+      ∀ block, block ∈ blocks →
+        block.LiveOnBucketPath leafCount bucketIndex) :
+    ∀ bucketBlock,
+      bucketBlock ∈ bucketBlocksOfCodecBlocks bucketIndex blocks →
+        bucketBlockAdmissionFailed leafCount bucketBlock = false := by
+  intro bucketBlock hMem
+  rcases List.mem_map.mp hMem with ⟨block, hBlock, hEq⟩
+  subst hEq
+  exact bucketBlockAdmissionFailed_bridge_liveOnBucketPath
+    (hLive block hBlock)
+
+theorem reconstructPathBucketBlocks_eq_reconstructPathBlocks_of_admitted
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState)
+      (bucketBlocks : List BucketBlock),
+      (∀ bb, bb ∈ bucketBlocks →
+        bucketBlockAdmissionFailed leafCount bb = false) →
+      reconstructPathBucketBlocks
+          capacity leafCount positionMap state bucketBlocks =
+        reconstructPathBlocks capacity leafCount positionMap state
+          (bucketBlocks.map BucketBlock.block) := by
+  intro state bucketBlocks
+  induction bucketBlocks generalizing state with
+  | nil =>
+      intro _hAdmit
+      simp [reconstructPathBucketBlocks, reconstructPathBlocks]
+  | cons bb tail ih =>
+      intro hAdmit
+      have hHead :
+          bucketBlockAdmissionFailed leafCount bb = false :=
+        hAdmit bb (by simp)
+      have hTail :
+          ∀ bb', bb' ∈ tail →
+            bucketBlockAdmissionFailed leafCount bb' = false := by
+        intro bb' hbb'
+        exact hAdmit bb' (List.mem_cons_of_mem _ hbb')
+      by_cases hFailed : state.failed = true
+      · have hStep :=
+          reconstructPathBucketBlockStep_priorFailure
+            capacity leafCount positionMap bb hFailed
+        have hStepFlat :=
+          reconstructPathBlockStep_priorFailure
+            capacity leafCount positionMap bb.block hFailed
+        have hRecBucket :=
+          reconstructPathBucketBlocks_priorFailure
+            capacity leafCount positionMap tail hFailed
+        have hRecFlat :=
+          reconstructPathBlocks_priorFailure
+            capacity leafCount positionMap (tail.map BucketBlock.block) hFailed
+        simp [reconstructPathBucketBlocks, hStep, hRecBucket,
+          reconstructPathBlocks, hStepFlat, hRecFlat]
+      · have hStateNotFailed : state.failed = false := by
+          cases h : state.failed
+          · rfl
+          · simp [h] at hFailed
+        have hStep :=
+          reconstructPathBucketBlockStep_admitted
+            capacity leafCount positionMap hStateNotFailed hHead
+        rw [reconstructPathBucketBlocks_cons,
+          hStep,
+          List.map_cons,
+          reconstructPathBlocks_cons]
+        exact ih _ hTail
+
+theorem reconstructPathBucketBlocks_bucketBlocksOfCodecBlocks
+    {capacity leafCount bucketIndex : Nat}
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState)
+    (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+    (hLive :
+      ∀ block, block ∈ codecBlocks →
+        block.LiveOnBucketPath leafCount bucketIndex) :
+    reconstructPathBucketBlocks capacity leafCount positionMap state
+        (bucketBlocksOfCodecBlocks bucketIndex codecBlocks) =
+      reconstructPathBlocks capacity leafCount positionMap state
+        (stashBlocksOfCodecBlocks codecBlocks) := by
+  have hAdmit :
+      ∀ bb, bb ∈ bucketBlocksOfCodecBlocks bucketIndex codecBlocks →
+        bucketBlockAdmissionFailed leafCount bb = false :=
+    bucketBlocksOfCodecBlocks_admitted_of_liveOnBucketPath hLive
+  rw [reconstructPathBucketBlocks_eq_reconstructPathBlocks_of_admitted
+    capacity leafCount positionMap state
+    (bucketBlocksOfCodecBlocks bucketIndex codecBlocks) hAdmit,
+    bucketBlocksOfCodecBlocks_map_block]
+
+theorem reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks
+    {capacity leafCount bucketIndex : Nat}
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+    (hLive :
+      ∀ block, block ∈ codecBlocks →
+        block.LiveOnBucketPath leafCount bucketIndex) :
+    reconstructPathDecodedBucketsState capacity leafCount positionMap
+        stashBlocks (bucketBlocksOfCodecBlocks bucketIndex codecBlocks) =
+      reconstructPathDecodedBlocksState capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks codecBlocks) := by
+  unfold reconstructPathDecodedBucketsState reconstructPathDecodedBlocksState
+  exact reconstructPathBucketBlocks_bucketBlocksOfCodecBlocks
+    positionMap _ codecBlocks hLive
+
+theorem reconstructPathDecodedBucketsFailed_bucketBlocksOfCodecBlocks
+    {capacity leafCount bucketIndex : Nat}
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+    (hLive :
+      ∀ block, block ∈ codecBlocks →
+        block.LiveOnBucketPath leafCount bucketIndex) :
+    reconstructPathDecodedBucketsFailed capacity leafCount positionMap
+        stashBlocks (bucketBlocksOfCodecBlocks bucketIndex codecBlocks) =
+      reconstructPathDecodedBlocksFailed capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks codecBlocks) := by
+  unfold reconstructPathDecodedBucketsFailed reconstructPathDecodedBlocksFailed
+  rw [reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks
+    positionMap stashBlocks codecBlocks hLive]
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

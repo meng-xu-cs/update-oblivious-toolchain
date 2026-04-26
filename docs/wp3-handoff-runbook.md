@@ -58,12 +58,21 @@ This checkpoint completed:
   occupied bucket blocks off the public bucket path are rejected before entering
   reconstruction; admitted bucket blocks reduce to the ordinary block-step
   semantics.
-- Projection of the new bucket-indexed checkpoint through:
+- Lean codec-to-helper bridge: each decoded
+  `RuntimeOramCodecSemantics.CodecBlock` lifts canonically into a helper
+  `StashBlock` and, paired with a public bucket index, into a helper
+  `BucketBlock`; codec blocks proven `LiveOnBucketPath` admit pointwise into
+  the bucket-indexed reconstruction; the bucket-indexed reconstruction state
+  and final failure predicate over a decoded bucket payload coincide with the
+  flat-list state and predicate over the bridged stash blocks.
+- Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
+  through:
   `RuntimeImplementationInterface`,
   `RuntimeImplementationInterfaceJson`,
   `CheckProofGradeRuntimeResidualHelperShellBoundary`, and
   `CheckProofGradeRuntimeImplementationKernelMachineConfinementBoundary`.
-- Probe report/static checks for the newly exposed theorem names.
+- Probe report/static checks for the newly exposed theorem names, including
+  the twelve codec-to-helper bridge `*_theorem_checked` bits.
 - Documentation updates in `docs/paper-theorem-profile.md` and
   `docs/top-tier-paper-execution-roadmap.md`.
 
@@ -113,30 +122,35 @@ Then run the validation slice above before editing. Do not rely on stale local
 mental state.
 
 The next best technical target is to continue the same shrink-and-prove pattern
-on the remaining Path-ORAM reconstruction and codec side:
+on the remaining Path-ORAM reconstruction and codec side. The codec-to-helper
+bridge has now landed: `bucketBlockOfCodecBlock`, `bucketBlocksOfCodecBlocks`,
+`bucketBlockAdmissionFailed_bridge_liveOnBucketPath`,
+`bucketBlocksOfCodecBlocks_admitted_of_liveOnBucketPath`,
+`reconstructPathBucketBlocks_eq_reconstructPathBlocks_of_admitted`,
+`reconstructPathBucketBlocks_bucketBlocksOfCodecBlocks`,
+`reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks`, and
+`reconstructPathDecodedBucketsFailed_bucketBlocksOfCodecBlocks` are now
+projected through the implementation interface, the imported JSON checker, and
+both the residual-helper-shell and direct machine-confinement boundary
+checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
-1. Strengthen the bucket-indexed reconstruction model so the theorem exports
-   cover the currently internal Lean facts not yet all projected through the
-   imported checkers, especially:
-   `bucketBlockAdmissionFailed_onPath`,
-   `reconstructPathBucketBlockStep_priorFailure`,
-   `reconstructPathBucketBlocks_cons`,
-   `reconstructPathDecodedBucketsState_noBlocks`,
-   `reconstructPathDecodedBucketsFailed_priorFailure`,
-   `reconstructPathDecodedBucketsFailed_stashFailure`, and
-   `reconstructPathDecodedBucketsFailed_noBlocks`.
-2. Tie codec-level decoded bucket payload facts to helper-level `BucketBlock`
-   reconstruction facts. Existing codec theorems prove decoded path buckets
-   satisfy `LiveOnBucketPath`; the helper model now has the admission gate, but
-   the next scientific step is a bridge theorem that maps decoded codec blocks
-   into admitted helper bucket blocks.
-3. Model the exact runtime callback structure:
+Recommended next steps:
+
+1. Strengthen the bridge by composing with the codec acceptance theorems
+   `decodePathBucketPathBoundedExact_some_shape` /
+   `decodePathBucketPositionMapBoundedExact_some_shape` /
+   `decodePathBucketUniquePositionMapBoundedExact_some_shape` so that
+   "the bytes for a path bucket decode" implies "the bridged bucket-block list
+   admits and reduces to the flat reconstruction" without restating
+   `LiveOnBucketPath` per call site.
+2. Model the exact runtime callback structure:
    `with_opened_oram_payload` -> `decode_bucket_payload` -> per-block admission
-   -> validation/update -> install.
-4. Move any remaining public-only but currently handwritten reconstruction
+   -> validation/update -> install. Tie each callback edge to the matching
+   bridge theorem.
+3. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.
-5. Extend the static drift suite to reject reintroduction of direct indexing,
+4. Extend the static drift suite to reject reintroduction of direct indexing,
    variable-size buffers, or secret-dependent control flow in those paths.
 
 ## End-To-End Completion Path

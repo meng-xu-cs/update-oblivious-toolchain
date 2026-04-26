@@ -4418,6 +4418,210 @@ theorem
       capacity leafCount positionMap stashBlocks bucketBlocks hFailed hCoverage
 
 theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlockOfCodecBlockBucketIndex
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (bucketIndex : Nat)
+  (block : RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block).bucketIndex =
+    bucketIndex := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockOfCodecBlockBucketIndex
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      bucketIndex block
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlockOfCodecBlockBlock
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (bucketIndex : Nat)
+  (block : RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block).block =
+    RuntimeOramHelperSemantics.stashBlockOfCodecBlock block := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockOfCodecBlockBlock
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      bucketIndex block
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperStashBlocksOfCodecBlocksLength
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks blocks).length =
+    blocks.length := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperStashBlocksOfCodecBlocksLength
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      blocks
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksOfCodecBlocksLength
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (bucketIndex : Nat)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks).length =
+    blocks.length := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfCodecBlocksLength
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      bucketIndex blocks
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksOfCodecBlocksMapBlock
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (bucketIndex : Nat)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks).map
+      RuntimeOramHelperSemantics.BucketBlock.block =
+    RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks blocks := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfCodecBlocksMapBlock
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      bucketIndex blocks
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlockAdmissionFailedBridgeUnoccupied
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hUnoccupied : block.occupiedTag ≠ 1) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block) =
+    false := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockAdmissionFailedBridgeUnoccupied
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      hUnoccupied
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlockAdmissionFailedBridgeLiveOnBucketPath
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hLive : block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block) =
+    false := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockAdmissionFailedBridgeLiveOnBucketPath
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      hLive
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksOfCodecBlocksAdmittedOfLiveOnBucketPath
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {leafCount bucketIndex : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hLive :
+    ∀ block, block ∈ blocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  ∀ bucketBlock,
+    bucketBlock ∈
+        RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bucketBlock =
+        false := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfCodecBlocksAdmittedOfLiveOnBucketPath
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      hLive
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathBucketBlocksEqReconstructPathBlocksOfAdmitted
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hAdmit :
+    ∀ bb, bb ∈ bucketBlocks →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bb = false) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state
+      (bucketBlocks.map RuntimeOramHelperSemantics.BucketBlock.block) := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlocksEqReconstructPathBlocksOfAdmitted
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      capacity leafCount positionMap state bucketBlocks hAdmit
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathBucketBlocksBucketBlocksOfCodecBlocks
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlocksBucketBlocksOfCodecBlocks
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      positionMap state codecBlocks hLive
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsStateBucketBlocksOfCodecBlocks
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsStateBucketBlocksOfCodecBlocks
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      positionMap stashBlocks codecBlocks hLive
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsFailedBucketBlocksOfCodecBlocks
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsFailedBucketBlocksOfCodecBlocks
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      positionMap stashBlocks codecBlocks hLive
+
+theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)

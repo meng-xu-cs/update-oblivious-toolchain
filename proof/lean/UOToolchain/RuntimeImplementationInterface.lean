@@ -10918,6 +10918,169 @@ theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRec
   RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed_success
     capacity leafCount positionMap stashBlocks bucketBlocks hFailed hCoverage
 
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockOfCodecBlockBucketIndex
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (bucketIndex : Nat)
+  (block : RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block).bucketIndex =
+    bucketIndex :=
+  RuntimeOramHelperSemantics.bucketBlockOfCodecBlock_bucketIndex bucketIndex block
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockOfCodecBlockBlock
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (bucketIndex : Nat)
+  (block : RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block).block =
+    RuntimeOramHelperSemantics.stashBlockOfCodecBlock block :=
+  RuntimeOramHelperSemantics.bucketBlockOfCodecBlock_block bucketIndex block
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperStashBlocksOfCodecBlocksLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks blocks).length =
+    blocks.length :=
+  RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks_length blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfCodecBlocksLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (bucketIndex : Nat)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks).length =
+    blocks.length :=
+  RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks_length bucketIndex blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfCodecBlocksMapBlock
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (bucketIndex : Nat)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks).map
+      RuntimeOramHelperSemantics.BucketBlock.block =
+    RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks blocks :=
+  RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks_map_block bucketIndex blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedBridgeUnoccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hUnoccupied : block.occupiedTag ≠ 1) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block) =
+    false :=
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed_bridge_unoccupied
+    (bucketIndex := bucketIndex) hUnoccupied
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedBridgeLiveOnBucketPath
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hLive : block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block) =
+    false :=
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed_bridge_liveOnBucketPath
+    hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfCodecBlocksAdmittedOfLiveOnBucketPath
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount bucketIndex : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hLive :
+    ∀ block, block ∈ blocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  ∀ bucketBlock,
+    bucketBlock ∈
+        RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bucketBlock =
+        false :=
+  RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks_admitted_of_liveOnBucketPath
+    hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksEqReconstructPathBlocksOfAdmitted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hAdmit :
+    ∀ bb, bb ∈ bucketBlocks →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bb = false) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state
+      (bucketBlocks.map RuntimeOramHelperSemantics.BucketBlock.block) :=
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks_eq_reconstructPathBlocks_of_admitted
+    capacity leafCount positionMap state bucketBlocks hAdmit
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksBucketBlocksOfCodecBlocks
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) :=
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks_bucketBlocksOfCodecBlocks
+    positionMap state codecBlocks hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsStateBucketBlocksOfCodecBlocks
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks
+    positionMap stashBlocks codecBlocks hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsFailedBucketBlocksOfCodecBlocks
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed_bucketBlocksOfCodecBlocks
+    positionMap stashBlocks codecBlocks hLive
+
 theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperWorkingStashCapacityFormula
   (iface : RuntimeImplementationInterface)
   (_h : iface.ResidualHelperShellBoundary)
@@ -15865,6 +16028,186 @@ theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBuck
     assumptions.implementationInterface
     (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
     capacity leafCount positionMap stashBlocks bucketBlocks hFailed hCoverage
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockOfCodecBlockBucketIndex
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (bucketIndex : Nat)
+  (block : RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block).bucketIndex =
+    bucketIndex :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockOfCodecBlockBucketIndex
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    bucketIndex block
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockOfCodecBlockBlock
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (bucketIndex : Nat)
+  (block : RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block).block =
+    RuntimeOramHelperSemantics.stashBlockOfCodecBlock block :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockOfCodecBlockBlock
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    bucketIndex block
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperStashBlocksOfCodecBlocksLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks blocks).length =
+    blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperStashBlocksOfCodecBlocksLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfCodecBlocksLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (bucketIndex : Nat)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks).length =
+    blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfCodecBlocksLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    bucketIndex blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfCodecBlocksMapBlock
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (bucketIndex : Nat)
+  (blocks : List RuntimeOramCodecSemantics.CodecBlock) :
+  (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks).map
+      RuntimeOramHelperSemantics.BucketBlock.block =
+    RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks blocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfCodecBlocksMapBlock
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    bucketIndex blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockAdmissionFailedBridgeUnoccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hUnoccupied : block.occupiedTag ≠ 1) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block) =
+    false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedBridgeUnoccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hUnoccupied
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockAdmissionFailedBridgeLiveOnBucketPath
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hLive : block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      (RuntimeOramHelperSemantics.bucketBlockOfCodecBlock bucketIndex block) =
+    false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedBridgeLiveOnBucketPath
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfCodecBlocksAdmittedOfLiveOnBucketPath
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount bucketIndex : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hLive :
+    ∀ block, block ∈ blocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  ∀ bucketBlock,
+    bucketBlock ∈
+        RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex blocks →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bucketBlock =
+        false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfCodecBlocksAdmittedOfLiveOnBucketPath
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlocksEqReconstructPathBlocksOfAdmitted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hAdmit :
+    ∀ bb, bb ∈ bucketBlocks →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bb = false) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state
+      (bucketBlocks.map RuntimeOramHelperSemantics.BucketBlock.block) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksEqReconstructPathBlocksOfAdmitted
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap state bucketBlocks hAdmit
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlocksBucketBlocksOfCodecBlocks
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksBucketBlocksOfCodecBlocks
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap state codecBlocks hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsStateBucketBlocksOfCodecBlocks
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsStateBucketBlocksOfCodecBlocks
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap stashBlocks codecBlocks hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsFailedBucketBlocksOfCodecBlocks
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount bucketIndex : Nat}
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (codecBlocks : List RuntimeOramCodecSemantics.CodecBlock)
+  (hLive :
+    ∀ block, block ∈ codecBlocks →
+      block.LiveOnBucketPath leafCount bucketIndex) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks bucketIndex
+        codecBlocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks codecBlocks) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsFailedBucketBlocksOfCodecBlocks
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap stashBlocks codecBlocks hLive
 
 theorem RuntimePaperNativeKernelAssumptions.oramHelperWorkingStashCapacityFormula
   (assumptions : RuntimePaperNativeKernelAssumptions)

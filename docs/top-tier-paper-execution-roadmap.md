@@ -2003,7 +2003,36 @@ If implementation resumes immediately, the next concrete sequence should be:
    has a bucket-indexed Lean variant that matches the runtime gate rejecting
    any occupied decoded bucket block whose leaf is not on that public bucket
    path before reconstruction; admitted bucket blocks reduce to the ordinary
-   block-step semantics. Public metadata,
+   block-step semantics. The bridge between codec-level decoded path bucket
+   payloads and the bucket-indexed helper reconstruction is now also explicit
+   on both sides of the proof boundary: each `RuntimeOramCodecSemantics.CodecBlock`
+   lifts canonically to a helper `StashBlock` (occupancy from the codec tag,
+   slot/leaf from `decodeNatField`), each codec block paired with a public
+   bucket index lifts to a helper `BucketBlock` preserving that bucket index,
+   and the per-list bridge keeps the public block count and composes with
+   `BucketBlock.block`. Codec blocks proven `LiveOnBucketPath` admit into the
+   helper bucket-block reconstruction without short-circuit, all-`LiveOnBucketPath`
+   lifted bucket-block lists admit pointwise, the bucket-indexed reconstruction
+   collapses to the flat block reconstruction over the bridged stash list, and
+   the bucket-indexed reconstruction state and final failure predicate over a
+   decoded bucket payload coincide with the flat-list state and predicate.
+   These bridge theorems are projected through the residual-helper-shell
+   boundary, the direct machine-confinement boundary, and the imported JSON
+   checker, and emitted as
+   `oram_helper_bucket_block_of_codec_block_bucket_index_theorem_checked`,
+   `oram_helper_bucket_block_of_codec_block_block_theorem_checked`,
+   `oram_helper_stash_blocks_of_codec_blocks_length_theorem_checked`,
+   `oram_helper_bucket_blocks_of_codec_blocks_length_theorem_checked`,
+   `oram_helper_bucket_blocks_of_codec_blocks_map_block_theorem_checked`,
+   `oram_helper_bucket_block_admission_failed_bridge_unoccupied_theorem_checked`,
+   `oram_helper_bucket_block_admission_failed_bridge_live_on_bucket_path_theorem_checked`,
+   `oram_helper_bucket_blocks_of_codec_blocks_admitted_of_live_on_bucket_path_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_blocks_eq_reconstruct_path_blocks_of_admitted_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_blocks_bucket_blocks_of_codec_blocks_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_state_bucket_blocks_of_codec_blocks_theorem_checked`,
+   and
+   `oram_helper_reconstruct_path_decoded_buckets_failed_bucket_blocks_of_codec_blocks_theorem_checked`.
+   Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,
    slice, or decoded-slot access in the generated
@@ -2128,7 +2157,10 @@ If implementation resumes immediately, the next concrete sequence should be:
    coverage-check effects; Path-entry reset/install effects; combined
    reconstruction loop-body, decoded-block-list fold, bucket-indexed admission
    fold, whole decoded
-   reconstruction shell, and finish-predicate effects; position-map
+   reconstruction shell, finish-predicate effects, and the codec-to-helper
+   bridge that lifts decoded path bucket payload blocks into admitted
+   helper bucket blocks so that the bucket-indexed reconstruction collapses
+   onto the flat block reconstruction over those bridged blocks; position-map
    coverage/agreement hooks;
    page coverage,
    positivity, split, decode-acceptance, page-length, and exact
