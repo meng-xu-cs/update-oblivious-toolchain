@@ -44,7 +44,16 @@ inductive Ty where
 
 /-- Mirror of `crates/uo-core/src/types.rs`'s `Value`. The `uint` payload is
 modeled as `Nat` instead of Rust's `u128`; width-aware operations should be
-performed in the evaluator. -/
+performed in the evaluator.
+
+The `map` variant is the Lean-side representation of a confidential
+`UOMap` instance: a list of `(key, value)` entries the evaluator can
+search by key. The Rust runtime uses Path-ORAM with `Keccak(key)` as the
+lookup key, but the W4.1 evaluator operates one level higher (over
+plaintext entries) so that the W4.4 IR-to-kernel preservation theorem
+can compare evaluator outcomes directly. The map's *physical*
+representation is part of the storage backend's responsibility, not the
+W4.1 evaluator's. -/
 inductive Value where
   | bool (b : Bool)
   | uint (n : Nat)
@@ -52,6 +61,7 @@ inductive Value where
   | address (bytes : List UInt8)
   | structValue (fields : List (String × Value))
   | array (values : List Value)
+  | map (entries : List (Value × Value))
   deriving Inhabited
 
 /-- Mirror of `crates/uo-core/src/ir.rs`'s `ProgramMode`. -/
@@ -181,5 +191,74 @@ def insert (store : ObjectStore) (objectId : Nat) (value : Value) : ObjectStore 
   (objectId, value) :: store.filter (fun entry => entry.fst ≠ objectId)
 
 end ObjectStore
+
+/-! ## Value equality and hash placeholder
+
+`Value.beq` is a structural Boolean equality used by the evaluator's
+`mapGet` lookup. It is defined manually (rather than `deriving BEq`)
+because `Value` is a nested-inductive over `List` and `String × Value`
+pairs, and Lean 4.30's `deriving` for nested inductives sometimes
+fails on this shape.
+
+`Value.keccak256Mock` is a deterministic placeholder for the Rust
+runtime's `tiny_keccak::Keccak::v256()` hash. The W4.1 evaluator only
+uses this for the value flow; the runtime's actual hash bits are
+material at a lower abstraction layer (Path-ORAM physical lookup).
+The mock is *not* cryptographically sound; it suffices for the
+evaluator and for the W4.4 preservation theorem (both IR-side and
+kernel-side evaluators use the same mock so they agree). -/
+
+mutual
+
+partial def Value.beq : Value → Value → Bool
+  | .bool a, .bool b => a == b
+  | .uint a, .uint b => a == b
+  | .bytes32 a, .bytes32 b => a == b
+  | .address a, .address b => a == b
+  | .structValue a, .structValue b => Value.beqStructFields a b
+  | .array a, .array b => Value.beqList a b
+  | .map a, .map b => Value.beqMapEntries a b
+  | _, _ => false
+
+partial def Value.beqList : List Value → List Value → Bool
+  | [], [] => true
+  | [], _ :: _ => false
+  | _ :: _, [] => false
+  | x :: xs, y :: ys => Value.beq x y && Value.beqList xs ys
+
+partial def Value.beqStructFields :
+    List (String × Value) → List (String × Value) → Bool
+  | [], [] => true
+  | [], _ :: _ => false
+  | _ :: _, [] => false
+  | (n1, v1) :: rest1, (n2, v2) :: rest2 =>
+      n1 == n2 && Value.beq v1 v2 && Value.beqStructFields rest1 rest2
+
+partial def Value.beqMapEntries :
+    List (Value × Value) → List (Value × Value) → Bool
+  | [], [] => true
+  | [], _ :: _ => false
+  | _ :: _, [] => false
+  | (k1, v1) :: rest1, (k2, v2) :: rest2 =>
+      Value.beq k1 k2 && Value.beq v1 v2 && Value.beqMapEntries rest1 rest2
+
+end
+
+instance : BEq Value where
+  beq := Value.beq
+
+/-- Look up a key in a `Value.map`'s entry list using `Value.beq`. -/
+def Value.mapLookup (entries : List (Value × Value)) (key : Value) : Option Value :=
+  match entries.find? (fun entry => Value.beq entry.fst key) with
+  | some (_, value) => some value
+  | none => none
+
+/-- A deterministic placeholder for the Rust runtime's `Keccak::v256`
+hash. The mock returns a 32-byte zero vector regardless of input.
+This is *not* a cryptographic hash; the evaluator only relies on
+determinism. The W4.4 IR-to-kernel preservation theorem holds because
+both evaluators use the same mock. -/
+def Value.keccak256Mock (_parts : List Value) : Value :=
+  Value.bytes32 (List.replicate 32 0)
 
 end UOToolchain.IR

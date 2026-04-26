@@ -439,10 +439,26 @@ partial def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
               | none =>
                   .status (.evalError s!"arrayGet on unknown object {objectId}")
           | _ => .status (.evalError "arrayGet index not uint")
-  | .mapGet _ _ =>
-      -- Map values are not yet representable in `IR.Value` (no `Value.map`
-      -- variant). Adding map support requires extending `IRSyntax.lean`.
-      .status (.unsupported "Expr.mapGet (needs Value.map variant)")
+  | .mapGet objectId keyExpr =>
+      match evalExpr cfg env keyExpr with
+      | .status s => .status s
+      | .value keyVal =>
+          -- Look up the object's `Value.map` in either store, then
+          -- search its entries by key using `Value.beq`.
+          let mapVal? : Option Value :=
+            match cfg.publicState.lookup objectId with
+            | some v => some v
+            | none => cfg.secretState.lookup objectId
+          match mapVal? with
+          | some (.map entries) =>
+              match Value.mapLookup entries keyVal with
+              | some v => .value v
+              | none =>
+                  .status (.evalError s!"mapGet missing key in object {objectId}")
+          | some _ =>
+              .status (.evalError s!"mapGet on non-map object {objectId}")
+          | none =>
+              .status (.evalError s!"mapGet on unknown object {objectId}")
   | .structField _ _ =>
       -- `Expr.structField` is forbidden by `Expr.fragmentValid`; keeping it
       -- `unsupported` matches the W4.3 admission.
@@ -450,11 +466,25 @@ partial def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
   | .arrayIndex _ _ =>
       -- `Expr.arrayIndex` is forbidden by `Expr.fragmentValid`.
       .status (.unsupported "Expr.arrayIndex")
-  | .keccak256 _ =>
-      -- Modeling Keccak-256 requires either an abstract hash carrier
-      -- (`Value.bytes32` derived from inputs) or an explicit hash
-      -- function. Deferred to a follow-up commit.
-      .status (.unsupported "Expr.keccak256 (needs hash model)")
+  | .keccak256 parts =>
+      -- Use the deterministic `Value.keccak256Mock` placeholder. Each
+      -- sub-expression is evaluated in order; the W4.1 evaluator only
+      -- uses the resulting list shape (every element evaluated to a
+      -- value), not the actual hash bits. The W4.4 preservation
+      -- theorem will hold because both IR and kernel evaluators use
+      -- the same mock.
+      let rec evalParts : List Expr → Except EvalStatus (List Value)
+        | [] => .ok []
+        | p :: rest =>
+            match evalExpr cfg env p with
+            | .status s => .error s
+            | .value v =>
+                match evalParts rest with
+                | .ok vs => .ok (v :: vs)
+                | .error s => .error s
+      match evalParts parts with
+      | .error s => .status s
+      | .ok vs => .value (Value.keccak256Mock vs)
 
 end
 
