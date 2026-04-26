@@ -150,6 +150,31 @@ profile. The convention is: theorem-level facts go through the five-layer
 projection AND get a probe report bit AND get static-drift coverage. A fact
 that lives only in prose drifts.
 
+## Claim And TCB Discipline
+
+The documentation should be as precise as the theorem surface. Avoid saying
+"verified" or "proved" for facts that are only source-frozen, statically
+checked, tested, or documented. Use the stronger wording only when there is a
+Lean theorem exposed through the relevant imported checker route and reflected
+in the probe reports.
+
+When updating the theorem profile or roadmap, classify each claim explicitly:
+
+- **Lean-proved.** A theorem exists in a semantics file and is projected
+  through the imported checker route used by the paper story.
+- **Generated-and-checked.** The Rust helper is generated from Lean or
+  exact-string-checked against a Lean generator/source cut, but the runtime
+  behavior may still need a separate refinement theorem.
+- **Source-frozen/static-drift checked.** The probe rejects representative
+  source drift, but this is still a boundary assumption, not a semantic proof.
+- **Empirically tested.** Cargo/probe/tamper tests exercise behavior but do
+  not by themselves discharge the TCB.
+- **Trusted.** The component remains in the TCB and must be listed as such.
+
+If a change reduces the TCB, say exactly which assumption moved to which
+stronger bucket. If a change only adds a source freeze or drift check, do not
+describe it as eliminating the assumption.
+
 ## Validation-Slice Protocol
 
 The minimum recurring set is in
@@ -164,7 +189,7 @@ cd proof/lean
 lake build UOToolchain.RuntimeImplementationInterfaceJson \
   CheckProofGradeRuntimeResidualHelperShellBoundary \
   CheckProofGradeRuntimeImplementationKernelMachineConfinementBoundary
-cd ..
+cd ../..
 cargo check -p mplus-probe
 cargo run -q -p mplus-probe -- --only runtime-residual-helper-shell-boundary-validation \
   --out-dir results > /tmp/uo-residual-helper-validation.json
@@ -196,13 +221,21 @@ Always cross-check before declaring success:
   checkpoint or status-only pause if a clear next technical step is
   available. Stop only if a human policy or design decision is genuinely
   needed.
-- **Prefer plurality of small commits over one large commit.** Each
-  coherent checkpoint that passes validation is a commit. Large
+- **Prefer plurality of small commits over one large commit.** When the
+  task scope includes implementation work and the user has authorized
+  checkpointing, each coherent checkpoint that passes validation is a
+  commit. Large
   refactor-everything commits are hard to bisect when the static drift
   suite reports a regression three weeks later.
 - **Commit messages document the *why*.** Explain what assumption the
   checkpoint addresses, what theorem family lands, what specific drift it
   closes. The body should outlive the diff.
+- **Use patch-style manual edits.** Manual file edits should be small,
+  reviewable patches. For generated Rust/Lean artifacts, prefer editing
+  the generator or Lean source-of-truth and regenerating; direct edits to
+  generated files are acceptable only when the file is intentionally the
+  current source cut and the generator/source-freeze checks are updated in
+  the same checkpoint.
 - **Do not revert unrelated dirty files.** Many files in the working tree
   are intentionally modified or untracked as part of the broader branch.
   Do not run `git checkout .` or `git restore .`. If a file looks
@@ -244,6 +277,16 @@ Always cross-check before declaring success:
   kernel-machine confinement route. The probe intentionally checks both;
   if only one route is updated, the paper story is weaker and the report
   drifts.
+- **Keep terminal/process hygiene tight.** Prefer one-shot, non-PTY
+  commands for short reads/builds. Redirect large JSON outputs to `/tmp`
+  or `results/` as appropriate. If a command returns a session id, poll
+  and reuse that session rather than opening many persistent processes.
+- **Write a handoff before stopping on a long-running work package.** If
+  context limits, a policy decision, or user direction requires stopping
+  before the larger roadmap is done, add or update a handoff runbook and
+  prompt. The handoff must name the exact work-package/subtask checkpoint,
+  validation commands just run, known remaining gaps, and the next
+  recommended technically clear step.
 
 ## Common Pitfalls (From Lived Experience)
 
