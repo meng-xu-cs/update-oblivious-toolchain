@@ -20,9 +20,11 @@ a TEE under a hostile-host adversary (M+ model).
 
 You are now picking up **Work Package 4: Prove Source-To-Kernel
 Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
-**W4.1** (real operational evaluator surface) and **W4.1b**
-(secrecy-lemma re-statement against the new evaluator) are landed
-as commits `6e234df` and `267dc89`.
+**W4.1** (real operational evaluator surface), **W4.1b** (secrecy-
+lemma re-statement against the new evaluator), and the **W4.3
+definitions side** (structural and count-based confidential-fragment
+classifiers, definitions only) are landed as commits `6e234df`,
+`267dc89`, `63cdd36`, and `4f30757`.
 
 ## First, Read These Files In This Exact Order
 
@@ -109,44 +111,57 @@ land in:
 
 ## Recommended Next Subtask
 
-Subtask **W4.3** is recommended as the next checkpoint because it
-lives entirely on the IR side of the boundary (no Solidity source
-semantics required), it is cleanly bounded, and the existing
-`ConfidentialFragmentEntrypointWitness` already pins the right shape.
+The W4.3 *definitions* side is landed; the next subtask is the
+**W4.3 iff theorem proper**:
+`(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+fn.fragmentValid = true`. The classifier
+(`IR.confidentialFragmentEntrypointWitnessOf`), the structural
+predicate (`IR.CompiledFunction.fragmentValid`), and the count-
+based classifier (`IR.CompiledFunction.fragmentStats`) all exist.
+What is missing is the iff proof.
 
-**Subtask W4.3: Prove a confidential-fragment characterization
-theorem against the structured IR.**
+**Subtask W4.3 (theorem): prove the confidential-fragment iff
+characterization.**
 
-Concretely:
+The natural proof strategy is structural induction on `Expr` and
+`Statement`. Lean 4.30.0-rc2's default `induction` tactic does not
+support nested-inductive types, so the proof needs one of:
 
-- Define a Lean-side classifier
-  `confidentialFragmentClassify : IR.CompiledFunction →
-  ConfidentialFragmentEntrypointWitness` in
-  `ConfidentialFragment.lean`. It walks the structured IR
-  (`Statement`, `Expr` cases) and counts the same fields the existing
-  Rust classifier in `crates/uo-core/src/fragment.rs` produces.
-- Define a structural predicate `FragmentValidStructure` over
-  `IR.CompiledFunction` that says "no `Expr.structField` anywhere",
-  "no `Expr.arrayIndex` anywhere", "no non-branchless `Expr.select`
-  anywhere", and the matching constraints on `Statement`.
-- Prove the characterization theorem
-  `confidentialFragmentClassify(fn).Valid ↔
-  FragmentValidStructure fn`. This is the W4.3 deliverable.
-- Optional but valuable: prove that for any `OperationalConfig`
-  whose entrypoint's function body satisfies
-  `FragmentValidStructure`, `evalContract` returns an `Outcome` whose
-  status is one of `completed` / `requireFailed` / `abortedByUser`
-  (i.e., never `unsupported`). This proves the W4.1 evaluator covers
-  the confidential-fragment surface.
+1. **Mutual recursive `def`-style proof** — define the iff proof as
+   a `def` returning `Iff` propositions, structured with mutual
+   recursion (mirroring the existing
+   `Expr.fragmentValid` / `Expr.fragmentValidList` mutual pair).
+   Lean's structural recursion accepts this form. Probably the
+   cleanest path.
+2. **Manual recursor application** — use `Expr.recOn` /
+   `Statement.recOn` directly via `refine` with explicit motives for
+   `Expr`/`Statement` and the nested `List Expr`/`List Statement`.
+3. **Restructure the IR types** — replace nested-inductive
+   `Statement.ifStmt cond (List Statement) (List Statement)` with
+   explicit mutual `Statement` / `StatementList` inductives. Higher
+   churn but enables the standard `induction` tactic.
 
-If you would prefer to drive W4.2 (source-to-IR correctness) first
+Recommendation: try approach (1) first.
+
+Prove three lemmas in sequence (see the runbook's "Recommended
+Starting Subtask" section for the exact statements):
+
+1. `Expr.fragmentStats_valid_iff` per expression.
+2. `Statement.fragmentStats_valid_iff` per statement.
+3. `confidentialFragmentEntrypointWitnessOf_valid_iff` per function.
+
+Project through `ProofGrade.lean` as
+`proofGrade_confidential_fragment_valid_iff_structurally_valid` (or
+similar). Optionally also prove that `fragmentValid → evalContract`
+never returns `EvalStatus.unsupported`, which establishes that the
+W4.1 evaluator covers the confidential-fragment surface.
+
+If you would prefer to drive W4.2 (source-to-IR correctness)
 instead, the runbook's "Recommended Starting Subtask" section
 explains the AST-pull-back framing that makes W4.2 tractable. W4.2
-is roughly 2-3× the effort of W4.3 because it requires either a
-partial Lean Solidity semantics or a Lean mirror of `uo-solc`'s
-parser intermediate AST.
+is roughly 2-3× the effort of completing W4.3.
 
-After W4.3 lands, the natural sequence is:
+After W4.3 (theorem) lands, the natural sequence is:
 
 - W4.2 — source-to-IR correctness theorem (deliverable 1).
 - W4.4 — IR-to-kernel correctness theorem (deliverable 2).
@@ -248,6 +263,7 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The first technical step is W4.3 (or W4.2 if
-you prefer strict deliverable order — see the runbook for the AST-
-pull-back framing).
+Begin with the runbook. The first technical step is the W4.3 iff
+theorem (its definitions side is already landed). If you prefer
+strict deliverable order, the runbook's "Recommended Starting
+Subtask" section also documents the W4.2 AST-pull-back framing.

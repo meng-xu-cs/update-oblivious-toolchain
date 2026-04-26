@@ -255,13 +255,24 @@ What is still open:
   cellGet}` and `Statement.{declare,assign,require,abortIf,cellSet,
   retStmt}`; remaining IR constructs return an explicit
   `EvalStatus.unsupported` and will be admitted incrementally as W4.2-W4.4
-  prove their lowering correctness. W4.2 (source-to-IR), W4.3
-  (confidential-fragment admission/rejection), W4.4 (IR-to-kernel),
-  W4.5 (manifest-exactness semantics-preserving lift), and W4.6
-  (artifact-checker demotion) all remain open. `uo-solc` therefore
-  remains in the trusted surface for source-to-IR / IR-to-kernel
-  semantics; W4.1 only adds the Lean-side operational evaluator the WP4
-  theorems will refine against.
+  prove their lowering correctness. The W4.3 *definitions* side has also
+  landed: `IR.branchlessPureExpr` /
+  `IR.Expr.fragmentValid` / `IR.Statement.fragmentValid` /
+  `IR.CompiledFunction.fragmentValid` decide structural validity, and
+  `IR.confidentialFragmentEntrypointWitnessOf` mirrors the Rust count-
+  based classifier — so the iff-theorem surface is now in place. The
+  iff proof itself
+  `(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+  fn.fragmentValid` is deferred to a follow-up commit (Lean 4.30.0-rc2's
+  default `induction` tactic does not support nested-inductive `Expr` /
+  `Statement`; the follow-up will use `Expr.recOn` / `Statement.recOn`
+  directly or restructure as explicit mutual inductives). W4.2 (source-
+  to-IR), the W4.3 iff theorem proper, W4.4 (IR-to-kernel), W4.5
+  (manifest-exactness semantics-preserving lift), and W4.6 (artifact-
+  checker demotion) all remain open. `uo-solc` therefore remains in the
+  trusted surface for source-to-IR / IR-to-kernel semantics; W4.1 / W4.3
+  only add the Lean-side operational evaluator and confidential-
+  fragment classifier the WP4 theorems will refine against.
 - WP5 (concrete backend assumptions): full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,

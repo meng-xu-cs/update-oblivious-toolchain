@@ -16,8 +16,9 @@ WP3 closed on 2026-04-26. WP4 then opened with the goal of replacing
 the placeholder `abbrev Semantics := Config → Trace` and proving real
 source-to-kernel correctness for the admitted Solidity subset.
 
-Subtasks **W4.1** and **W4.1b** landed on 2026-04-26 (commits
-`6e234df` and `267dc89`):
+Subtasks **W4.1**, **W4.1b**, and the **W4.3 definitions side**
+landed on 2026-04-26 (commits `6e234df`, `267dc89`, `63cdd36`, and
+`4f30757`):
 
 - A structured Lean mirror of `crates/uo-core/src/{ir,types}.rs` lives
   in [`proof/lean/UOToolchain/IRSyntax.lean`](../proof/lean/UOToolchain/IRSyntax.lean).
@@ -57,6 +58,21 @@ Subtasks **W4.1** and **W4.1b** landed on 2026-04-26 (commits
   `TeeDeployment.lean`, `SgxExactProjection.lean`, and
   `PathOramLocalPosmapV1.lean` were updated to reference
   `TraceSemantics` rather than the new evaluator type.
+- W4.3 *definitions* landed in
+  [`proof/lean/UOToolchain/ConfidentialFragment.lean`](../proof/lean/UOToolchain/ConfidentialFragment.lean).
+  `IR.branchlessPureExpr` / `branchlessPureExprList` mirror
+  `lower_confidential_kernel_pure_expr`. `IR.Expr.fragmentValid` /
+  `IR.Statement.fragmentValid` /
+  `IR.CompiledFunction.fragmentValid` are mutual-recursion structural
+  validity predicates. `IR.Expr.fragmentStats` /
+  `IR.Statement.fragmentStats` /
+  `IR.CompiledFunction.fragmentStats` plus
+  `IR.confidentialFragmentEntrypointWitnessOf` mirror the Rust count-
+  based classifier in `crates/uo-core/src/fragment.rs`.
+  `FragmentStats.add_zero_forbidden_iff` is a primitive split lemma.
+  The W4.3 iff theorem
+  `(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+  fn.fragmentValid` is deferred — see the next-subtask section.
 
 The WP4 entry conditions therefore now also include the operational
 evaluator surface; what is open is the actual semantics-preserving
@@ -198,47 +214,69 @@ against; `uo-solc` therefore remains in the trusted surface.
 
 ## Recommended Starting Subtask
 
-Charter task 1 is now landed (W4.1/W4.1b). The next charter task that
-unblocks the largest amount of downstream work is task 3 — confidential-
-fragment admission/rejection (W4.3). Task 3 lives entirely on the IR
-side of the boundary: it does *not* require defining a Solidity source
-semantics, and its theorem can be stated directly against the new
-evaluator surface and the structured IR mirror.
+Charter task 1 (W4.1 / W4.1b) and the *definitions* side of charter
+task 3 (W4.3) are now landed. The smallest still-open subtask that
+unblocks downstream work is the **W4.3 iff theorem proper**:
+`(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+fn.fragmentValid`. This is the deliverable of W4.3 charter task 3.
+It requires structural induction on `Expr` and `Statement`, which
+Lean 4.30.0-rc2's default `induction` tactic does not currently
+support for the nested-inductive types defined in
+`IRSyntax.lean`.
 
-**Subtask W4.3: Prove a confidential-fragment characterization theorem
-against the structured IR.**
+**Subtask W4.3 (theorem): Prove the confidential-fragment iff
+characterization theorem.**
 
 Concretely:
 
-- Strengthen `ConfidentialFragmentEntrypointWitness.Valid` from
-  count-based (`structFieldCount = 0 ∧ arrayIndexCount = 0 ∧
-  nonBranchlessSelectArmCount = 0`) to a structural predicate over the
-  IR: a function's body contains no `Expr.structField`,
-  no `Expr.arrayIndex`, no `Expr.select` whose arms are not branchless,
-  and (depending on the design) no `Statement.{ifStmt,forLoop}` whose
-  guards depend on a secret.
-- Define a Lean-side classifier `confidentialFragmentClassify :
-  IR.CompiledFunction → ConfidentialFragmentEntrypointWitness` that
-  walks the structured IR and produces the witness counts/flags. This
-  parallels the Rust classifier in `crates/uo-core/src/fragment.rs` —
-  if the Rust file changes, the Lean classifier must move with it.
-- Prove a *characterization* theorem in
-  `ConfidentialFragment.lean`:
-  `confidentialFragmentClassify(fn).Valid ↔ FragmentValidStructure fn`
-  where `FragmentValidStructure` is the structural predicate (no
-  forbidden constructs anywhere in the AST). This is the W4.3
-  deliverable: the count-based witness is exactly the structural
-  property.
+- Pick one of three approaches:
+  1. **Mutual recursive `def`-style proof.** Define the iff proof as a
+     `def` returning `Iff` propositions, structured with mutual
+     recursion (mirroring the existing
+     `Expr.fragmentValid` / `Expr.fragmentValidList` mutual pair).
+     Lean's structural recursion accepts this form. The proof body is
+     a `match e with | ... => by ...` per constructor. This is
+     probably the cleanest path.
+  2. **Manual recursor application.** Use `Expr.recOn` /
+     `Statement.recOn` directly via `refine` with explicit motives for
+     both `Expr`/`Statement` and `List Expr`/`List Statement`. Verbose
+     but direct.
+  3. **Restructure the IR types.** Replace the nested-inductive
+     `Statement.ifStmt cond (List Statement) (List Statement)` with
+     explicit mutual `Statement` / `StatementList` inductives. This
+     would let the `induction` tactic apply, but it churns
+     `IRSyntax.lean` and `IRSemantics.lean`.
+
+  Recommendation: try approach (1) first — it preserves the existing
+  data-type shape and gets the proof done in one mutual block.
+
+- Prove three lemmas in sequence:
+  1. `Expr.fragmentStats_valid_iff (e : Expr) :
+       ((e.fragmentStats).structFieldCount = 0 ∧
+         (e.fragmentStats).arrayIndexCount = 0 ∧
+         (e.fragmentStats).nonBranchlessSelectArmCount = 0) ↔
+         e.fragmentValid = true`
+     (mutually with the `List Expr` companion).
+  2. `Statement.fragmentStats_valid_iff` analogously for `Statement`.
+  3. `confidentialFragmentEntrypointWitnessOf_valid_iff (fn :
+        CompiledFunction) :
+        (confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+          fn.fragmentValid = true`,
+     pulling the per-statement iff through the function body.
+
+- Project the result through `ProofGrade.lean` as
+  `proofGrade_confidential_fragment_valid_iff_structurally_valid`
+  (or similar) so the paper-facing facade has a named handle on the
+  new theorem.
+
 - (Optional but valuable) Connect the structural predicate to the
   evaluator: prove that for any `OperationalConfig` whose entrypoint's
-  function body satisfies `FragmentValidStructure`, `evalContract`
-  returns an `Outcome` whose status is one of `completed` /
-  `requireFailed` / `abortedByUser` (i.e., never `unsupported`). This
-  proves the evaluator's coverage *at minimum* matches the
-  confidential-fragment surface.
+  function body satisfies `fragmentValid`, `evalContract` returns an
+  `Outcome` whose status is one of `completed` / `requireFailed` /
+  `abortedByUser` (i.e., never `unsupported`). This proves the
+  W4.1 evaluator covers the confidential-fragment surface.
 
-The W4.3 work is roughly one session. After it lands, the natural
-sequence is:
+After W4.3 (theorem) lands, the natural sequence is:
 
 - W4.2 — source-to-IR correctness theorem (deliverable 1). This is
   the deeper one because it requires either a partial Lean Solidity
@@ -378,8 +416,12 @@ should be its own commit:
   lemma re-statement (W4.1 / W4.1b, commit `6e234df`).
 - *(landed)* Roadmap / theorem-profile status update (commit
   `267dc89`).
-- *(next)* Confidential-fragment classifier + structural
-  characterization theorem (W4.3).
+- *(landed)* W4.3 definitions: structural confidential-fragment
+  classifier + count-based classifier + primitive split lemma
+  (commit `4f30757`).
+- *(next)* W4.3 iff theorem
+  (`(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+  fn.fragmentValid`).
 - Source-to-IR lowering theorem (W4.2, probably split into
   expression-level, statement-level, function-level).
 - IR-to-kernel lowering theorem (W4.4, likely split per kernel-DSL

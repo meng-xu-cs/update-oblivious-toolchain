@@ -1554,15 +1554,41 @@ Current status update:
   `EvaluatorPublicGasSafe` predicate over `IR.OperationalConfig`).
   The original trace-side statements remain so the abstract composition
   theorems still consume them directly.
-- Still open: a *real* source-to-IR correctness theorem (W4.2), a
-  confidential-fragment admission/rejection theorem (W4.3), an
-  IR-to-kernel correctness theorem (W4.4), the manifest-exactness
-  semantics-preserving lift (W4.5), and the direct artifact checker
-  demotion (W4.6). The evaluator coverage of W4.1 also still leaves
+- Subtask W4.3 (definitions only) landed (commit `4f30757`,
+  [proof/lean/UOToolchain/ConfidentialFragment.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ConfidentialFragment.lean)):
+  the structural confidential-fragment classifier surface is now
+  Lean-defined.
+  `IR.branchlessPureExpr` characterises the kernel-DSL branchless-
+  pure expression surface; `IR.Expr.fragmentValid` /
+  `IR.Statement.fragmentValid` /
+  `IR.CompiledFunction.fragmentValid` decide structural validity (no
+  `Expr.structField`, no `Expr.arrayIndex`, no non-branchless
+  `Expr.select`); `IR.Expr.fragmentStats` /
+  `IR.Statement.fragmentStats` /
+  `IR.CompiledFunction.fragmentStats` are the count-based classifier
+  mirroring `crates/uo-core/src/fragment.rs`;
+  `IR.confidentialFragmentEntrypointWitnessOf` builds the count-based
+  witness from a structured function; and
+  `FragmentStats.add_zero_forbidden_iff` is a primitive split lemma.
+  The W4.3 characterization theorem
+  `(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+  fn.fragmentValid` is deferred to a follow-up commit because the
+  natural proof strategy uses structural induction on `Expr` /
+  `Statement`, which Lean 4.30.0-rc2's default `induction` tactic
+  does not support for nested-inductive types; the follow-up commit
+  will use `Expr.recOn` / `Statement.recOn` directly or restructure
+  the IR data types as explicitly mutual inductives.
+- Still open: completing the W4.3 characterization theorem (the iff
+  proof, not just the definitions), the *real* source-to-IR
+  correctness theorem (W4.2), the IR-to-kernel correctness theorem
+  (W4.4), the manifest-exactness semantics-preserving lift (W4.5),
+  and the direct artifact checker demotion (W4.6). The evaluator
+  coverage of W4.1 also still leaves
   `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
-  `Expr.{arrayGet,mapGet,structField,arrayIndex,keccak256}` reporting
-  `EvalStatus.unsupported`; those will be admitted incrementally as
-  W4.2-W4.4 work proves the corresponding lowering correctness facts.
+  `Expr.{arrayGet,mapGet,structField,arrayIndex,keccak256}`
+  reporting `EvalStatus.unsupported`; those will be admitted
+  incrementally as W4.2-W4.4 work proves the corresponding
+  lowering correctness facts.
 
 Exit gate:
 
