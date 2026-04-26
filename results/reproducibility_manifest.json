@@ -259,8 +259,8 @@
     },
     {
       "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.json",
-      "bytes": 917704,
-      "sha256": "e25b2fc3bb103691eda1969183f04c6d25a6d9aab00c637ccbfd55ca6b4358cc"
+      "bytes": 937320,
+      "sha256": "e18e38bc49316e451bf79b319f377d37639a969e4db794734cd1d12137feab2d"
     },
     {
       "path": "runtime_implementation_kernel_meeting_boundary_validation.json",
@@ -319,8 +319,8 @@
     },
     {
       "path": "runtime_residual_helper_shell_boundary_validation.json",
-      "bytes": 20842,
-      "sha256": "49af414cf01d91e0c1f0caeb9da610d342ccdbb537ae77618e627a889580cc17"
+      "bytes": 21990,
+      "sha256": "d5db0500f26edf9d70a481f7611e6b4c3328cc0e3b13fba788ac228e4e27c498"
     },
     {
       "path": "runtime_shared_confidential_kernel_boundary_validation.json",

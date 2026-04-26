@@ -2897,6 +2897,192 @@ theorem decodedBucket_liveOnBucketPath_of_decodedPathBucketUniquePositionMapBoun
       hDecode
   exact (hShape.2.2.2 block hMem).2.2.1
 
+/-! ### Length invariants across stash, bucket, and list-level folds -/
+
+theorem liveSlotsAfterBlockValidation_length
+    (capacity leafCount : Nat)
+    (positionMap liveSlots : List MaskedUsizeOption)
+    (block : StashBlock) :
+    (liveSlotsAfterBlockValidation capacity leafCount positionMap liveSlots
+        block).length =
+      liveSlots.length := by
+  unfold liveSlotsAfterBlockValidation
+  split
+  · rfl
+  · split
+    · exact replaceAt_length _ _ _
+    · rfl
+
+theorem reconstructPathBlockStep_liveSlots_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState)
+    (block : StashBlock) :
+    (reconstructPathBlockStep capacity leafCount positionMap state
+        block).liveSlots.length =
+      state.liveSlots.length := by
+  unfold reconstructPathBlockStep
+  split
+  · rfl
+  · split
+    · rfl
+    · split
+      · rfl
+      · simp [liveSlotsAfterBlockValidation_length]
+
+theorem reconstructPathBlockStep_entries_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState)
+    (block : StashBlock) :
+    (reconstructPathBlockStep capacity leafCount positionMap state
+        block).entries.length =
+      state.entries.length := by
+  unfold reconstructPathBlockStep
+  split
+  · rfl
+  · split
+    · rfl
+    · split
+      · rfl
+      · simp [installPathEntryFromBlock_preservesLength]
+
+theorem reconstructPathBlocks_liveSlots_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState) (blocks : List StashBlock),
+      (reconstructPathBlocks capacity leafCount positionMap state
+          blocks).liveSlots.length =
+        state.liveSlots.length := by
+  intro state blocks
+  induction blocks generalizing state with
+  | nil => simp [reconstructPathBlocks]
+  | cons b bs ih =>
+      simp [reconstructPathBlocks, ih,
+        reconstructPathBlockStep_liveSlots_length]
+
+theorem reconstructPathBlocks_entries_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState) (blocks : List StashBlock),
+      (reconstructPathBlocks capacity leafCount positionMap state
+          blocks).entries.length =
+        state.entries.length := by
+  intro state blocks
+  induction blocks generalizing state with
+  | nil => simp [reconstructPathBlocks]
+  | cons b bs ih =>
+      simp [reconstructPathBlocks, ih,
+        reconstructPathBlockStep_entries_length]
+
+theorem reconstructPathBucketBlockStep_liveSlots_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState)
+    (bucketBlock : BucketBlock) :
+    (reconstructPathBucketBlockStep capacity leafCount positionMap state
+        bucketBlock).liveSlots.length =
+      state.liveSlots.length := by
+  unfold reconstructPathBucketBlockStep
+  split
+  · rfl
+  · split
+    · rfl
+    · exact reconstructPathBlockStep_liveSlots_length
+        capacity leafCount positionMap state bucketBlock.block
+
+theorem reconstructPathBucketBlockStep_entries_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState)
+    (bucketBlock : BucketBlock) :
+    (reconstructPathBucketBlockStep capacity leafCount positionMap state
+        bucketBlock).entries.length =
+      state.entries.length := by
+  unfold reconstructPathBucketBlockStep
+  split
+  · rfl
+  · split
+    · rfl
+    · exact reconstructPathBlockStep_entries_length
+        capacity leafCount positionMap state bucketBlock.block
+
+theorem reconstructPathBucketBlocks_liveSlots_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState) (bucketBlocks : List BucketBlock),
+      (reconstructPathBucketBlocks capacity leafCount positionMap state
+          bucketBlocks).liveSlots.length =
+        state.liveSlots.length := by
+  intro state bucketBlocks
+  induction bucketBlocks generalizing state with
+  | nil => simp [reconstructPathBucketBlocks]
+  | cons b bs ih =>
+      simp [reconstructPathBucketBlocks, ih,
+        reconstructPathBucketBlockStep_liveSlots_length]
+
+theorem reconstructPathBucketBlocks_entries_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState) (bucketBlocks : List BucketBlock),
+      (reconstructPathBucketBlocks capacity leafCount positionMap state
+          bucketBlocks).entries.length =
+        state.entries.length := by
+  intro state bucketBlocks
+  induction bucketBlocks generalizing state with
+  | nil => simp [reconstructPathBucketBlocks]
+  | cons b bs ih =>
+      simp [reconstructPathBucketBlocks, ih,
+        reconstructPathBucketBlockStep_entries_length]
+
+theorem reconstructPathDecodedBucketsState_liveSlots_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (bucketBlocks : List BucketBlock) :
+    (reconstructPathDecodedBucketsState capacity leafCount positionMap
+        stashBlocks bucketBlocks).liveSlots.length = capacity := by
+  unfold reconstructPathDecodedBucketsState
+  rw [reconstructPathBucketBlocks_liveSlots_length,
+    reconstructPathBlocks_liveSlots_length,
+    initialReconstructionState_liveSlots_length]
+
+theorem reconstructPathDecodedBucketsState_entries_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (bucketBlocks : List BucketBlock) :
+    (reconstructPathDecodedBucketsState capacity leafCount positionMap
+        stashBlocks bucketBlocks).entries.length = capacity := by
+  unfold reconstructPathDecodedBucketsState
+  rw [reconstructPathBucketBlocks_entries_length,
+    reconstructPathBlocks_entries_length,
+    initialReconstructionState_entries_length]
+
+theorem reconstructPathDecodedBucketsListState_liveSlots_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket) :
+    (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+        stashBlocks decodedBuckets).liveSlots.length = capacity := by
+  unfold reconstructPathDecodedBucketsListState
+  exact reconstructPathDecodedBucketsState_liveSlots_length
+    capacity leafCount positionMap stashBlocks
+    (bucketBlocksOfDecodedBuckets decodedBuckets)
+
+theorem reconstructPathDecodedBucketsListState_entries_length
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket) :
+    (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+        stashBlocks decodedBuckets).entries.length = capacity := by
+  unfold reconstructPathDecodedBucketsListState
+  exact reconstructPathDecodedBucketsState_entries_length
+    capacity leafCount positionMap stashBlocks
+    (bucketBlocksOfDecodedBuckets decodedBuckets)
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

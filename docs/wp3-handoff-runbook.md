@@ -88,6 +88,15 @@ This checkpoint completed:
   PositionMap, UniquePositionMap}Bounded` converts a single codec acceptance
   into the matching head fact. Together they let runtime call sites build the
   list-level admission hypothesis from per-bucket codec invocations directly.
+- Reconstruction-buffer absolute-capacity invariant: every per-block step
+  (`liveSlotsAfterBlockValidation`, `reconstructPathBlockStep`),
+  per-bucket-block step (`reconstructPathBucketBlockStep`), list-fold,
+  decoded-buckets shell, and runtime callback fold preserve `liveSlots.length`
+  and `entries.length`. Starting from `initialReconstructionState capacity`,
+  both buffers stay exactly at `capacity` throughout the entire reconstruction,
+  matching the runtime's coverage check that iterates
+  `position_map.iter().enumerate()` in lockstep with `live_slots.get(...)` at
+  the same length.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,
@@ -163,14 +172,14 @@ checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
 Recommended next steps:
 
-1. Push the runtime stash phase, position-map coverage check, and live-slot
-   buffer initialization into the same Lean shell so the entire
-   `reconstruct_path_entries_from_storage_into` body is modeled by one
-   theorem rather than the current per-step facts. The helper model already
-   has `reconstructPathBlocks`, `liveSlotCoverageFailed`,
-   `initialReconstructionState`, and the decoded-bucket fold; what's missing
-   is one combined "stash + bucket + coverage" predicate plus its success
-   theorem.
+1. Strengthen the decoded-buckets list-state with a non-failure preservation
+   theorem family: starting from the initial reconstruction state, processing
+   a stash whose blocks satisfy the well-formedness predicate
+   (`livePathBlockValidationFailed = false` and
+   `installPathEntryFailed = false` for every block, given the running
+   live-slot buffer) yields a non-failed state, and similarly for the bucket
+   phase. Combined with the existing length invariants this gives a clean
+   "valid input → reconstruction success" shell theorem.
 2. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.

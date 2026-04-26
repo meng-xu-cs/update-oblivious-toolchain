@@ -878,6 +878,28 @@ emitted as
 `oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_position_map_bounded_theorem_checked`,
 and
 `oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
+The reconstruction shell now also carries an absolute-capacity invariant on
+both the live-slots buffer and the path-entry buffer: every
+per-block-validation/install step preserves `liveSlots.length` and
+`entries.length`, every per-bucket admission step preserves them, the
+list-folds preserve them, and starting from `initialReconstructionState
+capacity` both buffers stay at exactly `capacity` throughout the stash
+phase, the bucket phase, and the runtime callback fold. These invariants
+are exposed at every layer and emitted as
+`oram_helper_live_slots_after_block_validation_length_theorem_checked`,
+`oram_helper_reconstruct_path_block_step_live_slots_length_theorem_checked`,
+`oram_helper_reconstruct_path_block_step_entries_length_theorem_checked`,
+`oram_helper_reconstruct_path_blocks_live_slots_length_theorem_checked`,
+`oram_helper_reconstruct_path_blocks_entries_length_theorem_checked`,
+`oram_helper_reconstruct_path_bucket_block_step_live_slots_length_theorem_checked`,
+`oram_helper_reconstruct_path_bucket_block_step_entries_length_theorem_checked`,
+`oram_helper_reconstruct_path_bucket_blocks_live_slots_length_theorem_checked`,
+`oram_helper_reconstruct_path_bucket_blocks_entries_length_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_state_live_slots_length_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_state_entries_length_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_list_state_live_slots_length_theorem_checked`,
+and
+`oram_helper_reconstruct_path_decoded_buckets_list_state_entries_length_theorem_checked`.
 The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it

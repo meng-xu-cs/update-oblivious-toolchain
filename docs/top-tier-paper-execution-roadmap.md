@@ -2081,6 +2081,28 @@ If implementation resumes immediately, the next concrete sequence should be:
    `oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_position_map_bounded_theorem_checked`,
    and
    `oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
+   The reconstruction shell now carries the absolute-capacity invariant on
+   both the live-slots buffer and the path-entry buffer: each
+   block-validation/install step, each per-bucket admission step, both
+   list-folds, the decoded-buckets shell, and the runtime callback fold all
+   preserve `liveSlots.length` and `entries.length`, so starting from
+   `initialReconstructionState capacity` both buffers stay exactly
+   `capacity` throughout the entire reconstruction. These length invariants
+   land at every layer and are emitted as
+   `oram_helper_live_slots_after_block_validation_length_theorem_checked`,
+   `oram_helper_reconstruct_path_block_step_live_slots_length_theorem_checked`,
+   `oram_helper_reconstruct_path_block_step_entries_length_theorem_checked`,
+   `oram_helper_reconstruct_path_blocks_live_slots_length_theorem_checked`,
+   `oram_helper_reconstruct_path_blocks_entries_length_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_block_step_live_slots_length_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_block_step_entries_length_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_blocks_live_slots_length_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_blocks_entries_length_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_state_live_slots_length_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_state_entries_length_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_list_state_live_slots_length_theorem_checked`,
+   and
+   `oram_helper_reconstruct_path_decoded_buckets_list_state_entries_length_theorem_checked`.
    Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,
