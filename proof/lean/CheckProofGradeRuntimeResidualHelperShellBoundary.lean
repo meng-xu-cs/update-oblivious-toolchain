@@ -3107,6 +3107,80 @@ theorem importedBoundaryOramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBu
       (importedBoundaryResidualShellBoundary hValid)
       hLive
 
+theorem importedBoundaryOramHelperBucketBlocksValidationInstallWellFormedFromNil
+  {boundary : ImportedRuntimeImplementationResidualHelperShellBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState) :
+  RuntimeOramHelperSemantics.BucketBlocksValidationInstallWellFormedFrom
+    capacity leafCount positionMap state [] := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksValidationInstallWellFormedFromNil
+      (importedBoundaryResidualIface hValid)
+      (importedBoundaryResidualShellBoundary hValid)
+      capacity leafCount positionMap state
+
+theorem importedBoundaryOramHelperBucketBlocksWellFormedFromOfValidationInstallWellFormedFromAndAdmission
+  {boundary : ImportedRuntimeImplementationResidualHelperShellBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hAdmissions :
+    ∀ bb ∈ bucketBlocks,
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bb =
+        false)
+  (hWellFormed :
+    RuntimeOramHelperSemantics.BucketBlocksValidationInstallWellFormedFrom
+      capacity leafCount positionMap state bucketBlocks) :
+  RuntimeOramHelperSemantics.BucketBlocksWellFormedFrom
+    capacity leafCount positionMap state bucketBlocks := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksWellFormedFromOfValidationInstallWellFormedFromAndAdmission
+      (importedBoundaryResidualIface hValid)
+      (importedBoundaryResidualShellBoundary hValid)
+      capacity leafCount positionMap state bucketBlocks hAdmissions hWellFormed
+
+theorem importedBoundaryOramHelperReconstructPathDecodedBucketsListFailedSuccessOfCodecLiveAndValidInstall
+  {boundary : ImportedRuntimeImplementationResidualHelperShellBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket)
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets)
+  (hStashWellFormed :
+    RuntimeOramHelperSemantics.StashWellFormedFrom
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks)
+  (hBucketValInstall :
+    RuntimeOramHelperSemantics.BucketBlocksValidationInstallWellFormedFrom
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlocks
+        capacity leafCount positionMap
+        (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+        stashBlocks)
+      (RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets
+        decodedBuckets))
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListState
+        capacity leafCount positionMap stashBlocks
+        decodedBuckets).liveSlots = false) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListFailed
+      capacity leafCount positionMap stashBlocks decodedBuckets = false := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsListFailedSuccessOfCodecLiveAndValidInstall
+      (importedBoundaryResidualIface hValid)
+      (importedBoundaryResidualShellBoundary hValid)
+      capacity leafCount positionMap stashBlocks decodedBuckets
+      hLive hStashWellFormed hBucketValInstall hCoverage
+
 theorem importedBoundaryOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationResidualHelperShellBoundary}
   (hValid : boundary.Valid)

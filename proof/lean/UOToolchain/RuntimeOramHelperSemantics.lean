@@ -3338,6 +3338,89 @@ theorem bucketBlocksOfDecodedBuckets_admitted_of_liveOnBucketPath
           hHead bucketBlock hHere
       · exact ih hTail hThere
 
+/-! ### Validation/install-only well-formedness and capstone success theorems -/
+
+def BucketBlocksValidationInstallWellFormedFrom
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ReconstructionState → List BucketBlock → Prop
+  | _, [] => True
+  | state, bucketBlock :: bucketBlocks =>
+      livePathBlockValidationFailed capacity leafCount positionMap
+          state.liveSlots bucketBlock.block = false ∧
+      installPathEntryFailed state.entries bucketBlock.block = false ∧
+      BucketBlocksValidationInstallWellFormedFrom capacity leafCount
+        positionMap
+        (reconstructPathBucketBlockStep capacity leafCount positionMap state
+          bucketBlock)
+        bucketBlocks
+
+theorem bucketBlocksValidationInstallWellFormedFrom_nil
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState) :
+    BucketBlocksValidationInstallWellFormedFrom capacity leafCount
+        positionMap state [] := by
+  trivial
+
+theorem bucketBlocksWellFormedFrom_of_validationInstallWellFormedFrom_and_admission
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState) (bucketBlocks : List BucketBlock),
+      (∀ bb ∈ bucketBlocks,
+        bucketBlockAdmissionFailed leafCount bb = false) →
+      BucketBlocksValidationInstallWellFormedFrom capacity leafCount
+        positionMap state bucketBlocks →
+      BucketBlocksWellFormedFrom capacity leafCount positionMap state
+        bucketBlocks := by
+  intro state bucketBlocks
+  induction bucketBlocks generalizing state with
+  | nil =>
+      intro _ _
+      trivial
+  | cons bb tail ih =>
+      intro hAdmissions hWellFormed
+      have hHeadAdmission :
+          bucketBlockAdmissionFailed leafCount bb = false :=
+        hAdmissions bb (by simp)
+      have hTailAdmissions :
+          ∀ bb' ∈ tail, bucketBlockAdmissionFailed leafCount bb' = false := by
+        intro bb' hb'
+        exact hAdmissions bb' (List.mem_cons_of_mem _ hb')
+      rcases hWellFormed with ⟨hValidation, hInstall, hRest⟩
+      refine ⟨hHeadAdmission, hValidation, hInstall, ?_⟩
+      exact ih _ hTailAdmissions hRest
+
+theorem reconstructPathDecodedBucketsListFailed_success_of_codecLiveAndValidInstall
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket)
+    (hLive : DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets)
+    (hStashWellFormed :
+      StashWellFormedFrom capacity leafCount positionMap
+        (initialReconstructionState capacity) stashBlocks)
+    (hBucketValInstall :
+      BucketBlocksValidationInstallWellFormedFrom capacity leafCount
+        positionMap
+        (reconstructPathBlocks capacity leafCount positionMap
+          (initialReconstructionState capacity) stashBlocks)
+        (bucketBlocksOfDecodedBuckets decodedBuckets))
+    (hCoverage :
+      liveSlotCoverageFailed positionMap
+        (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+          stashBlocks decodedBuckets).liveSlots = false) :
+    reconstructPathDecodedBucketsListFailed capacity leafCount positionMap
+        stashBlocks decodedBuckets = false := by
+  exact reconstructPathDecodedBucketsListFailed_success_of_wellFormed
+    capacity leafCount positionMap stashBlocks decodedBuckets
+    hStashWellFormed
+    (bucketBlocksWellFormedFrom_of_validationInstallWellFormedFrom_and_admission
+      capacity leafCount positionMap _ _
+      (bucketBlocksOfDecodedBuckets_admitted_of_liveOnBucketPath hLive)
+      hBucketValInstall)
+    hCoverage
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

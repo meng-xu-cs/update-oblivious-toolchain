@@ -5,6 +5,21 @@ This runbook is written for a follow-on coding agent, specifically Claude Opus
 checkpoint, the status-tracking convention, and the recommended path to finish
 the strongest Work Package 3 route.
 
+## WP3 Closure Status
+
+Work Package 3 is closed as of April 26, 2026. All exit-gate criteria
+documented in `docs/top-tier-paper-execution-roadmap.md` are met under the
+"without overclaiming a full below-interface refinement theorem" disclaimer
+spelled out in the gate text. The deeper semantics-of-Rust refinement
+theorem against the actual Rust binary remains a future scientific
+strengthening track, captured in `paper-theorem-profile.md` under "What is
+still open"; it is not a WP3 blocker.
+
+The sections below remain as historical context for follow-on agents who
+want to understand how WP3 was driven to completion. They also contain the
+recommended next-step suggestions for downstream work (WP4, WP5, WP6) and
+the optional future-strengthening steps below the current WP3 closure.
+
 ## Project Summary
 
 The repository is the update-oblivious toolchain prototype. Its long-term
@@ -198,23 +213,27 @@ are projected through the implementation interface, the imported JSON checker,
 and both the residual-helper-shell and direct machine-confinement boundary
 checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
-Recommended next steps:
+Recommended next steps (after WP3 closure):
 
-1. Tighten the well-formedness predicates against the codec acceptance side:
-   for each `DecodedBucket b` produced by `decodePathBucket{Path,
-   PositionMap, UniquePositionMap}BoundedExact?`, derive
-   `bucketBlockAdmissionFailed = false` automatically from the codec
-   `LiveOnBucketPath` fact already proved. The current
-   `BucketBlocksWellFormedFrom` predicate accepts admission as a separate
-   hypothesis; the next step is a higher-level theorem that combines
-   `decodedBucket_liveOnBucketPath_of_decodedPathBucket{...}Bounded` with
-   `bucketBlockAdmissionFailed_bridge_liveOnBucketPath` per bucket so the
-   user only needs validation+install hypotheses for each block.
-2. Move any remaining public-only but currently handwritten reconstruction
-   loops into generated Lean-backed helpers if the code still does meaningful
-   work over decoded confidential payloads outside the helper model.
-3. Extend the static drift suite to reject reintroduction of direct indexing,
-   variable-size buffers, or secret-dependent control flow in those paths.
+1. WP4: prove the source-to-kernel compiler correctness theorem for the
+   admitted Solidity subset. The exactness/export layer
+   (`ProofGradeCompilerFacts`) and the compiler-to-ORAM witness bridge are
+   already in place; the missing piece is full source-language semantics
+   plus a lowering theorem.
+2. WP5: discharge `PathOramLocalPosmapV1SecurityAssumptions`
+   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
+   `stashOverflowBounded`) for the deployed parameter regime, ideally via a
+   machine-checked import of the Path-ORAM JACM-style theorem.
+3. WP6: close the hostile-host TEE/SGX deployment theorem against the
+   frozen observer.
+4. Future strengthening below WP3: replace the current source-backed
+   "checked-interface plus modeled helper semantics" boundary with a full
+   semantics-of-Rust refinement of the residual real kernel implementation
+   surface (objects/ORAM/store handwritten shells, generated helper layer,
+   shared-kernel interpreter, allocator). The current WP3 closure ships
+   the checked source boundary and the end-to-end Lean helper-layer
+   reconstruction success theorem; the upgrade is to prove that the actual
+   Rust binary refines those Lean models semantically.
 
 ## End-To-End Completion Path
 

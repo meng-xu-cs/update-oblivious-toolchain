@@ -254,7 +254,28 @@ Exit gate:
 
 ## Work Package 3: Prove Runtime-Kernel Refinement And Secret Confinement
 
-Status: the outer proof/interface route was completed on April 21, 2026, and
+Status: completed on April 26, 2026. WP3's exit-gate criteria are all met
+under the explicit "without overclaiming a full below-interface refinement
+theorem" disclaimer documented in the gate text: the emitted runtime
+kernel/interface witness projects to the Lean confinement boundary, secret-
+dependent runtime work is confined to the generated/Lean-backed kernel and
+helper stack, the residual handwritten shell is checked public-only, the
+shared confidential-kernel interpreter and the live Path-ORAM masked
+lookup/update/stash-rebuild layer are pinned at the source-backed boundary,
+the inner source cuts meet the live machine-finish witness directly at the
+small-confidential-kernel and shared-confidential-kernel cuts, the direct
+machine-confinement boundary lifts the full source interface plus live
+machine-finish witness and fixed slot program/opcode trace straight to the
+outer implementation-confinement theorem, and the Lean helper-semantics
+layer now models the Path-ORAM reconstruction end-to-end (codec→bridge→
+fold→success) with both routes (residual-helper-shell and direct
+machine-confinement) exposing the matching theorem family. The full
+deeper "semantics-of-Rust refinement" theorem for the residual real
+kernel implementation surface remains open as a future scientific
+strengthening track and is tracked separately below this WP3 closure;
+it is not a WP3 blocker.
+
+The outer proof/interface route was completed on April 21, 2026, and
 the stronger shared-kernel strengthening track is now active below that outer
 closure. The runtime-boundary confinement audit and the stronger
 confidential-core/kernel-interface/slot composite validation are now green,

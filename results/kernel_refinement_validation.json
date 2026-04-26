@@ -18,7 +18,7 @@
       "commit_object_count": 1,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
-      "kernel_json_bytes": 1570,
+      "kernel_json_bytes": 1510,
       "kernel_refinement_json_bytes": 538,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -62,7 +62,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -75,12 +75,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -209,7 +203,7 @@
       "commit_object_count": 1,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
-      "kernel_json_bytes": 1570,
+      "kernel_json_bytes": 1510,
       "kernel_refinement_json_bytes": 538,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -253,7 +247,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -266,12 +260,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -400,7 +388,7 @@
       "commit_object_count": 2,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
-      "kernel_json_bytes": 3863,
+      "kernel_json_bytes": 3803,
       "kernel_refinement_json_bytes": 1065,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -455,7 +443,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -516,12 +504,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -793,7 +775,7 @@
       "commit_object_count": 2,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
-      "kernel_json_bytes": 3863,
+      "kernel_json_bytes": 3803,
       "kernel_refinement_json_bytes": 1065,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -848,7 +830,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -909,12 +891,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -1186,7 +1162,7 @@
       "commit_object_count": 1,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 3605,
+      "kernel_json_bytes": 3485,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1203,7 +1179,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1225,12 +1201,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1327,18 +1303,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1545,7 +1509,7 @@
       "commit_object_count": 1,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 3605,
+      "kernel_json_bytes": 3485,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1562,7 +1526,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1584,12 +1548,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1686,18 +1650,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1904,7 +1856,7 @@
       "commit_object_count": 2,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 4470,
+      "kernel_json_bytes": 4350,
       "kernel_refinement_json_bytes": 1003,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1957,7 +1909,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2066,18 +2018,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2346,7 +2286,7 @@
       "commit_object_count": 2,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 4470,
+      "kernel_json_bytes": 4350,
       "kernel_refinement_json_bytes": 1003,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2399,7 +2339,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2508,18 +2448,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2788,7 +2716,7 @@
       "commit_object_count": 1,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
-      "kernel_json_bytes": 6357,
+      "kernel_json_bytes": 6177,
       "kernel_refinement_json_bytes": 668,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2834,7 +2762,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3027,24 +2955,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -3382,7 +3292,7 @@
       "commit_object_count": 1,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
-      "kernel_json_bytes": 6357,
+      "kernel_json_bytes": 6177,
       "kernel_refinement_json_bytes": 668,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3428,7 +3338,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3621,24 +3531,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -3976,7 +3868,7 @@
       "commit_object_count": 1,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
-      "kernel_json_bytes": 8725,
+      "kernel_json_bytes": 8605,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3993,7 +3885,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -4015,12 +3907,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -4453,18 +4345,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -4755,7 +4635,7 @@
       "commit_object_count": 1,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
-      "kernel_json_bytes": 8725,
+      "kernel_json_bytes": 8605,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -4772,7 +4652,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -4794,12 +4674,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -5232,18 +5112,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -5534,7 +5402,7 @@
       "commit_object_count": 1,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
-      "kernel_json_bytes": 11192,
+      "kernel_json_bytes": 11072,
       "kernel_refinement_json_bytes": 592,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -5580,7 +5448,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -6013,18 +5881,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -6516,7 +6372,7 @@
       "commit_object_count": 1,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
-      "kernel_json_bytes": 11192,
+      "kernel_json_bytes": 11072,
       "kernel_refinement_json_bytes": 592,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -6562,7 +6418,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -6995,18 +6851,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -7498,7 +7342,7 @@
       "commit_object_count": 2,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 12288,
-      "kernel_json_bytes": 32222,
+      "kernel_json_bytes": 32102,
       "kernel_refinement_json_bytes": 1003,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -7551,7 +7395,7 @@
           1,
           2
         ],
-        "resource_event_count": 428,
+        "resource_event_count": 426,
         "resource_events": [
           {
             "bytes": 8,
@@ -9292,18 +9136,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -10220,7 +10052,7 @@
       "commit_object_count": 2,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 16384,
-      "kernel_json_bytes": 98475,
+      "kernel_json_bytes": 98235,
       "kernel_refinement_json_bytes": 1111,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -10277,7 +10109,7 @@
           1,
           2
         ],
-        "resource_event_count": 1334,
+        "resource_event_count": 1330,
         "resource_events": [
           {
             "bytes": 8,
@@ -15462,30 +15294,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 4
           },
           {
             "bytes": 20,

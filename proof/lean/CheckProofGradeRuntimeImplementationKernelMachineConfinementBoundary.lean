@@ -2636,6 +2636,75 @@ theorem importedBoundaryPaperNativeOramHelperBucketBlocksOfDecodedBucketsAdmitte
     importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
       hValid hLive
 
+theorem importedBoundaryPaperNativeOramHelperBucketBlocksValidationInstallWellFormedFromNil
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState) :
+  RuntimeOramHelperSemantics.BucketBlocksValidationInstallWellFormedFrom
+    capacity leafCount positionMap state [] := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksValidationInstallWellFormedFromNil
+      hValid capacity leafCount positionMap state
+
+theorem importedBoundaryPaperNativeOramHelperBucketBlocksWellFormedFromOfValidationInstallWellFormedFromAndAdmission
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hAdmissions :
+    ∀ bb ∈ bucketBlocks,
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount bb =
+        false)
+  (hWellFormed :
+    RuntimeOramHelperSemantics.BucketBlocksValidationInstallWellFormedFrom
+      capacity leafCount positionMap state bucketBlocks) :
+  RuntimeOramHelperSemantics.BucketBlocksWellFormedFrom
+    capacity leafCount positionMap state bucketBlocks := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksWellFormedFromOfValidationInstallWellFormedFromAndAdmission
+      hValid capacity leafCount positionMap state bucketBlocks
+      hAdmissions hWellFormed
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListFailedSuccessOfCodecLiveAndValidInstall
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket)
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets)
+  (hStashWellFormed :
+    RuntimeOramHelperSemantics.StashWellFormedFrom
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks)
+  (hBucketValInstall :
+    RuntimeOramHelperSemantics.BucketBlocksValidationInstallWellFormedFrom
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlocks
+        capacity leafCount positionMap
+        (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+        stashBlocks)
+      (RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets
+        decodedBuckets))
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListState
+        capacity leafCount positionMap stashBlocks
+        decodedBuckets).liveSlots = false) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsListFailed
+      capacity leafCount positionMap stashBlocks decodedBuckets = false := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListFailedSuccessOfCodecLiveAndValidInstall
+      hValid capacity leafCount positionMap stashBlocks decodedBuckets
+      hLive hStashWellFormed hBucketValInstall hCoverage
+
 theorem importedBoundaryPaperNativeOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)

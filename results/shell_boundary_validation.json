@@ -58,7 +58,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -71,12 +71,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -193,7 +187,7 @@
       },
       "scenario": "FixedSlotClassifier/uo/class0",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 3431,
+      "shell_boundary_bundle_json_bytes": 3371,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -291,7 +285,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -304,12 +298,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -426,7 +414,7 @@
       },
       "scenario": "FixedSlotClassifier/uo/class1",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 3431,
+      "shell_boundary_bundle_json_bytes": 3371,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -535,7 +523,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -596,12 +584,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -861,7 +843,7 @@
       },
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
-      "shell_boundary_bundle_json_bytes": 7168,
+      "shell_boundary_bundle_json_bytes": 7108,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -989,7 +971,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -1050,12 +1032,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -1315,7 +1291,7 @@
       },
       "scenario": "AuthScan/uo/class1",
       "setup_calls": 2,
-      "shell_boundary_bundle_json_bytes": 7168,
+      "shell_boundary_bundle_json_bytes": 7108,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -1405,7 +1381,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1427,12 +1403,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1529,18 +1505,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1735,7 +1699,7 @@
       },
       "scenario": "RegistryCRUD/uo/class0",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 5460,
+      "shell_boundary_bundle_json_bytes": 5340,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -1806,7 +1770,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1828,12 +1792,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1930,18 +1894,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2136,7 +2088,7 @@
       },
       "scenario": "RegistryCRUD/uo/class1",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 5460,
+      "shell_boundary_bundle_json_bytes": 5340,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -2243,7 +2195,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2352,18 +2304,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2620,7 +2560,7 @@
       },
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 7537,
+      "shell_boundary_bundle_json_bytes": 7417,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -2743,7 +2683,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2852,18 +2792,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -3120,7 +3048,7 @@
       },
       "scenario": "ConfidentialMixer/fullscan/class1",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 7537,
+      "shell_boundary_bundle_json_bytes": 7417,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -3236,7 +3164,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3429,24 +3357,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -3772,7 +3682,7 @@
       },
       "scenario": "ERC20Lite/fullscan/class0",
       "setup_calls": 1,
-      "shell_boundary_bundle_json_bytes": 8480,
+      "shell_boundary_bundle_json_bytes": 8300,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -3875,7 +3785,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -4068,24 +3978,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -4411,7 +4303,7 @@
       },
       "scenario": "ERC20Lite/fullscan/class1",
       "setup_calls": 1,
-      "shell_boundary_bundle_json_bytes": 8480,
+      "shell_boundary_bundle_json_bytes": 8300,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -4485,7 +4377,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -4507,12 +4399,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -4945,18 +4837,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -5235,7 +5115,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/put-class0",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 10580,
+      "shell_boundary_bundle_json_bytes": 10460,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -5306,7 +5186,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -5328,12 +5208,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -5766,18 +5646,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -6056,7 +5924,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/put-class1",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 10580,
+      "shell_boundary_bundle_json_bytes": 10460,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -6156,7 +6024,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -6589,18 +6457,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -7080,7 +6936,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/add-class0",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 13243,
+      "shell_boundary_bundle_json_bytes": 13123,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -7183,7 +7039,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -7616,18 +7472,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -8107,7 +7951,7 @@
       },
       "scenario": "SingleAccessMap/pathoram/add-class1",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 13243,
+      "shell_boundary_bundle_json_bytes": 13123,
       "shell_contract": {
         "canonical_loaded_object_count": 1,
         "canonical_loaded_object_schedule": [
@@ -8217,7 +8061,7 @@
           1,
           2
         ],
-        "resource_event_count": 428,
+        "resource_event_count": 426,
         "resource_events": [
           {
             "bytes": 8,
@@ -9958,18 +9802,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -10874,7 +10706,7 @@
       },
       "scenario": "ConfidentialMixer/pathoram/deposit",
       "setup_calls": 0,
-      "shell_boundary_bundle_json_bytes": 35289,
+      "shell_boundary_bundle_json_bytes": 35169,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [
@@ -11001,7 +10833,7 @@
           1,
           2
         ],
-        "resource_event_count": 1334,
+        "resource_event_count": 1330,
         "resource_events": [
           {
             "bytes": 8,
@@ -16186,30 +16018,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 4
           },
           {
             "bytes": 20,
@@ -19100,7 +18908,7 @@
       },
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
-      "shell_boundary_bundle_json_bytes": 101922,
+      "shell_boundary_bundle_json_bytes": 101682,
       "shell_contract": {
         "canonical_loaded_object_count": 2,
         "canonical_loaded_object_schedule": [

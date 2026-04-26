@@ -234,44 +234,40 @@ What is already established at the frozen interface:
 
 What is still open:
 
-- a machine-checked source-to-kernel compiler correctness theorem beyond the
-  now-landed `ProofGradeCompilerFacts` exactness/export layer for manifest
-  fields, confidential-kernel lowering, runtime-step schedules, hash bounds,
-  confidential kernel-step non-raw target facts, and the new compiler-to-ORAM
-  witness bridge for source-derived manifest / expected-access objects now
-  packaged inside that theorem object
-- full discharge of the concrete
+- WP4 (source-to-kernel compiler correctness): a machine-checked
+  source-to-kernel compiler correctness theorem beyond the now-landed
+  `ProofGradeCompilerFacts` exactness/export layer for manifest fields,
+  confidential-kernel lowering, runtime-step schedules, hash bounds,
+  confidential kernel-step non-raw target facts, and the compiler-to-ORAM
+  witness bridge for source-derived manifest / expected-access objects.
+- WP5 (concrete backend assumptions): full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
-- the final malicious-host SGX / TEE deployment theorem for the real runtime
-- a deeper semantics-of-Rust refinement below the strengthened
-  runtime/shared-confidential-kernel source interface and its paired live
-  machine-finish / flattened finish-slot artifact boundaries, which remains
-  the next scientifically stronger step below the current proof/interface
-  claim surface
-- the remaining runtime-side open item below that checked source interface:
-  a semantics-of-Rust refinement theorem for the real shared-kernel / Path
-  ORAM implementation surface, whose checked source-facing boundary now
-  already freezes masked full-scan lookup/update/stash-rebuild behavior
-  together with the exact transition-shaped fresh-leaf schedule used by the
-  modeled witness extractor, the boxed non-`Clone` `PathOramFreshCoinPlan`
-  carrier in `runtime/uo-evm/src/fresh_coins.rs`, the forwarding-only
-  generated-slot adapter discipline, and the public-opcode /
-  bounded-scratch / object-store effect schedule now modeled by
-  `RuntimeKernelMachineSchedule`; it also imports `uo-allocator` source and
-  checks allocator-session kernel-op/scratch/stack budgets, wipe discipline,
-  bounded public resource-event logging, and boxed finish-boundary resource
-  events, backed by `RuntimeAllocatorDiscipline`.
-  The live statement-trace recorder is now an exact-capacity
-  `RuntimeKernelStatementTrace` backed by `RuntimeStatementTraceDiscipline`
-  instead of a growable `Vec<String>`; the Lean model now includes the
-  recorded trace-name list, proves capacity rejection, per-record append of
-  exactly the public statement `traceName`, and exact boxed-trace equality
-  with `program.statementTraceNames`. The live recorder now records through
-  checked `get_mut(...)` slots and finishes/drops initialized entries through
-  iterator-limited fixed buffers rather than direct `trace[index]` /
-  `self.statements[index]` access or initialized-prefix slicing. This route now
-  meets the smaller
-  emitted finish-slot artifact directly on `RuntimeKernelFinishSlotBoundary`
+  (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
+  `stashOverflowBounded`).
+- WP6 (hostile-host TEE theorem): the final malicious-host SGX / TEE
+  deployment theorem for the real runtime.
+- Future strengthening below WP3 (not a WP3 blocker, retained as the next
+  scientific step): a deeper semantics-of-Rust refinement below the now
+  source-pinned/public-only handwritten runtime shell cuts, the
+  Lean-generated/source-checked confidential-kernel interpreter and helper
+  layer, the source-pinned machine/effect schedule
+  (`RuntimeKernelMachineSchedule`), allocator discipline
+  (`RuntimeAllocatorDiscipline`), statement-trace discipline
+  (`RuntimeStatementTraceDiscipline`), Path-ORAM write-log discipline
+  (`RuntimeOramWriteLogDiscipline`), small-map lookup discipline
+  (`RuntimeSmallMapLookupDiscipline`), array-access discipline
+  (`RuntimeArrayAccessDiscipline`), return-tail discipline
+  (`RuntimeReturnScheduleDiscipline`), auditable opcode vocabulary
+  (`uo-precompiles::UoOpcode`), fresh-leaf tape carrier
+  (`PathOramFreshCoinPlan`), and the now end-to-end Lean-modeled Path-ORAM
+  reconstruction surface (`RuntimeOramHelperSemantics`,
+  `RuntimeOramCodecSemantics`, `RuntimeStoreCodecSemantics`,
+  `RuntimeStoreHelperSemantics`). The current WP3 closure ships a checked
+  source-backed boundary at this cut plus the helper-layer end-to-end
+  reconstruction success theorem; the open future-strengthening step is to
+  upgrade this from a "checked source interface plus modeled helper
+  semantics" boundary to a full semantics-of-Rust refinement of the actual
+  Rust binary against that Lean model.
 
 ## Main Choice
 
