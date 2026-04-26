@@ -82,6 +82,12 @@ This checkpoint completed:
   for both `reconstructPathBucketBlocks` and `reconstructPathBlocks` plus
   prior-failure absorption, success acceptance, and the no-buckets initial
   state are exposed at every layer.
+- LiveOnBucketPath chain primitives:
+  `decodedBuckets_liveOnBucketPath_cons` extends a tail proof with one head
+  fact, and `decodedBucket_liveOnBucketPath_of_decodedPathBucket{Path,
+  PositionMap, UniquePositionMap}Bounded` converts a single codec acceptance
+  into the matching head fact. Together they let runtime call sites build the
+  list-level admission hypothesis from per-bucket codec invocations directly.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,
@@ -157,21 +163,18 @@ checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
 Recommended next steps:
 
-1. Tie the runtime decoded-bucket callback fold to the composed codec
-   acceptance hypotheses at every site: build a `List DecodedBucket` whose
-   `LiveOnBucketPath` predicate is discharged by per-bucket invocations of
-   `decodePathBucketPathBoundedExact_some_shape` /
-   `decodePathBucketPositionMapBoundedExact_some_shape` /
-   `decodePathBucketUniquePositionMapBoundedExact_some_shape`, and pass that
-   directly into `reconstructPathDecodedBucketsListFailed_liveOnBucketPath`.
-2. Push the runtime stash phase, position-map coverage check, and live-slot
+1. Push the runtime stash phase, position-map coverage check, and live-slot
    buffer initialization into the same Lean shell so the entire
    `reconstruct_path_entries_from_storage_into` body is modeled by one
-   theorem rather than the current per-step facts.
-3. Move any remaining public-only but currently handwritten reconstruction
+   theorem rather than the current per-step facts. The helper model already
+   has `reconstructPathBlocks`, `liveSlotCoverageFailed`,
+   `initialReconstructionState`, and the decoded-bucket fold; what's missing
+   is one combined "stash + bucket + coverage" predicate plus its success
+   theorem.
+2. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.
-4. Extend the static drift suite to reject reintroduction of direct indexing,
+3. Extend the static drift suite to reject reintroduction of direct indexing,
    variable-size buffers, or secret-dependent control flow in those paths.
 
 ## End-To-End Completion Path

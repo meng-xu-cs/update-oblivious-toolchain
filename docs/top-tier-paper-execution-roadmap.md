@@ -2069,6 +2069,18 @@ If implementation resumes immediately, the next concrete sequence should be:
    `oram_helper_reconstruct_path_decoded_buckets_list_state_no_buckets_theorem_checked`,
    and
    `oram_helper_reconstruct_path_decoded_buckets_list_failed_no_buckets_theorem_checked`.
+   Runtime call sites can also build
+   `DecodedBuckets.LiveOnBucketPath` directly from per-bucket codec
+   acceptance: `decodedBuckets_liveOnBucketPath_cons` extends a tail proof
+   with one head fact, and the three
+   `decodedBucket_liveOnBucketPath_of_decodedPathBucket{Path,PositionMap,UniquePositionMap}Bounded`
+   lemmas each derive the head from a single matching codec acceptance. These
+   primitives land at every layer and are emitted as
+   `oram_helper_decoded_buckets_live_on_bucket_path_cons_theorem_checked`,
+   `oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_path_bounded_theorem_checked`,
+   `oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_position_map_bounded_theorem_checked`,
+   and
+   `oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
    Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,

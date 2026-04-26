@@ -2150,6 +2150,69 @@ theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListFa
     importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsListFailedNoBuckets
       hValid capacity leafCount positionMap
 
+theorem importedBoundaryPaperNativeOramHelperDecodedBucketsLiveOnBucketPathCons
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {leafCount : Nat}
+  {b : RuntimeOramHelperSemantics.DecodedBucket}
+  {bs : List RuntimeOramHelperSemantics.DecodedBucket}
+  (hHead : b.LiveOnBucketPath leafCount)
+  (hTail :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount bs) :
+  RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount (b :: bs) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperDecodedBucketsLiveOnBucketPathCons
+      hValid hHead hTail
+
+theorem importedBoundaryPaperNativeOramHelperDecodedBucketLiveOnBucketPathOfDecodedPathBucketPathBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {blocksPerBucket keyBytes valueBytes capacity leafCount : Nat}
+  {bytes : List Nat}
+  {b : RuntimeOramHelperSemantics.DecodedBucket}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+      blocksPerBucket keyBytes valueBytes b.bucketIndex
+      capacity leafCount bytes = some b.payload) :
+  b.LiveOnBucketPath leafCount := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperDecodedBucketLiveOnBucketPathOfDecodedPathBucketPathBounded
+      hValid hDecode
+
+theorem importedBoundaryPaperNativeOramHelperDecodedBucketLiveOnBucketPathOfDecodedPathBucketPositionMapBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {blocksPerBucket keyBytes valueBytes capacity leafCount : Nat}
+  {positionMapEntries : List (Option Nat)}
+  {bytes : List Nat}
+  {b : RuntimeOramHelperSemantics.DecodedBucket}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+      blocksPerBucket keyBytes valueBytes b.bucketIndex
+      capacity leafCount positionMapEntries bytes = some b.payload) :
+  b.LiveOnBucketPath leafCount := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperDecodedBucketLiveOnBucketPathOfDecodedPathBucketPositionMapBounded
+      hValid hDecode
+
+theorem importedBoundaryPaperNativeOramHelperDecodedBucketLiveOnBucketPathOfDecodedPathBucketUniquePositionMapBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {blocksPerBucket keyBytes valueBytes capacity leafCount : Nat}
+  {positionMapEntries : List (Option Nat)}
+  {bytes : List Nat}
+  {b : RuntimeOramHelperSemantics.DecodedBucket}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+      blocksPerBucket keyBytes valueBytes b.bucketIndex
+      capacity leafCount positionMapEntries bytes = some b.payload) :
+  b.LiveOnBucketPath leafCount := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperDecodedBucketLiveOnBucketPathOfDecodedPathBucketUniquePositionMapBounded
+      hValid hDecode
+
 theorem importedBoundaryPaperNativeOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)

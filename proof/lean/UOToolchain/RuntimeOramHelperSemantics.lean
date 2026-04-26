@@ -2838,6 +2838,65 @@ theorem reconstructPathDecodedBucketsListFailed_noBuckets
   exact reconstructPathDecodedBucketsFailed_noBlocks
     capacity leafCount positionMap
 
+theorem decodedBuckets_liveOnBucketPath_cons
+    {leafCount : Nat}
+    {b : DecodedBucket}
+    {bs : List DecodedBucket}
+    (hHead : b.LiveOnBucketPath leafCount)
+    (hTail : DecodedBuckets.LiveOnBucketPath leafCount bs) :
+    DecodedBuckets.LiveOnBucketPath leafCount (b :: bs) := by
+  intro b' hMem
+  rcases List.mem_cons.mp hMem with hHere | hThere
+  · subst hHere
+    exact hHead
+  · exact hTail b' hThere
+
+theorem decodedBucket_liveOnBucketPath_of_decodedPathBucketPathBounded
+    {blocksPerBucket keyBytes valueBytes capacity leafCount : Nat}
+    {bytes : List Nat}
+    {b : DecodedBucket}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+        blocksPerBucket keyBytes valueBytes b.bucketIndex
+        capacity leafCount bytes = some b.payload) :
+    b.LiveOnBucketPath leafCount := by
+  intro block hMem
+  have hShape :=
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact_some_shape hDecode
+  exact (hShape.2.2 block hMem).2.2
+
+theorem decodedBucket_liveOnBucketPath_of_decodedPathBucketPositionMapBounded
+    {blocksPerBucket keyBytes valueBytes capacity leafCount : Nat}
+    {positionMapEntries : List (Option Nat)}
+    {bytes : List Nat}
+    {b : DecodedBucket}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes b.bucketIndex
+        capacity leafCount positionMapEntries bytes = some b.payload) :
+    b.LiveOnBucketPath leafCount := by
+  intro block hMem
+  have hShape :=
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact_some_shape
+      hDecode
+  exact (hShape.2.2 block hMem).2.2.1
+
+theorem decodedBucket_liveOnBucketPath_of_decodedPathBucketUniquePositionMapBounded
+    {blocksPerBucket keyBytes valueBytes capacity leafCount : Nat}
+    {positionMapEntries : List (Option Nat)}
+    {bytes : List Nat}
+    {b : DecodedBucket}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes b.bucketIndex
+        capacity leafCount positionMapEntries bytes = some b.payload) :
+    b.LiveOnBucketPath leafCount := by
+  intro block hMem
+  have hShape :=
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact_some_shape
+      hDecode
+  exact (hShape.2.2.2 block hMem).2.2.1
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

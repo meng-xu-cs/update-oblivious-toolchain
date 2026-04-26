@@ -865,6 +865,19 @@ projected through both checker boundaries and emitted as
 `oram_helper_reconstruct_path_decoded_buckets_list_state_no_buckets_theorem_checked`,
 and
 `oram_helper_reconstruct_path_decoded_buckets_list_failed_no_buckets_theorem_checked`.
+For runtime call sites the helper layer also exposes the smallest possible
+chain step from "decoded codec bytes" to
+`DecodedBuckets.LiveOnBucketPath`: `decodedBuckets_liveOnBucketPath_cons`
+extends a tail proof with one head per-bucket fact, and each of the three
+`decodedBucket_liveOnBucketPath_of_decodedPathBucket{Path,PositionMap,UniquePositionMap}Bounded`
+lemmas converts a single `decodePathBucket{...}BoundedExact?` decode into the
+matching head fact. These chain primitives land at every layer and are
+emitted as
+`oram_helper_decoded_buckets_live_on_bucket_path_cons_theorem_checked`,
+`oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_path_bounded_theorem_checked`,
+`oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_position_map_bounded_theorem_checked`,
+and
+`oram_helper_decoded_bucket_live_on_bucket_path_of_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
 The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it
