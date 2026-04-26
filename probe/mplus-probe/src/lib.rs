@@ -24829,6 +24829,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let confidential_core_path = repo_root().join("crates/uo-core/src/confidential_core.rs");
     let trusted_kernel_path = repo_root().join("crates/uo-core/src/trusted_kernel.rs");
     let shell_boundary_path = repo_root().join("crates/uo-core/src/shell_boundary.rs");
+    let shell_path = repo_root().join("runtime/uo-evm/src/shell.rs");
+    let runtime_evm_cargo_toml_path = repo_root().join("runtime/uo-evm/Cargo.toml");
+    let runtime_uo_store_cargo_toml_path = repo_root().join("runtime/uo-store/Cargo.toml");
+    let workspace_cargo_toml_path = repo_root().join("Cargo.toml");
     let lean_runtime_implementation_interface_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterface.lean");
     let lean_runtime_implementation_interface_json_path =
@@ -25012,6 +25016,29 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&trusted_kernel_path)))?;
     let shell_boundary_source = fs::read_to_string(&shell_boundary_path)
         .with_context(|| format!("reading {}", display_report_path(&shell_boundary_path)))?;
+    let shell_source = fs::read_to_string(&shell_path)
+        .with_context(|| format!("reading {}", display_report_path(&shell_path)))?;
+    let runtime_evm_cargo_toml_source = fs::read_to_string(&runtime_evm_cargo_toml_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&runtime_evm_cargo_toml_path)
+            )
+        })?;
+    let runtime_uo_store_cargo_toml_source = fs::read_to_string(&runtime_uo_store_cargo_toml_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&runtime_uo_store_cargo_toml_path)
+            )
+        })?;
+    let workspace_cargo_toml_source =
+        fs::read_to_string(&workspace_cargo_toml_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&workspace_cargo_toml_path)
+            )
+        })?;
     let lean_runtime_implementation_interface_source =
         fs::read_to_string(&lean_runtime_implementation_interface_path).with_context(|| {
             format!(
@@ -29560,6 +29587,33 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .all(|needle| {
                     runtime_residual_helper_shell_boundary_validation_fn_source.contains(needle)
                 });
+    let runtime_crypto_primitive_identity_pinned = generated_store_surface_source
+        .contains("use chacha20poly1305::aead::AeadInPlace;")
+        && generated_store_surface_source
+            .contains("use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};")
+        && generated_store_surface_source.contains("ChaCha20Poly1305::new_from_slice(&cipher.key)")
+        && generated_store_surface_source.contains(".encrypt_in_place_detached(")
+        && generated_store_surface_source.contains(".decrypt_in_place_detached(")
+        && generated_store_surface_source.contains("Nonce::from_slice(")
+        && generated_store_surface_source.contains("Tag::from_slice(tag_bytes),")
+        && !generated_store_surface_source.contains("aes_gcm")
+        && !generated_store_surface_source.contains("aes-gcm")
+        && shell_source.contains("use tiny_keccak::{Hasher, Keccak};")
+        && shell_source.contains("Keccak::v256()")
+        && shell_source.contains("hasher.update(")
+        && shell_source.contains("hasher.finalize(&mut out);")
+        && !shell_source.contains("use sha2::")
+        && !shell_source.contains("use sha3::")
+        && !shell_source.contains("Sha3::")
+        && runtime_evm_cargo_toml_source.contains("tiny-keccak.workspace = true")
+        && !runtime_evm_cargo_toml_source.contains("sha3")
+        && !runtime_evm_cargo_toml_source.contains("sha2")
+        && runtime_uo_store_cargo_toml_source.contains("chacha20poly1305.workspace = true")
+        && !runtime_uo_store_cargo_toml_source.contains("aes-gcm")
+        && !runtime_uo_store_cargo_toml_source.contains("aes_gcm")
+        && workspace_cargo_toml_source.contains("chacha20poly1305 = \"=0.10.1\"")
+        && workspace_cargo_toml_source
+            .contains("tiny-keccak = { version = \"=2.0.2\", features = [\"keccak\"] }");
     let rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names =
         extract_rust_struct_fields(
             &probe_source,
@@ -33952,6 +34006,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_residual_helper_shell_boundary_oram_helper_semantics_theorems_present
         && runtime_residual_helper_shell_boundary_path_metadata_codec_roundtrip_theorems_present
         && runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present
+        && runtime_crypto_primitive_identity_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34629,6 +34684,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_residual_helper_shell_boundary_path_metadata_codec_roundtrip_theorems_present,
         "runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present":
             runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present,
+        "runtime_crypto_primitive_identity_pinned":
+            runtime_crypto_primitive_identity_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":

@@ -808,6 +808,7 @@
   "runtime_confidential_core_slot_bundle_nonclone": true,
   "runtime_confidential_statement_trace_bridge_boundary_bridge_theorem_present": true,
   "runtime_confidential_statement_trace_bridge_boundary_field_names_match": true,
+  "runtime_crypto_primitive_identity_pinned": true,
   "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_bridge_theorem_present": true,
   "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_field_names_match": true,
   "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_refines_lean_kernel_state_theorem_present": true,
