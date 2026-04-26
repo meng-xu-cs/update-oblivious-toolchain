@@ -416,18 +416,58 @@ partial def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | some v, _ => .value v
       | none, some v => .value v
       | none, none => .status (.evalError s!"cellGet on unknown object {objectId}")
-  | .arrayGet _ _ => .status (.unsupported "Expr.arrayGet")
-  | .mapGet _ _ => .status (.unsupported "Expr.mapGet")
-  | .structField _ _ => .status (.unsupported "Expr.structField")
-  | .arrayIndex _ _ => .status (.unsupported "Expr.arrayIndex")
-  | .keccak256 _ => .status (.unsupported "Expr.keccak256")
+  | .arrayGet objectId indexExpr =>
+      match evalExpr cfg env indexExpr with
+      | .status s => .status s
+      | .value indexVal =>
+          match indexVal with
+          | .uint idx =>
+              -- Look up the object's array value in either the public or
+              -- secret store, then index into the underlying `Value.array`.
+              let arrayVal? : Option Value :=
+                match cfg.publicState.lookup objectId with
+                | some v => some v
+                | none => cfg.secretState.lookup objectId
+              match arrayVal? with
+              | some (.array values) =>
+                  match values[idx]? with
+                  | some v => .value v
+                  | none =>
+                      .status (.evalError s!"arrayGet index {idx} out of bounds")
+              | some _ =>
+                  .status (.evalError s!"arrayGet on non-array object {objectId}")
+              | none =>
+                  .status (.evalError s!"arrayGet on unknown object {objectId}")
+          | _ => .status (.evalError "arrayGet index not uint")
+  | .mapGet _ _ =>
+      -- Map values are not yet representable in `IR.Value` (no `Value.map`
+      -- variant). Adding map support requires extending `IRSyntax.lean`.
+      .status (.unsupported "Expr.mapGet (needs Value.map variant)")
+  | .structField _ _ =>
+      -- `Expr.structField` is forbidden by `Expr.fragmentValid`; keeping it
+      -- `unsupported` matches the W4.3 admission.
+      .status (.unsupported "Expr.structField")
+  | .arrayIndex _ _ =>
+      -- `Expr.arrayIndex` is forbidden by `Expr.fragmentValid`.
+      .status (.unsupported "Expr.arrayIndex")
+  | .keccak256 _ =>
+      -- Modeling Keccak-256 requires either an abstract hash carrier
+      -- (`Value.bytes32` derived from inputs) or an explicit hash
+      -- function. Deferred to a follow-up commit.
+      .status (.unsupported "Expr.keccak256 (needs hash model)")
 
 end
+
+mutual
 
 /-- Big-step statement evaluator step: takes a configuration, environment,
 running outcome, and a single statement; returns the updated environment
 and outcome. The evaluator stops as soon as a `retStmt` lands or any
-non-`completed` status is recorded. -/
+non-`completed` status is recorded.
+
+`evalStatement` and `evalBody` are mutually recursive so that
+`Statement.ifStmt` and `Statement.forLoop` can recurse into nested
+statement bodies via `evalBody`. -/
 partial def evalStatement
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     Statement → LocalEnv × Outcome
@@ -460,15 +500,53 @@ partial def evalStatement
       | .value _ =>
           (env, { oc with kernelSteps := oc.kernelSteps ++ ["CellSet"] })
       | .status s => (env, { oc with status := s })
+  | .arraySet _objectId index value _predicate =>
+      -- Mirrors the cellSet handling: evaluate the index and value
+      -- expressions, track the kernel step, leave the masked store
+      -- mutation to a follow-up commit.
+      match evalExpr cfg env index with
+      | .status s => (env, { oc with status := s })
+      | .value _ =>
+          match evalExpr cfg env value with
+          | .status s => (env, { oc with status := s })
+          | .value _ =>
+              (env, { oc with kernelSteps := oc.kernelSteps ++ ["ArraySet"] })
+  | .mapPut _objectId key value _predicate =>
+      match evalExpr cfg env key with
+      | .status s => (env, { oc with status := s })
+      | .value _ =>
+          match evalExpr cfg env value with
+          | .status s => (env, { oc with status := s })
+          | .value _ =>
+              (env, { oc with kernelSteps := oc.kernelSteps ++ ["MapPut"] })
+  | .ifStmt cond thenBody elseBody =>
+      -- Public-conditional control flow: evaluate the condition, then
+      -- recurse into the chosen branch via `evalBody`.
+      match evalExpr cfg env cond with
+      | .status s => (env, { oc with status := s })
+      | .value (.bool true) => evalBody cfg env oc thenBody
+      | .value (.bool false) => evalBody cfg env oc elseBody
+      | .value _ => (env, { oc with status := .evalError "if condition not boolean" })
+  | .forLoop _loopId indexVar startExpr endExpr body =>
+      -- Bounded loop: the admitted fragment requires `start` and `end`
+      -- to be public, so the iteration count is fixed by the public
+      -- projection.
+      match evalExpr cfg env startExpr with
+      | .status s => (env, { oc with status := s })
+      | .value startVal =>
+          match evalExpr cfg env endExpr with
+          | .status s => (env, { oc with status := s })
+          | .value endVal =>
+              match startVal, endVal with
+              | .uint startN, .uint endN =>
+                  evalForLoop cfg env oc indexVar startN endN body
+              | _, _ =>
+                  (env, { oc with status := .evalError "for-loop bounds not uint" })
   | .retStmt none => (env, oc)
   | .retStmt (some value) =>
       match evalExpr cfg env value with
       | .value v => (env, { oc with publicResult := some v })
       | .status s => (env, { oc with status := s })
-  | .ifStmt _ _ _ => (env, { oc with status := .unsupported "Statement.ifStmt" })
-  | .forLoop _ _ _ _ _ => (env, { oc with status := .unsupported "Statement.forLoop" })
-  | .arraySet _ _ _ _ => (env, { oc with status := .unsupported "Statement.arraySet" })
-  | .mapPut _ _ _ _ => (env, { oc with status := .unsupported "Statement.mapPut" })
 
 partial def evalBody
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
@@ -481,6 +559,26 @@ partial def evalBody
           if oc'.publicResult.isSome then (env', oc')
           else evalBody cfg env' oc' rest
       | _ => (env', oc')
+
+/-- Bounded for-loop helper. The loop runs from `i` (inclusive) to `endN`
+(exclusive). Each iteration binds `indexVar` to `Value.uint i` and
+walks `body` via `evalBody`. The loop exits early on a `retStmt` or any
+non-`completed` status. -/
+partial def evalForLoop
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
+    (indexVar : String) (i endN : Nat) (body : List Statement) :
+    LocalEnv × Outcome :=
+  if i ≥ endN then (env, oc)
+  else
+    let env' := env.insert indexVar (.uint i)
+    let (env'', oc') := evalBody cfg env' oc body
+    match oc'.status with
+    | .completed =>
+        if oc'.publicResult.isSome then (env'', oc')
+        else evalForLoop cfg env'' oc' indexVar (i + 1) endN body
+    | _ => (env'', oc')
+
+end
 
 /-- Lookup the entrypoint function inside the contract. -/
 def OperationalConfig.entrypointFn? (cfg : OperationalConfig) :
