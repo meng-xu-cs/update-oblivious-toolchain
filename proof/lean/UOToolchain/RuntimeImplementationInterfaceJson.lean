@@ -5484,6 +5484,26 @@ theorem
       hStashWellFormed hBucketWellFormed hCoverage
 
 theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {leafCount : Nat}
+  {decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket}
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets) :
+  ∀ bucketBlock,
+    bucketBlock ∈
+        RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets
+          decodedBuckets →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+          bucketBlock = false := by
+  exact
+    RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      hLive
+
+theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)

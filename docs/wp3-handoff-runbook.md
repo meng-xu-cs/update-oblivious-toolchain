@@ -119,6 +119,12 @@ This checkpoint completed:
   entire `for index in 0..bucket_count` fold:
   `reconstructPathDecodedBucketsFailed_success_of_wellFormed` and
   `reconstructPathDecodedBucketsListFailed_success_of_wellFormed`.
+- List-level admission from LiveOnBucketPath:
+  `bucketBlocksOfDecodedBuckets_admitted_of_liveOnBucketPath` shows that
+  under `DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets`, every
+  entry in the flattened bucket-block list satisfies admission. Combined
+  with the chain primitives, runtime callers can derive admission for the
+  entire fold from per-bucket codec acceptance hypotheses alone.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,

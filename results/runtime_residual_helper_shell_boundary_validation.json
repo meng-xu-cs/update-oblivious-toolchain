@@ -53,6 +53,7 @@
   "oram_helper_bucket_blocks_of_codec_blocks_admitted_of_live_on_bucket_path_theorem_checked": true,
   "oram_helper_bucket_blocks_of_codec_blocks_length_theorem_checked": true,
   "oram_helper_bucket_blocks_of_codec_blocks_map_block_theorem_checked": true,
+  "oram_helper_bucket_blocks_of_decoded_buckets_admitted_of_live_on_bucket_path_theorem_checked": true,
   "oram_helper_bucket_blocks_well_formed_from_nil_theorem_checked": true,
   "oram_helper_build_path_bucket_bucket_length_theorem_checked": true,
   "oram_helper_build_path_bucket_live_count_bound_theorem_checked": true,

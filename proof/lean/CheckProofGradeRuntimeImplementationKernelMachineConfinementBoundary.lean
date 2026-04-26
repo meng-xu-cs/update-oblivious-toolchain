@@ -2618,6 +2618,24 @@ theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsListFa
       hValid capacity leafCount positionMap stashBlocks decodedBuckets
       hStashWellFormed hBucketWellFormed hCoverage
 
+theorem importedBoundaryPaperNativeOramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {leafCount : Nat}
+  {decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket}
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets) :
+  ∀ bucketBlock,
+    bucketBlock ∈
+        RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets
+          decodedBuckets →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+          bucketBlock = false := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
+      hValid hLive
+
 theorem importedBoundaryPaperNativeOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)

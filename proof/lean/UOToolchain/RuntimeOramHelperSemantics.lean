@@ -3316,6 +3316,28 @@ theorem reconstructPathDecodedBucketsListFailed_success_of_wellFormed
     (bucketBlocksOfDecodedBuckets decodedBuckets)
     hStashWellFormed hBucketWellFormed hCoverage
 
+theorem bucketBlocksOfDecodedBuckets_admitted_of_liveOnBucketPath
+    {leafCount : Nat}
+    {decodedBuckets : List DecodedBucket}
+    (hLive : DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets) :
+    ∀ bucketBlock,
+      bucketBlock ∈ bucketBlocksOfDecodedBuckets decodedBuckets →
+        bucketBlockAdmissionFailed leafCount bucketBlock = false := by
+  intro bucketBlock hMem
+  induction decodedBuckets with
+  | nil => simp [bucketBlocksOfDecodedBuckets] at hMem
+  | cons b bs ih =>
+      have hHead : b.LiveOnBucketPath leafCount :=
+        decodedBuckets_liveOnBucketPath_head hLive
+      have hTail : DecodedBuckets.LiveOnBucketPath leafCount bs :=
+        decodedBuckets_liveOnBucketPath_tail hLive
+      rw [bucketBlocksOfDecodedBuckets_cons] at hMem
+      rcases List.mem_append.mp hMem with hHere | hThere
+      · unfold bucketBlocksOfDecodedBucket at hHere
+        exact bucketBlocksOfCodecBlocks_admitted_of_liveOnBucketPath
+          hHead bucketBlock hHere
+      · exact ih hTail hThere
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

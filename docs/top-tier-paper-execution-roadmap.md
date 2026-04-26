@@ -2138,6 +2138,11 @@ If implementation resumes immediately, the next concrete sequence should be:
    `oram_helper_reconstruct_path_decoded_buckets_failed_success_of_well_formed_theorem_checked`
    and
    `oram_helper_reconstruct_path_decoded_buckets_list_failed_success_of_well_formed_theorem_checked`.
+   The list-level admission derivation
+   `bucketBlocksOfDecodedBuckets_admitted_of_liveOnBucketPath` shows that
+   under `DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets`, every
+   entry in the flattened bucket-block list satisfies admission, landing as
+   `oram_helper_bucket_blocks_of_decoded_buckets_admitted_of_live_on_bucket_path_theorem_checked`.
    Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,

@@ -938,6 +938,11 @@ predicate `reconstructPathDecodedBucketsFailed = false` (resp.
 `oram_helper_reconstruct_path_decoded_buckets_failed_success_of_well_formed_theorem_checked`
 and
 `oram_helper_reconstruct_path_decoded_buckets_list_failed_success_of_well_formed_theorem_checked`.
+The flatten-level admission lemma is also exposed:
+`bucketBlocksOfDecodedBuckets_admitted_of_liveOnBucketPath` shows that under
+`DecodedBuckets.LiveOnBucketPath leafCount decodedBuckets`, every entry in
+the flattened bucket-block list satisfies admission, emitted as
+`oram_helper_bucket_blocks_of_decoded_buckets_admitted_of_live_on_bucket_path_theorem_checked`.
 The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it

@@ -11816,6 +11816,23 @@ theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRec
     capacity leafCount positionMap stashBlocks decodedBuckets
     hStashWellFormed hBucketWellFormed hCoverage
 
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount : Nat}
+  {decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket}
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets) :
+  ∀ bucketBlock,
+    bucketBlock ∈
+        RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets
+          decodedBuckets →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+          bucketBlock = false :=
+  RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets_admitted_of_liveOnBucketPath
+    hLive
+
 theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperWorkingStashCapacityFormula
   (iface : RuntimeImplementationInterface)
   (_h : iface.ResidualHelperShellBoundary)
@@ -17721,6 +17738,24 @@ theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBuck
     (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
     capacity leafCount positionMap stashBlocks decodedBuckets
     hStashWellFormed hBucketWellFormed hCoverage
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount : Nat}
+  {decodedBuckets : List RuntimeOramHelperSemantics.DecodedBucket}
+  (hLive :
+    RuntimeOramHelperSemantics.DecodedBuckets.LiveOnBucketPath
+      leafCount decodedBuckets) :
+  ∀ bucketBlock,
+    bucketBlock ∈
+        RuntimeOramHelperSemantics.bucketBlocksOfDecodedBuckets
+          decodedBuckets →
+      RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+          bucketBlock = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlocksOfDecodedBucketsAdmittedOfLiveOnBucketPath
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hLive
 
 theorem RuntimePaperNativeKernelAssumptions.oramHelperWorkingStashCapacityFormula
   (assumptions : RuntimePaperNativeKernelAssumptions)
