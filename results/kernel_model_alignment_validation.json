@@ -65,21 +65,44 @@
   "confidential_core_bundle_bridge_surface_restricted": true,
   "confidential_core_reuses_shell_boundary_bundle_only": true,
   "confidential_core_runtime_witness_constructors_private": true,
+  "confidential_kernel_consumes_generated_interpreter": true,
+  "confidential_kernel_consumes_generated_profiles": true,
+  "confidential_kernel_expr_evaluated_operands_match": true,
   "confidential_kernel_expr_kind_names_match": true,
+  "confidential_kernel_expr_profiles_are_centralized": true,
   "confidential_kernel_expr_serde_snake_case": true,
+  "confidential_kernel_expr_tail_opcodes_match": true,
   "confidential_kernel_param_field_names_match": true,
   "confidential_kernel_program_field_names_match": true,
+  "confidential_kernel_pure_expr_evaluated_operands_match": true,
   "confidential_kernel_pure_expr_kind_names_match": true,
+  "confidential_kernel_pure_expr_profiles_are_centralized": true,
   "confidential_kernel_pure_expr_serde_snake_case": true,
+  "confidential_kernel_slot_expr_evaluated_operands_match": true,
   "confidential_kernel_slot_expr_kind_names_match": true,
+  "confidential_kernel_slot_expr_profiles_are_centralized": true,
   "confidential_kernel_slot_expr_serde_snake_case": true,
+  "confidential_kernel_slot_expr_tail_opcodes_match": true,
   "confidential_kernel_slot_program_field_names_match": true,
+  "confidential_kernel_slot_pure_expr_evaluated_operands_match": true,
   "confidential_kernel_slot_pure_expr_kind_names_match": true,
+  "confidential_kernel_slot_pure_expr_profiles_are_centralized": true,
   "confidential_kernel_slot_pure_expr_serde_snake_case": true,
+  "confidential_kernel_slot_statement_effect_kinds_match": true,
+  "confidential_kernel_slot_statement_evaluated_operands_match": true,
   "confidential_kernel_slot_statement_kind_names_match": true,
+  "confidential_kernel_slot_statement_runtime_normal_form_flags_match": true,
   "confidential_kernel_slot_statement_serde_snake_case": true,
+  "confidential_kernel_slot_statement_tail_opcodes_match": true,
+  "confidential_kernel_slot_statement_trace_names_match": true,
+  "confidential_kernel_statement_effect_kinds_match": true,
+  "confidential_kernel_statement_evaluated_operands_match": true,
   "confidential_kernel_statement_kind_names_match": true,
+  "confidential_kernel_statement_profiles_are_centralized": true,
+  "confidential_kernel_statement_runtime_normal_form_flags_match": true,
   "confidential_kernel_statement_serde_snake_case": true,
+  "confidential_kernel_statement_tail_opcodes_match": true,
+  "confidential_kernel_statement_trace_names_match": true,
   "execution_trace_kernel_interface_bundle_prefers_stored_finish_bundle": true,
   "execution_trace_runtime_api_is_explicit": true,
   "execution_trace_runtime_fields_private": true,
@@ -88,12 +111,32 @@
     "crates/uo-core/src/trace.rs"
   ],
   "expected_runtime_trusted_kernel_bundle_storage_surface_files": [],
+  "generated_confidential_kernel_source_matches_lean": true,
+  "generated_kernel_machine_source_matches_lean": true,
+  "generated_object_helpers_source_matches_lean": true,
+  "generated_oram_codecs_source_matches_lean": true,
+  "generated_slot_support_source_matches_lean": true,
+  "generated_store_codec_source_matches_lean": true,
+  "generated_store_helpers_source_matches_lean": true,
+  "generated_store_surface_source_matches_lean": true,
   "kernel_dsl_manifest_entry_constructors_private": true,
+  "kernel_runtime_consumes_generated_machine_schedule": true,
   "lean_confidential_core_kernel_interface_slot_exactness_present": true,
   "lean_confidential_core_proof_grade_assurance_present": true,
   "lean_confidential_core_reuses_kernel_boundary_facts": true,
   "lean_confidential_core_shell_boundary_lowering_exactness_present": true,
   "lean_confidential_core_shell_boundary_slot_exactness_present": true,
+  "lean_confidential_kernel_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond",
+    "",
+    "index",
+    "key",
+    "parts"
+  ],
   "lean_confidential_kernel_expr_kind_names": [
     "literal",
     "var",
@@ -104,6 +147,18 @@
     "array_get",
     "map_get",
     "keccak256"
+  ],
+  "lean_confidential_kernel_expr_profile_tables_present": true,
+  "lean_confidential_kernel_expr_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "CellGet",
+    "ArrayGet",
+    "MapGet",
+    ""
   ],
   "lean_confidential_kernel_param_field_names": [
     "name",
@@ -116,6 +171,14 @@
     "secret_args",
     "body"
   ],
+  "lean_confidential_kernel_pure_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond,when_true,when_false",
+    "parts"
+  ],
   "lean_confidential_kernel_pure_expr_kind_names": [
     "literal",
     "var",
@@ -123,6 +186,18 @@
     "binary",
     "select",
     "keccak256"
+  ],
+  "lean_confidential_kernel_pure_expr_profile_tables_present": true,
+  "lean_confidential_kernel_slot_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond",
+    "",
+    "index",
+    "key",
+    "parts"
   ],
   "lean_confidential_kernel_slot_expr_kind_names": [
     "literal",
@@ -135,6 +210,18 @@
     "map_get",
     "keccak256"
   ],
+  "lean_confidential_kernel_slot_expr_profile_tables_present": true,
+  "lean_confidential_kernel_slot_expr_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "CellGet",
+    "ArrayGet",
+    "MapGet",
+    ""
+  ],
   "lean_confidential_kernel_slot_program_field_names": [
     "entrypoint_id",
     "param_count",
@@ -143,6 +230,14 @@
     "slot_count",
     "body"
   ],
+  "lean_confidential_kernel_slot_pure_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond,when_true,when_false",
+    "parts"
+  ],
   "lean_confidential_kernel_slot_pure_expr_kind_names": [
     "literal",
     "slot",
@@ -150,6 +245,27 @@
     "binary",
     "select",
     "keccak256"
+  ],
+  "lean_confidential_kernel_slot_pure_expr_profile_tables_present": true,
+  "lean_confidential_kernel_slot_statement_effect_kinds": [
+    "store_slot",
+    "store_slot",
+    "guard_only",
+    "abort_flag",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return_value"
+  ],
+  "lean_confidential_kernel_slot_statement_evaluated_operands": [
+    "value",
+    "value",
+    "cond",
+    "cond",
+    "value,predicate?",
+    "index,value,predicate?",
+    "key,value,predicate?",
+    "value?"
   ],
   "lean_confidential_kernel_slot_statement_kind_names": [
     "declare",
@@ -161,7 +277,89 @@
     "map_put",
     "return"
   ],
+  "lean_confidential_kernel_slot_statement_profile_tables_present": true,
+  "lean_confidential_kernel_slot_statement_runtime_normal_form_flags": [
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "lean_confidential_kernel_slot_statement_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "CellSet",
+    "ArraySet",
+    "MapPut",
+    ""
+  ],
+  "lean_confidential_kernel_slot_statement_trace_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "lean_confidential_kernel_statement_effect_kinds": [
+    "store_slot",
+    "store_slot",
+    "guard_only",
+    "abort_flag",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return_value"
+  ],
+  "lean_confidential_kernel_statement_evaluated_operands": [
+    "value",
+    "value",
+    "cond",
+    "cond",
+    "value,predicate?",
+    "index,value,predicate?",
+    "key,value,predicate?",
+    "value?"
+  ],
   "lean_confidential_kernel_statement_kind_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "lean_confidential_kernel_statement_profile_tables_present": true,
+  "lean_confidential_kernel_statement_runtime_normal_form_flags": [
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "lean_confidential_kernel_statement_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "CellSet",
+    "ArraySet",
+    "MapPut",
+    ""
+  ],
+  "lean_confidential_kernel_statement_trace_names": [
     "declare",
     "assign",
     "require",
@@ -222,6 +420,100 @@
     "runtime_witness",
     "confidential_slot_program"
   ],
+  "lean_runtime_confidential_statement_trace_bridge_boundary_field_names": [
+    "implementation_interface"
+  ],
+  "lean_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "lean_runtime_implementation_confinement_boundary_field_names": [
+    "implementation_interface",
+    "kernel_interface_bundle"
+  ],
+  "lean_runtime_implementation_interface_field_names": [
+    "runtime_evm_lib_source",
+    "engine_source",
+    "runtime_module_source",
+    "fresh_coins_source",
+    "controller_source",
+    "shell_source",
+    "state_source",
+    "kernel_runtime_source",
+    "kernel_slot_support_source",
+    "generated_kernel_machine_source",
+    "generated_object_helpers_source",
+    "generated_oram_codecs_source",
+    "objects_source",
+    "oram_source",
+    "theorem_source",
+    "confidential_kernel_source",
+    "generated_confidential_kernel_source",
+    "trace_source",
+    "confidential_core_source",
+    "trusted_kernel_source",
+    "core_lib_source",
+    "precompiles_source",
+    "allocator_source",
+    "store_lib_source",
+    "store_codec_source",
+    "generated_store_codec_source",
+    "generated_store_surface_source",
+    "generated_store_helpers_source",
+    "store_store_source",
+    "generated_value_ops_source",
+    "types_source"
+  ],
+  "lean_runtime_implementation_kernel_machine_confinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "lean_runtime_implementation_kernel_meeting_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "lean_runtime_implementation_kernel_meeting_confinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "lean_runtime_implementation_residual_helper_shell_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "lean_runtime_implementation_shared_kernel_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "lean_runtime_implementation_shared_kernel_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "lean_runtime_implementation_slot_adapter_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "lean_runtime_implementation_small_confidential_kernel_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
   "lean_runtime_kernel_confinement_boundary_object_present": true,
   "lean_runtime_kernel_dsl_bundle_exactness_present": true,
   "lean_runtime_kernel_interface_bundle_field_names": [
@@ -237,13 +529,52 @@
     "confidential_program",
     "confidential_slot_program"
   ],
+  "lean_runtime_kernel_machine_finish_boundary_field_names": [
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "lean_runtime_kernel_machine_finish_witness_field_names": [
+    "entrypoint_id",
+    "arena_bytes",
+    "max_stack_words",
+    "scratch_bytes",
+    "peak_stack_words",
+    "value_scratch_peak_bytes",
+    "value_scratch_live_bytes_end",
+    "value_scratch_wipe_count",
+    "hash_scratch_peak_bytes",
+    "hash_scratch_live_bytes_end",
+    "hash_scratch_wipe_count",
+    "io_scratch_peak_bytes",
+    "io_scratch_live_bytes_end",
+    "io_scratch_wipe_count",
+    "resource_events",
+    "expected_kernel_steps",
+    "expected_kernel_step_index",
+    "public_object_ids",
+    "expected_public_object_ids",
+    "kernel_steps",
+    "max_kernel_ops",
+    "max_runtime_phase_event_count",
+    "runtime_phase_events_before_finish"
+  ],
   "lean_runtime_kernel_refinement_boundary_object_present": true,
   "lean_runtime_kernel_slot_dsl_bundle_exactness_present": true,
   "lean_runtime_kernel_slot_dsl_bundle_field_names": [
     "kernel_witness",
     "confidential_slot_program"
   ],
+  "lean_runtime_public_bridge_boundary_field_names": [
+    "implementation_interface"
+  ],
   "lean_runtime_refinement_proof_grade_exactness_present": true,
+  "lean_runtime_residual_helper_shell_boundary_field_names": [
+    "implementation_interface"
+  ],
+  "lean_runtime_shared_confidential_kernel_boundary_field_names": [
+    "implementation_interface"
+  ],
   "lean_runtime_shell_boundary_bundle_field_names": [
     "kernel_witness",
     "runtime_kernel_refinement_witness",
@@ -273,10 +604,17 @@
     "cold_store_object_schedule",
     "post_committed_cold_object_schedule"
   ],
+  "lean_runtime_slot_adapter_boundary_field_names": [
+    "implementation_interface"
+  ],
+  "lean_runtime_small_confidential_kernel_boundary_field_names": [
+    "implementation_interface"
+  ],
   "lean_runtime_trusted_kernel_proof_grade_exactness_present": true,
   "lean_runtime_trusted_kernel_slot_bundle_field_names": [
     "trusted_kernel_bundle",
-    "confidential_slot_program"
+    "confidential_slot_program",
+    "opcode_trace"
   ],
   "lean_scratch_region_names": [
     "value_scratch",
@@ -292,13 +630,22 @@
     "family",
     "public_outcome",
     "boundary_schedule",
+    "opcode_trace",
     "confidential_slot_program"
   ],
   "lean_shell_boundary_bundle_checks_exact_runtime_views": true,
   "lean_shell_boundary_lowering_bundle_exactness_present": true,
   "lean_shell_boundary_slot_bundle_exactness_present": true,
   "lean_trusted_kernel_slot_bundle_proof_grade_exactness_present": true,
+  "objects_runtime_consumes_generated_object_helpers": true,
+  "objects_runtime_uses_shared_boxed_seal_helper": true,
+  "objects_runtime_uses_shared_open_decode_helper": true,
   "opcode_names_match": true,
+  "oram_runtime_consumes_generated_object_helpers": true,
+  "oram_runtime_consumes_generated_oram_codecs": true,
+  "oram_runtime_uses_shared_boxed_filler_helper": true,
+  "oram_runtime_uses_shared_boxed_seal_helper": true,
+  "oram_runtime_uses_shared_open_decode_helper": true,
   "proof_interface_bundle_literal_checks": [
     {
       "expected_files": [
@@ -459,6 +806,118 @@
   "runtime_confidential_core_slot_bundle_field_names_match": true,
   "runtime_confidential_core_slot_bundle_fields_private": true,
   "runtime_confidential_core_slot_bundle_nonclone": true,
+  "runtime_confidential_statement_trace_bridge_boundary_bridge_theorem_present": true,
+  "runtime_confidential_statement_trace_bridge_boundary_field_names_match": true,
+  "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_bridge_theorem_present": true,
+  "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_field_names_match": true,
+  "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_refines_lean_kernel_state_theorem_present": true,
+  "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_runtime_kernel_confinement_projection_theorem_present": true,
+  "runtime_implementation_confinement_boundary_field_names_match": true,
+  "runtime_implementation_confinement_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_confinement_boundary_paper_public_only_shell_theorem_present": true,
+  "runtime_implementation_confinement_boundary_public_bridge_observer_theorem_present": true,
+  "runtime_implementation_confinement_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_confinement_boundary_runtime_kernel_confinement_projection_theorem_present": true,
+  "runtime_implementation_confinement_boundary_shared_kernel_theorem_present": true,
+  "runtime_implementation_confinement_boundary_slot_adapter_theorem_present": true,
+  "runtime_implementation_confinement_boundary_small_kernel_theorem_present": true,
+  "runtime_implementation_interface_field_names_match": true,
+  "runtime_implementation_interface_handwritten_host_coordination_lacks_secret_serialization_theorem_present": true,
+  "runtime_implementation_interface_handwritten_runtime_lacks_direct_secret_ops_theorem_present": true,
+  "runtime_implementation_interface_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_interface_host_visible_error_taxonomy_theorem_present": true,
+  "runtime_implementation_interface_public_shell_canonical_hashing_guarded_by_public_entry_theorem_present": true,
+  "runtime_implementation_interface_public_shell_rejects_confidential_expression_evaluation_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_array_access_selection_theorems_present": true,
+  "runtime_implementation_kernel_machine_confinement_boundary_field_names_match": true,
+  "runtime_implementation_kernel_machine_confinement_codec_layout_theorems_present": true,
+  "runtime_implementation_kernel_machine_confinement_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_native_machine_semantics_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_oram_helper_semantics_theorems_present": true,
+  "runtime_implementation_kernel_machine_confinement_oram_write_log_push_theorems_present": true,
+  "runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumption_bundle_minimized": true,
+  "runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumptions_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_paper_public_only_residual_helper_shell_observer_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_paper_public_only_residual_helper_shell_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_paper_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_public_bridge_boundary_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_public_bridge_observer_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_public_only_shell_paper_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_public_shell_canonical_hashing_guarded_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_residual_helper_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_runtime_implementation_confinement_projection_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_shared_kernel_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_slot_adapter_machine_paper_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_slot_adapter_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_slot_support_stage_args_theorems_present": true,
+  "runtime_implementation_kernel_machine_confinement_small_kernel_theorem_present": true,
+  "runtime_implementation_kernel_machine_confinement_small_map_lookup_fold_theorems_present": true,
+  "runtime_implementation_kernel_machine_confinement_statement_trace_content_theorems_present": true,
+  "runtime_implementation_kernel_machine_confinement_value_ops_semantics_theorems_present": true,
+  "runtime_implementation_kernel_meeting_boundary_bridge_theorem_present": true,
+  "runtime_implementation_kernel_meeting_boundary_field_names_match": true,
+  "runtime_implementation_kernel_meeting_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_kernel_meeting_boundary_refines_lean_kernel_state_theorem_present": true,
+  "runtime_implementation_kernel_meeting_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_kernel_meeting_boundary_runtime_kernel_confinement_projection_theorem_present": true,
+  "runtime_implementation_kernel_meeting_boundary_shared_kernel_theorem_present": true,
+  "runtime_implementation_kernel_meeting_boundary_slot_adapter_theorem_present": true,
+  "runtime_implementation_kernel_meeting_boundary_small_kernel_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_field_names_match": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_paper_public_only_shell_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_public_bridge_observer_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_runtime_implementation_confinement_projection_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_shared_kernel_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_slot_adapter_theorem_present": true,
+  "runtime_implementation_kernel_meeting_confinement_boundary_small_kernel_theorem_present": true,
+  "runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match": true,
+  "runtime_implementation_public_bridge_observer_refinement_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_public_bridge_observer_refinement_boundary_paper_theorem_present": true,
+  "runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present": true,
+  "runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_residual_helper_shell_machine_refinement_boundary_field_names_match": true,
+  "runtime_implementation_residual_helper_shell_machine_refinement_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_residual_helper_shell_machine_refinement_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_residual_helper_shell_machine_refinement_native_machine_theorem_present": true,
+  "runtime_implementation_residual_helper_shell_machine_refinement_observer_theorem_present": true,
+  "runtime_implementation_residual_helper_shell_machine_refinement_paper_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_field_names_match": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_native_machine_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_paper_observer_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_paper_public_only_residual_helper_shell_observer_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_paper_public_only_residual_helper_shell_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_paper_public_only_shell_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_paper_slot_adapter_machine_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_shared_kernel_theorem_present": true,
+  "runtime_implementation_shared_kernel_machine_refinement_boundary_slot_adapter_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_field_names_match": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_paper_observer_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_paper_public_only_shell_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_refines_lean_kernel_state_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_runtime_kernel_confinement_projection_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_shared_kernel_theorem_present": true,
+  "runtime_implementation_shared_kernel_refinement_boundary_slot_adapter_theorem_present": true,
+  "runtime_implementation_slot_adapter_machine_refinement_boundary_field_names_match": true,
+  "runtime_implementation_slot_adapter_machine_refinement_boundary_native_machine_theorem_present": true,
+  "runtime_implementation_slot_adapter_machine_refinement_boundary_paper_theorem_present": true,
+  "runtime_implementation_slot_adapter_machine_refinement_boundary_slot_adapter_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_field_names_match": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_native_machine_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_paper_observer_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_paper_public_only_residual_helper_shell_observer_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_paper_public_only_residual_helper_shell_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_paper_public_only_shell_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_paper_slot_adapter_machine_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_residual_helper_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_slot_adapter_theorem_present": true,
+  "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_small_kernel_theorem_present": true,
   "runtime_kernel_bundle_bridge_checks": [
     {
       "expected_files": [
@@ -536,13 +995,32 @@
   "runtime_kernel_lowering_bundle_api_is_explicit": true,
   "runtime_kernel_lowering_bundle_field_names_match": true,
   "runtime_kernel_lowering_bundle_fields_private": true,
+  "runtime_kernel_machine_finish_boundary_field_names_match": true,
+  "runtime_kernel_machine_finish_witness_field_names_match": true,
   "runtime_kernel_refinement_witness_export_prefers_stored_finish_bundle": true,
   "runtime_kernel_slot_dsl_bundle_api_is_explicit": true,
   "runtime_kernel_slot_dsl_bundle_field_names_match": true,
   "runtime_kernel_slot_dsl_bundle_fields_private": true,
   "runtime_kernel_witness_export_prefers_stored_finish_bundle": true,
+  "runtime_public_bridge_boundary_field_names_match": true,
+  "runtime_public_bridge_boundary_public_bridge_theorem_present": true,
   "runtime_refinement_witness_constructors_private": true,
   "runtime_refinement_witness_reuses_trusted_kernel_bundle": true,
+  "runtime_residual_helper_shell_boundary_field_names_match": true,
+  "runtime_residual_helper_shell_boundary_generated_helpers_match_lean_generator_theorems_present": true,
+  "runtime_residual_helper_shell_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_residual_helper_shell_boundary_host_visible_error_taxonomy_theorem_present": true,
+  "runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present": true,
+  "runtime_residual_helper_shell_boundary_oram_helper_semantics_theorems_present": true,
+  "runtime_residual_helper_shell_boundary_path_metadata_codec_roundtrip_theorems_present": true,
+  "runtime_residual_helper_shell_boundary_residual_helper_theorem_present": true,
+  "runtime_residual_helper_shell_boundary_store_codec_semantics_theorems_present": true,
+  "runtime_shared_confidential_kernel_boundary_field_names_match": true,
+  "runtime_shared_confidential_kernel_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_shared_confidential_kernel_boundary_host_visible_error_taxonomy_theorem_present": true,
+  "runtime_shared_confidential_kernel_boundary_residual_helper_theorem_present": true,
+  "runtime_shared_confidential_kernel_boundary_shared_kernel_theorem_present": true,
+  "runtime_shared_confidential_kernel_boundary_slot_adapter_theorem_present": true,
   "runtime_shell_boundary_bundle_api_is_explicit": true,
   "runtime_shell_boundary_bundle_constructor_borrows_runtime_kernel_finish_bundle": true,
   "runtime_shell_boundary_bundle_constructor_borrows_runtime_witness": true,
@@ -563,6 +1041,14 @@
   "runtime_shell_trace_api_is_explicit": true,
   "runtime_shell_trace_field_names_match": true,
   "runtime_shell_trace_fields_private": true,
+  "runtime_slot_adapter_boundary_field_names_match": true,
+  "runtime_slot_adapter_boundary_slot_adapter_theorem_present": true,
+  "runtime_small_confidential_kernel_boundary_field_names_match": true,
+  "runtime_small_confidential_kernel_boundary_handwritten_runtime_public_only_theorem_present": true,
+  "runtime_small_confidential_kernel_boundary_host_visible_error_taxonomy_theorem_present": true,
+  "runtime_small_confidential_kernel_boundary_residual_helper_theorem_present": true,
+  "runtime_small_confidential_kernel_boundary_slot_adapter_theorem_present": true,
+  "runtime_small_confidential_kernel_boundary_small_kernel_theorem_present": true,
   "runtime_trace_bridge_checks": [
     {
       "expected_files": [
@@ -639,6 +1125,17 @@
   "runtime_trusted_kernel_slot_bundle_field_names_match": true,
   "runtime_trusted_kernel_slot_bundle_fields_private": true,
   "runtime_trusted_kernel_slot_bundle_nonclone": true,
+  "rust_confidential_kernel_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond",
+    "",
+    "index",
+    "key",
+    "parts"
+  ],
   "rust_confidential_kernel_expr_kind_names": [
     "literal",
     "var",
@@ -649,6 +1146,77 @@
     "array_get",
     "map_get",
     "keccak256"
+  ],
+  "rust_confidential_kernel_expr_profiles": [
+    {
+      "evaluated_operands": [],
+      "kind": "literal",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [],
+      "kind": "var",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "expr"
+      ],
+      "kind": "unary",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "lhs",
+        "rhs"
+      ],
+      "kind": "binary",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "cond"
+      ],
+      "kind": "select",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [],
+      "kind": "cell_get",
+      "tail_opcode": "CellGet"
+    },
+    {
+      "evaluated_operands": [
+        "index"
+      ],
+      "kind": "array_get",
+      "tail_opcode": "ArrayGet"
+    },
+    {
+      "evaluated_operands": [
+        "key"
+      ],
+      "kind": "map_get",
+      "tail_opcode": "MapGet"
+    },
+    {
+      "evaluated_operands": [
+        "parts"
+      ],
+      "kind": "keccak256",
+      "tail_opcode": ""
+    }
+  ],
+  "rust_confidential_kernel_expr_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "CellGet",
+    "ArrayGet",
+    "MapGet",
+    ""
   ],
   "rust_confidential_kernel_param_field_names": [
     "name",
@@ -661,6 +1229,14 @@
     "secret_args",
     "body"
   ],
+  "rust_confidential_kernel_pure_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond,when_true,when_false",
+    "parts"
+  ],
   "rust_confidential_kernel_pure_expr_kind_names": [
     "literal",
     "var",
@@ -668,6 +1244,54 @@
     "binary",
     "select",
     "keccak256"
+  ],
+  "rust_confidential_kernel_pure_expr_profiles": [
+    {
+      "evaluated_operands": [],
+      "kind": "literal"
+    },
+    {
+      "evaluated_operands": [],
+      "kind": "var"
+    },
+    {
+      "evaluated_operands": [
+        "expr"
+      ],
+      "kind": "unary"
+    },
+    {
+      "evaluated_operands": [
+        "lhs",
+        "rhs"
+      ],
+      "kind": "binary"
+    },
+    {
+      "evaluated_operands": [
+        "cond",
+        "when_true",
+        "when_false"
+      ],
+      "kind": "select"
+    },
+    {
+      "evaluated_operands": [
+        "parts"
+      ],
+      "kind": "keccak256"
+    }
+  ],
+  "rust_confidential_kernel_slot_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond",
+    "",
+    "index",
+    "key",
+    "parts"
   ],
   "rust_confidential_kernel_slot_expr_kind_names": [
     "literal",
@@ -680,6 +1304,77 @@
     "map_get",
     "keccak256"
   ],
+  "rust_confidential_kernel_slot_expr_profiles": [
+    {
+      "evaluated_operands": [],
+      "kind": "literal",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [],
+      "kind": "slot",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "expr"
+      ],
+      "kind": "unary",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "lhs",
+        "rhs"
+      ],
+      "kind": "binary",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "cond"
+      ],
+      "kind": "select",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [],
+      "kind": "cell_get",
+      "tail_opcode": "CellGet"
+    },
+    {
+      "evaluated_operands": [
+        "index"
+      ],
+      "kind": "array_get",
+      "tail_opcode": "ArrayGet"
+    },
+    {
+      "evaluated_operands": [
+        "key"
+      ],
+      "kind": "map_get",
+      "tail_opcode": "MapGet"
+    },
+    {
+      "evaluated_operands": [
+        "parts"
+      ],
+      "kind": "keccak256",
+      "tail_opcode": ""
+    }
+  ],
+  "rust_confidential_kernel_slot_expr_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "CellGet",
+    "ArrayGet",
+    "MapGet",
+    ""
+  ],
   "rust_confidential_kernel_slot_program_field_names": [
     "entrypoint_id",
     "param_count",
@@ -688,6 +1383,14 @@
     "slot_count",
     "body"
   ],
+  "rust_confidential_kernel_slot_pure_expr_evaluated_operands": [
+    "",
+    "",
+    "expr",
+    "lhs,rhs",
+    "cond,when_true,when_false",
+    "parts"
+  ],
   "rust_confidential_kernel_slot_pure_expr_kind_names": [
     "literal",
     "slot",
@@ -695,6 +1398,63 @@
     "binary",
     "select",
     "keccak256"
+  ],
+  "rust_confidential_kernel_slot_pure_expr_profiles": [
+    {
+      "evaluated_operands": [],
+      "kind": "literal"
+    },
+    {
+      "evaluated_operands": [],
+      "kind": "slot"
+    },
+    {
+      "evaluated_operands": [
+        "expr"
+      ],
+      "kind": "unary"
+    },
+    {
+      "evaluated_operands": [
+        "lhs",
+        "rhs"
+      ],
+      "kind": "binary"
+    },
+    {
+      "evaluated_operands": [
+        "cond",
+        "when_true",
+        "when_false"
+      ],
+      "kind": "select"
+    },
+    {
+      "evaluated_operands": [
+        "parts"
+      ],
+      "kind": "keccak256"
+    }
+  ],
+  "rust_confidential_kernel_slot_statement_effect_kinds": [
+    "store_slot",
+    "store_slot",
+    "guard_only",
+    "abort_flag",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return_value"
+  ],
+  "rust_confidential_kernel_slot_statement_evaluated_operands": [
+    "value",
+    "value",
+    "cond",
+    "cond",
+    "value,predicate?",
+    "index,value,predicate?",
+    "key,value,predicate?",
+    "value?"
   ],
   "rust_confidential_kernel_slot_statement_kind_names": [
     "declare",
@@ -706,7 +1466,261 @@
     "map_put",
     "return"
   ],
+  "rust_confidential_kernel_slot_statement_profiles": [
+    {
+      "effect_kind": "store_slot",
+      "evaluated_operands": [
+        "value"
+      ],
+      "kind": "declare",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "declare"
+    },
+    {
+      "effect_kind": "store_slot",
+      "evaluated_operands": [
+        "value"
+      ],
+      "kind": "assign",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "assign"
+    },
+    {
+      "effect_kind": "guard_only",
+      "evaluated_operands": [
+        "cond"
+      ],
+      "kind": "require",
+      "runtime_normal_form": false,
+      "tail_opcode": "",
+      "trace_name": "require"
+    },
+    {
+      "effect_kind": "abort_flag",
+      "evaluated_operands": [
+        "cond"
+      ],
+      "kind": "abort_if",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "abort_if"
+    },
+    {
+      "effect_kind": "cell_set",
+      "evaluated_operands": [
+        "value",
+        "predicate?"
+      ],
+      "kind": "cell_set",
+      "runtime_normal_form": true,
+      "tail_opcode": "CellSet",
+      "trace_name": "cell_set"
+    },
+    {
+      "effect_kind": "array_set",
+      "evaluated_operands": [
+        "index",
+        "value",
+        "predicate?"
+      ],
+      "kind": "array_set",
+      "runtime_normal_form": true,
+      "tail_opcode": "ArraySet",
+      "trace_name": "array_set"
+    },
+    {
+      "effect_kind": "map_put",
+      "evaluated_operands": [
+        "key",
+        "value",
+        "predicate?"
+      ],
+      "kind": "map_put",
+      "runtime_normal_form": true,
+      "tail_opcode": "MapPut",
+      "trace_name": "map_put"
+    },
+    {
+      "effect_kind": "return_value",
+      "evaluated_operands": [
+        "value?"
+      ],
+      "kind": "return",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "return"
+    }
+  ],
+  "rust_confidential_kernel_slot_statement_runtime_normal_form_flags": [
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "rust_confidential_kernel_slot_statement_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "CellSet",
+    "ArraySet",
+    "MapPut",
+    ""
+  ],
+  "rust_confidential_kernel_slot_statement_trace_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "rust_confidential_kernel_statement_effect_kinds": [
+    "store_slot",
+    "store_slot",
+    "guard_only",
+    "abort_flag",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return_value"
+  ],
+  "rust_confidential_kernel_statement_evaluated_operands": [
+    "value",
+    "value",
+    "cond",
+    "cond",
+    "value,predicate?",
+    "index,value,predicate?",
+    "key,value,predicate?",
+    "value?"
+  ],
   "rust_confidential_kernel_statement_kind_names": [
+    "declare",
+    "assign",
+    "require",
+    "abort_if",
+    "cell_set",
+    "array_set",
+    "map_put",
+    "return"
+  ],
+  "rust_confidential_kernel_statement_profiles": [
+    {
+      "effect_kind": "store_slot",
+      "evaluated_operands": [
+        "value"
+      ],
+      "kind": "declare",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "declare"
+    },
+    {
+      "effect_kind": "store_slot",
+      "evaluated_operands": [
+        "value"
+      ],
+      "kind": "assign",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "assign"
+    },
+    {
+      "effect_kind": "guard_only",
+      "evaluated_operands": [
+        "cond"
+      ],
+      "kind": "require",
+      "runtime_normal_form": false,
+      "tail_opcode": "",
+      "trace_name": "require"
+    },
+    {
+      "effect_kind": "abort_flag",
+      "evaluated_operands": [
+        "cond"
+      ],
+      "kind": "abort_if",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "abort_if"
+    },
+    {
+      "effect_kind": "cell_set",
+      "evaluated_operands": [
+        "value",
+        "predicate?"
+      ],
+      "kind": "cell_set",
+      "runtime_normal_form": true,
+      "tail_opcode": "CellSet",
+      "trace_name": "cell_set"
+    },
+    {
+      "effect_kind": "array_set",
+      "evaluated_operands": [
+        "index",
+        "value",
+        "predicate?"
+      ],
+      "kind": "array_set",
+      "runtime_normal_form": true,
+      "tail_opcode": "ArraySet",
+      "trace_name": "array_set"
+    },
+    {
+      "effect_kind": "map_put",
+      "evaluated_operands": [
+        "key",
+        "value",
+        "predicate?"
+      ],
+      "kind": "map_put",
+      "runtime_normal_form": true,
+      "tail_opcode": "MapPut",
+      "trace_name": "map_put"
+    },
+    {
+      "effect_kind": "return_value",
+      "evaluated_operands": [
+        "value?"
+      ],
+      "kind": "return",
+      "runtime_normal_form": true,
+      "tail_opcode": "",
+      "trace_name": "return"
+    }
+  ],
+  "rust_confidential_kernel_statement_runtime_normal_form_flags": [
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "rust_confidential_kernel_statement_tail_opcodes": [
+    "",
+    "",
+    "",
+    "",
+    "CellSet",
+    "ArraySet",
+    "MapPut",
+    ""
+  ],
+  "rust_confidential_kernel_statement_trace_names": [
     "declare",
     "assign",
     "require",
@@ -765,6 +1779,100 @@
     "runtime_witness",
     "confidential_slot_program"
   ],
+  "rust_runtime_confidential_statement_trace_bridge_boundary_field_names": [
+    "implementation_interface"
+  ],
+  "rust_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "rust_runtime_implementation_confinement_boundary_field_names": [
+    "implementation_interface",
+    "kernel_interface_bundle"
+  ],
+  "rust_runtime_implementation_interface_field_names": [
+    "runtime_evm_lib_source",
+    "engine_source",
+    "runtime_module_source",
+    "fresh_coins_source",
+    "controller_source",
+    "shell_source",
+    "state_source",
+    "kernel_runtime_source",
+    "kernel_slot_support_source",
+    "generated_kernel_machine_source",
+    "generated_object_helpers_source",
+    "generated_oram_codecs_source",
+    "objects_source",
+    "oram_source",
+    "theorem_source",
+    "confidential_kernel_source",
+    "generated_confidential_kernel_source",
+    "trace_source",
+    "confidential_core_source",
+    "trusted_kernel_source",
+    "core_lib_source",
+    "precompiles_source",
+    "allocator_source",
+    "store_lib_source",
+    "store_codec_source",
+    "generated_store_codec_source",
+    "generated_store_surface_source",
+    "generated_store_helpers_source",
+    "store_store_source",
+    "generated_value_ops_source",
+    "types_source"
+  ],
+  "rust_runtime_implementation_kernel_machine_confinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "rust_runtime_implementation_kernel_meeting_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "rust_runtime_implementation_kernel_meeting_confinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "rust_runtime_implementation_residual_helper_shell_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "rust_runtime_implementation_shared_kernel_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "rust_runtime_implementation_shared_kernel_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_confidential_core_kernel_finish_slot_bundle"
+  ],
+  "rust_runtime_implementation_slot_adapter_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "rust_runtime_implementation_small_confidential_kernel_machine_refinement_boundary_field_names": [
+    "implementation_interface",
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
   "rust_runtime_kernel_interface_bundle_field_names": [
     "shell_boundary_bundle",
     "expected_kernel_steps",
@@ -776,9 +1884,48 @@
     "confidential_program",
     "confidential_slot_program"
   ],
+  "rust_runtime_kernel_machine_finish_boundary_field_names": [
+    "runtime_kernel_machine_finish_witness",
+    "confidential_slot_program",
+    "opcode_trace"
+  ],
+  "rust_runtime_kernel_machine_finish_witness_field_names": [
+    "entrypoint_id",
+    "arena_bytes",
+    "max_stack_words",
+    "scratch_bytes",
+    "peak_stack_words",
+    "value_scratch_peak_bytes",
+    "value_scratch_live_bytes_end",
+    "value_scratch_wipe_count",
+    "hash_scratch_peak_bytes",
+    "hash_scratch_live_bytes_end",
+    "hash_scratch_wipe_count",
+    "io_scratch_peak_bytes",
+    "io_scratch_live_bytes_end",
+    "io_scratch_wipe_count",
+    "resource_events",
+    "expected_kernel_steps",
+    "expected_kernel_step_index",
+    "public_object_ids",
+    "expected_public_object_ids",
+    "kernel_steps",
+    "max_kernel_ops",
+    "max_runtime_phase_event_count",
+    "runtime_phase_events_before_finish"
+  ],
   "rust_runtime_kernel_slot_dsl_bundle_field_names": [
     "kernel_witness",
     "confidential_slot_program"
+  ],
+  "rust_runtime_public_bridge_boundary_field_names": [
+    "implementation_interface"
+  ],
+  "rust_runtime_residual_helper_shell_boundary_field_names": [
+    "implementation_interface"
+  ],
+  "rust_runtime_shared_confidential_kernel_boundary_field_names": [
+    "implementation_interface"
   ],
   "rust_runtime_shell_boundary_bundle_field_names": [
     "kernel_witness",
@@ -809,9 +1956,16 @@
     "cold_store_object_schedule",
     "post_committed_cold_object_schedule"
   ],
+  "rust_runtime_slot_adapter_boundary_field_names": [
+    "implementation_interface"
+  ],
+  "rust_runtime_small_confidential_kernel_boundary_field_names": [
+    "implementation_interface"
+  ],
   "rust_runtime_trusted_kernel_slot_bundle_field_names": [
     "trusted_kernel_bundle",
-    "confidential_slot_program"
+    "confidential_slot_program",
+    "opcode_trace"
   ],
   "rust_scratch_region_names": [
     "value_scratch",
@@ -827,6 +1981,7 @@
     "family",
     "public_outcome",
     "boundary_schedule",
+    "opcode_trace",
     "confidential_slot_program"
   ],
   "scratch_region_names_match": true,
@@ -934,26 +2089,56 @@
   "shell_boundary_slot_lowering_bridge_surface_restricted": true,
   "shell_boundary_slot_lowering_uses_manifest_programs": true,
   "sources": {
+    "lean_confidential_kernel_dsl": "proof/lean/UOToolchain/ConfidentialKernelDsl.lean",
+    "lean_confidential_kernel_rust_generator": "proof/lean/.lake/build/bin/generateConfidentialKernelRust",
+    "lean_runtime_array_access_model": "proof/lean/UOToolchain/RuntimeArrayAccessDiscipline.lean",
     "lean_runtime_coins_json": "proof/lean/UOToolchain/RuntimeCoinsJson.lean",
     "lean_runtime_confidential_core": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean",
     "lean_runtime_confidential_core_kernel_interface_slot": "proof/lean/UOToolchain/RuntimeConfidentialCoreKernelInterfaceSlotJson.lean",
     "lean_runtime_confidential_core_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundaryLoweringJson.lean",
     "lean_runtime_confidential_core_shell_boundary_slot": "proof/lean/UOToolchain/RuntimeConfidentialCoreShellBoundarySlotJson.lean",
     "lean_runtime_kernel_dsl": "proof/lean/UOToolchain/RuntimeKernelDslJson.lean",
+    "lean_runtime_kernel_machine_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeKernelMachineRust",
+    "lean_runtime_kernel_slot_support_model": "proof/lean/UOToolchain/RuntimeKernelSlotSupport.lean",
+    "lean_runtime_kernel_slot_support_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeKernelSlotSupportRust",
+    "lean_runtime_object_helpers_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeObjectHelpersRust",
+    "lean_runtime_oram_codecs_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeOramCodecsRust",
+    "lean_runtime_oram_helper_semantics": "proof/lean/UOToolchain/RuntimeOramHelperSemantics.lean",
+    "lean_runtime_oram_write_log_model": "proof/lean/UOToolchain/RuntimeOramWriteLogDiscipline.lean",
     "lean_runtime_refinement": "proof/lean/UOToolchain/RuntimeRefinement.lean",
     "lean_runtime_refinement_json": "proof/lean/UOToolchain/RuntimeRefinementJson.lean",
     "lean_runtime_shell_boundary": "proof/lean/UOToolchain/RuntimeShellBoundaryJson.lean",
     "lean_runtime_shell_boundary_lowering": "proof/lean/UOToolchain/RuntimeShellBoundaryLoweringJson.lean",
     "lean_runtime_shell_boundary_slot": "proof/lean/UOToolchain/RuntimeShellBoundarySlotJson.lean",
+    "lean_runtime_small_map_lookup_model": "proof/lean/UOToolchain/RuntimeSmallMapLookupDiscipline.lean",
+    "lean_runtime_statement_trace_model": "proof/lean/UOToolchain/RuntimeStatementTraceDiscipline.lean",
+    "lean_runtime_store_codec_semantics": "proof/lean/UOToolchain/RuntimeStoreCodecSemantics.lean",
+    "lean_runtime_store_helper_semantics": "proof/lean/UOToolchain/RuntimeStoreHelperSemantics.lean",
+    "lean_runtime_store_helpers_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeStoreHelpersRust",
+    "lean_runtime_store_surface_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeStoreSurfaceRust",
     "lean_runtime_trusted_kernel": "proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean",
+    "lean_runtime_value_ops_semantics": "proof/lean/UOToolchain/RuntimeValueOpsSemantics.lean",
     "rust_confidential_core": "crates/uo-core/src/confidential_core.rs",
     "rust_confidential_kernel": "crates/uo-core/src/confidential_kernel.rs",
     "rust_core_trace": "crates/uo-core/src/trace.rs",
+    "rust_generated_confidential_kernel": "crates/uo-core/src/generated_confidential_kernel.rs",
+    "rust_generated_kernel_machine": "runtime/uo-kernel-runtime/src/generated_machine.rs",
+    "rust_generated_object_helpers": "runtime/uo-evm/src/generated_object_helpers.rs",
+    "rust_generated_oram_codecs": "runtime/uo-evm/src/generated_oram_codecs.rs",
+    "rust_generated_slot_support": "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+    "rust_generated_store_helpers": "runtime/uo-store/src/generated_store_helpers.rs",
+    "rust_generated_store_surface": "runtime/uo-store/src/generated_surface.rs",
     "rust_kernel_dsl": "crates/uo-core/src/kernel_dsl.rs",
+    "rust_objects": "runtime/uo-evm/src/objects.rs",
+    "rust_oram": "runtime/uo-evm/src/oram.rs",
     "rust_precompiles": "runtime/uo-precompiles/src/lib.rs",
     "rust_shell_boundary": "crates/uo-core/src/shell_boundary.rs",
+    "rust_store_store": "runtime/uo-store/src/store.rs",
     "rust_trusted_kernel": "crates/uo-core/src/trusted_kernel.rs"
   },
+  "store_codec_consumes_generated_surface": true,
+  "store_codec_consumes_generated_transport": true,
+  "store_runtime_consumes_generated_store_helpers": true,
   "trusted_kernel_slot_bundle_bridge_checks": [
     {
       "expected_files": [

@@ -222,6 +222,10 @@ pub enum RuntimeConfidentialCoreKernelFinishSlotBundleError {
         program_entrypoint: String,
     },
     #[error(
+        "runtime confidential-core kernel-finish slot bundle statement trace drifted from confidential_slot_program for '{entrypoint}'"
+    )]
+    ConfidentialSlotProgramOpcodeTraceMismatch { entrypoint: String },
+    #[error(
         "runtime confidential-core kernel-finish slot bundle expected admitted kernel steps for '{entrypoint}' to match the fixed confidential_slot_program"
     )]
     ConfidentialSlotProgramScheduleMismatch { entrypoint: String },
@@ -334,6 +338,7 @@ pub struct RuntimeConfidentialCoreKernelInterfaceSlotBundle {
 pub struct RuntimeConfidentialCoreKernelFinishSlotBundle {
     runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
     confidential_slot_program: ConfidentialKernelSlotProgram,
+    opcode_trace: Box<[String]>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -851,6 +856,10 @@ impl RuntimeConfidentialCoreKernelFinishSlotBundle {
         &self.confidential_slot_program
     }
 
+    pub fn opcode_trace(&self) -> &[String] {
+        &self.opcode_trace
+    }
+
     pub fn entrypoint_id(&self) -> &str {
         self.runtime_kernel_finish_bundle.entrypoint_id()
     }
@@ -871,6 +880,7 @@ impl RuntimeConfidentialCoreKernelFinishSlotBundle {
 
     fn from_runtime_kernel_finish_bundle(
         runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
+        opcode_trace: Box<[String]>,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeConfidentialCoreKernelFinishSlotBundleError> {
         runtime_kernel_finish_bundle.validate()?;
@@ -901,6 +911,13 @@ impl RuntimeConfidentialCoreKernelFinishSlotBundle {
                 },
             );
         }
+        if opcode_trace.as_ref() != confidential_slot_program.statement_trace().as_ref() {
+            return Err(
+                RuntimeConfidentialCoreKernelFinishSlotBundleError::ConfidentialSlotProgramOpcodeTraceMismatch {
+                    entrypoint: confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
         let program_expected_kernel_steps =
             confidential_slot_program.expected_runtime_step_witnesses();
         if runtime_kernel_finish_bundle.expected_kernel_steps()
@@ -916,6 +933,7 @@ impl RuntimeConfidentialCoreKernelFinishSlotBundle {
         Ok(Self {
             runtime_kernel_finish_bundle,
             confidential_slot_program,
+            opcode_trace,
         })
     }
 }
@@ -1011,6 +1029,7 @@ impl ExecutionTrace {
         )?;
         RuntimeConfidentialCoreKernelFinishSlotBundle::from_runtime_kernel_finish_bundle(
             runtime_kernel_finish_bundle,
+            self.opcode_trace.clone(),
             artifact,
         )
     }

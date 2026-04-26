@@ -727,7 +727,7 @@ theorem importedWitness_proofGradeShellContractRefinement
         kernelWitness.shellContract := by
   have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid := by
     unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
-    exact hValid.2.2
+    exact hValid.2.2.1
   cases hKernel : witness.kernel_witness with
   | none =>
       cases hRefinement : witness.runtime_kernel_refinement_witness with
@@ -986,7 +986,7 @@ theorem importedWitness_proofGradeKernelInterface
       (by
         have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid := by
           unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
-          exact hValid.2.2
+          exact hValid.2.2.1
         simpa [ImportedRuntimeRefinementWitness.proofGradeRuntimeKernelRefinementWitnessValid,
           hKernel, hRefinement] using hRefinementValid)
   exact

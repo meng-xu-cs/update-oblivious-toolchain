@@ -1,12 +1,11 @@
 use crate::oram::OramParameters;
 use anyhow::{bail, Result};
-use std::collections::BTreeMap;
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
-use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent};
+use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};
 pub(crate) use uo_core::PublicCallSummary;
 use uo_core::{
-    BoundaryEvent, ControllerPageBudget, ControllerPhase, OutputShape, PublicOutcomeTrace,
-    RuntimeControllerObserverCertificate, RuntimeObservedOramAccessWitness,
+    BoundaryEvent, ControllerPageBudget, ControllerPhase, FixedBoxBuilder, OutputShape,
+    PublicOutcomeTrace, RuntimeControllerObserverCertificate, RuntimeObservedOramAccessWitness,
     RuntimeOramAccessWitness, RuntimeOramLeafWitness, RuntimePathOramTransitionWitness,
     RuntimePublicCallTraceBundle, Value,
 };
@@ -16,6 +15,80 @@ const METADATA_REGION: &str = "metadata";
 const POSITION_MAP_REGION: &str = "position_map";
 const PATH_REGION: &str = "path";
 const STASH_REGION: &str = "stash";
+
+#[derive(Clone, Copy, Debug)]
+enum ControllerRegion {
+    Metadata,
+    PositionMap,
+    Path,
+    Stash,
+}
+
+impl ControllerRegion {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Metadata => METADATA_REGION,
+            Self::PositionMap => POSITION_MAP_REGION,
+            Self::Path => PATH_REGION,
+            Self::Stash => STASH_REGION,
+        }
+    }
+}
+
+const CONTROLLER_REGIONS: [ControllerRegion; 4] = [
+    ControllerRegion::Metadata,
+    ControllerRegion::PositionMap,
+    ControllerRegion::Path,
+    ControllerRegion::Stash,
+];
+
+#[derive(Debug, Default)]
+struct ControllerRegionCounters {
+    metadata: usize,
+    position_map: usize,
+    path: usize,
+    stash: usize,
+}
+
+impl ControllerRegionCounters {
+    fn get(&self, region: ControllerRegion) -> usize {
+        match region {
+            ControllerRegion::Metadata => self.metadata,
+            ControllerRegion::PositionMap => self.position_map,
+            ControllerRegion::Path => self.path,
+            ControllerRegion::Stash => self.stash,
+        }
+    }
+
+    fn get_mut(&mut self, region: ControllerRegion) -> &mut usize {
+        match region {
+            ControllerRegion::Metadata => &mut self.metadata,
+            ControllerRegion::PositionMap => &mut self.position_map,
+            ControllerRegion::Path => &mut self.path,
+            ControllerRegion::Stash => &mut self.stash,
+        }
+    }
+
+    fn bump(&mut self, region: ControllerRegion, delta: usize) {
+        *self.get_mut(region) += delta;
+    }
+
+    fn max_with(&mut self, region: ControllerRegion, budget: usize) {
+        let current = self.get_mut(region);
+        *current = (*current).max(budget);
+    }
+
+    fn budgets(&self) -> Result<Box<[ControllerPageBudget]>> {
+        let mut budgets = FixedBoxBuilder::new(CONTROLLER_REGIONS.len());
+        for region in CONTROLLER_REGIONS {
+            budgets.push(ControllerPageBudget {
+                page_kind: region.name().into(),
+                event_budget: self.get(region),
+            })?;
+        }
+        budgets.finish()
+    }
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct CallRecorder {
@@ -27,11 +100,10 @@ pub(crate) struct CallRecorder {
     metrics: StoreExecutionMetrics,
     boundary_schedule: Vec<BoundaryEvent>,
     controller_phase_order: Vec<ControllerPhase>,
-    page_trace_regions: BTreeMap<&'static str, usize>,
-    workset_regions: BTreeMap<&'static str, usize>,
+    page_trace_regions: ControllerRegionCounters,
+    workset_regions: ControllerRegionCounters,
     total_oram_accesses: usize,
     observed_oram_schedule: Vec<RuntimeObservedOramAccessWitness>,
-    observed_oram_accesses: BTreeMap<u32, usize>,
     path_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,
     path_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,
     recursive_position_map_depth: usize,
@@ -50,14 +122,6 @@ impl CallRecorder {
             entrypoint: entrypoint.into(),
             ..Self::default()
         };
-        recorder.page_trace_regions.insert(METADATA_REGION, 0);
-        recorder.page_trace_regions.insert(POSITION_MAP_REGION, 0);
-        recorder.page_trace_regions.insert(PATH_REGION, 0);
-        recorder.page_trace_regions.insert(STASH_REGION, 0);
-        recorder.workset_regions.insert(METADATA_REGION, 0);
-        recorder.workset_regions.insert(POSITION_MAP_REGION, 0);
-        recorder.workset_regions.insert(PATH_REGION, 0);
-        recorder.workset_regions.insert(STASH_REGION, 0);
         recorder
             .boundary_schedule
             .push(BoundaryEvent::enter(entrypoint, total_input_len));
@@ -99,7 +163,7 @@ impl CallRecorder {
         self.physical_writes.push(event);
     }
 
-    pub(crate) fn physical_write_from_buffers(
+    pub(crate) fn raw_physical_write_from_buffers(
         &mut self,
         object: &str,
         location: impl Into<String>,
@@ -107,11 +171,11 @@ impl CallRecorder {
         new: &[u8],
     ) {
         self.metrics.physical_writes += 1;
-        if new.iter().all(|byte| *byte == 0) {
+        let event = PhysicalWriteEvent::from_buffers(object, location, old, new);
+        if matches!(event.class, WriteClass::Same | WriteClass::Clear) {
             self.metrics.zero_writes += 1;
         }
-        self.physical_writes
-            .push(PhysicalWriteEvent::from_buffers(object, location, old, new));
+        self.physical_writes.push(event);
     }
 
     pub(crate) fn add_zero_writes(&mut self, count: usize) {
@@ -136,7 +200,6 @@ impl CallRecorder {
                 parameters.buckets_per_access,
                 parameters.accesses_per_call,
             ));
-        *self.observed_oram_accesses.entry(object_id).or_default() += 1;
         self.boundary_schedule
             .push(BoundaryEvent::exit("oram_access", 0));
         self.boundary_schedule
@@ -157,14 +220,20 @@ impl CallRecorder {
             ControllerPhase::AscendPositionMap,
             parameters.recursion_depth,
         ));
-        self.bump_region(METADATA_REGION, parameters.metadata_pages_per_access);
-        self.bump_region(POSITION_MAP_REGION, parameters.recursion_depth);
-        self.bump_region(PATH_REGION, parameters.buckets_per_access);
-        self.bump_region(STASH_REGION, parameters.stash_bound);
-        self.bump_workset(METADATA_REGION, parameters.metadata_pages_per_access);
-        self.bump_workset(POSITION_MAP_REGION, parameters.recursion_depth);
-        self.bump_workset(PATH_REGION, parameters.buckets_per_access);
-        self.bump_workset(STASH_REGION, parameters.stash_bound);
+        self.bump_region(
+            ControllerRegion::Metadata,
+            parameters.metadata_pages_per_access,
+        );
+        self.bump_region(ControllerRegion::PositionMap, parameters.recursion_depth);
+        self.bump_region(ControllerRegion::Path, parameters.buckets_per_access);
+        self.bump_region(ControllerRegion::Stash, parameters.stash_bound);
+        self.bump_workset(
+            ControllerRegion::Metadata,
+            parameters.metadata_pages_per_access,
+        );
+        self.bump_workset(ControllerRegion::PositionMap, parameters.recursion_depth);
+        self.bump_workset(ControllerRegion::Path, parameters.buckets_per_access);
+        self.bump_workset(ControllerRegion::Stash, parameters.stash_bound);
         self.recursive_position_map_depth = self
             .recursive_position_map_depth
             .max(parameters.recursion_depth);
@@ -193,14 +262,12 @@ impl CallRecorder {
         self.path_oram_leaf_state_transitions.push(transition);
     }
 
-    fn bump_region(&mut self, region: &'static str, delta: usize) {
-        let budget = self.page_trace_regions.entry(region).or_default();
-        *budget += delta;
+    fn bump_region(&mut self, region: ControllerRegion, delta: usize) {
+        self.page_trace_regions.bump(region, delta);
     }
 
-    fn bump_workset(&mut self, region: &'static str, budget: usize) {
-        let current = self.workset_regions.entry(region).or_default();
-        *current = (*current).max(budget);
+    fn bump_workset(&mut self, region: ControllerRegion, budget: usize) {
+        self.workset_regions.max_with(region, budget);
     }
 
     pub(crate) fn finish(
@@ -235,8 +302,8 @@ impl CallRecorder {
                 public_outcome,
                 self.boundary_schedule.into_boxed_slice(),
                 self.controller_phase_order.into_boxed_slice(),
-                controller_region_budgets(&self.page_trace_regions),
-                controller_region_budgets(&self.workset_regions),
+                self.page_trace_regions.budgets()?,
+                self.workset_regions.budgets()?,
                 self.total_oram_accesses,
                 self.recursive_position_map_depth,
                 self.stash_bound,
@@ -269,11 +336,7 @@ impl CallRecorder {
 
     fn assert_manifest_exactness(&self, manifest_entry: &EntrypointManifest) -> Result<()> {
         for (object_id, expected) in &manifest_entry.oram_accesses {
-            let observed = self
-                .observed_oram_accesses
-                .get(object_id)
-                .copied()
-                .unwrap_or(0);
+            let observed = self.observed_oram_access_count(*object_id);
             if observed != *expected {
                 bail!(
                     "runtime ORAM access count mismatch for object {}: observed {}, manifest {}",
@@ -283,12 +346,12 @@ impl CallRecorder {
                 );
             }
         }
-        for (object_id, observed) in &self.observed_oram_accesses {
-            if !manifest_entry.oram_accesses.contains_key(object_id) && *observed != 0 {
+        for access in &self.observed_oram_schedule {
+            if !manifest_entry.oram_accesses.contains_key(&access.object_id) {
                 bail!(
                     "runtime observed unexpected ORAM accesses for object {}: {}",
-                    object_id,
-                    observed
+                    access.object_id,
+                    self.observed_oram_access_count(access.object_id)
                 );
             }
         }
@@ -390,6 +453,13 @@ impl CallRecorder {
         }
         Ok(())
     }
+
+    fn observed_oram_access_count(&self, object_id: u32) -> usize {
+        self.observed_oram_schedule
+            .iter()
+            .filter(|access| access.object_id == object_id)
+            .count()
+    }
 }
 
 fn observed_oram_access_witnesses(
@@ -414,24 +484,6 @@ where
         );
     }
     Ok(())
-}
-
-fn controller_region_budgets(
-    regions: &BTreeMap<&'static str, usize>,
-) -> Box<[ControllerPageBudget]> {
-    [
-        METADATA_REGION,
-        POSITION_MAP_REGION,
-        PATH_REGION,
-        STASH_REGION,
-    ]
-    .into_iter()
-    .map(|region| ControllerPageBudget {
-        page_kind: region.into(),
-        event_budget: regions.get(region).copied().unwrap_or_default(),
-    })
-    .collect::<Vec<_>>()
-    .into_boxed_slice()
 }
 
 fn gas_used_of(

@@ -43,6 +43,24 @@ enum ReportKind {
     PathoramHiddenValidation,
     RuntimeBoundaryValidation,
     RuntimeImplementationInterfaceValidation,
+    RuntimeSmallConfidentialKernelBoundaryValidation,
+    RuntimePublicBridgeBoundaryValidation,
+    RuntimeSlotAdapterBoundaryValidation,
+    RuntimeResidualHelperShellBoundaryValidation,
+    RuntimeImplementationPublicBridgeObserverRefinementBoundaryValidation,
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundaryValidation,
+    RuntimeConfidentialStatementTraceBridgeBoundaryValidation,
+    RuntimeImplementationSlotAdapterMachineRefinementBoundaryValidation,
+    RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundaryValidation,
+    RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundaryValidation,
+    RuntimeImplementationKernelMeetingBoundaryValidation,
+    RuntimeImplementationKernelMeetingConfinementBoundaryValidation,
+    RuntimeImplementationKernelMachineConfinementBoundaryValidation,
+    RuntimeSharedConfidentialKernelBoundaryValidation,
+    RuntimeKernelMachineFinishWitnessValidation,
+    RuntimeKernelMachineFinishBoundaryValidation,
+    RuntimeImplementationSharedKernelMachineRefinementBoundaryValidation,
+    RuntimeImplementationSharedKernelRefinementBoundaryValidation,
     RuntimeImplementationConfinementBoundaryValidation,
     KernelModelAlignmentValidation,
     ShellBoundaryValidation,
@@ -330,6 +348,184 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "runtime_implementation_interface_validation.json",
                 "runtime_implementation_interface_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeSmallConfidentialKernelBoundaryValidation) => {
+            let report =
+                mplus_probe::run_runtime_small_confidential_kernel_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_small_confidential_kernel_boundary_validation.json",
+                "runtime_small_confidential_kernel_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimePublicBridgeBoundaryValidation) => {
+            let report = mplus_probe::run_runtime_public_bridge_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_public_bridge_boundary_validation.json",
+                "runtime_public_bridge_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeSlotAdapterBoundaryValidation) => {
+            let report = mplus_probe::run_runtime_slot_adapter_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_slot_adapter_boundary_validation.json",
+                "runtime_slot_adapter_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeResidualHelperShellBoundaryValidation) => {
+            let report =
+                mplus_probe::run_runtime_residual_helper_shell_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_residual_helper_shell_boundary_validation.json",
+                "runtime_residual_helper_shell_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationPublicBridgeObserverRefinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_public_bridge_observer_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_public_bridge_observer_refinement_boundary_validation.json",
+                "runtime_implementation_public_bridge_observer_refinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationResidualHelperShellMachineRefinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation.json",
+                "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeConfidentialStatementTraceBridgeBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_confidential_statement_trace_bridge_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_confidential_statement_trace_bridge_boundary_validation.json",
+                "runtime_confidential_statement_trace_bridge_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationSlotAdapterMachineRefinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_slot_adapter_machine_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_slot_adapter_machine_refinement_boundary_validation.json",
+                "runtime_implementation_slot_adapter_machine_refinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation.json",
+                "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation.json",
+                "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationKernelMeetingBoundaryValidation) => {
+            let report =
+                mplus_probe::run_runtime_implementation_kernel_meeting_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_kernel_meeting_boundary_validation.json",
+                "runtime_implementation_kernel_meeting_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationKernelMeetingConfinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_kernel_meeting_confinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_kernel_meeting_confinement_boundary_validation.json",
+                "runtime_implementation_kernel_meeting_confinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationKernelMachineConfinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_kernel_machine_confinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_kernel_machine_confinement_boundary_validation.json",
+                "runtime_implementation_kernel_machine_confinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeSharedConfidentialKernelBoundaryValidation) => {
+            let report =
+                mplus_probe::run_runtime_shared_confidential_kernel_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_shared_confidential_kernel_boundary_validation.json",
+                "runtime_shared_confidential_kernel_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeKernelMachineFinishWitnessValidation) => {
+            let report =
+                mplus_probe::run_runtime_kernel_machine_finish_witness_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_kernel_machine_finish_witness_validation.json",
+                "runtime_kernel_machine_finish_witness_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeKernelMachineFinishBoundaryValidation) => {
+            let report =
+                mplus_probe::run_runtime_kernel_machine_finish_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_kernel_machine_finish_boundary_validation.json",
+                "runtime_kernel_machine_finish_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationSharedKernelMachineRefinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_shared_kernel_machine_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_shared_kernel_machine_refinement_boundary_validation.json",
+                "runtime_implementation_shared_kernel_machine_refinement_boundary_validation",
+                &report,
+            )?;
+        }
+        Some(ReportKind::RuntimeImplementationSharedKernelRefinementBoundaryValidation) => {
+            let report = mplus_probe::
+                run_runtime_implementation_shared_kernel_refinement_boundary_validation_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "runtime_implementation_shared_kernel_refinement_boundary_validation.json",
+                "runtime_implementation_shared_kernel_refinement_boundary_validation",
                 &report,
             )?;
         }

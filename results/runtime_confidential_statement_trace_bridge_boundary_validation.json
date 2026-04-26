@@ -1,0 +1,37 @@
+{
+  "accepted": true,
+  "artifact_json_bytes": 1058537,
+  "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialStatementTraceBridgeBoundary",
+  "confidential_statement_trace_bridge_boundary_theorem_checked": true,
+  "lean_checker_input": "source-backed runtime confidential statement-trace bridge boundary",
+  "lean_checker_kind": "runtime confidential statement-trace bridge boundary",
+  "lean_stdout": "validated runtime confidential statement-trace bridge boundary for source-backed uo-evm/shared-kernel runtime (387197 trace bytes)",
+  "source_bytes": {
+    "allocator": 14890,
+    "confidential_core": 46577,
+    "confidential_kernel": 95686,
+    "generated_confidential_kernel": 20843,
+    "generated_kernel_machine": 4681,
+    "generated_object_helpers": 22962,
+    "generated_oram_codecs": 83477,
+    "kernel_runtime": 23758,
+    "kernel_slot_support": 3128,
+    "state": 29902,
+    "trace": 387197,
+    "trusted_kernel": 4518
+  },
+  "source_files": [
+    "runtime/uo-evm/src/state.rs",
+    "runtime/uo-kernel-runtime/src/lib.rs",
+    "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+    "runtime/uo-kernel-runtime/src/generated_machine.rs",
+    "runtime/uo-evm/src/generated_object_helpers.rs",
+    "runtime/uo-evm/src/generated_oram_codecs.rs",
+    "crates/uo-core/src/confidential_kernel.rs",
+    "crates/uo-core/src/generated_confidential_kernel.rs",
+    "crates/uo-core/src/trace.rs",
+    "crates/uo-core/src/confidential_core.rs",
+    "crates/uo-core/src/trusted_kernel.rs",
+    "runtime/uo-allocator/src/lib.rs"
+  ]
+}

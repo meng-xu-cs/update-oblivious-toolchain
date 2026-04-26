@@ -28,7 +28,7 @@
         "secret_arg_count": 1,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 64103,
+      "confidential_proof_bundle_family_json_bytes": 64210,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -237,8 +237,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 2,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 2
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -304,7 +307,7 @@
         "secret_arg_count": 1,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 64096,
+      "confidential_proof_bundle_family_json_bytes": 64210,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -513,8 +516,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 2,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 2
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -580,7 +586,7 @@
         "secret_arg_count": 1,
         "statement_count": 7
       },
-      "confidential_proof_bundle_family_json_bytes": 144880,
+      "confidential_proof_bundle_family_json_bytes": 145122,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -998,8 +1004,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 8,
+        "opcode_trace_len": 7,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 7
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -1082,7 +1091,7 @@
         "secret_arg_count": 1,
         "statement_count": 7
       },
-      "confidential_proof_bundle_family_json_bytes": 144873,
+      "confidential_proof_bundle_family_json_bytes": 145129,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -1500,8 +1509,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 8,
+        "opcode_trace_len": 7,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 7
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -1584,7 +1596,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 109950,
+      "confidential_proof_bundle_family_json_bytes": 110024,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1961,8 +1973,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 1,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 1
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -2028,7 +2043,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 109950,
+      "confidential_proof_bundle_family_json_bytes": 110024,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -2405,8 +2420,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 1,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 1
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -2472,7 +2490,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 151249,
+      "confidential_proof_bundle_family_json_bytes": 151393,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2937,8 +2955,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 7,
+        "opcode_trace_len": 3,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 3
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -3019,7 +3040,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 151256,
+      "confidential_proof_bundle_family_json_bytes": 151393,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -3484,8 +3505,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 7,
+        "opcode_trace_len": 3,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 3
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -3566,7 +3590,7 @@
         "secret_arg_count": 3,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 177714,
+      "confidential_proof_bundle_family_json_bytes": 177825,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -4178,8 +4202,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 2,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 2
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -4249,7 +4276,7 @@
         "secret_arg_count": 3,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 177714,
+      "confidential_proof_bundle_family_json_bytes": 177825,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -4861,8 +4888,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 2,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 2,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 0,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 2
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -4932,7 +4962,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 229508,
+      "confidential_proof_bundle_family_json_bytes": 229717,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -5729,8 +5759,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 4,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 1,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 1,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 1
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -5796,7 +5829,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 229472,
+      "confidential_proof_bundle_family_json_bytes": 229663,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -6593,8 +6626,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 4,
         "expected_runtime_step_count": 4,
+        "opcode_trace_len": 1,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 1,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 1
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -6660,7 +6696,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 316929,
+      "confidential_proof_bundle_family_json_bytes": 317364,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -7662,8 +7698,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 6,
         "expected_runtime_step_count": 5,
+        "opcode_trace_len": 2,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 2,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 2
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -7731,7 +7770,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 316931,
+      "confidential_proof_bundle_family_json_bytes": 317375,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -8733,8 +8772,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 6,
         "expected_runtime_step_count": 5,
+        "opcode_trace_len": 2,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 2,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 2
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -8802,7 +8844,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 818671,
+      "confidential_proof_bundle_family_json_bytes": 819094,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -11547,8 +11589,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 6,
         "expected_runtime_step_count": 7,
+        "opcode_trace_len": 3,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 2,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 3
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
@@ -11629,7 +11674,7 @@
         "secret_arg_count": 4,
         "statement_count": 9
       },
-      "confidential_proof_bundle_family_json_bytes": 2560846,
+      "confidential_proof_bundle_family_json_bytes": 2562070,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -19824,8 +19869,11 @@
       "paper_main_slot_family": {
         "boundary_schedule_len": 14,
         "expected_runtime_step_count": 9,
+        "opcode_trace_len": 9,
+        "opcode_trace_matches_slot_program": true,
         "public_leaf_scaffold_steps": 6,
-        "seed_count": 1
+        "seed_count": 1,
+        "statement_trace_len": 9
       },
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,

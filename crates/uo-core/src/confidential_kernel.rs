@@ -1,9 +1,8 @@
 use crate::ir::{BinaryOp, CompiledFunction, Expr, StateObject, Statement, UnaryOp};
-use crate::types::{Type, Value};
-use anyhow::{anyhow, bail, Result};
+use crate::types::{FixedBoxBuilder, Type, Value};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::mem::MaybeUninit;
+use std::{collections::BTreeMap, mem::MaybeUninit};
 use thiserror::Error;
 use uo_precompiles::UoOpcode;
 
@@ -23,7 +22,7 @@ pub struct ConfidentialKernelProgram {
     #[serde(default)]
     pub secret_args: Vec<usize>,
     #[serde(default)]
-    pub body: Vec<ConfidentialKernelStatement>,
+    pub body: Box<[ConfidentialKernelStatement]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -36,7 +35,86 @@ pub struct ConfidentialKernelSlotProgram {
     pub secret_args: Vec<usize>,
     pub slot_count: usize,
     #[serde(default)]
-    pub body: Vec<ConfidentialKernelSlotStatement>,
+    pub body: Box<[ConfidentialKernelSlotStatement]>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfidentialKernelStatementKind {
+    Declare,
+    Assign,
+    Require,
+    AbortIf,
+    CellSet,
+    ArraySet,
+    MapPut,
+    Return,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfidentialKernelStatementEffectKind {
+    StoreSlot,
+    GuardOnly,
+    AbortFlag,
+    CellSet,
+    ArraySet,
+    MapPut,
+    ReturnValue,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConfidentialKernelStatementProfile {
+    pub kind: ConfidentialKernelStatementKind,
+    pub trace_name: &'static str,
+    pub runtime_normal_form: bool,
+    pub effect_kind: ConfidentialKernelStatementEffectKind,
+    pub evaluated_operands: &'static [&'static str],
+    pub tail_opcode: Option<UoOpcode>,
+}
+
+#[path = "generated_confidential_kernel.rs"]
+mod generated_confidential_kernel;
+
+pub use generated_confidential_kernel::{
+    CONFIDENTIAL_KERNEL_EXPR_PROFILES, CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_STATEMENT_PROFILES,
+};
+
+impl ConfidentialKernelStatementKind {
+    pub const fn as_str(self) -> &'static str {
+        self.profile().trace_name
+    }
+
+    pub const fn profile(self) -> ConfidentialKernelStatementProfile {
+        match self {
+            Self::Declare => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[0],
+            Self::Assign => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[1],
+            Self::Require => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[2],
+            Self::AbortIf => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[3],
+            Self::CellSet => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[4],
+            Self::ArraySet => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[5],
+            Self::MapPut => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[6],
+            Self::Return => CONFIDENTIAL_KERNEL_STATEMENT_PROFILES[7],
+        }
+    }
+
+    pub const fn all_profiles() -> &'static [ConfidentialKernelStatementProfile; 8] {
+        &CONFIDENTIAL_KERNEL_STATEMENT_PROFILES
+    }
+}
+
+impl ConfidentialKernelStatementEffectKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::StoreSlot => "store_slot",
+            Self::GuardOnly => "guard_only",
+            Self::AbortFlag => "abort_flag",
+            Self::CellSet => "cell_set",
+            Self::ArraySet => "array_set",
+            Self::MapPut => "map_put",
+            Self::ReturnValue => "return_value",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -118,6 +196,202 @@ pub enum ConfidentialKernelSlotStatement {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfidentialKernelSlotExprKind {
+    Literal,
+    Slot,
+    Unary,
+    Binary,
+    Select,
+    CellGet,
+    ArrayGet,
+    MapGet,
+    Keccak256,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConfidentialKernelSlotExprProfile {
+    pub kind: ConfidentialKernelSlotExprKind,
+    pub evaluated_operands: &'static [&'static str],
+    pub tail_opcode: Option<UoOpcode>,
+}
+
+impl ConfidentialKernelSlotExprKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Literal => "literal",
+            Self::Slot => "slot",
+            Self::Unary => "unary",
+            Self::Binary => "binary",
+            Self::Select => "select",
+            Self::CellGet => "cell_get",
+            Self::ArrayGet => "array_get",
+            Self::MapGet => "map_get",
+            Self::Keccak256 => "keccak256",
+        }
+    }
+
+    pub const fn profile(self) -> ConfidentialKernelSlotExprProfile {
+        match self {
+            Self::Literal => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[0],
+            Self::Slot => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[1],
+            Self::Unary => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[2],
+            Self::Binary => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[3],
+            Self::Select => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[4],
+            Self::CellGet => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[5],
+            Self::ArrayGet => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[6],
+            Self::MapGet => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[7],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[8],
+        }
+    }
+
+    pub const fn all_profiles() -> &'static [ConfidentialKernelSlotExprProfile; 9] {
+        &CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfidentialKernelSlotPureExprKind {
+    Literal,
+    Slot,
+    Unary,
+    Binary,
+    Select,
+    Keccak256,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConfidentialKernelSlotPureExprProfile {
+    pub kind: ConfidentialKernelSlotPureExprKind,
+    pub evaluated_operands: &'static [&'static str],
+}
+
+impl ConfidentialKernelSlotPureExprKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Literal => "literal",
+            Self::Slot => "slot",
+            Self::Unary => "unary",
+            Self::Binary => "binary",
+            Self::Select => "select",
+            Self::Keccak256 => "keccak256",
+        }
+    }
+
+    pub const fn profile(self) -> ConfidentialKernelSlotPureExprProfile {
+        match self {
+            Self::Literal => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[0],
+            Self::Slot => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[1],
+            Self::Unary => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[2],
+            Self::Binary => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[3],
+            Self::Select => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[4],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[5],
+        }
+    }
+
+    pub const fn all_profiles() -> &'static [ConfidentialKernelSlotPureExprProfile; 6] {
+        &CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfidentialKernelExprKind {
+    Literal,
+    Var,
+    Unary,
+    Binary,
+    Select,
+    CellGet,
+    ArrayGet,
+    MapGet,
+    Keccak256,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConfidentialKernelExprProfile {
+    pub kind: ConfidentialKernelExprKind,
+    pub evaluated_operands: &'static [&'static str],
+    pub tail_opcode: Option<UoOpcode>,
+}
+
+impl ConfidentialKernelExprKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Literal => "literal",
+            Self::Var => "var",
+            Self::Unary => "unary",
+            Self::Binary => "binary",
+            Self::Select => "select",
+            Self::CellGet => "cell_get",
+            Self::ArrayGet => "array_get",
+            Self::MapGet => "map_get",
+            Self::Keccak256 => "keccak256",
+        }
+    }
+
+    pub const fn profile(self) -> ConfidentialKernelExprProfile {
+        match self {
+            Self::Literal => CONFIDENTIAL_KERNEL_EXPR_PROFILES[0],
+            Self::Var => CONFIDENTIAL_KERNEL_EXPR_PROFILES[1],
+            Self::Unary => CONFIDENTIAL_KERNEL_EXPR_PROFILES[2],
+            Self::Binary => CONFIDENTIAL_KERNEL_EXPR_PROFILES[3],
+            Self::Select => CONFIDENTIAL_KERNEL_EXPR_PROFILES[4],
+            Self::CellGet => CONFIDENTIAL_KERNEL_EXPR_PROFILES[5],
+            Self::ArrayGet => CONFIDENTIAL_KERNEL_EXPR_PROFILES[6],
+            Self::MapGet => CONFIDENTIAL_KERNEL_EXPR_PROFILES[7],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_EXPR_PROFILES[8],
+        }
+    }
+
+    pub const fn all_profiles() -> &'static [ConfidentialKernelExprProfile; 9] {
+        &CONFIDENTIAL_KERNEL_EXPR_PROFILES
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfidentialKernelPureExprKind {
+    Literal,
+    Var,
+    Unary,
+    Binary,
+    Select,
+    Keccak256,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConfidentialKernelPureExprProfile {
+    pub kind: ConfidentialKernelPureExprKind,
+    pub evaluated_operands: &'static [&'static str],
+}
+
+impl ConfidentialKernelPureExprKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Literal => "literal",
+            Self::Var => "var",
+            Self::Unary => "unary",
+            Self::Binary => "binary",
+            Self::Select => "select",
+            Self::Keccak256 => "keccak256",
+        }
+    }
+
+    pub const fn profile(self) -> ConfidentialKernelPureExprProfile {
+        match self {
+            Self::Literal => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[0],
+            Self::Var => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[1],
+            Self::Unary => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[2],
+            Self::Binary => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[3],
+            Self::Select => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[4],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[5],
+        }
+    }
+
+    pub const fn all_profiles() -> &'static [ConfidentialKernelPureExprProfile; 6] {
+        &CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ConfidentialKernelExpr {
@@ -153,7 +427,7 @@ pub enum ConfidentialKernelExpr {
         key: Box<ConfidentialKernelExpr>,
     },
     Keccak256 {
-        parts: Vec<ConfidentialKernelExpr>,
+        parts: Box<[ConfidentialKernelExpr]>,
     },
 }
 
@@ -192,7 +466,7 @@ pub enum ConfidentialKernelSlotExpr {
         key: Box<ConfidentialKernelSlotExpr>,
     },
     Keccak256 {
-        parts: Vec<ConfidentialKernelSlotExpr>,
+        parts: Box<[ConfidentialKernelSlotExpr]>,
     },
 }
 
@@ -220,7 +494,7 @@ pub enum ConfidentialKernelPureExpr {
         when_false: Box<ConfidentialKernelPureExpr>,
     },
     Keccak256 {
-        parts: Vec<ConfidentialKernelPureExpr>,
+        parts: Box<[ConfidentialKernelPureExpr]>,
     },
 }
 
@@ -248,7 +522,7 @@ pub enum ConfidentialKernelSlotPureExpr {
         when_false: Box<ConfidentialKernelSlotPureExpr>,
     },
     Keccak256 {
-        parts: Vec<ConfidentialKernelSlotPureExpr>,
+        parts: Box<[ConfidentialKernelSlotPureExpr]>,
     },
 }
 
@@ -257,6 +531,45 @@ pub struct ConfidentialKernelStep {
     pub opcode: UoOpcode,
     #[serde(default)]
     pub object_id: Option<u32>,
+}
+
+struct FixedKernelStepBuffer {
+    steps: Box<[MaybeUninit<ConfidentialKernelStep>]>,
+    len: usize,
+}
+
+impl FixedKernelStepBuffer {
+    fn new(capacity: usize) -> Self {
+        Self {
+            steps: Box::<[ConfidentialKernelStep]>::new_uninit_slice(capacity),
+            len: 0,
+        }
+    }
+
+    fn push(&mut self, step: ConfidentialKernelStep) {
+        if let Some(slot) = self.steps.get_mut(self.len) {
+            slot.write(step);
+            self.len += 1;
+        }
+    }
+
+    fn finish(mut self) -> Box<[ConfidentialKernelStep]> {
+        let mut out = Box::<[ConfidentialKernelStep]>::new_uninit_slice(self.len);
+        for (slot, step) in out.iter_mut().zip(self.steps.iter_mut().take(self.len)) {
+            slot.write(unsafe { step.assume_init_read() });
+        }
+        self.len = 0;
+        let raw = Box::into_raw(out) as *mut [ConfidentialKernelStep];
+        unsafe { Box::from_raw(raw) }
+    }
+}
+
+impl Drop for FixedKernelStepBuffer {
+    fn drop(&mut self) {
+        for step in self.steps.iter_mut().take(self.len) {
+            unsafe { step.assume_init_drop() };
+        }
+    }
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -282,6 +595,14 @@ pub enum ConfidentialKernelLoweringError {
         "confidential entrypoint {entrypoint} contains unsupported array indexing in the confidential fragment"
     )]
     ConfidentialArrayIndex { entrypoint: String },
+    #[error(
+        "confidential entrypoint {entrypoint} contains statement {index} after a return; returns must be final in the admitted public schedule"
+    )]
+    NonFinalReturn { entrypoint: String, index: usize },
+    #[error(
+        "confidential entrypoint {entrypoint} fixed lowering buffer invariant failed: {detail}"
+    )]
+    FixedBufferInvariant { entrypoint: String, detail: String },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -292,6 +613,10 @@ pub enum ConfidentialKernelSlotLoweringError {
     DuplicateBinding { entrypoint: String, name: String },
     #[error("confidential entrypoint {entrypoint} refers to unknown variable '{name}'")]
     UnknownVariable { entrypoint: String, name: String },
+    #[error(
+        "confidential entrypoint {entrypoint} fixed slot-lowering buffer invariant failed: {detail}"
+    )]
+    FixedBufferInvariant { entrypoint: String, detail: String },
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -333,7 +658,7 @@ pub trait ConfidentialKernelSlotRuntime {
         predicate: Option<bool>,
     ) -> Result<()>;
 
-    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value>;
+    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<(Value, bool)>;
 
     fn map_put(
         &mut self,
@@ -341,7 +666,7 @@ pub trait ConfidentialKernelSlotRuntime {
         key: Value,
         value: Value,
         predicate: Option<bool>,
-    ) -> Result<()>;
+    ) -> Result<bool>;
 
     fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value>;
 }
@@ -369,7 +694,7 @@ pub trait ConfidentialKernelEffectRuntime {
         predicate: Option<bool>,
     ) -> Result<()>;
 
-    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value>;
+    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<(Value, bool)>;
 
     fn map_put(
         &mut self,
@@ -377,242 +702,20 @@ pub trait ConfidentialKernelEffectRuntime {
         key: Value,
         value: Value,
         predicate: Option<bool>,
-    ) -> Result<()>;
+    ) -> Result<bool>;
 
     fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value>;
-}
-
-struct ConfidentialKernelSlotExecutor<'a, R> {
-    runtime: &'a mut R,
-    state: ConfidentialKernelSlotState,
-}
-
-impl<'a, R: ConfidentialKernelEffectRuntime> ConfidentialKernelSlotExecutor<'a, R> {
-    fn new(runtime: &'a mut R, slot_count: usize) -> Self {
-        Self {
-            runtime,
-            state: ConfidentialKernelSlotState::new(slot_count),
-        }
-    }
-
-    fn store_call_inputs(
-        &mut self,
-        program: &ConfidentialKernelSlotProgram,
-        call_inputs: ConfidentialCallInputs,
-    ) -> Result<()> {
-        let mut supplied_args = 0usize;
-        for (slot, arg) in call_inputs.into_raw_args().enumerate() {
-            supplied_args = slot + 1;
-            if slot >= program.param_count {
-                bail!(
-                    "confidential slot program {} expected {} confidential arguments but runtime supplied {}",
-                    program.entrypoint_id,
-                    program.param_count,
-                    supplied_args
-                );
-            }
-            self.store_slot(slot, arg)?;
-        }
-        if supplied_args != program.param_count {
-            bail!(
-                "confidential slot program {} expected {} confidential arguments but runtime supplied {}",
-                program.entrypoint_id,
-                program.param_count,
-                supplied_args
-            );
-        }
-        Ok(())
-    }
-}
-
-impl<R: ConfidentialKernelEffectRuntime> ConfidentialKernelSlotRuntime
-    for ConfidentialKernelSlotExecutor<'_, R>
-{
-    fn note_statement(&mut self, statement: &ConfidentialKernelSlotStatement) -> Result<()> {
-        self.runtime.note_statement(statement)
-    }
-
-    fn load_slot(&self, slot: usize) -> Result<Value> {
-        self.state.load_slot(slot)
-    }
-
-    fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {
-        self.state.store_slot(slot, value)?;
-        self.runtime
-            .note_live_slot_words(self.state.live_slot_words())?;
-        Ok(())
-    }
-
-    fn cell_get(&mut self, object_id: u32) -> Result<Value> {
-        self.runtime.cell_get(object_id)
-    }
-
-    fn cell_set(&mut self, object_id: u32, value: Value, predicate: Option<bool>) -> Result<()> {
-        self.runtime.cell_set(object_id, value, predicate)
-    }
-
-    fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value> {
-        self.runtime.array_get(object_id, index)
-    }
-
-    fn array_set(
-        &mut self,
-        object_id: u32,
-        index: usize,
-        value: Value,
-        predicate: Option<bool>,
-    ) -> Result<()> {
-        self.runtime.array_set(object_id, index, value, predicate)
-    }
-
-    fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value> {
-        self.runtime.map_get(object_id, key)
-    }
-
-    fn map_put(
-        &mut self,
-        object_id: u32,
-        key: Value,
-        value: Value,
-        predicate: Option<bool>,
-    ) -> Result<()> {
-        self.runtime.map_put(object_id, key, value, predicate)
-    }
-
-    fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {
-        self.runtime.keccak256(parts)
-    }
-}
-
-struct FixedConfidentialValueBuffer {
-    values: Box<[MaybeUninit<Value>]>,
-    initialized: usize,
-}
-
-impl FixedConfidentialValueBuffer {
-    fn new(len: usize) -> Self {
-        Self {
-            values: Box::<[Value]>::new_uninit_slice(len),
-            initialized: 0,
-        }
-    }
-
-    fn push(&mut self, value: Value) {
-        assert!(
-            self.initialized < self.values.len(),
-            "fixed confidential value buffer overflow"
-        );
-        self.values[self.initialized].write(value);
-        self.initialized += 1;
-    }
-
-    fn finish(mut self) -> Box<[Value]> {
-        assert_eq!(
-            self.initialized,
-            self.values.len(),
-            "fixed confidential value buffer underfilled"
-        );
-        let values = std::mem::take(&mut self.values);
-        self.initialized = 0;
-        let raw = Box::into_raw(values) as *mut [Value];
-        unsafe { Box::from_raw(raw) }
-    }
-}
-
-impl Drop for FixedConfidentialValueBuffer {
-    fn drop(&mut self) {
-        for value in &mut self.values[..self.initialized] {
-            unsafe {
-                value.assume_init_mut().wipe_secrets();
-                value.assume_init_drop();
-            }
-        }
-    }
 }
 
 fn collect_confidential_hash_parts(
     len: usize,
     parts: impl IntoIterator<Item = Result<Value>>,
 ) -> Result<Box<[Value]>> {
-    let mut values = FixedConfidentialValueBuffer::new(len);
+    let mut values = FixedBoxBuilder::new(len);
     for part in parts {
-        values.push(part?);
+        values.push(part?)?;
     }
-    Ok(values.finish())
-}
-
-#[derive(Debug)]
-pub struct ConfidentialCallInputs {
-    raw_args: Box<[Value]>,
-}
-
-impl ConfidentialCallInputs {
-    pub fn from_raw_args(args: Box<[Value]>) -> Self {
-        Self { raw_args: args }
-    }
-
-    pub fn into_raw_args(mut self) -> impl Iterator<Item = Value> {
-        std::iter::IntoIterator::into_iter(std::mem::take(&mut self.raw_args))
-    }
-}
-
-impl Drop for ConfidentialCallInputs {
-    fn drop(&mut self) {
-        for value in self.raw_args.iter_mut() {
-            value.wipe_secrets();
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ConfidentialKernelSlotState {
-    slots: Box<[Option<Value>]>,
-    initialized_slots: usize,
-}
-
-impl ConfidentialKernelSlotState {
-    pub fn new(slot_count: usize) -> Self {
-        Self {
-            slots: vec![None; slot_count].into_boxed_slice(),
-            initialized_slots: 0,
-        }
-    }
-
-    pub fn load_slot(&self, slot: usize) -> Result<Value> {
-        self.slots
-            .get(slot)
-            .and_then(Option::as_ref)
-            .cloned()
-            .ok_or_else(|| anyhow!("unknown slot {slot}"))
-    }
-
-    pub fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {
-        let cell = self
-            .slots
-            .get_mut(slot)
-            .ok_or_else(|| anyhow!("unknown slot {slot}"))?;
-        if cell.is_none() {
-            self.initialized_slots += 1;
-        }
-        *cell = Some(value);
-        Ok(())
-    }
-
-    pub fn live_slot_words(&self) -> usize {
-        self.initialized_slots
-    }
-}
-
-impl Drop for ConfidentialKernelSlotState {
-    fn drop(&mut self) {
-        for slot in &mut self.slots {
-            if let Some(value) = slot.as_mut() {
-                value.wipe_secrets();
-            }
-            *slot = None;
-        }
-        self.initialized_slots = 0;
-    }
+    values.finish()
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -645,7 +748,6 @@ impl ConfidentialKernelExecutionOutcome {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct ConfidentialKernelInterpreterState {
     aborted: bool,
-    returned: bool,
     return_value: Option<Value>,
 }
 
@@ -653,285 +755,9 @@ pub fn execute_confidential_kernel_slot_program<R: ConfidentialKernelSlotRuntime
     runtime: &mut R,
     program: &ConfidentialKernelSlotProgram,
 ) -> Result<ConfidentialKernelExecutionOutcome> {
-    if !program.is_runtime_normal_form() {
-        bail!(
-            "confidential slot program {} is not in runtime normal form",
-            program.entrypoint_id
-        );
-    }
-    let mut state = ConfidentialKernelInterpreterState::default();
-    execute_confidential_kernel_slot_block(runtime, &program.body, &mut state)?;
-    Ok(ConfidentialKernelExecutionOutcome::new(
-        state.aborted,
-        state.return_value,
-    ))
-}
-
-pub fn execute_confidential_kernel_slot_call<R: ConfidentialKernelEffectRuntime>(
-    runtime: &mut R,
-    program: &ConfidentialKernelSlotProgram,
-    call_inputs: ConfidentialCallInputs,
-) -> Result<ConfidentialKernelExecutionOutcome> {
-    let mut executor = ConfidentialKernelSlotExecutor::new(runtime, program.slot_count);
-    executor.store_call_inputs(program, call_inputs)?;
-    execute_confidential_kernel_slot_program(&mut executor, program)
-}
-
-fn execute_confidential_kernel_slot_block<R: ConfidentialKernelSlotRuntime>(
-    runtime: &mut R,
-    statements: &[ConfidentialKernelSlotStatement],
-    state: &mut ConfidentialKernelInterpreterState,
-) -> Result<()> {
-    for statement in statements {
-        if state.returned {
-            break;
-        }
-        runtime.note_statement(statement)?;
-        execute_confidential_kernel_slot_statement(runtime, statement, state)?;
-    }
-    Ok(())
-}
-
-fn execute_confidential_kernel_slot_statement<R: ConfidentialKernelSlotRuntime>(
-    runtime: &mut R,
-    statement: &ConfidentialKernelSlotStatement,
-    state: &mut ConfidentialKernelInterpreterState,
-) -> Result<()> {
-    match statement {
-        ConfidentialKernelSlotStatement::Declare { slot, value }
-        | ConfidentialKernelSlotStatement::Assign { slot, value } => {
-            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
-            runtime.store_slot(*slot, value)?;
-        }
-        ConfidentialKernelSlotStatement::Require { .. } => {
-            bail!("confidential slot program must be normalized before runtime execution");
-        }
-        ConfidentialKernelSlotStatement::AbortIf { cond } => {
-            let cond = eval_confidential_kernel_slot_expr(runtime, cond)?
-                .as_bool()
-                .ok_or_else(|| anyhow!("abort condition must be boolean"))?;
-            if cond {
-                state.aborted = true;
-            }
-        }
-        ConfidentialKernelSlotStatement::CellSet {
-            object_id,
-            value,
-            predicate,
-        } => {
-            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
-            let predicate =
-                eval_optional_confidential_kernel_predicate(runtime, predicate, "cell")?;
-            runtime.cell_set(*object_id, value, predicate)?;
-        }
-        ConfidentialKernelSlotStatement::ArraySet {
-            object_id,
-            index,
-            value,
-            predicate,
-        } => {
-            let index = eval_confidential_kernel_slot_expr(runtime, index)?
-                .as_uint()
-                .ok_or_else(|| anyhow!("array index must be uint"))?
-                as usize;
-            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
-            let predicate =
-                eval_optional_confidential_kernel_predicate(runtime, predicate, "array")?;
-            runtime.array_set(*object_id, index, value, predicate)?;
-        }
-        ConfidentialKernelSlotStatement::MapPut {
-            object_id,
-            key,
-            value,
-            predicate,
-        } => {
-            let key = eval_confidential_kernel_slot_expr(runtime, key)?;
-            let value = eval_confidential_kernel_slot_expr(runtime, value)?;
-            let predicate = eval_optional_confidential_kernel_predicate(runtime, predicate, "map")?;
-            runtime.map_put(*object_id, key, value, predicate)?;
-        }
-        ConfidentialKernelSlotStatement::Return { value } => {
-            state.return_value = value
-                .as_ref()
-                .map(|expr| eval_confidential_kernel_slot_expr(runtime, expr))
-                .transpose()?;
-            state.returned = true;
-        }
-    }
-    Ok(())
-}
-
-fn eval_optional_confidential_kernel_predicate<R: ConfidentialKernelSlotRuntime>(
-    runtime: &mut R,
-    predicate: &Option<ConfidentialKernelSlotExpr>,
-    label: &str,
-) -> Result<Option<bool>> {
-    predicate
-        .as_ref()
-        .map(|expr| eval_confidential_kernel_slot_expr(runtime, expr))
-        .transpose()?
-        .map(|value| {
-            value
-                .as_bool()
-                .ok_or_else(|| anyhow!("{label} predicate must be boolean"))
-        })
-        .transpose()
-}
-
-fn eval_confidential_kernel_slot_expr<R: ConfidentialKernelSlotRuntime>(
-    runtime: &mut R,
-    expr: &ConfidentialKernelSlotExpr,
-) -> Result<Value> {
-    match expr {
-        ConfidentialKernelSlotExpr::Literal { value } => Ok(value.clone()),
-        ConfidentialKernelSlotExpr::Slot { slot } => runtime.load_slot(*slot),
-        ConfidentialKernelSlotExpr::Unary { op, expr } => {
-            let value = eval_confidential_kernel_slot_expr(runtime, expr)?;
-            eval_confidential_kernel_unary(op, value)
-        }
-        ConfidentialKernelSlotExpr::Binary { op, lhs, rhs } => {
-            let lhs = eval_confidential_kernel_slot_expr(runtime, lhs)?;
-            let rhs = eval_confidential_kernel_slot_expr(runtime, rhs)?;
-            eval_confidential_kernel_binary(op, lhs, rhs)
-        }
-        ConfidentialKernelSlotExpr::Select {
-            cond,
-            when_true,
-            when_false,
-        } => {
-            let cond = eval_confidential_kernel_slot_expr(runtime, cond)?
-                .as_bool()
-                .ok_or_else(|| anyhow!("select condition must be boolean"))?;
-            let when_true = eval_confidential_kernel_slot_pure_expr(runtime, when_true)?;
-            let when_false = eval_confidential_kernel_slot_pure_expr(runtime, when_false)?;
-            Value::confidential_select(cond, when_true, when_false)
-        }
-        ConfidentialKernelSlotExpr::CellGet { object_id } => runtime.cell_get(*object_id),
-        ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {
-            let index = eval_confidential_kernel_slot_expr(runtime, index)?
-                .as_uint()
-                .ok_or_else(|| anyhow!("array index must be uint"))?
-                as usize;
-            runtime.array_get(*object_id, index)
-        }
-        ConfidentialKernelSlotExpr::MapGet { object_id, key } => {
-            let key = eval_confidential_kernel_slot_expr(runtime, key)?;
-            runtime.map_get(*object_id, &key)
-        }
-        ConfidentialKernelSlotExpr::Keccak256 { parts } => {
-            let values = collect_confidential_hash_parts(
-                parts.len(),
-                parts
-                    .iter()
-                    .map(|part| eval_confidential_kernel_slot_expr(runtime, part)),
-            )?;
-            runtime.keccak256(values)
-        }
-    }
-}
-
-fn eval_confidential_kernel_slot_pure_expr<R: ConfidentialKernelSlotRuntime>(
-    runtime: &mut R,
-    expr: &ConfidentialKernelSlotPureExpr,
-) -> Result<Value> {
-    match expr {
-        ConfidentialKernelSlotPureExpr::Literal { value } => Ok(value.clone()),
-        ConfidentialKernelSlotPureExpr::Slot { slot } => runtime.load_slot(*slot),
-        ConfidentialKernelSlotPureExpr::Unary { op, expr } => {
-            let value = eval_confidential_kernel_slot_pure_expr(runtime, expr)?;
-            eval_confidential_kernel_unary(op, value)
-        }
-        ConfidentialKernelSlotPureExpr::Binary { op, lhs, rhs } => {
-            let lhs = eval_confidential_kernel_slot_pure_expr(runtime, lhs)?;
-            let rhs = eval_confidential_kernel_slot_pure_expr(runtime, rhs)?;
-            eval_confidential_kernel_binary(op, lhs, rhs)
-        }
-        ConfidentialKernelSlotPureExpr::Select {
-            cond,
-            when_true,
-            when_false,
-        } => {
-            let cond = eval_confidential_kernel_slot_pure_expr(runtime, cond)?
-                .as_bool()
-                .ok_or_else(|| anyhow!("select condition must be boolean"))?;
-            let when_true = eval_confidential_kernel_slot_pure_expr(runtime, when_true)?;
-            let when_false = eval_confidential_kernel_slot_pure_expr(runtime, when_false)?;
-            Value::confidential_select(cond, when_true, when_false)
-        }
-        ConfidentialKernelSlotPureExpr::Keccak256 { parts } => {
-            let values = collect_confidential_hash_parts(
-                parts.len(),
-                parts
-                    .iter()
-                    .map(|part| eval_confidential_kernel_slot_pure_expr(runtime, part)),
-            )?;
-            runtime.keccak256(values)
-        }
-    }
-}
-
-fn eval_confidential_kernel_unary(op: &UnaryOp, value: Value) -> Result<Value> {
-    match op {
-        UnaryOp::Not => Ok(Value::Bool(
-            !value
-                .as_bool()
-                .ok_or_else(|| anyhow!("logical not expects bool"))?,
-        )),
-        UnaryOp::Neg => Ok(Value::Uint(
-            0u128.wrapping_sub(
-                value
-                    .as_uint()
-                    .ok_or_else(|| anyhow!("negation expects uint"))?,
-            ),
-        )),
-    }
-}
-
-fn eval_confidential_kernel_binary(op: &BinaryOp, lhs: Value, rhs: Value) -> Result<Value> {
-    match op {
-        BinaryOp::Add => Ok(Value::Uint(lhs_uint(&lhs)?.wrapping_add(lhs_uint(&rhs)?))),
-        BinaryOp::Sub => Ok(Value::Uint(lhs_uint(&lhs)?.wrapping_sub(lhs_uint(&rhs)?))),
-        BinaryOp::Mul => Ok(Value::Uint(lhs_uint(&lhs)?.wrapping_mul(lhs_uint(&rhs)?))),
-        BinaryOp::Div => {
-            let divisor = lhs_uint(&rhs)?;
-            Ok(Value::Uint(if divisor == 0 {
-                0
-            } else {
-                lhs_uint(&lhs)? / divisor
-            }))
-        }
-        BinaryOp::Mod => {
-            let divisor = lhs_uint(&rhs)?;
-            Ok(Value::Uint(if divisor == 0 {
-                0
-            } else {
-                lhs_uint(&lhs)? % divisor
-            }))
-        }
-        BinaryOp::BitAnd => Ok(Value::Uint(lhs_uint(&lhs)? & lhs_uint(&rhs)?)),
-        BinaryOp::BitOr => Ok(Value::Uint(lhs_uint(&lhs)? | lhs_uint(&rhs)?)),
-        BinaryOp::BitXor => Ok(Value::Uint(lhs_uint(&lhs)? ^ lhs_uint(&rhs)?)),
-        BinaryOp::Eq => Ok(Value::Bool(lhs == rhs)),
-        BinaryOp::Neq => Ok(Value::Bool(lhs != rhs)),
-        BinaryOp::Lt => Ok(Value::Bool(lhs_uint(&lhs)? < lhs_uint(&rhs)?)),
-        BinaryOp::Lte => Ok(Value::Bool(lhs_uint(&lhs)? <= lhs_uint(&rhs)?)),
-        BinaryOp::Gt => Ok(Value::Bool(lhs_uint(&lhs)? > lhs_uint(&rhs)?)),
-        BinaryOp::Gte => Ok(Value::Bool(lhs_uint(&lhs)? >= lhs_uint(&rhs)?)),
-        BinaryOp::And => Ok(Value::Bool(lhs_bool(&lhs)? && lhs_bool(&rhs)?)),
-        BinaryOp::Or => Ok(Value::Bool(lhs_bool(&lhs)? || lhs_bool(&rhs)?)),
-    }
-}
-
-fn lhs_uint(value: &Value) -> Result<u128> {
-    value
-        .as_uint()
-        .ok_or_else(|| anyhow!("expected uint-compatible value"))
-}
-
-fn lhs_bool(value: &Value) -> Result<bool> {
-    value
-        .as_bool()
-        .ok_or_else(|| anyhow!("expected bool-compatible value"))
+    generated_confidential_kernel::execute_confidential_kernel_slot_program_generated(
+        runtime, program,
+    )
 }
 
 impl CompiledFunction {
@@ -964,43 +790,61 @@ impl CompiledFunction {
 }
 
 impl ConfidentialKernelProgram {
+    pub fn runtime_step_count(&self) -> usize {
+        1 + self
+            .body
+            .iter()
+            .map(ConfidentialKernelStatement::kernel_step_count)
+            .sum::<usize>()
+            + 2
+    }
+
     pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
-        let mut steps = vec![ConfidentialKernelStep {
+        let mut steps = FixedKernelStepBuffer::new(self.runtime_step_count());
+        steps.push(ConfidentialKernelStep {
             opcode: UoOpcode::Begin,
             object_id: None,
-        }];
+        });
         for statement in &self.body {
             statement.collect_kernel_steps(&mut steps);
         }
-        steps.extend([
-            ConfidentialKernelStep {
-                opcode: UoOpcode::Commit,
-                object_id: None,
-            },
-            ConfidentialKernelStep {
-                opcode: UoOpcode::Wipe,
-                object_id: None,
-            },
-        ]);
-        steps.into_boxed_slice()
+        steps.push(ConfidentialKernelStep {
+            opcode: UoOpcode::Commit,
+            object_id: None,
+        });
+        steps.push(ConfidentialKernelStep {
+            opcode: UoOpcode::Wipe,
+            object_id: None,
+        });
+        steps.finish()
     }
 
     pub fn to_slot_program(
         &self,
     ) -> Result<ConfidentialKernelSlotProgram, ConfidentialKernelSlotLoweringError> {
         let mut layout = ConfidentialKernelSlotLayout::new(&self.entrypoint_id, &self.params)?;
-        let body = self
-            .body
-            .iter()
-            .map(|statement| statement.to_slot_statement(&mut layout))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut body = FixedBoxBuilder::new(self.body.len());
+        for statement in self.body.iter() {
+            body.push(statement.to_slot_statement(&mut layout)?)
+                .map_err(
+                    |error| ConfidentialKernelSlotLoweringError::FixedBufferInvariant {
+                        entrypoint: self.entrypoint_id.clone(),
+                        detail: error.to_string(),
+                    },
+                )?;
+        }
         Ok(ConfidentialKernelSlotProgram {
             entrypoint_id: self.entrypoint_id.clone(),
             param_count: self.params.len(),
             return_type: self.return_type.clone(),
             secret_args: self.secret_args.clone(),
             slot_count: layout.slot_count(),
-            body,
+            body: body.finish().map_err(|error| {
+                ConfidentialKernelSlotLoweringError::FixedBufferInvariant {
+                    entrypoint: self.entrypoint_id.clone(),
+                    detail: error.to_string(),
+                }
+            })?,
         })
     }
 
@@ -1030,55 +874,154 @@ impl ConfidentialKernelProgram {
 }
 
 impl ConfidentialKernelSlotProgram {
+    pub fn runtime_step_count(&self) -> usize {
+        1 + self
+            .body
+            .iter()
+            .map(ConfidentialKernelSlotStatement::kernel_step_count)
+            .sum::<usize>()
+            + 2
+    }
+
+    pub fn statement_trace(&self) -> Box<[String]> {
+        let mut statements = self.body.iter();
+        FixedBoxBuilder::from_fn(self.body.len(), |_| {
+            statements
+                .next()
+                .map(|statement| statement.trace_name().to_owned())
+                .unwrap_or_default()
+        })
+    }
+
     pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
-        let mut steps = vec![ConfidentialKernelStep {
+        let mut steps = FixedKernelStepBuffer::new(self.runtime_step_count());
+        steps.push(ConfidentialKernelStep {
             opcode: UoOpcode::Begin,
             object_id: None,
-        }];
+        });
         for statement in &self.body {
             statement.collect_kernel_steps(&mut steps);
         }
-        steps.extend([
-            ConfidentialKernelStep {
-                opcode: UoOpcode::Commit,
-                object_id: None,
-            },
-            ConfidentialKernelStep {
-                opcode: UoOpcode::Wipe,
-                object_id: None,
-            },
-        ]);
-        steps.into_boxed_slice()
+        steps.push(ConfidentialKernelStep {
+            opcode: UoOpcode::Commit,
+            object_id: None,
+        });
+        steps.push(ConfidentialKernelStep {
+            opcode: UoOpcode::Wipe,
+            object_id: None,
+        });
+        steps.finish()
     }
 
     pub fn is_runtime_normal_form(&self) -> bool {
-        self.body
-            .iter()
-            .all(ConfidentialKernelSlotStatement::is_runtime_normal_form)
+        let mut saw_return = false;
+        for statement in &self.body {
+            if saw_return || !statement.is_runtime_normal_form() {
+                return false;
+            }
+            saw_return = matches!(statement, ConfidentialKernelSlotStatement::Return { .. });
+        }
+        true
     }
 }
 
 impl ConfidentialKernelStatement {
-    pub fn trace_name(&self) -> &'static str {
+    pub fn kind(&self) -> ConfidentialKernelStatementKind {
         match self {
-            Self::Declare { .. } => "declare",
-            Self::Assign { .. } => "assign",
-            Self::Require { .. } => "require",
-            Self::AbortIf { .. } => "abort_if",
-            Self::CellSet { .. } => "cell_set",
-            Self::ArraySet { .. } => "array_set",
-            Self::MapPut { .. } => "map_put",
-            Self::Return { .. } => "return",
+            Self::Declare { .. } => ConfidentialKernelStatementKind::Declare,
+            Self::Assign { .. } => ConfidentialKernelStatementKind::Assign,
+            Self::Require { .. } => ConfidentialKernelStatementKind::Require,
+            Self::AbortIf { .. } => ConfidentialKernelStatementKind::AbortIf,
+            Self::CellSet { .. } => ConfidentialKernelStatementKind::CellSet,
+            Self::ArraySet { .. } => ConfidentialKernelStatementKind::ArraySet,
+            Self::MapPut { .. } => ConfidentialKernelStatementKind::MapPut,
+            Self::Return { .. } => ConfidentialKernelStatementKind::Return,
         }
     }
 
-    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
-        let mut steps = Vec::new();
-        self.collect_kernel_steps(&mut steps);
-        steps.into_boxed_slice()
+    pub fn profile(&self) -> ConfidentialKernelStatementProfile {
+        self.kind().profile()
     }
 
-    fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
+    pub fn trace_name(&self) -> &'static str {
+        self.profile().trace_name
+    }
+
+    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
+        let mut steps = FixedKernelStepBuffer::new(self.kernel_step_count());
+        self.collect_kernel_steps(&mut steps);
+        steps.finish()
+    }
+
+    pub fn kernel_step_count(&self) -> usize {
+        let operand_count = match self {
+            Self::Declare { value, .. } | Self::Assign { value, .. } => value.kernel_step_count(),
+            Self::Require { cond } | Self::AbortIf { cond } => cond.kernel_step_count(),
+            Self::CellSet {
+                value, predicate, ..
+            } => {
+                value.kernel_step_count()
+                    + predicate
+                        .as_ref()
+                        .map(ConfidentialKernelExpr::kernel_step_count)
+                        .unwrap_or(0)
+            }
+            Self::ArraySet {
+                index,
+                value,
+                predicate,
+                ..
+            } => {
+                index.kernel_step_count()
+                    + value.kernel_step_count()
+                    + predicate
+                        .as_ref()
+                        .map(ConfidentialKernelExpr::kernel_step_count)
+                        .unwrap_or(0)
+            }
+            Self::MapPut {
+                key,
+                value,
+                predicate,
+                ..
+            } => {
+                key.kernel_step_count()
+                    + value.kernel_step_count()
+                    + predicate
+                        .as_ref()
+                        .map(ConfidentialKernelExpr::kernel_step_count)
+                        .unwrap_or(0)
+            }
+            Self::Return { value } => value
+                .as_ref()
+                .map(ConfidentialKernelExpr::kernel_step_count)
+                .unwrap_or(0),
+        };
+        operand_count + usize::from(self.storage_opcode().is_some())
+    }
+
+    pub fn effect_kind(&self) -> ConfidentialKernelStatementEffectKind {
+        self.profile().effect_kind
+    }
+
+    pub fn storage_opcode(&self) -> Option<UoOpcode> {
+        self.profile().tail_opcode
+    }
+
+    fn tail_object_id(&self) -> Option<u32> {
+        match self {
+            Self::CellSet { object_id, .. }
+            | Self::ArraySet { object_id, .. }
+            | Self::MapPut { object_id, .. } => Some(*object_id),
+            Self::Declare { .. }
+            | Self::Assign { .. }
+            | Self::Require { .. }
+            | Self::AbortIf { .. }
+            | Self::Return { .. } => None,
+        }
+    }
+
+    fn collect_kernel_steps(&self, steps: &mut FixedKernelStepBuffer) {
         match self {
             Self::Declare { value, .. } | Self::Assign { value, .. } => {
                 value.collect_kernel_steps(steps);
@@ -1087,85 +1030,153 @@ impl ConfidentialKernelStatement {
                 cond.collect_kernel_steps(steps);
             }
             Self::CellSet {
-                object_id,
-                value,
-                predicate,
+                value, predicate, ..
             } => {
                 value.collect_kernel_steps(steps);
                 if let Some(predicate) = predicate {
                     predicate.collect_kernel_steps(steps);
                 }
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::CellSet,
-                    object_id: Some(*object_id),
-                });
             }
             Self::ArraySet {
-                object_id,
                 index,
                 value,
                 predicate,
+                ..
             } => {
                 index.collect_kernel_steps(steps);
                 value.collect_kernel_steps(steps);
                 if let Some(predicate) = predicate {
                     predicate.collect_kernel_steps(steps);
                 }
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::ArraySet,
-                    object_id: Some(*object_id),
-                });
             }
             Self::MapPut {
-                object_id,
                 key,
                 value,
                 predicate,
+                ..
             } => {
                 key.collect_kernel_steps(steps);
                 value.collect_kernel_steps(steps);
                 if let Some(predicate) = predicate {
                     predicate.collect_kernel_steps(steps);
                 }
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::MapPut,
-                    object_id: Some(*object_id),
-                });
             }
             Self::Return { value } => {
                 if let Some(value) = value {
                     value.collect_kernel_steps(steps);
                 }
             }
+        }
+        if let Some(opcode) = self.storage_opcode() {
+            steps.push(ConfidentialKernelStep {
+                opcode,
+                object_id: self.tail_object_id(),
+            });
         }
     }
 }
 
 impl ConfidentialKernelSlotStatement {
     pub fn is_runtime_normal_form(&self) -> bool {
-        !matches!(self, Self::Require { .. })
+        self.profile().runtime_normal_form
     }
 
-    pub fn trace_name(&self) -> &'static str {
+    pub fn kind(&self) -> ConfidentialKernelStatementKind {
         match self {
-            Self::Declare { .. } => "declare",
-            Self::Assign { .. } => "assign",
-            Self::Require { .. } => "require",
-            Self::AbortIf { .. } => "abort_if",
-            Self::CellSet { .. } => "cell_set",
-            Self::ArraySet { .. } => "array_set",
-            Self::MapPut { .. } => "map_put",
-            Self::Return { .. } => "return",
+            Self::Declare { .. } => ConfidentialKernelStatementKind::Declare,
+            Self::Assign { .. } => ConfidentialKernelStatementKind::Assign,
+            Self::Require { .. } => ConfidentialKernelStatementKind::Require,
+            Self::AbortIf { .. } => ConfidentialKernelStatementKind::AbortIf,
+            Self::CellSet { .. } => ConfidentialKernelStatementKind::CellSet,
+            Self::ArraySet { .. } => ConfidentialKernelStatementKind::ArraySet,
+            Self::MapPut { .. } => ConfidentialKernelStatementKind::MapPut,
+            Self::Return { .. } => ConfidentialKernelStatementKind::Return,
         }
     }
 
-    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
-        let mut steps = Vec::new();
-        self.collect_kernel_steps(&mut steps);
-        steps.into_boxed_slice()
+    pub fn profile(&self) -> ConfidentialKernelStatementProfile {
+        self.kind().profile()
     }
 
-    fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
+    pub fn trace_name(&self) -> &'static str {
+        self.profile().trace_name
+    }
+
+    pub fn expected_runtime_steps(&self) -> Box<[ConfidentialKernelStep]> {
+        let mut steps = FixedKernelStepBuffer::new(self.kernel_step_count());
+        self.collect_kernel_steps(&mut steps);
+        steps.finish()
+    }
+
+    pub fn kernel_step_count(&self) -> usize {
+        let operand_count = match self {
+            Self::Declare { value, .. } | Self::Assign { value, .. } => value.kernel_step_count(),
+            Self::Require { cond } | Self::AbortIf { cond } => cond.kernel_step_count(),
+            Self::CellSet {
+                value, predicate, ..
+            } => {
+                value.kernel_step_count()
+                    + predicate
+                        .as_ref()
+                        .map(ConfidentialKernelSlotExpr::kernel_step_count)
+                        .unwrap_or(0)
+            }
+            Self::ArraySet {
+                index,
+                value,
+                predicate,
+                ..
+            } => {
+                index.kernel_step_count()
+                    + value.kernel_step_count()
+                    + predicate
+                        .as_ref()
+                        .map(ConfidentialKernelSlotExpr::kernel_step_count)
+                        .unwrap_or(0)
+            }
+            Self::MapPut {
+                key,
+                value,
+                predicate,
+                ..
+            } => {
+                key.kernel_step_count()
+                    + value.kernel_step_count()
+                    + predicate
+                        .as_ref()
+                        .map(ConfidentialKernelSlotExpr::kernel_step_count)
+                        .unwrap_or(0)
+            }
+            Self::Return { value } => value
+                .as_ref()
+                .map(ConfidentialKernelSlotExpr::kernel_step_count)
+                .unwrap_or(0),
+        };
+        operand_count + usize::from(self.storage_opcode().is_some())
+    }
+
+    pub fn effect_kind(&self) -> ConfidentialKernelStatementEffectKind {
+        self.profile().effect_kind
+    }
+
+    pub fn storage_opcode(&self) -> Option<UoOpcode> {
+        self.profile().tail_opcode
+    }
+
+    fn tail_object_id(&self) -> Option<u32> {
+        match self {
+            Self::CellSet { object_id, .. }
+            | Self::ArraySet { object_id, .. }
+            | Self::MapPut { object_id, .. } => Some(*object_id),
+            Self::Declare { .. }
+            | Self::Assign { .. }
+            | Self::Require { .. }
+            | Self::AbortIf { .. }
+            | Self::Return { .. } => None,
+        }
+    }
+
+    fn collect_kernel_steps(&self, steps: &mut FixedKernelStepBuffer) {
         match self {
             Self::Declare { value, .. } | Self::Assign { value, .. } => {
                 value.collect_kernel_steps(steps);
@@ -1174,50 +1185,36 @@ impl ConfidentialKernelSlotStatement {
                 cond.collect_kernel_steps(steps);
             }
             Self::CellSet {
-                object_id,
-                value,
-                predicate,
+                value, predicate, ..
             } => {
                 value.collect_kernel_steps(steps);
                 if let Some(predicate) = predicate {
                     predicate.collect_kernel_steps(steps);
                 }
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::CellSet,
-                    object_id: Some(*object_id),
-                });
             }
             Self::ArraySet {
-                object_id,
                 index,
                 value,
                 predicate,
+                ..
             } => {
                 index.collect_kernel_steps(steps);
                 value.collect_kernel_steps(steps);
                 if let Some(predicate) = predicate {
                     predicate.collect_kernel_steps(steps);
                 }
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::ArraySet,
-                    object_id: Some(*object_id),
-                });
             }
             Self::MapPut {
-                object_id,
                 key,
                 value,
                 predicate,
+                ..
             } => {
                 key.collect_kernel_steps(steps);
                 value.collect_kernel_steps(steps);
                 if let Some(predicate) = predicate {
                     predicate.collect_kernel_steps(steps);
                 }
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::MapPut,
-                    object_id: Some(*object_id),
-                });
             }
             Self::Return { value } => {
                 if let Some(value) = value {
@@ -1225,17 +1222,76 @@ impl ConfidentialKernelSlotStatement {
                 }
             }
         }
+        if let Some(opcode) = self.storage_opcode() {
+            steps.push(ConfidentialKernelStep {
+                opcode,
+                object_id: self.tail_object_id(),
+            });
+        }
     }
 }
 
 impl ConfidentialKernelExpr {
-    pub fn kernel_steps(&self) -> Box<[ConfidentialKernelStep]> {
-        let mut steps = Vec::new();
-        self.collect_kernel_steps(&mut steps);
-        steps.into_boxed_slice()
+    pub fn kind(&self) -> ConfidentialKernelExprKind {
+        match self {
+            Self::Literal { .. } => ConfidentialKernelExprKind::Literal,
+            Self::Var { .. } => ConfidentialKernelExprKind::Var,
+            Self::Unary { .. } => ConfidentialKernelExprKind::Unary,
+            Self::Binary { .. } => ConfidentialKernelExprKind::Binary,
+            Self::Select { .. } => ConfidentialKernelExprKind::Select,
+            Self::CellGet { .. } => ConfidentialKernelExprKind::CellGet,
+            Self::ArrayGet { .. } => ConfidentialKernelExprKind::ArrayGet,
+            Self::MapGet { .. } => ConfidentialKernelExprKind::MapGet,
+            Self::Keccak256 { .. } => ConfidentialKernelExprKind::Keccak256,
+        }
     }
 
-    fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
+    pub fn profile(&self) -> ConfidentialKernelExprProfile {
+        self.kind().profile()
+    }
+
+    pub fn kernel_steps(&self) -> Box<[ConfidentialKernelStep]> {
+        let mut steps = FixedKernelStepBuffer::new(self.kernel_step_count());
+        self.collect_kernel_steps(&mut steps);
+        steps.finish()
+    }
+
+    pub fn kernel_step_count(&self) -> usize {
+        let operand_count = match self {
+            Self::Literal { .. } | Self::Var { .. } => 0,
+            Self::Unary { expr, .. } => expr.kernel_step_count(),
+            Self::Binary { lhs, rhs, .. } => lhs.kernel_step_count() + rhs.kernel_step_count(),
+            Self::Select { cond, .. } => cond.kernel_step_count(),
+            Self::CellGet { .. } => 0,
+            Self::ArrayGet { index, .. } => index.kernel_step_count(),
+            Self::MapGet { key, .. } => key.kernel_step_count(),
+            Self::Keccak256 { parts } => parts
+                .iter()
+                .map(ConfidentialKernelExpr::kernel_step_count)
+                .sum(),
+        };
+        operand_count + usize::from(self.storage_opcode().is_some())
+    }
+
+    pub fn storage_opcode(&self) -> Option<UoOpcode> {
+        self.profile().tail_opcode
+    }
+
+    fn tail_object_id(&self) -> Option<u32> {
+        match self {
+            Self::CellGet { object_id }
+            | Self::ArrayGet { object_id, .. }
+            | Self::MapGet { object_id, .. } => Some(*object_id),
+            Self::Literal { .. }
+            | Self::Var { .. }
+            | Self::Unary { .. }
+            | Self::Binary { .. }
+            | Self::Select { .. }
+            | Self::Keccak256 { .. } => None,
+        }
+    }
+
+    fn collect_kernel_steps(&self, steps: &mut FixedKernelStepBuffer) {
         match self {
             Self::Literal { .. } | Self::Var { .. } => {}
             Self::Unary { expr, .. } => expr.collect_kernel_steps(steps),
@@ -1244,23 +1300,12 @@ impl ConfidentialKernelExpr {
                 rhs.collect_kernel_steps(steps);
             }
             Self::Select { cond, .. } => cond.collect_kernel_steps(steps),
-            Self::CellGet { object_id } => steps.push(ConfidentialKernelStep {
-                opcode: UoOpcode::CellGet,
-                object_id: Some(*object_id),
-            }),
-            Self::ArrayGet { object_id, index } => {
+            Self::CellGet { .. } => {}
+            Self::ArrayGet { index, .. } => {
                 index.collect_kernel_steps(steps);
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::ArrayGet,
-                    object_id: Some(*object_id),
-                });
             }
-            Self::MapGet { object_id, key } => {
+            Self::MapGet { key, .. } => {
                 key.collect_kernel_steps(steps);
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::MapGet,
-                    object_id: Some(*object_id),
-                });
             }
             Self::Keccak256 { parts } => {
                 for part in parts {
@@ -1268,17 +1313,76 @@ impl ConfidentialKernelExpr {
                 }
             }
         }
+        if let Some(opcode) = self.storage_opcode() {
+            steps.push(ConfidentialKernelStep {
+                opcode,
+                object_id: self.tail_object_id(),
+            });
+        }
     }
 }
 
 impl ConfidentialKernelSlotExpr {
-    pub fn kernel_steps(&self) -> Box<[ConfidentialKernelStep]> {
-        let mut steps = Vec::new();
-        self.collect_kernel_steps(&mut steps);
-        steps.into_boxed_slice()
+    pub fn kind(&self) -> ConfidentialKernelSlotExprKind {
+        match self {
+            Self::Literal { .. } => ConfidentialKernelSlotExprKind::Literal,
+            Self::Slot { .. } => ConfidentialKernelSlotExprKind::Slot,
+            Self::Unary { .. } => ConfidentialKernelSlotExprKind::Unary,
+            Self::Binary { .. } => ConfidentialKernelSlotExprKind::Binary,
+            Self::Select { .. } => ConfidentialKernelSlotExprKind::Select,
+            Self::CellGet { .. } => ConfidentialKernelSlotExprKind::CellGet,
+            Self::ArrayGet { .. } => ConfidentialKernelSlotExprKind::ArrayGet,
+            Self::MapGet { .. } => ConfidentialKernelSlotExprKind::MapGet,
+            Self::Keccak256 { .. } => ConfidentialKernelSlotExprKind::Keccak256,
+        }
     }
 
-    fn collect_kernel_steps(&self, steps: &mut Vec<ConfidentialKernelStep>) {
+    pub fn profile(&self) -> ConfidentialKernelSlotExprProfile {
+        self.kind().profile()
+    }
+
+    pub fn kernel_steps(&self) -> Box<[ConfidentialKernelStep]> {
+        let mut steps = FixedKernelStepBuffer::new(self.kernel_step_count());
+        self.collect_kernel_steps(&mut steps);
+        steps.finish()
+    }
+
+    pub fn kernel_step_count(&self) -> usize {
+        let operand_count = match self {
+            Self::Literal { .. } | Self::Slot { .. } => 0,
+            Self::Unary { expr, .. } => expr.kernel_step_count(),
+            Self::Binary { lhs, rhs, .. } => lhs.kernel_step_count() + rhs.kernel_step_count(),
+            Self::Select { cond, .. } => cond.kernel_step_count(),
+            Self::CellGet { .. } => 0,
+            Self::ArrayGet { index, .. } => index.kernel_step_count(),
+            Self::MapGet { key, .. } => key.kernel_step_count(),
+            Self::Keccak256 { parts } => parts
+                .iter()
+                .map(ConfidentialKernelSlotExpr::kernel_step_count)
+                .sum(),
+        };
+        operand_count + usize::from(self.storage_opcode().is_some())
+    }
+
+    pub fn storage_opcode(&self) -> Option<UoOpcode> {
+        self.profile().tail_opcode
+    }
+
+    fn tail_object_id(&self) -> Option<u32> {
+        match self {
+            Self::CellGet { object_id }
+            | Self::ArrayGet { object_id, .. }
+            | Self::MapGet { object_id, .. } => Some(*object_id),
+            Self::Literal { .. }
+            | Self::Slot { .. }
+            | Self::Unary { .. }
+            | Self::Binary { .. }
+            | Self::Select { .. }
+            | Self::Keccak256 { .. } => None,
+        }
+    }
+
+    fn collect_kernel_steps(&self, steps: &mut FixedKernelStepBuffer) {
         match self {
             Self::Literal { .. } | Self::Slot { .. } => {}
             Self::Unary { expr, .. } => expr.collect_kernel_steps(steps),
@@ -1287,23 +1391,12 @@ impl ConfidentialKernelSlotExpr {
                 rhs.collect_kernel_steps(steps);
             }
             Self::Select { cond, .. } => cond.collect_kernel_steps(steps),
-            Self::CellGet { object_id } => steps.push(ConfidentialKernelStep {
-                opcode: UoOpcode::CellGet,
-                object_id: Some(*object_id),
-            }),
-            Self::ArrayGet { object_id, index } => {
+            Self::CellGet { .. } => {}
+            Self::ArrayGet { index, .. } => {
                 index.collect_kernel_steps(steps);
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::ArrayGet,
-                    object_id: Some(*object_id),
-                });
             }
-            Self::MapGet { object_id, key } => {
+            Self::MapGet { key, .. } => {
                 key.collect_kernel_steps(steps);
-                steps.push(ConfidentialKernelStep {
-                    opcode: UoOpcode::MapGet,
-                    object_id: Some(*object_id),
-                });
             }
             Self::Keccak256 { parts } => {
                 for part in parts {
@@ -1311,6 +1404,29 @@ impl ConfidentialKernelSlotExpr {
                 }
             }
         }
+        if let Some(opcode) = self.storage_opcode() {
+            steps.push(ConfidentialKernelStep {
+                opcode,
+                object_id: self.tail_object_id(),
+            });
+        }
+    }
+}
+
+impl ConfidentialKernelSlotPureExpr {
+    pub fn kind(&self) -> ConfidentialKernelSlotPureExprKind {
+        match self {
+            Self::Literal { .. } => ConfidentialKernelSlotPureExprKind::Literal,
+            Self::Slot { .. } => ConfidentialKernelSlotPureExprKind::Slot,
+            Self::Unary { .. } => ConfidentialKernelSlotPureExprKind::Unary,
+            Self::Binary { .. } => ConfidentialKernelSlotPureExprKind::Binary,
+            Self::Select { .. } => ConfidentialKernelSlotPureExprKind::Select,
+            Self::Keccak256 { .. } => ConfidentialKernelSlotPureExprKind::Keccak256,
+        }
+    }
+
+    pub fn profile(&self) -> ConfidentialKernelSlotPureExprProfile {
+        self.kind().profile()
     }
 }
 
@@ -1500,6 +1616,21 @@ impl ConfidentialKernelExpr {
 }
 
 impl ConfidentialKernelPureExpr {
+    pub fn kind(&self) -> ConfidentialKernelPureExprKind {
+        match self {
+            Self::Literal { .. } => ConfidentialKernelPureExprKind::Literal,
+            Self::Var { .. } => ConfidentialKernelPureExprKind::Var,
+            Self::Unary { .. } => ConfidentialKernelPureExprKind::Unary,
+            Self::Binary { .. } => ConfidentialKernelPureExprKind::Binary,
+            Self::Select { .. } => ConfidentialKernelPureExprKind::Select,
+            Self::Keccak256 { .. } => ConfidentialKernelPureExprKind::Keccak256,
+        }
+    }
+
+    pub fn profile(&self) -> ConfidentialKernelPureExprProfile {
+        self.kind().profile()
+    }
+
     fn max_keccak_part_canonical_len(
         &self,
         entrypoint: &str,
@@ -1751,12 +1882,25 @@ impl ConfidentialKernelExpr {
                 object_id: *object_id,
                 key: Box::new(key.to_slot_expr(layout)?),
             }),
-            Self::Keccak256 { parts } => Ok(ConfidentialKernelSlotExpr::Keccak256 {
-                parts: parts
-                    .iter()
-                    .map(|part| part.to_slot_expr(layout))
-                    .collect::<Result<Vec<_>, _>>()?,
-            }),
+            Self::Keccak256 { parts } => {
+                let mut lowered = FixedBoxBuilder::new(parts.len());
+                for part in parts.iter() {
+                    lowered.push(part.to_slot_expr(layout)?).map_err(|error| {
+                        ConfidentialKernelSlotLoweringError::FixedBufferInvariant {
+                            entrypoint: layout.entrypoint.clone(),
+                            detail: error.to_string(),
+                        }
+                    })?;
+                }
+                Ok(ConfidentialKernelSlotExpr::Keccak256 {
+                    parts: lowered.finish().map_err(|error| {
+                        ConfidentialKernelSlotLoweringError::FixedBufferInvariant {
+                            entrypoint: layout.entrypoint.clone(),
+                            detail: error.to_string(),
+                        }
+                    })?,
+                })
+            }
         }
     }
 }
@@ -1791,12 +1935,27 @@ impl ConfidentialKernelPureExpr {
                 when_true: Box::new(when_true.to_slot_pure_expr(layout)?),
                 when_false: Box::new(when_false.to_slot_pure_expr(layout)?),
             }),
-            Self::Keccak256 { parts } => Ok(ConfidentialKernelSlotPureExpr::Keccak256 {
-                parts: parts
-                    .iter()
-                    .map(|part| part.to_slot_pure_expr(layout))
-                    .collect::<Result<Vec<_>, _>>()?,
-            }),
+            Self::Keccak256 { parts } => {
+                let mut lowered = FixedBoxBuilder::new(parts.len());
+                for part in parts.iter() {
+                    lowered
+                        .push(part.to_slot_pure_expr(layout)?)
+                        .map_err(|error| {
+                            ConfidentialKernelSlotLoweringError::FixedBufferInvariant {
+                                entrypoint: layout.entrypoint.clone(),
+                                detail: error.to_string(),
+                            }
+                        })?;
+                }
+                Ok(ConfidentialKernelSlotPureExpr::Keccak256 {
+                    parts: lowered.finish().map_err(|error| {
+                        ConfidentialKernelSlotLoweringError::FixedBufferInvariant {
+                            entrypoint: layout.entrypoint.clone(),
+                            detail: error.to_string(),
+                        }
+                    })?,
+                })
+            }
         }
     }
 }
@@ -1804,12 +1963,34 @@ impl ConfidentialKernelPureExpr {
 pub fn lower_confidential_kernel_statements(
     statements: &[Statement],
     entrypoint: &str,
-) -> Result<Vec<ConfidentialKernelStatement>, ConfidentialKernelLoweringError> {
-    statements
-        .iter()
-        .enumerate()
-        .map(|(index, statement)| lower_confidential_kernel_statement(statement, entrypoint, index))
-        .collect()
+) -> Result<Box<[ConfidentialKernelStatement]>, ConfidentialKernelLoweringError> {
+    let mut lowered = FixedBoxBuilder::new(statements.len());
+    let mut saw_return = false;
+    for (index, statement) in statements.iter().enumerate() {
+        if saw_return {
+            return Err(ConfidentialKernelLoweringError::NonFinalReturn {
+                entrypoint: entrypoint.into(),
+                index,
+            });
+        }
+        saw_return = matches!(statement, Statement::Return { .. });
+        lowered
+            .push(lower_confidential_kernel_statement(
+                statement, entrypoint, index,
+            )?)
+            .map_err(
+                |error| ConfidentialKernelLoweringError::FixedBufferInvariant {
+                    entrypoint: entrypoint.into(),
+                    detail: error.to_string(),
+                },
+            )?;
+    }
+    Ok(lowered.finish().map_err(
+        |error| ConfidentialKernelLoweringError::FixedBufferInvariant {
+            entrypoint: entrypoint.into(),
+            detail: error.to_string(),
+        },
+    )?)
 }
 
 pub fn lower_confidential_kernel_expr(
@@ -1877,12 +2058,27 @@ pub fn lower_confidential_kernel_expr(
         Expr::ArrayIndex { .. } => Err(ConfidentialKernelLoweringError::ConfidentialArrayIndex {
             entrypoint: entrypoint.into(),
         }),
-        Expr::Keccak256 { parts } => Ok(ConfidentialKernelExpr::Keccak256 {
-            parts: parts
-                .iter()
-                .map(|part| lower_confidential_kernel_expr(part, entrypoint))
-                .collect::<Result<Vec<_>, _>>()?,
-        }),
+        Expr::Keccak256 { parts } => {
+            let mut lowered = FixedBoxBuilder::new(parts.len());
+            for part in parts.iter() {
+                lowered
+                    .push(lower_confidential_kernel_expr(part, entrypoint)?)
+                    .map_err(
+                        |error| ConfidentialKernelLoweringError::FixedBufferInvariant {
+                            entrypoint: entrypoint.into(),
+                            detail: error.to_string(),
+                        },
+                    )?;
+            }
+            Ok(ConfidentialKernelExpr::Keccak256 {
+                parts: lowered.finish().map_err(|error| {
+                    ConfidentialKernelLoweringError::FixedBufferInvariant {
+                        entrypoint: entrypoint.into(),
+                        detail: error.to_string(),
+                    }
+                })?,
+            })
+        }
     }
 }
 
@@ -1913,12 +2109,27 @@ pub fn lower_confidential_kernel_pure_expr(
             when_true: Box::new(lower_confidential_kernel_pure_expr(when_true, entrypoint)?),
             when_false: Box::new(lower_confidential_kernel_pure_expr(when_false, entrypoint)?),
         }),
-        Expr::Keccak256 { parts } => Ok(ConfidentialKernelPureExpr::Keccak256 {
-            parts: parts
-                .iter()
-                .map(|part| lower_confidential_kernel_pure_expr(part, entrypoint))
-                .collect::<Result<Vec<_>, _>>()?,
-        }),
+        Expr::Keccak256 { parts } => {
+            let mut lowered = FixedBoxBuilder::new(parts.len());
+            for part in parts.iter() {
+                lowered
+                    .push(lower_confidential_kernel_pure_expr(part, entrypoint)?)
+                    .map_err(
+                        |error| ConfidentialKernelLoweringError::FixedBufferInvariant {
+                            entrypoint: entrypoint.into(),
+                            detail: error.to_string(),
+                        },
+                    )?;
+            }
+            Ok(ConfidentialKernelPureExpr::Keccak256 {
+                parts: lowered.finish().map_err(|error| {
+                    ConfidentialKernelLoweringError::FixedBufferInvariant {
+                        entrypoint: entrypoint.into(),
+                        detail: error.to_string(),
+                    }
+                })?,
+            })
+        }
         Expr::StructField { .. } => Err(ConfidentialKernelLoweringError::ConfidentialStructField {
             entrypoint: entrypoint.into(),
         }),
@@ -2039,17 +2250,17 @@ fn expr_contains_kernel_access(expr: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        execute_confidential_kernel_slot_call, execute_confidential_kernel_slot_program,
-        ConfidentialCallInputs, ConfidentialKernelEffectRuntime,
-        ConfidentialKernelExecutionOutcome, ConfidentialKernelSlotExpr,
-        ConfidentialKernelSlotLoweringError, ConfidentialKernelSlotProgram,
-        ConfidentialKernelSlotRuntime, ConfidentialKernelSlotStatement,
+        execute_confidential_kernel_slot_program, ConfidentialKernelExecutionOutcome,
+        ConfidentialKernelSlotExpr, ConfidentialKernelSlotLoweringError,
+        ConfidentialKernelSlotProgram, ConfidentialKernelSlotRuntime,
+        ConfidentialKernelSlotStatement,
     };
     use crate::{
         ir::StateObject, BackendKind, BinaryOp, CompiledFunction, ContainerKind, Expr, ScalarType,
         Statement, Type, Value,
     };
     use anyhow::{anyhow, Result};
+    use uo_precompiles::UoOpcode;
 
     fn uint_type() -> Type {
         Type::Scalar(ScalarType::Uint(256))
@@ -2180,7 +2391,7 @@ mod tests {
             ))
         }
 
-        fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value> {
+        fn map_get(&mut self, object_id: u32, key: &Value) -> Result<(Value, bool)> {
             Err(anyhow!(
                 "unexpected map_get({object_id}, {key:?}) in mock runtime"
             ))
@@ -2192,68 +2403,7 @@ mod tests {
             key: Value,
             value: Value,
             predicate: Option<bool>,
-        ) -> Result<()> {
-            Err(anyhow!(
-                "unexpected map_put({object_id}, {key:?}, {value:?}, {predicate:?}) in mock runtime"
-            ))
-        }
-
-        fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {
-            Err(anyhow!("unexpected keccak256({parts:?}) in mock runtime"))
-        }
-    }
-
-    impl ConfidentialKernelEffectRuntime for MockRuntime {
-        fn note_statement(&mut self, statement: &ConfidentialKernelSlotStatement) -> Result<()> {
-            self.statements.push(statement.trace_name());
-            Ok(())
-        }
-
-        fn cell_get(&mut self, object_id: u32) -> Result<Value> {
-            Err(anyhow!("unexpected cell_get({object_id}) in mock runtime"))
-        }
-
-        fn cell_set(
-            &mut self,
-            object_id: u32,
-            value: Value,
-            predicate: Option<bool>,
-        ) -> Result<()> {
-            self.cell_sets.push((object_id, value, predicate));
-            Ok(())
-        }
-
-        fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value> {
-            Err(anyhow!(
-                "unexpected array_get({object_id}, {index}) in mock runtime"
-            ))
-        }
-
-        fn array_set(
-            &mut self,
-            object_id: u32,
-            index: usize,
-            _value: Value,
-            _predicate: Option<bool>,
-        ) -> Result<()> {
-            Err(anyhow!(
-                "unexpected array_set({object_id}, {index}) in mock runtime"
-            ))
-        }
-
-        fn map_get(&mut self, object_id: u32, key: &Value) -> Result<Value> {
-            Err(anyhow!(
-                "unexpected map_get({object_id}, {key:?}) in mock runtime"
-            ))
-        }
-
-        fn map_put(
-            &mut self,
-            object_id: u32,
-            key: Value,
-            value: Value,
-            predicate: Option<bool>,
-        ) -> Result<()> {
+        ) -> Result<bool> {
             Err(anyhow!(
                 "unexpected map_put({object_id}, {key:?}, {value:?}, {predicate:?}) in mock runtime"
             ))
@@ -2294,6 +2444,61 @@ mod tests {
             }
             other => panic!("unexpected first statement: {other:?}"),
         }
+    }
+
+    #[test]
+    fn confidential_kernel_expected_steps_use_exact_public_step_count() {
+        let function = sample_confidential_function();
+        let named = function.confidential_kernel_program().unwrap();
+        let slot = named.to_slot_program().unwrap();
+
+        let named_steps = named.expected_runtime_steps();
+        let slot_steps = slot.expected_runtime_steps();
+        assert_eq!(named.runtime_step_count(), named_steps.len());
+        assert_eq!(slot.runtime_step_count(), slot_steps.len());
+        assert_eq!(named_steps, slot_steps);
+        assert_eq!(named_steps[0].opcode, UoOpcode::Begin);
+        assert_eq!(named_steps[1].opcode, UoOpcode::CellSet);
+        assert_eq!(named_steps[2].opcode, UoOpcode::Commit);
+        assert_eq!(named_steps[3].opcode, UoOpcode::Wipe);
+
+        for statement in &slot.body {
+            assert_eq!(
+                statement.kernel_step_count(),
+                statement.expected_runtime_steps().len()
+            );
+        }
+
+        let expr = ConfidentialKernelSlotExpr::Keccak256 {
+            parts: vec![
+                ConfidentialKernelSlotExpr::CellGet { object_id: 7 },
+                ConfidentialKernelSlotExpr::ArrayGet {
+                    object_id: 8,
+                    index: Box::new(ConfidentialKernelSlotExpr::Literal {
+                        value: Value::Uint(0),
+                    }),
+                },
+                ConfidentialKernelSlotExpr::MapGet {
+                    object_id: 9,
+                    key: Box::new(ConfidentialKernelSlotExpr::CellGet { object_id: 10 }),
+                },
+            ]
+            .into_boxed_slice(),
+        };
+        let expr_steps = expr.kernel_steps();
+        assert_eq!(expr.kernel_step_count(), expr_steps.len());
+        assert_eq!(
+            expr_steps
+                .iter()
+                .map(|step| step.opcode)
+                .collect::<Vec<_>>(),
+            vec![
+                UoOpcode::CellGet,
+                UoOpcode::ArrayGet,
+                UoOpcode::CellGet,
+                UoOpcode::MapGet
+            ]
+        );
     }
 
     #[test]
@@ -2374,7 +2579,7 @@ mod tests {
 
         assert!(slot.is_runtime_normal_form());
         assert!(matches!(
-            slot.body.as_slice(),
+            slot.body.as_ref(),
             [ConfidentialKernelSlotStatement::AbortIf { .. }]
         ));
     }
@@ -2420,7 +2625,8 @@ mod tests {
                 ConfidentialKernelSlotStatement::Return {
                     value: Some(ConfidentialKernelSlotExpr::Slot { slot: 1 }),
                 },
-            ],
+            ]
+            .into_boxed_slice(),
         };
 
         let outcome = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap();
@@ -2451,7 +2657,8 @@ mod tests {
                 cond: ConfidentialKernelSlotExpr::Literal {
                     value: Value::Bool(true),
                 },
-            }],
+            }]
+            .into_boxed_slice(),
         };
 
         let err = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap_err();
@@ -2459,89 +2666,67 @@ mod tests {
     }
 
     #[test]
-    fn shared_slot_call_executor_stages_args_inside_uo_core() {
-        let mut runtime = MockRuntime::default();
+    fn shared_slot_interpreter_rejects_non_final_return_schedule() {
+        let mut runtime = MockRuntime::with_slot_count(1);
+        runtime.store_slot(0, Value::Uint(1)).unwrap();
         let program = ConfidentialKernelSlotProgram {
-            entrypoint_id: "demo(uint256)".into(),
+            entrypoint_id: "early_return(uint256)".into(),
             param_count: 1,
             return_type: Some(uint_type()),
             secret_args: vec![0],
-            slot_count: 2,
+            slot_count: 1,
             body: vec![
-                ConfidentialKernelSlotStatement::Declare {
-                    slot: 1,
-                    value: ConfidentialKernelSlotExpr::Binary {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(ConfidentialKernelSlotExpr::Slot { slot: 0 }),
-                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(2),
-                        }),
+                ConfidentialKernelSlotStatement::Return {
+                    value: Some(ConfidentialKernelSlotExpr::Slot { slot: 0 }),
+                },
+                ConfidentialKernelSlotStatement::Assign {
+                    slot: 0,
+                    value: ConfidentialKernelSlotExpr::Literal {
+                        value: Value::Uint(2),
                     },
                 },
-                ConfidentialKernelSlotStatement::CellSet {
-                    object_id: 7,
-                    value: ConfidentialKernelSlotExpr::Slot { slot: 1 },
-                    predicate: Some(ConfidentialKernelSlotExpr::Literal {
-                        value: Value::Bool(true),
-                    }),
-                },
-                ConfidentialKernelSlotStatement::Return {
-                    value: Some(ConfidentialKernelSlotExpr::Slot { slot: 1 }),
-                },
-            ],
+            ]
+            .into_boxed_slice(),
         };
 
-        let outcome = execute_confidential_kernel_slot_call(
-            &mut runtime,
-            &program,
-            ConfidentialCallInputs::from_raw_args(vec![Value::Uint(5)].into_boxed_slice()),
-        )
-        .unwrap();
+        let err = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap_err();
+        assert!(err.to_string().contains("not in runtime normal form"));
+        assert!(runtime.statements.is_empty());
+    }
+
+    #[test]
+    fn shared_slot_interpreter_tracks_abort_without_schedule_drift() {
+        let mut runtime = MockRuntime::with_slot_count(1);
+        runtime.store_slot(0, Value::Bool(true)).unwrap();
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "guard(bool)".into(),
+            param_count: 1,
+            return_type: Some(uint_type()),
+            secret_args: vec![0],
+            slot_count: 1,
+            body: vec![
+                ConfidentialKernelSlotStatement::AbortIf {
+                    cond: ConfidentialKernelSlotExpr::Slot { slot: 0 },
+                },
+                ConfidentialKernelSlotStatement::Return {
+                    value: Some(ConfidentialKernelSlotExpr::Literal {
+                        value: Value::Uint(9),
+                    }),
+                },
+            ]
+            .into_boxed_slice(),
+        };
+
+        let outcome = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap();
 
         assert_eq!(
             outcome,
             ConfidentialKernelExecutionOutcome {
-                aborted: false,
-                return_value: Some(Value::Uint(7)),
+                aborted: true,
+                return_value: Some(Value::Uint(9)),
             }
         );
-        assert_eq!(runtime.cell_sets, vec![(7, Value::Uint(7), Some(true))]);
-        assert_eq!(runtime.statements, vec!["declare", "cell_set", "return"]);
-    }
-
-    #[test]
-    fn shared_slot_call_executor_rejects_confidential_arg_count_mismatch() {
-        let mut runtime = MockRuntime::default();
-        let program = ConfidentialKernelSlotProgram {
-            entrypoint_id: "demo(uint256)".into(),
-            param_count: 1,
-            return_type: None,
-            secret_args: vec![0],
-            slot_count: 1,
-            body: vec![ConfidentialKernelSlotStatement::Return { value: None }],
-        };
-
-        let err = execute_confidential_kernel_slot_call(
-            &mut runtime,
-            &program,
-            ConfidentialCallInputs::from_raw_args(vec![].into_boxed_slice()),
-        )
-        .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("expected 1 confidential arguments but runtime supplied 0"));
-
-        let err = execute_confidential_kernel_slot_call(
-            &mut runtime,
-            &program,
-            ConfidentialCallInputs::from_raw_args(
-                vec![Value::Uint(1), Value::Uint(2)].into_boxed_slice(),
-            ),
-        )
-        .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("expected 1 confidential arguments but runtime supplied 2"));
+        assert_eq!(runtime.statements, vec!["abort_if", "return"]);
     }
 
     #[test]

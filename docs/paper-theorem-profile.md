@@ -37,8 +37,167 @@ What is already established at the frozen interface:
   `RuntimeImplementationInterface`, and a combined checked runtime
   implementation confinement boundary,
   `RuntimeImplementationConfinementBoundary`, over the real
-  `runtime/uo-evm/src/{lib,engine,runtime,shell,state,kernel,theorem}.rs`
-  modules
+  `runtime/uo-evm/src/{lib,engine,runtime,shell,state,objects,oram,theorem}.rs`
+  modules together with the shared-kernel support files
+  `runtime/uo-kernel-runtime/src/{lib,generated_slot_support,generated_machine}.rs`,
+  the generated object-helper module
+  `runtime/uo-evm/src/generated_object_helpers.rs`, the lower-level store
+  files `runtime/uo-store/src/{codec,generated_store_helpers,store}.rs`, the allocator file
+  `runtime/uo-allocator/src/lib.rs`, and the shared-kernel/core files
+  `crates/uo-core/src/{confidential_kernel,generated_confidential_kernel,trace,confidential_core,trusted_kernel,types}.rs`;
+  that checked interface now also includes centralized confidential
+  statement-profile, named-expression-profile, named-pure-expression-profile,
+  slot-expression-profile, and slot-pure-expression-profile routes in the
+  shared kernel, and it source-checks the explicit named-to-slot lowering
+  bridge plus the live slot-statement / slot-expression /
+  slot-pure-expression evaluator order against that shared structure, so
+  Rust/Lean agreement is pinned not only for statement names but also for
+  runtime-normal-form flags, effect kinds, operand-evaluation order,
+  storage-tail opcodes, and named/slot pure-expression select/keccak operand
+  structure; `tamper_validation.json` now also rejects representative
+  named-expression profile-table drift, named-pure-expression profile-table
+  drift, and named-to-slot lowering drift at the implementation-interface,
+  standalone shared-confidential-kernel-boundary, and
+  implementation-confinement-boundary checkers, and Lean now factors that
+  checked source route into an explicit outer `PublicBridgeBoundary`, an
+  explicit `SmallConfidentialKernelBoundary` for the actual tiny kernel
+  files, an explicit
+  `ConfidentialStatementTraceBridgeBoundary` for the exact
+  statement-trace/proof-bundle bridge, and a
+  `SharedConfidentialKernelBoundary` that conjoins those two confidential
+  cuts, with dedicated emitted
+  `runtime_small_confidential_kernel_boundary_validation.json`,
+  `runtime_confidential_statement_trace_bridge_boundary_validation.json`,
+  and `runtime_shared_confidential_kernel_boundary_validation.json`
+  artifacts for those standalone and combined inner cuts;
+  `tamper_validation.json` now also rejects representative secret-branch
+  drift, centralized profile-table drift, named-to-slot lowering drift, and
+  Path ORAM early-exit scan drift at the standalone
+  small-confidential-kernel boundary and the combined
+  small-confidential-kernel machine-refinement route, plus statement-trace
+  recording / bridge drift at the standalone confidential-statement-trace
+  bridge boundary and the combined confidential-statement-trace bridge
+  refinement route; that checked inner cut now also meets the closer-to-
+  implementation emitted `RuntimeKernelMachineFinishWitness` directly through
+  the checked `RuntimeKernelMachineFinishBoundary`,
+  `RuntimeImplementationSlotAdapterMachineRefinementBoundary`,
+  `RuntimeImplementationResidualHelperShellMachineRefinementBoundary`,
+  `RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary`,
+  and `RuntimeImplementationSharedKernelMachineRefinementBoundary`,
+  with dedicated emitted
+  `runtime_kernel_machine_finish_witness_validation.json` and
+  `runtime_kernel_machine_finish_boundary_validation.json` and
+  `runtime_implementation_slot_adapter_machine_refinement_boundary_validation.json`
+  and
+  `runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation.json`
+  and
+  `runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation.json`
+  and
+  `runtime_implementation_shared_kernel_machine_refinement_boundary_validation.json`
+  artifacts that validate the live machine-finish state itself, validate the
+  standalone native machine-finish boundary over that state plus the fixed
+  slot program/opcode trace, and pair it first with the dedicated checked
+  slot-adapter source cut, then with the dedicated checked residual-helper-
+  shell source cut, then with the dedicated checked small-confidential-kernel
+  source cut, and then with the larger checked shared-confidential-kernel
+  source cut before projecting through that same native runtime-kernel
+  finish/slot boundary, while the smaller flattened finish-slot route now
+  also remains available through the checked
+  `RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary`
+  and the new checked `RuntimeImplementationKernelMeetingBoundary` before the
+  older wider `RuntimeImplementationSharedKernelRefinementBoundary`, with a
+  dedicated emitted
+  `runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation.json`,
+  `runtime_implementation_kernel_meeting_boundary_validation.json`,
+  `runtime_implementation_kernel_meeting_confinement_boundary_validation.json`,
+  `runtime_implementation_kernel_machine_confinement_boundary_validation.json`,
+  and
+  `runtime_implementation_shared_kernel_refinement_boundary_validation.json`
+  artifacts that project the paired source/artifact objects directly to
+  `RuntimeKernelFinishSlotBoundary` and exact `RefinesLeanKernelState`; the
+  confidential-statement-trace bridge refinement, kernel-meeting, and
+  shared-kernel refinement reports now also mark
+  `refines_lean_kernel_state_theorem_checked` plus
+  `runtime_kernel_confinement_projection_theorem_checked`; the
+  confidential-statement-trace bridge refinement report now also marks
+  `confidential_statement_trace_bridge_boundary_theorem_checked`, the
+  kernel-meeting report now also marks
+  `shared_confidential_kernel_boundary_theorem_checked`,
+  `small_confidential_kernel_boundary_theorem_checked`,
+  `confidential_statement_trace_bridge_boundary_theorem_checked`, and
+  `slot_adapter_boundary_theorem_checked`,
+  `residual_helper_shell_boundary_theorem_checked`, and
+  `handwritten_runtime_public_only_theorem_checked`, and the shared-kernel
+  refinement report now also marks
+  `shared_confidential_kernel_boundary_theorem_checked`,
+  `slot_adapter_boundary_theorem_checked`,
+  `residual_helper_shell_boundary_theorem_checked`, and
+  `handwritten_runtime_public_only_theorem_checked`, plus
+  `paper_shared_kernel_refinement_with_public_only_handwritten_shell_theorem_checked`
+  and `paper_shared_kernel_observer_refinement_theorem_checked` for the
+  direct `RuntimeImplementationSharedKernelRefinementBoundary` paper
+  conjunctions, while the new
+  meeting-boundary artifact also checks that the live
+  machine-projected finish bundle and the emitted finish-slot bundle agree at
+  the native boundary before either wider route is used, and the new
+  meeting-confinement artifact then requires the full source-backed
+  implementation interface and reconstructs the outer
+  `RuntimeImplementationConfinementBoundary` mechanically from that same
+  meeting object; the direct machine-confinement artifact reconstructs that
+  same outer boundary from the full source-backed implementation interface
+  plus the live machine-finish witness and fixed slot program/opcode trace,
+  without requiring the separate emitted finish-slot meeting artifact. The
+  outer implementation-confinement report now also marks
+  `runtime_kernel_confinement_projection_theorem_checked` together with
+  `shared_confidential_kernel_boundary_theorem_checked`,
+  `small_confidential_kernel_boundary_theorem_checked`,
+  `residual_helper_shell_boundary_theorem_checked`, and
+  `slot_adapter_boundary_theorem_checked`; the meeting-confinement report
+  marks `runtime_implementation_confinement_projection_theorem_checked`
+  together with those same four named-cut checks; and the direct
+  machine-confinement report marks both
+  `runtime_implementation_machine_confinement_projection_theorem_checked`
+  and `native_machine_semantics_theorem_checked` together with those same
+  four named-cut checks and `public_bridge_boundary_theorem_checked`; that
+  same focused report now also exposes source-side hardening checks for the
+  remaining runtime shell:
+  `oram_write_batch_iteration_is_checked` confirms that handwritten
+  object/commit consumers use the checked public-prefix
+  `OramWriteBatch::for_each_write(...)` path instead of the older lossy
+  iterator, and
+  `handwritten_runtime_production_avoids_panic_style_control_flow` confirms
+  the production `engine.rs` / `shell.rs` / `state.rs` / `objects.rs` /
+  `oram.rs` surface avoids `expect(`, `unwrap(`, and `panic!`; the stronger
+  `runtime_interface_production_avoids_panic_style_control_flow` bit extends
+  that condition to the whole production `RuntimeImplementationInterface`,
+  including `uo-allocator`, `uo-store`, generated helper files, and shared
+  `uo-core` trace/types support; the same write-batch bit now also pins
+  fallible public-prefix access on both sides of the ORAM write evidence
+  boundary: generated `push_oram_write_update(...)` uses
+  `log.writes.get_mut(log.len)`, generated exact-batch finishing validates
+  prefix slots with `log.writes.get(index)`, and handwritten
+  `OramWriteBatch::for_each_write(...)` uses `self.writes.get(index)` rather
+  than direct indexing before tracing writes; the same boundary now also exposes
+  `handwritten_runtime_lacks_direct_secret_ops`, which checks that production
+  handwritten runtime sources contain no direct confidential value operations,
+  masked-select abort updates, canonical secret serialization, hidden option
+  declassification, `Value::zero_for_type(...)`, or `MapEntry::new(...)`; the
+  dedicated checker/report bit
+  `handwritten_runtime_lacks_direct_secret_ops_theorem_checked` records the
+  corresponding Lean theorem rather than only the raw source scan. The
+  stronger host-coordination theorem/report bit
+  `handwritten_host_coordination_lacks_secret_serialization_theorem_checked`
+  slices out handwritten coordination modules and non-generated shared core
+  proof/evidence/type carriers, excluding the public shell and Lean-generated
+  helpers, and proves that this slice contains no Keccak/canonical
+  serialization, direct confidential value operations, hidden option materialization,
+  `Value::zero_for_type(...)`, or `MapEntry::new(...)`. The public shell
+  exception is now theorem-facing too:
+  `public_shell_canonical_hashing_guarded_by_public_entry_theorem_checked`
+  uses an ordered source check to pin the confidential-function rejection in
+  `eval_expr` before the public-shell `Expr::Keccak256` canonical hashing path,
+  and the direct kernel-machine scenarios emit the same bit alongside the
+  public-bridge theorem bit
 - an explicit paper-facing runtime boundary and end-to-end route in Lean,
   `PaperMainRuntimeKernelBoundary`,
   `PaperMainPathOramAssumptions`, and
@@ -66,18 +225,53 @@ What is already established at the frozen interface:
 - runtime enforcement of the admitted public kernel schedule for accepted
   confidential entrypoints
 - dedicated positive reports and dedicated tamper rejections for the
-  source-backed implementation-interface and combined
-  implementation-confinement-boundary routes
+  source-backed implementation-interface, standalone
+  small-confidential-kernel / confidential-statement-trace bridge /
+  shared-confidential-kernel boundary routes, combined small-confidential-
+  kernel machine-refinement / confidential-statement-trace bridge
+  refinement / shared-kernel machine-refinement / shared-kernel refinement
+  routes, and combined implementation-confinement route
 
 What is still open:
 
-- a machine-checked source-to-kernel compiler correctness theorem
+- a machine-checked source-to-kernel compiler correctness theorem beyond the
+  now-landed `ProofGradeCompilerFacts` exactness/export layer for manifest
+  fields, confidential-kernel lowering, runtime-step schedules, hash bounds,
+  confidential kernel-step non-raw target facts, and the new compiler-to-ORAM
+  witness bridge for source-derived manifest / expected-access objects now
+  packaged inside that theorem object
 - full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
 - the final malicious-host SGX / TEE deployment theorem for the real runtime
-- a deeper semantics-of-Rust refinement below the checked source-backed
-  runtime interface, if the paper later chooses to push below the current
-  proof/interface claim surface
+- a deeper semantics-of-Rust refinement below the strengthened
+  runtime/shared-confidential-kernel source interface and its paired live
+  machine-finish / flattened finish-slot artifact boundaries, which remains
+  the next scientifically stronger step below the current proof/interface
+  claim surface
+- the remaining runtime-side open item below that checked source interface:
+  a semantics-of-Rust refinement theorem for the real shared-kernel / Path
+  ORAM implementation surface, whose checked source-facing boundary now
+  already freezes masked full-scan lookup/update/stash-rebuild behavior
+  together with the exact transition-shaped fresh-leaf schedule used by the
+  modeled witness extractor, the boxed non-`Clone` `PathOramFreshCoinPlan`
+  carrier in `runtime/uo-evm/src/fresh_coins.rs`, the forwarding-only
+  generated-slot adapter discipline, and the public-opcode /
+  bounded-scratch / object-store effect schedule now modeled by
+  `RuntimeKernelMachineSchedule`; it also imports `uo-allocator` source and
+  checks allocator-session kernel-op/scratch/stack budgets, wipe discipline,
+  bounded public resource-event logging, and boxed finish-boundary resource
+  events, backed by `RuntimeAllocatorDiscipline`.
+  The live statement-trace recorder is now an exact-capacity
+  `RuntimeKernelStatementTrace` backed by `RuntimeStatementTraceDiscipline`
+  instead of a growable `Vec<String>`; the Lean model now includes the
+  recorded trace-name list, proves capacity rejection, per-record append of
+  exactly the public statement `traceName`, and exact boxed-trace equality
+  with `program.statementTraceNames`. The live recorder now records through
+  checked `get_mut(...)` slots and finishes/drops initialized entries through
+  iterator-limited fixed buffers rather than direct `trace[index]` /
+  `self.statements[index]` access or initialized-prefix slicing. This route now
+  meets the smaller
+  emitted finish-slot artifact directly on `RuntimeKernelFinishSlotBoundary`
 
 ## Main Choice
 
@@ -110,6 +304,586 @@ The exact fresh-leaf remapping bridge is no longer a separate theorem-side
 assumption field. It is discharged by the canonical fresh-coin runtime-family
 interface and the hidden-leaf coverage proof/checker path.
 
+The below-interface WP3 route has taken the first Lean-first/generated-kernel
+steps: `proof/lean/GenerateConfidentialKernelRust.lean` emits the live
+`crates/uo-core/src/generated_confidential_kernel.rs` evaluator/profile-table
+artifact, and `proof/lean/GenerateRuntimeKernelSlotSupportRust.lean` emits
+`runtime/uo-kernel-runtime/src/generated_slot_support.rs` for confidential
+argument staging and fixed slot-file state. `uo-core` delegates
+slot-program/block/statement execution and unary/binary operator semantics
+into the generated interpreter, while `RuntimeKernelSlotCall` delegates
+argument-count checked slot staging into the generated slot-support module.
+The Lean `RuntimeKernelSlotSupport` model now makes that staging executable:
+it accepts exactly the public preconditioned argument count, rejects
+argument-count mismatch and public slot-capacity overflow, and proves that any
+successful staged slot file satisfies the modeled staging relation.
+The checked implementation route now pulls exact source equality for the
+generated runtime-kernel machine, generated slot-support module, generated
+confidential-kernel interpreter/profile tables, generated object helpers, and
+generated store helpers directly into the Lean-backed
+`RuntimeImplementationInterface` boundary family: the helper-generated
+artifacts are exact obligations of `ResidualHelperShellBoundary`, and the
+generated kernel/machine/staging artifacts are exact obligations of
+`SmallConfidentialKernelBoundary`. That same small-kernel route now also pins
+the auditable `uo-precompiles::UoOpcode` vocabulary by importing and
+rechecking `runtime/uo-precompiles/src/lib.rs` as `precompiles_source`, so the
+public opcode alphabet consumed by the confidential kernel is part of the same
+source-backed interface object. The same interface object now also imports
+`runtime/uo-evm/src/fresh_coins.rs` as `fresh_coins_source`, so the opaque
+fresh-leaf tape carrier used by the exact transition-shaped Path-ORAM
+fresh-leaf schedule is pinned as a boxed, non-`Clone`, move-only per-object
+entry table rather than being left outside the checked source cut.
+`kernel_model_alignment_validation.json` still rechecks those exact
+equalities as a separate Rust/Lean audit while also checking that the live
+runtime consumes the generated artifacts on the expected paths, and
+`tamper_validation.json` rejects representative generated-interpreter,
+generated-slot-support, generated machine-schedule, generated object-helper,
+generated store-helper, `path_oram_fresh_coin_plan_surface_drift`, and
+`precompiles_opcode_surface_drift` at the source-backed
+implementation-interface, small-kernel, shared-kernel, and combined
+confinement cuts. The checked implementation boundary also now
+requires the residual `uo-kernel-runtime` slot/effect adapter to be only a
+forwarding shell and rejects raw confidential-argument observation in that
+handwritten layer. Lean now packages that narrower source cut explicitly as
+`RuntimeImplementationSlotAdapterBoundary`, the probe emits
+`runtime_slot_adapter_boundary_validation.json`, and the drift suite rejects
+generated slot-support argument-count drift, generated confidential-interpreter
+drift, shared-kernel interpreter-bypass drift, and handwritten raw-argument
+observation drift already at that dedicated slot-adapter cut. Lean now also
+packages the direct meeting between that same source cut and the emitted live
+machine-finish witness as
+`RuntimeImplementationSlotAdapterMachineRefinementBoundary`, benchmark-backed
+by `runtime_implementation_slot_adapter_machine_refinement_boundary_validation.json`;
+Lean now packages the paper-facing conjunction at that cut as
+`RuntimeImplementationSlotAdapterMachineRefinementBoundary.paperSlotAdapterMachineRefinement`;
+that machine-backed slot-adapter route already rejects representative expected-
+schedule-index drift, kernel-op/runtime-phase capacity drift, slot-program
+body drift, opcode-trace drift, generated confidential-interpreter drift,
+shared-kernel interpreter-bypass drift, generated post-return-break drift,
+generated slot-support argument-count drift, and handwritten raw-argument
+observation drift before the wider residual-helper-shell or small-kernel
+machine routes are used. The wider
+`RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary`,
+`RuntimeImplementationSharedKernelMachineRefinementBoundary`, and
+`RuntimeImplementationKernelMachineConfinementBoundary` routes now also expose
+that same paper-facing conjunction as
+`paperSlotAdapterMachineRefinement`, and their emitted reports mark
+`paper_slot_adapter_machine_refinement_theorem_checked` so the outer routes are
+checked as explicit projections through the smaller slot-adapter machine cut
+rather than only inheriting it informally. The slot-adapter, residual-helper-
+shell, small-confidential-kernel-machine, and shared-kernel-machine reports
+now also mark `native_machine_refinement_theorem_checked` for their own
+lower-level machine theorems. The small-confidential-kernel-machine route now
+also exposes `paperSmallKernelMachineRefinementWithPublicOnlyHandwrittenShell`
+and `paperSmallKernelMachineObserverRefinement`, and its emitted reports mark
+`paper_small_kernel_machine_refinement_with_public_only_handwritten_shell_theorem_checked`
+plus `paper_small_kernel_machine_observer_refinement_theorem_checked`.
+The shared-kernel-machine route now also exposes
+`paperSharedKernelMachineRefinementWithPublicOnlyHandwrittenShell` and
+`paperSharedKernelMachineObserverRefinement`, and its emitted reports mark
+`paper_shared_kernel_machine_refinement_with_public_only_handwritten_shell_theorem_checked`
+plus `paper_shared_kernel_machine_observer_refinement_theorem_checked`.
+It also pins the runtime machine's public-opcode,
+bounded-scratch, object-store delegation, commit-schedule, and finish-wipe
+schedule; Lean now exposes this as the explicit
+`RuntimeKernelMachineSchedule` model with proofs for the public-opcode prefix
+and finish-time scratch wiping. It also imports `runtime/uo-allocator/src/lib.rs`
+and checks allocator-session kernel-op budget, scratch budget, stack budget,
+guard-drop wipe, finish-time wipe validation, and absence of unsafe/forget
+escape hatches; `RuntimeAllocatorDiscipline` now models those accepted
+allocator transitions and the live allocator uses a bounded `ResourceEventLog`
+whose finish output is boxed in `RuntimeKernelTelemetrySnapshot`. The live
+statement recorder is now exact-capacity and modeled by
+`RuntimeStatementTraceDiscipline`; the model proves not only length/capacity
+but also exact public statement-trace content and boxed-trace equality. The
+checked source interface also now pins
+named/slot confidential-kernel program bodies and Keccak part lists to boxed
+fixed-shape slices, with named-to-slot lowering performed through
+`FixedBoxBuilder` rather than growable collection. The shared kernel-step
+buffer now also uses checked-slot push, iterator finish moves, and
+iterator-limited drop cleanup instead of direct uninit-slot indexing or
+initialized-prefix slicing, and slot-program statement traces are materialized
+by iterating over the body rather than reading `self.body[index]`.
+The generated `uo-core` value-operation layer now keeps canonical byte-buffer
+writes, struct-field zero materialization, scalar canonical decoding,
+length-word parsing, `u128` tail writes, and masked byte-array select/equality
+on checked-range and iterator helpers, and the source-backed interface rejects
+the old direct `fields[index]`, `copy_from_slice(...)`, fixed-slice, and
+per-byte index loops in `generated_value_ops.rs`. Its shared
+handwritten `FixedBoxBuilder<T>` backing buffer now uses iterator
+initialization, checked `get_mut(...)` push, and iterator-limited drop cleanup
+instead of direct uninit-slot indexing or initialized-prefix slicing. The
+same layer is now backed by `RuntimeValueOpsSemantics`, which proves the
+public scalar canonical lengths, the exact `u128` canonical byte-field shape,
+masked bool/byte-array selection facts, and fixed-capacity byte-buffer
+extend/finish behavior consumed by the direct machine-confinement boundary.
+The same state-side object
+table cut now requires fixed-order boxed object entries and fallible
+`entries.get(...)` / `entries.get_mut(...)` lookup after the public object-id
+scan, rejecting the old direct `entries[index]` table access. Tamper cases cover adapter observation,
+machine-effect schedule drift, allocator scratch-budget guard drift,
+allocator resource-event-log drift, and statement-trace recorder drift
+including the direct machine-confinement theorem route. The
+  remaining runtime-kernel TCB is now the non-generated object/ORAM
+coordination shell and thinner handwritten store wrapper layer rather
+than the older ad hoc object/ORAM open-seal-reseal surface. On the object
+side, the exact secret-bearing reopen/bootstrap/commit reseal shell now lives
+in the exact-source-checked generated object-helper module
+(`with_opened_object_payload`, `seal_boxed_object_payload`, and
+`reseal_payload_and_trace_write` together with the typed value/map
+open/bootstrap/commit wrappers that used to live in `objects.rs`). The same
+source-backed cut now also pins the remaining handwritten object shell to
+guarded public-slot access: raw array value/physical/written-flag operations
+use `get(...)` / `get_mut(...)`, generated UO array and small-map commit
+callbacks receive only checked public schedule indices before touching physical
+slots, and the stale `values[index]`, `physical_slots[index]`, and
+`written_slots[index]` forms are rejected from `objects.rs`. The same
+runtime cut now routes the deeper exact-size ORAM codec stack through the
+dedicated Lean-generated `runtime/uo-evm/src/generated_oram_codecs.rs`
+module, which owns the map-record, directory-page, scalar-metadata, block,
+bucket, stash-page, Path-ORAM metadata-page encode/rewrite/open,
+bucket-payload validation logic, the public ORAM geometry/addressing helpers,
+and the masked Path-ORAM selector / fixed-capacity stash-rebuild helpers that
+used to live in `oram.rs`. The current generated ORAM surface also removes the
+older broad clone convenience points: `MaskedUsizeOption` no longer derives
+`Clone`/`Copy`, metadata clone/assign/select/repeat operations are explicit
+generated borrowed helpers, and the old generic `repeat_boxed<T: Clone>` path
+has been replaced by typed generated builders for masked position-map entries
+and empty metadata pages. The source-backed interface and probe reject
+reintroducing the old metadata copy/select/repeat shape. On the ORAM side, the
+corresponding reopen/bootstrap/commit reseal shell now still lives in the
+generated helper module (`with_opened_oram_payload`,
+`seal_boxed_oram_payload`, `filler_boxed_oram_payload`, and
+`reseal_oram_payload_and_record_write`), and the generated reseal helper now
+records only public update-shape writes via `OramWriteLog::push_update`
+rather than threading prior/new ciphertext snapshots. `RuntimeOramWriteLogDiscipline`
+now proves the public write/update/read-transcript push transitions reject at
+capacity, preserve public capacity/overflow state on accepted pushes, update
+only the intended public counters, and preserve zero writes for the
+update-only path before exact public-capacity finish. Lean now also has an
+explicit byte-layout semantics layer for the generated ORAM block, bucket, and
+Path-ORAM metadata page codecs, including block roundtrip and exact encoded
+length theorems, exact-length block decode facts, plus exact-bucket decode
+acceptance tying byte length, expected bucket index, exact block decoding, and
+live-count agreement together, bounded Path bucket decode for occupied block
+slot/leaf bounds, public bucket-on-leaf-path membership, and decoded
+position-map agreement plus duplicate live-slot rejection and position-map
+live-slot coverage plus generic whole-block-list agreement/no-duplicate hooks,
+and Path-ORAM
+position-map capacity/leaf bounds. On the lower-level
+store side,
+`RuntimeImplementationInterface` now imports
+`runtime/uo-store/src/codec.rs`,
+`runtime/uo-store/src/generated_surface.rs`,
+`runtime/uo-store/src/generated_store_helpers.rs`, and
+`runtime/uo-store/src/store.rs` directly and pins both the exact-size
+seal/open/filler surface and the store helper layer via
+`storeWriteApiUsesMutablePlaintext`,
+`storeCipherSurfaceStaysInCodec`,
+`runtimeStoreUsesSharedBoxedFillerHelper`, and
+`runtimeStoreUsesSharedSealIntoHelper`, with `tamper_validation.json`
+rejecting representative codec-surface, boxed-filler, and seal-into helper drift at the
+implementation-interface, standalone small-kernel, standalone shared-kernel,
+combined confinement, and direct machine-confinement routes. The generated
+store-codec artifact beneath that layer is now also reduced to the exact-size
+transport primitives (`sealed_encoded_len`, `write_nonzero_encoded`, and
+`decode_nonzero_into`) instead of older `Vec` convenience helpers, while the
+generated nonzero transport encoder/decoder uses checked public windows,
+chunk-local `get_mut(...)`, and `zip(out.iter_mut())` instead of direct
+`out[index * 2]` / `out[index]` writes, and the
+live reopen path in `StoreCipher` stays on boxed exact-size decode buffers and
+in-place AEAD without `expect`, `unwrap`, or `panic!` in the generated store
+surface. That generated reopen path now also uses checked cursor/range helpers
+for magic/nonce/ciphertext/tag parsing and a checked exact-copy helper for boxed
+plaintext staging, so source-backed validation rejects direct `split_at(...)`
+and `payload.copy_from_slice(...)` reopen paths. Lean now models that reopen edge as a fixed-public-length
+`decodeNonzeroInto?` surface with roundtrip, encoded-length-mismatch rejection,
+and decoded-byte/nonzero-nibble soundness facts exposed through both residual
+and direct machine-confinement checkers. The generated store-helper layer now
+owns the raw/UO `StoreSlotTable`: slot storage is a boxed fixed table with
+public linear lookup rather than a handwritten
+`BTreeMap<String, Box<[u8]>>` in `store.rs`, and the public store evidence
+buffers are exposed to handwritten `store.rs` only as generated
+`StorePhysicalWriteTrace` / `StoreLogicalEventTrace` wrappers rather than raw
+`Vec<PhysicalWriteEvent>` / `Vec<LogicalEvent>` fields, and those generated
+wrappers now use exact boxed-slice backing with fallible fixed-builder appends
+rather than `Vec` storage. Lean now models this helper layer explicitly in
+`RuntimeStoreHelperSemantics`: taking a raw value copies exactly the input and
+wipes the source shape, zeroed raw-slot tables preserve the public object count
+and produce fixed-length zero slots, `insert_or_replace` preserves lookup for
+the written object while growing by at most one slot, boxed event append
+preserves the existing prefix and adds exactly one event, bootstrapped UO slots
+have the public sealed length, and UO reseal traces stay `Update`-only.
+Confidential UO-store writes now emit only public update-shape evidence rather
+than cloning ciphertext snapshots. The
+source-backed `RuntimeImplementationInterface` now also
+names that remaining handwritten object/ORAM coordination plus store
+surface as its own
+`ResidualHelperShellBoundary`, benchmark-backed through
+`runtime_residual_helper_shell_boundary_validation.json`, and both
+`RuntimeImplementationConfinementBoundary` and
+`RuntimeImplementationKernelMachineConfinementBoundary` project that named
+helper-shell cut explicitly. Lean now also packages the direct meeting between
+that source cut and the emitted native machine witness as
+`RuntimeImplementationResidualHelperShellMachineRefinementBoundary`,
+benchmark-backed through
+`runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation.json`;
+that smaller theorem route now exposes consumed expected-kernel schedule,
+kernel-op budget respect, runtime-phase-event budget respect, and exact
+slot-program/kernel-step agreement directly at the residual helper-shell cut,
+rather than leaving those facts only to the wider machine-confinement route.
+The standalone
+`SmallConfidentialKernelBoundary` / `SharedConfidentialKernelBoundary`,
+the Rust/Lean `kernel_model_alignment_validation.json` route, and the tamper
+suite now all pin those shared helper routes explicitly, with the small-kernel
+boundary now also exact-matching the generated kernel machine, slot-support,
+and confidential-kernel Rust artifacts against their Lean generators rather
+than leaving those equalities only to the separate alignment report.
+Together with the
+modeled/source-pinned machine/effect, allocator, statement-trace, boxed
+generated fixed public-capacity ORAM read transcript, fixed-public-batch ORAM write-log, exact ORAM commit
+restore-vs-write-batch split, masked UO small-map lookup with exact
+matched-fold semantics and public-capacity length rejection, masked UO
+array-access with executable selected-slot acceptance/rejection/uniqueness,
+generated-kernel public return-tail schedules, and the now-
+imported lower-level store codec plus generated-store-helper shell, the
+source-backed residual-helper-shell boundary now also states the stronger
+public-only shell claim explicitly: handwritten `objects.rs`, `oram.rs`,
+`codec.rs`, and `store.rs` are confined to the public bridge side, while the
+confidential object selectors, ORAM lookup/update/rebuild logic, and store
+seal/open/reseal helpers live only in Lean-generated helper modules. Lean now
+exports that fact directly through
+`RuntimeImplementationResidualHelperShellBoundary.handwrittenRuntimePublicOnly`,
+`RuntimeImplementationResidualHelperShellMachineRefinementBoundary.handwrittenRuntimePublicOnly`,
+`RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement`,
+`RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement`,
+`RuntimeImplementationPublicBridgeObserverRefinementBoundary.paperPublicBridgeObserverRefinement`,
+`RuntimeImplementationConfinementBoundary.handwrittenRuntimePublicOnly`,
+`RuntimeImplementationConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell`,
+`RuntimeImplementationConfinementBoundary.paperPublicBridgeObserverRefinement`,
+`RuntimeImplementationKernelMeetingConfinementBoundary` projected through
+`RuntimeImplementationConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell`
+and `RuntimeImplementationConfinementBoundary.paperPublicBridgeObserverRefinement`,
+`RuntimeImplementationKernelMachineConfinementBoundary.handwrittenRuntimePublicOnly`, and
+`RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell`,
+plus the direct outer public observer theorem
+`RuntimeImplementationKernelMachineConfinementBoundary.paperPublicBridgeObserverRefinement`.
+The wider small-confidential-kernel-machine, shared-kernel-machine, and direct
+kernel-machine-confinement routes now also expose explicit
+`paperPublicOnlyResidualHelperShellRefinement` and
+`paperPublicOnlyResidualHelperShellObserverRefinement` projections, and their
+reports mark
+`paper_public_only_residual_helper_shell_refinement_theorem_checked` and
+`paper_public_only_residual_helper_shell_observer_refinement_theorem_checked`.
+The small-confidential-kernel-machine report now also marks
+`paper_small_kernel_machine_refinement_with_public_only_handwritten_shell_theorem_checked`
+and `paper_small_kernel_machine_observer_refinement_theorem_checked`.
+The shared-kernel-machine report now also marks
+`paper_shared_kernel_machine_refinement_with_public_only_handwritten_shell_theorem_checked`
+and `paper_shared_kernel_machine_observer_refinement_theorem_checked`.
+The dedicated residual-helper-shell boundary, dedicated public-bridge observer
+boundary, the top-level source-backed implementation-interface route, the
+direct kernel-meeting route, the direct shared-kernel refinement route,
+dedicated residual-helper-shell machine boundary, the
+small-confidential-kernel-machine and shared-kernel-machine routes, and the
+kernel-meeting-confinement, implementation-confinement, and direct
+kernel-machine-confinement routes now also mark
+`handwritten_runtime_public_only_theorem_checked` for the explicit
+`handwrittenRuntimePublicOnly` corollary. The dedicated residual-helper-shell
+machine report also marks the two larger public-only shell paper theorems
+directly, alongside `native_machine_refinement_theorem_checked`.
+The dedicated source-backed small-confidential-kernel and shared-confidential-
+kernel reports now mark
+`small_confidential_kernel_boundary_theorem_checked` /
+`shared_confidential_kernel_boundary_theorem_checked` together with
+`slot_adapter_boundary_theorem_checked`, and now also
+`residual_helper_shell_boundary_theorem_checked` plus
+`handwritten_runtime_public_only_theorem_checked`. The direct shared-kernel
+refinement report now also marks
+`paper_shared_kernel_refinement_with_public_only_handwritten_shell_theorem_checked`
+and `paper_shared_kernel_observer_refinement_theorem_checked` for
+`RuntimeImplementationSharedKernelRefinementBoundary.paperSharedKernelRefinementWithPublicOnlyHandwrittenShell`
+and `RuntimeImplementationSharedKernelRefinementBoundary.paperSharedKernelObserverRefinement`.
+The dedicated source-backed public-
+bridge report now also marks `public_bridge_boundary_theorem_checked`. The
+dedicated source-backed slot-adapter report now also marks
+`slot_adapter_boundary_theorem_checked`. The dedicated slot-adapter machine
+report now also marks `slot_adapter_boundary_theorem_checked`, the dedicated
+residual-helper-shell machine report now also marks
+`residual_helper_shell_boundary_theorem_checked`, and the dedicated public-
+bridge observer report now also marks
+`public_bridge_boundary_theorem_checked`. The shared-kernel-machine,
+small-confidential-kernel-machine, kernel-meeting-confinement,
+implementation-confinement, and direct kernel-machine-confinement reports now
+also project `residual_helper_shell_boundary_theorem_checked` and
+`slot_adapter_boundary_theorem_checked`, with the applicable
+`shared_confidential_kernel_boundary_theorem_checked` and
+`small_confidential_kernel_boundary_theorem_checked` fields alongside them.
+The small-confidential-kernel-machine report also carries its direct paper-side
+pair
+`paper_small_kernel_machine_refinement_with_public_only_handwritten_shell_theorem_checked`
+and `paper_small_kernel_machine_observer_refinement_theorem_checked`.
+The direct kernel-meeting and direct shared-kernel refinement reports now also
+re-emit `residual_helper_shell_boundary_theorem_checked`.
+The kernel-meeting report now also marks
+`confidential_statement_trace_bridge_boundary_theorem_checked` directly, and
+the direct machine-confinement route now also marks
+`public_bridge_boundary_theorem_checked`.
+The dedicated source-backed confidential-statement-trace bridge report now also
+marks `confidential_statement_trace_bridge_boundary_theorem_checked`.
+The kernel-meeting-confinement report now also marks
+`paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked`
+and `paper_public_bridge_observer_refinement_theorem_checked`.
+The remaining open item is therefore a native semantics-of-Rust refinement
+theorem below the now-public-only residual helper implementation shell rather
+than a wider ad hoc runtime surface. That target is smaller than before because
+the generated store helper semantics for raw-slot copy/wipe, slot-table lookup
+and replacement, event appends, bootstrapped UO-slot lengths, and update-only
+UO reseal traces are now modeled in Lean and projected through the direct
+machine-confinement route. Lean now names the exact remaining below-interface
+target as `RuntimePaperNativeKernelAssumptions`, which packages
+only the source-side confinement fact plus the native machine-finish boundary
+object. The kernel-state and shell-trace refinement claims are no longer
+separate fields in that paper-native bundle: Lean derives them from the
+already checked `RuntimeKernelMachineFinishBoundary` /
+`RuntimeKernelConfinementBoundary` route through
+`RuntimePaperNativeKernelAssumptions.kernelStateRefinesLeanKernel` and
+`RuntimePaperNativeKernelAssumptions.shellTraceRefinesShellContract`. Schedule
+consumption, kernel-step budget respect, runtime-phase budget respect, and
+slot-program/kernel-step exactness are likewise derived from the already
+checked machine-finish boundary itself. The direct machine-confinement proof-grade
+route now surfaces that path explicitly through
+`ImportedRuntimeImplementationKernelMachineConfinementBoundary.toRuntimePaperNativeKernelAssumptions`,
+the theorem
+`importedRuntimeImplementationKernelMachineConfinementBoundary_valid_paper_native_kernel_assumptions`,
+the derived projection theorems
+`importedRuntimeImplementationKernelMachineConfinementBoundary_valid_paper_native_kernel_state_refinement`
+and
+`importedRuntimeImplementationKernelMachineConfinementBoundary_valid_paper_native_shell_trace_refinement`,
+the checker corollaries `importedBoundaryPaperNativeKernelAssumptions`,
+`importedBoundaryPaperNativeKernelStateRefinement`, and
+`importedBoundaryPaperNativeShellTraceRefinement`, and the emitted report bits
+`paper_native_kernel_assumptions_theorem_checked`,
+`paper_native_kernel_state_refinement_theorem_checked`, and
+`paper_native_shell_trace_refinement_theorem_checked`. The
+same paper-native route now also exposes
+`RuntimePaperNativeKernelAssumptions.handwrittenRuntimeLacksDirectSecretOps`
+and the checker corollary `importedBoundaryPaperNativeKernelLacksDirectSecretOps`,
+with each direct kernel-machine scenario marking
+`handwritten_runtime_lacks_direct_secret_ops_theorem_checked`. It now also
+exposes
+`RuntimePaperNativeKernelAssumptions.hostCoordinationLacksSecretSerialization`
+and the checker corollary
+`importedBoundaryPaperNativeKernelHostCoordinationLacksSecretSerialization`,
+with each direct kernel-machine scenario marking
+`handwritten_host_coordination_lacks_secret_serialization_theorem_checked`. The
+same route now also exposes the theorem-facing store/ORAM codec-layout facts
+through checker corollaries for nonzero transport shape, sealed-record length,
+successful nonzero decode soundness, fixed-public-length decode-into
+roundtrip/rejection/soundness, sealed-record decode split shape,
+sealed-record open magic-header shape plus transport soundness for the
+encoded nonzero nibbles, decoded sealed byte stream, and the
+magic/nonce/ciphertext/tag split components, plus transport roundtrip for a
+valid opened sealed-record split,
+ORAM block encode/decode roundtrip, exact-length ORAM block decode/roundtrip
+and decoded-block valid-shape facts, aggregate decoded bucket/stash block
+valid-shape facts, ORAM bucket encoded length, exact-bucket decode acceptance,
+bounded Path bucket decode for occupied block slot/leaf bounds and public
+bucket-on-leaf-path membership plus decoded position-map agreement and
+duplicate live-slot rejection plus position-map live-slot coverage,
+generic whole-block-list position-map agreement/no-duplicate hooks,
+Path-ORAM position-map page coverage, public metadata page split, exact
+position-map page and aggregate position-map-pages decode acceptance,
+position-map page byte-length mismatch rejection, position-map page-list public
+page-count mismatch rejection, exact stash page decode acceptance, exact
+stash-page byte-length mismatch rejection, stash page-list public page-count
+mismatch rejection, aggregate stash-pages decode shape/block
+validity, bounded aggregate stash decode for public stash/slot/leaf bounds,
+stash position-map agreement, stash duplicate live-slot rejection,
+and Path-ORAM position-map/stash page lengths. The generated ORAM metadata
+decoder now guards the public position-map/stash page counts before indexing
+and uses fallible `pages.get(...)` access, while the matching metadata encoder
+fills the sealed page array through fallible `pages.get_mut(next_page)` access.
+The generated ORAM block, bucket, counter, stash-page, and position-map byte
+codecs now route fixed-offset reads/writes through checked `read_exact_range` /
+`write_exact_range` and `read_u64_be_at` / `write_u64_be_at` helpers, including
+checked bucket-payload windows, instead of direct byte indexing, local copy
+staging, or fixed-offset slicing.
+The generated object-helper map-record and surrogate-directory codecs follow
+the same exact-range discipline for tag/key/value windows and decoded directory
+slots, so the checked source boundary now rejects the old `out[0]`, fixed
+byte-slice, and `out[slot]` decode paths there as well.
+The generated store-surface reopen parser follows the same checked-helper
+discipline through checked cursor/range helpers for magic, nonce, ciphertext,
+tag, and boxed plaintext staging, so
+the checked source boundary now rejects stale direct `split_at(...)` and
+`payload.copy_from_slice(...)` paths there as well.
+`RuntimeStoreCodecSemantics` now also gives that generated store surface
+theorem-facing content: exact zeroed-buffer shape, exact-range reads,
+exact-copy staging, seal-into-slice exact-length acceptance/rejection,
+opened-payload shape, and wipe length/zeroing facts are exposed through both
+the standalone residual-helper boundary and the direct machine-confinement
+route.
+`RuntimeStoreHelperSemantics` now also models the store helper's public
+read/write metric shell and UO write evidence shape: reads and writes increment
+only the public metric counters, UO writes keep the zero-write counter
+unchanged, and the emitted UO physical write remains the public UPDATE shape.
+`RuntimeOramHelperSemantics` now gives the generated ORAM helper layer
+theorem-facing content below the byte codecs: masked Nat/Bool/option
+selection, first-match slot lookup, vacant-slot allocation, fixed-stash clear,
+push, overflow, and take shape, position-map leaf/value selection,
+fresh/prior access-leaf selection, position-map/stash leaf updates,
+public failed-put cases, path-bucket rebuild length/live-count bounds, fixed
+path-access physical-read count, and the `rewrite_path_for_access` public
+shell shape for fixed physical-write count, counter increment, and
+load/effect/post-update/post-rebuild failure propagation are all modeled in
+Lean. The transition-witness kind is also modeled as masked selection with
+read-hit/read-miss cases and write-delete/update/insert/noop precedence rather
+than only source-frozen Rust, and the witness payload shape now covers
+slot/prior-leaf/next-leaf/fresh-leaf fields for read miss/hit and
+delete/update/insert/noop write cases.
+These facts are projected through both the standalone
+residual-helper boundary and the direct machine-confinement route.
+The generated value-operation layer applies that checked iterator/exact-range
+discipline to struct-field zero materialization, canonical byte-buffer writes,
+scalar canonical decoding, length words, `u128` tail writes, and masked
+byte-array select/equality loops, so direct `fields[index]`,
+`copy_from_slice(...)`, fixed-slice, and byte-index forms are rejected from
+`generated_value_ops.rs` too. The shared `FixedBoxBuilder<T>` under that layer
+now avoids direct slot indexing and prefix slicing as well.
+The generated transcript/open/reseal paths also guard public directory-page and
+bucket counts before using `get(...)` / `get_mut(...)`; surrogate directory
+decoding takes its remaining public entry tail through
+`entries.get_mut(next_entry_index..)`, and bucket / position-map decode plus
+live-bucket construction write decoded public slots through fallible
+`fixed_blocks.get_mut(slot)` / `position_map.get_mut(next_slot)` access. Live
+Path-ORAM bucket validation guards the
+public position-map and live-slot buffer lengths before using a decoded slot
+index through fallible `position_map.get(...)`, `live_slots.get(...)`, and
+`live_slots.get_mut(...)`. Its Lean helper semantics now also pin the
+validation/update effect itself: unoccupied blocks leave the live-slot buffer
+unchanged, valid occupied blocks replace exactly the decoded live slot with the
+decoded leaf, and occupied blocks with out-of-range slot indexes or duplicate
+live-slot occupancy are rejected. The final reconstruction coverage check is
+now modeled too: empty position maps accept, missing live-slot buffer entries
+reject, absent position-map heads are ignored, present heads with live slots
+continue, and present heads with empty live slots reject. The Path-entry
+reconstruction side is also modeled at the public shape level: reset produces
+exactly `capacity` empty cells, unoccupied decoded blocks leave the entry
+buffer unchanged, occupied out-of-range slots reject, and valid occupied blocks
+preserve length while making exactly the decoded public slot point to the
+decoded block cell. Lean also exposes the combined reconstruction loop-body
+step: prior failures stay failed, unoccupied blocks leave the state unchanged,
+validation or install failures set the failed flag, and valid occupied blocks
+update both the live-slot buffer and entry buffer at the same decoded public
+slot. The final reconstruction result predicate is modeled as the disjunction
+of the step-failure flag and live-slot coverage failure, with the corresponding
+success theorem requiring both to be false. Lean also models the block-list
+fold around that step: an empty decoded block list leaves the reconstruction
+state unchanged, a cons list is exactly one loop-body step followed by the tail
+fold, and any prior failure is absorbing across the remaining public block
+list. The whole decoded reconstruction shell is now modeled too: the initial
+state contains exactly `capacity` empty live slots and entry cells with no
+failure flag set, reconstruction is exactly the stash fold followed by the
+decoded bucket-block fold, a stash-side failure absorbs the bucket phase, and
+the final Boolean failure predicate is exposed for both prior-failure and
+success cases. That shell now has a bucket-indexed variant as well, matching
+the runtime gate that rejects any occupied decoded bucket block whose leaf is
+not on that public bucket path before the block enters reconstruction; admitted
+bucket blocks then reduce to the ordinary block-step semantics. The checked
+helper shell therefore rejects metadata,
+bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
+live-slot-buffer drift before page, slice, or decoded-slot access, and it
+rejects reintroducing direct fixed-offset ORAM byte indexing/slicing in the
+generated codec stack. Those same
+ORAM/store
+codec-layout facts now also surface at the standalone residual-helper-shell
+checker/report, so the smaller public-only helper-shell cut carries the
+block, bucket, exact public count-guard acceptance/rejection, Path bucket,
+position-map page-list, and stash page-list
+obligations directly rather than inheriting them only from the larger machine
+confinement route. The emitted machine-confinement and residual-helper-shell
+reports mark
+those as `store_codec_transport_shape_theorem_checked`,
+`store_codec_decode_sound_theorem_checked`,
+`store_codec_decode_into_roundtrip_theorem_checked`,
+`store_codec_decode_into_rejects_length_mismatch_theorem_checked`,
+`store_codec_decode_into_sound_theorem_checked`,
+`store_sealed_encoded_len_theorem_checked`,
+`store_sealed_record_decode_shape_theorem_checked`,
+`store_sealed_record_open_shape_theorem_checked`,
+`store_sealed_record_open_transport_sound_theorem_checked`,
+`store_sealed_record_transport_roundtrip_theorem_checked`,
+`store_surface_read_exact_range_length_theorem_checked`,
+`store_surface_copy_exact_into_shape_theorem_checked`,
+`store_surface_seal_into_accepts_exact_length_theorem_checked`,
+`store_surface_open_payload_shape_theorem_checked`,
+`store_surface_wipe_zeros_theorem_checked`,
+`oram_block_codec_roundtrip_theorem_checked`,
+`oram_exact_block_codec_roundtrip_theorem_checked`,
+`oram_exact_block_decode_length_theorem_checked`,
+`oram_exact_block_decode_valid_shape_theorem_checked`,
+`oram_bucket_codec_length_theorem_checked`,
+`oram_public_count_guard_accepts_exact_theorem_checked`,
+`oram_directory_pages_reject_count_mismatch_theorem_checked`,
+`oram_buckets_reject_count_mismatch_theorem_checked`,
+`oram_exact_bucket_decode_acceptance_theorem_checked`,
+`oram_exact_bucket_decode_block_valid_shapes_theorem_checked`,
+`path_bucket_bounded_decode_shape_theorem_checked`,
+`path_bucket_path_bounded_decode_shape_theorem_checked`,
+`path_bucket_position_map_bounded_decode_shape_theorem_checked`,
+`path_bucket_unique_position_map_bounded_decode_shape_theorem_checked`,
+`path_position_map_live_slot_coverage_theorem_checked`,
+`path_blocks_position_map_agreement_theorem_checked`,
+`path_blocks_no_duplicate_live_slots_theorem_checked`,
+`oram_decoded_bucket_payload_acceptance_theorem_checked`,
+`path_position_map_pages_cover_capacity_theorem_checked`,
+`path_metadata_page_split_theorem_checked`,
+`path_position_map_decode_acceptance_theorem_checked`,
+`path_position_map_page_decode_acceptance_theorem_checked`,
+`path_position_map_pages_decode_acceptance_theorem_checked`,
+`path_position_map_page_length_theorem_checked`,
+`path_position_map_page_rejects_length_mismatch_theorem_checked`,
+`path_position_map_pages_rejects_page_count_mismatch_theorem_checked`,
+`path_stash_page_decode_acceptance_theorem_checked`,
+`path_stash_page_decode_block_valid_shapes_theorem_checked`,
+`path_stash_pages_decode_shape_theorem_checked`,
+`path_stash_pages_bounded_decode_shape_theorem_checked`,
+`path_stash_pages_position_map_bounded_decode_shape_theorem_checked`,
+`path_stash_pages_unique_position_map_bounded_decode_shape_theorem_checked`, and
+`path_stash_page_length_theorem_checked`,
+`path_stash_page_rejects_length_mismatch_theorem_checked`, and
+`path_stash_pages_rejects_page_count_mismatch_theorem_checked`; the
+kernel-model alignment artifact
+also records
+`runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present`.
+The same reports now also mark the ORAM helper operational facts as
+`oram_helper_masked_select_*_theorem_checked`,
+`oram_helper_slot_for_key_within_capacity_theorem_checked`,
+`oram_helper_allocate_slot_within_capacity_theorem_checked`,
+`oram_helper_first_vacant_index_within_capacity_theorem_checked`,
+`oram_helper_clear_fixed_stash_*_theorem_checked`,
+`oram_helper_push_fixed_stash_*_theorem_checked`,
+`oram_helper_take_selected_block_*_theorem_checked`,
+`oram_helper_select_position_map_leaf_*_theorem_checked`,
+`oram_helper_select_value_at_*_theorem_checked`, and
+`oram_helper_access_leaf_uses_*_theorem_checked`, and static checks require
+both
+`runtime_residual_helper_shell_boundary_oram_helper_semantics_theorems_present`
+and
+`runtime_implementation_kernel_machine_confinement_oram_helper_semantics_theorems_present`.
+The
+umbrella `runtime-boundary-validation` report now also marks the matching
+source-side minimization bit
+`runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumption_bundle_minimized`
+and is accepted again with the current public-only handwritten shell /
+generated-helper split. UO array
+out-of-range logical indices are now modeled and implemented
+as masked no-match / no-op cases on the UO path rather than public pre-scan
+errors, and generated confidential-kernel slots reject non-final source returns
+before lowering instead of truncating execution through a runtime
+`state.returned` / `break` branch.
+
 ## Current And Target TCB
 
 | Component | Current status | Final target |
@@ -119,8 +893,14 @@ interface and the hidden-leaf coverage proof/checker path.
 | `uo-check` | not in the proof-grade TCB | not in the TCB |
 | `mplus-probe` | not in the proof-grade TCB | not in the TCB |
 | `uo-solc` | not trusted for current artifact-level acceptance, but source-level compiler correctness is still unproved | remove from TCB by proving compiler correctness |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for the implementation side of the checked runtime proof/interface route, now frozen explicitly through `PaperMainRuntimeKernelBoundary`, `PaperMainRuntimeKernelSlotBoundary`, `RuntimeImplementationInterface`, and `RuntimeImplementationConfinementBoundary` | keep the kernel tiny and, if desired, push to a deeper semantics-of-Rust refinement below the checked source interface |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for the implementation side of the checked runtime proof/interface route, now frozen explicitly through `PaperMainRuntimeKernelBoundary`, `PaperMainRuntimeKernelSlotBoundary`, `RuntimeImplementationInterface`, `RuntimeImplementationPublicBridgeBoundary`, `RuntimeImplementationSlotAdapterBoundary`, `RuntimeImplementationResidualHelperShellBoundary`, `RuntimeImplementationSmallConfidentialKernelBoundary`, `RuntimeImplementationConfidentialStatementTraceBridgeBoundary`, `RuntimeImplementationSharedConfidentialKernelBoundary`, `RuntimeImplementationPublicBridgeObserverRefinementBoundary`, `RuntimeImplementationSlotAdapterMachineRefinementBoundary`, `RuntimeImplementationResidualHelperShellMachineRefinementBoundary`, `RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary`, `RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary`, `RuntimeImplementationKernelMeetingBoundary`, `RuntimeImplementationKernelMeetingConfinementBoundary`, `RuntimeImplementationKernelMachineConfinementBoundary`, `RuntimeImplementationSharedKernelMachineRefinementBoundary`, `RuntimeImplementationSharedKernelRefinementBoundary`, and `RuntimeImplementationConfinementBoundary`; that checked interface now reaches the shared `uo-core` confidential-kernel interpreter and masked-selection/value layer used by the live runtime, plus the live Path ORAM masked full-scan lookup/update/stash-rebuild layer, boxed generated public-capacity ORAM read transcripts, fixed-public-batch ORAM write evidence, masked UO small-map lookup, masked UO array read/write access with UO-path out-of-range no-match behavior, the public generated-kernel return-tail schedule backed by `RuntimeReturnScheduleDiscipline`, the exact transition-shaped fresh-leaf schedule used by the modeled witness extractor, and the shared `uo-core` crate-root export shell in `crates/uo-core/src/lib.rs`, where the theorem-carrying public API for controller certificates, shell traces/contracts, runtime outcomes, and trusted-kernel bundles is frozen while the generated confidential-kernel module remains non-exported; the Rust/Lean kernel-model alignment route now also pins centralized confidential statement, named-expression, named-pure-expression, slot-expression, and slot-pure-expression profile tables together with the `RuntimeKernelMachineFinishWitness` field schema and the source-backed runtime implementation, public-bridge, slot-adapter, residual-helper-shell, public-bridge observer-refinement, slot-adapter-machine-refinement, small-confidential-kernel, confidential-statement-trace-bridge, shared-confidential-kernel, residual-helper-shell-machine-refinement, small-confidential-kernel-machine-refinement, confidential-statement-trace-bridge-refinement, kernel-meeting, kernel-meeting-confinement, and kernel-machine-confinement JSON schemas, while the source-backed implementation interface also pins the explicit named-to-slot lowering bridge and the concrete slot-statement / slot-expression / slot-pure-expression evaluator order used by the live interpreter; the closer-to-implementation emitted `RuntimeKernelMachineFinishWitness` now meets that checked inner source cut directly first at the standalone public-bridge boundary, where the abstract engine/runtime/shell/state/theorem split is checked on its own and the tamper suite rejects representative bridge-module ownership, engine-bridge bypass, shell confidentiality bleed, state staging bypass, theorem-side manual trace materialization drift, and shared `uo-core` crate-root generated-kernel export drift, then at the dedicated slot-adapter boundary, where the handwritten `uo-kernel-runtime` forwarding shell is isolated explicitly and the drift suite rejects representative generated slot-support argument-count drift, generated confidential-interpreter drift, shared-kernel interpreter-bypass drift, and raw confidential-argument observation in the handwritten adapter, then at the dedicated machine-backed slot-adapter boundary, where the same smaller source cut is paired directly with the live machine-finish witness and fixed slot program/opcode trace and the drift suite rejects expected-schedule-index drift, kernel-op/runtime-phase capacity drift, slot-program body drift, opcode-trace drift, generated confidential-interpreter drift, shared-kernel interpreter-bypass drift, generated post-return-break drift, generated slot-support argument-count drift, and raw confidential-argument observation in the handwritten adapter, and whose paper-facing conjunction is now projected explicitly through the wider small-confidential-kernel-machine, shared-kernel-machine, kernel-meeting-confinement, implementation-confinement, and direct kernel-machine-confinement routes, with each emitted report marking `paper_slot_adapter_machine_refinement_theorem_checked`, then at the residual-helper-shell boundary, where Lean packages the machine-backed public-only shell claim as `RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement` and the narrower observer-side slice as `RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement`, and also through the dedicated machine-backed public-bridge observer route `RuntimeImplementationPublicBridgeObserverRefinementBoundary.paperPublicBridgeObserverRefinement`, which now stands as its own checked boundary instead of only appearing as an outer corollary. The direct machine-confinement boundary then projects through that dedicated public-observer cut and reconstructs the same outer theorem from the full source-backed implementation interface plus the live machine-finish witness and fixed slot program/opcode trace without depending on the separate emitted finish-slot meeting artifact; Lean now packages that direct route as `RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell`, while the matching direct outer public-observer slice remains exposed separately as `RuntimeImplementationKernelMachineConfinementBoundary.paperPublicBridgeObserverRefinement`; together those theorems state source confinement, that handwritten runtime confidential work lives only in generated helpers, Lean-kernel refinement, shell-trace refinement, schedule consumption, kernel-op and runtime-phase capacity bounds, and slot-program/kernel-step exactness together; the tamper suite rejects representative named-expression profile-table drift, named-pure-expression profile-table drift, named-to-slot lowering drift, statement-trace drift on both the standalone confidential-statement-trace bridge and smaller finish-slot artifact sides, machine-finish schedule/capacity drift on the standalone machine-witness and on the combined machine-backed public-bridge observer, slot-adapter, residual-helper-shell, small-kernel, shared-kernel, meeting-confinement, implementation-confinement, and direct machine-confinement routes, direct tiny-kernel secret-branch / ORAM early-exit scan drift at both the standalone and machine-backed small-confidential-kernel cuts, slot-adapter source-side drift on the generated slot-support / generated confidential-interpreter / shared-kernel bridge / handwritten adapter surfaces, UO array direct-index/OOB-branch drift, UO small-map lookup early-exit drift, ORAM write-log growable-vector drift, generated-interpreter post-return-break drift on the machine-backed slot-adapter route and on the direct machine-confinement route, finish-slot slot-program/opcode/public-schedule drift on the combined confidential-statement-trace bridge refinement route and the kernel-meeting / kernel-meeting-confinement routes, direct machine-confinement schedule/capacity/slot-program/opcode/public-schedule/source-side/statement-trace drift, standalone public-bridge boundary source-side drift on its own bridge-module / engine / shell / state / theorem cut, standalone and machine-backed shared `uo-core` crate-root generated-kernel export drift, dedicated public-bridge observer route slot-program/opcode drift plus source-side/object/ORAM/store/statement-trace drift, meeting-route source-side drift on both the small-kernel and statement-trace sides, and reintroduction of the older single-fresh-leaf approximation across the standalone implementation-interface, standalone public-bridge-boundary, standalone slot-adapter-boundary, standalone residual-helper-shell-boundary, standalone small-confidential-kernel-boundary, standalone confidential-statement-trace-bridge-boundary, standalone shared-confidential-kernel-boundary, public-bridge observer-refinement-boundary, slot-adapter machine-refinement-boundary, residual-helper-shell machine-refinement-boundary, small-confidential-kernel machine-refinement-boundary, confidential-statement-trace bridge refinement-boundary, kernel-meeting-boundary, kernel-meeting-confinement-boundary, direct kernel-machine-confinement-boundary, shared-kernel machine-refinement-boundary, shared-kernel-refinement-boundary, and combined implementation-confinement-boundary routes | keep the kernel tiny and push to a deeper semantics-of-Rust refinement below the strengthened runtime/shared-kernel source interface |
 | Rust code outside the tiny kernel | no longer part of the current confidential-work claim; the checked source-backed implementation interface pins it to the public bridge side and tamper validation rejects representative drift | keep it public-only or remove it from the runtime path entirely |
+
+The current source-backed interface also pins the live kernel-step and
+runtime-phase tracker journals to fixed-capacity boxed `BoundedJournal<T>`
+storage in `uo-core` and rejects the older tracker-side `Vec` fields. This is
+part of the implementation-side route toward the eventual native
+semantics-of-Rust refinement theorem, not a new external assumption.
 
 ## Observer Shape
 
@@ -475,8 +1255,9 @@ The runtime-to-Lean witness interface is now fixed in:
 - `checkProofGradeRuntimePaperMainSlotFamilyBundle` in
   `proof/lean/CheckProofGradeRuntimePaperMainSlotFamilyBundle.lean` for the
   stronger shared-slot theorem-facing
-  `SeededRuntimePaperMainSlotFamilyBundle`; the imported bridge also now
-  proves
+  `SeededRuntimePaperMainSlotFamilyBundle`, which now carries an explicit
+  `opcode_trace` and rechecks it against the admitted slot-program statement
+  trace names; the imported bridge also now proves
   `importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_slot_assurance`,
   so an accepted slot-family artifact can be reused as an explicit theorem-side
   family-slot assurance object rather than only as a checker success bit

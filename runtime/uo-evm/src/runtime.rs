@@ -1,9 +1,6 @@
 #[path = "fresh_coins.rs"]
 mod fresh_coins;
 
-#[path = "kernel.rs"]
-mod kernel;
-
 #[path = "objects.rs"]
 pub(crate) mod objects;
 
@@ -78,7 +75,7 @@ pub(in crate::runtime) fn run_runtime_entrypoint(
             contract,
             entrypoint,
             manifest_entry,
-            args.into_vec(),
+            args,
             recorder,
         )
     }

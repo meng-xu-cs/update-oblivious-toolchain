@@ -685,49 +685,38 @@ theorem RuntimeKernelRefinementBoundary.toRefinesLeanKernelState
 noncomputable def RuntimeKernelInterfaceBundle.refinementBoundary
   {bundle : RuntimeKernelInterfaceBundle}
   (hValid : bundle.Valid) : RuntimeKernelRefinementBoundary := by
-  classical
-  rcases hValid with
-    ⟨hShellValid, hKernelStateRefinement, _hExpectedKernelSteps, _hKernelSteps,
-      _hExpectedPublicObjectIds, _hPublicObjectIds, hResourceState,
-      hExpectedKernelSchedule, hEmittedKernelSchedule, hFinalKernelScheduleState⟩
-  rcases hShellValid with
-    ⟨hKernelProofGrade, hRefinementValid, _hShellContractExact, _hShellTraceExact,
-      _hShellProofGrade⟩
-  let expectedKernelScheduleFromRefinement := Classical.choose hKernelStateRefinement
-  have hKernelStateRefinement' := Classical.choose_spec hKernelStateRefinement
-  rcases hKernelStateRefinement' with
-    ⟨_hKernelProofGradeFromRefinement, _hRefinementValidFromRefinement,
-      _hResourceStateFromRefinement, hExpectedKernelScheduleFromRefinement,
-      _hEmittedKernelScheduleFromRefinement, _hFinalKernelScheduleStateFromRefinement,
-      hProjectedKernelSchedule, hPreCommittedColdObjectSchedule,
-      hPostCommittedColdObjectSchedule, hShadowLoadObjectSchedule,
-      hCommitObjectSchedule, hColdStoreObjectSchedule⟩
-  have hExpectedKernelScheduleEq :
-      expectedKernelScheduleFromRefinement = bundle.expectedKernelSchedule := by
-    apply Option.some.inj
-    calc
-      some expectedKernelScheduleFromRefinement =
-          bundle.shellBoundaryBundle.kernelWitness.expectedKernelSchedule? := by
-            simpa using hExpectedKernelScheduleFromRefinement.symm
-      _ = some bundle.expectedKernelSchedule := hExpectedKernelSchedule
-  subst expectedKernelScheduleFromRefinement
+  let hKernelStateRefinementSpec := Classical.choose_spec hValid.2.1
   exact
     { kernelWitness := bundle.shellBoundaryBundle.kernelWitness
     , runtimeKernelRefinementWitness := bundle.shellBoundaryBundle.runtimeKernelRefinementWitness
     , expectedKernelSchedule := bundle.expectedKernelSchedule
-    , kernelWitnessProofGrade := hKernelProofGrade
-    , refinementValid := hRefinementValid
-    , resourceStateExact := hResourceState
-    , expectedKernelScheduleExact := hExpectedKernelSchedule
-    , emittedKernelScheduleExact := hEmittedKernelSchedule
-    , finalKernelScheduleStateExact := hFinalKernelScheduleState
-    , projectedKernelScheduleExact := hProjectedKernelSchedule
-    , preCommittedColdObjectScheduleExact := hPreCommittedColdObjectSchedule
-    , postCommittedColdObjectScheduleExact := hPostCommittedColdObjectSchedule
-    , shadowLoadObjectScheduleExact := hShadowLoadObjectSchedule
-    , commitObjectScheduleExact := hCommitObjectSchedule
-    , coldStoreObjectScheduleExact := hColdStoreObjectSchedule
+    , kernelWitnessProofGrade := hValid.1.1
+    , refinementValid := hValid.1.2.1
+    , resourceStateExact := hValid.2.2.2.2.2.2.1
+    , expectedKernelScheduleExact := hValid.2.2.2.2.2.2.2.1
+    , emittedKernelScheduleExact := hValid.2.2.2.2.2.2.2.2.1
+    , finalKernelScheduleStateExact := hValid.2.2.2.2.2.2.2.2.2
+    , projectedKernelScheduleExact := hKernelStateRefinementSpec.2.2.2.2.2.2.1
+    , preCommittedColdObjectScheduleExact := hKernelStateRefinementSpec.2.2.2.2.2.2.2.1
+    , postCommittedColdObjectScheduleExact := hKernelStateRefinementSpec.2.2.2.2.2.2.2.2.1
+    , shadowLoadObjectScheduleExact := hKernelStateRefinementSpec.2.2.2.2.2.2.2.2.2.1
+    , commitObjectScheduleExact := hKernelStateRefinementSpec.2.2.2.2.2.2.2.2.2.2.1
+    , coldStoreObjectScheduleExact := hKernelStateRefinementSpec.2.2.2.2.2.2.2.2.2.2.2
     }
+
+theorem runtimeKernelInterfaceBundle_refinementBoundary_kernelWitness_exact
+  {bundle : RuntimeKernelInterfaceBundle}
+  (hValid : bundle.Valid) :
+  (bundle.refinementBoundary hValid).kernelWitness =
+    bundle.shellBoundaryBundle.kernelWitness := by
+  rfl
+
+theorem runtimeKernelInterfaceBundle_refinementBoundary_runtimeKernelRefinementWitness_exact
+  {bundle : RuntimeKernelInterfaceBundle}
+  (hValid : bundle.Valid) :
+  (bundle.refinementBoundary hValid).runtimeKernelRefinementWitness =
+    bundle.shellBoundaryBundle.runtimeKernelRefinementWitness := by
+  rfl
 
 theorem runtimeKernelInterfaceBundle_valid_projects_to_runtimeKernelRefinementBoundary
   {bundle : RuntimeKernelInterfaceBundle}
@@ -1039,6 +1028,14 @@ theorem runtimeKernelRefinementWitness_valid_proofGradeRefinesShellContract
       runtimeKernelRefinementWitness, ?_, ?_⟩
   · exact runtimeKernelRefinementWitness_valid_replaysShellContract hValid
   · exact runtimeKernelRefinementWitness_valid_refinesShellContract hValid
+
+theorem RuntimeKernelRefinementBoundary.witness_refinesShellContract
+  (boundary : RuntimeKernelRefinementBoundary) :
+  boundary.runtimeKernelRefinementWitness.shellTrace.Refines
+    boundary.kernelWitness.shellContract := by
+  exact
+    (runtimeKernelRefinementWitness_valid_proofGradeRefinesShellContract
+      boundary.refinementValid).2.2
 
 theorem runtimeWitness_proofGradeShellContractRefinement
   (witness : RuntimeRefinementWitness)

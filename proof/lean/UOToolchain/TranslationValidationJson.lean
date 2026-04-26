@@ -129,7 +129,7 @@ private def listedSubset [BEq α] : List α → List α → Bool
 private def listedEquivalent [BEq α] (lhs rhs : List α) : Bool :=
   listedSubset lhs rhs && listedSubset rhs lhs
 
-private def lookupEntrypoint
+def lookupEntrypoint
   (signature : String) :
   List ImportedProofRelevantEntrypointView → Option ImportedProofRelevantEntrypointView
   | [] => none
@@ -151,7 +151,7 @@ private def functionsMatchManifestSecrets :
             (entry.param_names == fn.params.map ImportedProofRelevantParamView.name) &&
             functionsMatchManifestSecrets rest entrypoints
 
-private structure CountSummary where
+structure CountSummary where
   localCount : Nat := 0
   cellReads : Nat := 0
   cellWrites : Nat := 0
@@ -240,12 +240,12 @@ private def asBoolLiteral? (json : Json) : Option Nat :=
       | .error _ => none
   | none => none
 
-private def stateObjectById?
+def stateObjectById?
   (state : List ImportedProofRelevantStateObjectView)
   (objectId : Nat) : Option ImportedProofRelevantStateObjectView :=
   state.find? (fun object => object.id == objectId)
 
-private def manifestObjectById?
+def manifestObjectById?
   (objects : List ImportedProofRelevantManifestObjectView)
   (objectId : Nat) : Option ImportedProofRelevantManifestObjectView :=
   objects.find? (fun object => object.id == objectId)
@@ -348,12 +348,12 @@ private partial def typeCanonicalLenFromJson (json : Json) : Except String Nat :
 private def typeCanonicalLenFromRawString (input : String) : Except String Nat := do
   typeCanonicalLenFromJson (← parseJsonString input)
 
-private def expectedEntrypointInputLen
+def expectedEntrypointInputLen
   (fn : ImportedProofRelevantFunctionView) : Except String Nat := do
   let lengths ← fn.params.mapM fun param => typeCanonicalLenFromRawString param.ty
   pure (lengths.foldl (· + ·) 0)
 
-private def expectedReturnCanonicalLen
+def expectedReturnCanonicalLen
   (fn : ImportedProofRelevantFunctionView) : Except String (Option Nat) := do
   match fn.return_type with
   | none => pure none
@@ -778,15 +778,15 @@ private partial def countNestedStatementArray
 
 end
 
-private def countBodyStrings (body : List String) : Except String CountSummary :=
+def countBodyStrings (body : List String) : Except String CountSummary :=
   body.foldlM (init := ({ } : CountSummary)) fun acc item => do
     pure <| acc.add (← countStatementJson (← parseJsonString item))
 
-private def translationPathOramScheme : String := "path_oram_local_posmap_v1"
+def translationPathOramScheme : String := "path_oram_local_posmap_v1"
 
-private def translationSurrogateOramScheme : String := "surrogate_public_schedule_v1"
+def translationSurrogateOramScheme : String := "surrogate_public_schedule_v1"
 
-private def translationOramBucketHeaderBytes : Nat := 24
+def translationOramBucketHeaderBytes : Nat := 24
 
 private def mergeDistinctNatLists (lhs rhs : List Nat) : List Nat :=
   rhs.foldl (init := lhs) fun acc objectId =>
@@ -1101,7 +1101,7 @@ private def accessedObjectIdsInBodyStrings (body : List String) : Except String 
   body.foldlM (init := ([] : List Nat)) fun acc item => do
     pure <| mergeDistinctNatLists acc (← collectAccessedObjectIdsStatement (← parseJsonString item))
 
-private def countOramAccessesInBodyStrings
+def countOramAccessesInBodyStrings
   (body : List String)
   (state : List ImportedProofRelevantStateObjectView) :
   Except String (List (Nat × Nat)) :=
@@ -1109,7 +1109,7 @@ private def countOramAccessesInBodyStrings
     pure <| mergePairCounts acc
       (← collectOramStatementAccesses (← parseJsonString item) state)
 
-private def oramAccessesMatchExpected
+def oramAccessesMatchExpected
   (expected : List (Nat × Nat))
   (actual : List ImportedProofRelevantOramAccessView) : Bool :=
   distinctList (pairCountObjectIds expected) &&
@@ -1118,7 +1118,7 @@ private def oramAccessesMatchExpected
     expected.all (fun entry => lookupOramAccessCount entry.fst actual == entry.snd) &&
     actual.all (fun entry => lookupPairCount entry.object_id expected == entry.accesses)
 
-private def validateImportedOramShape
+def validateImportedOramShape
   (stateObject : ImportedProofRelevantStateObjectView)
   (manifestObject : ImportedProofRelevantManifestObjectView)
   (accesses : Nat) : Bool :=
@@ -1159,7 +1159,7 @@ private def validateImportedOramShape
         else
           false)
 
-private def expectedCommitOpsForFunction
+def expectedCommitOpsForFunction
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView) :
   Except String Nat := do
@@ -1436,6 +1436,75 @@ private def confidentialRawBackendMessages
       s!"confidential state object {stateObject.name} uses raw backend" :: tail
     else
       tail
+
+private def kernelStepTargetsNonRawStateObject
+  (state : List ImportedProofRelevantStateObjectView)
+  (step : ImportedProofRelevantKernelStepView) : Bool :=
+  match step.object_id with
+  | none => true
+  | some objectId =>
+      match stateObjectById? state objectId with
+      | some stateObject => stateObject.backend != "raw"
+      | none => false
+
+private def kernelStepsTargetNonRawStateObjects
+  (state : List ImportedProofRelevantStateObjectView) :
+  List ImportedProofRelevantKernelStepView → Bool
+  | [] => true
+  | step :: rest =>
+      kernelStepTargetsNonRawStateObject state step &&
+        kernelStepsTargetNonRawStateObjects state rest
+
+private def confidentialEntrypointsAvoidRawKernelTargets :
+  ImportedProofRelevantContractView →
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → Bool
+  | _, [], _ => true
+  | view, fn :: rest, entrypoints =>
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => false
+      | some entry =>
+          (if fn.confidential then
+            kernelStepsTargetNonRawStateObjects view.state entry.kernel_steps
+          else
+            true) &&
+            confidentialEntrypointsAvoidRawKernelTargets view rest entrypoints
+
+private def kernelStepRawTargetMessages
+  (state : List ImportedProofRelevantStateObjectView)
+  (signature : String) :
+  List ImportedProofRelevantKernelStepView → List String
+  | [] => []
+  | step :: rest =>
+      let tail := kernelStepRawTargetMessages state signature rest
+      match step.object_id with
+      | none => tail
+      | some objectId =>
+          match stateObjectById? state objectId with
+          | none =>
+              s!"{signature}: kernel step {step.opcode}@{objectId} targets unknown state object" ::
+                tail
+          | some stateObject =>
+              if stateObject.backend == "raw" then
+                s!"{signature}: kernel step {step.opcode}@{objectId} targets raw backend object {stateObject.name}" ::
+                  tail
+              else
+                tail
+
+private def confidentialRawKernelTargetMessages :
+  ImportedProofRelevantContractView →
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → List String
+  | _, [], _ => []
+  | view, fn :: rest, entrypoints =>
+      let tail := confidentialRawKernelTargetMessages view rest entrypoints
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => s!"{fn.signature}: missing manifest entrypoint" :: tail
+      | some entry =>
+          if fn.confidential then
+            kernelStepRawTargetMessages view.state fn.signature entry.kernel_steps ++ tail
+          else
+            tail
 
 mutual
 
@@ -1860,7 +1929,7 @@ private def lowerConfidentialKernelBodyStrings
   (body : List String) : Except String (List ImportedConfidentialKernelStatement) :=
   lowerConfidentialKernelBodyStringsAux 0 body
 
-private def expectedConfidentialKernelProgramForFunction
+def expectedConfidentialKernelProgramForFunction
   (fn : ImportedProofRelevantFunctionView) : Except String ImportedConfidentialKernelProgram := do
   let params ← fn.params.mapM fun param => do
     pure
@@ -1883,32 +1952,43 @@ private def importedProofRelevantKernelStepViewOfImportedRuntimeKernelStep
   (step : ImportedRuntimeKernelStep) : ImportedProofRelevantKernelStepView :=
   { opcode := step.opcode, object_id := step.object_id }
 
-private def importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+def importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
   (steps : List ImportedRuntimeKernelStep) : List ImportedProofRelevantKernelStepView :=
   steps.map importedProofRelevantKernelStepViewOfImportedRuntimeKernelStep
 
-private def parseEntrypointConfidentialProgram
+def importedConfidentialKernelProgramSchedulesEq
+  (lhs rhs : ImportedConfidentialKernelProgram) : Bool :=
+  lhs.expectedRuntimeKernelSteps == rhs.expectedRuntimeKernelSteps
+
+theorem importedConfidentialKernelProgramSchedulesEq_eq_true_iff
+  (lhs rhs : ImportedConfidentialKernelProgram) :
+  importedConfidentialKernelProgramSchedulesEq lhs rhs = true ↔
+    lhs.expectedRuntimeKernelSteps = rhs.expectedRuntimeKernelSteps := by
+  unfold importedConfidentialKernelProgramSchedulesEq
+  exact beq_iff_eq
+
+def parseEntrypointConfidentialProgram
   (entry : ImportedProofRelevantEntrypointView) :
   Except String (Option ImportedConfidentialKernelProgram) := do
   match entry.confidential_program with
   | none => pure none
   | some json => some <$> fromJson? (← parseJsonString json)
 
-private def parseEntrypointConfidentialSlotProgram
+def parseEntrypointConfidentialSlotProgram
   (entry : ImportedProofRelevantEntrypointView) :
   Except String (Option ImportedConfidentialKernelSlotProgram) := do
   match entry.confidential_slot_program with
   | none => pure none
   | some json => some <$> fromJson? (← parseJsonString json)
 
-private def parseFunctionConfidentialProgram
+def parseFunctionConfidentialProgram
   (fn : ImportedProofRelevantFunctionView) :
   Except String (Option ImportedConfidentialKernelProgram) := do
   match fn.confidential_program with
   | none => pure none
   | some json => some <$> fromJson? (← parseJsonString json)
 
-private def parseFunctionConfidentialSlotProgram
+def parseFunctionConfidentialSlotProgram
   (fn : ImportedProofRelevantFunctionView) :
   Except String (Option ImportedConfidentialKernelSlotProgram) := do
   match fn.confidential_slot_program with
@@ -2159,7 +2239,7 @@ private def importedConfidentialKernelStatementMaxHashPartBytes
       | some value =>
           pure (← importedConfidentialKernelExprMaxHashPartBytes state env value, env)
 
-private def importedConfidentialKernelProgramMaxHashPartBytes
+def importedConfidentialKernelProgramMaxHashPartBytes
   (state : List ImportedProofRelevantStateObjectView)
   (program : ImportedConfidentialKernelProgram) : Except String Nat := do
   let env ← program.params.foldlM (init := ([] : ImportedKernelLenEnv)) fun env param => do
@@ -2273,7 +2353,7 @@ private partial def importedConfidentialKernelPureExprEq
 
 end
 
-private def importedConfidentialKernelProgramEq
+def importedConfidentialKernelProgramEq
   (lhs rhs : ImportedConfidentialKernelProgram) : Bool :=
   lhs.entrypoint_id == rhs.entrypoint_id &&
     listPairwiseEq importedConfidentialKernelParamEq lhs.params rhs.params &&
@@ -2281,7 +2361,7 @@ private def importedConfidentialKernelProgramEq
     lhs.secret_args == rhs.secret_args &&
     listPairwiseEq importedConfidentialKernelStatementEq lhs.body rhs.body
 
-private def functionStoredDslMatchesBody
+def functionStoredDslMatchesBody
   (fn : ImportedProofRelevantFunctionView) : Bool :=
   if fn.confidential then
     match
@@ -2290,6 +2370,7 @@ private def functionStoredDslMatchesBody
       parseFunctionConfidentialSlotProgram fn with
     | .ok expectedProgram, .ok (some program), .ok (some slotProgram) =>
         importedConfidentialKernelProgramEq program expectedProgram &&
+          importedConfidentialKernelProgramSchedulesEq program expectedProgram &&
           checkImportedConfidentialKernelProgramSlotLowering program slotProgram
     | _, _, _ => false
   else
@@ -2321,7 +2402,7 @@ private def functionStoredDslMismatchMessage
   else
     s!"{fn.signature}: non-confidential function should not carry stored confidential DSL"
 
-private def manifestStoredDslMatchesKernelSchedule
+def manifestStoredDslMatchesKernelSchedule
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
@@ -2347,7 +2428,7 @@ private def manifestStoredDslMatchesKernelSchedule
       | .error _ => false
   | _, _ => false
 
-private def functionConfidentialLoweringMatchesManifest
+def functionConfidentialLoweringMatchesManifest
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
@@ -2360,11 +2441,12 @@ private def functionConfidentialLoweringMatchesManifest
         parseEntrypointConfidentialProgram entry,
         parseEntrypointConfidentialSlotProgram entry with
       | .ok (some fnProgram), .ok (some fnSlotProgram), .ok (some entryProgram), .ok (some entrySlotProgram) =>
-          fn.confidential_program == entry.confidential_program &&
-            fn.confidential_slot_program == entry.confidential_slot_program &&
-            importedConfidentialKernelProgramEq fnProgram entryProgram &&
-            checkImportedConfidentialKernelProgramSlotLowering entryProgram entrySlotProgram &&
-            checkImportedConfidentialKernelProgramSlotLowering fnProgram fnSlotProgram
+            fn.confidential_program == entry.confidential_program &&
+              fn.confidential_slot_program == entry.confidential_slot_program &&
+              importedConfidentialKernelProgramEq fnProgram entryProgram &&
+              importedConfidentialKernelProgramSchedulesEq fnProgram entryProgram &&
+              checkImportedConfidentialKernelProgramSlotLowering entryProgram entrySlotProgram &&
+              checkImportedConfidentialKernelProgramSlotLowering fnProgram fnSlotProgram
       | _, _, _, _ => false
   else
     entry.kernel_steps.isEmpty &&
@@ -2485,6 +2567,7 @@ def ImportedProofRelevantContractView.checkStructuralValid
     listedEquivalent view.stateObjectIds view.manifestObjectIds &&
     stateObjectsMatchManifestObjects view &&
     confidentialObjectsAvoidRawBackends view &&
+    confidentialEntrypointsAvoidRawKernelTargets view view.functions view.manifest.entrypoints &&
     distinctList view.functionSignatures &&
     distinctList view.manifestEntrypointSignatures &&
     (view.functions.length == view.manifest.entrypoints.length) &&
@@ -2529,6 +2612,12 @@ def ImportedProofRelevantContractView.validationErrors
     (if !(confidentialObjectsAvoidRawBackends view) then
       ["confidential state objects use raw backends: " ++
         String.intercalate ", " (confidentialRawBackendMessages view)]
+    else
+      []) ++
+    (if !(confidentialEntrypointsAvoidRawKernelTargets view view.functions view.manifest.entrypoints) then
+      ["confidential kernel schedules target raw or unknown state objects: " ++
+        String.intercalate ", "
+          (confidentialRawKernelTargetMessages view view.functions view.manifest.entrypoints)]
     else
       []) ++
     (if !(distinctList view.functionSignatures) then
@@ -2776,6 +2865,11 @@ def loadAndCheckImportedProofGradeTranslationArtifacts
     ImportedProofRelevantTranslationBundle.ProofGradeValid
   simp [importedProofRelevantTranslationBundle_checkValid_eq_true_iff]
 
+@[simp] theorem importedProofRelevantContractView_checkStructuralValid_eq_true_iff
+  (view : ImportedProofRelevantContractView) :
+  view.checkStructuralValid = true ↔ view.StructuralValid := by
+  rfl
+
 theorem importedProofRelevantTranslationBundle_source_view_exact_from_raw_contract
   (bundle : ImportedProofRelevantTranslationBundle)
   (hValid : bundle.ProofGradeValid) :
@@ -2799,5 +2893,653 @@ theorem importedProofRelevantTranslationBundle_views_exact
   (hValid : bundle.ProofGradeValid) :
   bundle.source_view = bundle.artifact_view := by
   exact hValid.2.2.1
+
+theorem ImportedProofRelevantTranslationBundle.source_view_structural_valid
+  (bundle : ImportedProofRelevantTranslationBundle)
+  (hValid : bundle.ProofGradeValid) :
+  bundle.source_view.StructuralValid := by
+  exact hValid.2.2.2.1
+
+theorem ImportedProofRelevantTranslationBundle.artifact_view_structural_valid
+  (bundle : ImportedProofRelevantTranslationBundle)
+  (hValid : bundle.ProofGradeValid) :
+  bundle.artifact_view.StructuralValid := by
+  exact hValid.2.2.2.2.1
+
+private theorem functionsMatchManifestSecrets_exact_of_lookup
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchManifestSecrets functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  entry.secret_args = fn.secret_args ∧
+    entry.param_names = fn.params.map ImportedProofRelevantParamView.name := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchManifestSecrets, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchManifestSecrets, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
+private theorem functionsMatchConfidentialLowering_exact_of_lookup
+  {view : ImportedProofRelevantContractView}
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchConfidentialLowering view functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  functionConfidentialLoweringMatchesManifest view fn entry = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchConfidentialLowering, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchConfidentialLowering, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
+private theorem functionsMatchManifestBoundaryLengths_exact_of_lookup
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchManifestBoundaryLengths functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  functionBoundaryLengthsMatchManifest fn entry = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchManifestBoundaryLengths, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchManifestBoundaryLengths, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
+private theorem functionsMatchManifestCounts_exact_of_lookup
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchManifestCounts functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  functionCountsMatchManifest fn entry = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchManifestCounts, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchManifestCounts, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
+private theorem functionsMatchManifestOramAccesses_exact_of_lookup
+  {view : ImportedProofRelevantContractView}
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchManifestOramAccesses view functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  functionOramAccessesMatchManifest view fn entry = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchManifestOramAccesses, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchManifestOramAccesses, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
+private theorem functionsMatchManifestCommitOps_exact_of_lookup
+  {view : ImportedProofRelevantContractView}
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchManifestCommitOps view functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  functionMaxCommitOpsMatchesManifest view fn entry = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchManifestCommitOps, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchManifestCommitOps, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
+private theorem kernelStepsTargetNonRawStateObjects_exact_of_mem
+  {state : List ImportedProofRelevantStateObjectView}
+  {steps : List ImportedProofRelevantKernelStepView}
+  {step : ImportedProofRelevantKernelStepView}
+  (hMatch : kernelStepsTargetNonRawStateObjects state steps = true)
+  (hMem : step ∈ steps) :
+  kernelStepTargetsNonRawStateObject state step = true := by
+  induction steps with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      simp [kernelStepsTargetNonRawStateObjects] at hMatch
+      rcases hMem with hEq | hMem
+      · subst hEq
+        exact hMatch.1
+      · exact ih hMatch.2 hMem
+
+private theorem confidentialEntrypointsAvoidRawKernelTargets_exact_of_lookup
+  {view : ImportedProofRelevantContractView}
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : confidentialEntrypointsAvoidRawKernelTargets view functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry)
+  (hConf : fn.confidential = true) :
+  kernelStepsTargetNonRawStateObjects view.state entry.kernel_steps = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [confidentialEntrypointsAvoidRawKernelTargets, hLookup, hConf] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints with
+        | none =>
+            simp [confidentialEntrypointsAvoidRawKernelTargets, hHd] at hMatch
+        | some hdEntry =>
+            have hTail :
+                confidentialEntrypointsAvoidRawKernelTargets view tl entrypoints = true := by
+              cases hHdConf : hd.confidential with
+              | false =>
+                simp [confidentialEntrypointsAvoidRawKernelTargets, hHd, hHdConf] at hMatch
+                exact hMatch
+              | true =>
+                simp [confidentialEntrypointsAvoidRawKernelTargets, hHd, hHdConf] at hMatch
+                exact hMatch.2
+            exact ih hTail hMem hLookup hConf
+
+private theorem ImportedProofRelevantContractView.structural_exactness_checks
+  (view : ImportedProofRelevantContractView)
+  (hValid : view.StructuralValid) :
+  functionsMatchConfidentialLowering view view.functions view.manifest.entrypoints = true ∧
+    functionsMatchManifestSecrets view.functions view.manifest.entrypoints = true ∧
+    functionsMatchManifestBoundaryLengths view.functions view.manifest.entrypoints = true ∧
+    functionsMatchManifestCounts view.functions view.manifest.entrypoints = true ∧
+    functionsMatchManifestOramAccesses view view.functions view.manifest.entrypoints = true ∧
+    functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints = true := by
+  have hChecks := hValid
+  simp [ImportedProofRelevantContractView.StructuralValid,
+    ImportedProofRelevantContractView.checkStructuralValid] at hChecks
+  rcases hChecks with ⟨hPrefix16, hCommit⟩
+  rcases hPrefix16 with ⟨hPrefix15, hOram⟩
+  rcases hPrefix15 with ⟨hPrefix14, hCounts⟩
+  rcases hPrefix14 with ⟨hPrefix13, hBoundary⟩
+  rcases hPrefix13 with ⟨hPrefix12, hSecrets⟩
+  rcases hPrefix12 with ⟨_hPrefix11, hLowering⟩
+  exact ⟨hLowering, hSecrets, hBoundary, hCounts, hOram, hCommit⟩
+
+private theorem ImportedProofRelevantContractView.structural_confidential_kernel_targets
+  (view : ImportedProofRelevantContractView)
+  (hValid : view.StructuralValid) :
+  confidentialEntrypointsAvoidRawKernelTargets
+      view view.functions view.manifest.entrypoints = true := by
+  have hChecks := hValid
+  simp [ImportedProofRelevantContractView.StructuralValid,
+    ImportedProofRelevantContractView.checkStructuralValid] at hChecks
+  rcases hChecks with ⟨hPrefix16, _hCommit⟩
+  rcases hPrefix16 with ⟨hPrefix15, _hOram⟩
+  rcases hPrefix15 with ⟨hPrefix14, _hCounts⟩
+  rcases hPrefix14 with ⟨hPrefix13, _hBoundary⟩
+  rcases hPrefix13 with ⟨hPrefix12, _hSecrets⟩
+  rcases hPrefix12 with ⟨hPrefix11, _hLowering⟩
+  rcases hPrefix11 with ⟨hPrefix10, _hLength⟩
+  rcases hPrefix10 with ⟨hPrefix9, _hEntrypointSignatures⟩
+  rcases hPrefix9 with ⟨hPrefix8, _hFunctionSignatures⟩
+  rcases hPrefix8 with ⟨_hPrefix7, hTargets⟩
+  exact hTargets
+
+theorem ImportedProofRelevantContractView.manifest_secrets_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  entry.secret_args = fn.secret_args ∧
+    entry.param_names = fn.params.map ImportedProofRelevantParamView.name := by
+  exact
+    functionsMatchManifestSecrets_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.1
+      hMem
+      hLookup
+
+theorem ImportedProofRelevantContractView.confidential_lowering_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  functionConfidentialLoweringMatchesManifest view fn entry = true := by
+  exact
+    functionsMatchConfidentialLowering_exact_of_lookup
+      (view.structural_exactness_checks hValid).1
+      hMem
+      hLookup
+
+theorem ImportedProofRelevantContractView.confidential_kernel_step_targets_non_raw_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry)
+  (hConf : fn.confidential = true)
+  {kernelStep : ImportedProofRelevantKernelStepView}
+  {objectId : Nat}
+  (hStepMem : kernelStep ∈ entry.kernel_steps)
+  (hObjectId : kernelStep.object_id = some objectId) :
+  ∃ stateObject,
+    stateObjectById? view.state objectId = some stateObject ∧
+      stateObject.backend ≠ "raw" := by
+  have hEntryTargets :
+      kernelStepsTargetNonRawStateObjects view.state entry.kernel_steps = true :=
+    confidentialEntrypointsAvoidRawKernelTargets_exact_of_lookup
+      (view.structural_confidential_kernel_targets hValid)
+      hMem
+      hLookup
+      hConf
+  have hStepTarget :
+      kernelStepTargetsNonRawStateObject view.state kernelStep = true :=
+    kernelStepsTargetNonRawStateObjects_exact_of_mem hEntryTargets hStepMem
+  simp [kernelStepTargetsNonRawStateObject, hObjectId] at hStepTarget
+  cases hStateObject : stateObjectById? view.state objectId with
+  | none =>
+      simp [hStateObject] at hStepTarget
+  | some stateObject =>
+      simp [hStateObject] at hStepTarget
+      exact ⟨stateObject, rfl, hStepTarget⟩
+
+theorem ImportedProofRelevantContractView.manifest_boundary_lengths_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  ∃ inputLen returnLen,
+    expectedEntrypointInputLen fn = .ok inputLen ∧
+    expectedReturnCanonicalLen fn = .ok returnLen ∧
+    entry.entry_input_len = inputLen ∧
+    entry.return_canonical_len = returnLen := by
+  have hMatch :=
+    functionsMatchManifestBoundaryLengths_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.2.1
+      hMem
+      hLookup
+  cases hInput : expectedEntrypointInputLen fn with
+  | error err =>
+      simp [functionBoundaryLengthsMatchManifest, hInput] at hMatch
+  | ok inputLen =>
+      cases hReturn : expectedReturnCanonicalLen fn with
+      | error err =>
+          simp [functionBoundaryLengthsMatchManifest, hInput, hReturn] at hMatch
+      | ok returnLen =>
+          have hFacts := hMatch
+          simp [functionBoundaryLengthsMatchManifest, hInput, hReturn] at hFacts
+          have hInputLen : entry.entry_input_len = inputLen := hFacts.1
+          have hReturnLen : entry.return_canonical_len = returnLen := hFacts.2
+          exact ⟨inputLen, returnLen, rfl, rfl, hInputLen, hReturnLen⟩
+
+theorem ImportedProofRelevantContractView.manifest_counts_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  ∃ counts,
+    countBodyStrings fn.body = .ok counts ∧
+    entry.arena_bytes = 4096 + counts.localCount * 64 ∧
+    entry.max_stack_words = 64 + counts.localCount ∧
+    entry.uocell_reads = counts.cellReads ∧
+    entry.uocell_writes = counts.cellWrites ∧
+    entry.uoarray_reads = counts.arrayReads ∧
+    entry.uoarray_writes = counts.arrayWrites ∧
+    entry.uomap_reads = counts.mapReads ∧
+    entry.uomap_writes = counts.mapWrites := by
+  have hMatch :=
+    functionsMatchManifestCounts_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.2.2.1
+      hMem
+      hLookup
+  cases hCounts : countBodyStrings fn.body with
+  | error err =>
+      simp [functionCountsMatchManifest, hCounts] at hMatch
+  | ok counts =>
+      have hFacts := hMatch
+      simp [functionCountsMatchManifest, hCounts] at hFacts
+      rcases hFacts with ⟨hPrefix7, hMapWrites⟩
+      rcases hPrefix7 with ⟨hPrefix6, hMapReads⟩
+      rcases hPrefix6 with ⟨hPrefix5, hArrayWrites⟩
+      rcases hPrefix5 with ⟨hPrefix4, hArrayReads⟩
+      rcases hPrefix4 with ⟨hPrefix3, hCellWrites⟩
+      rcases hPrefix3 with ⟨hPrefix2, hCellReads⟩
+      rcases hPrefix2 with ⟨hArena, hStack⟩
+      exact
+        ⟨counts, rfl, hArena, hStack, hCellReads, hCellWrites, hArrayReads,
+          hArrayWrites, hMapReads, hMapWrites⟩
+
+theorem ImportedProofRelevantContractView.manifest_oram_accesses_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  ∃ expected,
+    countOramAccessesInBodyStrings fn.body view.state = .ok expected ∧
+    oramAccessesMatchExpected expected entry.oram_accesses = true ∧
+    ∀ objectId accesses,
+      (objectId, accesses) ∈ expected →
+        (match stateObjectById? view.state objectId, manifestObjectById? view.manifest.objects objectId with
+        | some stateObject, some manifestObject =>
+            validateImportedOramShape stateObject manifestObject accesses
+        | _, _ => false) = true := by
+  have hMatch :=
+    functionsMatchManifestOramAccesses_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.2.2.2.1
+      hMem
+      hLookup
+  cases hCounts : countOramAccessesInBodyStrings fn.body view.state with
+  | error err =>
+      simp [functionOramAccessesMatchManifest, hCounts] at hMatch
+  | ok expected =>
+      have hFacts := hMatch
+      simp [functionOramAccessesMatchManifest, hCounts] at hFacts
+      exact ⟨expected, rfl, hFacts.1, hFacts.2⟩
+
+theorem ImportedProofRelevantContractView.manifest_commit_ops_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  ∃ maxCommitOps,
+    expectedCommitOpsForFunction view fn = .ok maxCommitOps ∧
+    entry.max_commit_ops = maxCommitOps := by
+  have hMatch :=
+    functionsMatchManifestCommitOps_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.2.2.2.2
+      hMem
+      hLookup
+  cases hCommit : expectedCommitOpsForFunction view fn with
+  | error err =>
+      simp [functionMaxCommitOpsMatchesManifest, hCommit] at hMatch
+  | ok maxCommitOps =>
+      have hFact := hMatch
+      simp [functionMaxCommitOpsMatchesManifest, hCommit] at hFact
+      exact ⟨maxCommitOps, rfl, hFact⟩
+
+theorem functionStoredDslMatchesBody_confidential_exact
+  {fn : ImportedProofRelevantFunctionView}
+  (hMatch : functionStoredDslMatchesBody fn = true)
+  (hConf : fn.confidential = true) :
+  ∃ expectedProgram program slotProgram,
+    expectedConfidentialKernelProgramForFunction fn = .ok expectedProgram ∧
+    parseFunctionConfidentialProgram fn = .ok (some program) ∧
+    parseFunctionConfidentialSlotProgram fn = .ok (some slotProgram) ∧
+    importedConfidentialKernelProgramEq program expectedProgram = true ∧
+    program.expectedRuntimeKernelSteps = expectedProgram.expectedRuntimeKernelSteps ∧
+    checkImportedConfidentialKernelProgramSlotLowering program slotProgram = true := by
+  unfold functionStoredDslMatchesBody at hMatch
+  rw [if_pos hConf] at hMatch
+  cases hExpected : expectedConfidentialKernelProgramForFunction fn with
+  | error err =>
+      simp [hExpected] at hMatch
+  | ok expectedProgram =>
+      cases hProgram : parseFunctionConfidentialProgram fn with
+      | error err =>
+          simp [hExpected, hProgram] at hMatch
+      | ok programOpt =>
+          cases programOpt with
+          | none =>
+              simp [hExpected, hProgram] at hMatch
+          | some program =>
+              cases hSlot : parseFunctionConfidentialSlotProgram fn with
+              | error err =>
+                  simp [hExpected, hProgram, hSlot] at hMatch
+              | ok slotProgramOpt =>
+                  cases slotProgramOpt with
+                  | none =>
+                      simp [hExpected, hProgram, hSlot] at hMatch
+                  | some slotProgram =>
+                      have hFacts := hMatch
+                      simp [hExpected, hProgram, hSlot] at hFacts
+                      have hProgramEq :
+                          importedConfidentialKernelProgramEq program expectedProgram = true := hFacts.1.1
+                      have hScheduleEq :
+                          program.expectedRuntimeKernelSteps =
+                            expectedProgram.expectedRuntimeKernelSteps := by
+                        exact
+                          (importedConfidentialKernelProgramSchedulesEq_eq_true_iff
+                            program expectedProgram).mp hFacts.1.2
+                      have hSlotLowering :
+                          checkImportedConfidentialKernelProgramSlotLowering program slotProgram = true := hFacts.2
+                      exact
+                        ⟨expectedProgram, program, slotProgram, rfl, rfl, rfl,
+                          hProgramEq, hScheduleEq, hSlotLowering⟩
+
+theorem manifestStoredDslMatchesKernelSchedule_confidential_exact
+  {view : ImportedProofRelevantContractView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : manifestStoredDslMatchesKernelSchedule view fn entry = true)
+  (hConf : fn.confidential = true) :
+  ∃ program slotProgram expectedHashPartBytes,
+    parseEntrypointConfidentialProgram entry = .ok (some program) ∧
+    parseEntrypointConfidentialSlotProgram entry = .ok (some slotProgram) ∧
+    importedConfidentialKernelProgramMaxHashPartBytes view.state program = .ok expectedHashPartBytes ∧
+    program.entrypoint_id = fn.signature ∧
+    slotProgram.entrypoint_id = fn.signature ∧
+    program.secret_args = fn.secret_args ∧
+    slotProgram.secret_args = fn.secret_args ∧
+    entry.max_hash_part_bytes = expectedHashPartBytes ∧
+    importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+        program.expectedRuntimeKernelSteps = entry.kernel_steps ∧
+    importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+        slotProgram.expectedRuntimeKernelSteps = entry.kernel_steps ∧
+    checkImportedConfidentialKernelProgramSlotLowering program slotProgram = true := by
+  unfold manifestStoredDslMatchesKernelSchedule at hMatch
+  cases hProgram : parseEntrypointConfidentialProgram entry with
+  | error err =>
+      simp [hProgram] at hMatch
+  | ok programOpt =>
+      cases programOpt with
+      | none =>
+          cases hSlot : parseEntrypointConfidentialSlotProgram entry with
+          | error err =>
+              simp [hProgram, hSlot] at hMatch
+          | ok slotProgramOpt =>
+              cases slotProgramOpt with
+              | none =>
+                  simp [hProgram, hSlot, hConf] at hMatch
+              | some slotProgram =>
+                  simp [hProgram, hSlot] at hMatch
+      | some program =>
+          cases hSlot : parseEntrypointConfidentialSlotProgram entry with
+          | error err =>
+              simp [hProgram, hSlot] at hMatch
+          | ok slotProgramOpt =>
+              cases slotProgramOpt with
+              | none =>
+                  simp [hProgram, hSlot] at hMatch
+              | some slotProgram =>
+                  cases hHash : importedConfidentialKernelProgramMaxHashPartBytes view.state program with
+                  | error err =>
+                      simp [hProgram, hSlot, hHash] at hMatch
+                  | ok expectedHashPartBytes =>
+                      have hFacts := hMatch
+                      simp [hProgram, hSlot, hHash] at hFacts
+                      rcases hFacts with ⟨hPrefix7, hSlotLowering⟩
+                      rcases hPrefix7 with ⟨hPrefix6, hSlotSteps⟩
+                      rcases hPrefix6 with ⟨hPrefix5, hSteps⟩
+                      rcases hPrefix5 with ⟨hPrefix4, hHashBound⟩
+                      rcases hPrefix4 with ⟨hPrefix3, hSlotSecrets⟩
+                      rcases hPrefix3 with ⟨hPrefix2, hSecrets⟩
+                      rcases hPrefix2 with ⟨hPrefix1, hSlotEntrypoint⟩
+                      rcases hPrefix1 with ⟨_hConfTrue, hEntrypoint⟩
+                      exact
+                        ⟨program, slotProgram, expectedHashPartBytes, rfl, rfl, hHash,
+                          hEntrypoint, hSlotEntrypoint, hSecrets, hSlotSecrets,
+                          hHashBound, hSteps, hSlotSteps, hSlotLowering⟩
+
+theorem functionConfidentialLoweringMatchesManifest_confidential_exact
+  {view : ImportedProofRelevantContractView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionConfidentialLoweringMatchesManifest view fn entry = true)
+  (hConf : fn.confidential = true) :
+  ∃ expectedProgram fnProgram fnSlotProgram entryProgram entrySlotProgram expectedHashPartBytes,
+    expectedConfidentialKernelProgramForFunction fn = .ok expectedProgram ∧
+    parseFunctionConfidentialProgram fn = .ok (some fnProgram) ∧
+    parseFunctionConfidentialSlotProgram fn = .ok (some fnSlotProgram) ∧
+    parseEntrypointConfidentialProgram entry = .ok (some entryProgram) ∧
+    parseEntrypointConfidentialSlotProgram entry = .ok (some entrySlotProgram) ∧
+    importedConfidentialKernelProgramEq fnProgram expectedProgram = true ∧
+    fnProgram.expectedRuntimeKernelSteps = expectedProgram.expectedRuntimeKernelSteps ∧
+    importedConfidentialKernelProgramEq fnProgram entryProgram = true ∧
+    fnProgram.expectedRuntimeKernelSteps = entryProgram.expectedRuntimeKernelSteps ∧
+    checkImportedConfidentialKernelProgramSlotLowering fnProgram fnSlotProgram = true ∧
+    checkImportedConfidentialKernelProgramSlotLowering entryProgram entrySlotProgram = true ∧
+    fn.confidential_program = entry.confidential_program ∧
+    fn.confidential_slot_program = entry.confidential_slot_program ∧
+    importedConfidentialKernelProgramMaxHashPartBytes view.state entryProgram = .ok expectedHashPartBytes ∧
+    entryProgram.entrypoint_id = fn.signature ∧
+    entrySlotProgram.entrypoint_id = fn.signature ∧
+    entryProgram.secret_args = fn.secret_args ∧
+    entrySlotProgram.secret_args = fn.secret_args ∧
+    entry.max_hash_part_bytes = expectedHashPartBytes ∧
+    importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+        entryProgram.expectedRuntimeKernelSteps = entry.kernel_steps ∧
+    importedProofRelevantKernelStepViewsOfImportedRuntimeKernelSteps
+        entrySlotProgram.expectedRuntimeKernelSteps = entry.kernel_steps := by
+  have hSplit :
+    (functionStoredDslMatchesBody fn = true ∧
+      manifestStoredDslMatchesKernelSchedule view fn entry = true) ∧
+      (match
+          parseFunctionConfidentialProgram fn,
+          parseFunctionConfidentialSlotProgram fn,
+          parseEntrypointConfidentialProgram entry,
+          parseEntrypointConfidentialSlotProgram entry with
+        | .ok (some fnProgram), .ok (some fnSlotProgram), .ok (some entryProgram), .ok (some entrySlotProgram) =>
+            fn.confidential_program == entry.confidential_program &&
+              fn.confidential_slot_program == entry.confidential_slot_program &&
+              importedConfidentialKernelProgramEq fnProgram entryProgram &&
+              importedConfidentialKernelProgramSchedulesEq fnProgram entryProgram &&
+              checkImportedConfidentialKernelProgramSlotLowering entryProgram entrySlotProgram &&
+              checkImportedConfidentialKernelProgramSlotLowering fnProgram fnSlotProgram
+        | _, _, _, _ => false) = true := by
+    simpa [functionConfidentialLoweringMatchesManifest, hConf] using hMatch
+  rcases
+      functionStoredDslMatchesBody_confidential_exact hSplit.1.1 hConf with
+    ⟨expectedProgram, fnProgram, fnSlotProgram, hExpected, hFnProgram, hFnSlotProgram,
+      hFnProgramExpected, hFnExpectedSchedule, hFnSlotLowering⟩
+  rcases
+      manifestStoredDslMatchesKernelSchedule_confidential_exact hSplit.1.2 hConf with
+    ⟨entryProgram, entrySlotProgram, expectedHashPartBytes, hEntryProgram, hEntrySlotProgram,
+      hHash, hEntryEntrypoint, hEntrySlotEntrypoint, hEntrySecrets, hEntrySlotSecrets,
+      hEntryHash, hEntrySteps, hEntrySlotSteps, hEntrySlotLowering⟩
+  have hCrossFacts :
+    ((((fn.confidential_program = entry.confidential_program ∧
+        fn.confidential_slot_program = entry.confidential_slot_program) ∧
+        importedConfidentialKernelProgramEq fnProgram entryProgram = true) ∧
+        importedConfidentialKernelProgramSchedulesEq fnProgram entryProgram = true) ∧
+        checkImportedConfidentialKernelProgramSlotLowering entryProgram entrySlotProgram = true) ∧
+      checkImportedConfidentialKernelProgramSlotLowering fnProgram fnSlotProgram = true := by
+    simpa [hFnProgram, hFnSlotProgram, hEntryProgram, hEntrySlotProgram] using hSplit.2
+  rcases hCrossFacts with ⟨hPrefix2, hFnSlotLowering'⟩
+  rcases hPrefix2 with ⟨hPrefix1, hEntrySlotLowering⟩
+  rcases hPrefix1 with ⟨hPrefix0, hFnEntryScheduleBool⟩
+  rcases hPrefix0 with ⟨hJsonPair, hProgramEq⟩
+  rcases hJsonPair with ⟨hJsonEq, hSlotJsonEq⟩
+  have hFnEntrySchedule :
+      fnProgram.expectedRuntimeKernelSteps = entryProgram.expectedRuntimeKernelSteps := by
+    exact
+      (importedConfidentialKernelProgramSchedulesEq_eq_true_iff
+        fnProgram entryProgram).mp hFnEntryScheduleBool
+  exact
+    ⟨expectedProgram, fnProgram, fnSlotProgram, entryProgram, entrySlotProgram,
+      expectedHashPartBytes, hExpected, hFnProgram, hFnSlotProgram, hEntryProgram,
+      hEntrySlotProgram, hFnProgramExpected, hFnExpectedSchedule, hProgramEq,
+      hFnEntrySchedule, hFnSlotLowering', hEntrySlotLowering, hJsonEq, hSlotJsonEq, hHash, hEntryEntrypoint,
+      hEntrySlotEntrypoint, hEntrySecrets, hEntrySlotSecrets, hEntryHash, hEntrySteps,
+      hEntrySlotSteps⟩
+
+theorem functionConfidentialLoweringMatchesManifest_nonconfidential_exact
+  {view : ImportedProofRelevantContractView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionConfidentialLoweringMatchesManifest view fn entry = true)
+  (hConf : fn.confidential = false) :
+  entry.kernel_steps = [] ∧
+    entry.confidential_program = none ∧
+    entry.confidential_slot_program = none ∧
+    entry.max_hash_part_bytes = 0 ∧
+    fn.confidential_program = none ∧
+    fn.confidential_slot_program = none := by
+  have hFacts := hMatch
+  simp [functionConfidentialLoweringMatchesManifest, hConf] at hFacts
+  rcases hFacts with ⟨hPrefix4, hFnSlot⟩
+  rcases hPrefix4 with ⟨hPrefix3, hFnProgram⟩
+  rcases hPrefix3 with ⟨hPrefix2, hHash⟩
+  rcases hPrefix2 with ⟨hPrefix1, hEntrySlot⟩
+  rcases hPrefix1 with ⟨hKernelSteps, hEntryProgram⟩
+  exact ⟨hKernelSteps, hEntryProgram, hEntrySlot, hHash, hFnProgram, hFnSlot⟩
 
 end UOToolchain

@@ -14,11 +14,37 @@ deriving FromJson
 def importedConfidentialKernelStatementKindNames : List String :=
   ["declare", "assign", "require", "abort_if", "cell_set", "array_set", "map_put", "return"]
 
+def importedConfidentialKernelStatementTraceNames : List String :=
+  ["declare", "assign", "require", "abort_if", "cell_set", "array_set", "map_put", "return"]
+
+def importedConfidentialKernelStatementRuntimeNormalFormFlags : List Bool :=
+  [true, true, false, true, true, true, true, true]
+
+def importedConfidentialKernelStatementEffectKinds : List String :=
+  ["store_slot", "store_slot", "guard_only", "abort_flag", "cell_set", "array_set", "map_put",
+    "return_value"]
+
+def importedConfidentialKernelStatementEvaluatedOperands : List String :=
+  ["value", "value", "cond", "cond", "value,predicate?", "index,value,predicate?",
+    "key,value,predicate?", "value?"]
+
+def importedConfidentialKernelStatementTailOpcodes : List String :=
+  ["", "", "", "", "CellSet", "ArraySet", "MapPut", ""]
+
 def importedConfidentialKernelExprKindNames : List String :=
   ["literal", "var", "unary", "binary", "select", "cell_get", "array_get", "map_get", "keccak256"]
 
+def importedConfidentialKernelExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+
+def importedConfidentialKernelExprTailOpcodes : List String :=
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+
 def importedConfidentialKernelPureExprKindNames : List String :=
   ["literal", "var", "unary", "binary", "select", "keccak256"]
+
+def importedConfidentialKernelPureExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
 
 def importedConfidentialKernelParamFieldNames : List String :=
   ["name", "ty"]
@@ -709,12 +735,38 @@ def loadAndCheckImportedProofGradeRuntimeKernelDslBundle
 def importedConfidentialKernelSlotStatementKindNames : List String :=
   ["declare", "assign", "require", "abort_if", "cell_set", "array_set", "map_put", "return"]
 
+def importedConfidentialKernelSlotStatementTraceNames : List String :=
+  ["declare", "assign", "require", "abort_if", "cell_set", "array_set", "map_put", "return"]
+
+def importedConfidentialKernelSlotStatementRuntimeNormalFormFlags : List Bool :=
+  [true, true, false, true, true, true, true, true]
+
+def importedConfidentialKernelSlotStatementEffectKinds : List String :=
+  ["store_slot", "store_slot", "guard_only", "abort_flag", "cell_set", "array_set", "map_put",
+    "return_value"]
+
+def importedConfidentialKernelSlotStatementEvaluatedOperands : List String :=
+  ["value", "value", "cond", "cond", "value,predicate?", "index,value,predicate?",
+    "key,value,predicate?", "value?"]
+
+def importedConfidentialKernelSlotStatementTailOpcodes : List String :=
+  ["", "", "", "", "CellSet", "ArraySet", "MapPut", ""]
+
 def importedConfidentialKernelSlotExprKindNames : List String :=
   ["literal", "slot", "unary", "binary", "select", "cell_get", "array_get", "map_get",
     "keccak256"]
 
+def importedConfidentialKernelSlotExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+
+def importedConfidentialKernelSlotExprTailOpcodes : List String :=
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+
 def importedConfidentialKernelSlotPureExprKindNames : List String :=
   ["literal", "slot", "unary", "binary", "select", "keccak256"]
+
+def importedConfidentialKernelSlotPureExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
 
 def importedConfidentialKernelSlotProgramFieldNames : List String :=
   ["entrypoint_id", "param_count", "return_type", "secret_args", "slot_count", "body"]
@@ -2687,6 +2739,17 @@ theorem importedConfidentialKernelProgram_slotLowering_runtimeNormalForm
 
 mutual
 
+def ImportedConfidentialKernelSlotStatement.traceName :
+  ImportedConfidentialKernelSlotStatement → String
+  | .declare _ _ => "declare"
+  | .assign _ _ => "assign"
+  | .require _ => "require"
+  | .abortIf _ => "abort_if"
+  | .cellSet _ _ _ => "cell_set"
+  | .arraySet _ _ _ _ => "array_set"
+  | .mapPut _ _ _ _ => "map_put"
+  | .ret _ => "return"
+
 def importedConfidentialKernelSlotStatementListExpectedRuntimeKernelSteps :
   List ImportedConfidentialKernelSlotStatement → List ImportedRuntimeKernelStep
   | [] => []
@@ -2770,6 +2833,10 @@ def importedConfidentialKernelSlotPureExprListExpectedRuntimeKernelSteps :
         importedConfidentialKernelSlotPureExprListExpectedRuntimeKernelSteps exprs
 
 end
+
+def ImportedConfidentialKernelSlotProgram.statementTraceNames
+  (program : ImportedConfidentialKernelSlotProgram) : List String :=
+  program.body.map ImportedConfidentialKernelSlotStatement.traceName
 
 def ImportedConfidentialKernelSlotProgram.expectedRuntimeKernelSteps
   (program : ImportedConfidentialKernelSlotProgram) : List ImportedRuntimeKernelStep :=
@@ -3616,6 +3683,102 @@ theorem importedConfidentialKernelSlotProgram_expectedRuntimeKernelSteps_toRunti
         ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram,
         ConfidentialKernelSlotProgram.expectedRuntimeKernelSteps,
         importedConfidentialKernelSlotStatementListExpectedRuntimeKernelSteps_toRuntime]
+
+theorem importedConfidentialKernelSlotStatement_traceName_toRuntime
+  (stmt : ImportedConfidentialKernelSlotStatement) :
+  stmt.traceName = stmt.toConfidentialKernelSlotStatement.traceName := by
+  cases stmt <;> rfl
+
+theorem importedConfidentialKernelSlotProgram_statementTraceNames_toRuntime
+  (program : ImportedConfidentialKernelSlotProgram) :
+  program.statementTraceNames =
+    program.toConfidentialKernelSlotProgram.statementTraceNames := by
+  cases program with
+  | mk entrypoint_id param_count return_type secret_args slot_count body =>
+      simp [ImportedConfidentialKernelSlotProgram.statementTraceNames,
+        ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram,
+        ConfidentialKernelSlotProgram.statementTraceNames,
+        importedConfidentialKernelSlotStatement_traceName_toRuntime]
+
+theorem importedConfidentialKernelStatementTraceNames_toRuntime :
+  importedConfidentialKernelStatementTraceNames =
+    confidentialKernelStatementTraceNames := by
+  rfl
+
+theorem importedConfidentialKernelStatementRuntimeNormalFormFlags_toRuntime :
+  importedConfidentialKernelStatementRuntimeNormalFormFlags =
+    confidentialKernelStatementRuntimeNormalFormFlags := by
+  rfl
+
+theorem importedConfidentialKernelStatementEffectKinds_toRuntime :
+  importedConfidentialKernelStatementEffectKinds =
+    confidentialKernelStatementEffectKinds := by
+  rfl
+
+theorem importedConfidentialKernelStatementEvaluatedOperands_toRuntime :
+  importedConfidentialKernelStatementEvaluatedOperands =
+    confidentialKernelStatementEvaluatedOperands := by
+  rfl
+
+theorem importedConfidentialKernelStatementTailOpcodes_toRuntime :
+  importedConfidentialKernelStatementTailOpcodes =
+    confidentialKernelStatementTailOpcodes := by
+  rfl
+
+theorem importedConfidentialKernelExprEvaluatedOperands_toRuntime :
+  importedConfidentialKernelExprEvaluatedOperands =
+    confidentialKernelExprEvaluatedOperands := by
+  rfl
+
+theorem importedConfidentialKernelExprTailOpcodes_toRuntime :
+  importedConfidentialKernelExprTailOpcodes =
+    confidentialKernelExprTailOpcodes := by
+  rfl
+
+theorem importedConfidentialKernelPureExprEvaluatedOperands_toRuntime :
+  importedConfidentialKernelPureExprEvaluatedOperands =
+    confidentialKernelPureExprEvaluatedOperands := by
+  rfl
+
+theorem importedConfidentialKernelSlotStatementTraceNames_toRuntime :
+  importedConfidentialKernelSlotStatementTraceNames =
+    confidentialKernelSlotStatementTraceNames := by
+  rfl
+
+theorem importedConfidentialKernelSlotStatementRuntimeNormalFormFlags_toRuntime :
+  importedConfidentialKernelSlotStatementRuntimeNormalFormFlags =
+    confidentialKernelSlotStatementRuntimeNormalFormFlags := by
+  rfl
+
+theorem importedConfidentialKernelSlotStatementEffectKinds_toRuntime :
+  importedConfidentialKernelSlotStatementEffectKinds =
+    confidentialKernelSlotStatementEffectKinds := by
+  rfl
+
+theorem importedConfidentialKernelSlotStatementEvaluatedOperands_toRuntime :
+  importedConfidentialKernelSlotStatementEvaluatedOperands =
+    confidentialKernelSlotStatementEvaluatedOperands := by
+  rfl
+
+theorem importedConfidentialKernelSlotStatementTailOpcodes_toRuntime :
+  importedConfidentialKernelSlotStatementTailOpcodes =
+    confidentialKernelSlotStatementTailOpcodes := by
+  rfl
+
+theorem importedConfidentialKernelSlotExprEvaluatedOperands_toRuntime :
+  importedConfidentialKernelSlotExprEvaluatedOperands =
+    confidentialKernelSlotExprEvaluatedOperands := by
+  rfl
+
+theorem importedConfidentialKernelSlotExprTailOpcodes_toRuntime :
+  importedConfidentialKernelSlotExprTailOpcodes =
+    confidentialKernelSlotExprTailOpcodes := by
+  rfl
+
+theorem importedConfidentialKernelSlotPureExprEvaluatedOperands_toRuntime :
+  importedConfidentialKernelSlotPureExprEvaluatedOperands =
+    confidentialKernelSlotPureExprEvaluatedOperands := by
+  rfl
 
 def importedRuntimeKernelSlotDslBundleFieldNames : List String :=
   ["kernel_witness", "confidential_slot_program"]

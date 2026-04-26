@@ -1,11 +1,12 @@
 use crate::codec::StoreCipher;
-use anyhow::{anyhow, Result};
-use rand::SeedableRng;
+use anyhow::Result;
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use uo_core::trace::{LogicalEvent, PhysicalWriteEvent, WriteClass};
-use zeroize::Zeroize;
+use uo_core::trace::{LogicalEvent, PhysicalWriteEvent};
+
+#[path = "generated_store_helpers.rs"]
+mod generated_store_helpers;
+use generated_store_helpers::{StoreLogicalEventTrace, StorePhysicalWriteTrace, StoreSlotTable};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct StoreExecutionMetrics {
@@ -17,6 +18,7 @@ pub struct StoreExecutionMetrics {
     pub discard_writes: usize,
 }
 
+#[allow(dead_code)]
 pub trait ObjectStore {
     fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>>;
     fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()>;
@@ -25,185 +27,22 @@ pub trait ObjectStore {
     fn metrics(&self) -> &StoreExecutionMetrics;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct RawObjectStore {
-    slots: BTreeMap<String, Box<[u8]>>,
-    physical_writes: Vec<PhysicalWriteEvent>,
-    logical_events: Vec<LogicalEvent>,
+    slots: StoreSlotTable,
+    physical_writes: StorePhysicalWriteTrace,
+    logical_events: StoreLogicalEventTrace,
     metrics: StoreExecutionMetrics,
 }
 
-impl RawObjectStore {
-    pub fn new() -> Self {
-        Self {
-            slots: BTreeMap::new(),
-            physical_writes: Vec::new(),
-            logical_events: Vec::new(),
-            metrics: StoreExecutionMetrics::default(),
-        }
-    }
-
-    pub fn with_zeroed_slots(objects: impl IntoIterator<Item = String>) -> Self {
-        let mut store = Self::new();
-        for object in objects {
-            store.slots.insert(object, vec![0u8; 32].into_boxed_slice());
-        }
-        store
-    }
-}
-
-impl ObjectStore for RawObjectStore {
-    fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>> {
-        self.metrics.logical_reads += 1;
-        self.metrics.physical_reads += 1;
-        self.logical_events.push(LogicalEvent {
-            kind: "raw_cell_get".into(),
-            object: object.into(),
-            detail: String::new(),
-        });
-        Ok(self
-            .slots
-            .entry(object.into())
-            .or_insert_with(|| vec![0u8; 32].into_boxed_slice())
-            .clone())
-    }
-
-    fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()> {
-        self.metrics.logical_writes += 1;
-        self.metrics.physical_writes += 1;
-        if value.iter().all(|byte| *byte == 0) {
-            self.metrics.zero_writes += 1;
-        }
-        let old = self
-            .slots
-            .entry(object.into())
-            .or_insert_with(|| vec![0u8; value.len()].into_boxed_slice())
-            .clone();
-        let new = value.to_vec().into_boxed_slice();
-        value.zeroize();
-        self.slots.insert(object.into(), new.clone());
-        self.logical_events.push(LogicalEvent {
-            kind: "raw_cell_set".into(),
-            object: object.into(),
-            detail: format!("{} bytes", value.len()),
-        });
-        self.physical_writes
-            .push(PhysicalWriteEvent::from_buffers(object, object, &old, &new));
-        Ok(())
-    }
-
-    fn physical_writes(&self) -> &[PhysicalWriteEvent] {
-        &self.physical_writes
-    }
-
-    fn logical_events(&self) -> &[LogicalEvent] {
-        &self.logical_events
-    }
-
-    fn metrics(&self) -> &StoreExecutionMetrics {
-        &self.metrics
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct UoObjectStore {
-    slots: BTreeMap<String, Box<[u8]>>,
-    physical_writes: Vec<PhysicalWriteEvent>,
-    logical_events: Vec<LogicalEvent>,
+    slots: StoreSlotTable,
+    physical_writes: StorePhysicalWriteTrace,
+    logical_events: StoreLogicalEventTrace,
     metrics: StoreExecutionMetrics,
     rng: ChaCha20Rng,
     cipher: StoreCipher,
-}
-
-impl UoObjectStore {
-    pub fn preinitialized(objects: impl IntoIterator<Item = (String, usize)>) -> Self {
-        let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);
-        let cipher = StoreCipher::random();
-        let mut slots = BTreeMap::new();
-        for (object, logical_len) in objects {
-            let aad = format!("uo_store:{object}");
-            slots.insert(
-                object,
-                cipher.filler_boxed(aad.as_bytes(), logical_len, &mut rng),
-            );
-        }
-        Self {
-            slots,
-            physical_writes: Vec::new(),
-            logical_events: Vec::new(),
-            metrics: StoreExecutionMetrics::default(),
-            rng,
-            cipher,
-        }
-    }
-
-    pub fn ensure_update_only(&self) -> Result<()> {
-        if self
-            .physical_writes
-            .iter()
-            .any(|event| event.class != WriteClass::Update)
-        {
-            return Err(anyhow!("confidential path emitted a non-UPDATE write"));
-        }
-        Ok(())
-    }
-}
-
-impl ObjectStore for UoObjectStore {
-    fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>> {
-        self.metrics.logical_reads += 1;
-        self.metrics.physical_reads += 1;
-        self.logical_events.push(LogicalEvent {
-            kind: "uo_cell_get".into(),
-            object: object.into(),
-            detail: String::new(),
-        });
-        self.slots
-            .get(object)
-            .cloned()
-            .ok_or_else(|| anyhow!("unknown UO object: {object}"))
-    }
-
-    fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()> {
-        self.metrics.logical_writes += 1;
-        self.metrics.physical_writes += 1;
-        let slot = self
-            .slots
-            .get_mut(object)
-            .ok_or_else(|| anyhow!("unknown UO object: {object}"))?;
-        let old = slot.clone();
-        let aad = format!("uo_store:{object}");
-        let value_len = value.len();
-        if !self
-            .cipher
-            .seal_and_wipe_into_slice(aad.as_bytes(), value, &mut self.rng, slot)
-        {
-            return Err(anyhow!(
-                "sealed slot buffer for {object} fell below required public ciphertext size"
-            ));
-        }
-        let new = slot.clone();
-        self.logical_events.push(LogicalEvent {
-            kind: "uo_cell_set".into(),
-            object: object.into(),
-            detail: format!("{} bytes", value_len),
-        });
-        self.physical_writes
-            .push(PhysicalWriteEvent::from_buffers(object, object, &old, &new));
-        Ok(())
-    }
-
-    fn physical_writes(&self) -> &[PhysicalWriteEvent] {
-        &self.physical_writes
-    }
-
-    fn logical_events(&self) -> &[LogicalEvent] {
-        &self.logical_events
-    }
-
-    fn metrics(&self) -> &StoreExecutionMetrics {
-        &self.metrics
-    }
 }
 
 #[cfg(test)]
@@ -213,7 +52,7 @@ mod tests {
 
     #[test]
     fn raw_store_exposes_set_and_same() {
-        let mut store = RawObjectStore::with_zeroed_slots(["slot".to_string()]);
+        let mut store = RawObjectStore::with_zeroed_slots(["slot".to_string()]).unwrap();
         let mut first = [0u8; 32];
         let mut second = [1u8; 32];
         store.write_cell("slot", &mut first).unwrap();
@@ -230,7 +69,7 @@ mod tests {
 
     #[test]
     fn uo_store_emits_update_only_after_init() {
-        let mut store = UoObjectStore::preinitialized([("slot".to_string(), 32)]);
+        let mut store = UoObjectStore::preinitialized([("slot".to_string(), 32)]).unwrap();
         let mut first = [0u8; 32];
         let mut second = [0u8; 32];
         let mut third = [1u8; 32];

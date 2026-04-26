@@ -86,8 +86,10 @@ blank design.
 
 The current runtime has a first hardening layer:
 
-- `runtime/uo-evm/src/kernel.rs` is now the internal small-kernel surface used
-  by the interpreter for confidential state access
+- `runtime/uo-kernel-runtime/src/lib.rs` is now the shared small-kernel
+  surface used by the runtime for confidential state access, and `uo-evm`
+  reaches it directly from `state.rs` / `shell.rs` rather than through a
+  runtime-local shim
 - `runtime/uo-precompiles/src/lib.rs` provides the kernel opcode vocabulary:
   `Begin`, `CellGet`, `CellSet`, `ArrayGet`, `ArraySet`, `MapGet`, `MapPut`,
   `Commit`, `Wipe`
@@ -125,15 +127,15 @@ The current runtime has a first hardening layer:
   the hasher under the existing scratch-budget accounting instead of
   materializing per-part heap buffers first
 - confidential object commits and ORAM page/bucket rewrites now route
-  caller-owned plaintext buffers through `StoreCipher::seal_and_wipe`, so the
-  post-encryption plaintext staging buffers are scrubbed before they are
-  dropped
+  caller-owned plaintext buffers through
+  `StoreCipher::seal_and_wipe_boxed`, so the post-encryption plaintext
+  staging buffers are scrubbed before they are dropped
 - written UO cell/array/small-map commit paths, surrogate ORAM page/bucket/
   counter rewrites, theorem-facing ORAM bucket/counter rewrites, and the
   generic `uo-store` cell-write path now also reuse their existing sealed
-  buffers in place through `StoreCipher::seal_and_wipe_into`, so those write
-  paths no longer replace the sealed `Vec<u8>` buffers on each confidential
-  write
+  buffers in place through `StoreCipher::seal_and_wipe_into_slice`, so those
+  write paths no longer replace the sealed boxed ciphertext buffers on each
+  confidential write
 - surrogate ORAM directory-page encode/decode now also stays on exact-size
   page buffers: the runtime fills caller-owned page slices before sealing and
   decodes opened metadata pages directly back into the caller-owned boxed
@@ -146,7 +148,10 @@ The current runtime has a first hardening layer:
   directly into fixed-size block slices rather than through growable
   plaintext page buffers; the live Path-ORAM position map now also stays in a
   boxed fixed-size buffer across decode and rewrite instead of widening into a
-  temporary `Vec<Option<usize>>` on the confidential path
+  temporary `Vec<Option<usize>>` on the confidential path; its
+  `MaskedUsizeOption` entries are now non-`Clone`/non-`Copy`, and all
+  metadata clone/assign/select/repeat work routes through typed generated
+  borrowed helpers rather than a generic `repeat_boxed<T: Clone>` surface
 - live ORAM bucket reconstruction now likewise writes directly into the fixed
   bucket block buffer instead of staging live blocks through temporary
   growable `Vec<OramBlock>` lists
@@ -200,12 +205,12 @@ The current runtime has a first hardening layer:
   directly, the shell now holds an opaque `ContractRuntime` wrapper rather
   than the raw committed confidential state, `engine.rs` now boxes call args
   once into a fixed-size slice for the traced-call/runtime path, and the
-  runtime/state confidential branch then converts that payload into the shared fixed-size `uo-core` wrapper
-  `ConfidentialCallInputs` before the kernel path begins, with consumption
-  restricted to the shared
-  `uo-core::execute_confidential_kernel_slot_call(...)` path while
-  `runtime/uo-evm/src/kernel.rs` supplies only the effect adapter, and
-  buffered `Value`s wiping on drop,
+  runtime/state confidential branch then passes that payload directly to the
+  shared `uo-kernel-runtime` confidential-call path, where the
+  Lean-generated fixed-size `ConfidentialCallInputs` wrapper is created,
+  consumed by `RuntimeKernelSlotCall`, checked for exact argument count, and
+  wiped on drop before delegating to
+  `uo_core::execute_confidential_kernel_slot_program(...)`,
   and the controller/theorem path now derives public return length from
   manifest-stored `return_canonical_len` and receives only the public
   `OutputShape` summary rather than the full return payload; `theorem.rs` also
@@ -216,7 +221,10 @@ The current runtime has a first hardening layer:
   leaf tapes in fixed-size buffers while staged, and move them into the live
   shadow state without cloning them first; the live `PathOramLeafCoinSource`
   now keeps those injected leaf choices as a fixed-size tape plus cursor
-  rather than widening them back into a growable queue
+  rather than widening them back into a growable queue, and the theorem-facing
+  diagnostics fresh-coin grouping/replacement path now uses checked
+  `get(...)` / `get_mut(...)` lookups rather than `old_entries[index]`,
+  `coin_schedule[index]`, or schedule sub-slices
 - kernel object-operation scratch reservations and UO object commit `io`
   scratch reservations now derive from admitted object/type metadata instead
   of live confidential value lengths wherever the runtime already knows the
@@ -276,6 +284,10 @@ The current runtime has a first hardening layer:
   those stack/scratch facts: stack checks, scratch reservations, and scratch
   wipes are recorded explicitly on the runtime kernel witness rather than only
   summarized as final counters
+- the shared runtime-kernel statement recorder now uses exact-capacity boxed
+  `MaybeUninit<String>` storage rather than `vec![None; capacity]` plus a
+  `Vec`-repacking finish step, so the opcode-trace bridge stays on the same
+  fixed-shape discipline as the rest of the tiny kernel
 - the call-scoped kernel now begins before transaction shadow-state cloning, so
   the pre-call ORAM refresh/decode path is also covered by that `io` scratch
   accounting instead of happening entirely outside the witness boundary
@@ -350,43 +362,69 @@ The current runtime has a first hardening layer:
   remains the small kernel ABI while the runtime-to-kernel bridge gains a more
   concrete internal certificate
 - confidential expression / statement interpretation for admitted entrypoints
-  now also runs inside `RuntimeKernel`, while the non-confidential interpreter
-  has been split into the explicit `runtime/uo-evm/src/shell.rs` public-shell
-  module, so the engine is public orchestration only and the secret-bearing
-  env / return-value machine is kernel-owned
+  now also runs through the shared `RuntimeKernelMachine` path, while the
+  non-confidential interpreter has been split into the explicit
+  `runtime/uo-evm/src/shell.rs` public-shell module, so the engine is public
+  orchestration only and the secret-bearing env / return-value machine is
+  kernel-owned
 - that confidential interpreter now executes a slot-lowered kernel DSL rather
   than the earlier name-keyed environment form: `uo-core` lowers admitted
   confidential entrypoints to a fixed-slot program, and the shared
-  `uo-core` slot-call executor now owns the bounded fixed-size
-  `Box<[Option<Value>]>` slot file, confidential-argument staging, and
-  live slot-word accounting instead of leaving
-  `runtime/uo-evm/src/kernel.rs` to wire those pieces together by hand; the
-  slot state wipes those values on drop. Confidential `keccak256` evaluation
-  in that shared
-  interpreter now also stages hash parts through an exact-size boxed buffer
-  rather than a growable `Vec<Value>`, and `runtime/uo-evm/src/kernel.rs`
+  Lean-generated `uo-kernel-runtime` slot-support module now owns the bounded
+  fixed-size `Box<[Option<Value>]>` slot file and confidential-argument
+  staging, while the private `RuntimeKernelSlotCall` adapter keeps live
+  slot-word accounting instead of leaving `uo-evm` or a public `uo-core` call
+  wrapper to wire those pieces together by hand; the source-backed Lean
+  boundary now checks that this adapter only forwards to generated slot
+  support, object-store effects, and the generated interpreter and rejects raw
+  confidential-argument observations in the adapter; the generated slot state
+  wipes those values on drop. The same boundary now pins the
+  `RuntimeKernelMachine` effect schedule so cell/array/map/commit operations
+  record public opcodes, reserve bounded scratch, delegate to the object
+  store, append the commit schedule, and wipe before finish; Lean exposes the
+  expected effect shape as `RuntimeKernelMachineSchedule`. The checked
+  implementation boundary now also imports `uo-allocator` source and checks
+  allocator-session kernel-op, scratch, stack, guard-drop wipe, finish-wipe,
+  bounded public resource-event logging, boxed finish-boundary resource
+  events, and unsafe/forget-escape discipline, backed by
+  `RuntimeAllocatorDiscipline`. The live confidential statement recorder is
+  now exact-capacity and backed by `RuntimeStatementTraceDiscipline` rather
+  than a growable `Vec<String>`. Confidential
+  `keccak256` evaluation in the
+  shared `uo-core` interpreter now also stages hash parts through an
+  exact-size boxed buffer
+  rather than a growable `Vec<Value>`, and the shared kernel/runtime path
   wipes each hashed part after it has streamed its canonical bytes; the same
   fixed-shape discipline now also covers the recursive runtime `Value`
   aggregates themselves, so both struct fields and array elements stay in
   boxed fixed-size buffers rather than growable `Vec` carriers, canonical
   payload extraction now has an exact-size boxed helper rather than
-  `canonical_bytes().into_boxed_slice()` caller-side bouncing, and it also covers the live
+  `canonical_bytes().into_boxed_slice()` caller-side bouncing, the remaining
+  generated `canonical_bytes()` `Vec` helper is test-only rather than part of
+  the production runtime value API, and the discipline also covers the live
   confidential array / small-map logical buffers, the boxed UO cell
   ciphertext slot, the live fixed-shape Path-ORAM entry array, the live
   fixed-capacity stash, the fixed-shape bucket block buffer, and the fixed
   public-shape Path-ORAM page arrays plus boxed ORAM counter slot and live
-  position-map buffer; the hidden Path-ORAM position-map witness now also
+  position-map buffer; handwritten array write bookkeeping now uses fixed-size
+  boxed public flags instead of a growable `BTreeSet` of written indices; the
+  hidden Path-ORAM position-map witness now also
   stores its leaf array in a boxed fixed-size buffer while the theorem-side
   leaf-state validator now keeps those leaves boxed too rather than reopening
   them into temporary `Vec` state, and the raw-backend
   `RawMapEntry` ciphertext slot is now boxed too, so the runtime object graph
-  no longer keeps secret-bearing ciphertext in growable `Vec<u8>` buffers
+  no longer keeps secret-bearing ciphertext in growable `Vec<u8>` buffers;
+  raw-backend objects are also rejected as confidential slot-program targets
+  by the direct Lean proof-grade translation checker, `uo-solc` lowering, and
+  runtime admission
 - the kernel-step witness journal and the lower-level runtime phase witness
   journal are now both explicit bounded-capacity journals derived from the
-  public kernel-op/object bounds rather than plain growable `Vec::new()`
-  traces, and the remaining public shell-side commit / witness lists now
-  start from explicit `Vec::with_capacity(...)` bounds under those same public
-  object-count limits
+  public kernel-op/object bounds; the shared `uo-core` trackers now store those
+  journals in fixed-capacity boxed `BoundedJournal<T>` buffers rather than
+  growable `Vec` fields, and the remaining public shell-side commit / witness
+  lists now start from explicit `Vec::with_capacity(...)` bounds under those
+  same public object-count limits; ORAM placeholder states now use direct empty
+  boxed slices instead of `Vec::new().into_boxed_slice()` bootstrap carriers
 - live Path-ORAM stash state is now also rebuilt with public
   `working_stash_capacity(...)` headroom up front, preserved across cold
   commits with `.clear()`, and checked before use so the runtime no longer
@@ -408,6 +446,35 @@ The current runtime has a first hardening layer:
   UO cell/array/small-map commits now also reuse their existing ciphertext
   slot buffers in place, while untouched commits keep those already-cloned
   buffers instead of re-cloning old physical slots
+- the object-store confidential access schedule is now also source-pinned at
+  the boundary: Path-ORAM commit write evidence uses fixed public write batches
+  rather than a growable write log, ORAM read transcript evidence is held in
+  boxed logical/physical-read arrays produced by generated fixed
+  public-capacity builders rather than temporary growable trace vectors in handwritten runtime
+  code, UO small-map lookup scans the full public capacity with
+  masked selection rather than early exit, and UO array reads / writes scan
+  the full public capacity with masked selection; UO-path
+  out-of-range logical indices therefore become masked no-match/no-op behavior
+  instead of a public error branch
+- generated confidential-kernel return scheduling is now source-pinned at the
+  same boundary: non-final source returns are rejected before lowering, the
+  generated interpreter no longer uses a `state.returned` / `break` truncation
+  branch, and the tamper suite rejects reintroducing that branch on the checked
+  runtime implementation routes
+- generated map read/write capacity/update failure is now source-pinned as an
+  in-kernel confidential abort path: UO small-map and Path-ORAM helpers return
+  overflow/update-failed bits for reads and writes, and the generated
+  confidential-kernel interpreter records those bits with its generated
+  `note_abort_generated(...)` helper; the checked source boundary and probe
+  reject handwritten masked abort updates and the older generated host-visible
+  `bail!` branches for deterministic small-map full, missing selected ORAM
+  block, Path-ORAM stash insertion/working-stash
+  overflow, and surrogate insert-capacity failure
+- generated helper `Result` errors now have a checked taxonomy rather than a
+  blanket exemption: public shape/capacity, authenticated decode/integrity,
+  cold-restore, fresh-coin tape, and write-log discipline failures may surface
+  to the host, but deterministic hidden-state map/ORAM capacity and update
+  misses must be folded into the modeled abort bit
 - the remaining secret-bearing runtime object transitions are now kept behind
   the same `crate::runtime` module boundary at compile time, so the engine
   cannot directly reopen, commit, duplicate, or hidden-state-export runtime
@@ -419,20 +486,21 @@ The current runtime has a first hardening layer:
   rebuilds in `state.rs` now also go through one exact-size boxed builder
   rather than temporary growable `Vec<RuntimeObjectEntry>` staging buffers,
   and the hidden committed-state ORAM witness snapshot now uses that same
-  exact-size builder discipline keyed by the public Path-ORAM object count
+  exact-size builder discipline keyed by the public Path-ORAM object count.
+  The committed-state duplicate-object guard now also uses a two-element slice
+  pattern over public windows rather than `pair[0]` / `pair[1]` indexing.
 - the shadow-load path, committed-shadow reconciliation path, and injected
   Path-ORAM fresh-coin routing path now also live in
   `runtime/uo-evm/src/state.rs` rather than being assembled directly in
-  `runtime/uo-evm/src/kernel.rs`, which further shrinks the amount of
+  a separate `uo-evm` kernel module, which further shrinks the amount of
   object-level state surgery left inside the kernel body
-- `runtime/uo-evm/src/kernel.rs` now also routes the remaining object-level
+- the shared `uo-kernel-runtime` machine now routes the remaining object-level
   `cell_get` / `cell_set` / `array_get` / `array_set` / `map_get` / `map_put`
-  and commit logic through one private shared shadow-state interface rather
-  than keeping duplicate public-vs-confidential helper bodies, so the bespoke
-  Rust kernel surface that still needs a refinement story is smaller and more
-  uniform than before
+  and commit logic through one private shared shadow-state interface
+  implemented in `state.rs`, so the bespoke Rust kernel surface that still
+  needs a refinement story is smaller and more uniform than before
 - the live proof-critical kernel-boundary bookkeeping in
-  `runtime/uo-evm/src/kernel.rs` now also routes through one shared
+  `uo-kernel-runtime` now also routes through one shared
   `uo-core` `RuntimeKernelBoundaryTracker`, which owns the public-object
   bootstrap, admitted-schedule binding, runtime-phase tracking, and exact
   finish-snapshot handoff rather than leaving that coordination as ad hoc
@@ -522,7 +590,7 @@ The current runtime has a first hardening layer:
 - that same shell interface now also has a direct slot-only proof path:
   `uo-core` exports a `RuntimeShellBoundarySlotBundle` carrying the
   shell-boundary bundle plus the exact fixed-slot confidential program that
-  `RuntimeKernel` executes, and Lean checks that the shell-boundary
+  the shared runtime-kernel path executes, and Lean checks that the shell-boundary
   refinement claim and the slot-derived kernel schedule share the same
   proof-grade kernel witness; the probe validates that path separately as
   `shell_boundary_slot_validation.json`
@@ -540,8 +608,8 @@ The current runtime has a first hardening layer:
   preserves the manifest-carried named/slot program pair rather than silently
   re-lowering from the named DSL object
 - the post-call `cold_store_object` / `post_committed_cold_object` tail for
-  that runtime phase witness is now also finalized inside
-  `runtime/uo-evm/src/kernel.rs` rather than being assembled in `engine.rs`;
+  that runtime phase witness is now also finalized inside the shared
+  `uo-kernel-runtime` / `state.rs` boundary rather than being assembled in `engine.rs`;
   `state.rs` now only checks the committed-cold boundary after shadow state is
   turned back into committed storage, which further shrinks the amount of
   concrete runtime-phase witness construction left outside the kernel
@@ -641,7 +709,11 @@ The current runtime has a first hardening layer:
   `SgxControllerShapeTrace.page_trace_regions`,
   `SgxControllerShapeTrace.workset_regions`, and the derived
   `NormalizedMicroTrace` page/exit/shared-resource patterns all carried in
-  boxed fixed-shape buffers rather than growable `Vec` carriers
+  boxed fixed-shape buffers rather than growable `Vec` carriers; the live
+  recorder side now mirrors that discipline with fixed public
+  `ControllerRegionCounters` for page/workset budgets and derives per-object
+  ORAM access counts from the observed public schedule rather than maintaining
+  a separate `BTreeMap<u32, usize>` counter
 - the public-trace helper surface is pinned too:
   `PublicCallSummary::from_manifest_entry(...)` and
   `CallRecorder::begin_with_input_len(...)` stay confined to
@@ -775,7 +847,7 @@ The current runtime has a first hardening layer:
 - the hidden traced-call witness staging objects in `state.rs` now also wipe
   their access-counter and position-map vectors on drop unless the theorem
   finalizer explicitly consumes them
-- the confidential-path `RuntimeKernel` entrypoints that shadow-load
+- the confidential-path shared-kernel entrypoints that shadow-load
   committed state, run confidential calls, and commit public shadows are now
   also visibility-restricted to `crate::runtime`, so the generic shell cannot
   call those kernel hooks directly
@@ -783,18 +855,20 @@ The current runtime has a first hardening layer:
   and confidential execution to `runtime/uo-evm/src/state.rs`; confidential
   manifest-to-kernel planning is now fully internal to `ContractRuntime`, so
   the engine no longer stages a `ConfidentialEntrypointPlan`, imports either
-  the raw `RuntimeKernel` or the public kernel facade directly, or threads the
-  allocator/kernel-budget/hash-budget/commit-budget setup itself. The old
+  the shared `RuntimeKernelMachine` or the public kernel facade directly, or
+  threads the allocator/kernel-budget/hash-budget/commit-budget setup itself.
+  The old
   runtime-local plan wrapper inside `state.rs` is now gone too: that module
   consumes one shared `uo-core`
   `RuntimeConfidentialEntrypointPlan` produced by
   `EntrypointManifest::runtime_confidential_entrypoint_plan(...)`, so the
   admitted confidential slot program, exact public object universe, and the
   public runtime budgets all come from one shared admission object rather than
-  local manifest repacking, and that public object universe now stays on boxed
-  exact-size object-id slices from the committed object table through the
-  shared plan and into the public shell/bootstrap path instead of widening
-  back into a temporary `Vec<u32>` at the runtime boundary; the theorem-side
+  local manifest repacking, and that public object universe now crosses the
+  runtime boundary as boxed object-id slices from the committed object table
+  through the shared plan and into the public shell/bootstrap path; the only
+  `Vec` construction is the public-size collection step that builds that boxed
+  slice. The theorem-side
   theorem-side `begin_call_trace` path now triggers that runtime preflight
   instead, and the runtime now validates the slot program against the stored
   `manifest.kernel_steps` once but then carries the checked slot program
@@ -929,7 +1003,7 @@ The current runtime has a first hardening layer:
   scratch-region names, or refinement-event kinds
 - the boundary report now also checks constructor authority for those runtime
   witnesses directly: production `RuntimeKernelRefinementEventWitness`
-  construction is restricted to `runtime/uo-evm/src/kernel.rs` and
+  construction is restricted to `runtime/uo-kernel-runtime/src/lib.rs` and
   `runtime/uo-evm/src/state.rs`, while production
   `RuntimeKernelResourceEventWitness` construction is restricted to
   `runtime/uo-allocator/src/lib.rs`
@@ -938,38 +1012,64 @@ The current runtime has a first hardening layer:
   `RuntimeObject` reopen / commit / cold-store / witness-export / fresh-coin
   helper calls must stay in `runtime/uo-evm/src/state.rs`, the shadow-state
   helpers that reopen committed state, install fresh coins, and reconcile
-  committed shadows must be called only from `runtime/uo-evm/src/kernel.rs`,
-  the public shadow-load / public-commit / confidential-execution kernel
-  hooks `shadow_load_public_objects`, `commit_public_objects`, and
-  `run_confidential_call` must be invoked only from `runtime/uo-evm/src/state.rs`,
-  without exposing raw `inner_mut` / `into_inner` escape hatches on the
-  public kernel facade,
-  and the confidential shadow-load helper itself stays private to
-  `runtime/uo-evm/src/kernel.rs`; the same source-level report now also pins
+  committed shadows must be called only from `runtime/uo-evm/src/state.rs`,
+  the public shadow-load / public-commit / confidential-execution shared-kernel
+  hooks `shadow_load_with`, `commit_objects`, and `run_confidential_call`
+  must be invoked only from `runtime/uo-evm/src/state.rs`, without exposing
+  raw `inner_mut` / `into_inner` escape hatches on a runtime-local public
+  kernel facade, and the confidential shadow-load helper itself stays
+  private to `runtime/uo-evm/src/state.rs`; the same source-level report now also pins
   the top-level `ContractRuntime` authority split, so only `shell.rs` may
   drive `prepare_public_shadow`, `commit_public_shadow`, and
   `replace_with_cold_public_shadow`, while only `engine.rs` may call
   `self.state.run_confidential_entrypoint(...)`
 - the boundary report now also checks the low-level store helper layer:
   direct `StoreCipher::seal` / `StoreCipher::open` use must stay inside
-  `runtime/uo-store/src/codec.rs`, the public wipe-preserving helper surface
-  must stay at `seal_and_wipe` / `seal_and_wipe_into` /
+  `runtime/uo-store/src/codec.rs`, the Lean-generated exact-size
+  seal/open/filler surface in `runtime/uo-store/src/generated_surface.rs`,
+  the Lean-generated boxed-filler /
+  seal-into helper surface in
+  `runtime/uo-store/src/generated_store_helpers.rs`, and the thin call-site
+  shell in `runtime/uo-store/src/store.rs`; public store evidence buffers now
+  appear in that handwritten shell only as generated
+  `StorePhysicalWriteTrace` / `StoreLogicalEventTrace` wrappers rather than raw
+  `Vec<PhysicalWriteEvent>` / `Vec<LogicalEvent>` fields, and those generated
+  wrappers now use exact boxed-slice backing with fallible fixed-builder
+  appends rather than `Vec` storage; the public wipe-preserving helper
+  surface must stay at `seal_and_wipe_boxed` /
+  `seal_and_wipe_into_slice` / `filler_boxed` /
   `with_opened_payload`, the store write API must take mutable plaintext
   buffers, `StoreCipher` must zeroize its key on drop, and the internal
   nonzero transport plus sealed-payload encode/decode path must stay on
-  exact-size buffers and in-place AEAD helpers rather than regressing to
-  growable transport vectors
+  exact-size boxed buffers and in-place AEAD helpers without `expect`,
+  `unwrap`, or `panic!` rather than regressing to growable transport vectors;
+  public-size `Vec` construction is allowed only inside the generated helper
+  shells where it immediately becomes a boxed slice and is source-pinned
+- the allocator side of the same boundary now also avoids panic-style
+  resource-event finalization: `ResourceEventLog::into_events(...)` checks
+  public length/capacity and every populated public-prefix entry before
+  producing boxed finish telemetry instead of relying on
+  `expect("resource event prefix is populated")`; it now also uses checked
+  slot access before taking each event, and tamper validation rejects the stale
+  `self.events[index].take()` extraction shape
+- the same source-backed boundary now also checks the whole production
+  `RuntimeImplementationInterface` for absence of `expect(`, `unwrap(`, and
+  `panic!`; this includes the shared `uo-core` trace/types layer, whose
+  proof-object JSON and trace-hash APIs are now fallible and whose aggregate
+  canonical value encoding uses 64-bit length prefixes rather than panicking on
+  `u32` conversion
 - the probe-side production-source scan now strips `#[cfg(test)]` items
   without truncating the rest of the file, so those confinement checks cover
   production helpers that appear after mid-file test-only utilities rather
   than silently stopping at the first test block
 - the same boundary report now also rejects regressions back to unbounded
-  runtime witness buffers: the production kernel must keep its emitted
-  kernel-step witness and lower-level runtime phase witness inside the local
-  `BoundedJournal` wrapper with bounds derived from public kernel-op/object
-  counts, and the remaining public shell-side commit / witness helper lists
-  must start from explicit `Vec::with_capacity(...)` allocations rather than
-  `Vec::new()`
+  runtime witness buffers: the production path must keep its emitted
+  kernel-step witness and lower-level runtime phase witness inside the shared
+  `uo-core` `BoundedJournal` wrapper with bounds derived from public
+  kernel-op/object counts, reject the old tracker-side `Vec` fields, reject
+  the stale `BoundedJournal` `Vec` snapshot bounce and direct-index writes, and
+  keep the remaining public shell-side commit / witness helper lists on
+  explicit `Vec::with_capacity(...)` allocations rather than `Vec::new()`
 - the shared `uo-core` schedule/refinement layer now also stays exact-size all
   the way down: `ConfidentialKernelProgram::expected_runtime_steps`,
   `ConfidentialKernelSlotProgram::expected_runtime_steps`, and the shared
@@ -977,7 +1077,10 @@ The current runtime has a first hardening layer:
   while `RuntimeKernelFinishBundle::completed_runtime_phase_events` and
   `RuntimeKernelRefinementWitness::from_events` now meet on boxed refinement
   event slices instead of reopening that finish/refinement boundary through a
-  temporary `Vec<RuntimeKernelRefinementEventWitness>`
+  temporary `Vec<RuntimeKernelRefinementEventWitness>`; the same checked
+  source boundary now keeps named/slot confidential-kernel program bodies and
+  Keccak part lists boxed as fixed-shape slices and requires named-to-slot
+  lowering to use `FixedBoxBuilder` rather than growable `Vec` collection
 - that same boundary report now also rejects regressions back to mid-call
   Path-ORAM stash growth: the production ORAM path must derive one public
   `working_stash_capacity(...)` bound, rebuild stash buffers with that headroom
@@ -1002,6 +1105,20 @@ The current runtime has a first hardening layer:
   restoration, route array/small-map restore through those helpers, and avoid
   the old `next.physical = old.physical.clone()` /
   `next.physical_slots = old.physical_slots.clone()` assignments
+- that same boundary report now also rejects regressions back to object-store
+  schedule leaks: production `oram.rs` must keep fixed-public-batch ORAM write
+  evidence, production `objects.rs` must keep UO small-map lookup as a masked
+  full scan, and UO array access must keep masked full-scan read/write behavior
+  without direct secret-indexing or a UO-path out-of-range public branch
+- the direct machine-confinement report now also exposes the tightened
+  handwritten ORAM write-batch consumer cut: object/commit code must enumerate
+  fixed-public-batch write evidence through
+  `OramWriteBatch::for_each_write(...)`, which checks public length/capacity and
+  populated public-prefix entries, and the source-backed boundary rejects the
+  older lossy `filter_map(Option::as_ref)` iterator path; the same focused
+  report marks production handwritten `engine.rs` / `shell.rs` / `state.rs` /
+  `objects.rs` / `oram.rs` as free of `expect(`, `unwrap(`, and `panic!` after
+  test-only code is stripped
 - that same boundary report now also rejects regressions back to a
   string-keyed confidential runtime environment: the production shell must
   load the checked manifest's `confidential_slot_program` through the shared
@@ -1015,15 +1132,19 @@ The current runtime has a first hardening layer:
   carries, and it rejects any mismatch between the exact function-body
   lowering, the stored function-level DSL, and the stored manifest-level DSL,
   so the proof-grade path no longer depends on reconstructing only a public
-  schedule when the full DSL program is already available
+  schedule when the full DSL program is already available; the same checker
+  now also rejects any confidential kernel-step target that resolves to a raw
+  or unknown state object, and the paper-facing Lean facade exports that
+  non-raw target fact as a theorem
 - the runtime-boundary report now also checks that the production confidential
-  object API surface is routed only through `runtime/uo-evm/src/kernel.rs`:
+  object API surface is routed only through `runtime/uo-evm/src/state.rs`:
   all direct `.get_cell`, `.set_cell`, `.get_array`, `.set_array`, `.get_map`,
-  and `.put_map` call sites must stay inside the kernel module, while the
+  and `.put_map` call sites must stay inside the runtime state module, while the
   remaining runtime state surface is constrained to the committed-state
   wrapper and the fixed-slot kernel execution state; the report now also pins
-  the new private shared shadow-state traits in `kernel.rs` so the public and
-  confidential paths keep sharing one internal object-operation helper stack
+  the private shared shadow-state traits in `uo-kernel-runtime` plus their
+  `state.rs` implementations so the public and confidential paths keep
+  sharing one internal object-operation helper stack
   rather than drifting back into duplicated kernel code
 - the probe-side kernel witness summaries now expose the emitted
   `resource_events` trace together with the emitted and expected public object
@@ -1061,6 +1182,21 @@ theorem. Remaining gaps include:
   live plaintext buffer and helper-state transition inside the runtime; it
   closes the gap substantially, but it is not yet the final
   "all confidential runtime state refines one tiny machine" theorem
+- the modeled/source-pinned helper schedules now include the machine/effect
+  path, allocator discipline, statement recorder, ORAM write log, small-map
+  lookup, array access, and generated return-tail schedule, but these still need
+  a native semantics-of-Rust refinement theorem to stop relying on source
+  pattern checks; the exact secret-bearing object/ORAM open/bootstrap/reseal
+  shell now lives in the exact-source-checked generated helper module, and the
+  remaining handwritten object/ORAM coordination plus store surface is
+  isolated as its own source-backed
+  `RuntimeImplementationInterface.ResidualHelperShellBoundary`, with a
+  dedicated `runtime_residual_helper_shell_boundary_validation.json` report,
+  and Lean now also packages its direct meeting with the emitted native
+  machine witness as
+  `RuntimeImplementationResidualHelperShellMachineRefinementBoundary`,
+  benchmark-backed through
+  `runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation.json`
 - the rest of the runtime still uses ordinary Rust data structures whose host
   allocation behavior has not been proved irrelevant to the admitted observer
 - some helper APIs outside the confidential `uo-evm` hot path may still keep

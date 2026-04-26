@@ -13,16 +13,6 @@ pub struct ContractInstance {
     deploy_seed: u64,
 }
 
-impl Clone for ContractInstance {
-    fn clone(&self) -> Self {
-        Self {
-            artifact: self.artifact.clone(),
-            state: self.state.clone(),
-            deploy_seed: self.deploy_seed,
-        }
-    }
-}
-
 #[cfg(feature = "diagnostics")]
 #[derive(Clone, Debug)]
 pub struct CallTelemetry {
@@ -343,7 +333,7 @@ mod tests {
             .call("classify(uint256)", vec![Value::Uint(1)])
             .unwrap();
 
-        let (cell_id, hot_cell) = {
+        let (cell_id, mut hot_cell) = {
             let (cell_id, _) = instance
                 .state
                 .object_entries_for_test()
@@ -355,6 +345,7 @@ mod tests {
                 .unwrap();
             (cell_id, hot_cell)
         };
+        hot_cell.force_committed_cache_hot_for_test().unwrap();
         instance.state.insert_object_for_test(cell_id, hot_cell);
 
         let err = instance.call("peek()", vec![]).unwrap_err();

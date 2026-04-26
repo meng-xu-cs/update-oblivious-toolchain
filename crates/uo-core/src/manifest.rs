@@ -424,7 +424,7 @@ mod tests {
             return_type: None,
             secret_args: vec![0],
             slot_count: 1,
-            body: Vec::new(),
+            body: Box::default(),
         };
 
         assert_eq!(
@@ -455,7 +455,7 @@ mod tests {
             return_type: None,
             secret_args: vec![0],
             slot_count: 1,
-            body: Vec::new(),
+            body: Box::default(),
         };
         let manifest = EntrypointManifest {
             secret_args: vec![0],

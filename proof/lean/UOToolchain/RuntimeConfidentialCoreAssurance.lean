@@ -311,6 +311,54 @@ noncomputable def RuntimeKernelFinishSlotBoundary.runtimeKernelInterfaceSlotBoun
         boundary.emittedKernelStepsExact
   }
 
+/--
+Native theorem object for the closer-to-implementation machine-finish route:
+one exact finished kernel-finish-slot boundary plus the extra live
+`RuntimeKernelMachine` bookkeeping facts that are checked before the runtime
+flattens that machine state to the smaller finish bundle.
+-/
+structure RuntimeKernelMachineFinishBoundary where
+  runtimeKernelFinishSlotBoundary : RuntimeKernelFinishSlotBoundary
+  expectedKernelStepIndex : Nat
+  maxKernelOps : Nat
+  maxRuntimePhaseEventCount : Nat
+  expectedKernelScheduleConsumed :
+    match runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+    | some steps => expectedKernelStepIndex = steps.length
+    | none => expectedKernelStepIndex = 0
+  kernelStepBudgetRespected :
+    runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      maxKernelOps
+  runtimePhaseEventCapacityMatches :
+    maxRuntimePhaseEventCount =
+      runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.publicObjectIds.length * 5
+        + maxKernelOps
+  runtimePhaseEventCapacityRespected :
+    runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length
+      ≤ maxRuntimePhaseEventCount
+
+theorem RuntimeKernelMachineFinishBoundary.toRefinesLeanKernelState
+  (boundary : RuntimeKernelMachineFinishBoundary) :
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelFinishSlotBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelFinishSlotBoundary
+
+noncomputable def RuntimeKernelMachineFinishBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeKernelMachineFinishBoundary) : RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem RuntimeKernelMachineFinishBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeKernelMachineFinishBoundary) :
+  let runtimeBoundary :=
+    boundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelFinishSlotBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelFinishSlotBoundary
+
 theorem runtimeConfidentialCoreAssurance_slotAssurance_of_lowering
   (runtimeWitness : RuntimeRefinementWitness)
   (program : ConfidentialKernelProgram)

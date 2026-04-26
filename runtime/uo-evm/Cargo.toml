@@ -17,6 +17,7 @@ serde_json.workspace = true
 tiny-keccak.workspace = true
 uo-core = { path = "../../crates/uo-core" }
 uo-allocator = { path = "../uo-allocator" }
+uo-kernel-runtime = { path = "../uo-kernel-runtime" }
 uo-precompiles = { path = "../uo-precompiles" }
 uo-store = { path = "../uo-store" }
 

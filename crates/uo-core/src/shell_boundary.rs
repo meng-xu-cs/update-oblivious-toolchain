@@ -193,21 +193,7 @@ impl RuntimeShellTrace {
     }
 
     pub fn projected_kernel_schedule_from_events(&self) -> RuntimeKernelScheduleWitness {
-        let steps = self
-            .events()
-            .iter()
-            .filter_map(RuntimeKernelRefinementEventWitness::projected_kernel_step)
-            .collect::<Vec<_>>();
-        RuntimeKernelScheduleWitness::new(
-            steps
-                .iter()
-                .map(RuntimeKernelStepWitness::projected_opcode)
-                .collect(),
-            steps,
-        )
-        .expect(
-            "projected shell-boundary schedule derived from events must satisfy shape invariants",
-        )
+        RuntimeKernelScheduleWitness::from_projected_refinement_events(self.events())
     }
 
     fn object_schedule_from_events(
@@ -672,13 +658,15 @@ mod tests {
                     UoOpcode::CellGet,
                     UoOpcode::Commit,
                     UoOpcode::Wipe,
-                ],
+                ]
+                .into_boxed_slice(),
                 vec![
                     RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
                     RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
                     RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
                     RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
-                ],
+                ]
+                .into_boxed_slice(),
             )
             .unwrap(),
         }
@@ -704,13 +692,15 @@ mod tests {
                     UoOpcode::CellGet,
                     UoOpcode::Commit,
                     UoOpcode::Wipe,
-                ],
+                ]
+                .into_boxed_slice(),
                 vec![
                     RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
                     RuntimeKernelStepWitness::new(UoOpcode::CellGet, Some(7)).unwrap(),
                     RuntimeKernelStepWitness::new(UoOpcode::Commit, None).unwrap(),
                     RuntimeKernelStepWitness::new(UoOpcode::Wipe, None).unwrap(),
-                ],
+                ]
+                .into_boxed_slice(),
             )
             .unwrap(),
             pre_committed_cold_object_schedule: vec![7].into_boxed_slice(),

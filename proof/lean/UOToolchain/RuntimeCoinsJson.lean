@@ -946,12 +946,13 @@ def loadAndCheckImportedProofGradeSeededRuntimePaperMainFamilyBundle
             s!"failed to validate proof-grade seeded runtime paper-main family bundle: {err}"
 
 def importedSeededRuntimePaperMainSlotFamilyBundleFieldNames : List String :=
-  ["family", "public_outcome", "boundary_schedule", "confidential_slot_program"]
+  ["family", "public_outcome", "boundary_schedule", "opcode_trace", "confidential_slot_program"]
 
 structure ImportedSeededRuntimePaperMainSlotFamilyBundle where
   family : ImportedSeededRuntimePathOramWitnessFamily
   public_outcome : ImportedPublicOutcomeTrace
   boundary_schedule : List ImportedBoundaryEvent
+  opcode_trace : List String
   confidential_slot_program : ImportedConfidentialKernelSlotProgram
 deriving FromJson
 
@@ -970,6 +971,7 @@ def ImportedSeededRuntimePaperMainSlotFamilyBundle.Valid
     0 < bundle.family.seed_count ∧
     bundle.confidential_slot_program.RuntimeNormalForm ∧
     bundle.confidential_slot_program.entrypoint_id = bundle.runtimePublicOutcome.entrypointId ∧
+    bundle.opcode_trace = bundle.confidential_slot_program.statementTraceNames ∧
     ∀ seed, seed < bundle.family.seed_count →
       ∃ witness,
         bundle.family.witnessAt? seed = some witness ∧
@@ -989,6 +991,7 @@ def ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
     decide
       (bundle.confidential_slot_program.entrypoint_id =
         bundle.runtimePublicOutcome.entrypointId) &&
+    decide (bundle.opcode_trace = bundle.confidential_slot_program.statementTraceNames) &&
     (List.range bundle.family.seed_count).all fun seed =>
       match bundle.family.witnessAt? seed with
       | some witness =>
@@ -1009,7 +1012,9 @@ def ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
     have hCheck' := hCheck
     unfold ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid at hCheck'
     rw [Bool.and_eq_true] at hCheck'
-    rcases hCheck' with ⟨hPrefix4, hAll⟩
+    rcases hCheck' with ⟨hPrefix5, hAll⟩
+    rw [Bool.and_eq_true] at hPrefix5
+    rcases hPrefix5 with ⟨hPrefix4, hTrace⟩
     rw [Bool.and_eq_true] at hPrefix4
     rcases hPrefix4 with ⟨hPrefix3, hEntrypoint⟩
     rw [Bool.and_eq_true] at hPrefix3
@@ -1021,10 +1026,11 @@ def ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
       (importedSeededRuntimePathOramWitnessFamily_checkProofGrade_eq_true_iff
         bundle.family
         modelTags).mp hFamily
-    refine ⟨hFamilyValid, ?_, ?_, ?_, ?_⟩
+    refine ⟨hFamilyValid, ?_, ?_, ?_, ?_, ?_⟩
     · simpa [decide_eq_true_eq] using hSeedPos
     · exact (importedConfidentialKernelSlotProgram_checkRuntimeNormalForm_eq_true_iff _).mp hNorm
     · simpa [decide_eq_true_eq] using hEntrypoint
+    · simpa [decide_eq_true_eq] using hTrace
     intro seed hSeed
     rcases hFamilyValid.1.2 seed hSeed with ⟨witness, hWitness, _hTag, _hWitnessValid⟩
     have hSeedCheck := (List.all_eq_true.mp hAll) seed (List.mem_range.mpr hSeed)
@@ -1050,6 +1056,10 @@ def ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
           (bundle.confidential_slot_program.entrypoint_id =
             bundle.runtimePublicOutcome.entrypointId) = true := by
       simpa [decide_eq_true_eq] using hValid.2.2.2.1
+    have hTrace :
+        decide (bundle.opcode_trace = bundle.confidential_slot_program.statementTraceNames) =
+          true := by
+      simpa [decide_eq_true_eq] using hValid.2.2.2.2.1
     have hAll :
         (List.range bundle.family.seed_count).all fun seed =>
           match bundle.family.witnessAt? seed with
@@ -1064,7 +1074,7 @@ def ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
       refine List.all_eq_true.mpr ?_
       intro seed hSeedMem
       have hSeed : seed < bundle.family.seed_count := List.mem_range.mp hSeedMem
-      rcases hValid.2.2.2.2 seed hSeed with ⟨witness, hWitness, hSlot, hOutcome, hBoundary⟩
+      rcases hValid.2.2.2.2.2 seed hSeed with ⟨witness, hWitness, hSlot, hOutcome, hBoundary⟩
       have hSlotCheck :
           checkImportedRuntimeConfidentialCoreKernelInterfaceSlotAssurance
             witness
@@ -1079,7 +1089,7 @@ def ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
         simpa [decide_eq_true_eq] using hBoundary
       simp [hWitness, hSlotCheck, hOutcomeCheck, hBoundaryCheck]
     unfold ImportedSeededRuntimePaperMainSlotFamilyBundle.checkValid
-    simp [hFamily, hSeedPos, hNorm, hEntrypoint, hAll]
+    simp [hFamily, hSeedPos, hNorm, hEntrypoint, hTrace, hAll]
 
 theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_slot_assurance
   {bundle : ImportedSeededRuntimePaperMainSlotFamilyBundle}
@@ -1088,6 +1098,7 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
   bundle.family.ProofGradePaperMainRuntimeAssurance modelTags ∧
     bundle.confidential_slot_program.RuntimeNormalForm ∧
     bundle.confidential_slot_program.entrypoint_id = bundle.runtimePublicOutcome.entrypointId ∧
+    bundle.opcode_trace = bundle.confidential_slot_program.statementTraceNames ∧
     ∀ seed, seed < bundle.family.seed_count →
       ∃ witness,
         bundle.family.witnessAt? seed = some witness ∧
@@ -1095,12 +1106,12 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
             witness
             bundle.confidential_slot_program
             modelTags := by
-  refine ⟨?_, hValid.2.2.1, hValid.2.2.2.1, ?_⟩
+  refine ⟨?_, hValid.2.2.1, hValid.2.2.2.1, hValid.2.2.2.2.1, ?_⟩
   · have hKernelInterface :
         bundle.family.ProofGradeKernelInterfaceAssurance modelTags := by
       refine ⟨hValid.1, ?_⟩
       intro seed hSeed
-      rcases hValid.2.2.2.2 seed hSeed with
+      rcases hValid.2.2.2.2.2 seed hSeed with
         ⟨witness, hWitness, hSlot, _hOutcome, _hBoundary⟩
       exact
         ⟨witness, hWitness,
@@ -1111,7 +1122,7 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
       have hSeedOutcome :
           (bundle.family.runtimeWitnessAt seed).publicOutcome =
             bundle.runtimePublicOutcome := by
-        rcases hValid.2.2.2.2 seed hSeed with
+        rcases hValid.2.2.2.2.2 seed hSeed with
           ⟨witness, hWitness, _hSlot, hOutcome, _hBoundary⟩
         simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
           ImportedRuntimeRefinementWitness.toRuntimeWitness,
@@ -1121,7 +1132,7 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
       have hZeroOutcome :
           (bundle.family.runtimeWitnessAt 0).publicOutcome =
             bundle.runtimePublicOutcome := by
-        rcases hValid.2.2.2.2 0 hValid.2.1 with
+        rcases hValid.2.2.2.2.2 0 hValid.2.1 with
           ⟨witness, hWitness, _hSlot, hOutcome, _hBoundary⟩
         simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
           ImportedRuntimeRefinementWitness.toRuntimeWitness,
@@ -1138,7 +1149,7 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
       have hSeedBoundary :
           (bundle.family.runtimeWitnessAt seed).boundarySchedule =
             bundle.runtimeBoundarySchedule := by
-        rcases hValid.2.2.2.2 seed hSeed with
+        rcases hValid.2.2.2.2.2 seed hSeed with
           ⟨witness, hWitness, _hSlot, _hOutcome, hBoundary⟩
         simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
           ImportedRuntimeRefinementWitness.toRuntimeWitness,
@@ -1148,7 +1159,7 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
       have hZeroBoundary :
           (bundle.family.runtimeWitnessAt 0).boundarySchedule =
             bundle.runtimeBoundarySchedule := by
-        rcases hValid.2.2.2.2 0 hValid.2.1 with
+        rcases hValid.2.2.2.2.2 0 hValid.2.1 with
           ⟨witness, hWitness, _hSlot, _hOutcome, hBoundary⟩
         simpa [ImportedSeededRuntimeWitnessFamily.runtimeWitnessAt,
           ImportedRuntimeRefinementWitness.toRuntimeWitness,
@@ -1161,7 +1172,7 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_family_
         _ = (bundle.family.runtimeWitnessAt 0).boundarySchedule := by
               simpa using hZeroBoundary.symm
   · intro seed hSeed
-    rcases hValid.2.2.2.2 seed hSeed with
+    rcases hValid.2.2.2.2.2 seed hSeed with
       ⟨witness, hWitness, hSlot, _hOutcome, _hBoundary⟩
     exact ⟨witness, hWitness, hSlot⟩
 
@@ -1175,7 +1186,7 @@ theorem importedSeededRuntimePaperMainSlotFamilyBundle_valid_projects_to_runtime
       (importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid hValid.1))
     bundle.confidential_slot_program.toConfidentialKernelSlotProgram := by
   intro seed hSeed
-  rcases hValid.2.2.2.2 seed hSeed with
+  rcases hValid.2.2.2.2.2 seed hSeed with
     ⟨witness, hWitness, hSlot, _hOutcome, _hBoundary⟩
   rcases
       importedWitness_toRuntimeWitness_proofGradeConfidentialCoreKernelInterfaceSlotAssurance

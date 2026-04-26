@@ -1,8 +1,8 @@
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use uo_core::{
-    EntrypointManifest, RuntimeKernelResourceEventWitness, RuntimeKernelScratchRegionWitness,
-    RuntimeKernelTelemetrySnapshot,
+    EntrypointManifest, FixedBoxBuilder, RuntimeKernelResourceEventWitness,
+    RuntimeKernelScratchRegionWitness, RuntimeKernelTelemetrySnapshot,
 };
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -17,6 +17,63 @@ struct ScratchUsage {
     live_bytes: usize,
     peak_bytes: usize,
     wipe_count: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+struct ResourceEventLog {
+    events: Box<[Option<RuntimeKernelResourceEventWitness>]>,
+    len: usize,
+    overflowed: bool,
+}
+
+impl ResourceEventLog {
+    fn with_capacity(capacity: usize) -> Result<Self> {
+        let mut events = FixedBoxBuilder::new(capacity);
+        for _ in 0..capacity {
+            events.push(None)?;
+        }
+        Ok(Self {
+            events: events.finish()?,
+            len: 0,
+            overflowed: false,
+        })
+    }
+
+    fn push(&mut self, event: RuntimeKernelResourceEventWitness) {
+        match self.events.get_mut(self.len) {
+            Some(slot) => {
+                *slot = Some(event);
+                self.len += 1;
+            }
+            None => {
+                self.overflowed = true;
+            }
+        }
+    }
+
+    fn into_events(mut self) -> Result<Box<[RuntimeKernelResourceEventWitness]>> {
+        if self.overflowed {
+            bail!("allocator resource-event capacity exceeded");
+        }
+        if self.len > self.events.len() {
+            bail!(
+                "allocator resource-event length {} exceeds capacity {}",
+                self.len,
+                self.events.len()
+            );
+        }
+        let mut events = FixedBoxBuilder::new(self.len);
+        for index in 0..self.len {
+            let Some(slot) = self.events.get_mut(index) else {
+                bail!("allocator resource-event slot {index} missing despite capacity guard");
+            };
+            let Some(event) = slot.take() else {
+                bail!("allocator resource-event prefix missing entry {index}");
+            };
+            events.push(event)?;
+        }
+        events.finish()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -59,7 +116,7 @@ impl AllocatorPlan {
 pub struct AllocatorSession {
     plan: AllocatorPlan,
     kernel_op_count: usize,
-    resource_events: Vec<RuntimeKernelResourceEventWitness>,
+    resource_events: ResourceEventLog,
     peak_stack_words: usize,
     value_scratch: ScratchUsage,
     hash_scratch: ScratchUsage,
@@ -78,16 +135,17 @@ impl Drop for ScratchGuard<'_> {
 }
 
 impl AllocatorSession {
-    pub fn new(plan: AllocatorPlan) -> Self {
-        Self {
+    pub fn new(plan: AllocatorPlan) -> Result<Self> {
+        let resource_event_capacity = resource_event_capacity(&plan);
+        Ok(Self {
             plan,
             kernel_op_count: 0,
-            resource_events: Vec::new(),
+            resource_events: ResourceEventLog::with_capacity(resource_event_capacity)?,
             peak_stack_words: 0,
             value_scratch: ScratchUsage::default(),
             hash_scratch: ScratchUsage::default(),
             io_scratch: ScratchUsage::default(),
-        }
+        })
     }
 
     pub fn record_kernel_op(&mut self) -> Result<()> {
@@ -161,6 +219,7 @@ impl AllocatorSession {
         self.ensure_region_wiped(ScratchRegion::ValueScratch, &self.value_scratch)?;
         self.ensure_region_wiped(ScratchRegion::HashScratch, &self.hash_scratch)?;
         self.ensure_region_wiped(ScratchRegion::IoScratch, &self.io_scratch)?;
+        let resource_events = self.resource_events.into_events()?;
         Ok(RuntimeKernelTelemetrySnapshot::new(
             self.plan.arena_bytes,
             self.plan.max_stack_words,
@@ -175,7 +234,7 @@ impl AllocatorSession {
             self.io_scratch.peak_bytes,
             self.io_scratch.live_bytes,
             self.io_scratch.wipe_count,
-            self.resource_events,
+            resource_events,
         ))
     }
 
@@ -199,6 +258,13 @@ impl AllocatorSession {
         }
         Ok(())
     }
+}
+
+fn resource_event_capacity(plan: &AllocatorPlan) -> usize {
+    plan.max_kernel_ops
+        .saturating_add(plan.max_stack_words)
+        .saturating_mul(128)
+        .saturating_add(128)
 }
 
 fn runtime_kernel_region(region: ScratchRegion) -> RuntimeKernelScratchRegionWitness {
@@ -331,7 +397,7 @@ mod tests {
             return_type: None,
             secret_args: vec![0],
             slot_count: 1,
-            body: Vec::new(),
+            body: Box::default(),
         });
 
         let plan = AllocatorPlan::from_manifest(&manifest);
@@ -349,7 +415,8 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 1,
-        });
+        })
+        .unwrap();
         session.record_kernel_op().unwrap();
         assert!(session.record_kernel_op().is_err());
     }
@@ -361,7 +428,8 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 4,
-        });
+        })
+        .unwrap();
         session
             .reserve_scratch(ScratchRegion::ValueScratch, 32)
             .unwrap();
@@ -375,7 +443,8 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 4,
-        });
+        })
+        .unwrap();
         session.record_kernel_op().unwrap();
         session
             .reserve_scratch(ScratchRegion::ValueScratch, 32)
@@ -393,7 +462,8 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 4,
-        });
+        })
+        .unwrap();
         {
             let _guard = session.reserve_guard(ScratchRegion::IoScratch, 96).unwrap();
         }

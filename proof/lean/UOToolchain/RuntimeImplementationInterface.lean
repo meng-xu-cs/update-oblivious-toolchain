@@ -1,4 +1,29 @@
+import UOToolchain.ConfidentialKernelGeneratedRust
+import UOToolchain.RuntimeKernelMachineGeneratedRust
+import UOToolchain.RuntimeKernelSlotSupportGeneratedRust
+import UOToolchain.RuntimeObjectHelpersGeneratedRust
+import UOToolchain.RuntimeOramCodecsGeneratedRust
+import UOToolchain.RuntimeOramCodecSemantics
+import UOToolchain.RuntimeStoreCodecGeneratedRust
+import UOToolchain.RuntimeStoreHelpersGeneratedRust
+import UOToolchain.RuntimeStoreSurfaceGeneratedRust
+import UOToolchain.RuntimeValueOpsGeneratedRust
+import UOToolchain.RuntimeStoreCodecSemantics
+import UOToolchain.RuntimeStoreHelperSemantics
+import UOToolchain.RuntimeValueOpsSemantics
+import UOToolchain.RuntimeConfidentialCoreAssurance
+import UOToolchain.RuntimeAllocatorDiscipline
+import UOToolchain.RuntimeArrayAccessDiscipline
+import UOToolchain.RuntimeKernelMachineSchedule
+import UOToolchain.RuntimeKernelSlotSupport
+import UOToolchain.RuntimeOramWriteLogDiscipline
+import UOToolchain.RuntimeOramHelperSemantics
+import UOToolchain.RuntimeReturnScheduleDiscipline
+import UOToolchain.RuntimeSmallMapLookupDiscipline
+import UOToolchain.RuntimeStatementTraceDiscipline
 import UOToolchain.RuntimeShellBoundary
+
+open Lean
 
 namespace UOToolchain
 
@@ -18,6 +43,24 @@ def checkSourceLacksAll (source : String) : List String → Bool
   | [] => true
   | needle :: needles => !(source.contains needle) && checkSourceLacksAll source needles
 
+def checkSourceContainsLineOrderedFuel :
+    Nat → List String → List String → Bool
+  | _, [], _ => true
+  | 0, _ :: _, _ => false
+  | _ + 1, _ :: _, [] => false
+  | fuel + 1, needle :: needles, line :: lines =>
+      if line.contains needle then
+        checkSourceContainsLineOrderedFuel fuel needles lines
+      else
+        checkSourceContainsLineOrderedFuel fuel (needle :: needles) lines
+
+def checkSourceContainsLineOrdered (source : String) (needles : List String) : Bool :=
+  let lines := source.splitOn "\n"
+  checkSourceContainsLineOrderedFuel (lines.length + 1) needles lines
+
+def sourceContainsLineOrdered (source : String) (needles : List String) : Prop :=
+  checkSourceContainsLineOrdered source needles = true
+
 @[simp] theorem checkSourceContainsAll_eq_true_iff
   (source : String) (needles : List String) :
   checkSourceContainsAll source needles = true ↔ sourceContainsAll source needles := by
@@ -36,8 +79,60 @@ def checkSourceLacksAll (source : String) : List String → Bool
   | cons needle needles ih =>
       simp [checkSourceLacksAll, sourceLacksAll, ih]
 
+@[simp] theorem checkSourceContainsLineOrdered_eq_true_iff
+  (source : String) (needles : List String) :
+  checkSourceContainsLineOrdered source needles = true ↔
+    sourceContainsLineOrdered source needles := by
+  rfl
+
+def countChar (line : String) (target : Char) : Int :=
+  line.toList.foldl (fun acc ch => if ch = target then acc + 1 else acc) 0
+
+def lineContainsChar (line : String) (target : Char) : Bool :=
+  line.toList.any (fun ch => ch = target)
+
+def dropLeadingBlankLines : List String → List String
+  | [] => []
+  | line :: rest =>
+      if line.trimAscii.isEmpty then
+        dropLeadingBlankLines rest
+      else
+        line :: rest
+
+def skipCfgTestItemFuel : Nat → List String → Int → Bool → List String
+  | 0, lines, _, _ => lines
+  | _ + 1, [], _, _ => []
+  | fuel + 1, line :: rest, braceDepth, sawBody =>
+      let braceDepth :=
+        braceDepth + countChar line '{' - countChar line '}'
+      let sawBody := sawBody || lineContainsChar line '{'
+      if !sawBody then
+        if line.trimAsciiEnd.endsWith ";" then
+          rest
+        else
+          skipCfgTestItemFuel fuel rest braceDepth sawBody
+      else if braceDepth <= 0 then
+        rest
+      else
+        skipCfgTestItemFuel fuel rest braceDepth sawBody
+
+def skipCfgTestItem (lines : List String) : List String :=
+  skipCfgTestItemFuel lines.length lines 0 false
+
+def stripCfgTestItemsFuel : Nat → List String → List String
+  | 0, lines => lines
+  | _ + 1, [] => []
+  | fuel + 1, line :: rest =>
+      if line.trimAsciiStart.startsWith "#[cfg(test)]" then
+        stripCfgTestItemsFuel fuel (skipCfgTestItem (dropLeadingBlankLines rest))
+      else
+        line :: stripCfgTestItemsFuel fuel rest
+
+def stripCfgTestItems (lines : List String) : List String :=
+  stripCfgTestItemsFuel lines.length lines
+
 def productionSource (source : String) : String :=
-  (source.splitOn "#[cfg(test)]").head!
+  String.intercalate "\n" (stripCfgTestItems (source.splitOn "\n"))
 
 /--
 Source-backed implementation interface for the real `uo-evm` runtime. This is
@@ -45,16 +140,44 @@ the syntactic proof/interface boundary for the real Rust runtime modules: the
 public shell and engine must stay outside the confidential kernel surface,
 runtime orchestration must remain routed through the shared bridge, and the
 kernel / theorem finalizers must keep delegating to the shared boundary-tracker,
-slot-executor, and trace-finalization objects that Lean already models.
+slot-executor, and trace-finalization objects that Lean already models. The
+checked source boundary now also extends downward into the shared
+`uo-core` confidential-kernel interpreter and its masked/fixed-buffer secret
+state discipline, so the real confidential execution path is pinned to the
+small shared kernel ABI rather than only to the outer `uo-evm` module split.
 -/
 structure RuntimeImplementationInterface where
   runtimeEvmLibSource : String
   engineSource : String
   runtimeModuleSource : String
+  freshCoinsSource : String
+  controllerSource : String
   shellSource : String
   stateSource : String
-  kernelSource : String
+  kernelRuntimeSource : String
+  kernelSlotSupportSource : String
+  generatedKernelMachineSource : String
+  generatedObjectHelpersSource : String
+  generatedOramCodecsSource : String
+  objectsSource : String
+  oramSource : String
   theoremSource : String
+  confidentialKernelSource : String
+  generatedConfidentialKernelSource : String
+  traceSource : String
+  confidentialCoreSource : String
+  trustedKernelSource : String
+  coreLibSource : String
+  precompilesSource : String
+  allocatorSource : String
+  storeLibSource : String
+  storeCodecSource : String
+  generatedStoreCodecSource : String
+  generatedStoreSurfaceSource : String
+  generatedStoreHelpersSource : String
+  storeStoreSource : String
+  generatedValueOpsSource : String
+  typesSource : String
 deriving Repr, DecidableEq
 
 def RuntimeImplementationInterface.engineProductionSource
@@ -65,6 +188,14 @@ def RuntimeImplementationInterface.runtimeModuleProductionSource
   (iface : RuntimeImplementationInterface) : String :=
   productionSource iface.runtimeModuleSource
 
+def RuntimeImplementationInterface.freshCoinsProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.freshCoinsSource
+
+def RuntimeImplementationInterface.controllerProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.controllerSource
+
 def RuntimeImplementationInterface.shellProductionSource
   (iface : RuntimeImplementationInterface) : String :=
   productionSource iface.shellSource
@@ -73,13 +204,203 @@ def RuntimeImplementationInterface.stateProductionSource
   (iface : RuntimeImplementationInterface) : String :=
   productionSource iface.stateSource
 
-def RuntimeImplementationInterface.kernelProductionSource
+def RuntimeImplementationInterface.kernelRuntimeProductionSource
   (iface : RuntimeImplementationInterface) : String :=
-  productionSource iface.kernelSource
+  productionSource iface.kernelRuntimeSource
+
+def RuntimeImplementationInterface.kernelSlotSupportProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.kernelSlotSupportSource
+
+def RuntimeImplementationInterface.generatedKernelMachineProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedKernelMachineSource
+
+def RuntimeImplementationInterface.generatedObjectHelpersProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedObjectHelpersSource
+
+def RuntimeImplementationInterface.generatedOramCodecsProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedOramCodecsSource
+
+def RuntimeImplementationInterface.objectsProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.objectsSource
+
+def RuntimeImplementationInterface.oramProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.oramSource
 
 def RuntimeImplementationInterface.theoremProductionSource
   (iface : RuntimeImplementationInterface) : String :=
   productionSource iface.theoremSource
+
+def RuntimeImplementationInterface.confidentialKernelProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.confidentialKernelSource ++ "\n" ++
+    productionSource iface.generatedConfidentialKernelSource
+
+def RuntimeImplementationInterface.generatedConfidentialKernelProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedConfidentialKernelSource
+
+def RuntimeImplementationInterface.traceProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.traceSource
+
+def RuntimeImplementationInterface.confidentialCoreProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.confidentialCoreSource
+
+def RuntimeImplementationInterface.trustedKernelProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.trustedKernelSource
+
+def RuntimeImplementationInterface.coreLibProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.coreLibSource
+
+def RuntimeImplementationInterface.precompilesProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.precompilesSource
+
+def RuntimeImplementationInterface.allocatorProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.allocatorSource
+
+def RuntimeImplementationInterface.storeLibProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.storeLibSource
+
+def RuntimeImplementationInterface.storeCodecProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.storeCodecSource
+
+def RuntimeImplementationInterface.generatedStoreCodecProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedStoreCodecSource
+
+def RuntimeImplementationInterface.generatedStoreSurfaceProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedStoreSurfaceSource
+
+def RuntimeImplementationInterface.generatedStoreHelpersProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedStoreHelpersSource
+
+def RuntimeImplementationInterface.storeStoreProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.storeStoreSource
+
+def RuntimeImplementationInterface.generatedValueOpsProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.generatedValueOpsSource
+
+def RuntimeImplementationInterface.typesProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  productionSource iface.typesSource
+
+def RuntimeImplementationInterface.handwrittenRuntimeProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  String.intercalate "\n"
+    [ productionSource iface.runtimeEvmLibSource
+    , iface.engineProductionSource
+    , iface.runtimeModuleProductionSource
+    , iface.freshCoinsProductionSource
+    , iface.controllerProductionSource
+    , iface.shellProductionSource
+    , iface.stateProductionSource
+    , iface.kernelRuntimeProductionSource
+    , iface.kernelSlotSupportProductionSource
+    , iface.objectsProductionSource
+    , iface.oramProductionSource
+    , iface.theoremProductionSource
+    , productionSource iface.confidentialKernelSource
+    , iface.traceProductionSource
+    , iface.confidentialCoreProductionSource
+    , iface.trustedKernelProductionSource
+    , iface.coreLibProductionSource
+    , iface.precompilesProductionSource
+    , iface.allocatorProductionSource
+    , iface.storeLibProductionSource
+    , iface.storeCodecProductionSource
+    , iface.storeStoreProductionSource
+    , iface.typesProductionSource
+    ]
+
+def RuntimeImplementationInterface.handwrittenRuntimeSecretOpNeedles : List String :=
+  [ "Value::confidential_select("
+  , "Value::confidential_eq("
+  , "masked_select_bool("
+  , "confidential_is_zero_like("
+  , "Value::confidential_bytes_are_zero("
+  , ".canonical_bytes_boxed("
+  , "Value::zero_for_type("
+  , "MapEntry::new("
+  , ".to_option()"
+  ]
+
+def RuntimeImplementationInterface.handwrittenRuntimeLacksDirectSecretOps
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceLacksAll iface.handwrittenRuntimeProductionSource
+    RuntimeImplementationInterface.handwrittenRuntimeSecretOpNeedles
+
+def RuntimeImplementationInterface.checkHandwrittenRuntimeLacksDirectSecretOps
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceLacksAll iface.handwrittenRuntimeProductionSource
+    RuntimeImplementationInterface.handwrittenRuntimeSecretOpNeedles
+
+def RuntimeImplementationInterface.handwrittenHostCoordinationProductionSource
+  (iface : RuntimeImplementationInterface) : String :=
+  String.intercalate "\n"
+    [ productionSource iface.runtimeEvmLibSource
+    , iface.engineProductionSource
+    , iface.runtimeModuleProductionSource
+    , iface.freshCoinsProductionSource
+    , iface.controllerProductionSource
+    , iface.stateProductionSource
+    , iface.kernelRuntimeProductionSource
+    , iface.objectsProductionSource
+    , iface.oramProductionSource
+    , iface.theoremProductionSource
+    , productionSource iface.confidentialKernelSource
+    , iface.traceProductionSource
+    , iface.confidentialCoreProductionSource
+    , iface.trustedKernelProductionSource
+    , iface.coreLibProductionSource
+    , iface.precompilesProductionSource
+    , iface.allocatorProductionSource
+    , iface.storeLibProductionSource
+    , iface.storeCodecProductionSource
+    , iface.storeStoreProductionSource
+    , iface.typesProductionSource
+    ]
+
+def RuntimeImplementationInterface.handwrittenHostSecretSerializationNeedles : List String :=
+  [ "Keccak::v256()"
+  , "visit_canonical_chunks("
+  , ".canonical_bytes_boxed("
+  , ".canonical_bytes("
+  , "Value::confidential_select("
+  , "Value::confidential_eq("
+  , "masked_select_bool("
+  , "confidential_is_zero_like("
+  , "Value::confidential_bytes_are_zero("
+  , "Value::zero_for_type("
+  , "MapEntry::new("
+  , ".to_option()"
+  ]
+
+def RuntimeImplementationInterface.handwrittenHostCoordinationLacksSecretSerialization
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceLacksAll iface.handwrittenHostCoordinationProductionSource
+    RuntimeImplementationInterface.handwrittenHostSecretSerializationNeedles
+
+def RuntimeImplementationInterface.checkHandwrittenHostCoordinationLacksSecretSerialization
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceLacksAll iface.handwrittenHostCoordinationProductionSource
+    RuntimeImplementationInterface.handwrittenHostSecretSerializationNeedles
 
 def RuntimeImplementationInterface.runtimeOwnsBridgeModules
   (iface : RuntimeImplementationInterface) : Prop :=
@@ -131,6 +452,8 @@ def RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
       , "RuntimePathOramHiddenCertificate"
       , "RuntimeTrustedKernelBundle"
       , "ExecutionTrace {"
+      , "impl Clone for ContractInstance"
+      , "state: self.state.clone()"
       ]
 
 def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
@@ -150,6 +473,8 @@ def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
       , "RuntimePathOramHiddenCertificate"
       , "RuntimeTrustedKernelBundle"
       , "ExecutionTrace {"
+      , "impl Clone for ContractInstance"
+      , "state: self.state.clone()"
       ]
 
 @[simp] theorem runtimeImplementationInterface_checkEngineDelegatesToRuntimeBridge_eq_true_iff
@@ -159,14 +484,90 @@ def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
     RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
   simp
 
-def RuntimeImplementationInterface.shellStaysPublicOnly
+def RuntimeImplementationInterface.shellRejectsConfidentialExpressionEvaluation
   (iface : RuntimeImplementationInterface) : Prop :=
   sourceContainsAll iface.shellProductionSource
-    [ "use crate::runtime::kernel::PublicRuntimeKernel;"
-    , "objects: &mut PublicRuntimeShadowState"
+    [ "if function.confidential {"
+    , "bail!(\"public shell must not evaluate confidential expressions\");"
+    ]
+
+def RuntimeImplementationInterface.checkShellRejectsConfidentialExpressionEvaluation
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.shellProductionSource
+    [ "if function.confidential {"
+    , "bail!(\"public shell must not evaluate confidential expressions\");"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkShellRejectsConfidentialExpressionEvaluation_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkShellRejectsConfidentialExpressionEvaluation = true ↔
+    iface.shellRejectsConfidentialExpressionEvaluation := by
+  unfold RuntimeImplementationInterface.checkShellRejectsConfidentialExpressionEvaluation
+    RuntimeImplementationInterface.shellRejectsConfidentialExpressionEvaluation
+  simp
+
+def RuntimeImplementationInterface.shellCanonicalHashingGuardedByPublicEntry
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsLineOrdered iface.shellProductionSource
+    [ "fn eval_expr("
+    , "if function.confidential {"
+    , "bail!(\"public shell must not evaluate confidential expressions\");"
+    , "Expr::Keccak256 { parts } => {"
+    , "let mut hasher = Keccak::v256();"
+    , "let value = eval_expr(contract, function, part, objects, state, recorder, kernel)?;"
+    , "kernel.note_hash_bytes(value.canonical_len())?;"
+    , "value.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));"
+    , "kernel.wipe_hash_scratch();"
     ] ∧
     sourceLacksAll iface.shellProductionSource
       [ "ConfidentialCallInputs"
+      , "ConfidentialKernelSlotProgram"
+      , "RuntimeTrustedKernelBundle"
+      ]
+
+def RuntimeImplementationInterface.checkShellCanonicalHashingGuardedByPublicEntry
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsLineOrdered iface.shellProductionSource
+    [ "fn eval_expr("
+    , "if function.confidential {"
+    , "bail!(\"public shell must not evaluate confidential expressions\");"
+    , "Expr::Keccak256 { parts } => {"
+    , "let mut hasher = Keccak::v256();"
+    , "let value = eval_expr(contract, function, part, objects, state, recorder, kernel)?;"
+    , "kernel.note_hash_bytes(value.canonical_len())?;"
+    , "value.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));"
+    , "kernel.wipe_hash_scratch();"
+    ] &&
+    checkSourceLacksAll iface.shellProductionSource
+      [ "ConfidentialCallInputs"
+      , "ConfidentialKernelSlotProgram"
+      , "RuntimeTrustedKernelBundle"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkShellCanonicalHashingGuardedByPublicEntry_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkShellCanonicalHashingGuardedByPublicEntry = true ↔
+    iface.shellCanonicalHashingGuardedByPublicEntry := by
+  unfold RuntimeImplementationInterface.checkShellCanonicalHashingGuardedByPublicEntry
+    RuntimeImplementationInterface.shellCanonicalHashingGuardedByPublicEntry
+  simp
+
+def RuntimeImplementationInterface.shellStaysPublicOnly
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.shellProductionSource
+    [ "use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;"
+    , "objects: &mut PublicRuntimeShadowState"
+    , "public_args: Box<[Value]>"
+    , "std::iter::IntoIterator::into_iter(public_args)"
+    ] ∧
+    iface.shellRejectsConfidentialExpressionEvaluation ∧
+    iface.shellCanonicalHashingGuardedByPublicEntry ∧
+    sourceLacksAll iface.runtimeModuleProductionSource
+      [ "args.into_vec()" ] ∧
+    sourceLacksAll iface.shellProductionSource
+      [ "ConfidentialCallInputs"
+      , "public_args: Vec<Value>"
+      , "public_args.into_iter()"
       , "use crate::runtime::kernel::RuntimeKernel;"
       , "use crate::runtime::objects::RuntimeObject;"
       , "RuntimeKernelRefinementEventWitness"
@@ -177,11 +578,19 @@ def RuntimeImplementationInterface.shellStaysPublicOnly
 def RuntimeImplementationInterface.checkShellStaysPublicOnly
   (iface : RuntimeImplementationInterface) : Bool :=
   checkSourceContainsAll iface.shellProductionSource
-    [ "use crate::runtime::kernel::PublicRuntimeKernel;"
+    [ "use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;"
     , "objects: &mut PublicRuntimeShadowState"
+    , "public_args: Box<[Value]>"
+    , "std::iter::IntoIterator::into_iter(public_args)"
     ] &&
+    iface.checkShellRejectsConfidentialExpressionEvaluation &&
+    iface.checkShellCanonicalHashingGuardedByPublicEntry &&
+    checkSourceLacksAll iface.runtimeModuleProductionSource
+      [ "args.into_vec()" ] &&
     checkSourceLacksAll iface.shellProductionSource
       [ "ConfidentialCallInputs"
+      , "public_args: Vec<Value>"
+      , "public_args.into_iter()"
       , "use crate::runtime::kernel::RuntimeKernel;"
       , "use crate::runtime::objects::RuntimeObject;"
       , "RuntimeKernelRefinementEventWitness"
@@ -194,29 +603,79 @@ def RuntimeImplementationInterface.checkShellStaysPublicOnly
   iface.checkShellStaysPublicOnly = true ↔ iface.shellStaysPublicOnly := by
   unfold RuntimeImplementationInterface.checkShellStaysPublicOnly
     RuntimeImplementationInterface.shellStaysPublicOnly
-  simp
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.shellStaysPublicOnly_rejectsConfidentialExpressionEvaluation
+  (iface : RuntimeImplementationInterface)
+  (h : iface.shellStaysPublicOnly) :
+  iface.shellRejectsConfidentialExpressionEvaluation := by
+  exact h.2.1
+
+theorem RuntimeImplementationInterface.shellStaysPublicOnly_canonicalHashingGuardedByPublicEntry
+  (iface : RuntimeImplementationInterface)
+  (h : iface.shellStaysPublicOnly) :
+  iface.shellCanonicalHashingGuardedByPublicEntry := by
+  exact h.2.2.1
 
 def RuntimeImplementationInterface.stateStagesConfidentialCallsInsideRuntime
   (iface : RuntimeImplementationInterface) : Prop :=
   sourceContainsAll iface.stateProductionSource
     [ "runtime_confidential_entrypoint_plan(entrypoint, public_object_ids)?"
-    , "let args = ConfidentialCallInputs::from_raw_args(raw_args);"
+    , "raw_args: Box<[Value]>"
     , "PublicRuntimeKernel::begin("
+    , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
     , "CommittedRuntimeWitnessSnapshotBuilder::new("
+    , "fn object_ids(&self) -> Result<Box<[u32]>> {"
+    , "let mut object_ids = FixedBoxBuilder::new(self.entries.len());"
+    , "for entry in &self.entries {"
+    , "object_ids.push(entry.object_id)?;"
+    , "object_ids.finish()"
+    , "let public_object_ids = self.public_object_ids()?;"
+    , "for pair in objects.windows(2) {"
+    , "if let [left, right] = pair {"
+    , "if left.object_id == right.object_id {"
+    , "duplicate committed object id {}"
+    , "let mut found_index = None;"
+    , "for (index, entry) in self.entries.iter().enumerate() {"
     ] ∧
     sourceLacksAll iface.stateProductionSource
-      ["fn finalize_runtime_kernel_refinement_witness"]
+      [ "fn finalize_runtime_kernel_refinement_witness"
+      , "fn object_ids(&self) -> Box<[u32]> {"
+      , ".map(|entry| entry.object_id)\n            .collect::<Vec<_>>()\n            .into_boxed_slice()"
+      , ".find(|entry| entry.object_id == object_id)"
+      , "pair[0].object_id"
+      , "pair[1].object_id"
+      ]
 
 def RuntimeImplementationInterface.checkStateStagesConfidentialCallsInsideRuntime
   (iface : RuntimeImplementationInterface) : Bool :=
   checkSourceContainsAll iface.stateProductionSource
     [ "runtime_confidential_entrypoint_plan(entrypoint, public_object_ids)?"
-    , "let args = ConfidentialCallInputs::from_raw_args(raw_args);"
+    , "raw_args: Box<[Value]>"
     , "PublicRuntimeKernel::begin("
+    , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
     , "CommittedRuntimeWitnessSnapshotBuilder::new("
+    , "fn object_ids(&self) -> Result<Box<[u32]>> {"
+    , "let mut object_ids = FixedBoxBuilder::new(self.entries.len());"
+    , "for entry in &self.entries {"
+    , "object_ids.push(entry.object_id)?;"
+    , "object_ids.finish()"
+    , "let public_object_ids = self.public_object_ids()?;"
+    , "for pair in objects.windows(2) {"
+    , "if let [left, right] = pair {"
+    , "if left.object_id == right.object_id {"
+    , "duplicate committed object id {}"
+    , "let mut found_index = None;"
+    , "for (index, entry) in self.entries.iter().enumerate() {"
     ] &&
     checkSourceLacksAll iface.stateProductionSource
-      ["fn finalize_runtime_kernel_refinement_witness"]
+      [ "fn finalize_runtime_kernel_refinement_witness"
+      , "fn object_ids(&self) -> Box<[u32]> {"
+      , ".map(|entry| entry.object_id)\n            .collect::<Vec<_>>()\n            .into_boxed_slice()"
+      , ".find(|entry| entry.object_id == object_id)"
+      , "pair[0].object_id"
+      , "pair[1].object_id"
+      ]
 
 @[simp] theorem runtimeImplementationInterface_checkStateStagesConfidentialCallsInsideRuntime_eq_true_iff
   (iface : RuntimeImplementationInterface) :
@@ -228,38 +687,212 @@ def RuntimeImplementationInterface.checkStateStagesConfidentialCallsInsideRuntim
 
 def RuntimeImplementationInterface.kernelDelegatesToSharedBoundaryObjects
   (iface : RuntimeImplementationInterface) : Prop :=
-  sourceContainsAll iface.kernelProductionSource
-    [ "boundary: RuntimeKernelBoundaryTracker"
-    , "execute_confidential_kernel_slot_call(&mut runtime_effects, program, call_inputs)?"
-    , ".bind_expected_kernel_program(program)"
-    , ".expected_loaded_object_schedule_required()?"
-    , ".into_finish_snapshot(entrypoint_id.into(), self.allocator.finish()?)"
-    , "finish_snapshot\n            .into_finish_bundle()"
+  sourceContainsAll iface.stateProductionSource
+    [ "kernel.shadow_load_with(public_object_ids, |allocator| {"
+    , "Ok(PublicRuntimeShadowState::from_shadow(shadow))"
+    , "kernel.commit_objects(shadow, self, aborted, recorder)"
+    , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    , "RuntimeKernelMachine as PublicRuntimeKernel"
+    , "impl RuntimeKernelObjectStore for ConfidentialRuntimeShadowState {"
+    , "impl RuntimeKernelConfidentialStore for ConfidentialRuntimeShadowState {"
+    , "impl RuntimeKernelObjectStore for PublicRuntimeShadowState {"
+    , "Ok(Self::from_shadow(shadow))"
     ] ∧
-    sourceLacksAll iface.kernelProductionSource
-      [ "finish_bundle.to_witness_pair()?;"
-      , "RuntimeKernelExecutionTracker"
-      , "RuntimeKernelRefinementTracker"
-      , "pub(crate) struct RuntimeKernel {"
-      , "pub(crate) fn record_kernel_step("
+    sourceContainsAll iface.shellProductionSource
+    [ "use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;"
+    ] ∧
+    sourceContainsAll iface.kernelRuntimeProductionSource
+    [ "pub struct RuntimeKernelMachine {"
+    , "pub trait RuntimeKernelConfidentialStore: RuntimeKernelObjectStore + Sized {"
+    , "#[path = \"generated_machine.rs\"]"
+    , "mod generated_machine;"
+    , "boundary: RuntimeKernelBoundaryTracker"
+    , "pub fn bind_expected_kernel_program("
+    , "pub fn expected_loaded_object_schedule_required(&self) -> Result<Box<[u32]>> {"
+    , "pub fn run_confidential_call<S: RuntimeKernelConfidentialStore>("
+    , "self.bind_expected_kernel_program(program)?;"
+    , "let shadow_load_object_ids = self.expected_loaded_object_schedule_required()?;"
+    , "let mut shadow = self.shadow_load_with(shadow_load_object_ids.as_ref(), |allocator| {"
+    , "S::shadow_load(committed, shadow_load_object_ids.as_ref(), allocator)"
+    , "shadow.install_fresh_coins(fresh_coins)?;"
+    , "shadow.ensure_fresh_coins_consumed()?;"
+    , "pub fn shadow_load_with<T>("
+    ] ∧
+    sourceContainsAll iface.generatedKernelMachineProductionSource
+    [ "pub fn commit_objects<S: RuntimeKernelObjectStore>("
+    , ".append_commit_object_schedule(committed_object_ids)?;"
+    , "pub fn finish_with_machine_witness("
+    , ".into_finish_snapshot(entrypoint_id.into(), self.allocator.finish()?)"
+    , "finish_snapshot"
+    , ".into_finish_bundle()"
+    ] ∧
+    sourceContainsAll iface.traceProductionSource
+      [ "struct BoundedJournal<T> {"
+      , "entries: Box<[MaybeUninit<T>]>,"
+      , "kernel_steps: BoundedJournal<RuntimeKernelStepWitness>"
+      , "events: BoundedJournal<RuntimeKernelRefinementEventWitness>"
+      , "kernel_steps: BoundedJournal::with_capacity(max_kernel_ops)"
+      , "events: BoundedJournal::with_capacity(max_event_count)"
+      , "let Some(slot) = self.entries.get_mut(self.len) else {"
+      , "slot.write(value);"
+      , "let mut entries = Box::<[T]>::new_uninit_slice(self.len);"
+      , "entries.iter_mut().zip(self.as_slice().iter().cloned())"
+      , ".zip(self.entries.iter_mut().take(self.len))"
+      , "for (slot, entry) in journal"
+      , ".zip(self.as_slice().iter().cloned())"
+      , "self.entries.iter_mut().take(self.len)"
+      , "pub struct CommittedRuntimeWitnessSnapshotBuilder"
+      , "let counter_slot = self"
+      , ".runtime_oram_access_counters"
+      , ".get_mut(index)"
+      , "let position_map_slot = self"
+      , ".runtime_oram_position_maps"
+      , "counter_slot.write(runtime_oram_access_counter);"
+      , "position_map_slot.write(runtime_oram_position_map);"
+      , ".runtime_oram_access_counters"
+      , ".iter_mut()"
+      , ".runtime_oram_position_maps"
+      , ".take(self.initialized)"
+      , "self.kernel_steps.push(observed)"
+      , "self.kernel_steps.into_boxed_slice()"
+      , "self.events.push(event)"
+      , "self.events.into_boxed_slice()"
+      ] ∧
+    sourceLacksAll iface.traceProductionSource
+      [ "emitted_kernel_steps: Vec<RuntimeKernelStepWitness>"
+      , "events: Vec<RuntimeKernelRefinementEventWitness>"
+      , "Vec::with_capacity(max_kernel_ops.max(1))"
+      , "Vec::with_capacity(max_event_count.max(1))"
+      , "self.entries[self.len].write(value)"
+      , "self.as_slice().to_vec().into_boxed_slice()"
+      , "entries[index].write(unsafe { self.entries[index].assume_init_read() });"
+      , "journal.entries[index].write(entry);"
+      , "&mut self.entries[..self.len]"
+      , "self.runtime_oram_access_counters[self.initialized].write(runtime_oram_access_counter);"
+      , "self.runtime_oram_position_maps[self.initialized].write(runtime_oram_position_map);"
+      , "&mut self.runtime_oram_access_counters[..self.initialized]"
+      , "&mut self.runtime_oram_position_maps[..self.initialized]"
+      ] ∧
+    sourceLacksAll iface.runtimeModuleProductionSource
+      [ "#[path = \"kernel.rs\"]"
+      , "mod kernel;"
+      ] ∧
+    sourceLacksAll iface.shellProductionSource
+      [ "use crate::runtime::kernel::PublicRuntimeKernel;"
+      ] ∧
+    sourceLacksAll iface.stateProductionSource
+      [ "RuntimeKernelBoundaryTracker"
+      , "AllocatorSession::new("
+      , "Keccak::v256()"
+      , "ScratchRegion::ValueScratch"
+      , "struct PublicRuntimeKernel {"
+      , "impl PublicRuntimeKernel {"
+      , "impl ConfidentialKernelEffectRuntime for RuntimeKernelSlotEffects<'_>"
       ]
 
 def RuntimeImplementationInterface.checkKernelDelegatesToSharedBoundaryObjects
   (iface : RuntimeImplementationInterface) : Bool :=
-  checkSourceContainsAll iface.kernelProductionSource
-    [ "boundary: RuntimeKernelBoundaryTracker"
-    , "execute_confidential_kernel_slot_call(&mut runtime_effects, program, call_inputs)?"
-    , ".bind_expected_kernel_program(program)"
-    , ".expected_loaded_object_schedule_required()?"
-    , ".into_finish_snapshot(entrypoint_id.into(), self.allocator.finish()?)"
-    , "finish_snapshot\n            .into_finish_bundle()"
+  checkSourceContainsAll iface.stateProductionSource
+    [ "kernel.shadow_load_with(public_object_ids, |allocator| {"
+    , "Ok(PublicRuntimeShadowState::from_shadow(shadow))"
+    , "kernel.commit_objects(shadow, self, aborted, recorder)"
+    , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    , "RuntimeKernelMachine as PublicRuntimeKernel"
+    , "impl RuntimeKernelObjectStore for ConfidentialRuntimeShadowState {"
+    , "impl RuntimeKernelConfidentialStore for ConfidentialRuntimeShadowState {"
+    , "impl RuntimeKernelObjectStore for PublicRuntimeShadowState {"
+    , "Ok(Self::from_shadow(shadow))"
     ] &&
-    checkSourceLacksAll iface.kernelProductionSource
-      [ "finish_bundle.to_witness_pair()?;"
-      , "RuntimeKernelExecutionTracker"
-      , "RuntimeKernelRefinementTracker"
-      , "pub(crate) struct RuntimeKernel {"
-      , "pub(crate) fn record_kernel_step("
+    checkSourceContainsAll iface.shellProductionSource
+    [ "use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;"
+    ] &&
+    checkSourceContainsAll iface.kernelRuntimeProductionSource
+    [ "pub struct RuntimeKernelMachine {"
+    , "pub trait RuntimeKernelConfidentialStore: RuntimeKernelObjectStore + Sized {"
+    , "#[path = \"generated_machine.rs\"]"
+    , "mod generated_machine;"
+    , "boundary: RuntimeKernelBoundaryTracker"
+    , "pub fn bind_expected_kernel_program("
+    , "pub fn expected_loaded_object_schedule_required(&self) -> Result<Box<[u32]>> {"
+    , "pub fn run_confidential_call<S: RuntimeKernelConfidentialStore>("
+    , "self.bind_expected_kernel_program(program)?;"
+    , "let shadow_load_object_ids = self.expected_loaded_object_schedule_required()?;"
+    , "let mut shadow = self.shadow_load_with(shadow_load_object_ids.as_ref(), |allocator| {"
+    , "S::shadow_load(committed, shadow_load_object_ids.as_ref(), allocator)"
+    , "shadow.install_fresh_coins(fresh_coins)?;"
+    , "shadow.ensure_fresh_coins_consumed()?;"
+    , "pub fn shadow_load_with<T>("
+    ] &&
+    checkSourceContainsAll iface.generatedKernelMachineProductionSource
+    [ "pub fn commit_objects<S: RuntimeKernelObjectStore>("
+    , ".append_commit_object_schedule(committed_object_ids)?;"
+    , "pub fn finish_with_machine_witness("
+    , ".into_finish_snapshot(entrypoint_id.into(), self.allocator.finish()?)"
+    , "finish_snapshot"
+    , ".into_finish_bundle()"
+    ] &&
+    checkSourceContainsAll iface.traceProductionSource
+      [ "struct BoundedJournal<T> {"
+      , "entries: Box<[MaybeUninit<T>]>,"
+      , "kernel_steps: BoundedJournal<RuntimeKernelStepWitness>"
+      , "events: BoundedJournal<RuntimeKernelRefinementEventWitness>"
+      , "kernel_steps: BoundedJournal::with_capacity(max_kernel_ops)"
+      , "events: BoundedJournal::with_capacity(max_event_count)"
+      , "let Some(slot) = self.entries.get_mut(self.len) else {"
+      , "slot.write(value);"
+      , "let mut entries = Box::<[T]>::new_uninit_slice(self.len);"
+      , "entries.iter_mut().zip(self.as_slice().iter().cloned())"
+      , ".zip(self.entries.iter_mut().take(self.len))"
+      , "for (slot, entry) in journal"
+      , ".zip(self.as_slice().iter().cloned())"
+      , "self.entries.iter_mut().take(self.len)"
+      , "pub struct CommittedRuntimeWitnessSnapshotBuilder"
+      , "let counter_slot = self"
+      , ".runtime_oram_access_counters"
+      , ".get_mut(index)"
+      , "let position_map_slot = self"
+      , ".runtime_oram_position_maps"
+      , "counter_slot.write(runtime_oram_access_counter);"
+      , "position_map_slot.write(runtime_oram_position_map);"
+      , ".runtime_oram_access_counters"
+      , ".iter_mut()"
+      , ".runtime_oram_position_maps"
+      , ".take(self.initialized)"
+      , "self.kernel_steps.push(observed)"
+      , "self.kernel_steps.into_boxed_slice()"
+      , "self.events.push(event)"
+      , "self.events.into_boxed_slice()"
+      ] &&
+    checkSourceLacksAll iface.traceProductionSource
+      [ "emitted_kernel_steps: Vec<RuntimeKernelStepWitness>"
+      , "events: Vec<RuntimeKernelRefinementEventWitness>"
+      , "Vec::with_capacity(max_kernel_ops.max(1))"
+      , "Vec::with_capacity(max_event_count.max(1))"
+      , "self.entries[self.len].write(value)"
+      , "self.as_slice().to_vec().into_boxed_slice()"
+      , "entries[index].write(unsafe { self.entries[index].assume_init_read() });"
+      , "journal.entries[index].write(entry);"
+      , "&mut self.entries[..self.len]"
+      , "self.runtime_oram_access_counters[self.initialized].write(runtime_oram_access_counter);"
+      , "self.runtime_oram_position_maps[self.initialized].write(runtime_oram_position_map);"
+      , "&mut self.runtime_oram_access_counters[..self.initialized]"
+      , "&mut self.runtime_oram_position_maps[..self.initialized]"
+      ] &&
+    checkSourceLacksAll iface.runtimeModuleProductionSource
+      [ "#[path = \"kernel.rs\"]"
+      , "mod kernel;"
+      ] &&
+    checkSourceLacksAll iface.shellProductionSource
+      [ "use crate::runtime::kernel::PublicRuntimeKernel;"
+      ] &&
+    checkSourceLacksAll iface.stateProductionSource
+      [ "RuntimeKernelBoundaryTracker"
+      , "AllocatorSession::new("
+      , "Keccak::v256()"
+      , "ScratchRegion::ValueScratch"
+      , "struct PublicRuntimeKernel {"
+      , "impl PublicRuntimeKernel {"
+      , "impl ConfidentialKernelEffectRuntime for RuntimeKernelSlotEffects<'_>"
       ]
 
 @[simp] theorem runtimeImplementationInterface_checkKernelDelegatesToSharedBoundaryObjects_eq_true_iff
@@ -269,6 +902,7265 @@ def RuntimeImplementationInterface.checkKernelDelegatesToSharedBoundaryObjects
   unfold RuntimeImplementationInterface.checkKernelDelegatesToSharedBoundaryObjects
     RuntimeImplementationInterface.kernelDelegatesToSharedBoundaryObjects
   simp
+  constructor <;> intro h <;> simpa [and_assoc] using h
+
+def RuntimeImplementationInterface.kernelDelegatesToSharedConfidentialInterpreter
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.stateProductionSource
+    [ ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    , "raw_args: Box<[Value]>"
+    ] ∧
+    sourceContainsAll iface.kernelRuntimeProductionSource
+      [ "pub trait RuntimeKernelConfidentialStore: RuntimeKernelObjectStore + Sized {"
+      , "pub struct RuntimeKernelEffectAdapter<'a, S: RuntimeKernelObjectStore> {"
+      , "#[path = \"generated_slot_support.rs\"]"
+      , "mod generated_slot_support;"
+      , "use generated_slot_support::{"
+      , "store_confidential_call_inputs, ConfidentialCallInputs, ConfidentialKernelSlotState,"
+      , "struct RuntimeKernelSlotCall<'a, S: RuntimeKernelObjectStore> {"
+      , "impl<S: RuntimeKernelObjectStore> ConfidentialKernelSlotRuntime for RuntimeKernelSlotCall<'_, S> {"
+      , "pub fn run_confidential_call<S: RuntimeKernelConfidentialStore>("
+      , "let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);"
+      , "RuntimeKernelEffectAdapter::new(&mut self, &mut shadow, recorder, opcode_trace);"
+      , "let mut runtime = RuntimeKernelSlotCall::new(runtime_effects, program.slot_count)?;"
+      , "runtime.store_call_inputs(program, call_inputs)?;"
+      , "store_confidential_call_inputs(&mut self.state, program, call_inputs)"
+      , "let outcome = execute_confidential_kernel_slot_program(&mut runtime, program)?;"
+      , "impl<S: RuntimeKernelObjectStore> ConfidentialKernelEffectRuntime"
+      , "pub struct RuntimeKernelStatementTrace {"
+      , "self.opcode_trace.record(statement)"
+      , "self.machine.enforce_stack_words(words)"
+      ] ∧
+    sourceContainsAll iface.kernelSlotSupportProductionSource
+      [ "// @generated by proof/lean/GenerateRuntimeKernelSlotSupportRust.lean; do not edit by hand."
+      , "pub(super) struct ConfidentialCallInputs {"
+      , "raw_args: Box<[Value]>"
+      , "pub(super) fn from_raw_args(args: Box<[Value]>) -> Self {"
+      , "std::iter::IntoIterator::into_iter(std::mem::take(&mut self.raw_args))"
+      , "impl Drop for ConfidentialCallInputs {"
+      , "value.wipe_secrets();"
+      , "pub(super) struct ConfidentialKernelSlotState {"
+      , "use uo_core::{ConfidentialKernelSlotProgram, FixedBoxBuilder, Value};"
+      , "slots: Box<[Option<Value>]>"
+      , "pub(super) fn new(slot_count: usize) -> Result<Self> {"
+      , "let mut slots = FixedBoxBuilder::new(slot_count);"
+      , "slots.push(None)?;"
+      , "slots: slots.finish()?,"
+      , "pub(super) fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {"
+      , "pub(super) fn store_confidential_call_inputs("
+      , "call_inputs.into_raw_args().enumerate()"
+      , "if slot >= program.param_count {"
+      , "if supplied_args != program.param_count {"
+      ] ∧
+    sourceContainsAll iface.confidentialKernelProductionSource
+      [ "#[path = \"generated_confidential_kernel.rs\"]"
+      , "mod generated_confidential_kernel;"
+      , "pub fn execute_confidential_kernel_slot_program<R: ConfidentialKernelSlotRuntime>("
+      , "generated_confidential_kernel::execute_confidential_kernel_slot_program_generated("
+      , "pub(super) fn execute_confidential_kernel_slot_program_generated<"
+      , "fn execute_confidential_kernel_slot_block_generated<R: ConfidentialKernelSlotRuntime>("
+      , "statements: &[ConfidentialKernelSlotStatement]"
+      , "pub(super) fn execute_confidential_kernel_slot_statement_generated<"
+      , "fn eval_confidential_kernel_unary_generated(op: &UnaryOp, value: Value) -> Result<Value> {"
+      , "fn eval_confidential_kernel_binary_generated("
+      , "pub(super) fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernelSlotRuntime>("
+      , "pub(super) fn eval_confidential_kernel_slot_pure_expr_generated<"
+      ] ∧
+    sourceLacksAll iface.confidentialKernelProductionSource
+      [ "pub fn execute_confidential_kernel_slot_call<R: ConfidentialKernelEffectRuntime>("
+      , "struct ConfidentialKernelSlotExecutor<'a, R> {"
+      , "pub struct ConfidentialCallInputs {"
+      , "pub struct ConfidentialKernelSlotState {"
+      ] ∧
+    sourceLacksAll iface.kernelRuntimeProductionSource
+      [ "struct ConfidentialCallInputs {"
+      , "struct ConfidentialKernelSlotState {"
+      , "call_inputs.into_raw_args().enumerate()"
+      ] ∧
+    sourceLacksAll iface.runtimeModuleProductionSource
+      [ "#[path = \"kernel.rs\"]"
+      , "mod kernel;"
+      ] ∧
+    sourceLacksAll iface.stateProductionSource
+      [ "fn execute_confidential_call("
+      , "fn exec_confidential_block("
+      , "fn exec_confidential_statement("
+      , "impl ConfidentialKernelEffectRuntime for RuntimeKernelSlotEffects<'_>"
+      , "RuntimeKernelSlotInterpreter"
+      , "if !program.is_runtime_normal_form() {"
+      ]
+
+def RuntimeImplementationInterface.checkKernelDelegatesToSharedConfidentialInterpreter
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.stateProductionSource
+    [ ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    , "raw_args: Box<[Value]>"
+    ] &&
+    checkSourceContainsAll iface.kernelRuntimeProductionSource
+      [ "pub trait RuntimeKernelConfidentialStore: RuntimeKernelObjectStore + Sized {"
+      , "pub struct RuntimeKernelEffectAdapter<'a, S: RuntimeKernelObjectStore> {"
+      , "#[path = \"generated_slot_support.rs\"]"
+      , "mod generated_slot_support;"
+      , "use generated_slot_support::{"
+      , "store_confidential_call_inputs, ConfidentialCallInputs, ConfidentialKernelSlotState,"
+      , "struct RuntimeKernelSlotCall<'a, S: RuntimeKernelObjectStore> {"
+      , "impl<S: RuntimeKernelObjectStore> ConfidentialKernelSlotRuntime for RuntimeKernelSlotCall<'_, S> {"
+      , "pub fn run_confidential_call<S: RuntimeKernelConfidentialStore>("
+      , "let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);"
+      , "RuntimeKernelEffectAdapter::new(&mut self, &mut shadow, recorder, opcode_trace);"
+      , "let mut runtime = RuntimeKernelSlotCall::new(runtime_effects, program.slot_count)?;"
+      , "runtime.store_call_inputs(program, call_inputs)?;"
+      , "store_confidential_call_inputs(&mut self.state, program, call_inputs)"
+      , "let outcome = execute_confidential_kernel_slot_program(&mut runtime, program)?;"
+      , "impl<S: RuntimeKernelObjectStore> ConfidentialKernelEffectRuntime"
+      , "pub struct RuntimeKernelStatementTrace {"
+      , "self.opcode_trace.record(statement)"
+      , "self.machine.enforce_stack_words(words)"
+      ] &&
+    checkSourceContainsAll iface.kernelSlotSupportProductionSource
+      [ "// @generated by proof/lean/GenerateRuntimeKernelSlotSupportRust.lean; do not edit by hand."
+      , "pub(super) struct ConfidentialCallInputs {"
+      , "raw_args: Box<[Value]>"
+      , "pub(super) fn from_raw_args(args: Box<[Value]>) -> Self {"
+      , "std::iter::IntoIterator::into_iter(std::mem::take(&mut self.raw_args))"
+      , "impl Drop for ConfidentialCallInputs {"
+      , "value.wipe_secrets();"
+      , "pub(super) struct ConfidentialKernelSlotState {"
+      , "use uo_core::{ConfidentialKernelSlotProgram, FixedBoxBuilder, Value};"
+      , "slots: Box<[Option<Value>]>"
+      , "pub(super) fn new(slot_count: usize) -> Result<Self> {"
+      , "let mut slots = FixedBoxBuilder::new(slot_count);"
+      , "slots.push(None)?;"
+      , "slots: slots.finish()?,"
+      , "pub(super) fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {"
+      , "pub(super) fn store_confidential_call_inputs("
+      , "call_inputs.into_raw_args().enumerate()"
+      , "if slot >= program.param_count {"
+      , "if supplied_args != program.param_count {"
+      ] &&
+    checkSourceContainsAll iface.confidentialKernelProductionSource
+      [ "#[path = \"generated_confidential_kernel.rs\"]"
+      , "mod generated_confidential_kernel;"
+      , "pub fn execute_confidential_kernel_slot_program<R: ConfidentialKernelSlotRuntime>("
+      , "generated_confidential_kernel::execute_confidential_kernel_slot_program_generated("
+      , "pub(super) fn execute_confidential_kernel_slot_program_generated<"
+      , "fn execute_confidential_kernel_slot_block_generated<R: ConfidentialKernelSlotRuntime>("
+      , "statements: &[ConfidentialKernelSlotStatement]"
+      , "pub(super) fn execute_confidential_kernel_slot_statement_generated<"
+      , "fn eval_confidential_kernel_unary_generated(op: &UnaryOp, value: Value) -> Result<Value> {"
+      , "fn eval_confidential_kernel_binary_generated("
+      , "pub(super) fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernelSlotRuntime>("
+      , "pub(super) fn eval_confidential_kernel_slot_pure_expr_generated<"
+      ] &&
+    checkSourceLacksAll iface.confidentialKernelProductionSource
+      [ "pub fn execute_confidential_kernel_slot_call<R: ConfidentialKernelEffectRuntime>("
+      , "struct ConfidentialKernelSlotExecutor<'a, R> {"
+      , "pub struct ConfidentialCallInputs {"
+      , "pub struct ConfidentialKernelSlotState {"
+      ] &&
+    checkSourceLacksAll iface.kernelRuntimeProductionSource
+      [ "struct ConfidentialCallInputs {"
+      , "struct ConfidentialKernelSlotState {"
+      , "call_inputs.into_raw_args().enumerate()"
+      ] &&
+    checkSourceLacksAll iface.runtimeModuleProductionSource
+      [ "#[path = \"kernel.rs\"]"
+      , "mod kernel;"
+      ] &&
+    checkSourceLacksAll iface.stateProductionSource
+      [ "fn execute_confidential_call("
+      , "fn exec_confidential_block("
+      , "fn exec_confidential_statement("
+      , "impl ConfidentialKernelEffectRuntime for RuntimeKernelSlotEffects<'_>"
+      , "RuntimeKernelSlotInterpreter"
+      , "if !program.is_runtime_normal_form() {"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkKernelDelegatesToSharedConfidentialInterpreter_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkKernelDelegatesToSharedConfidentialInterpreter = true ↔
+    iface.kernelDelegatesToSharedConfidentialInterpreter := by
+  unfold RuntimeImplementationInterface.checkKernelDelegatesToSharedConfidentialInterpreter
+    RuntimeImplementationInterface.kernelDelegatesToSharedConfidentialInterpreter
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.sharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.kernelRuntimeProductionSource
+    [ "pub fn note_hash_bytes(&mut self, bytes: usize) -> Result<()> {"
+    , "reserve_scratch(ScratchRegion::HashScratch, bytes)"
+    , "fn touch_value_scratch(&mut self, bytes: usize) -> Result<()> {"
+    , "reserve_guard(ScratchRegion::ValueScratch, bytes)?;"
+    ] ∧
+  sourceContainsAll iface.generatedKernelMachineProductionSource
+    [ "let value_len = store.value_canonical_len(object_id)?;"
+    , "let key_len = store.key_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(value_len)?;"
+    , "self.touch_value_scratch(value_len.max(32))?;"
+    , "self.touch_value_scratch(key_len)?;"
+    , "self.touch_value_scratch(key_len.max(value_len))?;"
+    , "pub fn keccak256_values(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "self.note_hash_bytes(self.max_hash_part_bytes)?;"
+    , "part.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));"
+    , "part.wipe_secrets();"
+    , "self.wipe_hash_scratch();"
+    , "self.allocator.wipe_region(ScratchRegion::ValueScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::HashScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::IoScratch);"
+    ]
+
+def RuntimeImplementationInterface.checkSharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.kernelRuntimeProductionSource
+    [ "pub fn note_hash_bytes(&mut self, bytes: usize) -> Result<()> {"
+    , "reserve_scratch(ScratchRegion::HashScratch, bytes)"
+    , "fn touch_value_scratch(&mut self, bytes: usize) -> Result<()> {"
+    , "reserve_guard(ScratchRegion::ValueScratch, bytes)?;"
+    ] &&
+  checkSourceContainsAll iface.generatedKernelMachineProductionSource
+    [ "let value_len = store.value_canonical_len(object_id)?;"
+    , "let key_len = store.key_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(value_len)?;"
+    , "self.touch_value_scratch(value_len.max(32))?;"
+    , "self.touch_value_scratch(key_len)?;"
+    , "self.touch_value_scratch(key_len.max(value_len))?;"
+    , "pub fn keccak256_values(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "self.note_hash_bytes(self.max_hash_part_bytes)?;"
+    , "part.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));"
+    , "part.wipe_secrets();"
+    , "self.wipe_hash_scratch();"
+    , "self.allocator.wipe_region(ScratchRegion::ValueScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::HashScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::IoScratch);"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline = true ↔
+    iface.sharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline := by
+  unfold RuntimeImplementationInterface.checkSharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline
+    RuntimeImplementationInterface.sharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline
+  simp
+
+def RuntimeImplementationInterface.allocatorSessionEnforcesScratchAndWipeDiscipline
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.allocatorProductionSource
+    [ "struct ResourceEventLog {"
+    , "FixedBoxBuilder,"
+    , "events: Box<[Option<RuntimeKernelResourceEventWitness>]>,"
+    , "len: usize,"
+    , "overflowed: bool,"
+    , "fn with_capacity(capacity: usize) -> Result<Self> {"
+    , "let mut events = FixedBoxBuilder::new(capacity);"
+    , "for _ in 0..capacity {"
+    , "events.push(None)?;"
+    , "events: events.finish()?,"
+    , "fn push(&mut self, event: RuntimeKernelResourceEventWitness) {"
+    , "self.overflowed = true;"
+    , "fn into_events(mut self) -> Result<Box<[RuntimeKernelResourceEventWitness]>> {"
+    , "if self.overflowed {"
+    , "bail!(\"allocator resource-event capacity exceeded\");"
+    , "if self.len > self.events.len() {"
+    , "allocator resource-event length {} exceeds capacity {}"
+    , "let mut events = FixedBoxBuilder::new(self.len);"
+    , "for index in 0..self.len {"
+    , "let Some(slot) = self.events.get_mut(index) else {"
+    , "allocator resource-event slot {index} missing despite capacity guard"
+    , "let Some(event) = slot.take() else {"
+    , "allocator resource-event prefix missing entry {index}"
+    , "events.push(event)?;"
+    , "events.finish()"
+    , "pub struct AllocatorSession {"
+    , "pub fn new(plan: AllocatorPlan) -> Result<Self> {"
+    , "kernel_op_count: usize,"
+    , "resource_events: ResourceEventLog,"
+    , "resource_events: ResourceEventLog::with_capacity(resource_event_capacity)?,"
+    , "peak_stack_words: usize,"
+    , "value_scratch: ScratchUsage,"
+    , "hash_scratch: ScratchUsage,"
+    , "io_scratch: ScratchUsage,"
+    , "impl Drop for ScratchGuard<'_> {"
+    , "self.session.wipe_region(self.region);"
+    , "pub fn record_kernel_op(&mut self) -> Result<()> {"
+    , "if self.kernel_op_count >= self.plan.max_kernel_ops {"
+    , "self.kernel_op_count += 1;"
+    , "pub fn reserve_scratch(&mut self, region: ScratchRegion, bytes: usize) -> Result<()> {"
+    , "if bytes > self.plan.scratch_bytes {"
+    , "usage.live_bytes = bytes;"
+    , "usage.peak_bytes = usage.peak_bytes.max(bytes);"
+    , "RuntimeKernelResourceEventWitness::reserve_scratch("
+    , "pub fn reserve_guard("
+    , "self.reserve_scratch(region, bytes)?;"
+    , "pub fn wipe_region(&mut self, region: ScratchRegion) {"
+    , "usage.live_bytes = 0;"
+    , "usage.wipe_count += 1;"
+    , "RuntimeKernelResourceEventWitness::wipe_scratch("
+    , "pub fn enforce_stack_words(&mut self, words: usize) -> Result<()> {"
+    , "if words > self.plan.max_stack_words {"
+    , "self.peak_stack_words = self.peak_stack_words.max(words);"
+    , "RuntimeKernelResourceEventWitness::stack_check(words)"
+    , "pub fn finish(self) -> Result<RuntimeKernelTelemetrySnapshot> {"
+    , "self.ensure_region_wiped(ScratchRegion::ValueScratch, &self.value_scratch)?;"
+    , "self.ensure_region_wiped(ScratchRegion::HashScratch, &self.hash_scratch)?;"
+    , "self.ensure_region_wiped(ScratchRegion::IoScratch, &self.io_scratch)?;"
+    , "let resource_events = self.resource_events.into_events()?;"
+    , "RuntimeKernelTelemetrySnapshot::new("
+    , "fn resource_event_capacity(plan: &AllocatorPlan) -> usize {"
+    , "saturating_add(plan.max_stack_words)"
+    , "saturating_mul(128)"
+    , "saturating_add(128)"
+    , "fn ensure_region_wiped(&self, region: ScratchRegion, usage: &ScratchUsage) -> Result<()> {"
+    , "if usage.live_bytes != 0 {"
+    , "if usage.peak_bytes != 0 && usage.wipe_count == 0 {"
+    ] ∧
+  sourceLacksAll iface.allocatorProductionSource
+    [ "self.events[index].take()"
+    , "unsafe"
+    , "std::mem::forget"
+    , "ManuallyDrop"
+    , "MaybeUninit"
+    , "vec![None; capacity].into_boxed_slice()"
+    , "events: std::iter::repeat_with(|| None)"
+    , ".take(capacity)"
+    , ".collect::<Vec<_>>()"
+    , "Vec::with_capacity(self.len)"
+    , "self.events.into_vec()"
+    , "self.events.into_iter()"
+    , "resource_events: Vec<RuntimeKernelResourceEventWitness>,"
+    , "expect("
+    ]
+
+def RuntimeImplementationInterface.checkAllocatorSessionEnforcesScratchAndWipeDiscipline
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.allocatorProductionSource
+    [ "struct ResourceEventLog {"
+    , "FixedBoxBuilder,"
+    , "events: Box<[Option<RuntimeKernelResourceEventWitness>]>,"
+    , "len: usize,"
+    , "overflowed: bool,"
+    , "fn with_capacity(capacity: usize) -> Result<Self> {"
+    , "let mut events = FixedBoxBuilder::new(capacity);"
+    , "for _ in 0..capacity {"
+    , "events.push(None)?;"
+    , "events: events.finish()?,"
+    , "fn push(&mut self, event: RuntimeKernelResourceEventWitness) {"
+    , "self.overflowed = true;"
+    , "fn into_events(mut self) -> Result<Box<[RuntimeKernelResourceEventWitness]>> {"
+    , "if self.overflowed {"
+    , "bail!(\"allocator resource-event capacity exceeded\");"
+    , "if self.len > self.events.len() {"
+    , "allocator resource-event length {} exceeds capacity {}"
+    , "let mut events = FixedBoxBuilder::new(self.len);"
+    , "for index in 0..self.len {"
+    , "let Some(slot) = self.events.get_mut(index) else {"
+    , "allocator resource-event slot {index} missing despite capacity guard"
+    , "let Some(event) = slot.take() else {"
+    , "allocator resource-event prefix missing entry {index}"
+    , "events.push(event)?;"
+    , "events.finish()"
+    , "pub struct AllocatorSession {"
+    , "pub fn new(plan: AllocatorPlan) -> Result<Self> {"
+    , "kernel_op_count: usize,"
+    , "resource_events: ResourceEventLog,"
+    , "resource_events: ResourceEventLog::with_capacity(resource_event_capacity)?,"
+    , "peak_stack_words: usize,"
+    , "value_scratch: ScratchUsage,"
+    , "hash_scratch: ScratchUsage,"
+    , "io_scratch: ScratchUsage,"
+    , "impl Drop for ScratchGuard<'_> {"
+    , "self.session.wipe_region(self.region);"
+    , "pub fn record_kernel_op(&mut self) -> Result<()> {"
+    , "if self.kernel_op_count >= self.plan.max_kernel_ops {"
+    , "self.kernel_op_count += 1;"
+    , "pub fn reserve_scratch(&mut self, region: ScratchRegion, bytes: usize) -> Result<()> {"
+    , "if bytes > self.plan.scratch_bytes {"
+    , "usage.live_bytes = bytes;"
+    , "usage.peak_bytes = usage.peak_bytes.max(bytes);"
+    , "RuntimeKernelResourceEventWitness::reserve_scratch("
+    , "pub fn reserve_guard("
+    , "self.reserve_scratch(region, bytes)?;"
+    , "pub fn wipe_region(&mut self, region: ScratchRegion) {"
+    , "usage.live_bytes = 0;"
+    , "usage.wipe_count += 1;"
+    , "RuntimeKernelResourceEventWitness::wipe_scratch("
+    , "pub fn enforce_stack_words(&mut self, words: usize) -> Result<()> {"
+    , "if words > self.plan.max_stack_words {"
+    , "self.peak_stack_words = self.peak_stack_words.max(words);"
+    , "RuntimeKernelResourceEventWitness::stack_check(words)"
+    , "pub fn finish(self) -> Result<RuntimeKernelTelemetrySnapshot> {"
+    , "self.ensure_region_wiped(ScratchRegion::ValueScratch, &self.value_scratch)?;"
+    , "self.ensure_region_wiped(ScratchRegion::HashScratch, &self.hash_scratch)?;"
+    , "self.ensure_region_wiped(ScratchRegion::IoScratch, &self.io_scratch)?;"
+    , "let resource_events = self.resource_events.into_events()?;"
+    , "RuntimeKernelTelemetrySnapshot::new("
+    , "fn resource_event_capacity(plan: &AllocatorPlan) -> usize {"
+    , "saturating_add(plan.max_stack_words)"
+    , "saturating_mul(128)"
+    , "saturating_add(128)"
+    , "fn ensure_region_wiped(&self, region: ScratchRegion, usage: &ScratchUsage) -> Result<()> {"
+    , "if usage.live_bytes != 0 {"
+    , "if usage.peak_bytes != 0 && usage.wipe_count == 0 {"
+    ] &&
+  checkSourceLacksAll iface.allocatorProductionSource
+    [ "self.events[index].take()"
+    , "unsafe"
+    , "std::mem::forget"
+    , "ManuallyDrop"
+    , "MaybeUninit"
+    , "vec![None; capacity].into_boxed_slice()"
+    , "events: std::iter::repeat_with(|| None)"
+    , ".take(capacity)"
+    , ".collect::<Vec<_>>()"
+    , "Vec::with_capacity(self.len)"
+    , "self.events.into_vec()"
+    , "self.events.into_iter()"
+    , "resource_events: Vec<RuntimeKernelResourceEventWitness>,"
+    , "expect("
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkAllocatorSessionEnforcesScratchAndWipeDiscipline_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkAllocatorSessionEnforcesScratchAndWipeDiscipline = true ↔
+    iface.allocatorSessionEnforcesScratchAndWipeDiscipline := by
+  unfold RuntimeImplementationInterface.checkAllocatorSessionEnforcesScratchAndWipeDiscipline
+    RuntimeImplementationInterface.allocatorSessionEnforcesScratchAndWipeDiscipline
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.allocatorModel_recordKernelOp_acceptsOnlyBelowBudget
+  {state next : RuntimeAllocatorDiscipline.State}
+  (h : RuntimeAllocatorDiscipline.recordKernelOp state = some next) :
+  state.kernelOpCount < state.plan.maxKernelOps :=
+  RuntimeAllocatorDiscipline.recordKernelOp_acceptsOnlyBelowBudget h
+
+theorem RuntimeImplementationInterface.allocatorModel_reserveScratch_acceptsOnlyWithinBudget
+  {state next : RuntimeAllocatorDiscipline.State}
+  {region : RuntimeAllocatorDiscipline.Region}
+  {bytes : Nat}
+  (h : RuntimeAllocatorDiscipline.reserveScratch state region bytes = some next) :
+  bytes ≤ state.plan.scratchBytes :=
+  RuntimeAllocatorDiscipline.reserveScratch_acceptsOnlyWithinBudget h
+
+theorem RuntimeImplementationInterface.allocatorModel_wipeScratch_clearsLiveBytes
+  (state : RuntimeAllocatorDiscipline.State)
+  (region : RuntimeAllocatorDiscipline.Region) :
+  (RuntimeAllocatorDiscipline.getUsage
+    (RuntimeAllocatorDiscipline.wipeScratch state region)
+    region).liveBytes = 0 :=
+  RuntimeAllocatorDiscipline.wipeScratch_clearsLiveBytes state region
+
+theorem RuntimeImplementationInterface.allocatorModel_finishAccepted_impliesNoEventOverflow
+  {state : RuntimeAllocatorDiscipline.State}
+  (h : RuntimeAllocatorDiscipline.finishAccepted state) :
+  state.eventLog.overflowed = false :=
+  RuntimeAllocatorDiscipline.finishAccepted_impliesNoResourceEventOverflow h
+
+def RuntimeImplementationInterface.runtimeAllocatorTelemetryUsesModeledBoxedResourceEvents
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.allocatorProductionSource
+    [ "struct ResourceEventLog {"
+    , "events: Box<[Option<RuntimeKernelResourceEventWitness>]>,"
+    , "fn resource_event_capacity(plan: &AllocatorPlan) -> usize {"
+    , "let resource_events = self.resource_events.into_events()?;"
+    ] ∧
+  sourceContainsAll iface.traceProductionSource
+    [ "pub struct RuntimeKernelTelemetrySnapshot {"
+    , "resource_events: Box<[RuntimeKernelResourceEventWitness]>,"
+    , "resource_events: impl Into<Box<[RuntimeKernelResourceEventWitness]>>,"
+    , "resource_events: resource_events.into(),"
+    , "pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {"
+    , "resource_events: self.telemetry.resource_events,"
+    ] ∧
+  sourceLacksAll iface.traceProductionSource
+    [ "resource_events: Vec<RuntimeKernelResourceEventWitness>,"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeAllocatorTelemetryUsesModeledBoxedResourceEvents
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.allocatorProductionSource
+    [ "struct ResourceEventLog {"
+    , "events: Box<[Option<RuntimeKernelResourceEventWitness>]>,"
+    , "fn resource_event_capacity(plan: &AllocatorPlan) -> usize {"
+    , "let resource_events = self.resource_events.into_events()?;"
+    ] &&
+  checkSourceContainsAll iface.traceProductionSource
+    [ "pub struct RuntimeKernelTelemetrySnapshot {"
+    , "resource_events: Box<[RuntimeKernelResourceEventWitness]>,"
+    , "resource_events: impl Into<Box<[RuntimeKernelResourceEventWitness]>>,"
+    , "resource_events: resource_events.into(),"
+    , "pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {"
+    , "resource_events: self.telemetry.resource_events,"
+    ] &&
+  checkSourceLacksAll iface.traceProductionSource
+    [ "resource_events: Vec<RuntimeKernelResourceEventWitness>,"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkRuntimeAllocatorTelemetryUsesModeledBoxedResourceEvents_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeAllocatorTelemetryUsesModeledBoxedResourceEvents = true ↔
+    iface.runtimeAllocatorTelemetryUsesModeledBoxedResourceEvents := by
+  unfold
+    RuntimeImplementationInterface.checkRuntimeAllocatorTelemetryUsesModeledBoxedResourceEvents
+    RuntimeImplementationInterface.runtimeAllocatorTelemetryUsesModeledBoxedResourceEvents
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.runtimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.kernelRuntimeProductionSource
+    [ "#[path = \"generated_machine.rs\"]"
+    , "mod generated_machine;"
+    , "fn touch_value_scratch(&mut self, bytes: usize) -> Result<()> {"
+    , "fn record_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {"
+    , "self.boundary.record_opcode(opcode, object_id)?;"
+    , "self.allocator.record_kernel_op()?;"
+    ] ∧
+  sourceLacksAll iface.kernelRuntimeProductionSource
+    [ "pub fn cell_get<S: RuntimeKernelObjectStore>("
+    , "pub fn cell_set<S: RuntimeKernelObjectStore>("
+    , "pub fn array_get<S: RuntimeKernelObjectStore>("
+    , "pub fn array_set<S: RuntimeKernelObjectStore>("
+    , "pub fn map_get<S: RuntimeKernelObjectStore>("
+    , "pub fn map_put<S: RuntimeKernelObjectStore>("
+    , "pub fn keccak256_values(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "pub fn commit_objects<S: RuntimeKernelObjectStore>("
+    , "pub fn finish_with_machine_witness("
+    ] ∧
+  sourceContainsAll iface.generatedKernelMachineProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeKernelMachineRust.lean; do not edit by hand."
+    , "use tiny_keccak::{Hasher, Keccak};"
+    , "use super::{RuntimeKernelMachine, RuntimeKernelObjectStore};"
+    , "impl RuntimeKernelMachine {"
+    , "pub fn cell_get<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::CellGet, Some(object_id))?;"
+    , "store.cell_get(recorder, object_id)"
+    , "pub fn cell_set<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::CellSet, Some(object_id))?;"
+    , "let value_len = store.value_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(value_len)?;"
+    , "store.cell_set(recorder, object_id, value, predicate)"
+    , "pub fn array_get<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::ArrayGet, Some(object_id))?;"
+    , "self.touch_value_scratch(32)?;"
+    , "store.array_get(recorder, object_id, index)"
+    , "pub fn array_set<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::ArraySet, Some(object_id))?;"
+    , "self.touch_value_scratch(value_len.max(32))?;"
+    , "store.array_set(recorder, object_id, index, value, predicate)"
+    , "pub fn map_get<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::MapGet, Some(object_id))?;"
+    , "let key_len = store.key_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(key_len)?;"
+    , "store.map_get(recorder, object_id, key, &mut self.allocator)"
+    , "pub fn map_put<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::MapPut, Some(object_id))?;"
+    , "let key_len = store.key_canonical_len(object_id)?;"
+    , "let value_len = store.value_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(key_len.max(value_len))?;"
+    , "store.map_put("
+    , "&mut self.allocator,"
+    , "pub fn keccak256_values(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "let mut hasher = Keccak::v256();"
+    , "let mut parts = parts;"
+    , "for part in parts.iter_mut() {"
+    , "self.note_hash_bytes(self.max_hash_part_bytes)?;"
+    , "part.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));"
+    , "part.wipe_secrets();"
+    , "self.wipe_hash_scratch();"
+    , "hasher.finalize(&mut out);"
+    , "pub fn commit_objects<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::Commit, None)?;"
+    , "store.commit_against(committed, aborted, recorder, &mut self.allocator)?;"
+    , "append_commit_object_schedule(committed_object_ids)?;"
+    , "pub fn finish_with_machine_witness("
+    , "self.record_kernel_step(UoOpcode::Wipe, None)?;"
+    , "self.allocator.wipe_region(ScratchRegion::ValueScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::HashScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::IoScratch);"
+    , ".into_finish_snapshot(entrypoint_id.into(), self.allocator.finish()?)"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.kernelRuntimeProductionSource
+    [ "#[path = \"generated_machine.rs\"]"
+    , "mod generated_machine;"
+    , "fn touch_value_scratch(&mut self, bytes: usize) -> Result<()> {"
+    , "fn record_kernel_step(&mut self, opcode: UoOpcode, object_id: Option<u32>) -> Result<()> {"
+    , "self.boundary.record_opcode(opcode, object_id)?;"
+    , "self.allocator.record_kernel_op()?;"
+    ] &&
+  checkSourceLacksAll iface.kernelRuntimeProductionSource
+    [ "pub fn cell_get<S: RuntimeKernelObjectStore>("
+    , "pub fn cell_set<S: RuntimeKernelObjectStore>("
+    , "pub fn array_get<S: RuntimeKernelObjectStore>("
+    , "pub fn array_set<S: RuntimeKernelObjectStore>("
+    , "pub fn map_get<S: RuntimeKernelObjectStore>("
+    , "pub fn map_put<S: RuntimeKernelObjectStore>("
+    , "pub fn keccak256_values(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "pub fn commit_objects<S: RuntimeKernelObjectStore>("
+    , "pub fn finish_with_machine_witness("
+    ] &&
+  checkSourceContainsAll iface.generatedKernelMachineProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeKernelMachineRust.lean; do not edit by hand."
+    , "use tiny_keccak::{Hasher, Keccak};"
+    , "use super::{RuntimeKernelMachine, RuntimeKernelObjectStore};"
+    , "impl RuntimeKernelMachine {"
+    , "pub fn cell_get<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::CellGet, Some(object_id))?;"
+    , "store.cell_get(recorder, object_id)"
+    , "pub fn cell_set<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::CellSet, Some(object_id))?;"
+    , "let value_len = store.value_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(value_len)?;"
+    , "store.cell_set(recorder, object_id, value, predicate)"
+    , "pub fn array_get<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::ArrayGet, Some(object_id))?;"
+    , "self.touch_value_scratch(32)?;"
+    , "store.array_get(recorder, object_id, index)"
+    , "pub fn array_set<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::ArraySet, Some(object_id))?;"
+    , "self.touch_value_scratch(value_len.max(32))?;"
+    , "store.array_set(recorder, object_id, index, value, predicate)"
+    , "pub fn map_get<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::MapGet, Some(object_id))?;"
+    , "let key_len = store.key_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(key_len)?;"
+    , "store.map_get(recorder, object_id, key, &mut self.allocator)"
+    , "pub fn map_put<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::MapPut, Some(object_id))?;"
+    , "let key_len = store.key_canonical_len(object_id)?;"
+    , "let value_len = store.value_canonical_len(object_id)?;"
+    , "self.touch_value_scratch(key_len.max(value_len))?;"
+    , "store.map_put("
+    , "&mut self.allocator,"
+    , "pub fn keccak256_values(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "let mut hasher = Keccak::v256();"
+    , "let mut parts = parts;"
+    , "for part in parts.iter_mut() {"
+    , "self.note_hash_bytes(self.max_hash_part_bytes)?;"
+    , "part.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));"
+    , "part.wipe_secrets();"
+    , "self.wipe_hash_scratch();"
+    , "hasher.finalize(&mut out);"
+    , "pub fn commit_objects<S: RuntimeKernelObjectStore>("
+    , "self.record_kernel_step(UoOpcode::Commit, None)?;"
+    , "store.commit_against(committed, aborted, recorder, &mut self.allocator)?;"
+    , "append_commit_object_schedule(committed_object_ids)?;"
+    , "pub fn finish_with_machine_witness("
+    , "self.record_kernel_step(UoOpcode::Wipe, None)?;"
+    , "self.allocator.wipe_region(ScratchRegion::ValueScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::HashScratch);"
+    , "self.allocator.wipe_region(ScratchRegion::IoScratch);"
+    , ".into_finish_snapshot(entrypoint_id.into(), self.allocator.finish()?)"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkRuntimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule = true ↔
+    iface.runtimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule := by
+  unfold
+    RuntimeImplementationInterface.checkRuntimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule
+    RuntimeImplementationInterface.runtimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.runtimeKernelMachineEffectSchedule_hasPublicOpcodePrefix
+  (effect : RuntimeKernelMachineSchedule.Effect) :
+  ∃ opcode objectBearing tail,
+    RuntimeKernelMachineSchedule.effectSchedule effect =
+      RuntimeKernelMachineSchedule.Action.recordOpcode opcode objectBearing ::
+        RuntimeKernelMachineSchedule.Action.recordKernelOp :: tail :=
+  RuntimeKernelMachineSchedule.effectSchedule_startsWithPublicOpcodeAndKernelOp effect
+
+theorem RuntimeImplementationInterface.runtimeKernelMachineFinishSchedule_wipesAllScratch :
+  RuntimeKernelMachineSchedule.effectSchedule RuntimeKernelMachineSchedule.Effect.finish =
+    [ RuntimeKernelMachineSchedule.Action.recordOpcode "Wipe" false
+    , RuntimeKernelMachineSchedule.Action.recordKernelOp
+    , RuntimeKernelMachineSchedule.Action.wipeScratch RuntimeKernelMachineSchedule.ScratchRegion.value
+    , RuntimeKernelMachineSchedule.Action.wipeScratch RuntimeKernelMachineSchedule.ScratchRegion.hash
+    , RuntimeKernelMachineSchedule.Action.wipeScratch RuntimeKernelMachineSchedule.ScratchRegion.io
+    , RuntimeKernelMachineSchedule.Action.finishSnapshot
+    ] :=
+  RuntimeKernelMachineSchedule.finishSchedule_wipesAllScratchBeforeSnapshot
+
+def RuntimeImplementationInterface.precompilesDefineLeanUoOpcodeVocabulary
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.precompilesProductionSource
+    [ "pub enum UoOpcode {"
+    , "Begin,"
+    , "CellGet,"
+    , "CellSet,"
+    , "ArrayGet,"
+    , "ArraySet,"
+    , "MapGet,"
+    , "MapPut,"
+    , "Commit,"
+    , "Wipe,"
+    ]
+
+def RuntimeImplementationInterface.checkPrecompilesDefineLeanUoOpcodeVocabulary
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.precompilesProductionSource
+    [ "pub enum UoOpcode {"
+    , "Begin,"
+    , "CellGet,"
+    , "CellSet,"
+    , "ArrayGet,"
+    , "ArraySet,"
+    , "MapGet,"
+    , "MapPut,"
+    , "Commit,"
+    , "Wipe,"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkPrecompilesDefineLeanUoOpcodeVocabulary_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPrecompilesDefineLeanUoOpcodeVocabulary = true ↔
+    iface.precompilesDefineLeanUoOpcodeVocabulary := by
+  unfold
+    RuntimeImplementationInterface.checkPrecompilesDefineLeanUoOpcodeVocabulary
+    RuntimeImplementationInterface.precompilesDefineLeanUoOpcodeVocabulary
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterUsesFixedBuffers
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.stateProductionSource
+    [ "raw_args: Box<[Value]>"
+    , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    ] ∧
+    sourceContainsAll iface.kernelRuntimeProductionSource
+      [ "#[path = \"generated_slot_support.rs\"]"
+      , "mod generated_slot_support;"
+      , "struct RuntimeKernelSlotCall<'a, S: RuntimeKernelObjectStore> {"
+      , "note_live_slot_words(self.state.live_slot_words())"
+      ] ∧
+    sourceContainsAll iface.kernelSlotSupportProductionSource
+      [ "pub(super) struct ConfidentialCallInputs {"
+      , "raw_args: Box<[Value]>"
+      , "call_inputs.into_raw_args().enumerate()"
+      , "impl Drop for ConfidentialCallInputs {"
+      , "value.wipe_secrets();"
+      , "pub(super) struct ConfidentialKernelSlotState {"
+      , "use uo_core::{ConfidentialKernelSlotProgram, FixedBoxBuilder, Value};"
+      , "slots: Box<[Option<Value>]>"
+      , "pub(super) fn new(slot_count: usize) -> Result<Self> {"
+      , "let mut slots = FixedBoxBuilder::new(slot_count);"
+      , "slots.push(None)?;"
+      , "slots: slots.finish()?,"
+      ] ∧
+    sourceLacksAll iface.stateProductionSource
+      [ "call_inputs.into_raw_args().enumerate()"
+      ] ∧
+    sourceContainsAll iface.confidentialKernelProductionSource
+      [ "fn collect_confidential_hash_parts("
+      , "let mut values = FixedBoxBuilder::new(len);"
+      , "values.push(part?)?;"
+      , "values.finish()"
+      , "struct FixedKernelStepBuffer {"
+      , "steps: Box<[MaybeUninit<ConfidentialKernelStep>]>,"
+      , "steps: Box::<[ConfidentialKernelStep]>::new_uninit_slice(capacity),"
+      , "fn finish(mut self) -> Box<[ConfidentialKernelStep]>"
+      , "let mut out = Box::<[ConfidentialKernelStep]>::new_uninit_slice(self.len);"
+      , "if let Some(slot) = self.steps.get_mut(self.len) {"
+      , "for (slot, step) in out.iter_mut().zip(self.steps.iter_mut().take(self.len)) {"
+      , "slot.write(unsafe { step.assume_init_read() });"
+      , "impl Drop for FixedKernelStepBuffer {"
+      , "for step in self.steps.iter_mut().take(self.len) {"
+      , "unsafe { step.assume_init_drop() };"
+      , "FixedKernelStepBuffer::new(self.runtime_step_count())"
+      , "FixedKernelStepBuffer::new(self.kernel_step_count())"
+      ] ∧
+    sourceLacksAll iface.confidentialKernelProductionSource
+      [ "pub struct ConfidentialCallInputs {"
+      , "pub struct ConfidentialKernelSlotState {"
+      , "env: BTreeMap<String, Value>"
+      , "struct FixedConfidentialValueBuffer {"
+      , "values: Vec<Value>,"
+      , "let mut values = FixedConfidentialValueBuffer::new(len);"
+      , "values: Vec::with_capacity(len),"
+      , "self.values.into_boxed_slice()"
+      , "let mut values = Vec::with_capacity(parts.len());"
+      , "steps: Vec<ConfidentialKernelStep>,"
+      , "steps: Vec::with_capacity(len),"
+      , "self.steps.into_boxed_slice()"
+      , "let mut steps = Vec::new();"
+      , "let mut steps = vec![ConfidentialKernelStep"
+      , "self.steps[self.len].write(step);"
+      , "out[index].write(unsafe { self.steps[index].assume_init_read() });"
+      , "&mut self.steps[..self.len]"
+      ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterUsesFixedBuffers
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.stateProductionSource
+    [ "raw_args: Box<[Value]>"
+    , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    ] &&
+    checkSourceContainsAll iface.kernelRuntimeProductionSource
+      [ "#[path = \"generated_slot_support.rs\"]"
+      , "mod generated_slot_support;"
+      , "struct RuntimeKernelSlotCall<'a, S: RuntimeKernelObjectStore> {"
+      , "note_live_slot_words(self.state.live_slot_words())"
+      ] &&
+    checkSourceContainsAll iface.kernelSlotSupportProductionSource
+      [ "pub(super) struct ConfidentialCallInputs {"
+      , "raw_args: Box<[Value]>"
+      , "call_inputs.into_raw_args().enumerate()"
+      , "impl Drop for ConfidentialCallInputs {"
+      , "value.wipe_secrets();"
+      , "pub(super) struct ConfidentialKernelSlotState {"
+      , "use uo_core::{ConfidentialKernelSlotProgram, FixedBoxBuilder, Value};"
+      , "slots: Box<[Option<Value>]>"
+      , "pub(super) fn new(slot_count: usize) -> Result<Self> {"
+      , "let mut slots = FixedBoxBuilder::new(slot_count);"
+      , "slots.push(None)?;"
+      , "slots: slots.finish()?,"
+      ] &&
+    checkSourceLacksAll iface.stateProductionSource
+      [ "call_inputs.into_raw_args().enumerate()"
+      ] &&
+    checkSourceContainsAll iface.confidentialKernelProductionSource
+      [ "fn collect_confidential_hash_parts("
+      , "let mut values = FixedBoxBuilder::new(len);"
+      , "values.push(part?)?;"
+      , "values.finish()"
+      , "struct FixedKernelStepBuffer {"
+      , "steps: Box<[MaybeUninit<ConfidentialKernelStep>]>,"
+      , "steps: Box::<[ConfidentialKernelStep]>::new_uninit_slice(capacity),"
+      , "fn finish(mut self) -> Box<[ConfidentialKernelStep]>"
+      , "let mut out = Box::<[ConfidentialKernelStep]>::new_uninit_slice(self.len);"
+      , "if let Some(slot) = self.steps.get_mut(self.len) {"
+      , "for (slot, step) in out.iter_mut().zip(self.steps.iter_mut().take(self.len)) {"
+      , "slot.write(unsafe { step.assume_init_read() });"
+      , "impl Drop for FixedKernelStepBuffer {"
+      , "for step in self.steps.iter_mut().take(self.len) {"
+      , "unsafe { step.assume_init_drop() };"
+      , "FixedKernelStepBuffer::new(self.runtime_step_count())"
+      , "FixedKernelStepBuffer::new(self.kernel_step_count())"
+      ] &&
+    checkSourceLacksAll iface.confidentialKernelProductionSource
+      [ "pub struct ConfidentialCallInputs {"
+      , "pub struct ConfidentialKernelSlotState {"
+      , "env: BTreeMap<String, Value>"
+      , "struct FixedConfidentialValueBuffer {"
+      , "values: Vec<Value>,"
+      , "let mut values = FixedConfidentialValueBuffer::new(len);"
+      , "values: Vec::with_capacity(len),"
+      , "self.values.into_boxed_slice()"
+      , "let mut values = Vec::with_capacity(parts.len());"
+      , "steps: Vec<ConfidentialKernelStep>,"
+      , "steps: Vec::with_capacity(len),"
+      , "self.steps.into_boxed_slice()"
+      , "let mut steps = Vec::new();"
+      , "let mut steps = vec![ConfidentialKernelStep"
+      , "self.steps[self.len].write(step);"
+      , "out[index].write(unsafe { self.steps[index].assume_init_read() });"
+      , "&mut self.steps[..self.len]"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterUsesFixedBuffers_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterUsesFixedBuffers = true ↔
+    iface.sharedConfidentialInterpreterUsesFixedBuffers := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterUsesFixedBuffers
+    RuntimeImplementationInterface.sharedConfidentialInterpreterUsesFixedBuffers
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.runtimeKernelSlotSupportRefinesLeanStagingModel
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.kernelRuntimeProductionSource
+    [ "store_confidential_call_inputs(&mut self.state, program, call_inputs)"
+    , "let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);"
+    , "ConfidentialKernelSlotState::new(slot_count)?"
+    , "note_live_slot_words(self.state.live_slot_words())"
+    ] ∧
+  sourceContainsAll iface.kernelSlotSupportProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeKernelSlotSupportRust.lean; do not edit by hand."
+    , "pub(super) struct ConfidentialCallInputs {"
+    , "pub(super) struct ConfidentialKernelSlotState {"
+    , "pub(super) fn store_confidential_call_inputs("
+    , "for (slot, arg) in call_inputs.into_raw_args().enumerate() {"
+    , "if slot >= program.param_count {"
+    , "state.store_slot(slot, arg)?;"
+    , "if supplied_args != program.param_count {"
+    , "Ok(())"
+    ] ∧
+  sourceLacksAll iface.kernelRuntimeProductionSource
+    [ "for (slot, arg) in call_inputs.into_raw_args().enumerate() {"
+    , "if slot >= program.param_count {"
+    , "if supplied_args != program.param_count {"
+    ] ∧
+  sourceLacksAll iface.kernelSlotSupportProductionSource
+    [ "pub struct ConfidentialCallInputs"
+    , "pub struct ConfidentialKernelSlotState"
+    , "pub fn store_confidential_call_inputs"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeKernelSlotSupportRefinesLeanStagingModel
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.kernelRuntimeProductionSource
+    [ "store_confidential_call_inputs(&mut self.state, program, call_inputs)"
+    , "let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);"
+    , "ConfidentialKernelSlotState::new(slot_count)?"
+    , "note_live_slot_words(self.state.live_slot_words())"
+    ] &&
+  checkSourceContainsAll iface.kernelSlotSupportProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeKernelSlotSupportRust.lean; do not edit by hand."
+    , "pub(super) struct ConfidentialCallInputs {"
+    , "pub(super) struct ConfidentialKernelSlotState {"
+    , "pub(super) fn store_confidential_call_inputs("
+    , "for (slot, arg) in call_inputs.into_raw_args().enumerate() {"
+    , "if slot >= program.param_count {"
+    , "state.store_slot(slot, arg)?;"
+    , "if supplied_args != program.param_count {"
+    , "Ok(())"
+    ] &&
+  checkSourceLacksAll iface.kernelRuntimeProductionSource
+    [ "for (slot, arg) in call_inputs.into_raw_args().enumerate() {"
+    , "if slot >= program.param_count {"
+    , "if supplied_args != program.param_count {"
+    ] &&
+  checkSourceLacksAll iface.kernelSlotSupportProductionSource
+    [ "pub struct ConfidentialCallInputs"
+    , "pub struct ConfidentialKernelSlotState"
+    , "pub fn store_confidential_call_inputs"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkRuntimeKernelSlotSupportRefinesLeanStagingModel_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeKernelSlotSupportRefinesLeanStagingModel = true ↔
+    iface.runtimeKernelSlotSupportRefinesLeanStagingModel := by
+  unfold RuntimeImplementationInterface.checkRuntimeKernelSlotSupportRefinesLeanStagingModel
+    RuntimeImplementationInterface.runtimeKernelSlotSupportRefinesLeanStagingModel
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.runtimeKernelSlotSupport_stagedSlotsHaveProgramLength
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (slots : RuntimeKernelSlotSupport.SlotFile)
+  (h : RuntimeKernelSlotSupport.StagesCallInputs program args slots) :
+  slots.length = program.slotCount :=
+  RuntimeKernelSlotSupport.stagesCallInputs_slotFileLength h
+
+theorem RuntimeImplementationInterface.runtimeKernelSlotSupport_stagingIsDeterministic
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (lhs rhs : RuntimeKernelSlotSupport.SlotFile)
+  (hLhs : RuntimeKernelSlotSupport.StagesCallInputs program args lhs)
+  (hRhs : RuntimeKernelSlotSupport.StagesCallInputs program args rhs) :
+  lhs = rhs :=
+  RuntimeKernelSlotSupport.stagesCallInputs_deterministic hLhs hRhs
+
+theorem RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsAcceptsPrecondition
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (h : RuntimeKernelSlotSupport.Precondition program args) :
+  RuntimeKernelSlotSupport.stageArgs? program args =
+    some (RuntimeKernelSlotSupport.stageArgs program.slotCount args) :=
+  RuntimeKernelSlotSupport.stageArgs?_acceptsPrecondition h
+
+theorem RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsRejectsArgCountMismatch
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (h : args.length ≠ program.paramCount) :
+  RuntimeKernelSlotSupport.stageArgs? program args = none :=
+  RuntimeKernelSlotSupport.stageArgs?_rejectsArgCountMismatch h
+
+theorem RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsRejectsParamSlotOverflow
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (h : ¬ program.paramCount ≤ program.slotCount) :
+  RuntimeKernelSlotSupport.stageArgs? program args = none :=
+  RuntimeKernelSlotSupport.stageArgs?_rejectsParamSlotOverflow h
+
+theorem RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsSomeStagesCallInputs
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (slots : RuntimeKernelSlotSupport.SlotFile)
+  (h : RuntimeKernelSlotSupport.stageArgs? program args = some slots) :
+  RuntimeKernelSlotSupport.StagesCallInputs program args slots :=
+  RuntimeKernelSlotSupport.stageArgs?_some_stagesCallInputs h
+
+def RuntimeImplementationInterface.runtimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.kernelRuntimeProductionSource
+    [ "pub struct RuntimeKernelEffectAdapter<'a, S: RuntimeKernelObjectStore> {"
+    , "machine: &'a mut RuntimeKernelMachine,"
+    , "store: &'a mut S,"
+    , "recorder: &'a mut S::Recorder,"
+    , "opcode_trace: &'a mut RuntimeKernelStatementTrace,"
+    , "pub struct RuntimeKernelStatementTrace {"
+    , "statements: Box<[MaybeUninit<String>]>,"
+    , "pub fn new(capacity: usize) -> Self {"
+    , "statements: Box::<[String]>::new_uninit_slice(capacity),"
+    , "fn record(&mut self, statement: &uo_core::ConfidentialKernelSlotStatement) -> Result<()> {"
+    , "let Some(slot) = self.statements.get_mut(self.len) else {"
+    , "anyhow::bail!(\"runtime kernel statement-trace capacity exceeded\");"
+    , "slot.write(statement.trace_name().into());"
+    , "pub fn into_boxed_trace(mut self) -> Box<[String]> {"
+    , "let mut trace = Box::<[String]>::new_uninit_slice(self.len);"
+    , "for (slot, statement) in trace"
+    , ".zip(self.statements.iter_mut().take(self.len))"
+    , "slot.write(unsafe { statement.assume_init_read() });"
+    , "impl Drop for RuntimeKernelStatementTrace {"
+    , "for statement in self.statements.iter_mut().take(self.len) {"
+    , "unsafe { statement.assume_init_drop() };"
+    , "struct RuntimeKernelSlotCall<'a, S: RuntimeKernelObjectStore> {"
+    , "effects: RuntimeKernelEffectAdapter<'a, S>,"
+    , "state: ConfidentialKernelSlotState,"
+    , "state: ConfidentialKernelSlotState::new(slot_count)?,"
+    , "store_confidential_call_inputs(&mut self.state, program, call_inputs)"
+    , "fn load_slot(&self, slot: usize) -> Result<Value> {"
+    , "self.state.load_slot(slot)"
+    , "fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {"
+    , "self.state.store_slot(slot, value)?;"
+    , "note_live_slot_words(self.state.live_slot_words())"
+    , "fn cell_get(&mut self, object_id: u32) -> Result<Value> {"
+    , "self.effects.cell_get(object_id)"
+    , "fn cell_set(&mut self, object_id: u32, value: Value, predicate: Option<bool>) -> Result<()> {"
+    , "self.effects.cell_set(object_id, value, predicate)"
+    , "fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value> {"
+    , "self.effects.array_get(object_id, index)"
+    , "self.effects.array_set(object_id, index, value, predicate)"
+    , "fn map_get(&mut self, object_id: u32, key: &Value) -> Result<(Value, bool)> {"
+    , "self.effects.map_get(object_id, key)"
+    , "self.effects.map_put(object_id, key, value, predicate)"
+    , "fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "self.effects.keccak256(parts)"
+    , "self.opcode_trace.record(statement)"
+    , "self.machine.cell_get(self.store, self.recorder, object_id)"
+    , ".cell_set(self.store, self.recorder, object_id, value, predicate)"
+    , ".array_get(self.store, self.recorder, object_id, index)"
+    , "self.machine.array_set("
+    , ".map_get(self.store, self.recorder, object_id, key)"
+    , ".map_put(self.store, self.recorder, object_id, key, value, predicate)"
+    , "self.machine.keccak256_values(parts)"
+    , "let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);"
+    , "runtime.store_call_inputs(program, call_inputs)?;"
+    , "execute_confidential_kernel_slot_program(&mut runtime, program)?"
+    ] ∧
+  sourceLacksAll iface.kernelRuntimeProductionSource
+    [ "raw_args.len()"
+    , "raw_args.iter("
+    , "raw_args.into_iter("
+    , "raw_args.clone()"
+    , "raw_args.to_vec()"
+    , "for arg in raw_args"
+    , "for (slot, arg) in raw_args"
+    , "if raw_args"
+    , "match raw_args"
+    , "Vec<Value>"
+    , "HashMap<"
+    , "BTreeMap<"
+    , "opcode_trace: &'a mut Vec<String>,"
+    , "opcode_trace.push("
+    , "statements: Box<[Option<String>]>,"
+    , "statements: vec![None; capacity].into_boxed_slice()"
+    , "let mut trace = Vec::with_capacity(self.len);"
+    , "self.statements.into_vec()"
+    , "trace[index].write(unsafe { self.statements[index].assume_init_read() });"
+    , "&mut self.statements[..self.len]"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.kernelRuntimeProductionSource
+    [ "pub struct RuntimeKernelEffectAdapter<'a, S: RuntimeKernelObjectStore> {"
+    , "machine: &'a mut RuntimeKernelMachine,"
+    , "store: &'a mut S,"
+    , "recorder: &'a mut S::Recorder,"
+    , "opcode_trace: &'a mut RuntimeKernelStatementTrace,"
+    , "pub struct RuntimeKernelStatementTrace {"
+    , "statements: Box<[MaybeUninit<String>]>,"
+    , "pub fn new(capacity: usize) -> Self {"
+    , "statements: Box::<[String]>::new_uninit_slice(capacity),"
+    , "fn record(&mut self, statement: &uo_core::ConfidentialKernelSlotStatement) -> Result<()> {"
+    , "let Some(slot) = self.statements.get_mut(self.len) else {"
+    , "anyhow::bail!(\"runtime kernel statement-trace capacity exceeded\");"
+    , "slot.write(statement.trace_name().into());"
+    , "pub fn into_boxed_trace(mut self) -> Box<[String]> {"
+    , "let mut trace = Box::<[String]>::new_uninit_slice(self.len);"
+    , "for (slot, statement) in trace"
+    , ".zip(self.statements.iter_mut().take(self.len))"
+    , "slot.write(unsafe { statement.assume_init_read() });"
+    , "impl Drop for RuntimeKernelStatementTrace {"
+    , "for statement in self.statements.iter_mut().take(self.len) {"
+    , "unsafe { statement.assume_init_drop() };"
+    , "struct RuntimeKernelSlotCall<'a, S: RuntimeKernelObjectStore> {"
+    , "effects: RuntimeKernelEffectAdapter<'a, S>,"
+    , "state: ConfidentialKernelSlotState,"
+    , "state: ConfidentialKernelSlotState::new(slot_count)?,"
+    , "store_confidential_call_inputs(&mut self.state, program, call_inputs)"
+    , "fn load_slot(&self, slot: usize) -> Result<Value> {"
+    , "self.state.load_slot(slot)"
+    , "fn store_slot(&mut self, slot: usize, value: Value) -> Result<()> {"
+    , "self.state.store_slot(slot, value)?;"
+    , "note_live_slot_words(self.state.live_slot_words())"
+    , "fn cell_get(&mut self, object_id: u32) -> Result<Value> {"
+    , "self.effects.cell_get(object_id)"
+    , "fn cell_set(&mut self, object_id: u32, value: Value, predicate: Option<bool>) -> Result<()> {"
+    , "self.effects.cell_set(object_id, value, predicate)"
+    , "fn array_get(&mut self, object_id: u32, index: usize) -> Result<Value> {"
+    , "self.effects.array_get(object_id, index)"
+    , "self.effects.array_set(object_id, index, value, predicate)"
+    , "fn map_get(&mut self, object_id: u32, key: &Value) -> Result<(Value, bool)> {"
+    , "self.effects.map_get(object_id, key)"
+    , "self.effects.map_put(object_id, key, value, predicate)"
+    , "fn keccak256(&mut self, parts: Box<[Value]>) -> Result<Value> {"
+    , "self.effects.keccak256(parts)"
+    , "self.opcode_trace.record(statement)"
+    , "self.machine.cell_get(self.store, self.recorder, object_id)"
+    , ".cell_set(self.store, self.recorder, object_id, value, predicate)"
+    , ".array_get(self.store, self.recorder, object_id, index)"
+    , "self.machine.array_set("
+    , ".map_get(self.store, self.recorder, object_id, key)"
+    , ".map_put(self.store, self.recorder, object_id, key, value, predicate)"
+    , "self.machine.keccak256_values(parts)"
+    , "let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);"
+    , "runtime.store_call_inputs(program, call_inputs)?;"
+    , "execute_confidential_kernel_slot_program(&mut runtime, program)?"
+    ] &&
+  checkSourceLacksAll iface.kernelRuntimeProductionSource
+    [ "raw_args.len()"
+    , "raw_args.iter("
+    , "raw_args.into_iter("
+    , "raw_args.clone()"
+    , "raw_args.to_vec()"
+    , "for arg in raw_args"
+    , "for (slot, arg) in raw_args"
+    , "if raw_args"
+    , "match raw_args"
+    , "Vec<Value>"
+    , "HashMap<"
+    , "BTreeMap<"
+    , "opcode_trace: &'a mut Vec<String>,"
+    , "opcode_trace.push("
+    , "statements: Box<[Option<String>]>,"
+    , "statements: vec![None; capacity].into_boxed_slice()"
+    , "let mut trace = Vec::with_capacity(self.len);"
+    , "self.statements.into_vec()"
+    , "trace[index].write(unsafe { self.statements[index].assume_init_read() });"
+    , "&mut self.statements[..self.len]"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkRuntimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects = true ↔
+    iface.runtimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects := by
+  unfold RuntimeImplementationInterface.checkRuntimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
+    RuntimeImplementationInterface.runtimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterUsesMaskedSelectionAndAbort
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.generatedConfidentialKernelProductionSource
+    [ "fn note_abort_generated(state: &mut ConfidentialKernelInterpreterState, cond: bool) {"
+    , "state.aborted = masked_select_bool(cond, true, state.aborted);"
+    , "note_abort_generated(state, cond);"
+    , "note_abort_generated(state, overflowed);"
+    , "Value::confidential_select(cond, when_true, when_false)"
+    ] ∧
+    sourceLacksAll (productionSource iface.confidentialKernelSource)
+      [ "fn note_abort(&mut self, cond: bool) {"
+      , "masked_select_bool("
+      , "if cond {"
+      , "state.aborted = true;"
+      ] ∧
+    sourceContainsAll iface.generatedValueOpsProductionSource
+      [ "pub(crate) fn masked_select_bool(cond: bool, when_true: bool, when_false: bool) -> bool {"
+      , "masked_select_u8(cond, u8::from(when_true), u8::from(when_false)) != 0"
+      , "pub fn confidential_select("
+      , "pub fn zero_for_type(ty: &Type) -> Self {"
+      , "let mut field_iter = fields.iter();"
+      , "let fields = FixedBoxBuilder::from_fn(fields.len(), |_| {"
+      , ".map(|field| (field.name.clone(), Value::zero_for_type(&field.ty)))"
+      , ".unwrap_or_else(|| (String::new(), Value::Bool(false)))"
+      , "let values = FixedBoxBuilder::from_fn(*len, |_| Value::zero_for_type(element));"
+      , "pub fn as_bool(&self) -> Option<bool> {"
+      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn wipe_secrets(&mut self) {"
+      , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
+      , "masked_select_u8(cond, u8::from(*when_true), u8::from(*when_false)) != 0"
+      , "masked_select_u128(cond, *when_true, *when_false)"
+      , "masked_select_bytes(cond, *when_true, *when_false)"
+      , "FixedBoxBuilder::new(when_true_fields.len())"
+      , "FixedBoxBuilder::new(when_true_values.len())"
+      , "Ok(Value::Struct(selected.finish()?))"
+      , "Ok(Value::Array(selected.finish()?))"
+      , "struct FixedByteBuffer"
+      , "bytes: Box<[u8]>"
+      , "bytes: FixedBoxBuilder::from_fn(len, |_| 0u8)"
+      , "pub fn visit_canonical_chunks<F: FnMut(&[u8])>(&self, visitor: &mut F) {"
+      , "pub fn canonical_bytes_boxed(&self) -> Result<Box<[u8]>>"
+      , "FixedByteBuffer::new(self.canonical_len())"
+      , "pub fn decode_canonical(ty: &Type, bytes: &[u8]) -> Result<Self>"
+      , "fn read_length_word(bytes: &[u8], offset: &mut usize) -> Result<usize>"
+      , "fn checked_end(offset: usize, len: usize, context: &str) -> Result<usize>"
+      , "fn read_exact_range<'a>("
+      , "fn write_exact_range("
+      , "fn write_u128_tail_be(out: &mut [u8; 32], value: u128) {"
+      , "fn read_array_at<const N: usize>(bytes: &[u8], offset: usize, context: &str) -> Result<[u8; N]> {"
+      , "fn read_u64_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u64> {"
+      , "fn read_u128_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u128> {"
+      , "write_exact_range("
+      , "*slot = byte;"
+      , "write_u128_tail_be(&mut out, *value);"
+      , "write_u128_tail_be(&mut bytes, *value);"
+      , "let high = read_exact_range(bytes, 0, 16, \"canonical uint high word\")?;"
+      , "let out = read_u128_be_at(bytes, 16, \"canonical uint payload\")?;"
+      , "let out = read_array_at::<32>(bytes, 0, \"canonical bytes32 payload\")?;"
+      , "let out = read_array_at::<20>(bytes, 0, \"canonical address payload\")?;"
+      , "let out = read_u64_be_at(bytes, *offset, \"canonical length word\")?;"
+      , "selected.iter_mut().zip(when_true).zip(when_false)"
+      , "lhs.into_iter().zip(rhs)"
+      ] ∧
+    sourceLacksAll iface.generatedValueOpsProductionSource
+      [ "pub fn canonical_bytes(&self) -> Result<Vec<u8>>"
+      , "canonical_bytes_boxed()?.into_vec()"
+      , "let mut out = Vec::with_capacity(self.canonical_len());"
+      , "self.bytes[self.initialized..end]"
+      , "use std::mem::MaybeUninit;"
+      , "bytes: Box<[MaybeUninit<u8>]>"
+      , "Box::<[u8]>::new_uninit_slice(len)"
+      , "fn write_exact_uninit_range("
+      , "slot.write(byte);"
+      , "let raw = Box::into_raw(bytes) as *mut [u8];"
+      , "Ok(unsafe { Box::from_raw(raw) })"
+      , "out[16..].copy_from_slice(&value.to_be_bytes());"
+      , "bytes[16..].copy_from_slice(&value.to_be_bytes());"
+      , "bytes[..16].iter().any"
+      , "out.copy_from_slice(&bytes[16..32]);"
+      , "out.copy_from_slice(&bytes[..32]);"
+      , "out.copy_from_slice(&bytes[..20]);"
+      , "out.copy_from_slice(word);"
+      , "let field = &fields[index];"
+      , "selected[index] = (when_true[index]"
+      , "diff |= lhs[index] ^ rhs[index];"
+      ] ∧
+    sourceContainsAll iface.typesProductionSource
+      [ "#[path = \"generated_value_ops.rs\"]"
+      , "mod generated_value_ops;"
+      , "pub(crate) use generated_value_ops::masked_select_bool;"
+      , "struct FixedBoxBuilder<T>"
+      , "entries: Box<[MaybeUninit<T>]>,"
+      , "pub fn from_fn<F>(len: usize, mut make: F) -> Box<[T]>"
+      , "for (index, slot) in builder.entries.iter_mut().enumerate() {"
+      , "slot.write(make(index));"
+      , ".entries"
+      , ".get_mut(self.initialized)"
+      , "slot.write(value);"
+      , "for entry in self.entries.iter_mut().take(self.initialized) {"
+      ] ∧
+    sourceLacksAll iface.typesProductionSource
+      [ "Value::Struct(selected.into_boxed_slice())"
+      , "Value::Array(selected.into_boxed_slice())"
+      , "Value::Struct(decoded.into_boxed_slice())"
+      , "Value::Array(decoded.into_boxed_slice())"
+      , "pub fn confidential_select("
+      , "pub fn confidential_eq(lhs: &Value, rhs: &Value) -> bool {"
+      , "pub fn zero_for_type(ty: &Type) -> Self {"
+      , "pub fn as_bool(&self) -> Option<bool> {"
+      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn wipe_secrets(&mut self) {"
+      , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
+      , "pub fn is_zero_like(&self) -> bool {"
+      , "pub fn canonical_bytes_boxed(&self) -> Result<Box<[u8]>>"
+      , "pub fn decode_canonical(ty: &Type, bytes: &[u8]) -> Result<Self>"
+      , "pub fn visit_canonical_chunks<F: FnMut(&[u8])>(&self, visitor: &mut F)"
+      , "fn decode_canonical_prefix(ty: &Type, bytes: &[u8]) -> Result<(Self, usize)>"
+      , "fn read_length_word(bytes: &[u8], offset: &mut usize) -> Result<usize>"
+      , "struct FixedByteBuffer"
+      , "fn masked_select_u8(cond: bool, when_true: u8, when_false: u8) -> u8 {"
+      , "let mut out = Vec::with_capacity(self.canonical_len());"
+      , ".map(|field| (field.name.clone(), Value::zero_for_type(&field.ty)))"
+      , ".map(|_| Value::zero_for_type(element))"
+      , "builder.entries[index].write(make(index));"
+      , "self.entries[self.initialized].write(value);"
+      , "&mut self.entries[..self.initialized]"
+      ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterUsesMaskedSelectionAndAbort
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.generatedConfidentialKernelProductionSource
+    [ "fn note_abort_generated(state: &mut ConfidentialKernelInterpreterState, cond: bool) {"
+    , "state.aborted = masked_select_bool(cond, true, state.aborted);"
+    , "note_abort_generated(state, cond);"
+    , "note_abort_generated(state, overflowed);"
+    , "Value::confidential_select(cond, when_true, when_false)"
+    ] &&
+    checkSourceLacksAll (productionSource iface.confidentialKernelSource)
+      [ "fn note_abort(&mut self, cond: bool) {"
+      , "masked_select_bool("
+      , "if cond {"
+      , "state.aborted = true;"
+      ] &&
+    checkSourceContainsAll iface.generatedValueOpsProductionSource
+      [ "pub(crate) fn masked_select_bool(cond: bool, when_true: bool, when_false: bool) -> bool {"
+      , "masked_select_u8(cond, u8::from(when_true), u8::from(when_false)) != 0"
+      , "pub fn confidential_select("
+      , "pub fn zero_for_type(ty: &Type) -> Self {"
+      , "let mut field_iter = fields.iter();"
+      , "let fields = FixedBoxBuilder::from_fn(fields.len(), |_| {"
+      , ".map(|field| (field.name.clone(), Value::zero_for_type(&field.ty)))"
+      , ".unwrap_or_else(|| (String::new(), Value::Bool(false)))"
+      , "let values = FixedBoxBuilder::from_fn(*len, |_| Value::zero_for_type(element));"
+      , "pub fn as_bool(&self) -> Option<bool> {"
+      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn wipe_secrets(&mut self) {"
+      , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
+      , "masked_select_u8(cond, u8::from(*when_true), u8::from(*when_false)) != 0"
+      , "masked_select_u128(cond, *when_true, *when_false)"
+      , "masked_select_bytes(cond, *when_true, *when_false)"
+      , "FixedBoxBuilder::new(when_true_fields.len())"
+      , "FixedBoxBuilder::new(when_true_values.len())"
+      , "Ok(Value::Struct(selected.finish()?))"
+      , "Ok(Value::Array(selected.finish()?))"
+      , "struct FixedByteBuffer"
+      , "bytes: Box<[u8]>"
+      , "bytes: FixedBoxBuilder::from_fn(len, |_| 0u8)"
+      , "pub fn visit_canonical_chunks<F: FnMut(&[u8])>(&self, visitor: &mut F) {"
+      , "pub fn canonical_bytes_boxed(&self) -> Result<Box<[u8]>>"
+      , "FixedByteBuffer::new(self.canonical_len())"
+      , "pub fn decode_canonical(ty: &Type, bytes: &[u8]) -> Result<Self>"
+      , "fn read_length_word(bytes: &[u8], offset: &mut usize) -> Result<usize>"
+      , "fn checked_end(offset: usize, len: usize, context: &str) -> Result<usize>"
+      , "fn read_exact_range<'a>("
+      , "fn write_exact_range("
+      , "fn write_u128_tail_be(out: &mut [u8; 32], value: u128) {"
+      , "fn read_array_at<const N: usize>(bytes: &[u8], offset: usize, context: &str) -> Result<[u8; N]> {"
+      , "fn read_u64_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u64> {"
+      , "fn read_u128_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u128> {"
+      , "write_exact_range("
+      , "*slot = byte;"
+      , "write_u128_tail_be(&mut out, *value);"
+      , "write_u128_tail_be(&mut bytes, *value);"
+      , "let high = read_exact_range(bytes, 0, 16, \"canonical uint high word\")?;"
+      , "let out = read_u128_be_at(bytes, 16, \"canonical uint payload\")?;"
+      , "let out = read_array_at::<32>(bytes, 0, \"canonical bytes32 payload\")?;"
+      , "let out = read_array_at::<20>(bytes, 0, \"canonical address payload\")?;"
+      , "let out = read_u64_be_at(bytes, *offset, \"canonical length word\")?;"
+      , "selected.iter_mut().zip(when_true).zip(when_false)"
+      , "lhs.into_iter().zip(rhs)"
+      ] &&
+    checkSourceLacksAll iface.generatedValueOpsProductionSource
+      [ "pub fn canonical_bytes(&self) -> Result<Vec<u8>>"
+      , "canonical_bytes_boxed()?.into_vec()"
+      , "let mut out = Vec::with_capacity(self.canonical_len());"
+      , "self.bytes[self.initialized..end]"
+      , "use std::mem::MaybeUninit;"
+      , "bytes: Box<[MaybeUninit<u8>]>"
+      , "Box::<[u8]>::new_uninit_slice(len)"
+      , "fn write_exact_uninit_range("
+      , "slot.write(byte);"
+      , "let raw = Box::into_raw(bytes) as *mut [u8];"
+      , "Ok(unsafe { Box::from_raw(raw) })"
+      , "out[16..].copy_from_slice(&value.to_be_bytes());"
+      , "bytes[16..].copy_from_slice(&value.to_be_bytes());"
+      , "bytes[..16].iter().any"
+      , "out.copy_from_slice(&bytes[16..32]);"
+      , "out.copy_from_slice(&bytes[..32]);"
+      , "out.copy_from_slice(&bytes[..20]);"
+      , "out.copy_from_slice(word);"
+      , "let field = &fields[index];"
+      , "selected[index] = (when_true[index]"
+      , "diff |= lhs[index] ^ rhs[index];"
+      ] &&
+    checkSourceContainsAll iface.typesProductionSource
+      [ "#[path = \"generated_value_ops.rs\"]"
+      , "mod generated_value_ops;"
+      , "pub(crate) use generated_value_ops::masked_select_bool;"
+      , "struct FixedBoxBuilder<T>"
+      , "entries: Box<[MaybeUninit<T>]>,"
+      , "pub fn from_fn<F>(len: usize, mut make: F) -> Box<[T]>"
+      , "for (index, slot) in builder.entries.iter_mut().enumerate() {"
+      , "slot.write(make(index));"
+      , ".entries"
+      , ".get_mut(self.initialized)"
+      , "slot.write(value);"
+      , "for entry in self.entries.iter_mut().take(self.initialized) {"
+      ] &&
+    checkSourceLacksAll iface.typesProductionSource
+      [ "Value::Struct(selected.into_boxed_slice())"
+      , "Value::Array(selected.into_boxed_slice())"
+      , "Value::Struct(decoded.into_boxed_slice())"
+      , "Value::Array(decoded.into_boxed_slice())"
+      , "pub fn confidential_select("
+      , "pub fn confidential_eq(lhs: &Value, rhs: &Value) -> bool {"
+      , "pub fn zero_for_type(ty: &Type) -> Self {"
+      , "pub fn as_bool(&self) -> Option<bool> {"
+      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn wipe_secrets(&mut self) {"
+      , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
+      , "pub fn is_zero_like(&self) -> bool {"
+      , "pub fn canonical_bytes_boxed(&self) -> Result<Box<[u8]>>"
+      , "pub fn decode_canonical(ty: &Type, bytes: &[u8]) -> Result<Self>"
+      , "pub fn visit_canonical_chunks<F: FnMut(&[u8])>(&self, visitor: &mut F)"
+      , "fn decode_canonical_prefix(ty: &Type, bytes: &[u8]) -> Result<(Self, usize)>"
+      , "fn read_length_word(bytes: &[u8], offset: &mut usize) -> Result<usize>"
+      , "struct FixedByteBuffer"
+      , "fn masked_select_u8(cond: bool, when_true: u8, when_false: u8) -> u8 {"
+      , "let mut out = Vec::with_capacity(self.canonical_len());"
+      , ".map(|field| (field.name.clone(), Value::zero_for_type(&field.ty)))"
+      , ".map(|_| Value::zero_for_type(element))"
+      , "builder.entries[index].write(make(index));"
+      , "self.entries[self.initialized].write(value);"
+      , "&mut self.entries[..self.initialized]"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterUsesMaskedSelectionAndAbort_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterUsesMaskedSelectionAndAbort = true ↔
+    iface.sharedConfidentialInterpreterUsesMaskedSelectionAndAbort := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterUsesMaskedSelectionAndAbort
+    RuntimeImplementationInterface.sharedConfidentialInterpreterUsesMaskedSelectionAndAbort
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.sharedConfidentialObjectsUseMaskedCellAndArrayUpdates
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "pub(in crate::runtime) fn set_cell("
+    , "Self::UoCell(object) => {"
+    , "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "update_masked_value(&mut object.value, value, apply)?;"
+    , "object.written = true;"
+    , "pub(in crate::runtime) fn set_array("
+    , "Self::UoArray(object) => {"
+    , "update_array_value_at_index("
+    , "&mut object.values,"
+    ] ∧
+    sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn update_masked_value(current: &mut Value, value: Value, apply: bool) -> Result<()> {"
+    , "let prior = current.clone();"
+    , "*current = Value::confidential_select(apply, value, prior)?;"
+    , "for (slot, current) in values.iter_mut().enumerate() {"
+    , "let update_here = apply & in_bounds & (slot == index);"
+    , "*current = Value::confidential_select(update_here, value.clone(), prior)?;"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialObjectsUseMaskedCellAndArrayUpdates
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "pub(in crate::runtime) fn set_cell("
+    , "Self::UoCell(object) => {"
+    , "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "update_masked_value(&mut object.value, value, apply)?;"
+    , "object.written = true;"
+    , "pub(in crate::runtime) fn set_array("
+    , "Self::UoArray(object) => {"
+    , "update_array_value_at_index("
+    , "&mut object.values,"
+    ] &&
+    checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn update_masked_value(current: &mut Value, value: Value, apply: bool) -> Result<()> {"
+    , "let prior = current.clone();"
+    , "*current = Value::confidential_select(apply, value, prior)?;"
+    , "for (slot, current) in values.iter_mut().enumerate() {"
+    , "let update_here = apply & in_bounds & (slot == index);"
+    , "*current = Value::confidential_select(update_here, value.clone(), prior)?;"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialObjectsUseMaskedCellAndArrayUpdates_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialObjectsUseMaskedCellAndArrayUpdates = true ↔
+    iface.sharedConfidentialObjectsUseMaskedCellAndArrayUpdates := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialObjectsUseMaskedCellAndArrayUpdates
+    RuntimeImplementationInterface.sharedConfidentialObjectsUseMaskedCellAndArrayUpdates
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialArrayAccessUsesMaskedFullScans
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "trace.logical_read(\"array_get\", &object.spec.name, \"oblivious\");"
+    , "trace.logical_write(\"array_set\", &object.spec.name, \"oblivious\");"
+    , "select_array_value_at_index(&object.values, index, &object.spec.value_type)"
+    , "update_array_value_at_index("
+    , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
+    , "let mut physical_slots = FixedBoxBuilder::new(capacity);"
+    , "physical_slots: physical_slots.finish()?,"
+    , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
+    , "object.physical_slots.get(index).ok_or_else(|| {"
+    , "object.values.get_mut(index).ok_or_else(|| {"
+    , "object.written_slots.get_mut(index).ok_or_else(|| {"
+    , "object.physical_slots.iter().enumerate()"
+    ] ∧
+    sourceContainsAll iface.generatedObjectHelpersProductionSource
+      [ "pub(super) fn select_array_value_at_index("
+      , "values: &[Value],"
+      , "for (slot, value) in values.iter().enumerate() {"
+      , "let take_here = (index < values.len()) & (slot == index);"
+      , "selected = Value::confidential_select(take_here, value.clone(), selected)?;"
+      , "pub(super) fn update_array_value_at_index("
+      , "values: &mut [Value],"
+      , "let in_bounds = index < values.len();"
+      , "for (slot, current) in values.iter_mut().enumerate() {"
+      , "let update_here = apply & in_bounds & (slot == index);"
+      , "*current = Value::confidential_select(update_here, value.clone(), prior)?;"
+      , "pub(super) fn cold_zero_boxed_values(len: usize, value_type: &Type) -> Box<[Value]> {"
+      , "pub(super) fn cold_zero_small_map_entries("
+      ]
+    ∧
+    sourceLacksAll iface.objectsProductionSource
+      [ "fn select_array_value_at_index("
+      , "fn update_array_value_at_index("
+      , "trace.logical_read(\"array_get\", &object.spec.name, format!(\"[{index}]\"));\n                record_array_scan(object, trace);"
+      , "trace.logical_write(\"array_set\", &object.spec.name, format!(\"[{index}]\"));\n                record_array_scan(object, trace);"
+      ]
+    ∧
+    sourceLacksAll iface.generatedObjectHelpersProductionSource
+      [ "if index >= values.len() {"
+      ]
+    ∧
+    sourceLacksAll iface.objectsProductionSource
+      [ "let prior = object.values[index].clone();"
+      , "object.values[index] = Value::confidential_select(apply, value, prior)?;"
+      , "object.physical_slots[index].len()"
+      , "object.values[index] = value;"
+      , "object.written_slots[index] = true;"
+      , "collect::<Vec<_>>()"
+      , "vec![Value::zero_for_type(&spec.value_type); capacity]"
+      , "vec![zero_value; capacity]"
+      ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialArrayAccessUsesMaskedFullScans
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "trace.logical_read(\"array_get\", &object.spec.name, \"oblivious\");"
+    , "trace.logical_write(\"array_set\", &object.spec.name, \"oblivious\");"
+    , "select_array_value_at_index(&object.values, index, &object.spec.value_type)"
+    , "update_array_value_at_index("
+    , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
+    , "let mut physical_slots = FixedBoxBuilder::new(capacity);"
+    , "physical_slots: physical_slots.finish()?,"
+    , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
+    , "object.physical_slots.get(index).ok_or_else(|| {"
+    , "object.values.get_mut(index).ok_or_else(|| {"
+    , "object.written_slots.get_mut(index).ok_or_else(|| {"
+    , "object.physical_slots.iter().enumerate()"
+    ] &&
+    checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+      [ "pub(super) fn select_array_value_at_index("
+      , "values: &[Value],"
+      , "for (slot, value) in values.iter().enumerate() {"
+      , "let take_here = (index < values.len()) & (slot == index);"
+      , "selected = Value::confidential_select(take_here, value.clone(), selected)?;"
+      , "pub(super) fn update_array_value_at_index("
+      , "values: &mut [Value],"
+      , "let in_bounds = index < values.len();"
+      , "for (slot, current) in values.iter_mut().enumerate() {"
+      , "let update_here = apply & in_bounds & (slot == index);"
+      , "*current = Value::confidential_select(update_here, value.clone(), prior)?;"
+      , "pub(super) fn cold_zero_boxed_values(len: usize, value_type: &Type) -> Box<[Value]> {"
+      , "pub(super) fn cold_zero_small_map_entries("
+      ] &&
+    checkSourceLacksAll iface.objectsProductionSource
+      [ "fn select_array_value_at_index("
+      , "fn update_array_value_at_index("
+      , "trace.logical_read(\"array_get\", &object.spec.name, format!(\"[{index}]\"));\n                record_array_scan(object, trace);"
+      , "trace.logical_write(\"array_set\", &object.spec.name, format!(\"[{index}]\"));\n                record_array_scan(object, trace);"
+      ] &&
+    checkSourceLacksAll iface.generatedObjectHelpersProductionSource
+      [ "if index >= values.len() {"
+      ] &&
+    checkSourceLacksAll iface.objectsProductionSource
+      [ "let prior = object.values[index].clone();"
+      , "object.values[index] = Value::confidential_select(apply, value, prior)?;"
+      , "object.physical_slots[index].len()"
+      , "object.values[index] = value;"
+      , "object.written_slots[index] = true;"
+      , "collect::<Vec<_>>()"
+      , "vec![Value::zero_for_type(&spec.value_type); capacity]"
+      , "vec![zero_value; capacity]"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialArrayAccessUsesMaskedFullScans_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialArrayAccessUsesMaskedFullScans = true ↔
+    iface.sharedConfidentialArrayAccessUsesMaskedFullScans := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialArrayAccessUsesMaskedFullScans
+    RuntimeImplementationInterface.sharedConfidentialArrayAccessUsesMaskedFullScans
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.arrayAccessModel_initialCapacity
+  (parameters : RuntimeArrayAccessDiscipline.Parameters) :
+  (RuntimeArrayAccessDiscipline.initialTrace parameters).capacity =
+    parameters.capacity :=
+  RuntimeArrayAccessDiscipline.initialTrace_capacity parameters
+
+theorem RuntimeImplementationInterface.arrayAccessModel_stepIncrementsBeforeCapacity
+  {trace : RuntimeArrayAccessDiscipline.Trace}
+  (h : trace.index < trace.capacity) :
+  (RuntimeArrayAccessDiscipline.step trace).index = trace.index + 1 :=
+  RuntimeArrayAccessDiscipline.step_incrementsIndex_beforeCapacity h
+
+theorem RuntimeImplementationInterface.arrayAccessModel_acceptedScansPublicCapacity
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {trace : RuntimeArrayAccessDiscipline.Trace}
+  (h : RuntimeArrayAccessDiscipline.acceptedAccess parameters trace) :
+  trace.index = parameters.capacity :=
+  RuntimeArrayAccessDiscipline.acceptedAccess_scansPublicCapacity h
+
+theorem RuntimeImplementationInterface.arrayAccessModel_selectedSlotAcceptsInBounds
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex : Nat}
+  (h : logicalIndex < parameters.capacity) :
+  RuntimeArrayAccessDiscipline.selectedSlot? parameters logicalIndex =
+    some logicalIndex :=
+  RuntimeArrayAccessDiscipline.selectedSlot?_acceptsInBounds h
+
+theorem RuntimeImplementationInterface.arrayAccessModel_selectedSlotRejectsOutOfRange
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex : Nat}
+  (h : ¬ logicalIndex < parameters.capacity) :
+  RuntimeArrayAccessDiscipline.selectedSlot? parameters logicalIndex = none :=
+  RuntimeArrayAccessDiscipline.selectedSlot?_rejectsOutOfRange h
+
+theorem RuntimeImplementationInterface.arrayAccessModel_selectedSlotSomeSelectsSlot
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex slot : Nat}
+  (h : RuntimeArrayAccessDiscipline.selectedSlot? parameters logicalIndex = some slot) :
+  RuntimeArrayAccessDiscipline.selectsSlot parameters logicalIndex slot :=
+  RuntimeArrayAccessDiscipline.selectedSlot?_someSelectsSlot h
+
+theorem RuntimeImplementationInterface.arrayAccessModel_selectsSlotUnique
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex slot₁ slot₂ : Nat}
+  (h₁ : RuntimeArrayAccessDiscipline.selectsSlot parameters logicalIndex slot₁)
+  (h₂ : RuntimeArrayAccessDiscipline.selectsSlot parameters logicalIndex slot₂) :
+  slot₁ = slot₂ :=
+  RuntimeArrayAccessDiscipline.selectsSlot_unique h₁ h₂
+
+theorem RuntimeImplementationInterface.arrayAccessModel_outOfRangeSelectsNoSlot
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex slot : Nat}
+  (hOob : parameters.capacity ≤ logicalIndex)
+  (hSlot : slot < parameters.capacity) :
+  ¬ RuntimeArrayAccessDiscipline.selectsSlot parameters logicalIndex slot :=
+  RuntimeArrayAccessDiscipline.selectsSlot_false_for_outOfRange hOob hSlot
+
+def RuntimeImplementationInterface.sharedConfidentialSmallMapUsesMaskedFullScanUpdates
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "trace.logical_write(\"uomap_put\", &object.spec.name, \"oblivious\");"
+    , "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "update_small_map_entries_for_put("
+    , "object.dirty = true;"
+    ] ∧
+    sourceLacksAll iface.objectsProductionSource
+      [ "object.dirty |= apply;"
+      , "if apply {\n                    object.dirty = true;\n                }"
+      ] ∧
+    sourceContainsAll iface.generatedObjectHelpersProductionSource
+      [ "pub(super) fn update_small_map_entries_for_put("
+      , ") -> Result<bool> {"
+      , "let value_is_zero = value.confidential_is_zero_like();"
+      , "let zero_value = Value::zero_for_type(value_type);"
+      , "let mut matched_any = false;"
+      , "let mut inserted_any = false;"
+      , "let key_match = was_occupied & Value::confidential_eq(entry.key(), &key);"
+      , "let insert_here ="
+      , "apply & !value_is_zero & !matched_any & !inserted_any & !entry.is_occupied();"
+      , "let write_here = apply & !value_is_zero & (key_match | insert_here);"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      , "matched_any |= key_match;"
+      , "inserted_any |= insert_here;"
+      , "let capacity_overflowed = apply & !value_is_zero & !matched_any & !inserted_any;"
+      , "Ok(capacity_overflowed)"
+      ] ∧
+    sourceLacksAll iface.generatedObjectHelpersProductionSource
+      [ "bail!(\"map {} exceeded public capacity\", object_name);"
+      , "if apply & !value_is_zero & !matched_any & !inserted_any {"
+      ] ∧
+    sourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "impl MapEntry {"
+      , "pub(crate) fn matches_key(&self, key: &Value) -> bool {"
+      , "self.occupied & Value::confidential_eq(&self.key, key)"
+      , "pub(crate) fn overwrite(&mut self, occupied: bool, key: Value, value: Value) {"
+      , "fn clone_map_entry(entry: &MapEntry) -> MapEntry {"
+      , "fn select_map_entry(cond: bool, when_true: &MapEntry, when_false: &MapEntry) -> Result<MapEntry> {"
+      , "pub(crate) fn wipe_secrets(&mut self) {"
+      , "impl Drop for MapEntry {"
+      ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "pub(crate) fn matches_key(&self, key: &Value) -> bool {"
+      , "pub(crate) fn overwrite(&mut self, occupied: bool, key: Value, value: Value) {"
+      , "pub(crate) fn wipe_secrets(&mut self) {"
+      , "impl Drop for MapEntry {"
+      ] ∧
+    sourceContainsAll iface.generatedValueOpsProductionSource
+      [ "pub fn confidential_eq(lhs: &Value, rhs: &Value) -> bool {"
+      , "equal &= Value::confidential_eq(lhs_value, rhs_value);"
+      , "pub fn confidential_is_zero_like(&self) -> bool {"
+      , "is_zero &= value.confidential_is_zero_like();"
+      , "pub fn confidential_bytes_are_zero(bytes: &[u8]) -> bool {"
+      , "fn masked_slice_is_zero(bytes: &[u8]) -> bool {"
+      , "diff |= *byte;"
+      ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialSmallMapUsesMaskedFullScanUpdates
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "trace.logical_write(\"uomap_put\", &object.spec.name, \"oblivious\");"
+    , "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "update_small_map_entries_for_put("
+    , "object.dirty = true;"
+    ] &&
+    checkSourceLacksAll iface.objectsProductionSource
+      [ "object.dirty |= apply;"
+      , "if apply {\n                    object.dirty = true;\n                }"
+      ] &&
+    checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+      [ "pub(super) fn update_small_map_entries_for_put("
+      , ") -> Result<bool> {"
+      , "let value_is_zero = value.confidential_is_zero_like();"
+      , "let zero_value = Value::zero_for_type(value_type);"
+      , "let mut matched_any = false;"
+      , "let mut inserted_any = false;"
+      , "let key_match = was_occupied & Value::confidential_eq(entry.key(), &key);"
+      , "let insert_here ="
+      , "apply & !value_is_zero & !matched_any & !inserted_any & !entry.is_occupied();"
+      , "let write_here = apply & !value_is_zero & (key_match | insert_here);"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      , "matched_any |= key_match;"
+      , "inserted_any |= insert_here;"
+      , "let capacity_overflowed = apply & !value_is_zero & !matched_any & !inserted_any;"
+      , "Ok(capacity_overflowed)"
+      ] &&
+    checkSourceLacksAll iface.generatedObjectHelpersProductionSource
+      [ "bail!(\"map {} exceeded public capacity\", object_name);"
+      , "if apply & !value_is_zero & !matched_any & !inserted_any {"
+      ] &&
+    checkSourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "impl MapEntry {"
+      , "pub(crate) fn matches_key(&self, key: &Value) -> bool {"
+      , "self.occupied & Value::confidential_eq(&self.key, key)"
+      , "pub(crate) fn overwrite(&mut self, occupied: bool, key: Value, value: Value) {"
+      , "fn clone_map_entry(entry: &MapEntry) -> MapEntry {"
+      , "fn select_map_entry(cond: bool, when_true: &MapEntry, when_false: &MapEntry) -> Result<MapEntry> {"
+      , "pub(crate) fn wipe_secrets(&mut self) {"
+      , "impl Drop for MapEntry {"
+      ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "pub(crate) fn matches_key(&self, key: &Value) -> bool {"
+      , "pub(crate) fn overwrite(&mut self, occupied: bool, key: Value, value: Value) {"
+      , "pub(crate) fn wipe_secrets(&mut self) {"
+      , "impl Drop for MapEntry {"
+      ] &&
+    checkSourceContainsAll iface.generatedValueOpsProductionSource
+      [ "pub fn confidential_eq(lhs: &Value, rhs: &Value) -> bool {"
+      , "equal &= Value::confidential_eq(lhs_value, rhs_value);"
+      , "pub fn confidential_is_zero_like(&self) -> bool {"
+      , "is_zero &= value.confidential_is_zero_like();"
+      , "pub fn confidential_bytes_are_zero(bytes: &[u8]) -> bool {"
+      , "fn masked_slice_is_zero(bytes: &[u8]) -> bool {"
+      , "diff |= *byte;"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialSmallMapUsesMaskedFullScanUpdates_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialSmallMapUsesMaskedFullScanUpdates = true ↔
+    iface.sharedConfidentialSmallMapUsesMaskedFullScanUpdates := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialSmallMapUsesMaskedFullScanUpdates
+    RuntimeImplementationInterface.sharedConfidentialSmallMapUsesMaskedFullScanUpdates
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.sharedConfidentialSmallMapUsesMaskedFullScanLookup
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "select_small_map_value_for_key(&object.entries, key, &object.spec.value_type)"
+    , "decode_small_map_entries_from_storage("
+    ] ∧
+    sourceContainsAll iface.generatedObjectHelpersProductionSource
+      [ "pub(super) fn select_small_map_value_for_key("
+      , "entries: &[MapEntry],"
+      , "let mut selected = Value::zero_for_type(value_type);"
+      , "let mut matched_any = false;"
+      , "for entry in entries.iter() {"
+      , "let key_match = entry.matches_key(key);"
+      , "let take_here = !matched_any & key_match;"
+      , "selected = Value::confidential_select(take_here, entry.value().clone(), selected)?;"
+      , "matched_any |= key_match;"
+      , "pub(super) fn decode_small_map_entries_from_storage("
+      , "let mut entries = FixedBoxBuilder::new(physical_slots.len());"
+      , "entries.finish()"
+      ] ∧
+    sourceLacksAll iface.objectsProductionSource
+      [ "fn select_small_map_value_for_key("
+      ] ∧
+    sourceLacksAll iface.objectsProductionSource
+      [ ".iter().find(|entry| entry.matches_key(key))"
+      , ".iter().position(|entry| entry.matches_key(key))"
+      , ".find(|entry| entry.matches_key(key))"
+      , "Vec::with_capacity(self.physical_slots.len())"
+      , "entries.into_boxed_slice()"
+      ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialSmallMapUsesMaskedFullScanLookup
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "select_small_map_value_for_key(&object.entries, key, &object.spec.value_type)"
+    , "decode_small_map_entries_from_storage("
+    ] &&
+    checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+      [ "pub(super) fn select_small_map_value_for_key("
+      , "entries: &[MapEntry],"
+      , "let mut selected = Value::zero_for_type(value_type);"
+      , "let mut matched_any = false;"
+      , "for entry in entries.iter() {"
+      , "let key_match = entry.matches_key(key);"
+      , "let take_here = !matched_any & key_match;"
+      , "selected = Value::confidential_select(take_here, entry.value().clone(), selected)?;"
+      , "matched_any |= key_match;"
+      , "pub(super) fn decode_small_map_entries_from_storage("
+      , "let mut entries = FixedBoxBuilder::new(physical_slots.len());"
+      , "entries.finish()"
+      ] &&
+    checkSourceLacksAll iface.objectsProductionSource
+      [ "fn select_small_map_value_for_key("
+      ] &&
+    checkSourceLacksAll iface.objectsProductionSource
+      [ ".iter().find(|entry| entry.matches_key(key))"
+      , ".iter().position(|entry| entry.matches_key(key))"
+      , ".find(|entry| entry.matches_key(key))"
+      , "Vec::with_capacity(self.physical_slots.len())"
+      , "entries.into_boxed_slice()"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialSmallMapUsesMaskedFullScanLookup_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialSmallMapUsesMaskedFullScanLookup = true ↔
+    iface.sharedConfidentialSmallMapUsesMaskedFullScanLookup := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialSmallMapUsesMaskedFullScanLookup
+    RuntimeImplementationInterface.sharedConfidentialSmallMapUsesMaskedFullScanLookup
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_initialCapacity
+  (parameters : RuntimeSmallMapLookupDiscipline.Parameters) :
+  (RuntimeSmallMapLookupDiscipline.initialTrace parameters).capacity =
+    parameters.capacity :=
+  RuntimeSmallMapLookupDiscipline.initialTrace_capacity parameters
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_stepIncrementsBeforeCapacity
+  {trace : RuntimeSmallMapLookupDiscipline.Trace} {keyMatch : Bool}
+  (h : trace.index < trace.capacity) :
+  (RuntimeSmallMapLookupDiscipline.step trace keyMatch).index = trace.index + 1 :=
+  RuntimeSmallMapLookupDiscipline.step_incrementsIndex_beforeCapacity h
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_stepAccumulatesMatchBeforeCapacity
+  {trace : RuntimeSmallMapLookupDiscipline.Trace} {keyMatch : Bool}
+  (h : trace.index < trace.capacity) :
+  (RuntimeSmallMapLookupDiscipline.step trace keyMatch).matched =
+    (trace.matched || keyMatch) :=
+  RuntimeSmallMapLookupDiscipline.step_accumulatesMatch_beforeCapacity h
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_scanMatchesAcceptsExactPublicCapacity
+  (parameters : RuntimeSmallMapLookupDiscipline.Parameters)
+  (keyMatches : List Bool)
+  (h : RuntimeSmallMapLookupDiscipline.Precondition parameters keyMatches) :
+  RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches =
+    some
+      { capacity := parameters.capacity
+      , index := parameters.capacity
+      , matched := RuntimeSmallMapLookupDiscipline.scanMatches keyMatches
+      , overflowed := false
+      } :=
+  RuntimeSmallMapLookupDiscipline.scanMatches?_acceptsExactPublicCapacity
+    parameters keyMatches h
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_scanMatchesRejectsLengthMismatch
+  (parameters : RuntimeSmallMapLookupDiscipline.Parameters)
+  (keyMatches : List Bool)
+  (h : ¬ RuntimeSmallMapLookupDiscipline.Precondition parameters keyMatches) :
+  RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches = none :=
+  RuntimeSmallMapLookupDiscipline.scanMatches?_rejectsLengthMismatch
+    parameters keyMatches h
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_scanMatchesSomeAcceptedLookup
+  {parameters : RuntimeSmallMapLookupDiscipline.Parameters}
+  {keyMatches : List Bool}
+  {trace : RuntimeSmallMapLookupDiscipline.Trace}
+  (h : RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches = some trace) :
+  RuntimeSmallMapLookupDiscipline.acceptedLookup parameters trace :=
+  RuntimeSmallMapLookupDiscipline.scanMatches?_someAcceptedLookup h
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_scanMatchesSomeMatchedEqualsFold
+  {parameters : RuntimeSmallMapLookupDiscipline.Parameters}
+  {keyMatches : List Bool}
+  {trace : RuntimeSmallMapLookupDiscipline.Trace}
+  (h : RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches = some trace) :
+  trace.matched = RuntimeSmallMapLookupDiscipline.scanMatches keyMatches :=
+  RuntimeSmallMapLookupDiscipline.scanMatches?_someMatchedEqualsFold h
+
+theorem RuntimeImplementationInterface.smallMapLookupModel_acceptedScansPublicCapacity
+  {parameters : RuntimeSmallMapLookupDiscipline.Parameters}
+  {trace : RuntimeSmallMapLookupDiscipline.Trace}
+  (h : RuntimeSmallMapLookupDiscipline.acceptedLookup parameters trace) :
+  trace.index = parameters.capacity :=
+  RuntimeSmallMapLookupDiscipline.acceptedLookup_scansPublicCapacity h
+
+def RuntimeImplementationInterface.storeCipherKeyZeroizesOnDrop
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "impl Drop for StoreCipher {"
+    , "self.key.zeroize();"
+    ] ∧
+  sourceLacksAll iface.storeCodecProductionSource
+    [ "impl Drop for StoreCipher"
+    ]
+
+def RuntimeImplementationInterface.storeCipherUsesExactSizeNonzeroBuffers
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.storeCodecProductionSource
+    [ "#[path = \"generated_codec.rs\"]"
+    , "mod generated_codec;"
+    , "#[path = \"generated_surface.rs\"]"
+    , "mod generated_surface;"
+    , "pub use generated_surface::StoreCipher;"
+    , "use generated_codec::{"
+    ] ∧
+  sourceContainsAll iface.generatedStoreCodecProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreCodecRust.lean; do not edit by hand."
+    , "pub(super) const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];"
+    , "pub(super) const SEALED_NONCE_BYTES: usize = 12;"
+    , "pub(super) const SEALED_TAG_BYTES: usize = 16;"
+    , "pub(super) fn sealed_encoded_len(payload_len: usize) -> usize {"
+    , "pub(super) fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) -> bool {"
+    , "let Some(encoded_len) = bytes.len().checked_mul(2) else {"
+    , "let Some(end) = (*cursor).checked_add(encoded_len) else {"
+    , "let Some(out) = out.get_mut(*cursor..end) else {"
+    , "for (chunk, byte) in out.chunks_exact_mut(2).zip(bytes.iter()) {"
+    , "let Some(hi) = chunk.get_mut(0) else {"
+    , "*hi = (byte >> 4) + 1;"
+    , "let Some(lo) = chunk.get_mut(1) else {"
+    , "*lo = (byte & 0x0F) + 1;"
+    , "pub(super) fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()> {"
+    , "for (chunk, out_byte) in encoded.chunks_exact(2).zip(out.iter_mut()) {"
+    , "*out_byte = ((hi - 1) << 4) | (lo - 1);"
+    ] ∧
+  sourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreSurfaceRust.lean; do not edit by hand."
+    , "use rand::rngs::OsRng;"
+    , "use rand::RngCore;"
+    , "use std::fmt;"
+    , "use anyhow::{bail, Result};"
+    , "use uo_core::FixedBoxBuilder;"
+    , "use zeroize::Zeroize;"
+    , "use super::{"
+    , "decode_nonzero_into, generated_sealed_encoded_len, write_nonzero_encoded,"
+    , "#[derive(PartialEq, Eq)]"
+    , "pub struct StoreCipher {"
+    , "key: [u8; 32],"
+    , "struct WipeOnDrop<'a> {"
+    , "impl Drop for WipeOnDrop<'_> {"
+    , "impl fmt::Debug for StoreCipher {"
+    , "impl Drop for StoreCipher {"
+    , "fn zeroed_boxed_bytes(len: usize) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "for _ in 0..len {"
+    , "bytes.push(0u8)?;"
+    , "bytes.finish()"
+    , "fn checked_end(start: usize, len: usize) -> Option<usize> {"
+    , "start.checked_add(len)"
+    , "fn read_exact_range<'a>(bytes: &'a [u8], start: usize, len: usize) -> Option<&'a [u8]> {"
+    , "bytes.get(start..end)"
+    , "fn copy_exact_into(out: &mut [u8], input: &[u8]) -> Option<()> {"
+    , "impl StoreCipher {"
+    , "fn sealed_encoded_len(payload_len: usize) -> usize {"
+    , "generated_sealed_encoded_len(payload_len)"
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "rng.fill_bytes(&mut key);"
+    , "pub fn random() -> Self {"
+    , "let mut rng = OsRng;"
+    , "Self::from_rng(&mut rng)"
+    , "pub fn clone_for_runtime_state(&self) -> Self {"
+    , "pub fn seal_and_wipe_boxed("
+    , "self::seal_and_wipe_boxed(self, aad, payload, rng)"
+    , "pub fn seal_and_wipe_into_slice("
+    , "self::seal_and_wipe_into_slice(self, aad, payload, rng, out)"
+    , "pub fn filler_boxed("
+    , "self::filler_boxed(self, aad, len, rng)"
+    , "pub fn with_opened_payload<T>("
+    , "self::with_opened_payload(self, aad, payload_len, encoded, f)"
+    , ") -> Result<Box<[u8]>> {"
+    , "pub(super) fn seal_and_wipe_boxed("
+    , "let mut encoded = zeroed_boxed_bytes(generated_sealed_encoded_len(payload.len()))?;"
+    , "pub(super) fn seal_and_wipe_into_slice("
+    , "let required_len = generated_sealed_encoded_len(payload.as_slice().len());"
+    , "if !write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC) {"
+    , "if !write_nonzero_encoded(out, &mut cursor, &nonce_bytes) {"
+    , "if !write_nonzero_encoded(out, &mut cursor, payload.as_slice()) {"
+    , "if !write_nonzero_encoded(out, &mut cursor, tag.as_slice()) {"
+    , "let Ok(cipher_impl) = ChaCha20Poly1305::new_from_slice(&cipher.key) else {"
+    , "let Ok(tag) = cipher_impl.encrypt_in_place_detached("
+    , "Nonce::from_slice(&nonce_bytes),"
+    , "payload.as_mut_slice(),"
+    , ") else {"
+    , "if !sealed {"
+    , "bail!(\"exact-size sealed output buffer did not fit\");"
+    , "Ok(encoded)"
+    , "pub(super) fn filler_boxed("
+    , "let mut filler = zeroed_boxed_bytes(len)?;"
+    , "fn open_boxed("
+    , "decode_nonzero_into(encoded, &mut sealed)?;"
+    , "let mut sealed = zeroed_boxed_bytes(sealed_len).ok()?;"
+    , "let magic = read_exact_range(&sealed, 0, SEALED_MAGIC.len())?;"
+    , "let nonce_start = SEALED_MAGIC.len();"
+    , "let ciphertext_start = checked_end(nonce_start, SEALED_NONCE_BYTES)?;"
+    , "let tag_start = checked_end(ciphertext_start, payload_len)?;"
+    , "let nonce_bytes = read_exact_range(&sealed, nonce_start, SEALED_NONCE_BYTES)?;"
+    , "let ciphertext = read_exact_range(&sealed, ciphertext_start, payload_len)?;"
+    , "let tag_bytes = read_exact_range(&sealed, tag_start, SEALED_TAG_BYTES)?;"
+    , ".decrypt_in_place_detached("
+    , "let mut payload = zeroed_boxed_bytes(payload_len).ok()?;"
+    , "copy_exact_into(&mut payload, ciphertext)?;"
+    , "pub(super) fn with_opened_payload<T>("
+    , "let payload = WipeOnDrop {"
+    ] ∧
+  sourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "Vec::with_capacity("
+    , "vec![0u8; len].into_boxed_slice()"
+    , "pub(super) fn open_boxed("
+    , "sealed.split_at(SEALED_MAGIC.len())"
+    , "rest.split_at(SEALED_NONCE_BYTES)"
+    , "ciphertext_and_tag.split_at(payload_len)"
+    , "fn checked_split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {"
+    , "checked_split_at(&sealed, SEALED_MAGIC.len())?"
+    , "checked_split_at(rest, SEALED_NONCE_BYTES)?"
+    , "checked_split_at(ciphertext_and_tag, payload_len)?"
+    , "payload.copy_from_slice(ciphertext);"
+    , "expect("
+    , "unwrap("
+    , "panic!"
+    , "write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC);"
+    , "write_nonzero_encoded(out, &mut cursor, &nonce_bytes);"
+    , "write_nonzero_encoded(out, &mut cursor, payload.as_slice());"
+    , "write_nonzero_encoded(out, &mut cursor, tag.as_slice());"
+    ] ∧
+  sourceLacksAll iface.generatedStoreCodecProductionSource
+    [ "let end = *cursor + bytes.len() * 2;"
+    , "let out = &mut out[*cursor..end];"
+    , "for (index, byte) in bytes.iter().enumerate() {"
+    , "out[index * 2]"
+    , "out[index * 2 + 1]"
+    , "for (index, chunk) in encoded.chunks_exact(2).enumerate() {"
+    , "out[index] ="
+    ] ∧
+  sourceLacksAll iface.storeCodecProductionSource
+    [ "Vec::with_capacity(payload.len() * 2)"
+    , "Vec::with_capacity(encoded.len() / 2)"
+    , "push_nonzero_encoded("
+    , "decode_nonzero_bytes(byte_len, encoded)"
+    , "const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];"
+    , "fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8])"
+    , "fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()>"
+    , "fn open_boxed(&self, aad: &[u8], payload_len: usize, encoded: &[u8]) -> Option<Box<[u8]>>"
+    , "pub struct StoreCipher {"
+    , "key: [u8; 32],"
+    , "impl fmt::Debug for StoreCipher"
+    , "impl Drop for StoreCipher"
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "pub fn random() -> Self {"
+    , "let mut encoded = vec![0u8; Self::sealed_encoded_len(payload.len())].into_boxed_slice();"
+    , "let mut sealed = vec![0u8; sealed_len].into_boxed_slice();"
+    , "let mut payload = vec![0u8; payload_len].into_boxed_slice();"
+    , "let mut filler = vec![0u8; len].into_boxed_slice();"
+    , "out.resize(required_len, 0);"
+    , "struct WipeOnDrop<'a> {"
+    , "impl Drop for WipeOnDrop<'_> {"
+    ] ∧
+  sourceLacksAll iface.generatedStoreCodecProductionSource
+    [ "pub(super) fn encode_nonzero_bytes(payload: &[u8]) -> Vec<u8> {"
+    , "pub(super) fn decode_nonzero_bytes(byte_len: usize, encoded: &[u8]) -> Option<Vec<u8>> {"
+    ] ∧
+  sourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "let mut encoded = vec![0u8; generated_sealed_encoded_len(payload.len())].into_boxed_slice();"
+    , "let mut filler = vec![0u8; len].into_boxed_slice();"
+    , "let mut sealed = vec![0u8; sealed_len].into_boxed_slice();"
+    , "let mut payload = vec![0u8; payload_len].into_boxed_slice();"
+    ]
+
+def RuntimeImplementationInterface.storeWriteApiUsesMutablePlaintext
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.storeStoreProductionSource
+    [ "fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()>"
+    ]
+
+def RuntimeImplementationInterface.storeCipherSurfaceStaysInCodec
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.storeCodecProductionSource
+    [ "#[path = \"generated_surface.rs\"]"
+    , "mod generated_surface;"
+    , "pub use generated_surface::StoreCipher;"
+    ] ∧
+  sourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "#[derive(PartialEq, Eq)]"
+    , "pub struct StoreCipher {"
+    , "impl StoreCipher {"
+    , "use std::fmt;"
+    , "impl fmt::Debug for StoreCipher {"
+    , "impl Drop for StoreCipher {"
+    , "use rand::rngs::OsRng;"
+    , "use rand::RngCore;"
+    , "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<T>("
+    , "fn open_boxed("
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "rng.fill_bytes(&mut key);"
+    , "pub fn random() -> Self {"
+    , "let mut rng = OsRng;"
+    , "Self::from_rng(&mut rng)"
+    , "pub fn clone_for_runtime_state(&self) -> Self {"
+    , "self::seal_and_wipe_boxed(self, aad, payload, rng)"
+    , "self::seal_and_wipe_into_slice(self, aad, payload, rng, out)"
+    , "self::filler_boxed(self, aad, len, rng)"
+    , "self::with_opened_payload(self, aad, payload_len, encoded, f)"
+    ] ∧
+  sourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "pub(super) fn open_boxed("
+    , "#[derive(Clone, PartialEq, Eq)]"
+    ] ∧
+  sourceLacksAll iface.storeCodecProductionSource
+    [ "pub struct StoreCipher {"
+    , "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<T>("
+    , "impl fmt::Debug for StoreCipher {"
+    , "impl Drop for StoreCipher {"
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "pub fn random() -> Self {"
+    , "pub fn seal_and_wipe("
+    , "pub fn seal_and_wipe_into("
+    , "pub fn filler("
+    , "pub(super) fn seal_and_wipe_boxed("
+    , "fn open_boxed("
+    ] ∧
+  sourceLacksAll iface.storeStoreProductionSource
+    [ ".seal("
+    , ".open("
+    ]
+
+def RuntimeImplementationInterface.runtimeStoreUsesSharedBoxedFillerHelper
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    ] ∧
+  sourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand."
+    , "use rand::SeedableRng;"
+    , "use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};"
+    , "pub(super) struct StoreSlotTable {"
+    , "slots: Box<[StoreSlot]>,"
+    , "pub(super) fn with_bootstrapped_uo_slots<I>("
+    , "I::IntoIter: ExactSizeIterator,"
+    , "let mut slots = FixedBoxBuilder::new(objects.len());"
+    , "StoreSlot { object, value }"
+    , "fn uo_store_slot_aad(object: &str) -> String {"
+    , "pub(super) fn filler_boxed_uo_store_slot("
+    , "pub(super) fn bootstrap_uo_store_slot("
+    , "let aad = uo_store_slot_aad(object);"
+    , "filler_boxed_uo_store_slot(&aad, logical_len, cipher, rng)"
+    , "impl UoObjectStore {"
+    , "pub fn preinitialized<I>(objects: I) -> Result<Self>"
+    , "let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);"
+    , "let cipher = StoreCipher::random();"
+    , "let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher, &mut rng)?;"
+    , "Ok(Self {"
+    ] ∧
+  sourceLacksAll iface.storeStoreProductionSource
+    [ "fn filler_boxed_uo_store_slot("
+    , "bootstrap_uo_store_slot"
+    , "cipher.filler_boxed(aad.as_bytes(), logical_len, rng)"
+    , "cipher.filler_boxed(aad.as_bytes(), logical_len, &mut rng)"
+    , "let aad = format!(\"uo_store:{object}\");"
+    , "pub fn preinitialized(objects: impl IntoIterator<Item = (String, usize)>) -> Self {"
+    , "impl ObjectStore for UoObjectStore {"
+    ]
+
+def RuntimeImplementationInterface.runtimeStoreUsesSharedSealIntoHelper
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    ] ∧
+  sourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand."
+    , "impl ObjectStore for UoObjectStore {"
+    , "fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()> {"
+    , "pub(super) fn reseal_uo_store_slot_in_place("
+    , "pub(super) fn reseal_uo_store_slot_and_trace_write("
+    , "let aad = uo_store_slot_aad(object);"
+    , "reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;"
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)"
+    ] ∧
+  sourceLacksAll iface.storeStoreProductionSource
+    [ "fn reseal_uo_store_slot_in_place("
+    , "reseal_uo_store_slot_in_place("
+    , "reseal_uo_store_slot_and_trace_write"
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)"
+    , ".seal_and_wipe_into_slice(aad.as_bytes(), value, &mut self.rng, slot)"
+    , "let aad = format!(\"uo_store:{object}\");"
+    , "impl ObjectStore for UoObjectStore {"
+    ]
+
+def RuntimeImplementationInterface.runtimeStoreUsesGeneratedRawBoxedSlotHelpers
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    , "fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>>;"
+    , "use generated_store_helpers::{StoreLogicalEventTrace, StorePhysicalWriteTrace, StoreSlotTable};"
+    , "slots: StoreSlotTable,"
+    , "physical_writes: StorePhysicalWriteTrace,"
+    , "logical_events: StoreLogicalEventTrace,"
+    ] ∧
+  sourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand."
+    , "use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};"
+    , "use uo_core::trace::{LogicalEvent, PhysicalWriteEvent, WriteClass};"
+    , "use uo_core::FixedBoxBuilder;"
+    , "use zeroize::Zeroize;"
+    , "pub(super) fn zeroed_boxed_raw_store_slot(len: usize) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "for _ in 0..len {"
+    , "bytes.push(0u8)?;"
+    , "bytes.finish()"
+    , "pub(super) fn take_boxed_raw_store_value(value: &mut [u8]) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(value.len());"
+    , "for byte in value.iter().copied() {"
+    , "bytes.push(byte)?;"
+    , "value.zeroize();"
+    , "bytes.finish()"
+    , "pub(super) struct StorePhysicalWriteTrace {"
+    , "events: Box<[PhysicalWriteEvent]>,"
+    , "fn append_boxed_event<T>(events: &mut Box<[T]>, event: T) -> Result<()> {"
+    , "let previous_events = std::mem::take(events);"
+    , "let mut next_events = FixedBoxBuilder::new(previous_events.len() + 1);"
+    , "next_events.push(event)?;"
+    , "*events = next_events.finish()?;"
+    , "pub(super) fn new() -> Self {"
+    , "events: Box::<[PhysicalWriteEvent]>::default(),"
+    , "pub(super) fn push(&mut self, event: PhysicalWriteEvent) -> Result<()> {"
+    , "append_boxed_event(&mut self.events, event)"
+    , "pub(super) fn as_slice(&self) -> &[PhysicalWriteEvent] {"
+    , "pub(super) fn all_update(&self) -> bool {"
+    , ".all(|event| event.class == WriteClass::Update)"
+    , "pub(super) struct StoreLogicalEventTrace {"
+    , "events: Box<[LogicalEvent]>,"
+    , "events: Box::<[LogicalEvent]>::default(),"
+    , "pub(super) fn push(&mut self, event: LogicalEvent) -> Result<()> {"
+    , "pub(super) fn as_slice(&self) -> &[LogicalEvent] {"
+    , "pub(super) struct StoreSlot {"
+    , "object: String,"
+    , "value: Box<[u8]>,"
+    , "pub(super) struct StoreSlotTable {"
+    , "slots: Box<[StoreSlot]>,"
+    , "pub(super) fn empty() -> Self {"
+    , "slots: Box::<[StoreSlot]>::default(),"
+    , "pub(super) fn with_zeroed_raw_slots<I>(objects: I, slot_len: usize) -> Result<Self>"
+    , "I::IntoIter: ExactSizeIterator,"
+    , "let mut slots = FixedBoxBuilder::new(objects.len());"
+    , "value: zeroed_boxed_raw_store_slot(slot_len)?,"
+    , "pub(super) fn get(&self, object: &str) -> Option<&Box<[u8]>> {"
+    , ".find(|slot| slot.object == object)"
+    , "pub(super) fn insert_or_replace(&mut self, object: String, value: Box<[u8]>) -> Result<()> {"
+    , "let previous_slots = std::mem::take(&mut self.slots);"
+    , "FixedBoxBuilder::new(previous_slots.len() + 1)"
+    , "impl RawObjectStore {"
+    , "pub fn new() -> Self {"
+    , "slots: StoreSlotTable::empty(),"
+    , "physical_writes: StorePhysicalWriteTrace::new(),"
+    , "logical_events: StoreLogicalEventTrace::new(),"
+    , "pub fn with_zeroed_slots<I>(objects: I) -> Result<Self>"
+    , "StoreSlotTable::with_zeroed_raw_slots(objects, 32)?"
+    , "impl ObjectStore for RawObjectStore {"
+    , "if self.slots.get(object).is_none() {"
+    , ".insert_or_replace(object.into(), zeroed_boxed_raw_store_slot(32)?)?;"
+    , "let old = if let Some(existing) = self.slots.get(object) {"
+    , "let slot = zeroed_boxed_raw_store_slot(value_len)?;"
+    , "let new = take_boxed_raw_store_value(value)?;"
+    , "self.slots.insert_or_replace(object.into(), new.clone())?;"
+    , "let physical_write = PhysicalWriteEvent::from_buffers(object, object, &old, &new);"
+    , "if matches!(physical_write.class, WriteClass::Same | WriteClass::Clear) {"
+    , "self.metrics.zero_writes += 1;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "self.physical_writes.as_slice()"
+    , "self.logical_events.as_slice()"
+    ] ∧
+  sourceLacksAll iface.storeStoreProductionSource
+    [ "impl ObjectStore for RawObjectStore {"
+    , "take_boxed_raw_store_value"
+    , "zeroed_boxed_raw_store_slot"
+    , ".or_insert_with(|| zeroed_boxed_raw_store_slot(32))"
+    , ".or_insert_with(|| zeroed_boxed_raw_store_slot(value_len))"
+    , "let new = take_boxed_raw_store_value(value)?;"
+    , "pub fn new() -> Self {"
+    , "pub fn with_zeroed_slots(objects: impl IntoIterator<Item = String>) -> Result<Self> {"
+    , "store.slots.insert(object, zeroed_boxed_raw_store_slot(32)?);"
+    , "vec![0u8; 32].into_boxed_slice()"
+    , "vec![0u8; value.len()].into_boxed_slice()"
+    , "value.to_vec().into_boxed_slice();"
+    , "value.zeroize();"
+    , "physical_writes: Vec<PhysicalWriteEvent>"
+    , "logical_events: Vec<LogicalEvent>"
+    ] ∧
+  sourceLacksAll iface.generatedStoreHelpersProductionSource
+    [ "Vec::with_capacity("
+    , "events: Vec<PhysicalWriteEvent>,"
+    , "events: Vec<LogicalEvent>,"
+    , "Self { events: Vec::new() }"
+    , "self.events.push(event);"
+    , "use std::collections::BTreeMap;"
+    , "slots: BTreeMap::new(),"
+    , "slots: BTreeMap<String, Box<[u8]>>,"
+    , "self.slots.contains_key(object)"
+    , "slots.insert(object, slot);"
+    , "value.to_vec().into_boxed_slice()"
+    , "if value.iter().all(|byte| *byte == 0)"
+    ]
+
+def RuntimeImplementationInterface.runtimeStoreUoWritesEmitPublicUpdateShape
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "impl ObjectStore for UoObjectStore {"
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "pub(super) fn reseal_uo_store_slot_and_trace_write("
+    , "Ok(PhysicalWriteEvent::from_shape("
+    , "object,\n        object,\n        slot.len(),\n        WriteClass::Update,"
+    , "slot.len(),"
+    , "WriteClass::Update,"
+    ] ∧
+  sourceLacksAll iface.storeStoreProductionSource
+    [ "reseal_uo_store_slot_and_trace_write("
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "let physical_len = slot.len();"
+    , "PhysicalWriteEvent::from_shape("
+    , "let old = slot.clone();"
+    , "let new = slot.clone();"
+    ]
+
+def RuntimeImplementationInterface.storeLibrarySurfaceKeepsGeneratedHelpersPrivate
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.storeLibProductionSource
+    [ "pub mod codec;"
+    , "mod store;"
+    , "pub use codec::StoreCipher;"
+    , "pub use store::StoreExecutionMetrics;"
+    ] ∧
+  sourceLacksAll iface.storeLibProductionSource
+    [ "pub mod store;"
+    , "pub mod generated_codec;"
+    , "pub mod generated_surface;"
+    , "pub mod generated_store_helpers;"
+    , "mod generated_codec;"
+    , "mod generated_surface;"
+    , "mod generated_store_helpers;"
+    , "pub use generated_surface::StoreCipher;"
+    , "pub use generated_store_helpers::"
+    , "pub use store::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};"
+    , "pub use store::ObjectStore"
+    , "pub use store::RawObjectStore"
+    , "pub use store::UoObjectStore"
+    , "impl ObjectStore for RawObjectStore {"
+    , "impl ObjectStore for UoObjectStore {"
+    , "pub fn seal_and_wipe_boxed("
+    ]
+
+def RuntimeImplementationInterface.checkStoreWriteApiUsesMutablePlaintext
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.storeStoreProductionSource
+    [ "fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()>"
+    ]
+
+def RuntimeImplementationInterface.checkStoreCipherKeyZeroizesOnDrop
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "impl Drop for StoreCipher {"
+    , "self.key.zeroize();"
+    ] &&
+  checkSourceLacksAll iface.storeCodecProductionSource
+    [ "impl Drop for StoreCipher"
+    ]
+
+def RuntimeImplementationInterface.checkStoreCipherUsesExactSizeNonzeroBuffers
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.storeCodecProductionSource
+    [ "#[path = \"generated_codec.rs\"]"
+    , "mod generated_codec;"
+    , "#[path = \"generated_surface.rs\"]"
+    , "mod generated_surface;"
+    , "pub use generated_surface::StoreCipher;"
+    , "use generated_codec::{"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreCodecProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreCodecRust.lean; do not edit by hand."
+    , "pub(super) const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];"
+    , "pub(super) const SEALED_NONCE_BYTES: usize = 12;"
+    , "pub(super) const SEALED_TAG_BYTES: usize = 16;"
+    , "pub(super) fn sealed_encoded_len(payload_len: usize) -> usize {"
+    , "pub(super) fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) -> bool {"
+    , "let Some(encoded_len) = bytes.len().checked_mul(2) else {"
+    , "let Some(end) = (*cursor).checked_add(encoded_len) else {"
+    , "let Some(out) = out.get_mut(*cursor..end) else {"
+    , "for (chunk, byte) in out.chunks_exact_mut(2).zip(bytes.iter()) {"
+    , "let Some(hi) = chunk.get_mut(0) else {"
+    , "*hi = (byte >> 4) + 1;"
+    , "let Some(lo) = chunk.get_mut(1) else {"
+    , "*lo = (byte & 0x0F) + 1;"
+    , "pub(super) fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()> {"
+    , "for (chunk, out_byte) in encoded.chunks_exact(2).zip(out.iter_mut()) {"
+    , "*out_byte = ((hi - 1) << 4) | (lo - 1);"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreSurfaceRust.lean; do not edit by hand."
+    , "use rand::rngs::OsRng;"
+    , "use rand::RngCore;"
+    , "use std::fmt;"
+    , "use anyhow::{bail, Result};"
+    , "use uo_core::FixedBoxBuilder;"
+    , "use zeroize::Zeroize;"
+    , "use super::{"
+    , "decode_nonzero_into, generated_sealed_encoded_len, write_nonzero_encoded,"
+    , "#[derive(PartialEq, Eq)]"
+    , "pub struct StoreCipher {"
+    , "key: [u8; 32],"
+    , "struct WipeOnDrop<'a> {"
+    , "impl Drop for WipeOnDrop<'_> {"
+    , "impl fmt::Debug for StoreCipher {"
+    , "impl Drop for StoreCipher {"
+    , "fn zeroed_boxed_bytes(len: usize) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "for _ in 0..len {"
+    , "bytes.push(0u8)?;"
+    , "bytes.finish()"
+    , "fn checked_end(start: usize, len: usize) -> Option<usize> {"
+    , "start.checked_add(len)"
+    , "fn read_exact_range<'a>(bytes: &'a [u8], start: usize, len: usize) -> Option<&'a [u8]> {"
+    , "bytes.get(start..end)"
+    , "fn copy_exact_into(out: &mut [u8], input: &[u8]) -> Option<()> {"
+    , "impl StoreCipher {"
+    , "fn sealed_encoded_len(payload_len: usize) -> usize {"
+    , "generated_sealed_encoded_len(payload_len)"
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "rng.fill_bytes(&mut key);"
+    , "pub fn random() -> Self {"
+    , "let mut rng = OsRng;"
+    , "Self::from_rng(&mut rng)"
+    , "pub fn clone_for_runtime_state(&self) -> Self {"
+    , "pub fn seal_and_wipe_boxed("
+    , "self::seal_and_wipe_boxed(self, aad, payload, rng)"
+    , "pub fn seal_and_wipe_into_slice("
+    , "self::seal_and_wipe_into_slice(self, aad, payload, rng, out)"
+    , "pub fn filler_boxed("
+    , "self::filler_boxed(self, aad, len, rng)"
+    , "pub fn with_opened_payload<T>("
+    , "self::with_opened_payload(self, aad, payload_len, encoded, f)"
+    , ") -> Result<Box<[u8]>> {"
+    , "pub(super) fn seal_and_wipe_boxed("
+    , "let mut encoded = zeroed_boxed_bytes(generated_sealed_encoded_len(payload.len()))?;"
+    , "pub(super) fn seal_and_wipe_into_slice("
+    , "let required_len = generated_sealed_encoded_len(payload.as_slice().len());"
+    , "if !write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC) {"
+    , "if !write_nonzero_encoded(out, &mut cursor, &nonce_bytes) {"
+    , "if !write_nonzero_encoded(out, &mut cursor, payload.as_slice()) {"
+    , "if !write_nonzero_encoded(out, &mut cursor, tag.as_slice()) {"
+    , "let Ok(cipher_impl) = ChaCha20Poly1305::new_from_slice(&cipher.key) else {"
+    , "let Ok(tag) = cipher_impl.encrypt_in_place_detached("
+    , "Nonce::from_slice(&nonce_bytes),"
+    , "payload.as_mut_slice(),"
+    , ") else {"
+    , "if !sealed {"
+    , "bail!(\"exact-size sealed output buffer did not fit\");"
+    , "Ok(encoded)"
+    , "pub(super) fn filler_boxed("
+    , "let mut filler = zeroed_boxed_bytes(len)?;"
+    , "fn open_boxed("
+    , "decode_nonzero_into(encoded, &mut sealed)?;"
+    , "let mut sealed = zeroed_boxed_bytes(sealed_len).ok()?;"
+    , "let magic = read_exact_range(&sealed, 0, SEALED_MAGIC.len())?;"
+    , "let nonce_start = SEALED_MAGIC.len();"
+    , "let ciphertext_start = checked_end(nonce_start, SEALED_NONCE_BYTES)?;"
+    , "let tag_start = checked_end(ciphertext_start, payload_len)?;"
+    , "let nonce_bytes = read_exact_range(&sealed, nonce_start, SEALED_NONCE_BYTES)?;"
+    , "let ciphertext = read_exact_range(&sealed, ciphertext_start, payload_len)?;"
+    , "let tag_bytes = read_exact_range(&sealed, tag_start, SEALED_TAG_BYTES)?;"
+    , ".decrypt_in_place_detached("
+    , "let mut payload = zeroed_boxed_bytes(payload_len).ok()?;"
+    , "copy_exact_into(&mut payload, ciphertext)?;"
+    , "pub(super) fn with_opened_payload<T>("
+    , "let payload = WipeOnDrop {"
+    ] &&
+  checkSourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "Vec::with_capacity("
+    , "vec![0u8; len].into_boxed_slice()"
+    , "pub(super) fn open_boxed("
+    , "sealed.split_at(SEALED_MAGIC.len())"
+    , "rest.split_at(SEALED_NONCE_BYTES)"
+    , "ciphertext_and_tag.split_at(payload_len)"
+    , "fn checked_split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {"
+    , "checked_split_at(&sealed, SEALED_MAGIC.len())?"
+    , "checked_split_at(rest, SEALED_NONCE_BYTES)?"
+    , "checked_split_at(ciphertext_and_tag, payload_len)?"
+    , "payload.copy_from_slice(ciphertext);"
+    , "expect("
+    , "unwrap("
+    , "panic!"
+    , "write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC);"
+    , "write_nonzero_encoded(out, &mut cursor, &nonce_bytes);"
+    , "write_nonzero_encoded(out, &mut cursor, payload.as_slice());"
+    , "write_nonzero_encoded(out, &mut cursor, tag.as_slice());"
+    ] &&
+  checkSourceLacksAll iface.generatedStoreCodecProductionSource
+    [ "let end = *cursor + bytes.len() * 2;"
+    , "let out = &mut out[*cursor..end];"
+    , "for (index, byte) in bytes.iter().enumerate() {"
+    , "out[index * 2]"
+    , "out[index * 2 + 1]"
+    , "for (index, chunk) in encoded.chunks_exact(2).enumerate() {"
+    , "out[index] ="
+    ] &&
+  checkSourceLacksAll iface.storeCodecProductionSource
+    [ "Vec::with_capacity(payload.len() * 2)"
+    , "Vec::with_capacity(encoded.len() / 2)"
+    , "push_nonzero_encoded("
+    , "decode_nonzero_bytes(byte_len, encoded)"
+    , "const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];"
+    , "fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8])"
+    , "fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()>"
+    , "fn open_boxed(&self, aad: &[u8], payload_len: usize, encoded: &[u8]) -> Option<Box<[u8]>>"
+    , "pub struct StoreCipher {"
+    , "key: [u8; 32],"
+    , "impl fmt::Debug for StoreCipher"
+    , "impl Drop for StoreCipher"
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "pub fn random() -> Self {"
+    , "let mut encoded = vec![0u8; Self::sealed_encoded_len(payload.len())].into_boxed_slice();"
+    , "let mut sealed = vec![0u8; sealed_len].into_boxed_slice();"
+    , "let mut payload = vec![0u8; payload_len].into_boxed_slice();"
+    , "let mut filler = vec![0u8; len].into_boxed_slice();"
+    , "out.resize(required_len, 0);"
+    , "struct WipeOnDrop<'a> {"
+    , "impl Drop for WipeOnDrop<'_> {"
+    ] &&
+  checkSourceLacksAll iface.generatedStoreCodecProductionSource
+    [ "pub(super) fn encode_nonzero_bytes(payload: &[u8]) -> Vec<u8> {"
+    , "pub(super) fn decode_nonzero_bytes(byte_len: usize, encoded: &[u8]) -> Option<Vec<u8>> {"
+    ] &&
+  checkSourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "let mut encoded = vec![0u8; generated_sealed_encoded_len(payload.len())].into_boxed_slice();"
+    , "let mut filler = vec![0u8; len].into_boxed_slice();"
+    , "let mut sealed = vec![0u8; sealed_len].into_boxed_slice();"
+    , "let mut payload = vec![0u8; payload_len].into_boxed_slice();"
+    ]
+
+def RuntimeImplementationInterface.checkStoreCipherSurfaceStaysInCodec
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.storeCodecProductionSource
+    [ "#[path = \"generated_surface.rs\"]"
+    , "mod generated_surface;"
+    , "pub use generated_surface::StoreCipher;"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "#[derive(PartialEq, Eq)]"
+    , "pub struct StoreCipher {"
+    , "impl StoreCipher {"
+    , "use std::fmt;"
+    , "impl fmt::Debug for StoreCipher {"
+    , "impl Drop for StoreCipher {"
+    , "use rand::rngs::OsRng;"
+    , "use rand::RngCore;"
+    , "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<T>("
+    , "fn open_boxed("
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "rng.fill_bytes(&mut key);"
+    , "pub fn random() -> Self {"
+    , "let mut rng = OsRng;"
+    , "Self::from_rng(&mut rng)"
+    , "pub fn clone_for_runtime_state(&self) -> Self {"
+    , "self::seal_and_wipe_boxed(self, aad, payload, rng)"
+    , "self::seal_and_wipe_into_slice(self, aad, payload, rng, out)"
+    , "self::filler_boxed(self, aad, len, rng)"
+    , "self::with_opened_payload(self, aad, payload_len, encoded, f)"
+    ] &&
+  checkSourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "pub(super) fn open_boxed("
+    , "#[derive(Clone, PartialEq, Eq)]"
+    ] &&
+  checkSourceLacksAll iface.storeCodecProductionSource
+    [ "pub struct StoreCipher {"
+    , "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<T>("
+    , "impl fmt::Debug for StoreCipher {"
+    , "impl Drop for StoreCipher {"
+    , "pub fn from_rng<R: RngCore>(rng: &mut R) -> Self {"
+    , "pub fn random() -> Self {"
+    , "pub fn seal_and_wipe("
+    , "pub fn seal_and_wipe_into("
+    , "pub fn filler("
+    , "pub(super) fn seal_and_wipe_boxed("
+    , "fn open_boxed("
+    ] &&
+  checkSourceLacksAll iface.storeStoreProductionSource
+    [ ".seal("
+    , ".open("
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeStoreUsesSharedBoxedFillerHelper
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand."
+    , "use rand::SeedableRng;"
+    , "use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};"
+    , "pub(super) struct StoreSlotTable {"
+    , "slots: Box<[StoreSlot]>,"
+    , "pub(super) fn with_bootstrapped_uo_slots<I>("
+    , "I::IntoIter: ExactSizeIterator,"
+    , "let mut slots = FixedBoxBuilder::new(objects.len());"
+    , "StoreSlot { object, value }"
+    , "fn uo_store_slot_aad(object: &str) -> String {"
+    , "pub(super) fn filler_boxed_uo_store_slot("
+    , "pub(super) fn bootstrap_uo_store_slot("
+    , "let aad = uo_store_slot_aad(object);"
+    , "filler_boxed_uo_store_slot(&aad, logical_len, cipher, rng)"
+    , "impl UoObjectStore {"
+    , "pub fn preinitialized<I>(objects: I) -> Result<Self>"
+    , "let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);"
+    , "let cipher = StoreCipher::random();"
+    , "let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher, &mut rng)?;"
+    , "Ok(Self {"
+    ] &&
+  checkSourceLacksAll iface.storeStoreProductionSource
+    [ "fn filler_boxed_uo_store_slot("
+    , "bootstrap_uo_store_slot"
+    , "cipher.filler_boxed(aad.as_bytes(), logical_len, rng)"
+    , "cipher.filler_boxed(aad.as_bytes(), logical_len, &mut rng)"
+    , "let aad = format!(\"uo_store:{object}\");"
+    , "pub fn preinitialized(objects: impl IntoIterator<Item = (String, usize)>) -> Self {"
+    , "impl ObjectStore for UoObjectStore {"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeStoreUsesSharedSealIntoHelper
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand."
+    , "impl ObjectStore for UoObjectStore {"
+    , "fn write_cell(&mut self, object: &str, value: &mut [u8]) -> Result<()> {"
+    , "pub(super) fn reseal_uo_store_slot_in_place("
+    , "pub(super) fn reseal_uo_store_slot_and_trace_write("
+    , "let aad = uo_store_slot_aad(object);"
+    , "reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;"
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)"
+    ] &&
+  checkSourceLacksAll iface.storeStoreProductionSource
+    [ "fn reseal_uo_store_slot_in_place("
+    , "reseal_uo_store_slot_in_place("
+    , "reseal_uo_store_slot_and_trace_write"
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)"
+    , ".seal_and_wipe_into_slice(aad.as_bytes(), value, &mut self.rng, slot)"
+    , "let aad = format!(\"uo_store:{object}\");"
+    , "impl ObjectStore for UoObjectStore {"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeStoreUsesGeneratedRawBoxedSlotHelpers
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    , "fn read_cell(&mut self, object: &str) -> Result<Box<[u8]>>;"
+    , "use generated_store_helpers::{StoreLogicalEventTrace, StorePhysicalWriteTrace, StoreSlotTable};"
+    , "slots: StoreSlotTable,"
+    , "physical_writes: StorePhysicalWriteTrace,"
+    , "logical_events: StoreLogicalEventTrace,"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand."
+    , "use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};"
+    , "use uo_core::trace::{LogicalEvent, PhysicalWriteEvent, WriteClass};"
+    , "use uo_core::FixedBoxBuilder;"
+    , "use zeroize::Zeroize;"
+    , "pub(super) fn zeroed_boxed_raw_store_slot(len: usize) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "for _ in 0..len {"
+    , "bytes.push(0u8)?;"
+    , "bytes.finish()"
+    , "pub(super) fn take_boxed_raw_store_value(value: &mut [u8]) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(value.len());"
+    , "for byte in value.iter().copied() {"
+    , "bytes.push(byte)?;"
+    , "value.zeroize();"
+    , "bytes.finish()"
+    , "pub(super) struct StorePhysicalWriteTrace {"
+    , "events: Box<[PhysicalWriteEvent]>,"
+    , "fn append_boxed_event<T>(events: &mut Box<[T]>, event: T) -> Result<()> {"
+    , "let previous_events = std::mem::take(events);"
+    , "let mut next_events = FixedBoxBuilder::new(previous_events.len() + 1);"
+    , "next_events.push(event)?;"
+    , "*events = next_events.finish()?;"
+    , "pub(super) fn new() -> Self {"
+    , "events: Box::<[PhysicalWriteEvent]>::default(),"
+    , "pub(super) fn push(&mut self, event: PhysicalWriteEvent) -> Result<()> {"
+    , "append_boxed_event(&mut self.events, event)"
+    , "pub(super) fn as_slice(&self) -> &[PhysicalWriteEvent] {"
+    , "pub(super) fn all_update(&self) -> bool {"
+    , ".all(|event| event.class == WriteClass::Update)"
+    , "pub(super) struct StoreLogicalEventTrace {"
+    , "events: Box<[LogicalEvent]>,"
+    , "events: Box::<[LogicalEvent]>::default(),"
+    , "pub(super) fn push(&mut self, event: LogicalEvent) -> Result<()> {"
+    , "pub(super) fn as_slice(&self) -> &[LogicalEvent] {"
+    , "pub(super) struct StoreSlot {"
+    , "object: String,"
+    , "value: Box<[u8]>,"
+    , "pub(super) struct StoreSlotTable {"
+    , "slots: Box<[StoreSlot]>,"
+    , "pub(super) fn empty() -> Self {"
+    , "slots: Box::<[StoreSlot]>::default(),"
+    , "pub(super) fn with_zeroed_raw_slots<I>(objects: I, slot_len: usize) -> Result<Self>"
+    , "I::IntoIter: ExactSizeIterator,"
+    , "let mut slots = FixedBoxBuilder::new(objects.len());"
+    , "value: zeroed_boxed_raw_store_slot(slot_len)?,"
+    , "pub(super) fn get(&self, object: &str) -> Option<&Box<[u8]>> {"
+    , ".find(|slot| slot.object == object)"
+    , "pub(super) fn insert_or_replace(&mut self, object: String, value: Box<[u8]>) -> Result<()> {"
+    , "let previous_slots = std::mem::take(&mut self.slots);"
+    , "FixedBoxBuilder::new(previous_slots.len() + 1)"
+    , "impl RawObjectStore {"
+    , "pub fn new() -> Self {"
+    , "slots: StoreSlotTable::empty(),"
+    , "physical_writes: StorePhysicalWriteTrace::new(),"
+    , "logical_events: StoreLogicalEventTrace::new(),"
+    , "pub fn with_zeroed_slots<I>(objects: I) -> Result<Self>"
+    , "StoreSlotTable::with_zeroed_raw_slots(objects, 32)?"
+    , "impl ObjectStore for RawObjectStore {"
+    , "if self.slots.get(object).is_none() {"
+    , ".insert_or_replace(object.into(), zeroed_boxed_raw_store_slot(32)?)?;"
+    , "let old = if let Some(existing) = self.slots.get(object) {"
+    , "let slot = zeroed_boxed_raw_store_slot(value_len)?;"
+    , "let new = take_boxed_raw_store_value(value)?;"
+    , "self.slots.insert_or_replace(object.into(), new.clone())?;"
+    , "let physical_write = PhysicalWriteEvent::from_buffers(object, object, &old, &new);"
+    , "if matches!(physical_write.class, WriteClass::Same | WriteClass::Clear) {"
+    , "self.metrics.zero_writes += 1;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "self.physical_writes.as_slice()"
+    , "self.logical_events.as_slice()"
+    ] &&
+  checkSourceLacksAll iface.storeStoreProductionSource
+    [ "impl ObjectStore for RawObjectStore {"
+    , "take_boxed_raw_store_value"
+    , "zeroed_boxed_raw_store_slot"
+    , ".or_insert_with(|| zeroed_boxed_raw_store_slot(32))"
+    , ".or_insert_with(|| zeroed_boxed_raw_store_slot(value_len))"
+    , "let new = take_boxed_raw_store_value(value)?;"
+    , "pub fn new() -> Self {"
+    , "pub fn with_zeroed_slots(objects: impl IntoIterator<Item = String>) -> Result<Self> {"
+    , "store.slots.insert(object, zeroed_boxed_raw_store_slot(32)?);"
+    , "vec![0u8; 32].into_boxed_slice()"
+    , "vec![0u8; value.len()].into_boxed_slice()"
+    , "value.to_vec().into_boxed_slice();"
+    , "value.zeroize();"
+    , "physical_writes: Vec<PhysicalWriteEvent>"
+    , "logical_events: Vec<LogicalEvent>"
+    ] &&
+  checkSourceLacksAll iface.generatedStoreHelpersProductionSource
+    [ "Vec::with_capacity("
+    , "events: Vec<PhysicalWriteEvent>,"
+    , "events: Vec<LogicalEvent>,"
+    , "Self { events: Vec::new() }"
+    , "self.events.push(event);"
+    , "use std::collections::BTreeMap;"
+    , "slots: BTreeMap::new(),"
+    , "slots: BTreeMap<String, Box<[u8]>>,"
+    , "self.slots.contains_key(object)"
+    , "slots.insert(object, slot);"
+    , "value.to_vec().into_boxed_slice()"
+    , "if value.iter().all(|byte| *byte == 0)"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeStoreUoWritesEmitPublicUpdateShape
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "impl ObjectStore for UoObjectStore {"
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "pub(super) fn reseal_uo_store_slot_and_trace_write("
+    , "Ok(PhysicalWriteEvent::from_shape("
+    , "object,\n        object,\n        slot.len(),\n        WriteClass::Update,"
+    , "slot.len(),"
+    , "WriteClass::Update,"
+    ] &&
+  checkSourceLacksAll iface.storeStoreProductionSource
+    [ "reseal_uo_store_slot_and_trace_write("
+    , "let physical_write ="
+    , "reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;"
+    , "self.physical_writes.push(physical_write)?;"
+    , "let physical_len = slot.len();"
+    , "PhysicalWriteEvent::from_shape("
+    , "let old = slot.clone();"
+    , "let new = slot.clone();"
+    ]
+
+def RuntimeImplementationInterface.checkStoreLibrarySurfaceKeepsGeneratedHelpersPrivate
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.storeLibProductionSource
+    [ "pub mod codec;"
+    , "mod store;"
+    , "pub use codec::StoreCipher;"
+    , "pub use store::StoreExecutionMetrics;"
+    ] &&
+  checkSourceLacksAll iface.storeLibProductionSource
+    [ "pub mod store;"
+    , "pub mod generated_codec;"
+    , "pub mod generated_surface;"
+    , "pub mod generated_store_helpers;"
+    , "mod generated_codec;"
+    , "mod generated_surface;"
+    , "mod generated_store_helpers;"
+    , "pub use generated_surface::StoreCipher;"
+    , "pub use generated_store_helpers::"
+    , "pub use store::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};"
+    , "pub use store::ObjectStore"
+    , "pub use store::RawObjectStore"
+    , "pub use store::UoObjectStore"
+    , "impl ObjectStore for RawObjectStore {"
+    , "impl ObjectStore for UoObjectStore {"
+    , "pub fn seal_and_wipe_boxed("
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkStoreWriteApiUsesMutablePlaintext_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkStoreWriteApiUsesMutablePlaintext = true ↔
+    iface.storeWriteApiUsesMutablePlaintext := by
+  unfold RuntimeImplementationInterface.checkStoreWriteApiUsesMutablePlaintext
+    RuntimeImplementationInterface.storeWriteApiUsesMutablePlaintext
+  simp
+
+@[simp] theorem runtimeImplementationInterface_checkStoreCipherKeyZeroizesOnDrop_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkStoreCipherKeyZeroizesOnDrop = true ↔
+    iface.storeCipherKeyZeroizesOnDrop := by
+  unfold RuntimeImplementationInterface.checkStoreCipherKeyZeroizesOnDrop
+    RuntimeImplementationInterface.storeCipherKeyZeroizesOnDrop
+  simp
+
+@[simp] theorem runtimeImplementationInterface_checkStoreCipherUsesExactSizeNonzeroBuffers_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkStoreCipherUsesExactSizeNonzeroBuffers = true ↔
+    iface.storeCipherUsesExactSizeNonzeroBuffers := by
+  unfold RuntimeImplementationInterface.checkStoreCipherUsesExactSizeNonzeroBuffers
+    RuntimeImplementationInterface.storeCipherUsesExactSizeNonzeroBuffers
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkStoreCipherSurfaceStaysInCodec_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkStoreCipherSurfaceStaysInCodec = true ↔
+    iface.storeCipherSurfaceStaysInCodec := by
+  unfold RuntimeImplementationInterface.checkStoreCipherSurfaceStaysInCodec
+    RuntimeImplementationInterface.storeCipherSurfaceStaysInCodec
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeStoreUsesSharedBoxedFillerHelper_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeStoreUsesSharedBoxedFillerHelper = true ↔
+    iface.runtimeStoreUsesSharedBoxedFillerHelper := by
+  unfold RuntimeImplementationInterface.checkRuntimeStoreUsesSharedBoxedFillerHelper
+    RuntimeImplementationInterface.runtimeStoreUsesSharedBoxedFillerHelper
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeStoreUsesSharedSealIntoHelper_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeStoreUsesSharedSealIntoHelper = true ↔
+    iface.runtimeStoreUsesSharedSealIntoHelper := by
+  unfold RuntimeImplementationInterface.checkRuntimeStoreUsesSharedSealIntoHelper
+    RuntimeImplementationInterface.runtimeStoreUsesSharedSealIntoHelper
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeStoreUsesGeneratedRawBoxedSlotHelpers_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeStoreUsesGeneratedRawBoxedSlotHelpers = true ↔
+    iface.runtimeStoreUsesGeneratedRawBoxedSlotHelpers := by
+  unfold RuntimeImplementationInterface.checkRuntimeStoreUsesGeneratedRawBoxedSlotHelpers
+    RuntimeImplementationInterface.runtimeStoreUsesGeneratedRawBoxedSlotHelpers
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeStoreUoWritesEmitPublicUpdateShape_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeStoreUoWritesEmitPublicUpdateShape = true ↔
+    iface.runtimeStoreUoWritesEmitPublicUpdateShape := by
+  unfold RuntimeImplementationInterface.checkRuntimeStoreUoWritesEmitPublicUpdateShape
+    RuntimeImplementationInterface.runtimeStoreUoWritesEmitPublicUpdateShape
+  simp [and_assoc]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkStoreLibrarySurfaceKeepsGeneratedHelpersPrivate_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkStoreLibrarySurfaceKeepsGeneratedHelpersPrivate = true ↔
+    iface.storeLibrarySurfaceKeepsGeneratedHelpersPrivate := by
+  unfold RuntimeImplementationInterface.checkStoreLibrarySurfaceKeepsGeneratedHelpersPrivate
+    RuntimeImplementationInterface.storeLibrarySurfaceKeepsGeneratedHelpersPrivate
+  simp
+
+def RuntimeImplementationInterface.runtimeShadowStateUsesFixedSortedCommitTable
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.stateProductionSource
+    [ "pub(in crate::runtime) fn shadow_load("
+    , "objects: self.objects.clone_for_shadow(object_ids, allocator)?"
+    , "pub(in crate::runtime) fn commit_against("
+    , "let shadow_len = self.objects.len();"
+    , "std::iter::IntoIterator::into_iter(std::mem::take(&mut self.objects).into_entries())"
+    , ".peekable();"
+    , "let mut next_objects = FixedBoxBuilder::new(committed.objects.len());"
+    , "let mut committed_object_ids = FixedBoxBuilder::new(shadow_len);"
+    , "for (id, old) in committed.objects.iter() {"
+    , "match shadow.peek().map(|entry| entry.object_id.cmp(&id)) {"
+    , "entry.object.commit(old, aborted, recorder, allocator)?;"
+    , "old.clone_committed_cold()?,"
+    , "found_index.and_then(|index| self.entries.get(index).map(|entry| &entry.object))"
+    , "found_index.and_then(|index| self.entries.get_mut(index).map(|entry| &mut entry.object))"
+    , "self.objects = RuntimeObjectTable::new(next_objects.finish()?);"
+    , "committed_object_ids.finish()"
+    ] ∧
+  sourceLacksAll iface.stateProductionSource
+    [ "let mut next_objects = Vec::with_capacity(committed.objects.len());"
+    , "let mut committed_object_ids = Vec::with_capacity(shadow_len);"
+    , "impl Clone for ContractRuntime"
+    , "impl Clone for CommittedRuntimeState"
+    , ".collect::<Vec<_>>()\n                .into_boxed_slice()"
+    , "found_index.map(|index| &self.entries[index].object)"
+    , "found_index.map(|index| &mut self.entries[index].object)"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeShadowStateUsesFixedSortedCommitTable
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.stateProductionSource
+    [ "pub(in crate::runtime) fn shadow_load("
+    , "objects: self.objects.clone_for_shadow(object_ids, allocator)?"
+    , "pub(in crate::runtime) fn commit_against("
+    , "let shadow_len = self.objects.len();"
+    , "std::iter::IntoIterator::into_iter(std::mem::take(&mut self.objects).into_entries())"
+    , ".peekable();"
+    , "let mut next_objects = FixedBoxBuilder::new(committed.objects.len());"
+    , "let mut committed_object_ids = FixedBoxBuilder::new(shadow_len);"
+    , "for (id, old) in committed.objects.iter() {"
+    , "match shadow.peek().map(|entry| entry.object_id.cmp(&id)) {"
+    , "entry.object.commit(old, aborted, recorder, allocator)?;"
+    , "old.clone_committed_cold()?,"
+    , "found_index.and_then(|index| self.entries.get(index).map(|entry| &entry.object))"
+    , "found_index.and_then(|index| self.entries.get_mut(index).map(|entry| &mut entry.object))"
+    , "self.objects = RuntimeObjectTable::new(next_objects.finish()?);"
+    , "committed_object_ids.finish()"
+    ] &&
+  checkSourceLacksAll iface.stateProductionSource
+    [ "let mut next_objects = Vec::with_capacity(committed.objects.len());"
+    , "let mut committed_object_ids = Vec::with_capacity(shadow_len);"
+    , "impl Clone for ContractRuntime"
+    , "impl Clone for CommittedRuntimeState"
+    , ".collect::<Vec<_>>()\n                .into_boxed_slice()"
+    , "found_index.map(|index| &self.entries[index].object)"
+    , "found_index.map(|index| &mut self.entries[index].object)"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeShadowStateUsesFixedSortedCommitTable_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeShadowStateUsesFixedSortedCommitTable = true ↔
+    iface.runtimeShadowStateUsesFixedSortedCommitTable := by
+  unfold RuntimeImplementationInterface.checkRuntimeShadowStateUsesFixedSortedCommitTable
+    RuntimeImplementationInterface.runtimeShadowStateUsesFixedSortedCommitTable
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.generatedObjectHelpersMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedObjectHelpersSource = GenerateRuntimeObjectHelpersRust.generatedRust ∧
+    sourceLacksAll iface.generatedObjectHelpersProductionSource
+      [ "expect("
+      , "unwrap("
+      , "panic!"
+      ]
+
+def RuntimeImplementationInterface.checkGeneratedObjectHelpersMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  (iface.generatedObjectHelpersSource == GenerateRuntimeObjectHelpersRust.generatedRust) &&
+    checkSourceLacksAll iface.generatedObjectHelpersProductionSource
+      [ "expect("
+      , "unwrap("
+      , "panic!"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedObjectHelpersMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedObjectHelpersMatchLeanGenerator = true ↔
+    iface.generatedObjectHelpersMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedObjectHelpersMatchLeanGenerator
+    RuntimeImplementationInterface.generatedObjectHelpersMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.generatedOramCodecsMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedOramCodecsSource = GenerateRuntimeOramCodecsRust.generatedRust ∧
+    sourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "expect("
+      , "unwrap("
+      , "panic!"
+      , "vec![value; len].into_boxed_slice()"
+      , "value.is_zero_like()"
+      ]
+
+def RuntimeImplementationInterface.checkGeneratedOramCodecsMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  (iface.generatedOramCodecsSource == GenerateRuntimeOramCodecsRust.generatedRust) &&
+    checkSourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "expect("
+      , "unwrap("
+      , "panic!"
+      , "vec![value; len].into_boxed_slice()"
+      , "value.is_zero_like()"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedOramCodecsMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedOramCodecsMatchLeanGenerator = true ↔
+    iface.generatedOramCodecsMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedOramCodecsMatchLeanGenerator
+    RuntimeImplementationInterface.generatedOramCodecsMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.generatedStoreHelpersMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedStoreHelpersSource = GenerateRuntimeStoreHelpersRust.generatedRust
+
+def RuntimeImplementationInterface.checkGeneratedStoreHelpersMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.generatedStoreHelpersSource == GenerateRuntimeStoreHelpersRust.generatedRust
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedStoreHelpersMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedStoreHelpersMatchLeanGenerator = true ↔
+    iface.generatedStoreHelpersMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedStoreHelpersMatchLeanGenerator
+    RuntimeImplementationInterface.generatedStoreHelpersMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.panicStyleControlFlowNeedles : List String :=
+  [ "expect("
+  , "unwrap("
+  , "panic!"
+  , "assert!("
+  , "assert_eq!("
+  , "debug_assert!("
+  , "debug_assert_eq!("
+  ]
+
+def RuntimeImplementationInterface.handwrittenRuntimeProductionAvoidsPanicStyleControlFlow
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceLacksAll iface.engineProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.shellProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.stateProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.objectsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.oramProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles
+
+def RuntimeImplementationInterface.checkHandwrittenRuntimeProductionAvoidsPanicStyleControlFlow
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceLacksAll iface.engineProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.shellProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.stateProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.objectsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.oramProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles
+
+@[simp] theorem
+  runtimeImplementationInterface_checkHandwrittenRuntimeProductionAvoidsPanicStyleControlFlow_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkHandwrittenRuntimeProductionAvoidsPanicStyleControlFlow = true ↔
+    iface.handwrittenRuntimeProductionAvoidsPanicStyleControlFlow := by
+  unfold RuntimeImplementationInterface.checkHandwrittenRuntimeProductionAvoidsPanicStyleControlFlow
+    RuntimeImplementationInterface.handwrittenRuntimeProductionAvoidsPanicStyleControlFlow
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.runtimeInterfaceProductionAvoidsPanicStyleControlFlow
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceLacksAll (productionSource iface.runtimeEvmLibSource) RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.engineProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.runtimeModuleProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.freshCoinsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.controllerProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.shellProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.stateProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.kernelRuntimeProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.kernelSlotSupportProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedKernelMachineProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedObjectHelpersProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedOramCodecsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.objectsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.oramProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.theoremProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.confidentialKernelProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedConfidentialKernelProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.traceProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.confidentialCoreProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.trustedKernelProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.coreLibProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.precompilesProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.allocatorProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.storeLibProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.storeCodecProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedStoreCodecProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedStoreSurfaceProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedStoreHelpersProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.storeStoreProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.generatedValueOpsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles ∧
+    sourceLacksAll iface.typesProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles
+
+def RuntimeImplementationInterface.checkRuntimeInterfaceProductionAvoidsPanicStyleControlFlow
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceLacksAll (productionSource iface.runtimeEvmLibSource) RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.engineProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.runtimeModuleProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.freshCoinsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.controllerProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.shellProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.stateProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.kernelRuntimeProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.kernelSlotSupportProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedKernelMachineProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedObjectHelpersProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedOramCodecsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.objectsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.oramProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.theoremProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.confidentialKernelProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedConfidentialKernelProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.traceProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.confidentialCoreProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.trustedKernelProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.coreLibProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.precompilesProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.allocatorProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.storeLibProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.storeCodecProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedStoreCodecProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedStoreSurfaceProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedStoreHelpersProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.storeStoreProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.generatedValueOpsProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles &&
+    checkSourceLacksAll iface.typesProductionSource RuntimeImplementationInterface.panicStyleControlFlowNeedles
+
+@[simp] theorem
+  runtimeImplementationInterface_checkRuntimeInterfaceProductionAvoidsPanicStyleControlFlow_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeInterfaceProductionAvoidsPanicStyleControlFlow = true ↔
+    iface.runtimeInterfaceProductionAvoidsPanicStyleControlFlow := by
+  unfold RuntimeImplementationInterface.checkRuntimeInterfaceProductionAvoidsPanicStyleControlFlow
+    RuntimeImplementationInterface.runtimeInterfaceProductionAvoidsPanicStyleControlFlow
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "bail!(\"ORAM write-log capacity exceeded\");"
+    , "bail!(\"ORAM write-log prefix was not fully populated\");"
+    , "path ORAM object {} requires injected fresh-leaf coins, but the tape is exhausted"
+    , "path ORAM object {} received injected leaf {} outside leaf count {}"
+    , "path ORAM object {} left {} injected fresh-leaf coins unused"
+    , "decoded ORAM live block for {} references out-of-range slot {}"
+    , "decoded ORAM bucket header for {} claims index {} but storage location is {}"
+    , "decoded ORAM position map for {} references missing live block at slot {}"
+    , "decoded ORAM stash for {} exceeds manifest bound {}"
+    , "working stash capacity {} fell below required public bound {} for {}"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "sealed payload buffer for {} fell below required public ciphertext size"
+    , "bail!(\"map record canonical encoding drifted from exact output length\");"
+    , "invalid map record tag {other:#x} for {}"
+    , "bail!(\"cell commit missing restored value during aborted commit\");"
+    , "bail!(\"array commit missing restored values\");"
+    , "bail!(\"small-map commit missing restored entries\");"
+    ] ∧
+  sourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "bail!(\"exact-size sealed output buffer did not fit\");"
+    ] ∧
+  sourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "sealed slot buffer for {aad} fell below required public ciphertext size"
+    , "anyhow!(\"confidential path emitted a non-UPDATE write\")"
+    ] ∧
+  sourceLacksAll
+    (iface.generatedOramCodecsProductionSource ++ "\n" ++
+      iface.generatedObjectHelpersProductionSource ++ "\n" ++
+      iface.generatedStoreSurfaceProductionSource ++ "\n" ++
+      iface.generatedStoreHelpersProductionSource ++ "\n" ++
+      iface.objectsProductionSource ++ "\n" ++
+      iface.oramProductionSource)
+    [ "bail!(\"map {} exceeded public capacity\", spec.name);"
+    , "bail!(\"map {} exceeded public capacity\", object_name);"
+    , "bail!(\"missing ORAM block for slot {}\", slot_index);"
+    , "bail!(\"path ORAM stash for {} exceeded public capacity\", spec.name);"
+    , "path ORAM working stash for {} exceeded public capacity"
+    , "stash bound exceeded for {} under path ORAM candidate"
+    , "bail!(\"stash bound exceeded for {}\", spec.name);"
+    , "if request_insert && !insert_slot_present {"
+    , "if (update_existing | delete_existing) && !matched_slot {"
+    , "if insert_new && !inserted_slot {"
+    , "if insert_new && insert_slot_index >= entries.len() {"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeHostVisibleErrorsUsePublicIntegrityTaxonomy
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "bail!(\"ORAM write-log capacity exceeded\");"
+    , "bail!(\"ORAM write-log prefix was not fully populated\");"
+    , "path ORAM object {} requires injected fresh-leaf coins, but the tape is exhausted"
+    , "path ORAM object {} received injected leaf {} outside leaf count {}"
+    , "path ORAM object {} left {} injected fresh-leaf coins unused"
+    , "decoded ORAM live block for {} references out-of-range slot {}"
+    , "decoded ORAM bucket header for {} claims index {} but storage location is {}"
+    , "decoded ORAM position map for {} references missing live block at slot {}"
+    , "decoded ORAM stash for {} exceeds manifest bound {}"
+    , "working stash capacity {} fell below required public bound {} for {}"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "sealed payload buffer for {} fell below required public ciphertext size"
+    , "bail!(\"map record canonical encoding drifted from exact output length\");"
+    , "invalid map record tag {other:#x} for {}"
+    , "bail!(\"cell commit missing restored value during aborted commit\");"
+    , "bail!(\"array commit missing restored values\");"
+    , "bail!(\"small-map commit missing restored entries\");"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "bail!(\"exact-size sealed output buffer did not fit\");"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "sealed slot buffer for {aad} fell below required public ciphertext size"
+    , "anyhow!(\"confidential path emitted a non-UPDATE write\")"
+    ] &&
+  checkSourceLacksAll
+    (iface.generatedOramCodecsProductionSource ++ "\n" ++
+      iface.generatedObjectHelpersProductionSource ++ "\n" ++
+      iface.generatedStoreSurfaceProductionSource ++ "\n" ++
+      iface.generatedStoreHelpersProductionSource ++ "\n" ++
+      iface.objectsProductionSource ++ "\n" ++
+      iface.oramProductionSource)
+    [ "bail!(\"map {} exceeded public capacity\", spec.name);"
+    , "bail!(\"map {} exceeded public capacity\", object_name);"
+    , "bail!(\"missing ORAM block for slot {}\", slot_index);"
+    , "bail!(\"path ORAM stash for {} exceeded public capacity\", spec.name);"
+    , "path ORAM working stash for {} exceeded public capacity"
+    , "stash bound exceeded for {} under path ORAM candidate"
+    , "bail!(\"stash bound exceeded for {}\", spec.name);"
+    , "if request_insert && !insert_slot_present {"
+    , "if (update_existing | delete_existing) && !matched_slot {"
+    , "if insert_new && !inserted_slot {"
+    , "if insert_new && insert_slot_index >= entries.len() {"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkRuntimeHostVisibleErrorsUsePublicIntegrityTaxonomy_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeHostVisibleErrorsUsePublicIntegrityTaxonomy = true ↔
+    iface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy := by
+  unfold RuntimeImplementationInterface.checkRuntimeHostVisibleErrorsUsePublicIntegrityTaxonomy
+    RuntimeImplementationInterface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.generatedStoreCodecMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedStoreCodecSource = GenerateRuntimeStoreCodecRust.generatedRust
+
+def RuntimeImplementationInterface.checkGeneratedStoreCodecMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.generatedStoreCodecSource == GenerateRuntimeStoreCodecRust.generatedRust
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedStoreCodecMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedStoreCodecMatchLeanGenerator = true ↔
+    iface.generatedStoreCodecMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedStoreCodecMatchLeanGenerator
+    RuntimeImplementationInterface.generatedStoreCodecMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.generatedStoreSurfaceMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedStoreSurfaceSource = GenerateRuntimeStoreSurfaceRust.generatedRust
+
+def RuntimeImplementationInterface.checkGeneratedStoreSurfaceMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.generatedStoreSurfaceSource == GenerateRuntimeStoreSurfaceRust.generatedRust
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedStoreSurfaceMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedStoreSurfaceMatchLeanGenerator = true ↔
+    iface.generatedStoreSurfaceMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedStoreSurfaceMatchLeanGenerator
+    RuntimeImplementationInterface.generatedStoreSurfaceMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.generatedKernelMachineMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedKernelMachineSource = GenerateRuntimeKernelMachineRust.generatedRust
+
+def RuntimeImplementationInterface.checkGeneratedKernelMachineMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.generatedKernelMachineSource == GenerateRuntimeKernelMachineRust.generatedRust
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedKernelMachineMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedKernelMachineMatchLeanGenerator = true ↔
+    iface.generatedKernelMachineMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedKernelMachineMatchLeanGenerator
+    RuntimeImplementationInterface.generatedKernelMachineMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.generatedValueOpsMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedValueOpsSource = GenerateRuntimeValueOpsRust.generatedRust
+
+def RuntimeImplementationInterface.checkGeneratedValueOpsMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.generatedValueOpsSource == GenerateRuntimeValueOpsRust.generatedRust
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedValueOpsMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedValueOpsMatchLeanGenerator = true ↔
+    iface.generatedValueOpsMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedValueOpsMatchLeanGenerator
+    RuntimeImplementationInterface.generatedValueOpsMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.generatedKernelSlotSupportMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.kernelSlotSupportSource = GenerateRuntimeKernelSlotSupportRust.generatedRust
+
+def RuntimeImplementationInterface.checkGeneratedKernelSlotSupportMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.kernelSlotSupportSource == GenerateRuntimeKernelSlotSupportRust.generatedRust
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedKernelSlotSupportMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedKernelSlotSupportMatchLeanGenerator = true ↔
+    iface.generatedKernelSlotSupportMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedKernelSlotSupportMatchLeanGenerator
+    RuntimeImplementationInterface.generatedKernelSlotSupportMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.generatedConfidentialKernelMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedConfidentialKernelSource = GenerateConfidentialKernelRust.generatedRust
+
+def RuntimeImplementationInterface.checkGeneratedConfidentialKernelMatchLeanGenerator
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.generatedConfidentialKernelSource == GenerateConfidentialKernelRust.generatedRust
+
+@[simp] theorem runtimeImplementationInterface_checkGeneratedConfidentialKernelMatchLeanGenerator_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkGeneratedConfidentialKernelMatchLeanGenerator = true ↔
+    iface.generatedConfidentialKernelMatchLeanGenerator := by
+  unfold RuntimeImplementationInterface.checkGeneratedConfidentialKernelMatchLeanGenerator
+    RuntimeImplementationInterface.generatedConfidentialKernelMatchLeanGenerator
+  simp
+
+def RuntimeImplementationInterface.runtimeObjectCommitUsesLeanGeneratedHelpers
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "reconcile_cell_commit_value("
+    , "let restored_value = if aborted || !next.accessed {"
+    , "reconcile_array_commit_values("
+    , "let restored_values = if aborted || !next.accessed {"
+    , "reconcile_small_map_commit_entries("
+    , "let restored_entries = if aborted || !next.accessed {"
+    , "raw array new value slot {} missing for {} despite written flag"
+    , "raw array old physical slot {} missing for {} despite written flag"
+    , "raw array next value slot {} missing for {} despite written flag"
+    , "raw array next physical slot {} missing for {} despite written flag"
+    , "UO array commit physical slot {} missing for {} despite generated public commit schedule"
+    , "UO small-map commit physical slot {} missing for {} despite generated public commit schedule"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn reconcile_cell_commit_value<F>("
+    , "old_value: Option<Value>,"
+    , "let committed_value = if aborted {"
+    , "seal_committed(&committed_value)?;"
+    , "pub(super) fn reconcile_array_commit_values<F>("
+    , "old_values: Option<&[Value]>,"
+    , "if aborted || !accessed {"
+    , "for (current, old) in values.iter_mut().zip(old_values.iter()) {"
+    , "for (index, value) in values.iter().enumerate() {"
+    , "pub(super) fn reconcile_small_map_commit_entries<F>("
+    , "old_entries: Option<&[MapEntry]>,"
+    , "for (entry, old_entry) in entries.iter_mut().zip(old_entries.iter()) {"
+    , "entry.overwrite("
+    , "for (index, entry) in entries.iter().enumerate() {"
+    ] ∧
+  sourceLacksAll iface.objectsProductionSource
+    [ "old.decode_values_from_storage_into(allocator, &mut next.values)?;"
+    , "old.decode_entries_from_storage_into(allocator, &mut next.entries)?;"
+    , "let committed_value = if aborted {"
+    , "for index in 0..next.values.len() {"
+    , "for index in 0..next.entries.len() {"
+    , "let new_physical = raw_encode_value(&new.values[index])?;"
+    , "&old.physical_slots[index]"
+    , "next.values[index] = new.values[index].clone();"
+    , "next.physical_slots[index] = new_physical;"
+    , "let physical = &mut physical_slots[index];"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeObjectCommitUsesLeanGeneratedHelpers
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "reconcile_cell_commit_value("
+    , "let restored_value = if aborted || !next.accessed {"
+    , "reconcile_array_commit_values("
+    , "let restored_values = if aborted || !next.accessed {"
+    , "reconcile_small_map_commit_entries("
+    , "let restored_entries = if aborted || !next.accessed {"
+    , "raw array new value slot {} missing for {} despite written flag"
+    , "raw array old physical slot {} missing for {} despite written flag"
+    , "raw array next value slot {} missing for {} despite written flag"
+    , "raw array next physical slot {} missing for {} despite written flag"
+    , "UO array commit physical slot {} missing for {} despite generated public commit schedule"
+    , "UO small-map commit physical slot {} missing for {} despite generated public commit schedule"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn reconcile_cell_commit_value<F>("
+    , "old_value: Option<Value>,"
+    , "let committed_value = if aborted {"
+    , "seal_committed(&committed_value)?;"
+    , "pub(super) fn reconcile_array_commit_values<F>("
+    , "old_values: Option<&[Value]>,"
+    , "if aborted || !accessed {"
+    , "for (current, old) in values.iter_mut().zip(old_values.iter()) {"
+    , "for (index, value) in values.iter().enumerate() {"
+    , "pub(super) fn reconcile_small_map_commit_entries<F>("
+    , "old_entries: Option<&[MapEntry]>,"
+    , "for (entry, old_entry) in entries.iter_mut().zip(old_entries.iter()) {"
+    , "entry.overwrite("
+    , "for (index, entry) in entries.iter().enumerate() {"
+    ] &&
+  checkSourceLacksAll iface.objectsProductionSource
+    [ "old.decode_values_from_storage_into(allocator, &mut next.values)?;"
+    , "old.decode_entries_from_storage_into(allocator, &mut next.entries)?;"
+    , "let committed_value = if aborted {"
+    , "for index in 0..next.values.len() {"
+    , "for index in 0..next.entries.len() {"
+    , "let new_physical = raw_encode_value(&new.values[index])?;"
+    , "&old.physical_slots[index]"
+    , "next.values[index] = new.values[index].clone();"
+    , "next.physical_slots[index] = new_physical;"
+    , "let physical = &mut physical_slots[index];"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeObjectCommitUsesLeanGeneratedHelpers_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeObjectCommitUsesLeanGeneratedHelpers = true ↔
+    iface.runtimeObjectCommitUsesLeanGeneratedHelpers := by
+  unfold RuntimeImplementationInterface.checkRuntimeObjectCommitUsesLeanGeneratedHelpers
+    RuntimeImplementationInterface.runtimeObjectCommitUsesLeanGeneratedHelpers
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.runtimeObjectCommitUsesPublicSealAndWriteShell
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "seal_canonical_value_commit_slot("
+    , "seal_map_record_commit_slot("
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "use crate::oram::{MapEntry, OramParameters, OramWriteLog, ORAM_DIRECTORY_PAGE_ENTRIES};"
+    , "fn reseal_payload_and_record_write<F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)"
+    , "use uo_core::trace::{PhysicalWriteEvent, WriteClass};"
+    , "pub(super) fn reseal_payload_and_trace_write("
+    , "pub(super) fn seal_canonical_value_commit_slot("
+    , "let payload = value.canonical_bytes_boxed()?;"
+    , "pub(super) fn seal_map_record_commit_slot("
+    , "let payload = map_record_bytes(entry)?;"
+    , "let slot_label_for_error = slot_label.clone();"
+    , "slot_label_for_error.as_str(),"
+    , "trace.physical_write(PhysicalWriteEvent::from_shape(\n                object_name,\n                slot_label,\n                physical_len,\n                WriteClass::Update,\n            ));"
+    ] ∧
+  sourceLacksAll iface.objectsProductionSource
+    [ "fn reseal_payload_and_trace_write("
+    , "fn seal_canonical_value_commit_slot("
+    , "fn seal_map_record_commit_slot("
+    , "let payload = value.canonical_bytes_boxed()?;"
+    , "let payload = map_record_bytes(entry)?;"
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), &mut payload, rng, physical)"
+    ]
+
+def RuntimeImplementationInterface.runtimeObjectOpenUsesSharedDecodeShell
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "decode_cell_value_from_storage("
+    , "decode_array_values_from_storage("
+    , "decode_small_map_entries_from_storage("
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "use uo_core::ir::StateObject;"
+    , "fn with_opened_payload<T, F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "pub(super) fn with_opened_object_payload<T, F>("
+    , "with_opened_payload(\n        location,\n        aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
+    , "pub(super) fn decode_sealed_value("
+    , "object_name.to_owned(),"
+    , "|payload| Value::decode_canonical(ty, payload),"
+    , "pub(super) fn decode_sealed_map_record("
+    , "ok_or_else(|| anyhow!(\"map {} missing key type\", spec.name))?;"
+    , "|payload| decode_map_record(spec, payload),"
+    , "Ok(MapEntry::new(occupied, key, value))"
+    , "pub(super) fn decode_cell_value_from_storage("
+    , "let aad = format!(\"cell:{object_name}\");"
+    , "pub(super) fn decode_array_values_from_storage("
+    , "let aad = format!(\"array:{object_name}:{index}\");"
+    , "values.push(decode_sealed_value("
+    , "pub(super) fn decode_small_map_entries_from_storage("
+    , "let aad = format!(\"small_map:{}:{index}\", spec.name);"
+    , "format!(\"{}@smallmap{}\", spec.name, index),"
+    ] ∧
+  sourceLacksAll iface.objectsProductionSource
+    [ "fn with_opened_object_payload<"
+    , "fn decode_sealed_value("
+    , "fn decode_sealed_map_record("
+    , "decode_sealed_value("
+    , "decode_sealed_map_record("
+    , "for (index, physical) in self.physical_slots.iter().enumerate() {"
+    , "format!(\"{}@smallmap{}\", self.spec.name, index),"
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "failed to decode sealed object payload"
+    ]
+
+def RuntimeImplementationInterface.runtimeObjectBootstrapUsesSharedBoxedSealHelper
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "physical: seal_value(&aad, &logical, &cipher, &mut rng)?,"
+    , "let logical = cold_zero_value(&spec.value_type);"
+    , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
+    , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
+    , "let zero_entry = cold_zero_small_map_entry(key_type, &spec.value_type);"
+    , "physical_slots.push(seal_value(&aad, &zero_value, &cipher, &mut rng)?)?;"
+    , "physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher, &mut rng)?)?;"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn seal_boxed_payload_with_optional_guard("
+    , "cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)"
+    , "pub(super) fn seal_boxed_object_payload("
+    , "pub(super) fn repeated_boxed_bytes(len: usize, byte: u8) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "bytes.push(byte)?;"
+    , "bytes.finish()"
+    , "pub(super) fn raw_encode_value(value: &Value) -> Result<Box<[u8]>> {"
+    , "pub(super) fn cold_zero_value(value_type: &Type) -> Value {"
+    , "pub(super) fn cold_zero_boxed_values(len: usize, value_type: &Type) -> Box<[Value]> {"
+    , "pub(super) fn cold_zero_small_map_entries("
+    , "pub(super) fn cold_zero_small_map_entry("
+    , "value.confidential_is_zero_like()"
+    , "Value::confidential_bytes_are_zero(&bytes)"
+    , "repeated_boxed_bytes(32, 0u8)"
+    , "repeated_boxed_bytes(32, 1u8)"
+    , "pub(super) fn seal_value("
+    , "let mut payload = value.canonical_bytes_boxed()?;"
+    , "pub(super) fn seal_map_record("
+    , "let mut payload = map_record_bytes(entry)?;"
+    , "seal_boxed_object_payload(aad, payload.as_mut(), cipher, rng)"
+    , "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, None)"
+    ] ∧
+  sourceLacksAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn repeated_boxed_bytes(len: usize, byte: u8) -> Box<[u8]> {"
+    , "vec![byte; len].into_boxed_slice()"
+    , "value.is_zero_like()"
+    , "bytes.iter().all(|byte| *byte == 0)"
+    ] ∧
+  sourceLacksAll iface.objectsProductionSource
+    [ "fn seal_boxed_object_payload("
+    , "fn seal_value("
+    , "fn seal_map_record("
+    , "Value::zero_for_type("
+    , "MapEntry::new("
+    , "physical_slots.push(seal_boxed_object_payload("
+    , "physical_slots.push(cipher.seal_and_wipe_boxed("
+    , "cipher.seal_and_wipe_boxed(aad, &mut payload, rng)"
+    ]
+
+def RuntimeImplementationInterface.runtimeObjectResetUsesLeanGeneratedHelpers
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "wipe_value_and_physical_slot(&mut self.value, &mut self.physical);"
+    , "cold_commit_value_to_zero(&mut self.value, &self.spec.value_type);"
+    , "wipe_boxed_values_and_slots(&mut self.values, &mut self.physical_slots);"
+    , "cold_commit_boxed_values(&mut self.values, &self.spec.value_type);"
+    , "wipe_small_map_entries_and_slots(&mut self.entries, &mut self.physical_slots);"
+    , "cold_commit_small_map_entries("
+    , "Self::UoCell(object) => !object.accessed && !object.written,"
+    , "written_slots: Box<[bool]>,"
+    , "fn boxed_false_flags(len: usize) -> Box<[bool]> {"
+    , "FixedBoxBuilder::from_fn(len, |_| false)"
+    , "fn clear_written_slots(slots: &mut [bool]) {"
+    , "slots.fill(false);"
+    , "fn no_written_slots(slots: &[bool]) -> bool {"
+    , "!slots.iter().any(|written| *written)"
+    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
+    , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
+    ] ∧
+  sourceLacksAll iface.objectsProductionSource
+    [ "BTreeSet"
+    , "written_indices"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn wipe_value_and_physical_slot(value: &mut Value, physical: &mut [u8]) {"
+    , "value.wipe_secrets();"
+    , "physical.fill(0);"
+    , "pub(super) fn wipe_boxed_values_and_slots("
+    , "for value in values.iter_mut() {"
+    , "for slot in physical_slots.iter_mut() {"
+    , "pub(super) fn cold_commit_value_to_zero(value: &mut Value, value_type: &Type) {"
+    , "*value = Value::zero_for_type(value_type);"
+    , "pub(super) fn cold_commit_boxed_values(values: &mut [Value], value_type: &Type) {"
+    , "pub(super) fn wipe_small_map_entries_and_slots("
+    , "for entry in entries.iter_mut() {"
+    , "pub(super) fn cold_commit_small_map_entries("
+    , "let zero_key = Value::zero_for_type(key_type);"
+    , "let zero_value = Value::zero_for_type(value_type);"
+    , "*entry = MapEntry::new(false, zero_key.clone(), zero_value.clone());"
+    ] ∧
+  sourceLacksAll iface.objectsProductionSource
+    [ "self.value.wipe_secrets();"
+    , "self.physical.fill(0);"
+    , "for value in &mut self.values {"
+    , "for slot in &mut self.physical_slots {"
+    , "for value in self.values.iter_mut() {"
+    , "for entry in &mut self.entries {"
+    , "for entry in self.entries.iter_mut() {"
+    , "*entry = MapEntry::new(false, zero_key.clone(), zero_value.clone());"
+    , "reset_small_map_entry("
+    , "object.value == Value::zero_for_type(&object.spec.value_type)"
+    , ".all(|value| *value == Value::zero_for_type(&object.spec.value_type))"
+    , "object.entries.iter().all(|entry| !entry.is_occupied())"
+    , "cell_committed_cache_is_cold("
+    , "array_committed_cache_is_cold("
+    , "small_map_committed_cache_is_cold("
+    , "object.oram.is_cold()"
+    ] ∧
+  sourceLacksAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn cell_committed_cache_is_cold("
+    , "pub(super) fn array_committed_cache_is_cold("
+    , "pub(super) fn small_map_committed_cache_is_cold("
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeObjectCommitUsesPublicSealAndWriteShell
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "seal_canonical_value_commit_slot("
+    , "seal_map_record_commit_slot("
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "use crate::oram::{MapEntry, OramParameters, OramWriteLog, ORAM_DIRECTORY_PAGE_ENTRIES};"
+    , "fn reseal_payload_and_record_write<F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)"
+    , "use uo_core::trace::{PhysicalWriteEvent, WriteClass};"
+    , "pub(super) fn reseal_payload_and_trace_write("
+    , "pub(super) fn seal_canonical_value_commit_slot("
+    , "let payload = value.canonical_bytes_boxed()?;"
+    , "pub(super) fn seal_map_record_commit_slot("
+    , "let payload = map_record_bytes(entry)?;"
+    , "let slot_label_for_error = slot_label.clone();"
+    , "slot_label_for_error.as_str(),"
+    , "trace.physical_write(PhysicalWriteEvent::from_shape(\n                object_name,\n                slot_label,\n                physical_len,\n                WriteClass::Update,\n            ));"
+    ] &&
+  checkSourceLacksAll iface.objectsProductionSource
+    [ "fn reseal_payload_and_trace_write("
+    , "fn seal_canonical_value_commit_slot("
+    , "fn seal_map_record_commit_slot("
+    , "let payload = value.canonical_bytes_boxed()?;"
+    , "let payload = map_record_bytes(entry)?;"
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "cipher.seal_and_wipe_into_slice(aad.as_bytes(), &mut payload, rng, physical)"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeObjectResetUsesLeanGeneratedHelpers
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "wipe_value_and_physical_slot(&mut self.value, &mut self.physical);"
+    , "cold_commit_value_to_zero(&mut self.value, &self.spec.value_type);"
+    , "wipe_boxed_values_and_slots(&mut self.values, &mut self.physical_slots);"
+    , "cold_commit_boxed_values(&mut self.values, &self.spec.value_type);"
+    , "wipe_small_map_entries_and_slots(&mut self.entries, &mut self.physical_slots);"
+    , "cold_commit_small_map_entries("
+    , "Self::UoCell(object) => !object.accessed && !object.written,"
+    , "written_slots: Box<[bool]>,"
+    , "fn boxed_false_flags(len: usize) -> Box<[bool]> {"
+    , "FixedBoxBuilder::from_fn(len, |_| false)"
+    , "fn clear_written_slots(slots: &mut [bool]) {"
+    , "slots.fill(false);"
+    , "fn no_written_slots(slots: &[bool]) -> bool {"
+    , "!slots.iter().any(|written| *written)"
+    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
+    , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
+    ] &&
+  checkSourceLacksAll iface.objectsProductionSource
+    [ "BTreeSet"
+    , "written_indices"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn wipe_value_and_physical_slot(value: &mut Value, physical: &mut [u8]) {"
+    , "value.wipe_secrets();"
+    , "physical.fill(0);"
+    , "pub(super) fn wipe_boxed_values_and_slots("
+    , "for value in values.iter_mut() {"
+    , "for slot in physical_slots.iter_mut() {"
+    , "pub(super) fn cold_commit_value_to_zero(value: &mut Value, value_type: &Type) {"
+    , "*value = Value::zero_for_type(value_type);"
+    , "pub(super) fn cold_commit_boxed_values(values: &mut [Value], value_type: &Type) {"
+    , "pub(super) fn wipe_small_map_entries_and_slots("
+    , "for entry in entries.iter_mut() {"
+    , "pub(super) fn cold_commit_small_map_entries("
+    , "let zero_key = Value::zero_for_type(key_type);"
+    , "let zero_value = Value::zero_for_type(value_type);"
+    , "*entry = MapEntry::new(false, zero_key.clone(), zero_value.clone());"
+    ] &&
+  checkSourceLacksAll iface.objectsProductionSource
+    [ "self.value.wipe_secrets();"
+    , "self.physical.fill(0);"
+    , "for value in &mut self.values {"
+    , "for slot in &mut self.physical_slots {"
+    , "for value in self.values.iter_mut() {"
+    , "for entry in &mut self.entries {"
+    , "for entry in self.entries.iter_mut() {"
+    , "*entry = MapEntry::new(false, zero_key.clone(), zero_value.clone());"
+    , "reset_small_map_entry("
+    , "object.value == Value::zero_for_type(&object.spec.value_type)"
+    , ".all(|value| *value == Value::zero_for_type(&object.spec.value_type))"
+    , "object.entries.iter().all(|entry| !entry.is_occupied())"
+    , "cell_committed_cache_is_cold("
+    , "array_committed_cache_is_cold("
+    , "small_map_committed_cache_is_cold("
+    , "object.oram.is_cold()"
+    ] &&
+  checkSourceLacksAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn cell_committed_cache_is_cold("
+    , "pub(super) fn array_committed_cache_is_cold("
+    , "pub(super) fn small_map_committed_cache_is_cold("
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeObjectOpenUsesSharedDecodeShell
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "decode_cell_value_from_storage("
+    , "decode_array_values_from_storage("
+    , "decode_small_map_entries_from_storage("
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "use uo_core::ir::StateObject;"
+    , "fn with_opened_payload<T, F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "pub(super) fn with_opened_object_payload<T, F>("
+    , "with_opened_payload(\n        location,\n        aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
+    , "pub(super) fn decode_sealed_value("
+    , "object_name.to_owned(),"
+    , "|payload| Value::decode_canonical(ty, payload),"
+    , "pub(super) fn decode_sealed_map_record("
+    , "ok_or_else(|| anyhow!(\"map {} missing key type\", spec.name))?;"
+    , "|payload| decode_map_record(spec, payload),"
+    , "Ok(MapEntry::new(occupied, key, value))"
+    , "pub(super) fn decode_cell_value_from_storage("
+    , "let aad = format!(\"cell:{object_name}\");"
+    , "pub(super) fn decode_array_values_from_storage("
+    , "let aad = format!(\"array:{object_name}:{index}\");"
+    , "values.push(decode_sealed_value("
+    , "pub(super) fn decode_small_map_entries_from_storage("
+    , "let aad = format!(\"small_map:{}:{index}\", spec.name);"
+    , "format!(\"{}@smallmap{}\", spec.name, index),"
+    ] &&
+  checkSourceLacksAll iface.objectsProductionSource
+    [ "fn with_opened_object_payload<"
+    , "fn decode_sealed_value("
+    , "fn decode_sealed_map_record("
+    , "decode_sealed_value("
+    , "decode_sealed_map_record("
+    , "for (index, physical) in self.physical_slots.iter().enumerate() {"
+    , "format!(\"{}@smallmap{}\", self.spec.name, index),"
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "failed to decode sealed object payload"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeObjectResetUsesLeanGeneratedHelpers_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeObjectResetUsesLeanGeneratedHelpers = true ↔
+    iface.runtimeObjectResetUsesLeanGeneratedHelpers := by
+  unfold RuntimeImplementationInterface.checkRuntimeObjectResetUsesLeanGeneratedHelpers
+    RuntimeImplementationInterface.runtimeObjectResetUsesLeanGeneratedHelpers
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "physical: seal_value(&aad, &logical, &cipher, &mut rng)?,"
+    , "let logical = cold_zero_value(&spec.value_type);"
+    , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
+    , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
+    , "let zero_entry = cold_zero_small_map_entry(key_type, &spec.value_type);"
+    , "physical_slots.push(seal_value(&aad, &zero_value, &cipher, &mut rng)?)?;"
+    , "physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher, &mut rng)?)?;"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn seal_boxed_payload_with_optional_guard("
+    , "cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)"
+    , "pub(super) fn seal_boxed_object_payload("
+    , "pub(super) fn repeated_boxed_bytes(len: usize, byte: u8) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "bytes.push(byte)?;"
+    , "bytes.finish()"
+    , "pub(super) fn raw_encode_value(value: &Value) -> Result<Box<[u8]>> {"
+    , "pub(super) fn cold_zero_value(value_type: &Type) -> Value {"
+    , "pub(super) fn cold_zero_boxed_values(len: usize, value_type: &Type) -> Box<[Value]> {"
+    , "pub(super) fn cold_zero_small_map_entries("
+    , "pub(super) fn cold_zero_small_map_entry("
+    , "value.confidential_is_zero_like()"
+    , "Value::confidential_bytes_are_zero(&bytes)"
+    , "repeated_boxed_bytes(32, 0u8)"
+    , "repeated_boxed_bytes(32, 1u8)"
+    , "pub(super) fn seal_value("
+    , "let mut payload = value.canonical_bytes_boxed()?;"
+    , "pub(super) fn seal_map_record("
+    , "let mut payload = map_record_bytes(entry)?;"
+    , "seal_boxed_object_payload(aad, payload.as_mut(), cipher, rng)"
+    , "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, None)"
+    ] &&
+  checkSourceLacksAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn repeated_boxed_bytes(len: usize, byte: u8) -> Box<[u8]> {"
+    , "vec![byte; len].into_boxed_slice()"
+    , "value.is_zero_like()"
+    , "bytes.iter().all(|byte| *byte == 0)"
+    ] &&
+  checkSourceLacksAll iface.objectsProductionSource
+    [ "fn seal_boxed_object_payload("
+    , "fn seal_value("
+    , "fn seal_map_record("
+    , "Value::zero_for_type("
+    , "MapEntry::new("
+    , "physical_slots.push(seal_boxed_object_payload("
+    , "physical_slots.push(cipher.seal_and_wipe_boxed("
+    , "cipher.seal_and_wipe_boxed(aad, &mut payload, rng)"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeObjectCommitUsesPublicSealAndWriteShell_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeObjectCommitUsesPublicSealAndWriteShell = true ↔
+    iface.runtimeObjectCommitUsesPublicSealAndWriteShell := by
+  unfold RuntimeImplementationInterface.checkRuntimeObjectCommitUsesPublicSealAndWriteShell
+    RuntimeImplementationInterface.runtimeObjectCommitUsesPublicSealAndWriteShell
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeObjectOpenUsesSharedDecodeShell_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeObjectOpenUsesSharedDecodeShell = true ↔
+    iface.runtimeObjectOpenUsesSharedDecodeShell := by
+  unfold RuntimeImplementationInterface.checkRuntimeObjectOpenUsesSharedDecodeShell
+    RuntimeImplementationInterface.runtimeObjectOpenUsesSharedDecodeShell
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper = true ↔
+    iface.runtimeObjectBootstrapUsesSharedBoxedSealHelper := by
+  unfold RuntimeImplementationInterface.checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper
+    RuntimeImplementationInterface.runtimeObjectBootstrapUsesSharedBoxedSealHelper
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "(Self::UoOramMap(new), Self::UoOramMap(old)) => {"
+    , "if next.accessed {"
+    , "if next.spec.oram_scheme == PATH_ORAM_SCHEME {"
+    , ".restore_from_old(&old.spec, &old.oram, allocator)?;"
+    , "let shadow_oram ="
+    , "std::mem::replace(&mut next.oram, OramState::placeholder());"
+    , "let commit = shadow_oram.commit("
+    , "let (next_oram, writes, zero_writes) = commit.into_object_commit_parts();"
+    , "trace.physical_write(write.with_object(&next.spec.name));"
+    , "trace.add_zero_writes(zero_writes);"
+    , "next.oram = next_oram;"
+    , "next.leaf_coin_source = PathOramLeafCoinSource::random();"
+    ] ∧
+  sourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "pub(crate) fn commit("
+    , "if self.parameters.is_surrogate() {"
+    , "decode_surrogate_entries_from_storage_into("
+    , "OramWriteLog::with_capacity(oram_write_log_capacity(&next.parameters)?)?;"
+    , "rewrite_surrogate_directory_pages_in_place("
+    , "rewrite_oram_counter_in_place("
+    , "rewrite_surrogate_bucket_window_in_place("
+    , "let next_counter = old.access_counter + 1;"
+    , "writes: writes.into_exact_batch()?,"
+    , "next.restore_from_old(spec, old, allocator)?;"
+    , "writes: OramWriteBatch::empty(),"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn reseal_payload_and_record_write<F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)"
+    , "pub(super) fn reseal_oram_payload_and_record_write("
+    , "let location_for_error = location.clone();"
+    , "location_for_error.as_str(),"
+    , "|physical_len| writes.push_update(location, physical_len),"
+    ] ∧
+  sourceLacksAll iface.oramProductionSource
+    [ "fn reseal_oram_payload_and_record_write("
+    , "record_oram_write("
+    , "if !next.cipher.seal_and_wipe_into_slice("
+    , "if !self.cipher.seal_and_wipe_into_slice("
+    ]
+
+def RuntimeImplementationInterface.runtimeOramOpenUsesSharedDecodeShell
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "#[path = \"generated_oram_codecs.rs\"]"
+    , "mod generated_oram_codecs;"
+    , "read_oram_counter_from_storage("
+    , "encode_oram_directory_page_into,"
+    , "refresh_path_state_from_storage("
+    ] ∧
+  sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn read_oram_counter_from_storage("
+    , "format!(\"{}@counter\", spec.name),"
+    , "read_u64_be_at(counter_bytes, 0, \"reading ORAM access counter\")"
+    , "pub(super) fn decode_surrogate_entries_from_storage_into("
+    , "pub(super) fn load_path_buckets_into_stash("
+    , "pub(super) fn refresh_path_state_from_storage("
+    , "pub(super) fn reconstruct_path_entries_from_storage_into("
+    , "with_opened_oram_payload("
+    , "entries.get_mut(next_entry_index..).ok_or_else"
+    , "surrogate directory decode tail index {} missing despite capacity guard for {}"
+    , "decode_oram_directory_page_into_slice("
+    , "format!(\"{}@meta{}\", spec.name, page_index),"
+    , "format!(\"{}@meta{}\", spec.name, page),"
+    , "format!(\"{}@bucket{}\", spec.name, bucket_index),"
+    , "format!(\"{}@bucket{}\", spec.name, index),"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "use crate::oram::{MapEntry, OramParameters, OramWriteLog, ORAM_DIRECTORY_PAGE_ENTRIES};"
+    , "fn with_opened_payload<T, F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "pub(super) fn encode_map_record_into(entry: &MapEntry, out: &mut [u8]) -> Result<()> {"
+    , "fn masked_select_u8(cond: bool, when_true: u8, when_false: u8) -> u8 {"
+    , "let mask = 0u8.wrapping_sub(cond as u8);"
+    , "fn checked_end(start: usize, len: usize, context: &str) -> Result<usize> {"
+    , "fn read_exact_range<'a>("
+    , "fn copy_exact_into(out: &mut [u8], input: &[u8], context: &str) -> Result<()> {"
+    , "if out.len() != input.len() {"
+    , "\"object helper codec exact copy length mismatch while {context}: {} != {}\""
+    , "for (target, byte) in out.iter_mut().zip(input.iter()) {"
+    , "*target = *byte;"
+    , "fn write_exact_range(out: &mut [u8], start: usize, bytes: &[u8], context: &str) -> Result<usize> {"
+    , "copy_exact_into(target, bytes, context)?;"
+    , "write_exact_range("
+    , "\"writing map record tag\""
+    , "entry.key().visit_canonical_chunks(&mut copy_chunk);"
+    , "pub(super) fn map_record_bytes(entry: &MapEntry) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "bytes.push(0u8)?;"
+    , "let mut out = bytes.finish()?;"
+    , "pub(super) fn decode_map_record(spec: &StateObject, bytes: &[u8]) -> Result<MapEntry> {"
+    , "read_exact_range(bytes, 0, 1, \"reading map record tag\")?"
+    , "read_exact_range(bytes, key_start, key_len, \"reading map record key\")?"
+    , "read_exact_range(bytes, value_start, value_len, \"reading map record value\")?"
+    , "pub(super) fn fixed_scalar_width(ty: &Type) -> Result<usize> {"
+    , "Type::Scalar(ScalarType::Address) => Ok(20),"
+    , "pub(super) fn decode_scalar_value(ty: &Type, bytes: &[u8]) -> Result<Value> {"
+    , "pub(super) fn encode_oram_directory_page_into("
+    , "let expected_len = ORAM_DIRECTORY_PAGE_ENTRIES * record_len;"
+    , "let target = out.get_mut(start..end).ok_or_else"
+    , "encode_map_record_into(entry, target)?;"
+    , "pub(super) fn decode_oram_directory_page_into_slice("
+    , "let parameters = OramParameters::for_spec(spec)?;"
+    , "let target = out.get_mut(slot).ok_or_else"
+    , "*target = decode_map_record(spec, record)?;"
+    , "pub(super) fn with_opened_oram_payload<T, F>("
+    , "with_opened_payload(\n        location,\n        &aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
+    ] ∧
+  sourceLacksAll iface.generatedObjectHelpersProductionSource
+    [ "out[0] = if entry.is_occupied() { 0x7d } else { 0x53 };"
+    , "out[0] = masked_select_u8(entry.is_occupied(), 0x7d, 0x53);"
+    , "out[cursor..end].copy_from_slice(chunk);"
+    , "target.copy_from_slice(bytes);"
+    , "Value::decode_canonical(key_type, &bytes[1..1 + key_len])?;"
+    , "&bytes[1 + key_len..1 + key_len + value_len]"
+    , "encode_map_record_into(entry, &mut out[start..end])?;"
+    , "out[slot] = decode_map_record(spec, record)?;"
+    ] ∧
+  sourceLacksAll iface.oramProductionSource
+    [ "fn with_opened_oram_payload<"
+    , "with_opened_oram_payload("
+    , "let mut counter = [0u8; 8];"
+    , "counter.copy_from_slice(counter_bytes);"
+    , "u64::from_be_bytes(counter)"
+    , "pub(crate) fn map_record_bytes("
+    , "pub(crate) fn decode_map_record("
+    , "fn encode_map_record_into("
+    , "fn encode_oram_directory_page_into("
+    , "fn decode_surrogate_entries_from_storage_into("
+    , "fn decode_oram_directory_page_into_slice("
+    , "fn fixed_scalar_width("
+    , "fn decode_scalar_value("
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    ]
+
+def RuntimeImplementationInterface.runtimeOramBootstrapUsesSharedBoxedSealHelper
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "bootstrap_surrogate_directory_pages("
+    , "bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;"
+    , "bootstrap_oram_counter_slot(spec, &cipher, rng)?"
+    ] ∧
+  sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn bootstrap_oram_counter_slot("
+    , "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, rng, None)"
+    , "pub(super) fn bootstrap_surrogate_directory_pages("
+    , "pages.push(seal_boxed_oram_payload(\n            &aad,\n            payload.as_mut(),\n            cipher,\n            rng,\n            None,\n        )?)?;"
+    , "pub(super) fn bootstrap_empty_path_buckets("
+    , "buckets.push(seal_boxed_oram_payload(\n            &aad,\n            payload.as_mut(),\n            cipher,\n            rng,\n            None,\n        )?)?;"
+    , "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn seal_boxed_payload_with_optional_guard("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)"
+    , "pub(super) fn seal_boxed_oram_payload("
+    , "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, allocator)"
+    ] ∧
+  sourceLacksAll iface.oramProductionSource
+    [ "fn seal_boxed_oram_payload("
+    , "directory_pages.push(cipher.seal_and_wipe_boxed("
+    , "buckets.push(cipher.seal_and_wipe_boxed("
+    , "pages[next_page] = cipher.seal_and_wipe_boxed("
+    , "oram_counter_aad(spec).as_bytes(),"
+    ]
+
+def RuntimeImplementationInterface.runtimeOramBootstrapUsesSharedBoxedFillerHelper
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
+    ] ∧
+  sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn bootstrap_filler_buckets("
+    , "let mut buckets = FixedBoxBuilder::new(parameters.bucket_count);"
+    , "buckets.push(filler_boxed_oram_payload("
+    , ")?)?;"
+    , "buckets.finish()"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn filler_boxed_payload("
+    , "cipher.filler_boxed(aad.as_bytes(), payload_len, rng)"
+    , "pub(super) fn filler_boxed_oram_payload("
+    , "filler_boxed_payload(aad, payload_len, cipher, rng)"
+    ] ∧
+  sourceLacksAll iface.oramProductionSource
+    [ "fn filler_boxed_oram_payload("
+    , "buckets.push(cipher.filler_boxed("
+    ]
+
+def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_oram_codecs.rs\"]"
+    , "mod generated_oram_codecs;"
+    , "pub(crate) use generated_oram_codecs::{OramBlock, OramBucket};"
+    , "use generated_oram_codecs::{"
+    , "bootstrap_empty_path_buckets, bootstrap_filler_buckets, bootstrap_oram_counter_slot,"
+    , "bootstrap_surrogate_directory_pages, cold_clone_oram_state, cold_commit_oram_state,"
+    , "decode_surrogate_entries_from_storage_into, empty_map_entry, empty_oram_write_batch,"
+    , "encode_path_metadata_pages, finish_oram_write_log, oram_directory_page_count,"
+    , "oram_write_log_capacity, oram_write_log_with_capacity, path_position_map_witness_leaves,"
+    , "push_oram_write_update, read_oram_counter_from_storage, refresh_path_state_from_storage,"
+    , "repeat_boxed_map_entries, repeat_boxed_masked_usize_options, restore_oram_storage_from_old,"
+    , "rewrite_oram_counter_in_place,"
+    , "rewrite_surrogate_bucket_window_in_place,"
+    , "rewrite_surrogate_directory_pages_in_place,"
+    , "run_path_get, run_path_put, run_surrogate_get,"
+    , "run_surrogate_put, working_stash_capacity,"
+    , "FixedStash,"
+    , "refresh_path_state_from_storage("
+    , "restore_oram_storage_from_old(self, spec, old)?;"
+    , "let directory_pages = encode_path_metadata_pages("
+    , "run_surrogate_get(self, spec, key)"
+    , "run_surrogate_put(self, spec, key, value, apply)"
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    , "let mut cloned = cold_clone_oram_state(spec, self)?;"
+    , "cold_clone_oram_state(spec, self)"
+    , "path_position_map_witness_leaves("
+    , "cold_commit_oram_state("
+    , "bootstrap_surrogate_directory_pages("
+    , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
+    , "bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;"
+    , "bootstrap_oram_counter_slot(spec, &cipher, rng)?"
+    , "rewrite_surrogate_directory_pages_in_place("
+    , "rewrite_oram_counter_in_place("
+    , "rewrite_surrogate_bucket_window_in_place("
+    , "empty_map_entry(spec)?;"
+    , "let entries = repeat_boxed_map_entries(parameters.capacity, &empty_entry)?;"
+    , "FixedStash,"
+    , "FixedStash::with_capacity(spec, working_stash_capacity("
+    , "FixedStash::placeholder()"
+    , "#[derive(Debug, PartialEq, Eq)]\npub(crate) struct MapEntry {"
+    , "#[derive(Debug, Default)]\npub(crate) enum PathOramLeafCoinSource {"
+    ] ∧
+  sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeOramCodecsRust.lean; do not edit by hand."
+    , "use rand::RngCore;"
+    , "use rand_chacha::ChaCha20Rng;"
+    , "use uo_allocator::{AllocatorPlan, AllocatorSession};"
+    , "use uo_core::trace::{LogicalEvent, PhysicalReadEvent, WriteClass};"
+    , "use uo_core::{"
+    , "FixedBoxBuilder, RuntimeMaskedUsizeOptionWitness, RuntimePathOramTransitionKind,"
+    , "RuntimePathOramTransitionWitness, Type, Value,"
+    , "use uo_store::StoreCipher;"
+    , "use super::{"
+    , "decode_oram_directory_page_into_slice, decode_scalar_value, encode_oram_directory_page_into,"
+    , "filler_boxed_oram_payload, fixed_scalar_width,"
+    , "filler_boxed_oram_payload, fixed_scalar_width, reseal_oram_payload_and_record_write,"
+    , "with_opened_oram_payload,"
+    , "seal_boxed_oram_payload, with_opened_oram_payload, MapEntry, OramParameters, OramState,"
+    , "OramTranscript, OramWrite, OramWriteBatch, OramWriteLog, PathOramLeafCoinSource,"
+    , "#[derive(Debug, PartialEq, Eq)]\npub(crate) struct OramBlock {"
+    , "pub(crate) struct OramBlock {"
+    , "pub(super) occupied: bool,"
+    , "pub(super) slot_index: usize,"
+    , "pub(super) leaf: usize,"
+    , "pub(super) key: Value,"
+    , "pub(super) value: Value,"
+    , "fn clone_oram_block(block: &OramBlock) -> OramBlock {"
+    , "fn assign_oram_block(target: &mut OramBlock, source: &OramBlock) {"
+    , "fn select_oram_block(\n    cond: bool,\n    when_true: &OramBlock,\n    when_false: &OramBlock,\n) -> Result<OramBlock> {"
+    , "pub(super) fn repeat_boxed_oram_blocks(len: usize, block: &OramBlock) -> Result<Box<[OramBlock]>> {"
+    , "values.push(clone_oram_block(block))?;"
+    , "occupied: masked_select_bool(cond, when_true.occupied, when_false.occupied),"
+    , "#[derive(Debug, PartialEq, Eq)]\npub(crate) struct OramBucket {"
+    , "pub(crate) struct OramBucket {"
+    , "pub(super) access_counter: u64,"
+    , "pub(super) bucket_index: usize,"
+    , "pub(super) live_entry_count: usize,"
+    , "pub(super) blocks: Box<[OramBlock]>,"
+    , "#[derive(Debug)]\npub(super) struct FixedStash {"
+    , "pub(super) struct FixedStash {"
+    , "pub(super) empty_block: OramBlock,"
+    , "pub(super) blocks: Box<[OramBlock]>,"
+    , "pub(super) len: usize,"
+    , "impl FixedStash {"
+    , "pub(super) fn placeholder() -> Self {"
+    , "pub(super) fn with_capacity(spec: &StateObject, capacity: usize) -> Result<Self> {"
+    , "pub(super) fn len(&self) -> usize {"
+    , "pub(super) fn is_empty(&self) -> bool {"
+    , "pub(super) fn as_slice(&self) -> &[OramBlock] {"
+    , "pub(super) fn capacity(&self) -> usize {"
+    , "pub(super) fn clear(&mut self) {"
+    , "ORAM_DIRECTORY_PAGE_ENTRIES,"
+    , "pub(super) fn working_stash_capacity(parameters: &OramParameters) -> Result<usize> {"
+    , "pub(super) fn repeat_boxed_empty_byte_boxes(len: usize) -> Result<Box<[Box<[u8]>]>> {"
+    , "let mut entries = FixedBoxBuilder::new(len);"
+    , "entries.push(Box::<[u8]>::default())?;"
+    , "entries.finish()"
+    , "fn clone_map_entry(entry: &MapEntry) -> MapEntry {"
+    , "fn assign_map_entry(target: &mut MapEntry, source: &MapEntry) {"
+    , "fn select_map_entry(cond: bool, when_true: &MapEntry, when_false: &MapEntry) -> Result<MapEntry> {"
+    , "pub(super) fn repeat_boxed_map_entries(len: usize, entry: &MapEntry) -> Result<Box<[MapEntry]>> {"
+    , "values.push(clone_map_entry(entry))?;"
+    , "fn clone_oram_storage(storage: &super::OramStorage) -> super::OramStorage {"
+    , "pub(super) fn zeroed_boxed_bytes(len: usize) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "for _ in 0..len {"
+    , "bytes.push(0u8)?;"
+    , "bytes.finish()"
+    , "pub(super) fn oram_write_log_capacity(parameters: &OramParameters) -> Result<usize> {"
+    , "pub(super) fn empty_oram_write_batch() -> OramWriteBatch {"
+    , "pub(super) fn oram_write_log_with_capacity(capacity: usize) -> Result<OramWriteLog> {"
+    , "pub(super) fn push_oram_write_update("
+    , "class: WriteClass::Update,"
+    , "pub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {"
+    , "pub(super) fn cold_clone_oram_state(spec: &StateObject, state: &OramState) -> Result<OramState> {"
+    , "empty_entry: clone_map_entry(&state.empty_entry),"
+    , "entries: repeat_boxed_map_entries(state.parameters.capacity, &state.empty_entry)?,"
+    , "position_map: repeat_boxed_masked_usize_options("
+    , "state.parameters.capacity,"
+    , "&MaskedUsizeOption::none(),"
+    , "stash: FixedStash::with_capacity(spec, working_stash_capacity(&state.parameters)?)?,"
+    , "storage: clone_oram_storage(&state.storage),"
+    , "cipher: state.cipher.clone_for_runtime_state(),"
+    , "pub(super) fn restore_oram_storage_from_old("
+    , ".clone_from(&old.storage.directory_pages);"
+    , "state.storage.buckets.clone_from(&old.storage.buckets);"
+    , ".clone_from(&old.storage.access_counter_slot);"
+    , "state.access_counter = old.access_counter;"
+    , "impl OramState {"
+    , "pub(crate) fn placeholder() -> Self {"
+    , "storage: super::OramStorage {"
+    , "fn wipe_secrets(&mut self) {"
+    , "impl Drop for OramState {"
+    , "fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {"
+    , "impl Drop for PathOramLeafCoinSource {"
+    , "impl PathOramLeafCoinSource {"
+    , "pub(super) fn oram_meta_aad("
+    , "pub(super) fn oram_bucket_aad("
+    , "pub(super) fn oram_counter_aad("
+    , "pub(super) fn bootstrap_oram_counter_slot("
+    , "pub(super) fn read_oram_counter_from_storage("
+    , "pub(super) fn bootstrap_surrogate_directory_pages("
+    , "pub(super) fn bootstrap_filler_buckets("
+    , "pub(super) fn bootstrap_empty_path_buckets("
+    , "pub(super) fn surrogate_access_transcript("
+    , "pub(super) fn path_access_transcript("
+    , "pub(super) fn rewrite_oram_counter_in_place("
+    , "pub(super) fn rewrite_surrogate_directory_pages_in_place("
+    , "pub(super) fn rewrite_surrogate_bucket_window_in_place("
+    , "pub(super) fn directory_page_entries<T>("
+    , "let take = entries"
+    , ".len()"
+    , ".saturating_sub(start)"
+    , ".min(ORAM_DIRECTORY_PAGE_ENTRIES);"
+    , "let end = start.saturating_add(take);"
+    , "match entries.get(start..end) {"
+    , "Some(page_entries) => page_entries,"
+    , "None => &[],"
+    , "fn levels_for_leaf_count(leaf_count: usize) -> usize {"
+    , "fn path_bucket_at_depth(leaf_count: usize, leaf: usize, depth: usize) -> usize {"
+    , "let ascents = levels.saturating_sub(1).saturating_sub(depth);"
+    , "pub(super) fn for_each_surrogate_bucket_window<E, F>("
+    , "pub(super) fn for_each_bucket_on_leaf_path_root_to_leaf<F>("
+    , "for depth in 0..levels {"
+    , "f(path_bucket_at_depth(leaf_count, leaf, depth));"
+    , "pub(super) fn for_each_bucket_on_leaf_path_leaf_to_root<F>("
+    , "for offset in 0..levels {"
+    , "let depth = levels - 1 - offset;"
+    , "pub(super) fn bucket_on_leaf_path("
+    , "pub(super) fn validate_live_path_block("
+    , "pub(super) fn masked_select_usize("
+    , "pub(super) fn masked_select_u64("
+    , "pub(super) fn masked_select_bool("
+    , "#[derive(Debug, Default, PartialEq, Eq)]\npub(crate) struct MaskedUsizeOption {"
+    , "pub(crate) struct MaskedUsizeOption {"
+    , "impl MaskedUsizeOption {"
+    , "pub(crate) fn none() -> Self {"
+    , "pub(crate) fn some(value: usize) -> Self {"
+    , "pub(crate) fn to_witness(&self) -> RuntimeMaskedUsizeOptionWitness {"
+    , "RuntimeMaskedUsizeOptionWitness {"
+    , "fn clone_masked_usize_option(value: &MaskedUsizeOption) -> MaskedUsizeOption {"
+    , "fn assign_masked_usize_option(target: &mut MaskedUsizeOption, source: &MaskedUsizeOption) {"
+    , "pub(super) fn repeat_boxed_masked_usize_options("
+    , "present: masked_select_bool(cond, when_true.present, when_false.present),"
+    , "value: masked_select_usize(cond, when_true.value, when_false.value),"
+    , "pub(super) fn masked_select_option_usize("
+    , "when_true: &MaskedUsizeOption,"
+    , "when_false: &MaskedUsizeOption,"
+    , ") -> MaskedUsizeOption {"
+    , "pub(super) fn masked_select_transition_kind("
+    , "pub(super) fn select_position_map_leaf("
+    , "pub(super) fn select_entry_value_for_slot("
+    , "pub(super) fn select_stash_index("
+    , "pub(super) fn take_selected_stash_block("
+    , "let mut removed = clone_oram_block(&stash.empty_block);"
+    , "removed = select_oram_block(take_here, block, &removed)?;"
+    , "*block = select_oram_block(take_here, &stash.empty_block, block)?;"
+    , "pub(super) fn slot_for_key("
+    , "pub(super) fn access_leaf_for_key("
+    , "pub(super) fn apply_path_get_update("
+    , "pub(super) fn apply_path_put_update("
+    , "pub(super) fn apply_surrogate_put_update("
+    , "pub(super) fn allocate_slot("
+    , "pub(super) fn run_surrogate_get("
+    , "pub(super) fn run_surrogate_put("
+    , "pub(super) fn run_path_get("
+    , "slot_index: slot.to_witness(),"
+    , "prior_leaf: prior_leaf.to_witness(),"
+    , "next_leaf: next_leaf.to_witness(),"
+    , "pub(super) fn run_path_put("
+    , "slot_index: transition_slot.to_witness(),"
+    , "next_leaf: transition_next_leaf.to_witness(),"
+    , "pub(super) fn empty_map_entry(spec: &StateObject) -> Result<MapEntry> {"
+    , "pub(super) fn empty_oram_block(spec: &StateObject) -> Result<OramBlock> {"
+    , "key: Value::zero_for_type("
+    , "pub(super) fn fixed_stash_with_capacity(spec: &StateObject, capacity: usize) -> Result<FixedStash> {"
+    , "empty_block: clone_oram_block(&empty_block),"
+    , "blocks: repeat_boxed_oram_blocks(capacity, &empty_block)?,"
+    , "pub(super) fn clear_fixed_stash(stash: &mut FixedStash) {"
+    , "assign_oram_block(block, &stash.empty_block);"
+    , "pub(super) fn cold_commit_oram_state("
+    , "pub(super) fn path_position_map_witness_leaves("
+    , ") -> Result<Box<[RuntimeMaskedUsizeOptionWitness]>> {"
+    , "path_position_map_from_storage(spec, parameters, cipher, directory_pages)"
+    , "position_map_to_witness_boxed(&position_map)"
+    , "pub(super) fn position_map_to_witness_boxed("
+    , "leaves.push(leaf.to_witness())?;"
+    , "for leaf in position_map.iter_mut() {"
+    , "for entry in entries.iter_mut() {"
+    , "clear_fixed_stash(stash);"
+    , "pub(super) fn push_fixed_stash(stash: &mut FixedStash, block: OramBlock) -> Result<()> {"
+    , "pub(super) fn push_fixed_stash_with_limit("
+    , "let slot = select_stash_index_with_limit(stash, limit, |candidate| !candidate.occupied);"
+    , "stash.overflowed |= should_insert & !slot_present;"
+    , "push_fixed_stash_with_limit(stash, block, parameters.stash_bound)?;"
+    , "let insert_here = should_insert & slot_present & (index == slot_index);"
+    , "*candidate = select_oram_block(insert_here, &block, candidate)?;"
+    , "pub(super) fn install_path_entry_from_block_if_occupied("
+    , "select_map_entry(write_here, &candidate, entry)?;"
+    , "pub(super) fn oram_block_from_entry(entry: &MapEntry) -> OramBlock {"
+    , "pub(super) fn oram_bucket_with_live_blocks("
+    , "\"ORAM bucket {} for {} carries {} blocks beyond public budget {}\""
+    , "fixed_blocks.get_mut(slot).ok_or_else"
+    , "live block slot {} missing despite public block budget {}"
+    , "assign_oram_block(target, block);"
+    , "pub(super) fn oram_bucket_from_entries("
+    , "let live_entry_count = entries.iter().fold(0usize, |count, entry| {\n        count + usize::from(entry.is_occupied())\n    });"
+    , "let target_rank = consumed;"
+    , "let mut selected = clone_oram_block(&empty_block);"
+    , "let entry_block = oram_block_from_entry(entry);"
+    , "selected = select_oram_block(take_here, &entry_block, &selected)?;"
+    , "rank += usize::from(occupied);"
+    , "pub(super) fn build_path_bucket("
+    , "pub(super) fn oram_directory_page_count("
+    , "fn checked_end(start: usize, len: usize, context: &str) -> Result<usize> {"
+    , "fn read_exact_range<'a>("
+    , "fn copy_exact_into(out: &mut [u8], input: &[u8], context: &str) -> Result<()> {"
+    , "if out.len() != input.len() {"
+    , "\"ORAM codec exact copy length mismatch while {context}: {} != {}\""
+    , "for (target, byte) in out.iter_mut().zip(input.iter()) {"
+    , "*target = *byte;"
+    , "fn write_exact_range(out: &mut [u8], start: usize, bytes: &[u8], context: &str) -> Result<usize> {"
+    , "copy_exact_into(target, bytes, context)?;"
+    , "fn read_u64_be_at(bytes: &[u8], start: usize, context: &str) -> Result<u64> {"
+    , "let word_bytes = read_exact_range(bytes, start, 8, context)?;"
+    , "copy_exact_into(&mut word, word_bytes, context)?;"
+    , "fn write_u64_be_at(out: &mut [u8], start: usize, value: u64, context: &str) -> Result<usize> {"
+    , "pub(super) fn serialize_oram_block_into("
+    , "\"writing ORAM block tag\""
+    , "block.key.visit_canonical_chunks(&mut copy_chunk);"
+    , "pub(super) fn deserialize_oram_block(spec: &StateObject, bytes: &[u8]) -> Result<OramBlock> {"
+    , "read_exact_range(bytes, 0, 1, \"reading ORAM block tag\")?"
+    , "read_exact_range(bytes, key_start, key_len, \"reading ORAM block key\")?"
+    , "pub(super) fn encode_path_stash_page_into("
+    , "let target = out.get_mut(start..end).ok_or_else"
+    , "serialize_oram_block_into(block, spec, target)?;"
+    , "pub(super) fn encode_path_position_map_page_into("
+    , "\"writing Path-ORAM position-map page entry\""
+    , "pub(super) fn encode_path_metadata_pages("
+    , "directory_page_entries(position_map, page),"
+    , "directory_page_entries(stash, page),"
+    , "pages.get_mut(next_page).ok_or_else"
+    , "metadata page index {} missing despite public page-count guard for {}"
+    , "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;"
+    , "pub(super) fn rewrite_path_metadata_pages_in_place("
+    , "reseal_oram_payload_and_record_write("
+    , "pub(super) fn decode_path_metadata_pages("
+    , "pub(super) fn decode_path_metadata_pages_into("
+    , "let required_stash_capacity = working_stash_capacity(parameters)?;"
+    , "let block = deserialize_oram_block(spec, block_bytes)?;"
+    , "pub(super) fn load_path_buckets_into_stash("
+    , "pub(super) fn rewrite_path_for_access<F>("
+    , "let mut working_entries = std::mem::take(&mut state.entries);"
+    , "let mut working_position_map = std::mem::take(&mut state.position_map);"
+    , "let mut working_stash = std::mem::replace(&mut state.stash, FixedStash::placeholder());"
+    , "finish_oram_write_log(writes)"
+    , "decode_bucket_payload(spec, bucket_index, payload, |block| {"
+    , "pub(super) fn rebuild_path_buckets_from_stash("
+    , "let bucket = build_path_bucket(spec, parameters, bucket_index, stash)?;"
+    , "format!(\"{}@bucket{}\", spec.name, bucket_index),"
+    , "pub(super) fn refresh_path_state_from_storage("
+    , "let bucket = oram_bucket_from_entries(spec, entries, access_counter, index)?;"
+    , "let mut payload = oram_bucket_bytes(&bucket, spec)?;"
+    , "pub(super) fn reconstruct_path_entries_from_storage_into("
+    , "format!(\"{}@bucket{}\", spec.name, index),"
+    , "decode_bucket_payload(spec, index, payload, |block| {"
+    , "pub(super) fn path_position_map_from_storage("
+    , "let position_map =\n        decode_path_position_map_pages(spec, parameters, cipher, directory_pages, &mut allocator)?;"
+    , "pub(super) fn decode_path_position_map_pages("
+    , ".chunks_exact(ORAM_LEAF_LABEL_BYTES)"
+    , "position_map.get_mut(next_slot).ok_or_else"
+    , "position map slot {} missing despite public capacity guard for {}"
+    , "*target = MaskedUsizeOption::new(present, leaf);"
+    , ".enumerate()"
+    , "\"reading Path-ORAM position-map page entry\""
+    , "pub(super) fn serialize_oram_bucket_into("
+    , "\"writing ORAM bucket access counter\""
+    , "\"writing ORAM bucket live entry count\""
+    , "let target = out.get_mut(cursor..end).ok_or_else"
+    , "serialize_oram_block_into(block, spec, target)?;"
+    , "pub(super) fn oram_bucket_bytes(bucket: &OramBucket, spec: &StateObject) -> Result<Box<[u8]>> {"
+    , "let mut out = zeroed_boxed_bytes(parameters.bucket_size)?;"
+    , "pub(super) fn deserialize_oram_bucket(spec: &StateObject, bytes: &[u8]) -> Result<OramBucket> {"
+    , "read_u64_be_at(bytes, 0, \"reading ORAM bucket access counter\")?"
+    , "\"reading ORAM bucket live entry count\""
+    , "let block_payload = read_exact_range("
+    , "block_payload.chunks_exact(block_size)"
+    , "ORAM bucket decode slot {} missing despite exact public block count for {}"
+    , "*target = deserialize_oram_block(spec, block)?;"
+    , "pub(super) fn decode_bucket_payload<F>("
+    , "\"reading decoded ORAM bucket payload blocks\""
+    , "block_payload.chunks_exact(parameters.block_size)"
+    , "let block = deserialize_oram_block(spec, block)?;"
+    ] ∧
+  sourceLacksAll iface.oramProductionSource
+    [ "fn working_stash_capacity("
+    , "fn repeat_boxed<"
+    , "fn zeroed_boxed_bytes("
+    , "fn oram_write_log_capacity("
+    , "fn oram_meta_aad("
+    , "fn oram_bucket_aad("
+    , "fn oram_counter_aad("
+    , "fn directory_page_entries<T>("
+    , "fn path_bucket_indices("
+    , "fn for_each_surrogate_bucket_window<"
+    , "fn for_each_bucket_on_leaf_path_root_to_leaf<"
+    , "fn for_each_bucket_on_leaf_path_leaf_to_root<"
+    , "fn bucket_on_leaf_path("
+    , "fn validate_live_path_block("
+    , "fn masked_select_usize("
+    , "fn masked_select_option_usize("
+    , "fn masked_select_transition_kind("
+    , "fn select_position_map_leaf("
+    , "fn select_entry_value_for_slot("
+    , "fn select_stash_index("
+    , "fn take_selected_stash_block("
+    , "fn slot_for_key("
+    , "fn allocate_slot("
+    , "fn wipe_secrets(&mut self) {"
+    , "impl Drop for OramState {"
+    , "fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {"
+    , "#[derive(Clone, Debug, Default)]\npub(crate) enum PathOramLeafCoinSource {"
+    , "impl Drop for PathOramLeafCoinSource {"
+    , "impl PathOramLeafCoinSource {"
+    , "fn load_path_buckets_into_stash("
+    , "fn path_position_map_from_storage("
+    , "fn rebuild_path_buckets_from_stash("
+    , "fn reconstruct_path_entries_from_storage_into("
+    , "self.entries.iter().all(|entry| !entry.is_occupied())"
+    , "self.position_map.iter().all(Option::is_none)"
+    , "self.stash.is_empty()"
+    , "pub(crate) fn is_cold(&self) -> bool"
+    , "oram_state_is_cold(&self.entries, &self.position_map, &self.stash)"
+    , "oram_state_is_cold,"
+    , "let leaves = if self.is_cold() {"
+    , "self.position_map.clone()"
+    , "parameters: self.parameters.clone()"
+    , "empty_entry: self.empty_entry.clone()"
+    , "entries: repeat_boxed(self.parameters.capacity, self.empty_entry.clone())?"
+    , "storage: self.storage.clone()"
+    , "for leaf in &mut self.position_map {"
+    , "for entry in &mut self.entries {"
+    , "fn access_leaf_for_key("
+    , "fn apply_path_get_update("
+    , "fn apply_path_put_update("
+    , "fn apply_surrogate_put_update("
+    , "fn surrogate_access_transcript(&self, spec: &StateObject) -> OramTranscript {"
+    , "fn path_access_transcript(&self, spec: &StateObject, leaf: usize) -> OramTranscript {"
+    , "fn rewrite_path_for_access<F>("
+    , "fn build_path_bucket("
+    , "fn oram_directory_page_count("
+    , "fn encode_path_position_map_page_into("
+    , "fn encode_path_metadata_pages("
+    , "fn rewrite_path_metadata_pages_in_place("
+    , "fn decode_path_metadata_pages("
+    , "fn decode_path_metadata_pages_into("
+    , "fn decode_path_position_map_pages("
+    , "fn decode_path_position_map_pages_into("
+    , "fn decode_bucket_payload("
+    , "fn encode_path_stash_page_into("
+    , "fn refresh_path_state_from_storage("
+    , "clone_from(&old.storage.directory_pages)"
+    , "self.storage.buckets.clone_from(&old.storage.buckets)"
+    , "clone_from(&old.storage.access_counter_slot)"
+    , "out[0] = u8::from(self.occupied);"
+    , "block.key.visit_canonical_chunks(&mut copy_chunk);"
+    , "pub(crate) fn empty_map_entry(spec: &StateObject) -> Result<MapEntry> {"
+    , "fn empty(spec: &StateObject) -> Result<Self> {"
+    , "fn serialize_into_slice(&self, spec: &StateObject, out: &mut [u8]) -> Result<()> {"
+    , "fn deserialize(spec: &StateObject, bytes: &[u8]) -> Result<Self> {"
+    , "let block = OramBlock::deserialize(spec, block_bytes)?;"
+    , "let mut bucket_index = [0u8; 8];"
+    , "let mut access_counter = [0u8; 8];"
+    , "let mut fixed_blocks = repeat_boxed(parameters.blocks_per_bucket, empty_block)?;"
+    , "blocks: repeat_boxed(capacity, empty_block)?,"
+    , "*block = self.empty_block.clone();"
+    , "let slot = select_stash_index(self, |candidate| !candidate.occupied)"
+    , "oram_bucket_with_live_blocks(spec, access_counter, bucket_index, live_entry_count, blocks)"
+    , "oram_bucket_from_entries(spec, entries, access_counter, bucket_index)"
+    , "serialize_oram_block_into(self, spec, out)"
+    , "deserialize_oram_block(spec, bytes)"
+    , "oram_bucket_bytes(self, spec)"
+    , "serialize_oram_bucket_into(self, spec, out)"
+    , "deserialize_oram_bucket(spec, bytes)"
+    , "fixed_blocks[slot] = OramBlock::deserialize(spec, block)?;"
+    , "fixed_blocks[slot] = OramBlock::from_entry(entry);"
+    , "entries.split_at(start)"
+    , "&tail[..take]"
+    , "pub(crate) struct OramBlock {"
+    , "pub(crate) struct OramBucket {"
+    ] ∧
+  sourceLacksAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn oram_state_is_cold("
+    , "entries.iter().all(|entry| !entry.is_occupied())"
+    , "position_map.iter().all(Option::is_none)"
+    , "stash.is_empty()"
+    , "if oram_state_is_cold(entries, position_map, stash) {"
+    , "Ok(position_map.to_vec().into_boxed_slice())"
+    , "position_map: Box::<[Option<usize>]>::default(),"
+    , "let selected_present = masked_select_bool(cond, when_true.is_some(), when_false.is_some());"
+    , "if selected_present {"
+    , "slot.to_option()"
+    , "transition_slot.to_option()"
+    , "position_map_to_option_boxed("
+    , "Result<Box<[Option<usize>]>>"
+    , "fn visit<F>(node: usize, f: &mut F)"
+    , "visit(node, &mut f);"
+    , "path.reverse();"
+    , ".filter(|entry| entry.is_occupied())"
+    , "fixed_blocks[slot] = oram_block_from_entry(entry);"
+    , "&mut entries[next_entry_index..]"
+    , "assign_oram_block(&mut fixed_blocks[slot], block);"
+    , "position_map[next_slot]"
+    , "fixed_blocks[slot] = deserialize_oram_block(spec, block)?;"
+    , "if block.occupied"
+    , "let mut counter = [0u8; 8];"
+    , "counter.copy_from_slice(counter_bytes);"
+    , "u64::from_be_bytes(counter)"
+    , "let mut encoded = [0u8; ORAM_LEAF_LABEL_BYTES];"
+    , "encoded.copy_from_slice(slot);"
+    , "u64::from_be_bytes(encoded)"
+    , "target.copy_from_slice(bytes);"
+    , "word.copy_from_slice(read_exact_range(bytes, start, 8, context)?);"
+    , "impl Clone for OramState {"
+    , "entries: self.entries.clone(),"
+    , "position_map: self.position_map.clone(),"
+    , "stash: self.stash.clone(),"
+    , "#[derive(Clone, Debug, PartialEq, Eq)]\npub(crate) struct MapEntry {"
+    , "#[derive(Clone, Debug, PartialEq, Eq)]\npub(crate) struct OramBlock {"
+    , "#[derive(Clone, Debug, PartialEq, Eq)]\npub(crate) struct OramBucket {"
+    , "#[derive(Clone, Debug)]\npub(super) struct FixedStash {"
+    , "pub(super) fn repeat_boxed<T: Clone>(len: usize, value: T) -> Result<Box<[T]>> {"
+    , "#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\npub(crate) struct MaskedUsizeOption {"
+    , "entries: repeat_boxed(state.parameters.capacity, state.empty_entry.clone())?,"
+    , "position_map: repeat_boxed(state.parameters.capacity, MaskedUsizeOption::none())?,"
+    , "storage: state.storage.clone(),"
+    , "cipher: state.cipher.clone(),"
+    , "pub(crate) fn to_witness(self) -> RuntimeMaskedUsizeOptionWitness {"
+    , "pub(crate) fn select(cond: bool, when_true: Self, when_false: Self) -> Self {"
+    , "MaskedUsizeOption::select(cond, when_true, when_false)"
+    , "when_true: MaskedUsizeOption,"
+    , "when_false: MaskedUsizeOption,"
+    , "MapEntry::select(write_here, candidate.clone(), entry.clone())?;"
+    , "OramBlock::select("
+    , "block.clone()"
+    , "empty_block.clone()"
+    , "candidate.clone()"
+    , "blocks.iter().cloned()"
+    , "blocks: repeat_boxed(capacity, empty_block)?,"
+    , "repeat_boxed(parameters.blocks_per_bucket, empty_block.clone())?"
+    , "repeat_boxed(parameters.blocks_per_bucket, empty_block)?"
+    , "let mut position_map = repeat_boxed(parameters.capacity, MaskedUsizeOption::none())?;"
+    , "let mut live_slots = repeat_boxed(parameters.capacity, MaskedUsizeOption::none())?;"
+    , "let mut pages = repeat_boxed(parameters.metadata_pages, Box::<[u8]>::default())?;"
+    , "pages[next_page]"
+    , "*leaf = masked_select_option_usize(update_here, next_leaf, *leaf);"
+    , "*leaf = masked_select_option_usize(insert_here, next_leaf, cleared_leaf);"
+    , "out[0] = u8::from(block.occupied);"
+    , "bytes[0]"
+    , "&bytes[1..9]"
+    , "&bytes[9..17]"
+    , "&bytes[key_start..key_start + key_len]"
+    , "out[cursor..end].copy_from_slice(chunk);"
+    , "serialize_oram_block_into(block, spec, &mut out[start..end])?;"
+    , "out[cursor..end].copy_from_slice(&encoded.to_be_bytes());"
+    , "out[0..8].copy_from_slice"
+    , "out[8..16].copy_from_slice"
+    , "out[16..24].copy_from_slice"
+    , "bytes[24..]"
+    , "bytes[8..16]"
+    , "bytes[16..24]"
+    , "serialize_oram_block_into(block, spec, &mut out[cursor..end])?;"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "(Self::UoOramMap(new), Self::UoOramMap(old)) => {"
+    , "if next.accessed {"
+    , "if next.spec.oram_scheme == PATH_ORAM_SCHEME {"
+    , ".restore_from_old(&old.spec, &old.oram, allocator)?;"
+    , "let shadow_oram ="
+    , "std::mem::replace(&mut next.oram, OramState::placeholder());"
+    , "let commit = shadow_oram.commit("
+    , "let (next_oram, writes, zero_writes) = commit.into_object_commit_parts();"
+    , "trace.physical_write(write.with_object(&next.spec.name));"
+    , "trace.add_zero_writes(zero_writes);"
+    , "next.oram = next_oram;"
+    , "next.leaf_coin_source = PathOramLeafCoinSource::random();"
+    ] &&
+  checkSourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "pub(crate) fn commit("
+    , "if self.parameters.is_surrogate() {"
+    , "decode_surrogate_entries_from_storage_into("
+    , "OramWriteLog::with_capacity(oram_write_log_capacity(&next.parameters)?)?;"
+    , "rewrite_surrogate_directory_pages_in_place("
+    , "rewrite_oram_counter_in_place("
+    , "rewrite_surrogate_bucket_window_in_place("
+    , "let next_counter = old.access_counter + 1;"
+    , "writes: writes.into_exact_batch()?,"
+    , "next.restore_from_old(spec, old, allocator)?;"
+    , "writes: OramWriteBatch::empty(),"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn reseal_payload_and_record_write<F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)"
+    , "pub(super) fn reseal_oram_payload_and_record_write("
+    , "let location_for_error = location.clone();"
+    , "location_for_error.as_str(),"
+    , "|physical_len| writes.push_update(location, physical_len),"
+    ] &&
+  checkSourceLacksAll iface.oramProductionSource
+    [ "fn reseal_oram_payload_and_record_write("
+    , "record_oram_write("
+    , "if !next.cipher.seal_and_wipe_into_slice("
+    , "if !self.cipher.seal_and_wipe_into_slice("
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeOramOpenUsesSharedDecodeShell
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "#[path = \"generated_oram_codecs.rs\"]"
+    , "mod generated_oram_codecs;"
+    , "read_oram_counter_from_storage("
+    , "encode_oram_directory_page_into,"
+    , "refresh_path_state_from_storage("
+    ] &&
+  checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn read_oram_counter_from_storage("
+    , "format!(\"{}@counter\", spec.name),"
+    , "read_u64_be_at(counter_bytes, 0, \"reading ORAM access counter\")"
+    , "pub(super) fn decode_surrogate_entries_from_storage_into("
+    , "pub(super) fn load_path_buckets_into_stash("
+    , "pub(super) fn refresh_path_state_from_storage("
+    , "pub(super) fn reconstruct_path_entries_from_storage_into("
+    , "with_opened_oram_payload("
+    , "entries.get_mut(next_entry_index..).ok_or_else"
+    , "surrogate directory decode tail index {} missing despite capacity guard for {}"
+    , "decode_oram_directory_page_into_slice("
+    , "format!(\"{}@meta{}\", spec.name, page_index),"
+    , "format!(\"{}@meta{}\", spec.name, page),"
+    , "format!(\"{}@bucket{}\", spec.name, bucket_index),"
+    , "format!(\"{}@bucket{}\", spec.name, index),"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "use crate::oram::{MapEntry, OramParameters, OramWriteLog, ORAM_DIRECTORY_PAGE_ENTRIES};"
+    , "fn with_opened_payload<T, F>("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "pub(super) fn encode_map_record_into(entry: &MapEntry, out: &mut [u8]) -> Result<()> {"
+    , "fn masked_select_u8(cond: bool, when_true: u8, when_false: u8) -> u8 {"
+    , "let mask = 0u8.wrapping_sub(cond as u8);"
+    , "fn checked_end(start: usize, len: usize, context: &str) -> Result<usize> {"
+    , "fn read_exact_range<'a>("
+    , "fn copy_exact_into(out: &mut [u8], input: &[u8], context: &str) -> Result<()> {"
+    , "if out.len() != input.len() {"
+    , "\"object helper codec exact copy length mismatch while {context}: {} != {}\""
+    , "for (target, byte) in out.iter_mut().zip(input.iter()) {"
+    , "*target = *byte;"
+    , "fn write_exact_range(out: &mut [u8], start: usize, bytes: &[u8], context: &str) -> Result<usize> {"
+    , "copy_exact_into(target, bytes, context)?;"
+    , "write_exact_range("
+    , "\"writing map record tag\""
+    , "entry.key().visit_canonical_chunks(&mut copy_chunk);"
+    , "pub(super) fn map_record_bytes(entry: &MapEntry) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "bytes.push(0u8)?;"
+    , "let mut out = bytes.finish()?;"
+    , "pub(super) fn decode_map_record(spec: &StateObject, bytes: &[u8]) -> Result<MapEntry> {"
+    , "read_exact_range(bytes, 0, 1, \"reading map record tag\")?"
+    , "read_exact_range(bytes, key_start, key_len, \"reading map record key\")?"
+    , "read_exact_range(bytes, value_start, value_len, \"reading map record value\")?"
+    , "pub(super) fn fixed_scalar_width(ty: &Type) -> Result<usize> {"
+    , "Type::Scalar(ScalarType::Address) => Ok(20),"
+    , "pub(super) fn decode_scalar_value(ty: &Type, bytes: &[u8]) -> Result<Value> {"
+    , "pub(super) fn encode_oram_directory_page_into("
+    , "let expected_len = ORAM_DIRECTORY_PAGE_ENTRIES * record_len;"
+    , "let target = out.get_mut(start..end).ok_or_else"
+    , "encode_map_record_into(entry, target)?;"
+    , "pub(super) fn decode_oram_directory_page_into_slice("
+    , "let parameters = OramParameters::for_spec(spec)?;"
+    , "let target = out.get_mut(slot).ok_or_else"
+    , "*target = decode_map_record(spec, record)?;"
+    , "pub(super) fn with_opened_oram_payload<T, F>("
+    , "with_opened_payload(\n        location,\n        &aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
+    ] &&
+  checkSourceLacksAll iface.generatedObjectHelpersProductionSource
+    [ "out[0] = if entry.is_occupied() { 0x7d } else { 0x53 };"
+    , "out[0] = masked_select_u8(entry.is_occupied(), 0x7d, 0x53);"
+    , "out[cursor..end].copy_from_slice(chunk);"
+    , "target.copy_from_slice(bytes);"
+    , "Value::decode_canonical(key_type, &bytes[1..1 + key_len])?;"
+    , "&bytes[1 + key_len..1 + key_len + value_len]"
+    , "encode_map_record_into(entry, &mut out[start..end])?;"
+    , "out[slot] = decode_map_record(spec, record)?;"
+    ] &&
+  checkSourceLacksAll iface.oramProductionSource
+    [ "fn with_opened_oram_payload<"
+    , "with_opened_oram_payload("
+    , "let mut counter = [0u8; 8];"
+    , "counter.copy_from_slice(counter_bytes);"
+    , "u64::from_be_bytes(counter)"
+    , "pub(crate) fn map_record_bytes("
+    , "pub(crate) fn decode_map_record("
+    , "fn encode_map_record_into("
+    , "fn encode_oram_directory_page_into("
+    , "fn decode_surrogate_entries_from_storage_into("
+    , "fn decode_oram_directory_page_into_slice("
+    , "fn fixed_scalar_width("
+    , "fn decode_scalar_value("
+    , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeOramBootstrapUsesSharedBoxedSealHelper
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "bootstrap_surrogate_directory_pages("
+    , "bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;"
+    , "bootstrap_oram_counter_slot(spec, &cipher, rng)?"
+    ] &&
+  checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn bootstrap_oram_counter_slot("
+    , "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, rng, None)"
+    , "pub(super) fn bootstrap_surrogate_directory_pages("
+    , "pages.push(seal_boxed_oram_payload(\n            &aad,\n            payload.as_mut(),\n            cipher,\n            rng,\n            None,\n        )?)?;"
+    , "pub(super) fn bootstrap_empty_path_buckets("
+    , "buckets.push(seal_boxed_oram_payload(\n            &aad,\n            payload.as_mut(),\n            cipher,\n            rng,\n            None,\n        )?)?;"
+    , "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn seal_boxed_payload_with_optional_guard("
+    , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
+    , "cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)"
+    , "pub(super) fn seal_boxed_oram_payload("
+    , "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, allocator)"
+    ] &&
+  checkSourceLacksAll iface.oramProductionSource
+    [ "fn seal_boxed_oram_payload("
+    , "directory_pages.push(cipher.seal_and_wipe_boxed("
+    , "buckets.push(cipher.seal_and_wipe_boxed("
+    , "pages[next_page] = cipher.seal_and_wipe_boxed("
+    , "oram_counter_aad(spec).as_bytes(),"
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeOramBootstrapUsesSharedBoxedFillerHelper
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
+    ] &&
+  checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn bootstrap_filler_buckets("
+    , "let mut buckets = FixedBoxBuilder::new(parameters.bucket_count);"
+    , "buckets.push(filler_boxed_oram_payload("
+    , ")?)?;"
+    , "buckets.finish()"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "fn filler_boxed_payload("
+    , "cipher.filler_boxed(aad.as_bytes(), payload_len, rng)"
+    , "pub(super) fn filler_boxed_oram_payload("
+    , "filler_boxed_payload(aad, payload_len, cipher, rng)"
+    ] &&
+  checkSourceLacksAll iface.oramProductionSource
+    [ "fn filler_boxed_oram_payload("
+    , "buckets.push(cipher.filler_boxed("
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_oram_codecs.rs\"]"
+    , "mod generated_oram_codecs;"
+    , "pub(crate) use generated_oram_codecs::{OramBlock, OramBucket};"
+    , "use generated_oram_codecs::{"
+    , "bootstrap_empty_path_buckets, bootstrap_filler_buckets, bootstrap_oram_counter_slot,"
+    , "bootstrap_surrogate_directory_pages, cold_clone_oram_state, cold_commit_oram_state,"
+    , "decode_surrogate_entries_from_storage_into, empty_map_entry, empty_oram_write_batch,"
+    , "encode_path_metadata_pages, finish_oram_write_log, oram_directory_page_count,"
+    , "oram_write_log_capacity, oram_write_log_with_capacity, path_position_map_witness_leaves,"
+    , "push_oram_write_update, read_oram_counter_from_storage, refresh_path_state_from_storage,"
+    , "repeat_boxed_map_entries, repeat_boxed_masked_usize_options, restore_oram_storage_from_old,"
+    , "rewrite_oram_counter_in_place,"
+    , "rewrite_surrogate_bucket_window_in_place,"
+    , "rewrite_surrogate_directory_pages_in_place,"
+    , "run_path_get, run_path_put, run_surrogate_get,"
+    , "run_surrogate_put, working_stash_capacity,"
+    , "FixedStash,"
+    , "refresh_path_state_from_storage("
+    , "restore_oram_storage_from_old(self, spec, old)?;"
+    , "let directory_pages = encode_path_metadata_pages("
+    , "run_surrogate_get(self, spec, key)"
+    , "run_surrogate_put(self, spec, key, value, apply)"
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    , "let mut cloned = cold_clone_oram_state(spec, self)?;"
+    , "cold_clone_oram_state(spec, self)"
+    , "path_position_map_witness_leaves("
+    , "cold_commit_oram_state("
+    , "bootstrap_surrogate_directory_pages("
+    , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
+    , "bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;"
+    , "bootstrap_oram_counter_slot(spec, &cipher, rng)?"
+    , "rewrite_surrogate_directory_pages_in_place("
+    , "rewrite_oram_counter_in_place("
+    , "rewrite_surrogate_bucket_window_in_place("
+    , "empty_map_entry(spec)?;"
+    , "let entries = repeat_boxed_map_entries(parameters.capacity, &empty_entry)?;"
+    , "FixedStash,"
+    , "FixedStash::with_capacity(spec, working_stash_capacity("
+    , "FixedStash::placeholder()"
+    , "#[derive(Debug, PartialEq, Eq)]\npub(crate) struct MapEntry {"
+    , "#[derive(Debug, Default)]\npub(crate) enum PathOramLeafCoinSource {"
+    ] &&
+  checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "// @generated by proof/lean/GenerateRuntimeOramCodecsRust.lean; do not edit by hand."
+    , "use rand::RngCore;"
+    , "use rand_chacha::ChaCha20Rng;"
+    , "use uo_allocator::{AllocatorPlan, AllocatorSession};"
+    , "use uo_core::trace::{LogicalEvent, PhysicalReadEvent, WriteClass};"
+    , "use uo_core::{"
+    , "FixedBoxBuilder, RuntimeMaskedUsizeOptionWitness, RuntimePathOramTransitionKind,"
+    , "RuntimePathOramTransitionWitness, Type, Value,"
+    , "use uo_store::StoreCipher;"
+    , "use super::{"
+    , "decode_oram_directory_page_into_slice, decode_scalar_value, encode_oram_directory_page_into,"
+    , "filler_boxed_oram_payload, fixed_scalar_width,"
+    , "filler_boxed_oram_payload, fixed_scalar_width, reseal_oram_payload_and_record_write,"
+    , "with_opened_oram_payload,"
+    , "seal_boxed_oram_payload, with_opened_oram_payload, MapEntry, OramParameters, OramState,"
+    , "OramTranscript, OramWrite, OramWriteBatch, OramWriteLog, PathOramLeafCoinSource,"
+    , "#[derive(Debug, PartialEq, Eq)]\npub(crate) struct OramBlock {"
+    , "pub(crate) struct OramBlock {"
+    , "pub(super) occupied: bool,"
+    , "pub(super) slot_index: usize,"
+    , "pub(super) leaf: usize,"
+    , "pub(super) key: Value,"
+    , "pub(super) value: Value,"
+    , "fn clone_oram_block(block: &OramBlock) -> OramBlock {"
+    , "fn assign_oram_block(target: &mut OramBlock, source: &OramBlock) {"
+    , "fn select_oram_block(\n    cond: bool,\n    when_true: &OramBlock,\n    when_false: &OramBlock,\n) -> Result<OramBlock> {"
+    , "pub(super) fn repeat_boxed_oram_blocks(len: usize, block: &OramBlock) -> Result<Box<[OramBlock]>> {"
+    , "values.push(clone_oram_block(block))?;"
+    , "occupied: masked_select_bool(cond, when_true.occupied, when_false.occupied),"
+    , "#[derive(Debug, PartialEq, Eq)]\npub(crate) struct OramBucket {"
+    , "pub(crate) struct OramBucket {"
+    , "pub(super) access_counter: u64,"
+    , "pub(super) bucket_index: usize,"
+    , "pub(super) live_entry_count: usize,"
+    , "pub(super) blocks: Box<[OramBlock]>,"
+    , "#[derive(Debug)]\npub(super) struct FixedStash {"
+    , "pub(super) struct FixedStash {"
+    , "pub(super) empty_block: OramBlock,"
+    , "pub(super) blocks: Box<[OramBlock]>,"
+    , "pub(super) len: usize,"
+    , "impl FixedStash {"
+    , "pub(super) fn placeholder() -> Self {"
+    , "pub(super) fn with_capacity(spec: &StateObject, capacity: usize) -> Result<Self> {"
+    , "pub(super) fn len(&self) -> usize {"
+    , "pub(super) fn is_empty(&self) -> bool {"
+    , "pub(super) fn as_slice(&self) -> &[OramBlock] {"
+    , "pub(super) fn capacity(&self) -> usize {"
+    , "pub(super) fn clear(&mut self) {"
+    , "ORAM_DIRECTORY_PAGE_ENTRIES,"
+    , "pub(super) fn working_stash_capacity(parameters: &OramParameters) -> Result<usize> {"
+    , "pub(super) fn repeat_boxed_empty_byte_boxes(len: usize) -> Result<Box<[Box<[u8]>]>> {"
+    , "let mut entries = FixedBoxBuilder::new(len);"
+    , "entries.push(Box::<[u8]>::default())?;"
+    , "entries.finish()"
+    , "fn clone_map_entry(entry: &MapEntry) -> MapEntry {"
+    , "fn assign_map_entry(target: &mut MapEntry, source: &MapEntry) {"
+    , "fn select_map_entry(cond: bool, when_true: &MapEntry, when_false: &MapEntry) -> Result<MapEntry> {"
+    , "pub(super) fn repeat_boxed_map_entries(len: usize, entry: &MapEntry) -> Result<Box<[MapEntry]>> {"
+    , "values.push(clone_map_entry(entry))?;"
+    , "fn clone_oram_storage(storage: &super::OramStorage) -> super::OramStorage {"
+    , "pub(super) fn zeroed_boxed_bytes(len: usize) -> Result<Box<[u8]>> {"
+    , "let mut bytes = FixedBoxBuilder::new(len);"
+    , "for _ in 0..len {"
+    , "bytes.push(0u8)?;"
+    , "bytes.finish()"
+    , "pub(super) fn oram_write_log_capacity(parameters: &OramParameters) -> Result<usize> {"
+    , "pub(super) fn empty_oram_write_batch() -> OramWriteBatch {"
+    , "pub(super) fn oram_write_log_with_capacity(capacity: usize) -> Result<OramWriteLog> {"
+    , "pub(super) fn push_oram_write_update("
+    , "class: WriteClass::Update,"
+    , "pub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {"
+    , "pub(super) fn cold_clone_oram_state(spec: &StateObject, state: &OramState) -> Result<OramState> {"
+    , "empty_entry: clone_map_entry(&state.empty_entry),"
+    , "entries: repeat_boxed_map_entries(state.parameters.capacity, &state.empty_entry)?,"
+    , "position_map: repeat_boxed_masked_usize_options("
+    , "state.parameters.capacity,"
+    , "&MaskedUsizeOption::none(),"
+    , "stash: FixedStash::with_capacity(spec, working_stash_capacity(&state.parameters)?)?,"
+    , "storage: clone_oram_storage(&state.storage),"
+    , "cipher: state.cipher.clone_for_runtime_state(),"
+    , "pub(super) fn restore_oram_storage_from_old("
+    , ".clone_from(&old.storage.directory_pages);"
+    , "state.storage.buckets.clone_from(&old.storage.buckets);"
+    , ".clone_from(&old.storage.access_counter_slot);"
+    , "state.access_counter = old.access_counter;"
+    , "impl OramState {"
+    , "pub(crate) fn placeholder() -> Self {"
+    , "storage: super::OramStorage {"
+    , "fn wipe_secrets(&mut self) {"
+    , "impl Drop for OramState {"
+    , "fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {"
+    , "impl Drop for PathOramLeafCoinSource {"
+    , "impl PathOramLeafCoinSource {"
+    , "pub(super) fn oram_meta_aad("
+    , "pub(super) fn oram_bucket_aad("
+    , "pub(super) fn oram_counter_aad("
+    , "pub(super) fn bootstrap_oram_counter_slot("
+    , "pub(super) fn read_oram_counter_from_storage("
+    , "pub(super) fn bootstrap_surrogate_directory_pages("
+    , "pub(super) fn bootstrap_filler_buckets("
+    , "pub(super) fn bootstrap_empty_path_buckets("
+    , "pub(super) fn surrogate_access_transcript("
+    , "pub(super) fn path_access_transcript("
+    , "pub(super) fn rewrite_oram_counter_in_place("
+    , "pub(super) fn rewrite_surrogate_directory_pages_in_place("
+    , "pub(super) fn rewrite_surrogate_bucket_window_in_place("
+    , "pub(super) fn directory_page_entries<T>("
+    , "let take = entries"
+    , ".len()"
+    , ".saturating_sub(start)"
+    , ".min(ORAM_DIRECTORY_PAGE_ENTRIES);"
+    , "let end = start.saturating_add(take);"
+    , "match entries.get(start..end) {"
+    , "Some(page_entries) => page_entries,"
+    , "None => &[],"
+    , "fn levels_for_leaf_count(leaf_count: usize) -> usize {"
+    , "fn path_bucket_at_depth(leaf_count: usize, leaf: usize, depth: usize) -> usize {"
+    , "let ascents = levels.saturating_sub(1).saturating_sub(depth);"
+    , "pub(super) fn for_each_surrogate_bucket_window<E, F>("
+    , "pub(super) fn for_each_bucket_on_leaf_path_root_to_leaf<F>("
+    , "for depth in 0..levels {"
+    , "f(path_bucket_at_depth(leaf_count, leaf, depth));"
+    , "pub(super) fn for_each_bucket_on_leaf_path_leaf_to_root<F>("
+    , "for offset in 0..levels {"
+    , "let depth = levels - 1 - offset;"
+    , "pub(super) fn bucket_on_leaf_path("
+    , "pub(super) fn validate_live_path_block("
+    , "pub(super) fn masked_select_usize("
+    , "pub(super) fn masked_select_u64("
+    , "pub(super) fn masked_select_bool("
+    , "#[derive(Debug, Default, PartialEq, Eq)]\npub(crate) struct MaskedUsizeOption {"
+    , "pub(crate) struct MaskedUsizeOption {"
+    , "impl MaskedUsizeOption {"
+    , "pub(crate) fn none() -> Self {"
+    , "pub(crate) fn some(value: usize) -> Self {"
+    , "pub(crate) fn to_witness(&self) -> RuntimeMaskedUsizeOptionWitness {"
+    , "RuntimeMaskedUsizeOptionWitness {"
+    , "fn clone_masked_usize_option(value: &MaskedUsizeOption) -> MaskedUsizeOption {"
+    , "fn assign_masked_usize_option(target: &mut MaskedUsizeOption, source: &MaskedUsizeOption) {"
+    , "pub(super) fn repeat_boxed_masked_usize_options("
+    , "present: masked_select_bool(cond, when_true.present, when_false.present),"
+    , "value: masked_select_usize(cond, when_true.value, when_false.value),"
+    , "pub(super) fn masked_select_option_usize("
+    , "when_true: &MaskedUsizeOption,"
+    , "when_false: &MaskedUsizeOption,"
+    , ") -> MaskedUsizeOption {"
+    , "pub(super) fn masked_select_transition_kind("
+    , "pub(super) fn select_position_map_leaf("
+    , "pub(super) fn select_entry_value_for_slot("
+    , "pub(super) fn select_stash_index("
+    , "pub(super) fn take_selected_stash_block("
+    , "let mut removed = clone_oram_block(&stash.empty_block);"
+    , "removed = select_oram_block(take_here, block, &removed)?;"
+    , "*block = select_oram_block(take_here, &stash.empty_block, block)?;"
+    , "pub(super) fn slot_for_key("
+    , "pub(super) fn access_leaf_for_key("
+    , "pub(super) fn apply_path_get_update("
+    , "pub(super) fn apply_path_put_update("
+    , "pub(super) fn apply_surrogate_put_update("
+    , "pub(super) fn allocate_slot("
+    , "pub(super) fn run_surrogate_get("
+    , "pub(super) fn run_surrogate_put("
+    , "pub(super) fn run_path_get("
+    , "slot_index: slot.to_witness(),"
+    , "prior_leaf: prior_leaf.to_witness(),"
+    , "next_leaf: next_leaf.to_witness(),"
+    , "pub(super) fn run_path_put("
+    , "slot_index: transition_slot.to_witness(),"
+    , "next_leaf: transition_next_leaf.to_witness(),"
+    , "pub(super) fn empty_map_entry(spec: &StateObject) -> Result<MapEntry> {"
+    , "pub(super) fn empty_oram_block(spec: &StateObject) -> Result<OramBlock> {"
+    , "key: Value::zero_for_type("
+    , "pub(super) fn fixed_stash_with_capacity(spec: &StateObject, capacity: usize) -> Result<FixedStash> {"
+    , "empty_block: clone_oram_block(&empty_block),"
+    , "blocks: repeat_boxed_oram_blocks(capacity, &empty_block)?,"
+    , "pub(super) fn clear_fixed_stash(stash: &mut FixedStash) {"
+    , "assign_oram_block(block, &stash.empty_block);"
+    , "pub(super) fn cold_commit_oram_state("
+    , "pub(super) fn path_position_map_witness_leaves("
+    , ") -> Result<Box<[RuntimeMaskedUsizeOptionWitness]>> {"
+    , "path_position_map_from_storage(spec, parameters, cipher, directory_pages)"
+    , "position_map_to_witness_boxed(&position_map)"
+    , "pub(super) fn position_map_to_witness_boxed("
+    , "leaves.push(leaf.to_witness())?;"
+    , "for leaf in position_map.iter_mut() {"
+    , "for entry in entries.iter_mut() {"
+    , "clear_fixed_stash(stash);"
+    , "pub(super) fn push_fixed_stash(stash: &mut FixedStash, block: OramBlock) -> Result<()> {"
+    , "pub(super) fn push_fixed_stash_with_limit("
+    , "let slot = select_stash_index_with_limit(stash, limit, |candidate| !candidate.occupied);"
+    , "stash.overflowed |= should_insert & !slot_present;"
+    , "push_fixed_stash_with_limit(stash, block, parameters.stash_bound)?;"
+    , "let insert_here = should_insert & slot_present & (index == slot_index);"
+    , "*candidate = select_oram_block(insert_here, &block, candidate)?;"
+    , "pub(super) fn install_path_entry_from_block_if_occupied("
+    , "select_map_entry(write_here, &candidate, entry)?;"
+    , "pub(super) fn oram_block_from_entry(entry: &MapEntry) -> OramBlock {"
+    , "pub(super) fn oram_bucket_with_live_blocks("
+    , "\"ORAM bucket {} for {} carries {} blocks beyond public budget {}\""
+    , "fixed_blocks.get_mut(slot).ok_or_else"
+    , "live block slot {} missing despite public block budget {}"
+    , "assign_oram_block(target, block);"
+    , "pub(super) fn oram_bucket_from_entries("
+    , "let live_entry_count = entries.iter().fold(0usize, |count, entry| {\n        count + usize::from(entry.is_occupied())\n    });"
+    , "let target_rank = consumed;"
+    , "let mut selected = clone_oram_block(&empty_block);"
+    , "let entry_block = oram_block_from_entry(entry);"
+    , "selected = select_oram_block(take_here, &entry_block, &selected)?;"
+    , "rank += usize::from(occupied);"
+    , "pub(super) fn build_path_bucket("
+    , "pub(super) fn oram_directory_page_count("
+    , "fn checked_end(start: usize, len: usize, context: &str) -> Result<usize> {"
+    , "fn read_exact_range<'a>("
+    , "fn copy_exact_into(out: &mut [u8], input: &[u8], context: &str) -> Result<()> {"
+    , "if out.len() != input.len() {"
+    , "\"ORAM codec exact copy length mismatch while {context}: {} != {}\""
+    , "for (target, byte) in out.iter_mut().zip(input.iter()) {"
+    , "*target = *byte;"
+    , "fn write_exact_range(out: &mut [u8], start: usize, bytes: &[u8], context: &str) -> Result<usize> {"
+    , "copy_exact_into(target, bytes, context)?;"
+    , "fn read_u64_be_at(bytes: &[u8], start: usize, context: &str) -> Result<u64> {"
+    , "let word_bytes = read_exact_range(bytes, start, 8, context)?;"
+    , "copy_exact_into(&mut word, word_bytes, context)?;"
+    , "fn write_u64_be_at(out: &mut [u8], start: usize, value: u64, context: &str) -> Result<usize> {"
+    , "pub(super) fn serialize_oram_block_into("
+    , "\"writing ORAM block tag\""
+    , "block.key.visit_canonical_chunks(&mut copy_chunk);"
+    , "pub(super) fn deserialize_oram_block(spec: &StateObject, bytes: &[u8]) -> Result<OramBlock> {"
+    , "read_exact_range(bytes, 0, 1, \"reading ORAM block tag\")?"
+    , "read_exact_range(bytes, key_start, key_len, \"reading ORAM block key\")?"
+    , "pub(super) fn encode_path_stash_page_into("
+    , "let target = out.get_mut(start..end).ok_or_else"
+    , "serialize_oram_block_into(block, spec, target)?;"
+    , "pub(super) fn encode_path_position_map_page_into("
+    , "\"writing Path-ORAM position-map page entry\""
+    , "pub(super) fn encode_path_metadata_pages("
+    , "directory_page_entries(position_map, page),"
+    , "directory_page_entries(stash, page),"
+    , "pages.get_mut(next_page).ok_or_else"
+    , "metadata page index {} missing despite public page-count guard for {}"
+    , "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;"
+    , "pub(super) fn rewrite_path_metadata_pages_in_place("
+    , "reseal_oram_payload_and_record_write("
+    , "pub(super) fn decode_path_metadata_pages("
+    , "pub(super) fn decode_path_metadata_pages_into("
+    , "let required_stash_capacity = working_stash_capacity(parameters)?;"
+    , "let block = deserialize_oram_block(spec, block_bytes)?;"
+    , "pub(super) fn load_path_buckets_into_stash("
+    , "pub(super) fn rewrite_path_for_access<F>("
+    , "let mut working_entries = std::mem::take(&mut state.entries);"
+    , "let mut working_position_map = std::mem::take(&mut state.position_map);"
+    , "let mut working_stash = std::mem::replace(&mut state.stash, FixedStash::placeholder());"
+    , "finish_oram_write_log(writes)"
+    , "decode_bucket_payload(spec, bucket_index, payload, |block| {"
+    , "pub(super) fn rebuild_path_buckets_from_stash("
+    , "let bucket = build_path_bucket(spec, parameters, bucket_index, stash)?;"
+    , "format!(\"{}@bucket{}\", spec.name, bucket_index),"
+    , "pub(super) fn refresh_path_state_from_storage("
+    , "let bucket = oram_bucket_from_entries(spec, entries, access_counter, index)?;"
+    , "let mut payload = oram_bucket_bytes(&bucket, spec)?;"
+    , "pub(super) fn reconstruct_path_entries_from_storage_into("
+    , "format!(\"{}@bucket{}\", spec.name, index),"
+    , "decode_bucket_payload(spec, index, payload, |block| {"
+    , "pub(super) fn path_position_map_from_storage("
+    , "let position_map =\n        decode_path_position_map_pages(spec, parameters, cipher, directory_pages, &mut allocator)?;"
+    , "pub(super) fn decode_path_position_map_pages("
+    , ".chunks_exact(ORAM_LEAF_LABEL_BYTES)"
+    , "position_map.get_mut(next_slot).ok_or_else"
+    , "position map slot {} missing despite public capacity guard for {}"
+    , "*target = MaskedUsizeOption::new(present, leaf);"
+    , ".enumerate()"
+    , "\"reading Path-ORAM position-map page entry\""
+    , "pub(super) fn serialize_oram_bucket_into("
+    , "\"writing ORAM bucket access counter\""
+    , "\"writing ORAM bucket live entry count\""
+    , "let target = out.get_mut(cursor..end).ok_or_else"
+    , "serialize_oram_block_into(block, spec, target)?;"
+    , "pub(super) fn oram_bucket_bytes(bucket: &OramBucket, spec: &StateObject) -> Result<Box<[u8]>> {"
+    , "let mut out = zeroed_boxed_bytes(parameters.bucket_size)?;"
+    , "pub(super) fn deserialize_oram_bucket(spec: &StateObject, bytes: &[u8]) -> Result<OramBucket> {"
+    , "read_u64_be_at(bytes, 0, \"reading ORAM bucket access counter\")?"
+    , "\"reading ORAM bucket live entry count\""
+    , "let block_payload = read_exact_range("
+    , "block_payload.chunks_exact(block_size)"
+    , "ORAM bucket decode slot {} missing despite exact public block count for {}"
+    , "*target = deserialize_oram_block(spec, block)?;"
+    , "pub(super) fn decode_bucket_payload<F>("
+    , "\"reading decoded ORAM bucket payload blocks\""
+    , "block_payload.chunks_exact(parameters.block_size)"
+    , "let block = deserialize_oram_block(spec, block)?;"
+    ] &&
+  checkSourceLacksAll iface.oramProductionSource
+    [ "fn working_stash_capacity("
+    , "fn repeat_boxed<"
+    , "fn zeroed_boxed_bytes("
+    , "fn oram_write_log_capacity("
+    , "fn oram_meta_aad("
+    , "fn oram_bucket_aad("
+    , "fn oram_counter_aad("
+    , "fn directory_page_entries<T>("
+    , "fn path_bucket_indices("
+    , "fn for_each_surrogate_bucket_window<"
+    , "fn for_each_bucket_on_leaf_path_root_to_leaf<"
+    , "fn for_each_bucket_on_leaf_path_leaf_to_root<"
+    , "fn bucket_on_leaf_path("
+    , "fn validate_live_path_block("
+    , "fn masked_select_usize("
+    , "fn masked_select_option_usize("
+    , "fn masked_select_transition_kind("
+    , "fn select_position_map_leaf("
+    , "fn select_entry_value_for_slot("
+    , "fn select_stash_index("
+    , "fn take_selected_stash_block("
+    , "fn slot_for_key("
+    , "fn allocate_slot("
+    , "fn wipe_secrets(&mut self) {"
+    , "impl Drop for OramState {"
+    , "fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {"
+    , "#[derive(Clone, Debug, Default)]\npub(crate) enum PathOramLeafCoinSource {"
+    , "impl Drop for PathOramLeafCoinSource {"
+    , "impl PathOramLeafCoinSource {"
+    , "fn load_path_buckets_into_stash("
+    , "fn path_position_map_from_storage("
+    , "fn rebuild_path_buckets_from_stash("
+    , "fn reconstruct_path_entries_from_storage_into("
+    , "self.entries.iter().all(|entry| !entry.is_occupied())"
+    , "self.position_map.iter().all(Option::is_none)"
+    , "self.stash.is_empty()"
+    , "pub(crate) fn is_cold(&self) -> bool"
+    , "oram_state_is_cold(&self.entries, &self.position_map, &self.stash)"
+    , "oram_state_is_cold,"
+    , "let leaves = if self.is_cold() {"
+    , "self.position_map.clone()"
+    , "parameters: self.parameters.clone()"
+    , "empty_entry: self.empty_entry.clone()"
+    , "entries: repeat_boxed(self.parameters.capacity, self.empty_entry.clone())?"
+    , "storage: self.storage.clone()"
+    , "for leaf in &mut self.position_map {"
+    , "for entry in &mut self.entries {"
+    , "fn access_leaf_for_key("
+    , "fn apply_path_get_update("
+    , "fn apply_path_put_update("
+    , "fn apply_surrogate_put_update("
+    , "fn surrogate_access_transcript(&self, spec: &StateObject) -> OramTranscript {"
+    , "fn path_access_transcript(&self, spec: &StateObject, leaf: usize) -> OramTranscript {"
+    , "fn rewrite_path_for_access<F>("
+    , "fn build_path_bucket("
+    , "fn oram_directory_page_count("
+    , "fn encode_path_position_map_page_into("
+    , "fn encode_path_metadata_pages("
+    , "fn rewrite_path_metadata_pages_in_place("
+    , "fn decode_path_metadata_pages("
+    , "fn decode_path_metadata_pages_into("
+    , "fn decode_path_position_map_pages("
+    , "fn decode_path_position_map_pages_into("
+    , "fn decode_bucket_payload("
+    , "fn encode_path_stash_page_into("
+    , "fn refresh_path_state_from_storage("
+    , "clone_from(&old.storage.directory_pages)"
+    , "self.storage.buckets.clone_from(&old.storage.buckets)"
+    , "clone_from(&old.storage.access_counter_slot)"
+    , "out[0] = u8::from(self.occupied);"
+    , "block.key.visit_canonical_chunks(&mut copy_chunk);"
+    , "pub(crate) fn empty_map_entry(spec: &StateObject) -> Result<MapEntry> {"
+    , "fn empty(spec: &StateObject) -> Result<Self> {"
+    , "fn serialize_into_slice(&self, spec: &StateObject, out: &mut [u8]) -> Result<()> {"
+    , "fn deserialize(spec: &StateObject, bytes: &[u8]) -> Result<Self> {"
+    , "let block = OramBlock::deserialize(spec, block_bytes)?;"
+    , "let mut bucket_index = [0u8; 8];"
+    , "let mut access_counter = [0u8; 8];"
+    , "let mut fixed_blocks = repeat_boxed(parameters.blocks_per_bucket, empty_block)?;"
+    , "blocks: repeat_boxed(capacity, empty_block)?,"
+    , "*block = self.empty_block.clone();"
+    , "let slot = select_stash_index(self, |candidate| !candidate.occupied)"
+    , "oram_bucket_with_live_blocks(spec, access_counter, bucket_index, live_entry_count, blocks)"
+    , "oram_bucket_from_entries(spec, entries, access_counter, bucket_index)"
+    , "serialize_oram_block_into(self, spec, out)"
+    , "deserialize_oram_block(spec, bytes)"
+    , "oram_bucket_bytes(self, spec)"
+    , "serialize_oram_bucket_into(self, spec, out)"
+    , "deserialize_oram_bucket(spec, bytes)"
+    , "fixed_blocks[slot] = OramBlock::deserialize(spec, block)?;"
+    , "fixed_blocks[slot] = OramBlock::from_entry(entry);"
+    , "entries.split_at(start)"
+    , "&tail[..take]"
+    , "pub(crate) struct OramBlock {"
+    , "pub(crate) struct OramBucket {"
+    ] &&
+  checkSourceLacksAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn oram_state_is_cold("
+    , "entries.iter().all(|entry| !entry.is_occupied())"
+    , "position_map.iter().all(Option::is_none)"
+    , "stash.is_empty()"
+    , "if oram_state_is_cold(entries, position_map, stash) {"
+    , "Ok(position_map.to_vec().into_boxed_slice())"
+    , "position_map: Box::<[Option<usize>]>::default(),"
+    , "let selected_present = masked_select_bool(cond, when_true.is_some(), when_false.is_some());"
+    , "if selected_present {"
+    , "slot.to_option()"
+    , "transition_slot.to_option()"
+    , "position_map_to_option_boxed("
+    , "Result<Box<[Option<usize>]>>"
+    , "fn visit<F>(node: usize, f: &mut F)"
+    , "visit(node, &mut f);"
+    , "path.reverse();"
+    , ".filter(|entry| entry.is_occupied())"
+    , "fixed_blocks[slot] = oram_block_from_entry(entry);"
+    , "&mut entries[next_entry_index..]"
+    , "assign_oram_block(&mut fixed_blocks[slot], block);"
+    , "position_map[next_slot]"
+    , "fixed_blocks[slot] = deserialize_oram_block(spec, block)?;"
+    , "if block.occupied"
+    , "let mut counter = [0u8; 8];"
+    , "counter.copy_from_slice(counter_bytes);"
+    , "u64::from_be_bytes(counter)"
+    , "let mut encoded = [0u8; ORAM_LEAF_LABEL_BYTES];"
+    , "encoded.copy_from_slice(slot);"
+    , "u64::from_be_bytes(encoded)"
+    , "target.copy_from_slice(bytes);"
+    , "word.copy_from_slice(read_exact_range(bytes, start, 8, context)?);"
+    , "impl Clone for OramState {"
+    , "entries: self.entries.clone(),"
+    , "position_map: self.position_map.clone(),"
+    , "stash: self.stash.clone(),"
+    , "#[derive(Clone, Debug, PartialEq, Eq)]\npub(crate) struct MapEntry {"
+    , "#[derive(Clone, Debug, PartialEq, Eq)]\npub(crate) struct OramBlock {"
+    , "#[derive(Clone, Debug, PartialEq, Eq)]\npub(crate) struct OramBucket {"
+    , "#[derive(Clone, Debug)]\npub(super) struct FixedStash {"
+    , "pub(super) fn repeat_boxed<T: Clone>(len: usize, value: T) -> Result<Box<[T]>> {"
+    , "#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\npub(crate) struct MaskedUsizeOption {"
+    , "entries: repeat_boxed(state.parameters.capacity, state.empty_entry.clone())?,"
+    , "position_map: repeat_boxed(state.parameters.capacity, MaskedUsizeOption::none())?,"
+    , "storage: state.storage.clone(),"
+    , "cipher: state.cipher.clone(),"
+    , "pub(crate) fn to_witness(self) -> RuntimeMaskedUsizeOptionWitness {"
+    , "pub(crate) fn select(cond: bool, when_true: Self, when_false: Self) -> Self {"
+    , "MaskedUsizeOption::select(cond, when_true, when_false)"
+    , "when_true: MaskedUsizeOption,"
+    , "when_false: MaskedUsizeOption,"
+    , "MapEntry::select(write_here, candidate.clone(), entry.clone())?;"
+    , "OramBlock::select("
+    , "block.clone()"
+    , "empty_block.clone()"
+    , "candidate.clone()"
+    , "blocks.iter().cloned()"
+    , "blocks: repeat_boxed(capacity, empty_block)?,"
+    , "repeat_boxed(parameters.blocks_per_bucket, empty_block.clone())?"
+    , "repeat_boxed(parameters.blocks_per_bucket, empty_block)?"
+    , "let mut position_map = repeat_boxed(parameters.capacity, MaskedUsizeOption::none())?;"
+    , "let mut live_slots = repeat_boxed(parameters.capacity, MaskedUsizeOption::none())?;"
+    , "let mut pages = repeat_boxed(parameters.metadata_pages, Box::<[u8]>::default())?;"
+    , "pages[next_page]"
+    , "*leaf = masked_select_option_usize(update_here, next_leaf, *leaf);"
+    , "*leaf = masked_select_option_usize(insert_here, next_leaf, cleared_leaf);"
+    , "out[0] = u8::from(block.occupied);"
+    , "bytes[0]"
+    , "&bytes[1..9]"
+    , "&bytes[9..17]"
+    , "&bytes[key_start..key_start + key_len]"
+    , "out[cursor..end].copy_from_slice(chunk);"
+    , "serialize_oram_block_into(block, spec, &mut out[start..end])?;"
+    , "out[cursor..end].copy_from_slice(&encoded.to_be_bytes());"
+    , "out[0..8].copy_from_slice"
+    , "out[8..16].copy_from_slice"
+    , "out[16..24].copy_from_slice"
+    , "bytes[24..]"
+    , "bytes[8..16]"
+    , "bytes[16..24]"
+    , "serialize_oram_block_into(block, spec, &mut out[cursor..end])?;"
+    ]
+
+set_option maxRecDepth 10000 in
+@[simp] theorem runtimeImplementationInterface_checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs = true ↔
+    iface.runtimeOramUsesLeanGeneratedBlockBucketCodecs := by
+  unfold RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs
+    RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit = true ↔
+    iface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit := by
+  unfold RuntimeImplementationInterface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+    RuntimeImplementationInterface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeOramOpenUsesSharedDecodeShell_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeOramOpenUsesSharedDecodeShell = true ↔
+    iface.runtimeOramOpenUsesSharedDecodeShell := by
+  unfold RuntimeImplementationInterface.checkRuntimeOramOpenUsesSharedDecodeShell
+    RuntimeImplementationInterface.runtimeOramOpenUsesSharedDecodeShell
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeOramBootstrapUsesSharedBoxedSealHelper_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeOramBootstrapUsesSharedBoxedSealHelper = true ↔
+    iface.runtimeOramBootstrapUsesSharedBoxedSealHelper := by
+  unfold RuntimeImplementationInterface.checkRuntimeOramBootstrapUsesSharedBoxedSealHelper
+    RuntimeImplementationInterface.runtimeOramBootstrapUsesSharedBoxedSealHelper
+  simp [and_assoc]
+
+@[simp] theorem runtimeImplementationInterface_checkRuntimeOramBootstrapUsesSharedBoxedFillerHelper_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeOramBootstrapUsesSharedBoxedFillerHelper = true ↔
+    iface.runtimeOramBootstrapUsesSharedBoxedFillerHelper := by
+  unfold RuntimeImplementationInterface.checkRuntimeOramBootstrapUsesSharedBoxedFillerHelper
+    RuntimeImplementationInterface.runtimeOramBootstrapUsesSharedBoxedFillerHelper
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.pathOramSelectionUsesMaskedFullScans
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] ∧
+    sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn run_path_get("
+    , "pub(super) fn run_path_put("
+    , "pub(super) fn masked_select_usize(cond: bool, when_true: usize, when_false: usize) -> usize {"
+    , "pub(super) fn slot_for_key(entries: &[MapEntry], key: &Value) -> MaskedUsizeOption {"
+    , "let mut selected = 0usize;"
+    , "let mut present = false;"
+    , "for (index, entry) in entries.iter().enumerate() {"
+    , "let is_match = entry.matches_key(key);"
+    , "selected = masked_select_usize(match_here, index, selected);"
+    , "pub(super) fn allocate_slot(entries: &[MapEntry]) -> MaskedUsizeOption {"
+    , "let is_vacant = !entry.is_occupied();"
+    ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "fn masked_select_usize("
+      , "fn slot_for_key("
+      , "fn allocate_slot("
+      , "slot_for_key(&self.entries, key)"
+      , "slot_for_key(&self.entries, &key)"
+      , "allocate_slot(&self.entries)"
+      ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "entries.iter().position(|entry| entry.matches_key(key))"
+      , "entries.iter().position(|entry| !entry.is_occupied())"
+      , ".iter().find(|entry| entry.matches_key(key))"
+      , ".iter_mut().find(|entry| entry.matches_key(&key))"
+      , ".iter_mut().find(|entry| !entry.is_occupied())"
+      ]
+
+def RuntimeImplementationInterface.checkPathOramSelectionUsesMaskedFullScans
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] &&
+    checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn run_path_get("
+    , "pub(super) fn run_path_put("
+    , "pub(super) fn masked_select_usize(cond: bool, when_true: usize, when_false: usize) -> usize {"
+    , "pub(super) fn slot_for_key(entries: &[MapEntry], key: &Value) -> MaskedUsizeOption {"
+    , "let mut selected = 0usize;"
+    , "let mut present = false;"
+    , "for (index, entry) in entries.iter().enumerate() {"
+    , "let is_match = entry.matches_key(key);"
+    , "selected = masked_select_usize(match_here, index, selected);"
+    , "pub(super) fn allocate_slot(entries: &[MapEntry]) -> MaskedUsizeOption {"
+    , "let is_vacant = !entry.is_occupied();"
+    ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "fn masked_select_usize("
+      , "fn slot_for_key("
+      , "fn allocate_slot("
+      , "slot_for_key(&self.entries, key)"
+      , "slot_for_key(&self.entries, &key)"
+      , "allocate_slot(&self.entries)"
+      ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "entries.iter().position(|entry| entry.matches_key(key))"
+      , "entries.iter().position(|entry| !entry.is_occupied())"
+      , ".iter().find(|entry| entry.matches_key(key))"
+      , ".iter_mut().find(|entry| entry.matches_key(&key))"
+      , ".iter_mut().find(|entry| !entry.is_occupied())"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkPathOramSelectionUsesMaskedFullScans_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPathOramSelectionUsesMaskedFullScans = true ↔
+    iface.pathOramSelectionUsesMaskedFullScans := by
+  unfold RuntimeImplementationInterface.checkPathOramSelectionUsesMaskedFullScans
+    RuntimeImplementationInterface.pathOramSelectionUsesMaskedFullScans
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.surrogateOramPutUsesMaskedFullScanStateUpdates
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "run_surrogate_put(self, spec, key, value, apply)"
+    ] ∧
+    sourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn run_surrogate_put("
+      , ") -> Result<(OramTranscript, bool)> {"
+      , "let transcript = surrogate_access_transcript(state, spec)?;"
+      , "let slot = slot_for_key(&state.entries, &key);"
+      , "let vacant_slot = allocate_slot(&state.entries);"
+      , "let no_insert_slot = MaskedUsizeOption::none();"
+      , "let insert_slot = masked_select_option_usize(request_insert, &vacant_slot, &no_insert_slot);"
+      , "let capacity_overflowed ="
+      , "apply_surrogate_put_update("
+      , "spec,"
+      , "&mut state.entries,"
+      , "&key,"
+      , "&value,"
+      , "apply,"
+      , "&slot,"
+      , "&insert_slot,"
+      , ")?;"
+      , "Ok((transcript, capacity_overflowed))"
+      , "pub(super) fn apply_surrogate_put_update("
+      , ") -> Result<bool> {"
+      , "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "for (index, entry) in entries.iter_mut().enumerate() {"
+      , "let selected_key = Value::confidential_select(insert_here, key.clone(), prior_key)?;"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      , "let capacity_overflowed = request_insert & !insert_slot_present;"
+      , "Ok(capacity_overflowed)"
+      ] ∧
+    sourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "if request_insert && !insert_slot_present {"
+      , "bail!(\"map {} exceeded public capacity\", spec.name);"
+      ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "let transcript = surrogate_access_transcript(self, spec);"
+      , "let slot = slot_for_key(&self.entries, &key);"
+      , "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "masked_select_option_usize(request_insert, allocate_slot(&self.entries), None);"
+      , "apply_surrogate_put_update(spec, &mut self.entries, &key, &value, apply, slot, insert_slot)?;"
+      , "for (index, entry) in self.entries.iter_mut().enumerate() {"
+      , "let selected_key = Value::confidential_select(insert_here, key.clone(), prior_key)?;"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      ]
+
+def RuntimeImplementationInterface.checkSurrogateOramPutUsesMaskedFullScanStateUpdates
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "run_surrogate_put(self, spec, key, value, apply)"
+    ] &&
+    checkSourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn run_surrogate_put("
+      , ") -> Result<(OramTranscript, bool)> {"
+      , "let transcript = surrogate_access_transcript(state, spec)?;"
+      , "let slot = slot_for_key(&state.entries, &key);"
+      , "let vacant_slot = allocate_slot(&state.entries);"
+      , "let no_insert_slot = MaskedUsizeOption::none();"
+      , "let insert_slot = masked_select_option_usize(request_insert, &vacant_slot, &no_insert_slot);"
+      , "let capacity_overflowed ="
+      , "apply_surrogate_put_update("
+      , "spec,"
+      , "&mut state.entries,"
+      , "&key,"
+      , "&value,"
+      , "apply,"
+      , "&slot,"
+      , "&insert_slot,"
+      , ")?;"
+      , "Ok((transcript, capacity_overflowed))"
+      , "pub(super) fn apply_surrogate_put_update("
+      , ") -> Result<bool> {"
+      , "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "for (index, entry) in entries.iter_mut().enumerate() {"
+      , "let selected_key = Value::confidential_select(insert_here, key.clone(), prior_key)?;"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      , "let capacity_overflowed = request_insert & !insert_slot_present;"
+      , "Ok(capacity_overflowed)"
+      ] &&
+    checkSourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "if request_insert && !insert_slot_present {"
+      , "bail!(\"map {} exceeded public capacity\", spec.name);"
+      ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "let transcript = surrogate_access_transcript(self, spec);"
+      , "let slot = slot_for_key(&self.entries, &key);"
+      , "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "masked_select_option_usize(request_insert, allocate_slot(&self.entries), None);"
+      , "apply_surrogate_put_update(spec, &mut self.entries, &key, &value, apply, slot, insert_slot)?;"
+      , "for (index, entry) in self.entries.iter_mut().enumerate() {"
+      , "let selected_key = Value::confidential_select(insert_here, key.clone(), prior_key)?;"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkSurrogateOramPutUsesMaskedFullScanStateUpdates_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSurrogateOramPutUsesMaskedFullScanStateUpdates = true ↔
+    iface.surrogateOramPutUsesMaskedFullScanStateUpdates := by
+  unfold RuntimeImplementationInterface.checkSurrogateOramPutUsesMaskedFullScanStateUpdates
+    RuntimeImplementationInterface.surrogateOramPutUsesMaskedFullScanStateUpdates
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.pathOramGetUsesMaskedLookupAndTransitionSelection
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    ] ∧
+  sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn run_path_get("
+    , ") -> Result<(Value, OramTranscript, bool)> {"
+    , "let access_leaf = access_leaf_for_key(&state.entries, &state.position_map, key, fresh_leaf);"
+    , "let prior_leaf = select_position_map_leaf(&state.position_map, &slot);"
+    , "let next_leaf = masked_select_option_usize("
+    , "slot_present"
+    , "&fresh_leaf_option"
+    , "&no_next_leaf"
+    , "let return_value = select_entry_value_for_slot(&state.entries, &slot, &spec.value_type)?;"
+    , "let (writes, update_failed) = rewrite_path_for_access("
+    , "apply_path_get_update(position_map, stash, &slot, &next_leaf);"
+    , "kind: masked_select_transition_kind("
+    , "RuntimePathOramTransitionKind::ReadHit,"
+    , "RuntimePathOramTransitionKind::ReadMiss,"
+    , "Ok((return_value, transcript, update_failed))"
+    , "let mut update_failed = working_stash.overflowed();"
+    , "let effect_failed = update("
+    , "update_failed |= effect_failed;"
+    , "update_failed |= working_stash.len() > state.parameters.stash_bound;"
+    , "pub(super) fn access_leaf_for_key("
+    , "let slot = slot_for_key(entries, key);"
+    , "let prior_leaf = select_position_map_leaf(position_map, &slot);"
+    , "masked_select_usize(prior_leaf.is_some(), prior_leaf.unwrap_or(0), fresh_leaf)"
+    , "pub(super) fn apply_path_get_update("
+    , "let slot_present = slot.is_some();"
+    , "let next_leaf_present = next_leaf.is_some();"
+    , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+    , "let selected_leaf = masked_select_option_usize(update_here, next_leaf, leaf);"
+    , "assign_masked_usize_option(leaf, &selected_leaf);"
+    , "for block in stash.blocks.iter_mut() {"
+    , "block.leaf = masked_select_usize(update_here, next_leaf_value, block.leaf);"
+    ] ∧
+  sourceLacksAll iface.generatedOramCodecsProductionSource
+    [ "path ORAM working stash for {} exceeded public capacity"
+    , "stash bound exceeded for {} under path ORAM candidate"
+    , "bail!(\"stash bound exceeded for {}\", spec.name);"
+    , "update_failed |= working_stash.len() > state.parameters.stash_bound + state.parameters.buckets_per_access;"
+    ] ∧
+  sourceLacksAll iface.oramProductionSource
+    [ "let access_leaf = access_leaf_for_key(&self.entries, &self.position_map, key, fresh_leaf);"
+    , "let prior_leaf = select_position_map_leaf(&self.position_map, slot);"
+    , "let return_value = select_entry_value_for_slot(&self.entries, slot, &spec.value_type)?;"
+    , "apply_path_get_update(position_map, stash, slot, next_leaf);"
+    , "kind: masked_select_transition_kind("
+    , "RuntimePathOramTransitionKind::ReadHit,"
+    , "RuntimePathOramTransitionKind::ReadMiss,"
+    , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+    , "*leaf = masked_select_option_usize(update_here, next_leaf, *leaf);"
+    , "for block in stash.blocks.iter_mut() {"
+    , "block.leaf = masked_select_usize(update_here, next_leaf_value, block.leaf);"
+    ]
+
+def RuntimeImplementationInterface.checkPathOramGetUsesMaskedLookupAndTransitionSelection
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    ] &&
+  checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn run_path_get("
+    , ") -> Result<(Value, OramTranscript, bool)> {"
+    , "let access_leaf = access_leaf_for_key(&state.entries, &state.position_map, key, fresh_leaf);"
+    , "let prior_leaf = select_position_map_leaf(&state.position_map, &slot);"
+    , "let next_leaf = masked_select_option_usize("
+    , "slot_present"
+    , "&fresh_leaf_option"
+    , "&no_next_leaf"
+    , "let return_value = select_entry_value_for_slot(&state.entries, &slot, &spec.value_type)?;"
+    , "let (writes, update_failed) = rewrite_path_for_access("
+    , "apply_path_get_update(position_map, stash, &slot, &next_leaf);"
+    , "kind: masked_select_transition_kind("
+    , "RuntimePathOramTransitionKind::ReadHit,"
+    , "RuntimePathOramTransitionKind::ReadMiss,"
+    , "Ok((return_value, transcript, update_failed))"
+    , "let mut update_failed = working_stash.overflowed();"
+    , "let effect_failed = update("
+    , "update_failed |= effect_failed;"
+    , "update_failed |= working_stash.len() > state.parameters.stash_bound;"
+    , "pub(super) fn access_leaf_for_key("
+    , "let slot = slot_for_key(entries, key);"
+    , "let prior_leaf = select_position_map_leaf(position_map, &slot);"
+    , "masked_select_usize(prior_leaf.is_some(), prior_leaf.unwrap_or(0), fresh_leaf)"
+    , "pub(super) fn apply_path_get_update("
+    , "let slot_present = slot.is_some();"
+    , "let next_leaf_present = next_leaf.is_some();"
+    , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+    , "let selected_leaf = masked_select_option_usize(update_here, next_leaf, leaf);"
+    , "assign_masked_usize_option(leaf, &selected_leaf);"
+    , "for block in stash.blocks.iter_mut() {"
+    , "block.leaf = masked_select_usize(update_here, next_leaf_value, block.leaf);"
+    ] &&
+  checkSourceLacksAll iface.generatedOramCodecsProductionSource
+    [ "path ORAM working stash for {} exceeded public capacity"
+    , "stash bound exceeded for {} under path ORAM candidate"
+    , "bail!(\"stash bound exceeded for {}\", spec.name);"
+    , "update_failed |= working_stash.len() > state.parameters.stash_bound + state.parameters.buckets_per_access;"
+    ] &&
+  checkSourceLacksAll iface.oramProductionSource
+    [ "let access_leaf = access_leaf_for_key(&self.entries, &self.position_map, key, fresh_leaf);"
+      , "let prior_leaf = select_position_map_leaf(&self.position_map, slot);"
+      , "let return_value = select_entry_value_for_slot(&self.entries, slot, &spec.value_type)?;"
+      , "apply_path_get_update(position_map, stash, slot, next_leaf);"
+      , "kind: masked_select_transition_kind("
+      , "RuntimePathOramTransitionKind::ReadHit,"
+      , "RuntimePathOramTransitionKind::ReadMiss,"
+      , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+      , "*leaf = masked_select_option_usize(update_here, next_leaf, *leaf);"
+      , "for block in stash.blocks.iter_mut() {"
+      , "block.leaf = masked_select_usize(update_here, next_leaf_value, block.leaf);"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkPathOramGetUsesMaskedLookupAndTransitionSelection_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPathOramGetUsesMaskedLookupAndTransitionSelection = true ↔
+    iface.pathOramGetUsesMaskedLookupAndTransitionSelection := by
+  unfold RuntimeImplementationInterface.checkPathOramGetUsesMaskedLookupAndTransitionSelection
+    RuntimeImplementationInterface.pathOramGetUsesMaskedLookupAndTransitionSelection
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.pathOramPutUsesMaskedFullScanStateUpdates
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] ∧
+    sourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn run_path_put("
+      , ") -> Result<(OramTranscript, bool)> {"
+      , "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "let vacant_slot = allocate_slot(&state.entries);"
+      , "let no_insert_slot = MaskedUsizeOption::none();"
+      , "let insert_slot = masked_select_option_usize(request_insert, &vacant_slot, &no_insert_slot);"
+      , "let update_existing = apply & slot_present & !value_is_zero;"
+      , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
+      , "let transition_slot = masked_select_option_usize(insert_new, &insert_slot, &slot);"
+      , "let (writes, update_failed) = rewrite_path_for_access("
+      , "apply_path_put_update("
+      , "pub(super) fn apply_path_put_update("
+      , ") -> Result<bool> {"
+      , "let value_is_zero = value.confidential_is_zero_like();"
+      , "let update_existing = apply & slot_present & !value_is_zero;"
+      , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
+      , "for (index, entry) in entries.iter_mut().enumerate() {"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+      , "let selected_leaf = masked_select_option_usize(update_here, next_leaf, leaf);"
+      , "let updated_leaf = masked_select_option_usize(insert_here, next_leaf, &cleared_leaf);"
+      , "assign_masked_usize_option(leaf, &updated_leaf);"
+      , "for block in stash.blocks.iter_mut() {"
+      , "block.overwrite("
+      , "stash.len = stash"
+      , ".fold(0usize, |acc, block| acc + usize::from(block.occupied));"
+      , "let update_failed = ((update_existing | delete_existing) & !matched_slot)"
+      , "| (insert_new & !inserted_slot)"
+      , "| (insert_new & (insert_slot_index >= entries.len()));"
+      , "Ok(update_failed)"
+      , "pub(super) fn apply_surrogate_put_update("
+      , "let capacity_overflowed = request_insert & !insert_slot_present;"
+      , "Ok(capacity_overflowed)"
+      , "Ok((transcript, update_failed))"
+      ] ∧
+    sourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "if (update_existing | delete_existing) && !matched_slot {"
+      , "bail!(\"missing ORAM block for slot {}\", slot_index);"
+      , "if insert_new && !inserted_slot {"
+      , "bail!(\"path ORAM stash for {} exceeded public capacity\", spec.name);"
+      , "if insert_new && insert_slot_index >= entries.len() {"
+      , "bail!(\"map {} exceeded public capacity\", spec.name);"
+      , "if request_insert && !insert_slot_present {"
+      ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "let vacant_slot = allocate_slot(&self.entries);"
+      , "let insert_slot = masked_select_option_usize(request_insert, vacant_slot, MaskedUsizeOption::none());"
+      , "let update_existing = apply & slot_present & !value_is_zero;"
+      , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
+      , "let transition_slot = masked_select_option_usize(insert_new, insert_slot, slot);"
+      , "apply_path_put_update("
+      , "entries[slot_index] ="
+      , "position_map[slot_index] ="
+      , "find_stash_block_mut(stash, slot_index)"
+      , "remove_stash_block(stash, slot_index)"
+      , "for (index, entry) in entries.iter_mut().enumerate() {"
+      , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+      , "*leaf = masked_select_option_usize(insert_here, next_leaf, cleared_leaf);"
+      , "for block in stash.blocks.iter_mut() {"
+      , "let insert_here = insert_new & !inserted_slot & !was_occupied;"
+      , "block.overwrite("
+      , "matched_slot |= slot_match;"
+      , "if insert_new && !inserted_slot {"
+      , "stash.len = stash"
+      , ".fold(0usize, |acc, block| acc + usize::from(block.occupied));"
+      ]
+
+def RuntimeImplementationInterface.checkPathOramPutUsesMaskedFullScanStateUpdates
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] &&
+    checkSourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn run_path_put("
+      , ") -> Result<(OramTranscript, bool)> {"
+      , "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "let vacant_slot = allocate_slot(&state.entries);"
+      , "let no_insert_slot = MaskedUsizeOption::none();"
+      , "let insert_slot = masked_select_option_usize(request_insert, &vacant_slot, &no_insert_slot);"
+      , "let update_existing = apply & slot_present & !value_is_zero;"
+      , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
+      , "let transition_slot = masked_select_option_usize(insert_new, &insert_slot, &slot);"
+      , "let (writes, update_failed) = rewrite_path_for_access("
+      , "apply_path_put_update("
+      , "pub(super) fn apply_path_put_update("
+      , ") -> Result<bool> {"
+      , "let value_is_zero = value.confidential_is_zero_like();"
+      , "let update_existing = apply & slot_present & !value_is_zero;"
+      , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
+      , "for (index, entry) in entries.iter_mut().enumerate() {"
+      , "entry.overwrite(next_occupied, next_key, next_value);"
+      , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+      , "let selected_leaf = masked_select_option_usize(update_here, next_leaf, leaf);"
+      , "let updated_leaf = masked_select_option_usize(insert_here, next_leaf, &cleared_leaf);"
+      , "assign_masked_usize_option(leaf, &updated_leaf);"
+      , "for block in stash.blocks.iter_mut() {"
+      , "block.overwrite("
+      , "stash.len = stash"
+      , ".fold(0usize, |acc, block| acc + usize::from(block.occupied));"
+      , "let update_failed = ((update_existing | delete_existing) & !matched_slot)"
+      , "| (insert_new & !inserted_slot)"
+      , "| (insert_new & (insert_slot_index >= entries.len()));"
+      , "Ok(update_failed)"
+      , "pub(super) fn apply_surrogate_put_update("
+      , "let capacity_overflowed = request_insert & !insert_slot_present;"
+      , "Ok(capacity_overflowed)"
+      , "Ok((transcript, update_failed))"
+      ] &&
+    checkSourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "if (update_existing | delete_existing) && !matched_slot {"
+      , "bail!(\"missing ORAM block for slot {}\", slot_index);"
+      , "if insert_new && !inserted_slot {"
+      , "bail!(\"path ORAM stash for {} exceeded public capacity\", spec.name);"
+      , "if insert_new && insert_slot_index >= entries.len() {"
+      , "bail!(\"map {} exceeded public capacity\", spec.name);"
+      , "if request_insert && !insert_slot_present {"
+      ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "let request_insert = apply & !slot_present & !value_is_zero;"
+      , "let vacant_slot = allocate_slot(&self.entries);"
+      , "let insert_slot = masked_select_option_usize(request_insert, vacant_slot, MaskedUsizeOption::none());"
+      , "let update_existing = apply & slot_present & !value_is_zero;"
+      , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
+      , "let transition_slot = masked_select_option_usize(insert_new, insert_slot, slot);"
+      , "apply_path_put_update("
+      , "entries[slot_index] ="
+      , "position_map[slot_index] ="
+      , "find_stash_block_mut(stash, slot_index)"
+      , "remove_stash_block(stash, slot_index)"
+      , "for (index, entry) in entries.iter_mut().enumerate() {"
+      , "for (index, leaf) in position_map.iter_mut().enumerate() {"
+      , "*leaf = masked_select_option_usize(insert_here, next_leaf, cleared_leaf);"
+      , "for block in stash.blocks.iter_mut() {"
+      , "let insert_here = insert_new & !inserted_slot & !was_occupied;"
+      , "block.overwrite("
+      , "matched_slot |= slot_match;"
+      , "if insert_new && !inserted_slot {"
+      , "stash.len = stash"
+      , ".fold(0usize, |acc, block| acc + usize::from(block.occupied));"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkPathOramPutUsesMaskedFullScanStateUpdates_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPathOramPutUsesMaskedFullScanStateUpdates = true ↔
+    iface.pathOramPutUsesMaskedFullScanStateUpdates := by
+  unfold RuntimeImplementationInterface.checkPathOramPutUsesMaskedFullScanStateUpdates
+    RuntimeImplementationInterface.pathOramPutUsesMaskedFullScanStateUpdates
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.pathOramStashRebuildUsesFixedCapacitySelection
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "FixedStash::with_capacity(spec, working_stash_capacity("
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] ∧
+    sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) struct FixedStash {"
+    , "pub(super) fn with_capacity(spec: &StateObject, capacity: usize) -> Result<Self> {"
+    , "pub(super) fn clear(&mut self) {"
+    , "pub(super) fn fixed_stash_with_capacity(spec: &StateObject, capacity: usize) -> Result<FixedStash> {"
+    , "pub(super) fn clear_fixed_stash(stash: &mut FixedStash) {"
+    , "pub(super) fn push_fixed_stash(stash: &mut FixedStash, block: OramBlock) -> Result<()> {"
+    , "pub(super) fn push_fixed_stash_with_limit("
+    , "let slot = select_stash_index_with_limit(stash, limit, |candidate| !candidate.occupied);"
+    , "stash.overflowed |= should_insert & !slot_present;"
+    , "push_fixed_stash_with_limit(stash, block, parameters.stash_bound)?;"
+    , "pub(super) fn select_stash_index("
+    , "for (index, block) in stash.blocks.iter().enumerate() {"
+    , "pub(super) fn take_selected_stash_block("
+    , "for (index, block) in stash.blocks.iter_mut().enumerate() {"
+    , "removed = select_oram_block(take_here, block, &removed)?;"
+    , "*block = select_oram_block(take_here, &stash.empty_block, block)?;"
+    , "pub(super) fn build_path_bucket("
+    , "for slot in fixed_blocks.iter_mut() {"
+    , "let candidate_index = select_stash_index(stash, |block| {"
+    , "*slot = take_selected_stash_block(stash, candidate_index.unwrap_or(0), present)?;"
+    , "pub(super) fn rewrite_path_for_access<F>("
+    , "rebuild_path_buckets_from_stash("
+    ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "fn select_stash_index("
+      , "blocks: repeat_boxed(capacity, empty_block)?,"
+      , "*block = self.empty_block.clone();"
+      , "let slot = select_stash_index(self, |candidate| !candidate.occupied)"
+      , "fn take_selected_stash_block("
+      , "fn build_path_bucket("
+      , "rewrite_path_for_access("
+      ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "stash.position(|block| {"
+      , "stash.swap_remove(candidate_index)"
+      , "fn remove_stash_block("
+      ]
+
+def RuntimeImplementationInterface.checkPathOramStashRebuildUsesFixedCapacitySelection
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "FixedStash::with_capacity(spec, working_stash_capacity("
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] &&
+    checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) struct FixedStash {"
+    , "pub(super) fn with_capacity(spec: &StateObject, capacity: usize) -> Result<Self> {"
+    , "pub(super) fn clear(&mut self) {"
+    , "pub(super) fn fixed_stash_with_capacity(spec: &StateObject, capacity: usize) -> Result<FixedStash> {"
+    , "pub(super) fn clear_fixed_stash(stash: &mut FixedStash) {"
+    , "pub(super) fn push_fixed_stash(stash: &mut FixedStash, block: OramBlock) -> Result<()> {"
+    , "pub(super) fn push_fixed_stash_with_limit("
+    , "let slot = select_stash_index_with_limit(stash, limit, |candidate| !candidate.occupied);"
+    , "stash.overflowed |= should_insert & !slot_present;"
+    , "push_fixed_stash_with_limit(stash, block, parameters.stash_bound)?;"
+    , "pub(super) fn select_stash_index("
+    , "for (index, block) in stash.blocks.iter().enumerate() {"
+    , "pub(super) fn take_selected_stash_block("
+    , "for (index, block) in stash.blocks.iter_mut().enumerate() {"
+    , "removed = select_oram_block(take_here, block, &removed)?;"
+    , "*block = select_oram_block(take_here, &stash.empty_block, block)?;"
+    , "pub(super) fn build_path_bucket("
+    , "for slot in fixed_blocks.iter_mut() {"
+    , "let candidate_index = select_stash_index(stash, |block| {"
+    , "*slot = take_selected_stash_block(stash, candidate_index.unwrap_or(0), present)?;"
+    , "pub(super) fn rewrite_path_for_access<F>("
+    , "rebuild_path_buckets_from_stash("
+    ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "fn select_stash_index("
+      , "blocks: repeat_boxed(capacity, empty_block)?,"
+      , "*block = self.empty_block.clone();"
+      , "let slot = select_stash_index(self, |candidate| !candidate.occupied)"
+      , "fn take_selected_stash_block("
+      , "fn build_path_bucket("
+      , "rewrite_path_for_access("
+      ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "stash.position(|block| {"
+      , "stash.swap_remove(candidate_index)"
+      , "fn remove_stash_block("
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkPathOramStashRebuildUsesFixedCapacitySelection_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPathOramStashRebuildUsesFixedCapacitySelection = true ↔
+    iface.pathOramStashRebuildUsesFixedCapacitySelection := by
+  unfold RuntimeImplementationInterface.checkPathOramStashRebuildUsesFixedCapacitySelection
+    RuntimeImplementationInterface.pathOramStashRebuildUsesFixedCapacitySelection
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.pathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.runtimeModuleProductionSource
+    [ "#[path = \"fresh_coins.rs\"]"
+    , "mod fresh_coins;"
+    , "pub use fresh_coins::PathOramFreshCoinPlan;"
+    ] ∧
+  sourceContainsAll iface.engineProductionSource
+    [ "fresh_coins: PathOramFreshCoinPlan"
+    ] ∧
+  sourceLacksAll iface.engineProductionSource
+    [ "fresh_coins: &PathOramFreshCoinPlan"
+    , ".by_object"
+    , "fresh_coins_by_object"
+    ] ∧
+  sourceContainsAll iface.freshCoinsProductionSource
+    [ "pub struct PathOramFreshCoinPlan {"
+    , "entries: Box<[PathOramFreshCoinEntry]>,"
+    , "impl Drop for PathOramFreshCoinPlan"
+    , "impl Drop for PathOramFreshCoinEntry"
+    , "pub(in crate::runtime) struct PathOramFreshCoinEntry {"
+    , "coins: Box<[usize]>,"
+    , "use uo_core::{FixedBoxBuilder, RuntimeOramLeafScaffoldWitness};"
+    , "entries.binary_search_by_key(&object_id, |entry| entry.object_id)"
+    , ") -> Result<Option<Box<[usize]>>> {"
+    , "let Some(entry) = old_entries.get_mut(index) else {"
+    , "fresh-coin entry index {index} missing after binary search"
+    , "let mut entries = FixedBoxBuilder::new(old_entries.len() + 1);"
+    , "std::iter::IntoIterator::into_iter(old_entries).enumerate()"
+    , "coin_schedule.sort_by_key(|(object_id, _)| *object_id);"
+    , "let mut coin_schedule = FixedBoxBuilder::new(scaffold.len());"
+    , "coin_schedule.push((step.object_id, *value))?;"
+    , "let mut entries = FixedBoxBuilder::new(entry_count);"
+    , "let Some((object_id, _)) = coin_schedule.get(index).copied() else {"
+    , "fresh-coin schedule index {index} missing despite length guard"
+    , "match coin_schedule.get(index) {"
+    , "let mut coins = FixedBoxBuilder::new(index - start);"
+    , "coin_schedule.iter().skip(start).take(index - start)"
+    , "pub fn insert_object_coins("
+    , "coins: Box<[usize]>,"
+    , "pub(in crate::runtime) fn into_entries(mut self) -> Box<[PathOramFreshCoinEntry]>"
+    , "*coin = 0;"
+    ] ∧
+  sourceLacksAll iface.freshCoinsProductionSource
+    [ "#[derive(Clone"
+    , "Clone for PathOramFreshCoinPlan"
+    , "pub fn insert_object_coins(&mut self, object_id: u32, coins: Vec<usize>) -> Option<Vec<usize>> {"
+    , "std::mem::take(&mut self.entries).into_vec()"
+    , ".collect::<Vec<_>>()"
+    , "let mut entries = Vec::new();"
+    , "let mut current_coins = Vec::new();"
+    , "entries.insert(index,"
+    , "old_entries[index].coins"
+    , "coin_schedule[index]"
+    , "&coin_schedule[start..index]"
+    , "HashMap"
+    , "BTreeMap"
+    ]
+
+def RuntimeImplementationInterface.checkPathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.runtimeModuleProductionSource
+    [ "#[path = \"fresh_coins.rs\"]"
+    , "mod fresh_coins;"
+    , "pub use fresh_coins::PathOramFreshCoinPlan;"
+    ] &&
+  checkSourceContainsAll iface.engineProductionSource
+    [ "fresh_coins: PathOramFreshCoinPlan"
+    ] &&
+  checkSourceLacksAll iface.engineProductionSource
+    [ "fresh_coins: &PathOramFreshCoinPlan"
+    , ".by_object"
+    , "fresh_coins_by_object"
+    ] &&
+  checkSourceContainsAll iface.freshCoinsProductionSource
+    [ "pub struct PathOramFreshCoinPlan {"
+    , "entries: Box<[PathOramFreshCoinEntry]>,"
+    , "impl Drop for PathOramFreshCoinPlan"
+    , "impl Drop for PathOramFreshCoinEntry"
+    , "pub(in crate::runtime) struct PathOramFreshCoinEntry {"
+    , "coins: Box<[usize]>,"
+    , "use uo_core::{FixedBoxBuilder, RuntimeOramLeafScaffoldWitness};"
+    , "entries.binary_search_by_key(&object_id, |entry| entry.object_id)"
+    , ") -> Result<Option<Box<[usize]>>> {"
+    , "let Some(entry) = old_entries.get_mut(index) else {"
+    , "fresh-coin entry index {index} missing after binary search"
+    , "let mut entries = FixedBoxBuilder::new(old_entries.len() + 1);"
+    , "std::iter::IntoIterator::into_iter(old_entries).enumerate()"
+    , "coin_schedule.sort_by_key(|(object_id, _)| *object_id);"
+    , "let mut coin_schedule = FixedBoxBuilder::new(scaffold.len());"
+    , "coin_schedule.push((step.object_id, *value))?;"
+    , "let mut entries = FixedBoxBuilder::new(entry_count);"
+    , "let Some((object_id, _)) = coin_schedule.get(index).copied() else {"
+    , "fresh-coin schedule index {index} missing despite length guard"
+    , "match coin_schedule.get(index) {"
+    , "let mut coins = FixedBoxBuilder::new(index - start);"
+    , "coin_schedule.iter().skip(start).take(index - start)"
+    , "pub fn insert_object_coins("
+    , "coins: Box<[usize]>,"
+    , "pub(in crate::runtime) fn into_entries(mut self) -> Box<[PathOramFreshCoinEntry]>"
+    , "*coin = 0;"
+    ] &&
+  checkSourceLacksAll iface.freshCoinsProductionSource
+    [ "#[derive(Clone"
+    , "Clone for PathOramFreshCoinPlan"
+    , "pub fn insert_object_coins(&mut self, object_id: u32, coins: Vec<usize>) -> Option<Vec<usize>> {"
+    , "std::mem::take(&mut self.entries).into_vec()"
+    , ".collect::<Vec<_>>()"
+    , "let mut entries = Vec::new();"
+    , "let mut current_coins = Vec::new();"
+    , "entries.insert(index,"
+    , "old_entries[index].coins"
+    , "coin_schedule[index]"
+    , "&coin_schedule[start..index]"
+    , "HashMap"
+    , "BTreeMap"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkPathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes = true ↔
+    iface.pathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes := by
+  unfold RuntimeImplementationInterface.checkPathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes
+    RuntimeImplementationInterface.pathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.pathOramUsesTransitionShapedFreshLeafSchedule
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] ∧
+    sourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn run_path_get("
+      , "let fresh_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let access_leaf = access_leaf_for_key(&state.entries, &state.position_map, key, fresh_leaf);"
+      , "pub(super) fn run_path_put("
+      , "let miss_access_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let access_leaf = masked_select_usize("
+      , "prior_leaf.is_some()"
+      , "prior_leaf.unwrap_or(0)"
+      , "miss_access_leaf"
+      , "let next_leaf_value = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let selected_next_leaf = MaskedUsizeOption::some(next_leaf_value);"
+      , "let next_leaf ="
+      , "let next_leaf = masked_select_option_usize(\n        update_existing | insert_new,\n        &selected_next_leaf,\n        &no_next_leaf,\n    );"
+      , "update_existing | insert_new"
+      , "&selected_next_leaf"
+      , "&no_next_leaf"
+      , "let transition_fresh_leaf = transition_next_leaf.unwrap_or(access_leaf);"
+      , "fresh_leaf: transition_fresh_leaf,"
+      , "pub(super) fn access_leaf_for_key("
+      , "let slot = slot_for_key(entries, key);"
+      , "let prior_leaf = select_position_map_leaf(position_map, &slot);"
+      , "masked_select_usize(prior_leaf.is_some(), prior_leaf.unwrap_or(0), fresh_leaf)"
+      ] ∧
+    sourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "prior_leaf.unwrap_or(fresh_leaf)"
+      , ".unwrap_or_else(|| leaf_coins.take_leaf(&spec.name, self.parameters.leaf_count(), rng))"
+      , "let access_leaf = match prior_leaf {"
+      , "None => leaf_coins.take_leaf(&spec.name, leaf_count, rng)?,"
+      , "let next_leaf = if update_existing | insert_new {"
+      , "Some(leaf_coins.take_leaf(&spec.name, leaf_count, rng)?)"
+      , "let next_leaf = if slot_present {"
+      , "(Some(_), true, false, _) => Some(leaf_coins.take_leaf(&spec.name, leaf_count, rng)?)"
+      ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "fn access_leaf_for_key("
+      , "let fresh_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let access_leaf = access_leaf_for_key(&self.entries, &self.position_map, key, fresh_leaf);"
+      , "let access_leaf = match prior_leaf {"
+      , "None => leaf_coins.take_leaf(&spec.name, leaf_count, rng)?,"
+      , "let next_leaf = if update_existing | insert_new {"
+      , "Some(leaf_coins.take_leaf(&spec.name, leaf_count, rng)?)"
+      , "let transition_fresh_leaf = transition_next_leaf.unwrap_or(access_leaf);"
+      , "fresh_leaf: transition_fresh_leaf,"
+      , ".unwrap_or_else(|| leaf_coins.take_leaf(&spec.name, self.parameters.leaf_count(), rng))"
+      , "let access_leaf = self.access_leaf_for_key(key, fresh_leaf)?;"
+      , "let access_leaf = self.access_leaf_for_key(&key, fresh_leaf)?;"
+      ]
+
+def RuntimeImplementationInterface.checkPathOramUsesTransitionShapedFreshLeafSchedule
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    ] &&
+    checkSourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn run_path_get("
+      , "let fresh_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let access_leaf = access_leaf_for_key(&state.entries, &state.position_map, key, fresh_leaf);"
+      , "pub(super) fn run_path_put("
+      , "let miss_access_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let access_leaf = masked_select_usize("
+      , "prior_leaf.is_some()"
+      , "prior_leaf.unwrap_or(0)"
+      , "miss_access_leaf"
+      , "let next_leaf_value = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let selected_next_leaf = MaskedUsizeOption::some(next_leaf_value);"
+      , "let next_leaf ="
+      , "let next_leaf = masked_select_option_usize(\n        update_existing | insert_new,\n        &selected_next_leaf,\n        &no_next_leaf,\n    );"
+      , "update_existing | insert_new"
+      , "&selected_next_leaf"
+      , "&no_next_leaf"
+      , "let transition_fresh_leaf = transition_next_leaf.unwrap_or(access_leaf);"
+      , "fresh_leaf: transition_fresh_leaf,"
+      , "pub(super) fn access_leaf_for_key("
+      , "let slot = slot_for_key(entries, key);"
+      , "let prior_leaf = select_position_map_leaf(position_map, &slot);"
+      , "masked_select_usize(prior_leaf.is_some(), prior_leaf.unwrap_or(0), fresh_leaf)"
+      ] &&
+    checkSourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "prior_leaf.unwrap_or(fresh_leaf)"
+      , ".unwrap_or_else(|| leaf_coins.take_leaf(&spec.name, self.parameters.leaf_count(), rng))"
+      , "let access_leaf = match prior_leaf {"
+      , "None => leaf_coins.take_leaf(&spec.name, leaf_count, rng)?,"
+      , "let next_leaf = if update_existing | insert_new {"
+      , "Some(leaf_coins.take_leaf(&spec.name, leaf_count, rng)?)"
+      , "let next_leaf = if slot_present {"
+      , "(Some(_), true, false, _) => Some(leaf_coins.take_leaf(&spec.name, leaf_count, rng)?)"
+      ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "fn access_leaf_for_key("
+      , "let fresh_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;"
+      , "let access_leaf = access_leaf_for_key(&self.entries, &self.position_map, key, fresh_leaf);"
+      , "let access_leaf = match prior_leaf {"
+      , "None => leaf_coins.take_leaf(&spec.name, leaf_count, rng)?,"
+      , "let next_leaf = if update_existing | insert_new {"
+      , "Some(leaf_coins.take_leaf(&spec.name, leaf_count, rng)?)"
+      , "let transition_fresh_leaf = transition_next_leaf.unwrap_or(access_leaf);"
+      , "fresh_leaf: transition_fresh_leaf,"
+      , ".unwrap_or_else(|| leaf_coins.take_leaf(&spec.name, self.parameters.leaf_count(), rng))"
+      , "let access_leaf = self.access_leaf_for_key(key, fresh_leaf)?;"
+      , "let access_leaf = self.access_leaf_for_key(&key, fresh_leaf)?;"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkPathOramUsesTransitionShapedFreshLeafSchedule_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPathOramUsesTransitionShapedFreshLeafSchedule = true ↔
+    iface.pathOramUsesTransitionShapedFreshLeafSchedule := by
+  unfold RuntimeImplementationInterface.checkPathOramUsesTransitionShapedFreshLeafSchedule
+    RuntimeImplementationInterface.pathOramUsesTransitionShapedFreshLeafSchedule
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.pathOramWriteLogsUsePublicExactBatches
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.oramProductionSource
+    [ "pub(crate) struct OramWriteBatch {"
+    , "writes: Box<[Option<OramWrite>]>,"
+    , "pub(crate) struct OramWriteLog {"
+    , "overflowed: bool,"
+    , "fn empty() -> Self {"
+    , "empty_oram_write_batch()"
+    , "fn with_capacity(capacity: usize) -> Result<Self> {"
+    , "oram_write_log_with_capacity(capacity)"
+    , "pub(crate) fn push_update("
+    , "push_oram_write_update(self, location, len)"
+    , "fn into_exact_batch(self) -> Result<OramWriteBatch> {"
+    , "finish_oram_write_log(self)"
+    , "pub(crate) fn for_each_write<F>(&self, mut visitor: F) -> Result<()>"
+    , "ORAM write batch public length {} exceeds capacity {}"
+    , "self.writes.get(index).ok_or_else"
+    , "ORAM write batch public prefix index {} missing despite length guard"
+    , "ORAM write batch missing populated public prefix entry {index}"
+    , "visitor(write)?;"
+    , "physical_writes: OramWriteBatch,"
+    , "writes: OramWriteBatch,"
+    , "logical_accesses: Box<[LogicalEvent]>,"
+    , "physical_reads: Box<[PhysicalReadEvent]>,"
+    , "run_surrogate_get(self, spec, key)"
+    , "run_surrogate_put(self, spec, key, value, apply)"
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    , "OramWriteLog::with_capacity(oram_write_log_capacity(&next.parameters)?)?"
+    , "writes: writes.into_exact_batch()?,"
+    , "finish_oram_write_log(self)"
+    ] ∧
+    sourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn oram_write_log_capacity(parameters: &OramParameters) -> Result<usize> {"
+      , "pub(super) fn empty_oram_write_batch() -> OramWriteBatch {"
+      , "zero_writes: 0,"
+      , "pub(super) fn repeat_boxed_empty_oram_write_slots("
+      , "pub(super) fn oram_write_log_with_capacity(capacity: usize) -> Result<OramWriteLog> {"
+      , "writes: repeat_boxed_empty_oram_write_slots(capacity)?,"
+      , "pub(super) fn push_oram_write_update("
+      , "log.writes.get_mut(log.len).ok_or_else"
+      , "ORAM write-log public index {} missing despite capacity guard"
+      , "class: WriteClass::Update,"
+      , "pub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {"
+      , "if log.len != log.writes.len() {"
+      , "ORAM write-log length {} did not match public capacity {}"
+      , "log.writes.get(index).ok_or_else"
+      , "ORAM write-log public prefix index {} missing despite length guard"
+      , ".metadata_pages"
+      , ".checked_add(parameters.buckets_per_access)"
+      , ".and_then(|capacity| capacity.checked_add(1))"
+      , "pub(super) fn rewrite_path_for_access<F>("
+      , "let mut writes = oram_write_log_with_capacity(oram_write_log_capacity(&state.parameters)?)?;"
+      , "finish_oram_write_log(writes)"
+      , "pub(super) fn surrogate_access_transcript("
+      , "pub(super) fn path_access_transcript("
+      , "let mut logical_accesses = FixedBoxBuilder::new(public_access_count);"
+      , "let mut physical_reads = FixedBoxBuilder::new(public_access_count);"
+      , "logical_accesses: logical_accesses.finish()?,"
+      , "physical_reads: physical_reads.finish()?,"
+    ] ∧
+    sourceContainsAll iface.objectsProductionSource
+      [ "physical_writes.for_each_write(|write| {"
+      , "writes.for_each_write(|write| {"
+      ] ∧
+    sourceLacksAll iface.oramProductionSource
+      [ "physical_writes: Vec<OramWrite>,"
+      , "writes: Vec<OramWrite>,"
+      , "&mut Vec<OramWrite>"
+      , "Result<(Vec<OramWrite>, usize)>"
+      , "writes.push(OramWrite::from_buffers"
+      , "vec![None; capacity].into_boxed_slice()"
+      , "fn oram_write_log_capacity(parameters: &OramParameters) -> Result<usize> {"
+      , "let mut writes = FixedBoxBuilder::new(capacity);"
+      , "let mut writes = OramWriteLog::with_capacity(oram_write_log_capacity(&self.parameters)?);"
+      , "self.overflowed = true;"
+      , "if self.len != self.writes.len() {"
+      , "let mut logical_accesses = FixedBoxBuilder::new(public_access_count);"
+      , "let mut physical_reads = FixedBoxBuilder::new(public_access_count);"
+      , "logical_accesses: Vec<LogicalEvent>,"
+      , "physical_reads: Vec<PhysicalReadEvent>,"
+      , "Vec::with_capacity(public_access_count)"
+      , "surrogate_access_transcript(self, spec)"
+      , "path_access_transcript(self, spec, access_leaf)"
+      , "rewrite_path_for_access("
+      , "filter_map(Option::as_ref)"
+      , "self.writes[index]"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramWrite {"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramWriteBatch {"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramWriteLog {"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramTranscript {"
+      ] ∧
+    sourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "writes: std::iter::repeat_with(|| None)"
+      , "writes: repeat_boxed(capacity, None)?,"
+      , ".take(capacity)"
+      , ".collect::<Vec<_>>()"
+      , "PhysicalWriteEvent::from_buffers("
+      , "classify_write("
+      , "log.writes[log.len]"
+      , "log.writes[..log.len]"
+      , "log.zero_writes +="
+      , "zero_writes += "
+      ]
+
+def RuntimeImplementationInterface.checkPathOramWriteLogsUsePublicExactBatches
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.oramProductionSource
+    [ "pub(crate) struct OramWriteBatch {"
+    , "writes: Box<[Option<OramWrite>]>,"
+    , "pub(crate) struct OramWriteLog {"
+    , "overflowed: bool,"
+    , "fn empty() -> Self {"
+    , "empty_oram_write_batch()"
+    , "fn with_capacity(capacity: usize) -> Result<Self> {"
+    , "oram_write_log_with_capacity(capacity)"
+    , "pub(crate) fn push_update("
+    , "push_oram_write_update(self, location, len)"
+    , "fn into_exact_batch(self) -> Result<OramWriteBatch> {"
+    , "finish_oram_write_log(self)"
+    , "pub(crate) fn for_each_write<F>(&self, mut visitor: F) -> Result<()>"
+    , "ORAM write batch public length {} exceeds capacity {}"
+    , "self.writes.get(index).ok_or_else"
+    , "ORAM write batch public prefix index {} missing despite length guard"
+    , "ORAM write batch missing populated public prefix entry {index}"
+    , "visitor(write)?;"
+    , "physical_writes: OramWriteBatch,"
+    , "writes: OramWriteBatch,"
+    , "logical_accesses: Box<[LogicalEvent]>,"
+    , "physical_reads: Box<[PhysicalReadEvent]>,"
+    , "run_surrogate_get(self, spec, key)"
+    , "run_surrogate_put(self, spec, key, value, apply)"
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    , "OramWriteLog::with_capacity(oram_write_log_capacity(&next.parameters)?)?"
+    , "writes: writes.into_exact_batch()?,"
+    , "finish_oram_write_log(self)"
+    ] &&
+    checkSourceContainsAll iface.generatedOramCodecsProductionSource
+      [ "pub(super) fn oram_write_log_capacity(parameters: &OramParameters) -> Result<usize> {"
+      , "pub(super) fn empty_oram_write_batch() -> OramWriteBatch {"
+      , "zero_writes: 0,"
+      , "pub(super) fn repeat_boxed_empty_oram_write_slots("
+      , "pub(super) fn oram_write_log_with_capacity(capacity: usize) -> Result<OramWriteLog> {"
+      , "writes: repeat_boxed_empty_oram_write_slots(capacity)?,"
+      , "pub(super) fn push_oram_write_update("
+      , "log.writes.get_mut(log.len).ok_or_else"
+      , "ORAM write-log public index {} missing despite capacity guard"
+      , "class: WriteClass::Update,"
+      , "pub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {"
+      , "if log.len != log.writes.len() {"
+      , "ORAM write-log length {} did not match public capacity {}"
+      , "log.writes.get(index).ok_or_else"
+      , "ORAM write-log public prefix index {} missing despite length guard"
+      , ".metadata_pages"
+      , ".checked_add(parameters.buckets_per_access)"
+      , ".and_then(|capacity| capacity.checked_add(1))"
+      , "pub(super) fn rewrite_path_for_access<F>("
+      , "let mut writes = oram_write_log_with_capacity(oram_write_log_capacity(&state.parameters)?)?;"
+      , "finish_oram_write_log(writes)"
+      , "pub(super) fn surrogate_access_transcript("
+      , "pub(super) fn path_access_transcript("
+      , "let mut logical_accesses = FixedBoxBuilder::new(public_access_count);"
+      , "let mut physical_reads = FixedBoxBuilder::new(public_access_count);"
+      , "logical_accesses: logical_accesses.finish()?,"
+      , "physical_reads: physical_reads.finish()?,"
+    ] &&
+    checkSourceContainsAll iface.objectsProductionSource
+      [ "physical_writes.for_each_write(|write| {"
+      , "writes.for_each_write(|write| {"
+      ] &&
+    checkSourceLacksAll iface.oramProductionSource
+      [ "physical_writes: Vec<OramWrite>,"
+      , "writes: Vec<OramWrite>,"
+      , "&mut Vec<OramWrite>"
+      , "Result<(Vec<OramWrite>, usize)>"
+      , "writes.push(OramWrite::from_buffers"
+      , "vec![None; capacity].into_boxed_slice()"
+      , "fn oram_write_log_capacity(parameters: &OramParameters) -> Result<usize> {"
+      , "let mut writes = FixedBoxBuilder::new(capacity);"
+      , "let mut writes = OramWriteLog::with_capacity(oram_write_log_capacity(&self.parameters)?);"
+      , "self.overflowed = true;"
+      , "if self.len != self.writes.len() {"
+      , "let mut logical_accesses = FixedBoxBuilder::new(public_access_count);"
+      , "let mut physical_reads = FixedBoxBuilder::new(public_access_count);"
+      , "logical_accesses: Vec<LogicalEvent>,"
+      , "physical_reads: Vec<PhysicalReadEvent>,"
+      , "Vec::with_capacity(public_access_count)"
+      , "surrogate_access_transcript(self, spec)"
+      , "path_access_transcript(self, spec, access_leaf)"
+      , "rewrite_path_for_access("
+      , "filter_map(Option::as_ref)"
+      , "self.writes[index]"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramWrite {"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramWriteBatch {"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramWriteLog {"
+      , "#[derive(Clone, Debug)]\npub(crate) struct OramTranscript {"
+      ] &&
+    checkSourceLacksAll iface.generatedOramCodecsProductionSource
+      [ "writes: std::iter::repeat_with(|| None)"
+      , "writes: repeat_boxed(capacity, None)?,"
+      , ".take(capacity)"
+      , ".collect::<Vec<_>>()"
+      , "PhysicalWriteEvent::from_buffers("
+      , "classify_write("
+      , "log.writes[log.len]"
+      , "log.writes[..log.len]"
+      , "log.zero_writes +="
+      , "zero_writes += "
+      ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkPathOramWriteLogsUsePublicExactBatches_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPathOramWriteLogsUsePublicExactBatches = true ↔
+    iface.pathOramWriteLogsUsePublicExactBatches := by
+  unfold RuntimeImplementationInterface.checkPathOramWriteLogsUsePublicExactBatches
+    RuntimeImplementationInterface.pathOramWriteLogsUsePublicExactBatches
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "update_masked_value(&mut object.value, value, apply)?;"
+    , "let logical = cold_zero_value(&spec.value_type);"
+    , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
+    , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
+    , "let zero_entry = cold_zero_small_map_entry(key_type, &spec.value_type);"
+    , ".unwrap_or_else(|| cold_zero_value(&object.spec.value_type));"
+    , "select_array_value_at_index(&object.values, index, &object.spec.value_type)"
+    , "update_array_value_at_index("
+    , "select_small_map_value_for_key(&object.entries, key, &object.spec.value_type)"
+    , "update_small_map_entries_for_put("
+    , "clone_runtime_value_for_read(&object.value)"
+    , "Self::UoCell(object) => !object.accessed && !object.written,"
+    , "written_slots: Box<[bool]>,"
+    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
+    , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
+    , "reconcile_cell_commit_value("
+    , "reconcile_array_commit_values("
+    , "reconcile_small_map_commit_entries("
+    , "reconcile_raw_map_committed_entry("
+    , "if spec.confidential && matches!(spec.backend, BackendKind::Raw) {"
+    , "bail!(\"confidential object {} uses raw backend\", spec.name);"
+    , "pub(in crate::runtime) fn is_update_oblivious_backend(&self) -> bool {"
+    , "Self::UoCell(_) | Self::UoArray(_) | Self::UoSmallMap(_) | Self::UoOramMap(_)"
+    , "#[derive(Debug)]\npub(crate) struct CellObject {"
+    , "#[derive(Debug)]\npub(crate) struct ArrayObject {"
+    , "#[derive(Debug)]\npub(crate) struct RawMapEntry {"
+    , "#[derive(Debug)]\npub(crate) struct RawMapObject {"
+    , "#[derive(Debug)]\npub(crate) struct SmallMapObject {"
+    , "#[derive(Debug)]\npub(crate) struct OramMapObject {"
+    , "fn clone_committed_public(&self) -> Self {"
+    , "fn clone_committed_cold(&self) -> Result<Self> {"
+    , "fn clone_committed_public(&self) -> Self {"
+    , "fn clone_committed_cold(&self) -> Self {"
+    , "impl RawMapObject {\n    fn clone_committed_public(&self) -> Self {"
+    , "fn clone_committed_cold(&self) -> Result<Self> {"
+    , "fn clone_committed_cold(&self) -> Self {"
+    , "oram: self.oram.clone_committed_cold(&self.spec)?,"
+    , "cipher: self.cipher.clone_for_runtime_state(),"
+    , "leaf_coin_source: PathOramLeafCoinSource::random(),"
+    , "Self::RawCell(object) => Ok(Self::RawCell(object.clone_committed_public())),"
+    , "Self::RawArray(object) => Ok(Self::RawArray(object.clone_committed_public())),"
+    , "Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),"
+    , "pub(in crate::runtime) fn clone_committed_cold(&self) -> Result<Self> {"
+    , "Self::RawCell(object) => Self::RawCell(object.clone_committed_public()),"
+    , "Self::UoCell(object) => Self::UoCell(object.clone_committed_cold()),"
+    , "Self::RawArray(object) => Self::RawArray(object.clone_committed_public()),"
+    , "Self::UoArray(object) => Self::UoArray(object.clone_committed_cold()),"
+    , "Self::RawMap(object) => Self::RawMap(object.clone_committed_public()),"
+    , "Self::UoSmallMap(object) => Self::UoSmallMap(object.clone_committed_cold()?),"
+    , "Self::UoOramMap(object) => Self::UoOramMap(object.clone_committed_cold()?),"
+    , "let mut next = old.clone_committed_public();"
+    , "object.wipe_staged();"
+    , "trace.raw_physical_write_from_buffers("
+    , "record_small_map_scan(object, trace)?;"
+    , "fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) -> Result<()> {"
+    , "object.physical_slots.iter().enumerate()"
+    , "object.physical_slots.get(index).ok_or_else(|| {"
+    , "object.values.get_mut(index).ok_or_else(|| {"
+    , "object.written_slots.get_mut(index).ok_or_else(|| {"
+    , "physical_slots.get_mut(index).ok_or_else(|| {"
+    ] ∧
+  sourceContainsAll iface.stateProductionSource
+    [ ".ensure_confidential_program_targets_uo_backends(plan.confidential_slot_program())?;"
+    , "fn ensure_confidential_program_targets_uo_backends("
+    , "program.expected_runtime_steps().iter()"
+    , "if !object.is_update_oblivious_backend() {"
+    , "confidential kernel program {} targets raw backend object {} ({})"
+    ] ∧
+  sourceLacksAll iface.objectsProductionSource
+    [ "Value::confidential_select("
+    , "Value::confidential_eq("
+    , "fn update_masked_value("
+    , "fn select_array_value_at_index("
+    , "fn update_array_value_at_index("
+    , "fn select_small_map_value_for_key("
+    , "fn update_small_map_entries_for_put("
+    , "cell_committed_cache_is_cold("
+    , "array_committed_cache_is_cold("
+    , "small_map_committed_cache_is_cold("
+    , "object.oram.is_cold()"
+    , "fn reconcile_cell_commit_value("
+    , "fn reconcile_array_commit_values("
+    , "fn reconcile_small_map_commit_entries("
+    , "confidential_is_zero_like("
+    , "#[derive(Clone, Debug)]\npub(crate) struct CellObject {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct ArrayObject {"
+    , "#[derive(Clone, Debug)]\nstruct RawMapEntry {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct RawMapEntry {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct RawMapObject {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct SmallMapObject {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct OramMapObject {"
+    , "Self::RawCell(object) => Ok(Self::RawCell(object.clone())),"
+    , "Self::RawArray(object) => Ok(Self::RawArray(object.clone())),"
+    , "Self::RawMap(object) => Ok(Self::RawMap(object.clone())),"
+    , "Self::RawCell(object) => Self::RawCell(object.clone()),"
+    , "Self::UoCell(object) => Self::UoCell(object.clone()),"
+    , "Self::RawArray(object) => Self::RawArray(object.clone()),"
+    , "Self::UoArray(object) => Self::UoArray(object.clone()),"
+    , "Self::RawMap(object) => Self::RawMap(object.clone()),"
+    , "Self::UoSmallMap(object) => Self::UoSmallMap(object.clone()),"
+    , "Self::UoOramMap(object) => Self::UoOramMap(object.clone()),"
+    , "leaf_coin_source: self.leaf_coin_source.clone(),"
+    , "cipher: self.cipher.clone(),"
+    , "oram: self.oram.clone(),"
+    , "let mut next = old.clone();"
+    , "Ok(object.value.clone())"
+    , "Value::zero_for_type("
+    , "MapEntry::new("
+    , "trace.physical_write_from_buffers("
+    , "object.physical_slots[index]"
+    , "object.values[index]"
+    , "object.written_slots[index]"
+    , "new.values[index]"
+    , "old.physical_slots[index]"
+    , "next.values[index]"
+    , "next.physical_slots[index]"
+    , "physical_slots[index]"
+    ] ∧
+  iface.handwrittenRuntimeLacksDirectSecretOps ∧
+  iface.handwrittenHostCoordinationLacksSecretSerialization ∧
+  sourceContainsAll iface.controllerProductionSource
+    [ "use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};"
+    , "pub(crate) fn raw_physical_write_from_buffers("
+    , "let event = PhysicalWriteEvent::from_buffers(object, location, old, new);"
+    , "if matches!(event.class, WriteClass::Same | WriteClass::Clear) {"
+    , "self.metrics.zero_writes += 1;"
+    , "self.physical_writes.push(event);"
+    ] ∧
+  sourceLacksAll iface.controllerProductionSource
+    [ "pub(crate) fn physical_write_from_buffers("
+    , "if new.iter().all(|byte| *byte == 0)"
+    , ".push(PhysicalWriteEvent::from_buffers(object, location, old, new))"
+    ] ∧
+  sourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn update_masked_value(current: &mut Value, value: Value, apply: bool) -> Result<()> {"
+    , "pub(super) fn select_array_value_at_index("
+    , "pub(super) fn update_array_value_at_index("
+    , "pub(super) fn select_small_map_value_for_key("
+    , "pub(super) fn update_small_map_entries_for_put("
+    , "pub(super) fn clone_runtime_value_for_read(value: &Value) -> Value {"
+    , "pub(super) fn cold_zero_value(value_type: &Type) -> Value {"
+    , "pub(super) fn cold_zero_boxed_values(len: usize, value_type: &Type) -> Box<[Value]> {"
+    , "pub(super) fn cold_zero_small_map_entries("
+    , "pub(super) fn cold_zero_small_map_entry("
+    , "pub(super) fn reconcile_cell_commit_value<F>("
+    , "pub(super) fn reconcile_array_commit_values<F>("
+    , "pub(super) fn reconcile_small_map_commit_entries<F>("
+    , "pub(super) fn reconcile_raw_map_committed_entry("
+    , "RawMapEntry::committed(value.clone(), physical)"
+    ] ∧
+  sourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_oram_codecs.rs\"]"
+    , "mod generated_oram_codecs;"
+    , "run_surrogate_get(self, spec, key)"
+    , "run_surrogate_put(self, spec, key, value, apply)"
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    , "refresh_path_state_from_storage("
+    , "path_position_map_witness_leaves("
+    , "let mut cloned = cold_clone_oram_state(spec, self)?;"
+    , "cold_clone_oram_state(spec, self)"
+    , "cold_commit_oram_state("
+    ] ∧
+  sourceLacksAll iface.oramProductionSource
+    [ "Value::confidential_select("
+    , "Value::confidential_eq("
+    , "fn run_surrogate_get("
+    , "fn run_surrogate_put("
+    , "fn run_path_get("
+    , "fn run_path_put("
+    , "fn slot_for_key("
+    , "fn allocate_slot("
+    , "fn access_leaf_for_key("
+    , "fn apply_path_get_update("
+    , "fn apply_path_put_update("
+    , "fn apply_surrogate_put_update("
+    , "fn refresh_path_state_from_storage("
+    , "oram_state_is_cold(&self.entries, &self.position_map, &self.stash)"
+    , "oram_state_is_cold,"
+    , "pub(crate) fn is_cold(&self) -> bool"
+    , "fn path_position_map_witness_leaves("
+    , "fn cold_clone_oram_state("
+    , "parameters: self.parameters.clone()"
+    , "empty_entry: self.empty_entry.clone()"
+    , "entries: repeat_boxed(self.parameters.capacity, self.empty_entry.clone())?"
+    , "storage: self.storage.clone()"
+    , "fn oram_state_is_cold("
+    , "fn cold_commit_oram_state("
+    ] ∧
+  sourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn run_surrogate_get("
+    , "pub(super) fn run_surrogate_put("
+    , "pub(super) fn run_path_get("
+    , "RuntimeMaskedUsizeOptionWitness"
+    , "pub(crate) fn to_witness(&self) -> RuntimeMaskedUsizeOptionWitness {"
+    , "slot_index: slot.to_witness(),"
+    , "prior_leaf: prior_leaf.to_witness(),"
+    , "next_leaf: next_leaf.to_witness(),"
+    , "pub(super) fn run_path_put("
+    , "slot_index: transition_slot.to_witness(),"
+    , "next_leaf: transition_next_leaf.to_witness(),"
+    , "pub(super) fn slot_for_key(entries: &[MapEntry], key: &Value) -> MaskedUsizeOption {"
+    , "pub(super) fn allocate_slot(entries: &[MapEntry]) -> MaskedUsizeOption {"
+    , "pub(super) fn access_leaf_for_key("
+    , "pub(super) fn apply_path_get_update("
+    , "pub(super) fn apply_path_put_update("
+    , "pub(super) fn apply_surrogate_put_update("
+    , "pub(super) fn refresh_path_state_from_storage("
+    , "pub(super) fn path_position_map_witness_leaves("
+    , "pub(super) fn cold_clone_oram_state("
+    , "path_position_map_from_storage(spec, parameters, cipher, directory_pages)"
+    , "position_map_to_witness_boxed(&position_map)"
+    , "pub(super) fn position_map_to_witness_boxed("
+    , "leaves.push(leaf.to_witness())?;"
+    , "pub(super) fn cold_commit_oram_state("
+    ] ∧
+  sourceLacksAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn oram_state_is_cold("
+    , "if oram_state_is_cold(entries, position_map, stash) {"
+    , "Ok(position_map.to_vec().into_boxed_slice())"
+    , "slot.to_option()"
+    , "transition_slot.to_option()"
+    , "position_map_to_option_boxed("
+    , "Result<Box<[Option<usize>]>>"
+    , ".filter(|entry| entry.is_occupied())"
+    , "fixed_blocks[slot] = oram_block_from_entry(entry);"
+    , "if block.occupied"
+    ] ∧
+  sourceContainsAll iface.storeCodecProductionSource
+    [ "#[path = \"generated_codec.rs\"]"
+    , "mod generated_codec;"
+    , "#[path = \"generated_surface.rs\"]"
+    , "mod generated_surface;"
+    , "pub use generated_surface::StoreCipher;"
+    , "use generated_codec::{"
+    ] ∧
+  sourceLacksAll iface.storeCodecProductionSource
+    [ "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<"
+    , "fn open_boxed("
+    ] ∧
+  sourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<T>("
+    , "fn open_boxed("
+    ] ∧
+  sourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "pub(super) fn open_boxed("
+    ] ∧
+  sourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    , "pub trait ObjectStore {"
+    , "#[derive(Debug)]\npub struct RawObjectStore {"
+    , "#[derive(Debug)]\npub struct UoObjectStore {"
+    , "pub struct RawObjectStore {"
+    , "pub struct UoObjectStore {"
+    ] ∧
+  sourceLacksAll iface.storeStoreProductionSource
+    [ "impl ObjectStore for RawObjectStore {"
+    , "impl ObjectStore for UoObjectStore {"
+    , "impl RawObjectStore {"
+    , "impl UoObjectStore {"
+    , "fn filler_boxed_uo_store_slot("
+    , "fn bootstrap_uo_store_slot("
+    , "fn reseal_uo_store_slot_in_place("
+    , "fn reseal_uo_store_slot_and_trace_write("
+    , "take_boxed_raw_store_value("
+    , "zeroed_boxed_raw_store_slot("
+    , "#[derive(Clone, Debug)]\npub struct RawObjectStore {"
+    , "#[derive(Clone, Debug)]\npub struct UoObjectStore {"
+    ] ∧
+  sourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "impl ObjectStore for RawObjectStore {"
+    , "impl ObjectStore for UoObjectStore {"
+    , "impl RawObjectStore {"
+    , "impl UoObjectStore {"
+    , "pub(super) fn filler_boxed_uo_store_slot("
+    , "pub(super) fn bootstrap_uo_store_slot("
+    , "pub(super) fn reseal_uo_store_slot_in_place("
+    , "pub(super) fn reseal_uo_store_slot_and_trace_write("
+    , "pub(super) fn take_boxed_raw_store_value("
+    , "fn zeroed_boxed_raw_store_slot("
+    ]
+
+def RuntimeImplementationInterface.checkRuntimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.objectsProductionSource
+    [ "#[path = \"generated_object_helpers.rs\"]"
+    , "mod generated_object_helpers;"
+    , "update_masked_value(&mut object.value, value, apply)?;"
+    , "let logical = cold_zero_value(&spec.value_type);"
+    , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
+    , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
+    , "let zero_entry = cold_zero_small_map_entry(key_type, &spec.value_type);"
+    , ".unwrap_or_else(|| cold_zero_value(&object.spec.value_type));"
+    , "select_array_value_at_index(&object.values, index, &object.spec.value_type)"
+    , "update_array_value_at_index("
+    , "select_small_map_value_for_key(&object.entries, key, &object.spec.value_type)"
+    , "update_small_map_entries_for_put("
+    , "clone_runtime_value_for_read(&object.value)"
+    , "Self::UoCell(object) => !object.accessed && !object.written,"
+    , "written_slots: Box<[bool]>,"
+    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
+    , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
+    , "reconcile_cell_commit_value("
+    , "reconcile_array_commit_values("
+    , "reconcile_small_map_commit_entries("
+    , "reconcile_raw_map_committed_entry("
+    , "if spec.confidential && matches!(spec.backend, BackendKind::Raw) {"
+    , "bail!(\"confidential object {} uses raw backend\", spec.name);"
+    , "pub(in crate::runtime) fn is_update_oblivious_backend(&self) -> bool {"
+    , "Self::UoCell(_) | Self::UoArray(_) | Self::UoSmallMap(_) | Self::UoOramMap(_)"
+    , "#[derive(Debug)]\npub(crate) struct CellObject {"
+    , "#[derive(Debug)]\npub(crate) struct ArrayObject {"
+    , "#[derive(Debug)]\npub(crate) struct RawMapEntry {"
+    , "#[derive(Debug)]\npub(crate) struct RawMapObject {"
+    , "#[derive(Debug)]\npub(crate) struct SmallMapObject {"
+    , "#[derive(Debug)]\npub(crate) struct OramMapObject {"
+    , "fn clone_committed_public(&self) -> Self {"
+    , "fn clone_committed_cold(&self) -> Result<Self> {"
+    , "fn clone_committed_public(&self) -> Self {"
+    , "fn clone_committed_cold(&self) -> Self {"
+    , "impl RawMapObject {\n    fn clone_committed_public(&self) -> Self {"
+    , "fn clone_committed_cold(&self) -> Result<Self> {"
+    , "fn clone_committed_cold(&self) -> Self {"
+    , "oram: self.oram.clone_committed_cold(&self.spec)?,"
+    , "cipher: self.cipher.clone_for_runtime_state(),"
+    , "leaf_coin_source: PathOramLeafCoinSource::random(),"
+    , "Self::RawCell(object) => Ok(Self::RawCell(object.clone_committed_public())),"
+    , "Self::RawArray(object) => Ok(Self::RawArray(object.clone_committed_public())),"
+    , "Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),"
+    , "pub(in crate::runtime) fn clone_committed_cold(&self) -> Result<Self> {"
+    , "Self::RawCell(object) => Self::RawCell(object.clone_committed_public()),"
+    , "Self::UoCell(object) => Self::UoCell(object.clone_committed_cold()),"
+    , "Self::RawArray(object) => Self::RawArray(object.clone_committed_public()),"
+    , "Self::UoArray(object) => Self::UoArray(object.clone_committed_cold()),"
+    , "Self::RawMap(object) => Self::RawMap(object.clone_committed_public()),"
+    , "Self::UoSmallMap(object) => Self::UoSmallMap(object.clone_committed_cold()?),"
+    , "Self::UoOramMap(object) => Self::UoOramMap(object.clone_committed_cold()?),"
+    , "let mut next = old.clone_committed_public();"
+    , "object.wipe_staged();"
+    , "trace.raw_physical_write_from_buffers("
+    , "record_small_map_scan(object, trace)?;"
+    , "fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) -> Result<()> {"
+    , "object.physical_slots.iter().enumerate()"
+    , "object.physical_slots.get(index).ok_or_else(|| {"
+    , "object.values.get_mut(index).ok_or_else(|| {"
+    , "object.written_slots.get_mut(index).ok_or_else(|| {"
+    , "physical_slots.get_mut(index).ok_or_else(|| {"
+    ] &&
+  checkSourceContainsAll iface.stateProductionSource
+    [ ".ensure_confidential_program_targets_uo_backends(plan.confidential_slot_program())?;"
+    , "fn ensure_confidential_program_targets_uo_backends("
+    , "program.expected_runtime_steps().iter()"
+    , "if !object.is_update_oblivious_backend() {"
+    , "confidential kernel program {} targets raw backend object {} ({})"
+    ] &&
+  checkSourceLacksAll iface.objectsProductionSource
+    [ "Value::confidential_select("
+    , "Value::confidential_eq("
+    , "fn update_masked_value("
+    , "fn select_array_value_at_index("
+    , "fn update_array_value_at_index("
+    , "fn select_small_map_value_for_key("
+    , "fn update_small_map_entries_for_put("
+    , "cell_committed_cache_is_cold("
+    , "array_committed_cache_is_cold("
+    , "small_map_committed_cache_is_cold("
+    , "object.oram.is_cold()"
+    , "fn reconcile_cell_commit_value("
+    , "fn reconcile_array_commit_values("
+    , "fn reconcile_small_map_commit_entries("
+    , "confidential_is_zero_like("
+    , "#[derive(Clone, Debug)]\npub(crate) struct CellObject {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct ArrayObject {"
+    , "#[derive(Clone, Debug)]\nstruct RawMapEntry {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct RawMapEntry {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct RawMapObject {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct SmallMapObject {"
+    , "#[derive(Clone, Debug)]\npub(crate) struct OramMapObject {"
+    , "Self::RawCell(object) => Ok(Self::RawCell(object.clone())),"
+    , "Self::RawArray(object) => Ok(Self::RawArray(object.clone())),"
+    , "Self::RawMap(object) => Ok(Self::RawMap(object.clone())),"
+    , "Self::RawCell(object) => Self::RawCell(object.clone()),"
+    , "Self::UoCell(object) => Self::UoCell(object.clone()),"
+    , "Self::RawArray(object) => Self::RawArray(object.clone()),"
+    , "Self::UoArray(object) => Self::UoArray(object.clone()),"
+    , "Self::RawMap(object) => Self::RawMap(object.clone()),"
+    , "Self::UoSmallMap(object) => Self::UoSmallMap(object.clone()),"
+    , "Self::UoOramMap(object) => Self::UoOramMap(object.clone()),"
+    , "leaf_coin_source: self.leaf_coin_source.clone(),"
+    , "cipher: self.cipher.clone(),"
+    , "oram: self.oram.clone(),"
+    , "let mut next = old.clone();"
+    , "Ok(object.value.clone())"
+    , "Value::zero_for_type("
+    , "MapEntry::new("
+    , "trace.physical_write_from_buffers("
+    , "object.physical_slots[index]"
+    , "object.values[index]"
+    , "object.written_slots[index]"
+    , "new.values[index]"
+    , "old.physical_slots[index]"
+    , "next.values[index]"
+    , "next.physical_slots[index]"
+    , "physical_slots[index]"
+    ] &&
+  iface.checkHandwrittenRuntimeLacksDirectSecretOps &&
+  iface.checkHandwrittenHostCoordinationLacksSecretSerialization &&
+  checkSourceContainsAll iface.controllerProductionSource
+    [ "use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};"
+    , "pub(crate) fn raw_physical_write_from_buffers("
+    , "let event = PhysicalWriteEvent::from_buffers(object, location, old, new);"
+    , "if matches!(event.class, WriteClass::Same | WriteClass::Clear) {"
+    , "self.metrics.zero_writes += 1;"
+    , "self.physical_writes.push(event);"
+    ] &&
+  checkSourceLacksAll iface.controllerProductionSource
+    [ "pub(crate) fn physical_write_from_buffers("
+    , "if new.iter().all(|byte| *byte == 0)"
+    , ".push(PhysicalWriteEvent::from_buffers(object, location, old, new))"
+    ] &&
+  checkSourceContainsAll iface.generatedObjectHelpersProductionSource
+    [ "pub(super) fn update_masked_value(current: &mut Value, value: Value, apply: bool) -> Result<()> {"
+    , "pub(super) fn select_array_value_at_index("
+    , "pub(super) fn update_array_value_at_index("
+    , "pub(super) fn select_small_map_value_for_key("
+    , "pub(super) fn update_small_map_entries_for_put("
+    , "pub(super) fn clone_runtime_value_for_read(value: &Value) -> Value {"
+    , "pub(super) fn cold_zero_value(value_type: &Type) -> Value {"
+    , "pub(super) fn cold_zero_boxed_values(len: usize, value_type: &Type) -> Box<[Value]> {"
+    , "pub(super) fn cold_zero_small_map_entries("
+    , "pub(super) fn cold_zero_small_map_entry("
+    , "pub(super) fn reconcile_cell_commit_value<F>("
+    , "pub(super) fn reconcile_array_commit_values<F>("
+    , "pub(super) fn reconcile_small_map_commit_entries<F>("
+    , "pub(super) fn reconcile_raw_map_committed_entry("
+    , "RawMapEntry::committed(value.clone(), physical)"
+    ] &&
+  checkSourceContainsAll iface.oramProductionSource
+    [ "#[path = \"generated_oram_codecs.rs\"]"
+    , "mod generated_oram_codecs;"
+    , "run_surrogate_get(self, spec, key)"
+    , "run_surrogate_put(self, spec, key, value, apply)"
+    , "run_path_get(self, spec, key, allocator, leaf_coins, rng)"
+    , "run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)"
+    , "refresh_path_state_from_storage("
+    , "path_position_map_witness_leaves("
+    , "let mut cloned = cold_clone_oram_state(spec, self)?;"
+    , "cold_clone_oram_state(spec, self)"
+    , "cold_commit_oram_state("
+    ] &&
+  checkSourceLacksAll iface.oramProductionSource
+    [ "Value::confidential_select("
+    , "Value::confidential_eq("
+    , "fn run_surrogate_get("
+    , "fn run_surrogate_put("
+    , "fn run_path_get("
+    , "fn run_path_put("
+    , "fn slot_for_key("
+    , "fn allocate_slot("
+    , "fn access_leaf_for_key("
+    , "fn apply_path_get_update("
+    , "fn apply_path_put_update("
+    , "fn apply_surrogate_put_update("
+    , "fn refresh_path_state_from_storage("
+    , "oram_state_is_cold(&self.entries, &self.position_map, &self.stash)"
+    , "oram_state_is_cold,"
+    , "pub(crate) fn is_cold(&self) -> bool"
+    , "fn path_position_map_witness_leaves("
+    , "fn cold_clone_oram_state("
+    , "parameters: self.parameters.clone()"
+    , "empty_entry: self.empty_entry.clone()"
+    , "entries: repeat_boxed(self.parameters.capacity, self.empty_entry.clone())?"
+    , "storage: self.storage.clone()"
+    , "fn oram_state_is_cold("
+    , "fn cold_commit_oram_state("
+    ] &&
+  checkSourceContainsAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn run_surrogate_get("
+    , "pub(super) fn run_surrogate_put("
+    , "pub(super) fn run_path_get("
+    , "RuntimeMaskedUsizeOptionWitness"
+    , "pub(crate) fn to_witness(&self) -> RuntimeMaskedUsizeOptionWitness {"
+    , "slot_index: slot.to_witness(),"
+    , "prior_leaf: prior_leaf.to_witness(),"
+    , "next_leaf: next_leaf.to_witness(),"
+    , "pub(super) fn run_path_put("
+    , "slot_index: transition_slot.to_witness(),"
+    , "next_leaf: transition_next_leaf.to_witness(),"
+    , "pub(super) fn slot_for_key(entries: &[MapEntry], key: &Value) -> MaskedUsizeOption {"
+    , "pub(super) fn allocate_slot(entries: &[MapEntry]) -> MaskedUsizeOption {"
+    , "pub(super) fn access_leaf_for_key("
+    , "pub(super) fn apply_path_get_update("
+    , "pub(super) fn apply_path_put_update("
+    , "pub(super) fn apply_surrogate_put_update("
+    , "pub(super) fn refresh_path_state_from_storage("
+    , "pub(super) fn path_position_map_witness_leaves("
+    , "pub(super) fn cold_clone_oram_state("
+    , "path_position_map_from_storage(spec, parameters, cipher, directory_pages)"
+    , "position_map_to_witness_boxed(&position_map)"
+    , "pub(super) fn position_map_to_witness_boxed("
+    , "leaves.push(leaf.to_witness())?;"
+    , "pub(super) fn cold_commit_oram_state("
+    ] &&
+  checkSourceLacksAll iface.generatedOramCodecsProductionSource
+    [ "pub(super) fn oram_state_is_cold("
+    , "if oram_state_is_cold(entries, position_map, stash) {"
+    , "Ok(position_map.to_vec().into_boxed_slice())"
+    , "slot.to_option()"
+    , "transition_slot.to_option()"
+    , "position_map_to_option_boxed("
+    , "Result<Box<[Option<usize>]>>"
+    , ".filter(|entry| entry.is_occupied())"
+    , "fixed_blocks[slot] = oram_block_from_entry(entry);"
+    , "if block.occupied"
+    ] &&
+  checkSourceContainsAll iface.storeCodecProductionSource
+    [ "#[path = \"generated_codec.rs\"]"
+    , "mod generated_codec;"
+    , "#[path = \"generated_surface.rs\"]"
+    , "mod generated_surface;"
+    , "pub use generated_surface::StoreCipher;"
+    , "use generated_codec::{"
+    ] &&
+  checkSourceLacksAll iface.storeCodecProductionSource
+    [ "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<"
+    , "fn open_boxed("
+    ] &&
+  checkSourceContainsAll iface.generatedStoreSurfaceProductionSource
+    [ "pub fn seal_and_wipe_boxed("
+    , "pub fn seal_and_wipe_into_slice("
+    , "pub fn filler_boxed("
+    , "pub fn with_opened_payload<T>("
+    , "fn open_boxed("
+    ] &&
+  checkSourceLacksAll iface.generatedStoreSurfaceProductionSource
+    [ "pub(super) fn open_boxed("
+    ] &&
+  checkSourceContainsAll iface.storeStoreProductionSource
+    [ "#[path = \"generated_store_helpers.rs\"]"
+    , "mod generated_store_helpers;"
+    , "pub trait ObjectStore {"
+    , "#[derive(Debug)]\npub struct RawObjectStore {"
+    , "#[derive(Debug)]\npub struct UoObjectStore {"
+    , "pub struct RawObjectStore {"
+    , "pub struct UoObjectStore {"
+    ] &&
+  checkSourceLacksAll iface.storeStoreProductionSource
+    [ "impl ObjectStore for RawObjectStore {"
+    , "impl ObjectStore for UoObjectStore {"
+    , "impl RawObjectStore {"
+    , "impl UoObjectStore {"
+    , "fn filler_boxed_uo_store_slot("
+    , "fn bootstrap_uo_store_slot("
+    , "fn reseal_uo_store_slot_in_place("
+    , "fn reseal_uo_store_slot_and_trace_write("
+    , "take_boxed_raw_store_value("
+    , "zeroed_boxed_raw_store_slot("
+    , "#[derive(Clone, Debug)]\npub struct RawObjectStore {"
+    , "#[derive(Clone, Debug)]\npub struct UoObjectStore {"
+    ] &&
+  checkSourceContainsAll iface.generatedStoreHelpersProductionSource
+    [ "impl ObjectStore for RawObjectStore {"
+    , "impl ObjectStore for UoObjectStore {"
+    , "impl RawObjectStore {"
+    , "impl UoObjectStore {"
+    , "pub(super) fn filler_boxed_uo_store_slot("
+    , "pub(super) fn bootstrap_uo_store_slot("
+    , "pub(super) fn reseal_uo_store_slot_in_place("
+    , "pub(super) fn reseal_uo_store_slot_and_trace_write("
+    , "pub(super) fn take_boxed_raw_store_value("
+    , "fn zeroed_boxed_raw_store_slot("
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkRuntimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkRuntimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers = true ↔
+    iface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers := by
+  unfold RuntimeImplementationInterface.checkRuntimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers
+    RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers
+    RuntimeImplementationInterface.checkHandwrittenHostCoordinationLacksSecretSerialization
+    RuntimeImplementationInterface.handwrittenHostCoordinationLacksSecretSerialization
+    RuntimeImplementationInterface.checkHandwrittenRuntimeLacksDirectSecretOps
+    RuntimeImplementationInterface.handwrittenRuntimeLacksDirectSecretOps
+  simp [and_assoc]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkHandwrittenRuntimeLacksDirectSecretOps_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkHandwrittenRuntimeLacksDirectSecretOps = true ↔
+    iface.handwrittenRuntimeLacksDirectSecretOps := by
+  unfold RuntimeImplementationInterface.checkHandwrittenRuntimeLacksDirectSecretOps
+    RuntimeImplementationInterface.handwrittenRuntimeLacksDirectSecretOps
+  simp
+
+@[simp] theorem
+  runtimeImplementationInterface_checkHandwrittenHostCoordinationLacksSecretSerialization_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkHandwrittenHostCoordinationLacksSecretSerialization = true ↔
+    iface.handwrittenHostCoordinationLacksSecretSerialization := by
+  unfold RuntimeImplementationInterface.checkHandwrittenHostCoordinationLacksSecretSerialization
+    RuntimeImplementationInterface.handwrittenHostCoordinationLacksSecretSerialization
+  simp
+
+theorem
+  RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers_lacksDirectSecretOps
+  (iface : RuntimeImplementationInterface)
+  (h : iface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers) :
+  iface.handwrittenRuntimeLacksDirectSecretOps := by
+  unfold RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers at h
+  rcases h with ⟨_, _, _, hDirect, _⟩
+  exact hDirect
+
+theorem
+  RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers_hostCoordinationLacksSecretSerialization
+  (iface : RuntimeImplementationInterface)
+  (h : iface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers) :
+  iface.handwrittenHostCoordinationLacksSecretSerialization := by
+  unfold RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers at h
+  rcases h with ⟨_, _, _, _, hHost, _⟩
+  exact hHost
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_initialCapacity
+  (parameters : RuntimeOramWriteLogDiscipline.Parameters) :
+  (RuntimeOramWriteLogDiscipline.initialLog parameters).capacity =
+    RuntimeOramWriteLogDiscipline.writeLogCapacity parameters :=
+  RuntimeOramWriteLogDiscipline.initialLog_capacity parameters
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_initialZeroWrites
+  (parameters : RuntimeOramWriteLogDiscipline.Parameters) :
+  (RuntimeOramWriteLogDiscipline.initialLog parameters).zeroWrites = 0 :=
+  RuntimeOramWriteLogDiscipline.initialLog_zeroWrites parameters
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushAcceptsOnlyBelowCapacity
+  {log next : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = some next) :
+  log.len < log.capacity :=
+  RuntimeOramWriteLogDiscipline.pushWrite_acceptsOnlyBelowCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushRejectsAtCapacity
+  {log : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : log.capacity ≤ log.len) :
+  RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = none :=
+  RuntimeOramWriteLogDiscipline.pushWrite_rejectsAtCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushPreservesCapacity
+  {log next : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = some next) :
+  next.capacity = log.capacity :=
+  RuntimeOramWriteLogDiscipline.pushWrite_preservesCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushUpdatesZeroWrites
+  {log next : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = some next) :
+  next.zeroWrites =
+    log.zeroWrites + if isZeroWrite then 1 else 0 :=
+  RuntimeOramWriteLogDiscipline.pushWrite_updatesZeroWrites h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushPreservesOverflowFlag
+  {log next : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = some next) :
+  next.overflowed = log.overflowed :=
+  RuntimeOramWriteLogDiscipline.pushWrite_preservesOverflowFlag h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushUpdateAcceptsOnlyBelowCapacity
+  {log next : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.pushUpdate log = some next) :
+  log.len < log.capacity :=
+  RuntimeOramWriteLogDiscipline.pushUpdate_acceptsOnlyBelowCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushUpdateRejectsAtCapacity
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : log.capacity ≤ log.len) :
+  RuntimeOramWriteLogDiscipline.pushUpdate log = none :=
+  RuntimeOramWriteLogDiscipline.pushUpdate_rejectsAtCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushUpdatePreservesCapacity
+  {log next : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.pushUpdate log = some next) :
+  next.capacity = log.capacity :=
+  RuntimeOramWriteLogDiscipline.pushUpdate_preservesCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushUpdatePreservesZeroWrites
+  {log next : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.pushUpdate log = some next) :
+  next.zeroWrites = log.zeroWrites :=
+  RuntimeOramWriteLogDiscipline.pushUpdate_preservesZeroWrites h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_pushUpdatePreservesOverflowFlag
+  {log next : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.pushUpdate log = some next) :
+  next.overflowed = log.overflowed :=
+  RuntimeOramWriteLogDiscipline.pushUpdate_preservesOverflowFlag h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_exactBatchFillsPublicCapacity
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.exactBatchAccepted parameters log) :
+  log.len = RuntimeOramWriteLogDiscipline.writeLogCapacity parameters :=
+  RuntimeOramWriteLogDiscipline.exactBatchAccepted_exactCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_exactBatchNoOverflow
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.exactBatchAccepted parameters log) :
+  log.overflowed = false :=
+  RuntimeOramWriteLogDiscipline.exactBatchAccepted_noOverflow h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_exactUpdateBatchFillsPublicCapacity
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.exactUpdateBatchAccepted parameters log) :
+  log.len = RuntimeOramWriteLogDiscipline.writeLogCapacity parameters :=
+  RuntimeOramWriteLogDiscipline.exactUpdateBatchAccepted_exactCapacity h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_exactUpdateBatchZeroWrites
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.exactUpdateBatchAccepted parameters log) :
+  log.zeroWrites = 0 :=
+  RuntimeOramWriteLogDiscipline.exactUpdateBatchAccepted_zeroWrites h
+
+theorem RuntimeImplementationInterface.oramWriteLogModel_exactUpdateBatchNoOverflow
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.exactUpdateBatchAccepted parameters log) :
+  log.overflowed = false :=
+  RuntimeOramWriteLogDiscipline.exactUpdateBatchAccepted_noOverflow h
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_initialCapacity
+  (parameters : RuntimeOramWriteLogDiscipline.Parameters) :
+  (RuntimeOramWriteLogDiscipline.initialReadTranscriptBuilder parameters).capacity =
+    RuntimeOramWriteLogDiscipline.readTranscriptCapacity parameters :=
+  RuntimeOramWriteLogDiscipline.initialReadTranscriptBuilder_capacity parameters
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_pushAcceptsOnlyBelowCapacity
+  {builder next : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder =
+      some next) :
+  builder.logicalLen < builder.capacity ∧
+    builder.physicalReadLen < builder.capacity :=
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair_acceptsOnlyBelowCapacity h
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_pushRejectsAtLogicalCapacity
+  {builder : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h : builder.capacity ≤ builder.logicalLen) :
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder = none :=
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair_rejectsAtLogicalCapacity h
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_pushRejectsAtPhysicalReadCapacity
+  {builder : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h : builder.capacity ≤ builder.physicalReadLen) :
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder = none :=
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair_rejectsAtPhysicalReadCapacity h
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_pushPreservesCapacity
+  {builder next : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder =
+      some next) :
+  next.capacity = builder.capacity :=
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair_preservesCapacity h
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_exactTranscriptFillsPublicCapacity
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {builder : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.exactReadTranscriptAccepted
+      parameters builder) :
+  builder.logicalLen =
+      RuntimeOramWriteLogDiscipline.readTranscriptCapacity parameters ∧
+    builder.physicalReadLen =
+      RuntimeOramWriteLogDiscipline.readTranscriptCapacity parameters :=
+  ⟨ RuntimeOramWriteLogDiscipline.exactReadTranscriptAccepted_exactLogicalCapacity h
+  , RuntimeOramWriteLogDiscipline.exactReadTranscriptAccepted_exactPhysicalCapacity h
+  ⟩
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_pushPreservesOverflowFlag
+  {builder next : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder =
+      some next) :
+  next.overflowed = builder.overflowed :=
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair_preservesOverflowFlag h
+
+theorem RuntimeImplementationInterface.oramReadTranscriptModel_exactTranscriptNoOverflow
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {builder : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.exactReadTranscriptAccepted
+      parameters builder) :
+  builder.overflowed = false :=
+  RuntimeOramWriteLogDiscipline.exactReadTranscriptAccepted_noOverflow h
 
 def RuntimeImplementationInterface.theoremFinalizerUsesSharedTraceBridge
   (iface : RuntimeImplementationInterface) : Prop :=
@@ -308,14 +8200,4416 @@ def RuntimeImplementationInterface.checkTheoremFinalizerUsesSharedTraceBridge
     RuntimeImplementationInterface.theoremFinalizerUsesSharedTraceBridge
   simp
 
-def RuntimeImplementationInterface.ConfinesSecretDependentWork
+def RuntimeImplementationInterface.controllerBuildsExplicitPublicObserverCertificate
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.runtimeEvmLibSource
+    [ "mod controller;" ] ∧
+    sourceLacksAll iface.runtimeEvmLibSource
+      [ "pub mod controller;" ] ∧
+    sourceContainsAll iface.controllerProductionSource
+      [ "pub(crate) struct CallRecorder {"
+      , "boundary_schedule: Vec<BoundaryEvent>,"
+      , "controller_phase_order: Vec<ControllerPhase>,"
+      , "enum ControllerRegion {"
+      , "const CONTROLLER_REGIONS: [ControllerRegion; 4]"
+      , "struct ControllerRegionCounters {"
+      , "metadata: usize,"
+      , "fn budgets(&self) -> Result<Box<[ControllerPageBudget]>> {"
+      , "let mut budgets = FixedBoxBuilder::new(CONTROLLER_REGIONS.len());"
+      , "for region in CONTROLLER_REGIONS {"
+      , "event_budget: self.get(region),"
+      , "page_trace_regions: ControllerRegionCounters,"
+      , "workset_regions: ControllerRegionCounters,"
+      , "observed_oram_schedule: Vec<RuntimeObservedOramAccessWitness>,"
+      , "path_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,"
+      , "path_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,"
+      , "BoundaryEvent::enter(entrypoint, total_input_len)"
+      , "ControllerPhase::EnclaveEnter"
+      , "BoundaryEvent::exit(\"oram_access\", 0)"
+      , "ControllerPhase::StageRequest"
+      , "ControllerPhase::SealPersistentState"
+      , "ControllerPhase::EnclaveExit"
+      , "let entry_input_len = public_call.entry_input_len();"
+      , "public_call.into_public_args(),"
+      , "OutputShape::returned("
+      , "manifest_entry.return_canonical_len.ok_or_else"
+      , "RuntimeControllerObserverCertificate::from_runtime_observer_with_oram_accesses("
+      , "self.page_trace_regions.budgets()?"
+      , "self.workset_regions.budgets()?"
+      , "budgets.push(ControllerPageBudget {"
+      , "budgets.finish()"
+      , "fn observed_oram_access_count(&self, object_id: u32) -> usize {"
+      , ".filter(|access| access.object_id == object_id)"
+      , "observed_oram_access_witnesses(&self.observed_oram_schedule)"
+      , "controller_observer.theorem_trace()"
+      , "controller_observer.controller_certificate().clone()"
+      , "RuntimePublicCallTraceBundle::new("
+      ] ∧
+    sourceLacksAll iface.controllerProductionSource
+      [ "pub(crate) struct CallTraceBundle"
+      , "RuntimeControllerObserverCertificate::from_runtime_observer_parts("
+      , "TheoremTrace::from_public_observer_parts("
+      , "SgxControllerShapeTrace {"
+      , "PublicOutcomeTrace {"
+      , "BoundaryEvent {"
+      , "OutputShape {"
+      , "return_length: value.canonical_len(),"
+      , ".collect::<Vec<_>>()\n    .into_boxed_slice()"
+      , "use std::collections::BTreeMap;"
+      , "page_trace_regions: BTreeMap<&'static str, usize>,"
+      , "workset_regions: BTreeMap<&'static str, usize>,"
+      , "observed_oram_accesses: BTreeMap<u32, usize>,"
+      , "controller_region_budgets("
+      , "HashMap<"
+      ]
+
+def RuntimeImplementationInterface.checkControllerBuildsExplicitPublicObserverCertificate
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.runtimeEvmLibSource
+    [ "mod controller;" ] &&
+    checkSourceLacksAll iface.runtimeEvmLibSource
+      [ "pub mod controller;" ] &&
+    checkSourceContainsAll iface.controllerProductionSource
+      [ "pub(crate) struct CallRecorder {"
+      , "boundary_schedule: Vec<BoundaryEvent>,"
+      , "controller_phase_order: Vec<ControllerPhase>,"
+      , "enum ControllerRegion {"
+      , "const CONTROLLER_REGIONS: [ControllerRegion; 4]"
+      , "struct ControllerRegionCounters {"
+      , "metadata: usize,"
+      , "fn budgets(&self) -> Result<Box<[ControllerPageBudget]>> {"
+      , "let mut budgets = FixedBoxBuilder::new(CONTROLLER_REGIONS.len());"
+      , "for region in CONTROLLER_REGIONS {"
+      , "event_budget: self.get(region),"
+      , "page_trace_regions: ControllerRegionCounters,"
+      , "workset_regions: ControllerRegionCounters,"
+      , "observed_oram_schedule: Vec<RuntimeObservedOramAccessWitness>,"
+      , "path_oram_leaf_schedule: Vec<RuntimeOramLeafWitness>,"
+      , "path_oram_leaf_state_transitions: Vec<RuntimePathOramTransitionWitness>,"
+      , "BoundaryEvent::enter(entrypoint, total_input_len)"
+      , "ControllerPhase::EnclaveEnter"
+      , "BoundaryEvent::exit(\"oram_access\", 0)"
+      , "ControllerPhase::StageRequest"
+      , "ControllerPhase::SealPersistentState"
+      , "ControllerPhase::EnclaveExit"
+      , "let entry_input_len = public_call.entry_input_len();"
+      , "public_call.into_public_args(),"
+      , "OutputShape::returned("
+      , "manifest_entry.return_canonical_len.ok_or_else"
+      , "RuntimeControllerObserverCertificate::from_runtime_observer_with_oram_accesses("
+      , "self.page_trace_regions.budgets()?"
+      , "self.workset_regions.budgets()?"
+      , "budgets.push(ControllerPageBudget {"
+      , "budgets.finish()"
+      , "fn observed_oram_access_count(&self, object_id: u32) -> usize {"
+      , ".filter(|access| access.object_id == object_id)"
+      , "observed_oram_access_witnesses(&self.observed_oram_schedule)"
+      , "controller_observer.theorem_trace()"
+      , "controller_observer.controller_certificate().clone()"
+      , "RuntimePublicCallTraceBundle::new("
+      ] &&
+    checkSourceLacksAll iface.controllerProductionSource
+      [ "pub(crate) struct CallTraceBundle"
+      , "RuntimeControllerObserverCertificate::from_runtime_observer_parts("
+      , "TheoremTrace::from_public_observer_parts("
+      , "SgxControllerShapeTrace {"
+      , "PublicOutcomeTrace {"
+      , "BoundaryEvent {"
+      , "OutputShape {"
+      , "return_length: value.canonical_len(),"
+      , ".collect::<Vec<_>>()\n    .into_boxed_slice()"
+      , "use std::collections::BTreeMap;"
+      , "page_trace_regions: BTreeMap<&'static str, usize>,"
+      , "workset_regions: BTreeMap<&'static str, usize>,"
+      , "observed_oram_accesses: BTreeMap<u32, usize>,"
+      , "controller_region_budgets("
+      , "HashMap<"
+      ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkControllerBuildsExplicitPublicObserverCertificate_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkControllerBuildsExplicitPublicObserverCertificate = true ↔
+    iface.controllerBuildsExplicitPublicObserverCertificate := by
+  unfold RuntimeImplementationInterface.checkControllerBuildsExplicitPublicObserverCertificate
+    RuntimeImplementationInterface.controllerBuildsExplicitPublicObserverCertificate
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.coreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.coreLibProductionSource
+    [ "pub mod confidential_core;"
+    , "pub mod confidential_kernel;"
+    , "pub mod shell_boundary;"
+    , "pub mod trace;"
+    , "pub mod trusted_kernel;"
+    , "pub use confidential_core::{"
+    , "RuntimeConfidentialCoreKernelInterfaceSlotBundle"
+    , "RuntimeConfidentialCoreKernelFinishSlotBundle"
+    , "pub use confidential_kernel::{"
+    , "execute_confidential_kernel_slot_program"
+    , "ConfidentialKernelSlotProgram"
+    , "ConfidentialKernelStatementProfile"
+    , "pub use shell_boundary::{"
+    , "RuntimeKernelInterfaceBundle"
+    , "RuntimeShellBoundaryBundle"
+    , "RuntimeShellContract"
+    , "RuntimeShellTrace"
+    , "pub use trace::{"
+    , "RuntimeControllerObserverCertificate"
+    , "RuntimeKernelMachineFinishWitness"
+    , "RuntimeCallOutcome"
+    , "RuntimeTrustedKernelBundle"
+    , "pub use trusted_kernel::{RuntimeTrustedKernelSlotBundle, RuntimeTrustedKernelSlotBundleError};"
+    ] ∧
+  sourceLacksAll iface.coreLibProductionSource
+    [ "pub mod generated_confidential_kernel;"
+    , "pub use generated_confidential_kernel::"
+    , "eval_confidential_kernel_slot_expr_generated"
+    , "execute_confidential_kernel_slot_statement_generated"
+    , "pub use shell_boundary::shell_contract"
+    , "pub use shell_boundary::shell_trace"
+    ]
+
+def RuntimeImplementationInterface.checkCoreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.coreLibProductionSource
+    [ "pub mod confidential_core;"
+    , "pub mod confidential_kernel;"
+    , "pub mod shell_boundary;"
+    , "pub mod trace;"
+    , "pub mod trusted_kernel;"
+    , "pub use confidential_core::{"
+    , "RuntimeConfidentialCoreKernelInterfaceSlotBundle"
+    , "RuntimeConfidentialCoreKernelFinishSlotBundle"
+    , "pub use confidential_kernel::{"
+    , "execute_confidential_kernel_slot_program"
+    , "ConfidentialKernelSlotProgram"
+    , "ConfidentialKernelStatementProfile"
+    , "pub use shell_boundary::{"
+    , "RuntimeKernelInterfaceBundle"
+    , "RuntimeShellBoundaryBundle"
+    , "RuntimeShellContract"
+    , "RuntimeShellTrace"
+    , "pub use trace::{"
+    , "RuntimeControllerObserverCertificate"
+    , "RuntimeKernelMachineFinishWitness"
+    , "RuntimeCallOutcome"
+    , "RuntimeTrustedKernelBundle"
+    , "pub use trusted_kernel::{RuntimeTrustedKernelSlotBundle, RuntimeTrustedKernelSlotBundleError};"
+    ] &&
+  checkSourceLacksAll iface.coreLibProductionSource
+    [ "pub mod generated_confidential_kernel;"
+    , "pub use generated_confidential_kernel::"
+    , "eval_confidential_kernel_slot_expr_generated"
+    , "execute_confidential_kernel_slot_statement_generated"
+    , "pub use shell_boundary::shell_contract"
+    , "pub use shell_boundary::shell_trace"
+    ]
+
+@[simp] theorem
+  runtimeImplementationInterface_checkCoreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkCoreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate = true ↔
+    iface.coreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate := by
+  unfold RuntimeImplementationInterface.checkCoreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
+    RuntimeImplementationInterface.coreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.sharedConfidentialKernelConsumesLeanGeneratedProfiles
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelSource
+    [ "#[path = \"generated_confidential_kernel.rs\"]"
+    , "mod generated_confidential_kernel;"
+    , "pub use generated_confidential_kernel::{"
+    , "CONFIDENTIAL_KERNEL_STATEMENT_PROFILES"
+    , "CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES"
+    , "CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES"
+    , "CONFIDENTIAL_KERNEL_EXPR_PROFILES"
+    , "CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES"
+    ] ∧
+  sourceContainsAll iface.generatedConfidentialKernelProductionSource
+    [ "// @generated by proof/lean/GenerateConfidentialKernelRust.lean; do not edit by hand."
+    , "pub const CONFIDENTIAL_KERNEL_STATEMENT_PROFILES: [ConfidentialKernelStatementProfile; 8] = ["
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 9] = ["
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 6] = ["
+    , "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] = ["
+    , "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 6] = ["
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialKernelConsumesLeanGeneratedProfiles
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelSource
+    [ "#[path = \"generated_confidential_kernel.rs\"]"
+    , "mod generated_confidential_kernel;"
+    , "pub use generated_confidential_kernel::{"
+    , "CONFIDENTIAL_KERNEL_STATEMENT_PROFILES"
+    , "CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES"
+    , "CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES"
+    , "CONFIDENTIAL_KERNEL_EXPR_PROFILES"
+    , "CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES"
+    ] &&
+  checkSourceContainsAll iface.generatedConfidentialKernelProductionSource
+    [ "// @generated by proof/lean/GenerateConfidentialKernelRust.lean; do not edit by hand."
+    , "pub const CONFIDENTIAL_KERNEL_STATEMENT_PROFILES: [ConfidentialKernelStatementProfile; 8] = ["
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 9] = ["
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 6] = ["
+    , "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] = ["
+    , "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 6] = ["
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialKernelConsumesLeanGeneratedProfiles_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialKernelConsumesLeanGeneratedProfiles = true ↔
+    iface.sharedConfidentialKernelConsumesLeanGeneratedProfiles := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialKernelConsumesLeanGeneratedProfiles
+    RuntimeImplementationInterface.sharedConfidentialKernelConsumesLeanGeneratedProfiles
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialKernelConsumesLeanGeneratedInterpreter
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelSource
+    [ "generated_confidential_kernel::execute_confidential_kernel_slot_program_generated("
+    ] ∧
+  sourceContainsAll iface.generatedConfidentialKernelProductionSource
+    [ "pub(super) fn execute_confidential_kernel_slot_program_generated<"
+    , "fn execute_confidential_kernel_slot_block_generated<R: ConfidentialKernelSlotRuntime>("
+    , "pub(super) fn execute_confidential_kernel_slot_statement_generated<"
+    , "fn eval_confidential_kernel_unary_generated(op: &UnaryOp, value: Value) -> Result<Value> {"
+    , "fn eval_confidential_kernel_binary_generated("
+    , "pub(super) fn eval_optional_confidential_kernel_predicate_generated<"
+    , "pub(super) fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernelSlotRuntime>("
+    , "state: &mut ConfidentialKernelInterpreterState,"
+    , "pub(super) fn eval_confidential_kernel_slot_pure_expr_generated<"
+    , "if !program.is_runtime_normal_form() {"
+    , "ConfidentialKernelSlotStatement::Require { .. } => {"
+    , "bail!(\"confidential slot program must be normalized before runtime execution\");"
+    , "fn note_abort_generated(state: &mut ConfidentialKernelInterpreterState, cond: bool) {"
+    , "state.aborted = masked_select_bool(cond, true, state.aborted);"
+    , "note_abort_generated(state, cond);"
+    , "let (value, overflowed) = runtime.map_get(*object_id, &key)?;"
+    , "note_abort_generated(state, overflowed);"
+    , "eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"map\", state,\n            )?;"
+    , "Value::confidential_select(cond, when_true, when_false)"
+    , "collect_confidential_hash_parts("
+    , "runtime.note_statement(statement)?;"
+    ] ∧
+  sourceLacksAll iface.generatedConfidentialKernelProductionSource
+    [ "if state.returned {"
+    , "break;"
+    , "state.returned = true;"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialKernelConsumesLeanGeneratedInterpreter
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelSource
+    [ "generated_confidential_kernel::execute_confidential_kernel_slot_program_generated("
+    ] &&
+  checkSourceContainsAll iface.generatedConfidentialKernelProductionSource
+    [ "pub(super) fn execute_confidential_kernel_slot_program_generated<"
+    , "fn execute_confidential_kernel_slot_block_generated<R: ConfidentialKernelSlotRuntime>("
+    , "pub(super) fn execute_confidential_kernel_slot_statement_generated<"
+    , "fn eval_confidential_kernel_unary_generated(op: &UnaryOp, value: Value) -> Result<Value> {"
+    , "fn eval_confidential_kernel_binary_generated("
+    , "pub(super) fn eval_optional_confidential_kernel_predicate_generated<"
+    , "pub(super) fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernelSlotRuntime>("
+    , "state: &mut ConfidentialKernelInterpreterState,"
+    , "pub(super) fn eval_confidential_kernel_slot_pure_expr_generated<"
+    , "if !program.is_runtime_normal_form() {"
+    , "ConfidentialKernelSlotStatement::Require { .. } => {"
+    , "bail!(\"confidential slot program must be normalized before runtime execution\");"
+    , "fn note_abort_generated(state: &mut ConfidentialKernelInterpreterState, cond: bool) {"
+    , "state.aborted = masked_select_bool(cond, true, state.aborted);"
+    , "note_abort_generated(state, cond);"
+    , "let (value, overflowed) = runtime.map_get(*object_id, &key)?;"
+    , "note_abort_generated(state, overflowed);"
+    , "eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"map\", state,\n            )?;"
+    , "Value::confidential_select(cond, when_true, when_false)"
+    , "collect_confidential_hash_parts("
+    , "runtime.note_statement(statement)?;"
+    ] &&
+  checkSourceLacksAll iface.generatedConfidentialKernelProductionSource
+    [ "if state.returned {"
+    , "break;"
+    , "state.returned = true;"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialKernelConsumesLeanGeneratedInterpreter_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialKernelConsumesLeanGeneratedInterpreter = true ↔
+    iface.sharedConfidentialKernelConsumesLeanGeneratedInterpreter := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialKernelConsumesLeanGeneratedInterpreter
+    RuntimeImplementationInterface.sharedConfidentialKernelConsumesLeanGeneratedInterpreter
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesStatementProfiles
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelStatementKind {"
+    , "pub enum ConfidentialKernelStatementEffectKind {"
+    , "pub struct ConfidentialKernelStatementProfile {"
+    , "pub evaluated_operands: &'static [&'static str],"
+    , "pub const CONFIDENTIAL_KERNEL_STATEMENT_PROFILES: [ConfidentialKernelStatementProfile; 8] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelStatementProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelStatementKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelStatementProfile {"
+    , "self.profile().trace_name"
+    , "self.profile().runtime_normal_form"
+    , "self.storage_opcode()"
+    , "let mut saw_return = false;"
+    , "if saw_return || !statement.is_runtime_normal_form() {"
+    , "saw_return = matches!(statement, ConfidentialKernelSlotStatement::Return { .. });"
+    , "ConfidentialKernelLoweringError::NonFinalReturn"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesStatementProfiles
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelStatementKind {"
+    , "pub enum ConfidentialKernelStatementEffectKind {"
+    , "pub struct ConfidentialKernelStatementProfile {"
+    , "pub evaluated_operands: &'static [&'static str],"
+    , "pub const CONFIDENTIAL_KERNEL_STATEMENT_PROFILES: [ConfidentialKernelStatementProfile; 8] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelStatementProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelStatementKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelStatementProfile {"
+    , "self.profile().trace_name"
+    , "self.profile().runtime_normal_form"
+    , "self.storage_opcode()"
+    , "let mut saw_return = false;"
+    , "if saw_return || !statement.is_runtime_normal_form() {"
+    , "saw_return = matches!(statement, ConfidentialKernelSlotStatement::Return { .. });"
+    , "ConfidentialKernelLoweringError::NonFinalReturn"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterCentralizesStatementProfiles_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterCentralizesStatementProfiles = true ↔
+    iface.sharedConfidentialInterpreterCentralizesStatementProfiles := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesStatementProfiles
+    RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesStatementProfiles
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesExprProfiles
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelExprKind {"
+    , "pub struct ConfidentialKernelExprProfile {"
+    , "pub tail_opcode: Option<UoOpcode>,"
+    , "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelExprProfile {"
+    , "self.profile().tail_opcode"
+    , "fn tail_object_id(&self) -> Option<u32> {"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesExprProfiles
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelExprKind {"
+    , "pub struct ConfidentialKernelExprProfile {"
+    , "pub tail_opcode: Option<UoOpcode>,"
+    , "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelExprProfile {"
+    , "self.profile().tail_opcode"
+    , "fn tail_object_id(&self) -> Option<u32> {"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterCentralizesExprProfiles_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterCentralizesExprProfiles = true ↔
+    iface.sharedConfidentialInterpreterCentralizesExprProfiles := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesExprProfiles
+    RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesExprProfiles
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesPureExprProfiles
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelPureExprKind {"
+    , "pub struct ConfidentialKernelPureExprProfile {"
+    , "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 6] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelPureExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelPureExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelPureExprProfile {"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesPureExprProfiles
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelPureExprKind {"
+    , "pub struct ConfidentialKernelPureExprProfile {"
+    , "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 6] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelPureExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelPureExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelPureExprProfile {"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterCentralizesPureExprProfiles_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterCentralizesPureExprProfiles = true ↔
+    iface.sharedConfidentialInterpreterCentralizesPureExprProfiles := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesPureExprProfiles
+    RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesPureExprProfiles
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesSlotExprProfiles
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelSlotExprKind {"
+    , "pub struct ConfidentialKernelSlotExprProfile {"
+    , "pub evaluated_operands: &'static [&'static str],"
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 9] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelSlotExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelSlotExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelSlotExprProfile {"
+    , "self.storage_opcode()"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesSlotExprProfiles
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelSlotExprKind {"
+    , "pub struct ConfidentialKernelSlotExprProfile {"
+    , "pub evaluated_operands: &'static [&'static str],"
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 9] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelSlotExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelSlotExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelSlotExprProfile {"
+    , "self.storage_opcode()"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterCentralizesSlotExprProfiles_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterCentralizesSlotExprProfiles = true ↔
+    iface.sharedConfidentialInterpreterCentralizesSlotExprProfiles := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesSlotExprProfiles
+    RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesSlotExprProfiles
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesSlotPureExprProfiles
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelSlotPureExprKind {"
+    , "pub struct ConfidentialKernelSlotPureExprProfile {"
+    , "pub evaluated_operands: &'static [&'static str],"
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 6] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelSlotPureExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelSlotPureExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelSlotPureExprProfile {"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesSlotPureExprProfiles
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "pub enum ConfidentialKernelSlotPureExprKind {"
+    , "pub struct ConfidentialKernelSlotPureExprProfile {"
+    , "pub evaluated_operands: &'static [&'static str],"
+    , "pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 6] = ["
+    , "pub const fn profile(self) -> ConfidentialKernelSlotPureExprProfile {"
+    , "pub fn kind(&self) -> ConfidentialKernelSlotPureExprKind {"
+    , "pub fn profile(&self) -> ConfidentialKernelSlotPureExprProfile {"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterCentralizesSlotPureExprProfiles_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterCentralizesSlotPureExprProfiles = true ↔
+    iface.sharedConfidentialInterpreterCentralizesSlotPureExprProfiles := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterCentralizesSlotPureExprProfiles
+    RuntimeImplementationInterface.sharedConfidentialInterpreterCentralizesSlotPureExprProfiles
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialKernelKeepsNamedToSlotLoweringExplicit
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "fn to_slot_statement("
+    , "Self::Declare { name, value, .. } => Ok(ConfidentialKernelSlotStatement::Declare {"
+    , "slot: layout.declare(name)?,"
+    , "Self::Assign { name, value } => Ok(ConfidentialKernelSlotStatement::Assign {"
+    , "slot: layout.resolve(name)?,"
+    , "Self::Require { cond } => Ok(ConfidentialKernelSlotStatement::AbortIf {"
+    , "Self::AbortIf { cond } => Ok(ConfidentialKernelSlotStatement::AbortIf {"
+    , "Self::CellSet {\n                object_id,\n                value,\n                predicate,\n            } => Ok(ConfidentialKernelSlotStatement::CellSet {"
+    , "predicate: predicate\n                    .as_ref()\n                    .map(|expr| expr.to_slot_expr(layout))\n                    .transpose()?,"
+    , "Self::ArraySet {\n                object_id,\n                index,\n                value,\n                predicate,\n            } => Ok(ConfidentialKernelSlotStatement::ArraySet {"
+    , "index: index.to_slot_expr(layout)?,"
+    , "Self::MapPut {\n                object_id,\n                key,\n                value,\n                predicate,\n            } => Ok(ConfidentialKernelSlotStatement::MapPut {"
+    , "key: key.to_slot_expr(layout)?,"
+    , "Self::Return { value } => Ok(ConfidentialKernelSlotStatement::Return {"
+    , "value: value\n                    .as_ref()\n                    .map(|expr| expr.to_slot_expr(layout))\n                    .transpose()?,"
+    , "fn to_slot_expr("
+    , "Self::Var { name } => Ok(ConfidentialKernelSlotExpr::Slot {"
+    , "Self::Unary { op, expr } => Ok(ConfidentialKernelSlotExpr::Unary {"
+    , "Self::Binary { op, lhs, rhs } => Ok(ConfidentialKernelSlotExpr::Binary {"
+    , "Self::Select {\n                cond,\n                when_true,\n                when_false,\n            } => Ok(ConfidentialKernelSlotExpr::Select {"
+    , "when_true: Box::new(when_true.to_slot_pure_expr(layout)?),"
+    , "when_false: Box::new(when_false.to_slot_pure_expr(layout)?),"
+    , "Self::ArrayGet { object_id, index } => Ok(ConfidentialKernelSlotExpr::ArrayGet {"
+    , "Self::MapGet { object_id, key } => Ok(ConfidentialKernelSlotExpr::MapGet {"
+    , "let mut lowered = FixedBoxBuilder::new(parts.len());"
+    , "lowered.push(part.to_slot_expr(layout)?).map_err(|error| {"
+    , "Ok(ConfidentialKernelSlotExpr::Keccak256 {"
+    , "parts: lowered.finish().map_err(|error| {"
+    , "fn to_slot_pure_expr("
+    , "Self::Var { name } => Ok(ConfidentialKernelSlotPureExpr::Slot {"
+    , "Self::Unary { op, expr } => Ok(ConfidentialKernelSlotPureExpr::Unary {"
+    , "Self::Binary { op, lhs, rhs } => Ok(ConfidentialKernelSlotPureExpr::Binary {"
+    , "Self::Select {\n                cond,\n                when_true,\n                when_false,\n            } => Ok(ConfidentialKernelSlotPureExpr::Select {"
+    , "cond: Box::new(cond.to_slot_pure_expr(layout)?),"
+    , "when_true: Box::new(when_true.to_slot_pure_expr(layout)?),"
+    , "when_false: Box::new(when_false.to_slot_pure_expr(layout)?),"
+    , ".push(part.to_slot_pure_expr(layout)?)"
+    , "Ok(ConfidentialKernelSlotPureExpr::Keccak256 {"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialKernelKeepsNamedToSlotLoweringExplicit
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "fn to_slot_statement("
+    , "Self::Declare { name, value, .. } => Ok(ConfidentialKernelSlotStatement::Declare {"
+    , "slot: layout.declare(name)?,"
+    , "Self::Assign { name, value } => Ok(ConfidentialKernelSlotStatement::Assign {"
+    , "slot: layout.resolve(name)?,"
+    , "Self::Require { cond } => Ok(ConfidentialKernelSlotStatement::AbortIf {"
+    , "Self::AbortIf { cond } => Ok(ConfidentialKernelSlotStatement::AbortIf {"
+    , "Self::CellSet {\n                object_id,\n                value,\n                predicate,\n            } => Ok(ConfidentialKernelSlotStatement::CellSet {"
+    , "predicate: predicate\n                    .as_ref()\n                    .map(|expr| expr.to_slot_expr(layout))\n                    .transpose()?,"
+    , "Self::ArraySet {\n                object_id,\n                index,\n                value,\n                predicate,\n            } => Ok(ConfidentialKernelSlotStatement::ArraySet {"
+    , "index: index.to_slot_expr(layout)?,"
+    , "Self::MapPut {\n                object_id,\n                key,\n                value,\n                predicate,\n            } => Ok(ConfidentialKernelSlotStatement::MapPut {"
+    , "key: key.to_slot_expr(layout)?,"
+    , "Self::Return { value } => Ok(ConfidentialKernelSlotStatement::Return {"
+    , "value: value\n                    .as_ref()\n                    .map(|expr| expr.to_slot_expr(layout))\n                    .transpose()?,"
+    , "fn to_slot_expr("
+    , "Self::Var { name } => Ok(ConfidentialKernelSlotExpr::Slot {"
+    , "Self::Unary { op, expr } => Ok(ConfidentialKernelSlotExpr::Unary {"
+    , "Self::Binary { op, lhs, rhs } => Ok(ConfidentialKernelSlotExpr::Binary {"
+    , "Self::Select {\n                cond,\n                when_true,\n                when_false,\n            } => Ok(ConfidentialKernelSlotExpr::Select {"
+    , "when_true: Box::new(when_true.to_slot_pure_expr(layout)?),"
+    , "when_false: Box::new(when_false.to_slot_pure_expr(layout)?),"
+    , "Self::ArrayGet { object_id, index } => Ok(ConfidentialKernelSlotExpr::ArrayGet {"
+    , "Self::MapGet { object_id, key } => Ok(ConfidentialKernelSlotExpr::MapGet {"
+    , "let mut lowered = FixedBoxBuilder::new(parts.len());"
+    , "lowered.push(part.to_slot_expr(layout)?).map_err(|error| {"
+    , "Ok(ConfidentialKernelSlotExpr::Keccak256 {"
+    , "parts: lowered.finish().map_err(|error| {"
+    , "fn to_slot_pure_expr("
+    , "Self::Var { name } => Ok(ConfidentialKernelSlotPureExpr::Slot {"
+    , "Self::Unary { op, expr } => Ok(ConfidentialKernelSlotPureExpr::Unary {"
+    , "Self::Binary { op, lhs, rhs } => Ok(ConfidentialKernelSlotPureExpr::Binary {"
+    , "Self::Select {\n                cond,\n                when_true,\n                when_false,\n            } => Ok(ConfidentialKernelSlotPureExpr::Select {"
+    , "cond: Box::new(cond.to_slot_pure_expr(layout)?),"
+    , "when_true: Box::new(when_true.to_slot_pure_expr(layout)?),"
+    , "when_false: Box::new(when_false.to_slot_pure_expr(layout)?),"
+    , ".push(part.to_slot_pure_expr(layout)?)"
+    , "Ok(ConfidentialKernelSlotPureExpr::Keccak256 {"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialKernelKeepsNamedToSlotLoweringExplicit_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialKernelKeepsNamedToSlotLoweringExplicit = true ↔
+    iface.sharedConfidentialKernelKeepsNamedToSlotLoweringExplicit := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialKernelKeepsNamedToSlotLoweringExplicit
+    RuntimeImplementationInterface.sharedConfidentialKernelKeepsNamedToSlotLoweringExplicit
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernelSlotRuntime>("
+    , "state: &mut ConfidentialKernelInterpreterState,"
+    , "let value = eval_confidential_kernel_slot_expr_generated(runtime, expr, state)?;"
+    , "let lhs = eval_confidential_kernel_slot_expr_generated(runtime, lhs, state)?;"
+    , "let rhs = eval_confidential_kernel_slot_expr_generated(runtime, rhs, state)?;"
+    , "let cond = eval_confidential_kernel_slot_expr_generated(runtime, cond, state)?"
+    , "let when_true = eval_confidential_kernel_slot_pure_expr_generated(runtime, when_true)?;"
+    , "let when_false =\n                eval_confidential_kernel_slot_pure_expr_generated(runtime, when_false)?;"
+    , "let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?"
+    , "let key = eval_confidential_kernel_slot_expr_generated(runtime, key, state)?;"
+    , ".map(|part| eval_confidential_kernel_slot_expr_generated(runtime, part, state)),"
+    , "fn eval_confidential_kernel_slot_pure_expr_generated<"
+    , "let value = eval_confidential_kernel_slot_pure_expr_generated(runtime, expr)?;"
+    , "let lhs = eval_confidential_kernel_slot_pure_expr_generated(runtime, lhs)?;"
+    , "let rhs = eval_confidential_kernel_slot_pure_expr_generated(runtime, rhs)?;"
+    , "let cond = eval_confidential_kernel_slot_pure_expr_generated(runtime, cond)?"
+    , ".map(|part| eval_confidential_kernel_slot_pure_expr_generated(runtime, part)),"
+    , "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            runtime.array_get(*object_id, index)"
+    ] ∧
+  sourceLacksAll iface.confidentialKernelProductionSource
+    [ "as usize;"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernelSlotRuntime>("
+    , "state: &mut ConfidentialKernelInterpreterState,"
+    , "let value = eval_confidential_kernel_slot_expr_generated(runtime, expr, state)?;"
+    , "let lhs = eval_confidential_kernel_slot_expr_generated(runtime, lhs, state)?;"
+    , "let rhs = eval_confidential_kernel_slot_expr_generated(runtime, rhs, state)?;"
+    , "let cond = eval_confidential_kernel_slot_expr_generated(runtime, cond, state)?"
+    , "let when_true = eval_confidential_kernel_slot_pure_expr_generated(runtime, when_true)?;"
+    , "let when_false =\n                eval_confidential_kernel_slot_pure_expr_generated(runtime, when_false)?;"
+    , "let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?"
+    , "let key = eval_confidential_kernel_slot_expr_generated(runtime, key, state)?;"
+    , ".map(|part| eval_confidential_kernel_slot_expr_generated(runtime, part, state)),"
+    , "fn eval_confidential_kernel_slot_pure_expr_generated<"
+    , "let value = eval_confidential_kernel_slot_pure_expr_generated(runtime, expr)?;"
+    , "let lhs = eval_confidential_kernel_slot_pure_expr_generated(runtime, lhs)?;"
+    , "let rhs = eval_confidential_kernel_slot_pure_expr_generated(runtime, rhs)?;"
+    , "let cond = eval_confidential_kernel_slot_pure_expr_generated(runtime, cond)?"
+    , ".map(|part| eval_confidential_kernel_slot_pure_expr_generated(runtime, part)),"
+    , "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            runtime.array_get(*object_id, index)"
+    ] &&
+  checkSourceLacksAll iface.confidentialKernelProductionSource
+    [ "as usize;"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit = true ↔
+    iface.sharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit
+    RuntimeImplementationInterface.sharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit
+  simp
+
+def RuntimeImplementationInterface.sharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.confidentialKernelProductionSource
+    [ "fn execute_confidential_kernel_slot_statement_generated<"
+    , "ConfidentialKernelSlotStatement::Declare { slot, value }\n        | ConfidentialKernelSlotStatement::Assign { slot, value } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            runtime.store_slot(*slot, value)?;"
+    , "ConfidentialKernelSlotStatement::AbortIf { cond } => {\n            let cond = eval_confidential_kernel_slot_expr_generated(runtime, cond, state)?"
+    , "ConfidentialKernelSlotStatement::CellSet {\n            object_id,\n            value,\n            predicate,\n        } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"cell\", state,\n            )?;"
+    , "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"array\", state,\n            )?;"
+    , "ConfidentialKernelSlotStatement::MapPut {\n            object_id,\n            key,\n            value,\n            predicate,\n        } => {\n            let key = eval_confidential_kernel_slot_expr_generated(runtime, key, state)?;\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"map\", state,\n            )?;"
+    , "let return_value = if let Some(expr) = value.as_ref() {\n                Some(eval_confidential_kernel_slot_expr_generated(\n                    runtime, expr, state,\n                )?)"
+    ]
+
+def RuntimeImplementationInterface.checkSharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.confidentialKernelProductionSource
+    [ "fn execute_confidential_kernel_slot_statement_generated<"
+    , "ConfidentialKernelSlotStatement::Declare { slot, value }\n        | ConfidentialKernelSlotStatement::Assign { slot, value } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            runtime.store_slot(*slot, value)?;"
+    , "ConfidentialKernelSlotStatement::AbortIf { cond } => {\n            let cond = eval_confidential_kernel_slot_expr_generated(runtime, cond, state)?"
+    , "ConfidentialKernelSlotStatement::CellSet {\n            object_id,\n            value,\n            predicate,\n        } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"cell\", state,\n            )?;"
+    , "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"array\", state,\n            )?;"
+    , "ConfidentialKernelSlotStatement::MapPut {\n            object_id,\n            key,\n            value,\n            predicate,\n        } => {\n            let key = eval_confidential_kernel_slot_expr_generated(runtime, key, state)?;\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"map\", state,\n            )?;"
+    , "let return_value = if let Some(expr) = value.as_ref() {\n                Some(eval_confidential_kernel_slot_expr_generated(\n                    runtime, expr, state,\n                )?)"
+    ]
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit = true ↔
+    iface.sharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit
+    RuntimeImplementationInterface.sharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit
+  simp
+
+def RuntimeImplementationInterface.statementTraceBridgeIsExact
+  (iface : RuntimeImplementationInterface) : Prop :=
+  sourceContainsAll iface.stateProductionSource
+    [ ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    , "RuntimeKernelStatementTrace::new(plan.confidential_slot_program().body.len())"
+    , "opcode_trace.into_boxed_trace()"
+    , "opcode_trace: &mut RuntimeKernelStatementTrace,"
+    ] ∧
+    sourceContainsAll iface.kernelRuntimeProductionSource
+      [ "pub struct RuntimeKernelStatementTrace {"
+      , "statements: Box<[MaybeUninit<String>]>,"
+      , "pub fn new(capacity: usize) -> Self {"
+      , "statements: Box::<[String]>::new_uninit_slice(capacity),"
+      , "fn record(&mut self, statement: &uo_core::ConfidentialKernelSlotStatement) -> Result<()> {"
+      , "let Some(slot) = self.statements.get_mut(self.len) else {"
+      , "slot.write(statement.trace_name().into());"
+      , "self.opcode_trace.record(statement)"
+      , "pub fn into_boxed_trace(mut self) -> Box<[String]> {"
+      , "let mut trace = Box::<[String]>::new_uninit_slice(self.len);"
+      , "for (slot, statement) in trace"
+      , ".zip(self.statements.iter_mut().take(self.len))"
+      , "slot.write(unsafe { statement.assume_init_read() });"
+      , "impl Drop for RuntimeKernelStatementTrace {"
+      , "for statement in self.statements.iter_mut().take(self.len) {"
+      , "unsafe { statement.assume_init_drop() };"
+      , "opcode_trace: &mut RuntimeKernelStatementTrace,"
+      , "opcode_trace: &'a mut RuntimeKernelStatementTrace,"
+      , "RuntimeKernelEffectAdapter::new(&mut self, &mut shadow, recorder, opcode_trace)"
+      , "fn note_statement("
+      ]
+    ∧
+    sourceLacksAll iface.kernelRuntimeProductionSource
+      [ "opcode_trace: &mut Vec<String>,"
+      , "opcode_trace: &'a mut Vec<String>,"
+      , "opcode_trace.push("
+      , "statements: Box<[Option<String>]>,"
+      , "statements: vec![None; capacity].into_boxed_slice()"
+      , "let mut trace = Vec::with_capacity(self.len);"
+      , "self.statements.into_vec()"
+      , "trace[index].write(unsafe { self.statements[index].assume_init_read() });"
+      , "&mut self.statements[..self.len]"
+      ]
+    ∧
+    sourceContainsAll iface.generatedConfidentialKernelProductionSource
+      [ "runtime.note_statement(statement)?;"
+      ] ∧
+    sourceContainsAll iface.confidentialKernelProductionSource
+      [ "pub body: Box<[ConfidentialKernelStatement]>,"
+      , "pub body: Box<[ConfidentialKernelSlotStatement]>,"
+      , "parts: Box<[ConfidentialKernelExpr]>,"
+      , "parts: Box<[ConfidentialKernelSlotExpr]>,"
+      , "parts: Box<[ConfidentialKernelPureExpr]>,"
+      , "parts: Box<[ConfidentialKernelSlotPureExpr]>,"
+      , "let mut body = FixedBoxBuilder::new(self.body.len());"
+      , "body.push(statement.to_slot_statement(&mut layout)?)"
+      , "|error| ConfidentialKernelSlotLoweringError::FixedBufferInvariant {"
+      , "body: body.finish().map_err(|error| {"
+      , ") -> Result<Box<[ConfidentialKernelStatement]>, ConfidentialKernelLoweringError> {"
+      , "let mut lowered = FixedBoxBuilder::new(statements.len());"
+      , ".finish()"
+      , "|error| ConfidentialKernelLoweringError::FixedBufferInvariant {"
+      , "pub fn statement_trace(&self) -> Box<[String]>"
+      , "let mut statements = self.body.iter();"
+      , "FixedBoxBuilder::from_fn(self.body.len(), |_| {"
+      , ".map(|statement| statement.trace_name().to_owned())"
+      , ".unwrap_or_default()"
+      ] ∧
+    sourceLacksAll iface.confidentialKernelProductionSource
+      [ "pub body: Vec<ConfidentialKernelStatement>"
+      , "pub body: Vec<ConfidentialKernelSlotStatement>"
+      , "parts: Vec<ConfidentialKernel"
+      , "Vec::with_capacity(statements.len())"
+      , ".collect::<Result<Vec<_>, _>>()"
+      , "self.body[index].trace_name().to_owned()"
+      ] ∧
+    sourceContainsAll iface.traceProductionSource
+      [ "opcode_trace: Box<[String]>,"
+      , "pub fn from_runtime_execution("
+      , "pub fn into_theorem_trace_parts("
+      , "opcode_trace: self.opcode_trace.clone(),"
+      ] ∧
+    sourceContainsAll iface.confidentialCoreProductionSource
+      [ "opcode_trace: Box<[String]>,"
+      , "pub fn opcode_trace(&self) -> &[String] {"
+      , "if opcode_trace.as_ref() != confidential_slot_program.statement_trace().as_ref() {"
+      , "RuntimeConfidentialCoreKernelFinishSlotBundle::from_runtime_kernel_finish_bundle("
+      , "self.opcode_trace.clone(),"
+      ] ∧
+    sourceContainsAll iface.trustedKernelProductionSource
+      [ "opcode_trace: Box<[String]>,"
+      , "pub fn opcode_trace(&self) -> &[String] {"
+      , "if opcode_trace.as_ref() != confidential_slot_program.statement_trace().as_ref() {"
+      , "RuntimeTrustedKernelSlotBundle::from_trusted_kernel_bundle("
+      , "self.opcode_trace.clone(),"
+      ]
+
+def RuntimeImplementationInterface.checkStatementTraceBridgeIsExact
+  (iface : RuntimeImplementationInterface) : Bool :=
+  checkSourceContainsAll iface.stateProductionSource
+    [ ".run_confidential_call::<ConfidentialRuntimeShadowState>("
+    , "RuntimeKernelStatementTrace::new(plan.confidential_slot_program().body.len())"
+    , "opcode_trace.into_boxed_trace()"
+    , "opcode_trace: &mut RuntimeKernelStatementTrace,"
+    ] &&
+    checkSourceContainsAll iface.kernelRuntimeProductionSource
+      [ "pub struct RuntimeKernelStatementTrace {"
+      , "statements: Box<[MaybeUninit<String>]>,"
+      , "pub fn new(capacity: usize) -> Self {"
+      , "statements: Box::<[String]>::new_uninit_slice(capacity),"
+      , "fn record(&mut self, statement: &uo_core::ConfidentialKernelSlotStatement) -> Result<()> {"
+      , "let Some(slot) = self.statements.get_mut(self.len) else {"
+      , "slot.write(statement.trace_name().into());"
+      , "self.opcode_trace.record(statement)"
+      , "pub fn into_boxed_trace(mut self) -> Box<[String]> {"
+      , "let mut trace = Box::<[String]>::new_uninit_slice(self.len);"
+      , "for (slot, statement) in trace"
+      , ".zip(self.statements.iter_mut().take(self.len))"
+      , "slot.write(unsafe { statement.assume_init_read() });"
+      , "impl Drop for RuntimeKernelStatementTrace {"
+      , "for statement in self.statements.iter_mut().take(self.len) {"
+      , "unsafe { statement.assume_init_drop() };"
+      , "opcode_trace: &mut RuntimeKernelStatementTrace,"
+      , "opcode_trace: &'a mut RuntimeKernelStatementTrace,"
+      , "RuntimeKernelEffectAdapter::new(&mut self, &mut shadow, recorder, opcode_trace)"
+      , "fn note_statement("
+      ]
+    &&
+    checkSourceLacksAll iface.kernelRuntimeProductionSource
+      [ "opcode_trace: &mut Vec<String>,"
+      , "opcode_trace: &'a mut Vec<String>,"
+      , "opcode_trace.push("
+      , "statements: Box<[Option<String>]>,"
+      , "statements: vec![None; capacity].into_boxed_slice()"
+      , "let mut trace = Vec::with_capacity(self.len);"
+      , "self.statements.into_vec()"
+      , "trace[index].write(unsafe { self.statements[index].assume_init_read() });"
+      , "&mut self.statements[..self.len]"
+      ]
+    &&
+    checkSourceContainsAll iface.generatedConfidentialKernelProductionSource
+      [ "runtime.note_statement(statement)?;"
+      ] &&
+    checkSourceContainsAll iface.confidentialKernelProductionSource
+      [ "pub body: Box<[ConfidentialKernelStatement]>,"
+      , "pub body: Box<[ConfidentialKernelSlotStatement]>,"
+      , "parts: Box<[ConfidentialKernelExpr]>,"
+      , "parts: Box<[ConfidentialKernelSlotExpr]>,"
+      , "parts: Box<[ConfidentialKernelPureExpr]>,"
+      , "parts: Box<[ConfidentialKernelSlotPureExpr]>,"
+      , "let mut body = FixedBoxBuilder::new(self.body.len());"
+      , "body.push(statement.to_slot_statement(&mut layout)?)"
+      , "|error| ConfidentialKernelSlotLoweringError::FixedBufferInvariant {"
+      , "body: body.finish().map_err(|error| {"
+      , ") -> Result<Box<[ConfidentialKernelStatement]>, ConfidentialKernelLoweringError> {"
+      , "let mut lowered = FixedBoxBuilder::new(statements.len());"
+      , ".finish()"
+      , "|error| ConfidentialKernelLoweringError::FixedBufferInvariant {"
+      , "pub fn statement_trace(&self) -> Box<[String]>"
+      , "let mut statements = self.body.iter();"
+      , "FixedBoxBuilder::from_fn(self.body.len(), |_| {"
+      , ".map(|statement| statement.trace_name().to_owned())"
+      , ".unwrap_or_default()"
+      ] &&
+    checkSourceLacksAll iface.confidentialKernelProductionSource
+      [ "pub body: Vec<ConfidentialKernelStatement>"
+      , "pub body: Vec<ConfidentialKernelSlotStatement>"
+      , "parts: Vec<ConfidentialKernel"
+      , "Vec::with_capacity(statements.len())"
+      , ".collect::<Result<Vec<_>, _>>()"
+      , "self.body[index].trace_name().to_owned()"
+      ] &&
+    checkSourceContainsAll iface.traceProductionSource
+      [ "opcode_trace: Box<[String]>,"
+      , "pub fn from_runtime_execution("
+      , "pub fn into_theorem_trace_parts("
+      , "opcode_trace: self.opcode_trace.clone(),"
+      ] &&
+    checkSourceContainsAll iface.confidentialCoreProductionSource
+      [ "opcode_trace: Box<[String]>,"
+      , "pub fn opcode_trace(&self) -> &[String] {"
+      , "if opcode_trace.as_ref() != confidential_slot_program.statement_trace().as_ref() {"
+      , "RuntimeConfidentialCoreKernelFinishSlotBundle::from_runtime_kernel_finish_bundle("
+      , "self.opcode_trace.clone(),"
+      ] &&
+    checkSourceContainsAll iface.trustedKernelProductionSource
+      [ "opcode_trace: Box<[String]>,"
+      , "pub fn opcode_trace(&self) -> &[String] {"
+      , "if opcode_trace.as_ref() != confidential_slot_program.statement_trace().as_ref() {"
+      , "RuntimeTrustedKernelSlotBundle::from_trusted_kernel_bundle("
+      , "self.opcode_trace.clone(),"
+      ]
+
+@[simp] theorem runtimeImplementationInterface_checkStatementTraceBridgeIsExact_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkStatementTraceBridgeIsExact = true ↔
+    iface.statementTraceBridgeIsExact := by
+  unfold RuntimeImplementationInterface.checkStatementTraceBridgeIsExact
+    RuntimeImplementationInterface.statementTraceBridgeIsExact
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.statementTraceModel_initialCapacityMatchesProgram
+  (program : ConfidentialKernelSlotProgram) :
+  (RuntimeStatementTraceDiscipline.initialTrace program).capacity =
+    RuntimeStatementTraceDiscipline.capacityForProgram program :=
+  RuntimeStatementTraceDiscipline.initialTrace_capacityForProgram program
+
+theorem RuntimeImplementationInterface.statementTraceModel_statementTraceNamesMatchBodyLength
+  (program : ConfidentialKernelSlotProgram) :
+  program.statementTraceNames.length =
+    RuntimeStatementTraceDiscipline.capacityForProgram program :=
+  RuntimeStatementTraceDiscipline.statementTraceNames_length program
+
+theorem RuntimeImplementationInterface.statementTraceModel_recordAcceptsOnlyBelowCapacity
+  {trace next : RuntimeStatementTraceDiscipline.Trace}
+  {statement : ConfidentialKernelSlotStatement}
+  (h : RuntimeStatementTraceDiscipline.recordStatement trace statement = some next) :
+  trace.len < trace.capacity :=
+  RuntimeStatementTraceDiscipline.recordStatement_acceptsOnlyBelowCapacity h
+
+theorem RuntimeImplementationInterface.statementTraceModel_recordRejectsAtCapacity
+  {trace : RuntimeStatementTraceDiscipline.Trace}
+  (statement : ConfidentialKernelSlotStatement)
+  (h : ¬ trace.len < trace.capacity) :
+  RuntimeStatementTraceDiscipline.recordStatement trace statement = none :=
+  RuntimeStatementTraceDiscipline.recordStatement_rejectsAtCapacity statement h
+
+theorem RuntimeImplementationInterface.statementTraceModel_recordAppendsTraceName
+  {trace next : RuntimeStatementTraceDiscipline.Trace}
+  {statement : ConfidentialKernelSlotStatement}
+  (h : RuntimeStatementTraceDiscipline.recordStatement trace statement = some next) :
+  next.names = trace.names ++ [statement.traceName] :=
+  RuntimeStatementTraceDiscipline.recordStatement_appendsTraceName h
+
+theorem RuntimeImplementationInterface.statementTraceModel_acceptedTraceHasExactLength
+  {program : ConfidentialKernelSlotProgram}
+  {trace : RuntimeStatementTraceDiscipline.Trace}
+  (h : RuntimeStatementTraceDiscipline.acceptedTraceForProgram program trace) :
+  trace.len = program.statementTraceNames.length :=
+  RuntimeStatementTraceDiscipline.acceptedTraceForProgram_exactLength h
+
+theorem RuntimeImplementationInterface.statementTraceModel_acceptedTraceHasExactNames
+  {program : ConfidentialKernelSlotProgram}
+  {trace : RuntimeStatementTraceDiscipline.Trace}
+  (h : RuntimeStatementTraceDiscipline.acceptedTraceForProgram program trace) :
+  trace.names = program.statementTraceNames :=
+  RuntimeStatementTraceDiscipline.acceptedTraceForProgram_exactNames h
+
+theorem RuntimeImplementationInterface.statementTraceModel_boxedTraceExact
+  {program : ConfidentialKernelSlotProgram}
+  {trace : RuntimeStatementTraceDiscipline.Trace}
+  (h : RuntimeStatementTraceDiscipline.acceptedTraceForProgram program trace) :
+  RuntimeStatementTraceDiscipline.boxedTrace trace =
+    program.statementTraceNames :=
+  RuntimeStatementTraceDiscipline.acceptedTraceForProgram_boxedTraceExact h
+
+theorem RuntimeImplementationInterface.returnScheduleModel_checkedTailIsPublic
+  (program : ConfidentialKernelSlotProgram) :
+  RuntimeReturnScheduleDiscipline.checkStatementTraceHasPublicReturnTail program = true ↔
+    RuntimeReturnScheduleDiscipline.statementTraceHasPublicReturnTail program :=
+  RuntimeReturnScheduleDiscipline.checkStatementTraceHasPublicReturnTail_eq_true_iff program
+
+def RuntimeImplementationInterface.PublicBridgeBoundary
   (iface : RuntimeImplementationInterface) : Prop :=
   iface.runtimeOwnsBridgeModules ∧
     iface.engineDelegatesToRuntimeBridge ∧
     iface.shellStaysPublicOnly ∧
     iface.stateStagesConfidentialCallsInsideRuntime ∧
+    iface.theoremFinalizerUsesSharedTraceBridge ∧
+    iface.controllerBuildsExplicitPublicObserverCertificate ∧
+    iface.coreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
+
+def RuntimeImplementationInterface.checkPublicBridgeBoundary
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.checkRuntimeOwnsBridgeModules &&
+    iface.checkEngineDelegatesToRuntimeBridge &&
+    iface.checkShellStaysPublicOnly &&
+    iface.checkStateStagesConfidentialCallsInsideRuntime &&
+    iface.checkTheoremFinalizerUsesSharedTraceBridge &&
+    iface.checkControllerBuildsExplicitPublicObserverCertificate &&
+    iface.checkCoreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
+
+@[simp] theorem runtimeImplementationInterface_checkPublicBridgeBoundary_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkPublicBridgeBoundary = true ↔ iface.PublicBridgeBoundary := by
+  unfold RuntimeImplementationInterface.checkPublicBridgeBoundary
+    RuntimeImplementationInterface.PublicBridgeBoundary
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.publicBridgeBoundary_shellRejectsConfidentialExpressionEvaluation
+  (iface : RuntimeImplementationInterface)
+  (h : iface.PublicBridgeBoundary) :
+  iface.shellRejectsConfidentialExpressionEvaluation :=
+  RuntimeImplementationInterface.shellStaysPublicOnly_rejectsConfidentialExpressionEvaluation
+    iface h.2.2.1
+
+theorem RuntimeImplementationInterface.publicBridgeBoundary_shellCanonicalHashingGuardedByPublicEntry
+  (iface : RuntimeImplementationInterface)
+  (h : iface.PublicBridgeBoundary) :
+  iface.shellCanonicalHashingGuardedByPublicEntry :=
+  RuntimeImplementationInterface.shellStaysPublicOnly_canonicalHashingGuardedByPublicEntry
+    iface h.2.2.1
+
+def RuntimeImplementationInterface.SlotAdapterBoundary
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedKernelSlotSupportMatchLeanGenerator ∧
+    iface.generatedConfidentialKernelMatchLeanGenerator ∧
+    iface.runtimeKernelSlotSupportRefinesLeanStagingModel ∧
+    iface.runtimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects ∧
+    iface.sharedConfidentialKernelConsumesLeanGeneratedInterpreter
+
+def RuntimeImplementationInterface.checkSlotAdapterBoundary
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.checkGeneratedKernelSlotSupportMatchLeanGenerator &&
+    iface.checkGeneratedConfidentialKernelMatchLeanGenerator &&
+    iface.checkRuntimeKernelSlotSupportRefinesLeanStagingModel &&
+    iface.checkRuntimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects &&
+    iface.checkSharedConfidentialKernelConsumesLeanGeneratedInterpreter
+
+@[simp] theorem runtimeImplementationInterface_checkSlotAdapterBoundary_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSlotAdapterBoundary = true ↔ iface.SlotAdapterBoundary := by
+  unfold RuntimeImplementationInterface.checkSlotAdapterBoundary
+    RuntimeImplementationInterface.SlotAdapterBoundary
+  simp [and_assoc]
+
+def RuntimeImplementationInterface.ResidualHelperShellBoundary
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.generatedObjectHelpersMatchLeanGenerator ∧
+    iface.generatedOramCodecsMatchLeanGenerator ∧
+    iface.generatedStoreCodecMatchLeanGenerator ∧
+    iface.generatedStoreSurfaceMatchLeanGenerator ∧
+    iface.generatedStoreHelpersMatchLeanGenerator ∧
+    iface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy ∧
+    iface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    iface.runtimeObjectResetUsesLeanGeneratedHelpers ∧
+    iface.runtimeObjectCommitUsesLeanGeneratedHelpers ∧
+    iface.runtimeObjectCommitUsesPublicSealAndWriteShell ∧
+    iface.runtimeObjectOpenUsesSharedDecodeShell ∧
+    iface.runtimeObjectBootstrapUsesSharedBoxedSealHelper ∧
+    iface.runtimeOramUsesLeanGeneratedBlockBucketCodecs ∧
+    iface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit ∧
+    iface.runtimeOramOpenUsesSharedDecodeShell ∧
+    iface.runtimeOramBootstrapUsesSharedBoxedSealHelper ∧
+    iface.runtimeOramBootstrapUsesSharedBoxedFillerHelper ∧
+    iface.storeCipherKeyZeroizesOnDrop ∧
+    iface.storeCipherUsesExactSizeNonzeroBuffers ∧
+    iface.storeWriteApiUsesMutablePlaintext ∧
+    iface.storeCipherSurfaceStaysInCodec ∧
+    iface.runtimeStoreUsesSharedBoxedFillerHelper ∧
+    iface.runtimeStoreUsesSharedSealIntoHelper ∧
+    iface.runtimeStoreUsesGeneratedRawBoxedSlotHelpers ∧
+    iface.runtimeStoreUoWritesEmitPublicUpdateShape ∧
+    iface.storeLibrarySurfaceKeepsGeneratedHelpersPrivate ∧
+    iface.handwrittenRuntimeProductionAvoidsPanicStyleControlFlow ∧
+    iface.runtimeInterfaceProductionAvoidsPanicStyleControlFlow
+
+def RuntimeImplementationInterface.checkResidualHelperShellBoundary
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.checkGeneratedObjectHelpersMatchLeanGenerator &&
+    iface.checkGeneratedOramCodecsMatchLeanGenerator &&
+    iface.checkGeneratedStoreCodecMatchLeanGenerator &&
+    iface.checkGeneratedStoreSurfaceMatchLeanGenerator &&
+    iface.checkGeneratedStoreHelpersMatchLeanGenerator &&
+    iface.checkRuntimeHostVisibleErrorsUsePublicIntegrityTaxonomy &&
+    iface.checkRuntimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers &&
+    iface.checkRuntimeObjectResetUsesLeanGeneratedHelpers &&
+    iface.checkRuntimeObjectCommitUsesLeanGeneratedHelpers &&
+    iface.checkRuntimeObjectCommitUsesPublicSealAndWriteShell &&
+    iface.checkRuntimeObjectOpenUsesSharedDecodeShell &&
+    iface.checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper &&
+    iface.checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs &&
+    iface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit &&
+    iface.checkRuntimeOramOpenUsesSharedDecodeShell &&
+    iface.checkRuntimeOramBootstrapUsesSharedBoxedSealHelper &&
+    iface.checkRuntimeOramBootstrapUsesSharedBoxedFillerHelper &&
+    iface.checkStoreCipherKeyZeroizesOnDrop &&
+    iface.checkStoreCipherUsesExactSizeNonzeroBuffers &&
+    iface.checkStoreWriteApiUsesMutablePlaintext &&
+    iface.checkStoreCipherSurfaceStaysInCodec &&
+    iface.checkRuntimeStoreUsesSharedBoxedFillerHelper &&
+    iface.checkRuntimeStoreUsesSharedSealIntoHelper &&
+    iface.checkRuntimeStoreUsesGeneratedRawBoxedSlotHelpers &&
+    iface.checkRuntimeStoreUoWritesEmitPublicUpdateShape &&
+    iface.checkStoreLibrarySurfaceKeepsGeneratedHelpersPrivate &&
+    iface.checkHandwrittenRuntimeProductionAvoidsPanicStyleControlFlow &&
+    iface.checkRuntimeInterfaceProductionAvoidsPanicStyleControlFlow
+
+@[simp] theorem runtimeImplementationInterface_checkResidualHelperShellBoundary_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkResidualHelperShellBoundary = true ↔
+    iface.ResidualHelperShellBoundary := by
+  unfold RuntimeImplementationInterface.checkResidualHelperShellBoundary
+    RuntimeImplementationInterface.ResidualHelperShellBoundary
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+  (iface : RuntimeImplementationInterface)
+  (h : iface.ResidualHelperShellBoundary) :
+  iface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers := by
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  exact h.2.2.2.2.2.2.1
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimeLacksDirectSecretOps
+  (iface : RuntimeImplementationInterface)
+  (h : iface.ResidualHelperShellBoundary) :
+  iface.handwrittenRuntimeLacksDirectSecretOps :=
+  RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers_lacksDirectSecretOps
+    iface
+    (RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+      iface h)
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_hostCoordinationLacksSecretSerialization
+  (iface : RuntimeImplementationInterface)
+  (h : iface.ResidualHelperShellBoundary) :
+  iface.handwrittenHostCoordinationLacksSecretSerialization :=
+  RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers_hostCoordinationLacksSecretSerialization
+    iface
+    (RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+      iface h)
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_hostVisibleErrorTaxonomy
+  (iface : RuntimeImplementationInterface)
+  (h : iface.ResidualHelperShellBoundary) :
+  iface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy := by
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  exact h.2.2.2.2.2.1
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeTraceUsesExactBoxedBacking
+  (iface : RuntimeImplementationInterface)
+  (h : iface.ResidualHelperShellBoundary) :
+  iface.runtimeStoreUsesGeneratedRawBoxedSlotHelpers := by
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  rcases h with
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+      hStoreTrace, _, _, _, _⟩
+  exact hStoreTrace
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  (hBytes :
+    ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeNonzero
+      (RuntimeStoreCodecSemantics.encodeNonzero bytes) =
+    some bytes := by
+  exact RuntimeStoreCodecSemantics.decodeNonzero_encodeNonzero hBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecTransportShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  (hBytes :
+    ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
+  (RuntimeStoreCodecSemantics.encodeNonzero bytes).length = 2 * bytes.length ∧
+    ∀ nibble,
+      nibble ∈ RuntimeStoreCodecSemantics.encodeNonzero bytes →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble := by
+  exact
+    ⟨ RuntimeStoreCodecSemantics.encodeNonzero_length bytes
+    , fun nibble hMem =>
+        RuntimeStoreCodecSemantics.encodeNonzero_validEncodedNibbles hBytes hMem
+    ⟩
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeSound
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {encoded bytes : List Nat}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeNonzero encoded = some bytes) :
+  encoded.length = 2 * bytes.length ∧
+    (∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) ∧
+    (∀ nibble,
+      nibble ∈ encoded →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) := by
+  exact RuntimeStoreCodecSemantics.decodeNonzero_sound hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  (hBytes :
+    ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeNonzeroInto?
+      bytes.length (RuntimeStoreCodecSemantics.encodeNonzero bytes) =
+    some bytes := by
+  exact RuntimeStoreCodecSemantics.decodeNonzeroInto?_encodeNonzero hBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoRejectsLengthMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {byteLen : Nat}
+  {encoded : List Nat}
+  (hLen : encoded.length ≠ 2 * byteLen) :
+  RuntimeStoreCodecSemantics.decodeNonzeroInto? byteLen encoded = none := by
+  exact
+    RuntimeStoreCodecSemantics.decodeNonzeroInto?_rejectsEncodedLengthMismatch
+      hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoSound
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {byteLen : Nat}
+  {encoded bytes : List Nat}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeNonzeroInto? byteLen encoded =
+      some bytes) :
+  encoded.length = 2 * byteLen ∧
+    bytes.length = byteLen ∧
+    (∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) ∧
+    (∀ nibble,
+      nibble ∈ encoded →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) := by
+  exact RuntimeStoreCodecSemantics.decodeNonzeroInto?_some_sound hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedEncodedLen
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (payloadLen : Nat) :
+  RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen =
+    2 * (RuntimeStoreCodecSemantics.sealedMagicLen +
+      RuntimeStoreCodecSemantics.sealedNonceBytes +
+      payloadLen +
+      RuntimeStoreCodecSemantics.sealedTagBytes) := by
+  exact RuntimeStoreCodecSemantics.sealedEncodedLen_public_formula payloadLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedPlainLen
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (payloadLen : Nat) :
+  RuntimeStoreCodecSemantics.sealedPlainLen payloadLen =
+    RuntimeStoreCodecSemantics.sealedMagicLen +
+      RuntimeStoreCodecSemantics.sealedNonceBytes +
+      payloadLen +
+      RuntimeStoreCodecSemantics.sealedTagBytes := by
+  exact RuntimeStoreCodecSemantics.sealedPlainLen_public_formula payloadLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {encoded sealed : List Nat}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeNonzero encoded = some sealed)
+  (hEncodedLen :
+    encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
+  sealed.length = RuntimeStoreCodecSemantics.sealedPlainLen payloadLen ∧
+    ∃ parts,
+      RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen sealed =
+          some parts ∧
+        parts.ValidShape payloadLen := by
+  exact
+    RuntimeStoreCodecSemantics.decodeNonzero_sealedRecordShape
+      hDecode hEncodedLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordOpenShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen ∧
+    parts.ValidOpenShape payloadLen := by
+  exact RuntimeStoreCodecSemantics.decodeSealedRecord_some_validOpenShape hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordRejectsLengthMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  (hLen :
+    encoded.length ≠ RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded = none := by
+  exact RuntimeStoreCodecSemantics.decodeSealedRecord_none_of_encoded_length_ne hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordOpenTransportSound
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen ∧
+    parts.ValidOpenShape payloadLen ∧
+    (∀ nibble,
+      nibble ∈ encoded →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) ∧
+    ∃ sealed,
+      RuntimeStoreCodecSemantics.decodeNonzero encoded = some sealed ∧
+        RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen sealed =
+            some parts ∧
+          parts.bytes = sealed ∧
+          sealed.length = RuntimeStoreCodecSemantics.sealedPlainLen payloadLen ∧
+          (∀ byte, byte ∈ sealed →
+            RuntimeStoreCodecSemantics.ValidByte byte) ∧
+          (∀ byte, byte ∈ parts.bytes →
+            RuntimeStoreCodecSemantics.ValidByte byte) := by
+  exact RuntimeStoreCodecSemantics.decodeSealedRecord_some_transport_sound hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeUoSlotCiphertextShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape
+    payloadLen encoded := by
+  exact
+    RuntimeStoreCodecSemantics.decodeSealedRecord_some_uoSlotCiphertextShape
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordTransportRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hOpenShape : parts.ValidOpenShape payloadLen)
+  (hBytes :
+    ∀ byte, byte ∈ parts.bytes →
+      RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen
+      (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) =
+    some parts := by
+  exact
+    RuntimeStoreCodecSemantics.decodeSealedRecord_encodeSealedRecordParts
+      hOpenShape hBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordEncodedLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hShape : parts.ValidShape payloadLen) :
+  (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes).length =
+      RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen := by
+  exact RuntimeStoreCodecSemantics.encodeSealedRecordParts_length hShape
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeEncodedUoSlotCiphertextShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hShape : parts.ValidShape payloadLen)
+  (hBytes :
+    ∀ byte, byte ∈ parts.bytes →
+      RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape
+    payloadLen (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) := by
+  exact
+    RuntimeStoreCodecSemantics.encodeSealedRecordParts_uoSlotCiphertextShape
+      hShape hBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordRejectsWrongMagic
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hShape : parts.ValidShape payloadLen)
+  (hMagic : parts.magic ≠ RuntimeStoreCodecSemantics.sealedMagic)
+  (hBytes :
+    ∀ byte, byte ∈ parts.bytes →
+      RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen
+      (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) = none := by
+  exact
+    RuntimeStoreCodecSemantics.decodeSealedRecord_encodeSealedRecordParts_wrong_magic_none
+      hShape hMagic hBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceZeroedBytesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (len : Nat) :
+  (RuntimeStoreCodecSemantics.zeroedBytes len).length = len :=
+  RuntimeStoreCodecSemantics.zeroedBytes_length len
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceZeroedBytesValid
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (len : Nat) :
+  ∀ byte,
+    byte ∈ RuntimeStoreCodecSemantics.zeroedBytes len →
+      RuntimeStoreCodecSemantics.ValidByte byte :=
+  RuntimeStoreCodecSemantics.zeroedBytes_validBytes len
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceReadExactRangeLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes out : List Nat}
+  {start len : Nat}
+  (hRead :
+    RuntimeStoreCodecSemantics.readExactRange? bytes start len =
+      some out) :
+  out.length = len :=
+  RuntimeStoreCodecSemantics.readExactRange?_some_length hRead
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceReadExactRangeRejectsOutOfRange
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  {start len : Nat}
+  (hRange : ¬ start + len ≤ bytes.length) :
+  RuntimeStoreCodecSemantics.readExactRange? bytes start len = none :=
+  RuntimeStoreCodecSemantics.readExactRange?_rejectsOutOfRange hRange
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceCopyExactIntoShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {out input copied : List Nat}
+  (hCopy :
+    RuntimeStoreCodecSemantics.copyExactInto? out input =
+      some copied) :
+  copied = input ∧ copied.length = out.length :=
+  RuntimeStoreCodecSemantics.copyExactInto?_some_shape hCopy
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceCopyExactIntoRejectsLengthMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {out input : List Nat}
+  (hLen : out.length ≠ input.length) :
+  RuntimeStoreCodecSemantics.copyExactInto? out input = none :=
+  RuntimeStoreCodecSemantics.copyExactInto?_rejectsLengthMismatch hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceSealIntoAcceptsExactLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (payloadLen : Nat) :
+  RuntimeStoreCodecSemantics.sealAndWipeIntoSliceAccepted payloadLen
+    (RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :=
+  RuntimeStoreCodecSemantics.sealAndWipeIntoSliceAccepted_exactLength
+    payloadLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceSealIntoRejectsLengthMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen outLen : Nat}
+  (hLen :
+    outLen ≠ RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
+  ¬ RuntimeStoreCodecSemantics.sealAndWipeIntoSliceAccepted
+      payloadLen outLen :=
+  RuntimeStoreCodecSemantics.sealAndWipeIntoSliceAccepted_rejectsLengthMismatch
+    hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceOpenPayloadShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  RuntimeStoreCodecSemantics.openBoxedPayloadShape? payloadLen encoded =
+    some payloadLen :=
+  RuntimeStoreCodecSemantics.openBoxedPayloadShape?_some_payloadLen hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceWipePreservesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (bytes : List Nat) :
+  (RuntimeStoreCodecSemantics.wipeBytes bytes).length = bytes.length :=
+  RuntimeStoreCodecSemantics.wipeBytes_length bytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceWipeZeros
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  {byte : Nat}
+  (hMem : byte ∈ RuntimeStoreCodecSemantics.wipeBytes bytes) :
+  byte = 0 :=
+  RuntimeStoreCodecSemantics.wipeBytes_all_zero hMem
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperTakeRawValueCopiesInput
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (value : List Nat) :
+  (RuntimeStoreHelperSemantics.takeBoxedRawStoreValue value).boxed = value :=
+  RuntimeStoreHelperSemantics.takeBoxedRawStoreValue_copiesInput value
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperTakeRawValueWipesInputLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (value : List Nat) :
+  (RuntimeStoreHelperSemantics.takeBoxedRawStoreValue value).wiped.length =
+    value.length :=
+  RuntimeStoreHelperSemantics.takeBoxedRawStoreValue_wipesInputLength
+    value
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperTakeRawValueWipesInputZeros
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {value : List Nat}
+  {byte : Nat}
+  (hMem :
+    byte ∈
+      (RuntimeStoreHelperSemantics.takeBoxedRawStoreValue value).wiped) :
+  byte = 0 :=
+  RuntimeStoreHelperSemantics.takeBoxedRawStoreValue_wipesInputZeros
+    hMem
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperZeroedRawSlotsLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (objects : List String)
+  (slotLen : Nat) :
+  (RuntimeStoreHelperSemantics.zeroedRawSlots objects slotLen).length =
+    objects.length :=
+  RuntimeStoreHelperSemantics.zeroedRawSlots_length objects slotLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperLookupZeroedRawSlotsShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {objects : List String}
+  {object : String}
+  {slotLen : Nat}
+  {value : List Nat}
+  (hLookup :
+    RuntimeStoreHelperSemantics.lookupSlot object
+        (RuntimeStoreHelperSemantics.zeroedRawSlots objects slotLen) =
+      some value) :
+  value.length = slotLen ∧
+    ∀ byte,
+      byte ∈ value →
+        RuntimeStoreCodecSemantics.ValidByte byte ∧ byte = 0 :=
+  RuntimeStoreHelperSemantics.lookupSlot_zeroedRawSlots_some_shape
+    hLookup
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperInsertOrReplaceLookupSelf
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (slots : List RuntimeStoreHelperSemantics.StoreSlot)
+  (object : String)
+  (value : List Nat) :
+  RuntimeStoreHelperSemantics.lookupSlot object
+      (RuntimeStoreHelperSemantics.insertOrReplaceSlot object value slots) =
+    some value :=
+  RuntimeStoreHelperSemantics.insertOrReplaceSlot_lookup_self
+    slots object value
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperInsertOrReplaceLengthLeSucc
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (slots : List RuntimeStoreHelperSemantics.StoreSlot)
+  (object : String)
+  (value : List Nat) :
+  (RuntimeStoreHelperSemantics.insertOrReplaceSlot object value slots).length ≤
+    slots.length + 1 :=
+  RuntimeStoreHelperSemantics.insertOrReplaceSlot_length_le_succ
+    slots object value
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAppendEventLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (events : List α)
+  (event : α) :
+  (RuntimeStoreHelperSemantics.appendBoxedEvent events event).length =
+    events.length + 1 :=
+  RuntimeStoreHelperSemantics.appendBoxedEvent_length events event
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAppendEventPreservesPrefix
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (events : List α)
+  (event : α) :
+  (RuntimeStoreHelperSemantics.appendBoxedEvent events event).take
+      events.length =
+    events :=
+  RuntimeStoreHelperSemantics.appendBoxedEvent_preservesPrefix
+    events event
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAppendEventAppendsSingleton
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (events : List α)
+  (event : α) :
+  (RuntimeStoreHelperSemantics.appendBoxedEvent events event).drop
+      events.length =
+    [event] :=
+  RuntimeStoreHelperSemantics.appendBoxedEvent_appendsSingleton
+    events event
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAllUpdateAppendUoUpdate
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {events : List RuntimeStoreHelperSemantics.StoreWriteShape}
+  (hEvents : RuntimeStoreHelperSemantics.allUpdate events)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreHelperSemantics.allUpdate
+    (RuntimeStoreHelperSemantics.appendBoxedEvent events
+      (RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen)) :=
+  RuntimeStoreHelperSemantics.allUpdate_append_update
+    hEvents object slotLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperBootstrappedUoSlotPublicLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (object : String)
+  (logicalLen : Nat) :
+  (RuntimeStoreHelperSemantics.bootstrappedUoSlotShape object logicalLen).value.length =
+    RuntimeStoreCodecSemantics.sealedEncodedLen logicalLen :=
+  RuntimeStoreHelperSemantics.bootstrappedUoSlotShape_publicLength
+    object logicalLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperBootstrappedUoSlotValidBytes
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (object : String)
+  (logicalLen : Nat) :
+  ∀ byte,
+    byte ∈
+        (RuntimeStoreHelperSemantics.bootstrappedUoSlotShape object logicalLen).value →
+      RuntimeStoreCodecSemantics.ValidByte byte :=
+  RuntimeStoreHelperSemantics.bootstrappedUoSlotShape_validBytes
+    object logicalLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperResealTracePublicUpdateShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreHelperSemantics.allUpdate
+      [RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen] ∧
+    RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted object slotLen
+      (RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen) :=
+  RuntimeStoreHelperSemantics.resealUoStoreSlotTrace_publicUpdateShape
+    object slotLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordReadIncrementsReadCounts
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics) :
+  (RuntimeStoreHelperSemantics.recordStoreRead metrics).logicalReads =
+      metrics.logicalReads + 1 ∧
+    (RuntimeStoreHelperSemantics.recordStoreRead metrics).physicalReads =
+      metrics.physicalReads + 1 :=
+  RuntimeStoreHelperSemantics.recordStoreRead_incrementsReadCounts metrics
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordWriteIncrementsWriteCounts
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics)
+  (zeroWrite : Bool) :
+  (RuntimeStoreHelperSemantics.recordStoreWrite metrics zeroWrite).logicalWrites =
+      metrics.logicalWrites + 1 ∧
+    (RuntimeStoreHelperSemantics.recordStoreWrite metrics zeroWrite).physicalWrites =
+      metrics.physicalWrites + 1 :=
+  RuntimeStoreHelperSemantics.recordStoreWrite_incrementsWriteCounts
+    metrics zeroWrite
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordUoWriteZeroWritesUnchanged
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics)
+  (object : String)
+  (slotLen : Nat) :
+  (RuntimeStoreHelperSemantics.recordUoStoreWrite
+      metrics object slotLen).metrics.zeroWrites =
+    metrics.zeroWrites :=
+  RuntimeStoreHelperSemantics.recordUoStoreWrite_zeroWritesUnchanged
+    metrics object slotLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordUoWriteEventAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted object slotLen
+    (RuntimeStoreHelperSemantics.recordUoStoreWrite
+      metrics object slotLen).event :=
+  RuntimeStoreHelperSemantics.recordUoStoreWrite_eventAccepted
+    metrics object slotLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeUoUpdateWriteShapeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted object slotLen
+    (RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen) := by
+  exact RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape_accepted object slotLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_storeUoUpdateWritePublicShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {object : String}
+  {slotLen : Nat}
+  {write : RuntimeStoreCodecSemantics.StoreWriteShape}
+  (hAccepted :
+    RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted
+      object slotLen write) :
+  write.object = object ∧
+    write.location = object ∧
+    write.len = slotLen ∧
+    write.writeClass = RuntimeStoreCodecSemantics.StoreWriteClass.update := by
+  exact
+    RuntimeStoreCodecSemantics.uoStoreUpdateWriteAccepted_publicShape
+      hAccepted
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectNatTrue
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : Nat) :
+  RuntimeOramHelperSemantics.maskedSelectNat true whenTrue whenFalse =
+    whenTrue :=
+  RuntimeOramHelperSemantics.maskedSelectNat_true whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectNatFalse
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : Nat) :
+  RuntimeOramHelperSemantics.maskedSelectNat false whenTrue whenFalse =
+    whenFalse :=
+  RuntimeOramHelperSemantics.maskedSelectNat_false whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectBoolTrue
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : Bool) :
+  RuntimeOramHelperSemantics.maskedSelectBool true whenTrue whenFalse =
+    whenTrue :=
+  RuntimeOramHelperSemantics.maskedSelectBool_true whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectBoolFalse
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : Bool) :
+  RuntimeOramHelperSemantics.maskedSelectBool false whenTrue whenFalse =
+    whenFalse :=
+  RuntimeOramHelperSemantics.maskedSelectBool_false whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectOptionTrue
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.maskedSelectOption true whenTrue whenFalse =
+    whenTrue :=
+  RuntimeOramHelperSemantics.maskedSelectOption_true whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectOptionFalse
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.maskedSelectOption false whenTrue whenFalse =
+    whenFalse :=
+  RuntimeOramHelperSemantics.maskedSelectOption_false whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectTransitionKindTrue
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.PathTransitionKind) :
+  RuntimeOramHelperSemantics.maskedSelectTransitionKind
+      true whenTrue whenFalse = whenTrue :=
+  RuntimeOramHelperSemantics.maskedSelectTransitionKind_true
+    whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectTransitionKindFalse
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.PathTransitionKind) :
+  RuntimeOramHelperSemantics.maskedSelectTransitionKind
+      false whenTrue whenFalse = whenFalse :=
+  RuntimeOramHelperSemantics.maskedSelectTransitionKind_false
+    whenTrue whenFalse
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindDelete
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (insertNew updateExisting : Bool) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind
+      insertNew updateExisting true =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeDelete :=
+  RuntimeOramHelperSemantics.pathPutTransitionKind_delete
+    insertNew updateExisting
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindUpdate
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (insertNew : Bool) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind insertNew true false =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeUpdate :=
+  RuntimeOramHelperSemantics.pathPutTransitionKind_update insertNew
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindInsert
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind true false false =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeInsert :=
+  RuntimeOramHelperSemantics.pathPutTransitionKind_insert
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindNoop
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind false false false =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeNoop :=
+  RuntimeOramHelperSemantics.pathPutTransitionKind_noop
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionKindHit
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary) :
+  RuntimeOramHelperSemantics.pathGetTransitionKind true =
+    RuntimeOramHelperSemantics.PathTransitionKind.readHit :=
+  RuntimeOramHelperSemantics.pathGetTransitionKind_hit
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionKindMiss
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary) :
+  RuntimeOramHelperSemantics.pathGetTransitionKind false =
+    RuntimeOramHelperSemantics.PathTransitionKind.readMiss :=
+  RuntimeOramHelperSemantics.pathGetTransitionKind_miss
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionFieldsMiss
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (accessLeaf freshLeaf : Nat) :
+  RuntimeOramHelperSemantics.pathGetTransitionFields
+      positionMap RuntimeOramHelperSemantics.noneOption
+      accessLeaf freshLeaf =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.readMiss
+    , freshLeaf := accessLeaf
+    , slotIndex := RuntimeOramHelperSemantics.noneOption
+    , priorLeaf := RuntimeOramHelperSemantics.noneOption
+    , nextLeaf := RuntimeOramHelperSemantics.noneOption
+    } :=
+  RuntimeOramHelperSemantics.pathGetTransitionFields_miss
+    positionMap accessLeaf freshLeaf
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionFieldsHit
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {slotIndex accessLeaf freshLeaf : Nat}
+  {priorLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption}
+  (hLookup :
+    RuntimeOramHelperSemantics.lookupAt? positionMap slotIndex =
+      some priorLeaf) :
+  RuntimeOramHelperSemantics.pathGetTransitionFields
+      positionMap (RuntimeOramHelperSemantics.presentOption slotIndex)
+      accessLeaf freshLeaf =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.readHit
+    , freshLeaf
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption freshLeaf
+    } :=
+  RuntimeOramHelperSemantics.pathGetTransitionFields_hit hLookup
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsDelete
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (slotIndex priorLeaf accessLeaf nextLeafValue : Nat)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      true true (RuntimeOramHelperSemantics.presentOption slotIndex)
+      insertSlot (RuntimeOramHelperSemantics.presentOption priorLeaf)
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeDelete
+    , freshLeaf := accessLeaf
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.noneOption
+    } :=
+  RuntimeOramHelperSemantics.pathPutTransitionFields_delete
+    slotIndex priorLeaf accessLeaf nextLeafValue insertSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsUpdate
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (slotIndex priorLeaf accessLeaf nextLeafValue : Nat)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      true false (RuntimeOramHelperSemantics.presentOption slotIndex)
+      insertSlot (RuntimeOramHelperSemantics.presentOption priorLeaf)
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeUpdate
+    , freshLeaf := nextLeafValue
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption nextLeafValue
+    } :=
+  RuntimeOramHelperSemantics.pathPutTransitionFields_update
+    slotIndex priorLeaf accessLeaf nextLeafValue insertSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsInsert
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (insertSlot accessLeaf nextLeafValue : Nat) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      true false RuntimeOramHelperSemantics.noneOption
+      (RuntimeOramHelperSemantics.presentOption insertSlot)
+      RuntimeOramHelperSemantics.noneOption accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeInsert
+    , freshLeaf := nextLeafValue
+    , slotIndex := RuntimeOramHelperSemantics.presentOption insertSlot
+    , priorLeaf := RuntimeOramHelperSemantics.noneOption
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption nextLeafValue
+    } :=
+  RuntimeOramHelperSemantics.pathPutTransitionFields_insert
+    insertSlot accessLeaf nextLeafValue
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsNoopAbsent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (valueIsZero : Bool)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (accessLeaf nextLeafValue : Nat) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      false valueIsZero RuntimeOramHelperSemantics.noneOption
+      insertSlot RuntimeOramHelperSemantics.noneOption
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeNoop
+    , freshLeaf := accessLeaf
+    , slotIndex := RuntimeOramHelperSemantics.noneOption
+    , priorLeaf := RuntimeOramHelperSemantics.noneOption
+    , nextLeaf := RuntimeOramHelperSemantics.noneOption
+    } :=
+  RuntimeOramHelperSemantics.pathPutTransitionFields_noopAbsent
+    valueIsZero insertSlot accessLeaf nextLeafValue
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsNoopPresentRetainsPrior
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (valueIsZero : Bool)
+  (slotIndex priorLeaf accessLeaf nextLeafValue : Nat)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      false valueIsZero (RuntimeOramHelperSemantics.presentOption slotIndex)
+      insertSlot (RuntimeOramHelperSemantics.presentOption priorLeaf)
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeNoop
+    , freshLeaf := priorLeaf
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    } :=
+  RuntimeOramHelperSemantics.pathPutTransitionFields_noopPresentRetainsPrior
+    valueIsZero slotIndex priorLeaf accessLeaf nextLeafValue insertSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationUnoccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = false :=
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed_unoccupied
+    capacity leafCount positionMap liveSlots hOccupied
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotsAfterUnoccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation
+      capacity leafCount positionMap liveSlots block = liveSlots :=
+  RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation_unoccupied
+    capacity leafCount positionMap liveSlots hOccupied
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationValidOccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = false :=
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed_validOccupied
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotsAfterValidOccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption) :
+  RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation
+      capacity leafCount positionMap liveSlots block =
+    RuntimeOramHelperSemantics.replaceAt liveSlots block.slotIndex
+      (RuntimeOramHelperSemantics.presentOption block.leaf) :=
+  RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation_validOccupied
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationSlotOutOfRange
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : capacity ≤ block.slotIndex) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = true :=
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed_slotOutOfRange
+    hOccupied hSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationDuplicateLiveSlot
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount liveLeaf : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption liveLeaf)) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = true :=
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed_duplicateLiveSlot
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotsAfterValidOccupiedLookup
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption) :
+  RuntimeOramHelperSemantics.lookupAt?
+      (RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation
+        capacity leafCount positionMap liveSlots block)
+      block.slotIndex =
+    some (RuntimeOramHelperSemantics.presentOption block.leaf) :=
+  RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation_validOccupied_lookup
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoverageEmpty
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed [] liveSlots = false :=
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed_empty liveSlots
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoverageMissingLiveSlot
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (leaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (leaf :: positionMap) [] = true :=
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed_missingLiveSlot
+    leaf positionMap
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoverageAbsentHead
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (liveSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (RuntimeOramHelperSemantics.noneOption :: positionMap)
+      (liveSlot :: liveSlots) =
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap liveSlots :=
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed_absentHead
+    positionMap liveSlots liveSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoveragePresentLiveHead
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (leaf liveLeaf : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (RuntimeOramHelperSemantics.presentOption leaf :: positionMap)
+      (RuntimeOramHelperSemantics.presentOption liveLeaf :: liveSlots) =
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap liveSlots :=
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed_presentLiveHead
+    leaf liveLeaf positionMap liveSlots
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoveragePresentMissingHead
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (leaf : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (RuntimeOramHelperSemantics.presentOption leaf :: positionMap)
+      (RuntimeOramHelperSemantics.noneOption :: liveSlots) = true :=
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed_presentMissingHead
+    leaf positionMap liveSlots
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperResetPathEntryCellsLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.resetPathEntryCells capacity).length =
+    capacity :=
+  RuntimeOramHelperSemantics.resetPathEntryCells_length capacity
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperResetPathEntryCellsAllEmpty
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity : Nat}
+  {entry : RuntimeOramHelperSemantics.PathEntryCell}
+  (hEntry :
+    entry ∈ RuntimeOramHelperSemantics.resetPathEntryCells capacity) :
+  entry = RuntimeOramHelperSemantics.emptyPathEntryCell :=
+  RuntimeOramHelperSemantics.resetPathEntryCells_all_empty hEntry
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFailedUnoccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (entries : List RuntimeOramHelperSemantics.PathEntryCell)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.installPathEntryFailed entries block = false :=
+  RuntimeOramHelperSemantics.installPathEntryFailed_unoccupied
+    entries hOccupied
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFromBlockUnoccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (entries : List RuntimeOramHelperSemantics.PathEntryCell)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.installPathEntryFromBlock entries block =
+    entries :=
+  RuntimeOramHelperSemantics.installPathEntryFromBlock_unoccupied
+    entries hOccupied
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFailedOutOfRange
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {entries : List RuntimeOramHelperSemantics.PathEntryCell}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : entries.length ≤ block.slotIndex) :
+  RuntimeOramHelperSemantics.installPathEntryFailed entries block = true :=
+  RuntimeOramHelperSemantics.installPathEntryFailed_outOfRange
+    hOccupied hSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFailedValidOccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {entries : List RuntimeOramHelperSemantics.PathEntryCell}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < entries.length) :
+  RuntimeOramHelperSemantics.installPathEntryFailed entries block = false :=
+  RuntimeOramHelperSemantics.installPathEntryFailed_validOccupied
+    hOccupied hSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFromBlockPreservesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (entries : List RuntimeOramHelperSemantics.PathEntryCell)
+  (block : RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.installPathEntryFromBlock
+    entries block).length = entries.length :=
+  RuntimeOramHelperSemantics.installPathEntryFromBlock_preservesLength
+    entries block
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFromBlockValidOccupiedLookup
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {entries : List RuntimeOramHelperSemantics.PathEntryCell}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < entries.length) :
+  RuntimeOramHelperSemantics.lookupAt?
+      (RuntimeOramHelperSemantics.installPathEntryFromBlock entries block)
+      block.slotIndex =
+    some (RuntimeOramHelperSemantics.pathEntryCellFromBlock block) :=
+  RuntimeOramHelperSemantics.installPathEntryFromBlock_validOccupied_lookup
+    hOccupied hSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepPriorFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (block : RuntimeOramHelperSemantics.StashBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block = state :=
+  RuntimeOramHelperSemantics.reconstructPathBlockStep_priorFailure
+    capacity leafCount positionMap block hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepUnoccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block = state :=
+  RuntimeOramHelperSemantics.reconstructPathBlockStep_unoccupied
+    capacity leafCount positionMap hState hOccupied
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepValidationFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots block = true) :
+  (RuntimeOramHelperSemantics.reconstructPathBlockStep
+    capacity leafCount positionMap state block).failed = true :=
+  RuntimeOramHelperSemantics.reconstructPathBlockStep_validationFailure
+    capacity leafCount positionMap hState hValidation
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepInstallFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots block = false)
+  (hInstall :
+    RuntimeOramHelperSemantics.installPathEntryFailed
+      state.entries block = true) :
+  (RuntimeOramHelperSemantics.reconstructPathBlockStep
+    capacity leafCount positionMap state block).failed = true :=
+  RuntimeOramHelperSemantics.reconstructPathBlockStep_installFailure
+    capacity leafCount positionMap hState hValidation hInstall
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepValidOccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount : Nat}
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? state.liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption)
+  (hEntrySlot : block.slotIndex < state.entries.length) :
+  RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block =
+    { liveSlots :=
+        RuntimeOramHelperSemantics.replaceAt
+          state.liveSlots block.slotIndex
+          (RuntimeOramHelperSemantics.presentOption block.leaf)
+    , entries :=
+        RuntimeOramHelperSemantics.replaceAt
+          state.entries block.slotIndex
+          (RuntimeOramHelperSemantics.pathEntryCellFromBlock block)
+    , failed := false
+    } :=
+  RuntimeOramHelperSemantics.reconstructPathBlockStep_validOccupied
+    hState hOccupied hSlot hLeaf hPosition hLive hEntrySlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathFinishFailedPriorFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed
+      positionMap state = true :=
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed_priorFailure
+    positionMap hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathFinishFailedCoverageFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (hFailed : state.failed = false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      positionMap state.liveSlots = true) :
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed
+      positionMap state = true :=
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed_coverageFailure
+    positionMap hFailed hCoverage
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathFinishFailedSuccess
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (hFailed : state.failed = false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      positionMap state.liveSlots = false) :
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed
+      positionMap state = false :=
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed_success
+    positionMap hFailed hCoverage
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlocksEmpty
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState) :
+  RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state [] = state :=
+  RuntimeOramHelperSemantics.reconstructPathBlocks_empty
+    capacity leafCount positionMap state
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlocksCons
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (block : RuntimeOramHelperSemantics.StashBlock)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state (block :: blocks) =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlockStep
+        capacity leafCount positionMap state block)
+      blocks :=
+  RuntimeOramHelperSemantics.reconstructPathBlocks_cons
+    capacity leafCount positionMap state block blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlocksPriorFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state blocks = state :=
+  RuntimeOramHelperSemantics.reconstructPathBlocks_priorFailure
+    capacity leafCount positionMap blocks hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInitialReconstructionStateLiveSlotsLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.initialReconstructionState capacity).liveSlots.length =
+    capacity :=
+  RuntimeOramHelperSemantics.initialReconstructionState_liveSlots_length
+    capacity
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInitialReconstructionStateEntriesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.initialReconstructionState capacity).entries.length =
+    capacity :=
+  RuntimeOramHelperSemantics.initialReconstructionState_entries_length
+    capacity
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInitialReconstructionStateFailed
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.initialReconstructionState capacity).failed =
+    false :=
+  RuntimeOramHelperSemantics.initialReconstructionState_failed capacity
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksStateStashThenBuckets
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlocks
+        capacity leafCount positionMap
+        (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+        stashBlocks)
+      bucketBlocks :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState_stashThenBuckets
+    capacity leafCount positionMap stashBlocks bucketBlocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksStateNoBlocks
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap [] [] =
+    RuntimeOramHelperSemantics.initialReconstructionState capacity :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState_noBlocks
+    capacity leafCount positionMap
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksStateStashFailureAbsorbs
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState_stashFailureAbsorbs
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedPriorFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks).failed =
+        true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = true :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed_priorFailure
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedSuccess
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks).failed =
+        false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+        capacity leafCount positionMap stashBlocks bucketBlocks).liveSlots =
+        false) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = false :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed_success
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed hCoverage
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedStashFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = true :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed_stashFailure
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedNoBlocks
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap [] [] =
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      positionMap
+      (List.replicate capacity RuntimeOramHelperSemantics.noneOption) :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed_noBlocks
+    capacity leafCount positionMap
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedUnoccupied
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (leafCount bucketIndex leaf : Nat) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      { bucketIndex
+      , block := { occupied := false, slotIndex := 0, leaf }
+      } = false :=
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed_unoccupied
+    leafCount bucketIndex leaf
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedOnPath
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hPath :
+    RuntimeOramCodecSemantics.bucketOnLeafPath
+      leafCount bucketIndex block.leaf = true) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      { bucketIndex, block } = false :=
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed_onPath
+    hOccupied hPath
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedOffPath
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hPath :
+    RuntimeOramCodecSemantics.bucketOnLeafPath
+      leafCount bucketIndex block.leaf = false) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      { bucketIndex, block } = true :=
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed_offPath
+    hOccupied hPath
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlockStepPriorFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (bucketBlock : RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock = state :=
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep_priorFailure
+    capacity leafCount positionMap bucketBlock hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlockStepOffPathFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {bucketBlock : RuntimeOramHelperSemantics.BucketBlock}
+  (hState : state.failed = false)
+  (hAdmission :
+    RuntimeOramHelperSemantics.bucketBlockAdmissionFailed
+      leafCount bucketBlock = true) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock =
+    { state with failed := true } :=
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep_offPathFailure
+    capacity leafCount positionMap hState hAdmission
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlockStepAdmitted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {bucketBlock : RuntimeOramHelperSemantics.BucketBlock}
+  (hState : state.failed = false)
+  (hAdmission :
+    RuntimeOramHelperSemantics.bucketBlockAdmissionFailed
+      leafCount bucketBlock = false) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock =
+    RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state bucketBlock.block :=
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep_admitted
+    capacity leafCount positionMap hState hAdmission
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksEmpty
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state [] = state :=
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks_empty
+    capacity leafCount positionMap state
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksPriorFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state bucketBlocks = state :=
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks_priorFailure
+    capacity leafCount positionMap bucketBlocks hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsStateStashThenBuckets
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlocks
+        capacity leafCount positionMap
+        (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+        stashBlocks)
+      bucketBlocks :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState_stashThenBuckets
+    capacity leafCount positionMap stashBlocks bucketBlocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsStateStashFailureAbsorbs
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState_stashFailureAbsorbs
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsFailedStashFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = true :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed_stashFailure
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsFailedSuccess
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks bucketBlocks).failed =
+        false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+        capacity leafCount positionMap stashBlocks bucketBlocks).liveSlots =
+        false) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = false :=
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed_success
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed hCoverage
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperWorkingStashCapacityFormula
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.Parameters) :
+  RuntimeOramHelperSemantics.workingStashCapacity parameters =
+    parameters.stashBound +
+      parameters.bucketsPerAccess * parameters.blocksPerBucket :=
+  RuntimeOramHelperSemantics.workingStashCapacity_formula parameters
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSlotForKeySomeWithinCapacity
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {keyMatches : List Bool}
+  {slot : Nat}
+  (hSlot : RuntimeOramHelperSemantics.slotForKey? keyMatches = some slot) :
+  slot < keyMatches.length :=
+  RuntimeOramHelperSemantics.slotForKey?_some_lt_capacity hSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperAllocateSlotSomeWithinCapacity
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {occupied : List Bool}
+  {slot : Nat}
+  (hSlot : RuntimeOramHelperSemantics.allocateSlot? occupied = some slot) :
+  slot < occupied.length :=
+  RuntimeOramHelperSemantics.allocateSlot?_some_lt_capacity hSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperFirstVacantIndexSomeWithinCapacity
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {index : Nat}
+  (hIndex :
+    RuntimeOramHelperSemantics.firstVacantIndex blocks = some index) :
+  index < blocks.length :=
+  RuntimeOramHelperSemantics.firstVacantIndex_some_lt_length hIndex
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperClearFixedStashLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.clearFixedStash blocks).length =
+    blocks.length :=
+  RuntimeOramHelperSemantics.clearFixedStash_length blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperClearFixedStashAllEmpty
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hMem : block ∈ RuntimeOramHelperSemantics.clearFixedStash blocks) :
+  block = RuntimeOramHelperSemantics.emptyBlock :=
+  RuntimeOramHelperSemantics.clearFixedStash_allEmpty hMem
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPushFixedStashPreservesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (overflowed : Bool)
+  (block : RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.pushFixedStash
+      blocks overflowed block).blocks.length =
+    blocks.length :=
+  RuntimeOramHelperSemantics.pushFixedStash_preservesLength
+    blocks overflowed block
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPushFixedStashVacantPreservesOverflow
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {overflowed : Bool}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  {index : Nat}
+  (hOccupied : block.occupied = true)
+  (hVacant :
+    RuntimeOramHelperSemantics.firstVacantIndex blocks = some index) :
+  (RuntimeOramHelperSemantics.pushFixedStash
+      blocks overflowed block).overflowed = overflowed :=
+  RuntimeOramHelperSemantics.pushFixedStash_vacant_preservesOverflow
+    hOccupied hVacant
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPushFixedStashNoVacantOverflows
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {overflowed : Bool}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hVacant :
+    RuntimeOramHelperSemantics.firstVacantIndex blocks = none) :
+  (RuntimeOramHelperSemantics.pushFixedStash
+      blocks overflowed block).overflowed = true :=
+  RuntimeOramHelperSemantics.pushFixedStash_noVacant_overflows
+    hOccupied hVacant
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperTakeSelectedBlockPreservesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {selectedIndex : Nat}
+  {present : Bool}
+  {result : RuntimeOramHelperSemantics.TakeResult}
+  (hTake :
+    RuntimeOramHelperSemantics.takeSelectedBlock
+        blocks selectedIndex present = some result) :
+  result.blocks.length = blocks.length :=
+  RuntimeOramHelperSemantics.takeSelectedBlock_some_preservesLength hTake
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperTakeSelectedBlockPresentSelectedInBounds
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {selectedIndex : Nat}
+  {result : RuntimeOramHelperSemantics.TakeResult}
+  (hTake :
+    RuntimeOramHelperSemantics.takeSelectedBlock
+        blocks selectedIndex true = some result) :
+  selectedIndex < blocks.length :=
+  RuntimeOramHelperSemantics.takeSelectedBlock_present_selectedInBounds hTake
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectPositionMapLeafAbsent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.selectPositionMapLeaf positionMap slot =
+    RuntimeOramHelperSemantics.noneOption :=
+  RuntimeOramHelperSemantics.selectPositionMapLeaf_absent
+    positionMap slot hAbsent
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectPositionMapLeafPresentGet
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {slot leaf : RuntimeOramHelperSemantics.MaskedUsizeOption}
+  (hPresent : slot.present = true)
+  (hGet :
+    RuntimeOramHelperSemantics.lookupAt? positionMap slot.value = some leaf) :
+  RuntimeOramHelperSemantics.selectPositionMapLeaf positionMap slot = leaf :=
+  RuntimeOramHelperSemantics.selectPositionMapLeaf_present_get
+    hPresent hGet
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectValueAtAbsent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (values : List α)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (default : α)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.selectValueAt values slot default = default :=
+  RuntimeOramHelperSemantics.selectValueAt_absent
+    values slot default hAbsent
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectValueAtPresentGet
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {values : List α}
+  {slot : RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {default value : α}
+  (hPresent : slot.present = true)
+  (hGet : RuntimeOramHelperSemantics.lookupAt? values slot.value = some value) :
+  RuntimeOramHelperSemantics.selectValueAt values slot default = value :=
+  RuntimeOramHelperSemantics.selectValueAt_present_get hPresent hGet
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperAccessLeafUsesFreshWhenNoPrior
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (freshLeaf : Nat)
+  (hNoPrior :
+    (RuntimeOramHelperSemantics.selectPositionMapLeaf
+      positionMap slot).present = false) :
+  RuntimeOramHelperSemantics.accessLeafForSlot
+      positionMap slot freshLeaf = freshLeaf :=
+  RuntimeOramHelperSemantics.accessLeafForSlot_usesFreshWhenNoPrior
+    positionMap slot freshLeaf hNoPrior
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperAccessLeafUsesPriorWhenPresent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (freshLeaf : Nat)
+  (hPrior :
+    (RuntimeOramHelperSemantics.selectPositionMapLeaf
+      positionMap slot).present = true) :
+  RuntimeOramHelperSemantics.accessLeafForSlot
+      positionMap slot freshLeaf =
+    (RuntimeOramHelperSemantics.selectPositionMapLeaf
+      positionMap slot).value :=
+  RuntimeOramHelperSemantics.accessLeafForSlot_usesPriorWhenPresent
+    positionMap slot freshLeaf hPrior
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdatePositionMapLeafPreservesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  (RuntimeOramHelperSemantics.updatePositionMapLeaf
+      positionMap slot nextLeaf).length = positionMap.length :=
+  RuntimeOramHelperSemantics.updatePositionMapLeaf_preservesLength
+    positionMap slot nextLeaf
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdatePositionMapLeafAbsent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.updatePositionMapLeaf
+      positionMap slot nextLeaf = positionMap :=
+  RuntimeOramHelperSemantics.updatePositionMapLeaf_absent
+    positionMap slot nextLeaf hAbsent
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdatePositionMapLeafNextAbsent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : nextLeaf.present = false) :
+  RuntimeOramHelperSemantics.updatePositionMapLeaf
+      positionMap slot nextLeaf = positionMap :=
+  RuntimeOramHelperSemantics.updatePositionMapLeaf_nextAbsent
+    positionMap slot nextLeaf hAbsent
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdateStashLeafForSlotPreservesLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  (RuntimeOramHelperSemantics.updateStashLeafForSlot
+      blocks slot nextLeaf).length = blocks.length :=
+  RuntimeOramHelperSemantics.updateStashLeafForSlot_preservesLength
+    blocks slot nextLeaf
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdateStashLeafForSlotAbsent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.updateStashLeafForSlot
+      blocks slot nextLeaf = blocks :=
+  RuntimeOramHelperSemantics.updateStashLeafForSlot_absent
+    blocks slot nextLeaf hAbsent
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdateStashLeafForSlotNextAbsent
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : nextLeaf.present = false) :
+  RuntimeOramHelperSemantics.updateStashLeafForSlot
+      blocks slot nextLeaf = blocks :=
+  RuntimeOramHelperSemantics.updateStashLeafForSlot_nextAbsent
+    blocks slot nextLeaf hAbsent
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedNoApply
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (valueIsZero : Bool)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks false valueIsZero slot insertSlot = false :=
+  RuntimeOramHelperSemantics.pathPutUpdateFailed_noApply
+    entryCapacity blocks valueIsZero slot insertSlot
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedUpdateMissing
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hSlot : slot.present = true)
+  (hMissing :
+    RuntimeOramHelperSemantics.stashContainsSlot
+      blocks slot.value = false) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks true false slot insertSlot = true :=
+  RuntimeOramHelperSemantics.pathPutUpdateFailed_updateMissing
+    entryCapacity blocks slot insertSlot hSlot hMissing
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedInsertNoVacancy
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hSlotAbsent : slot.present = false)
+  (hInsert : insertSlot.present = true)
+  (hVacant : RuntimeOramHelperSemantics.stashHasVacant blocks = false) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks true false slot insertSlot = true :=
+  RuntimeOramHelperSemantics.pathPutUpdateFailed_insertNoVacancy
+    entryCapacity blocks slot insertSlot hSlotAbsent hInsert hVacant
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedInsertOutOfRange
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hSlotAbsent : slot.present = false)
+  (hInsert : insertSlot.present = true)
+  (hOutOfRange : entryCapacity ≤ insertSlot.value) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks true false slot insertSlot = true :=
+  RuntimeOramHelperSemantics.pathPutUpdateFailed_insertOutOfRange
+    entryCapacity blocks slot insertSlot hSlotAbsent hInsert hOutOfRange
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBuildPathBucketBucketLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocksPerBucket leafCount bucketIndex : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.buildPathBucket
+      blocksPerBucket leafCount bucketIndex blocks).bucket.length =
+    blocksPerBucket :=
+  RuntimeOramHelperSemantics.buildPathBucket_bucketLength
+    blocksPerBucket leafCount bucketIndex blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBuildPathBucketStashLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocksPerBucket leafCount bucketIndex : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.buildPathBucket
+      blocksPerBucket leafCount bucketIndex blocks).stash.length =
+    blocks.length :=
+  RuntimeOramHelperSemantics.buildPathBucket_stashLength
+    blocksPerBucket leafCount bucketIndex blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBuildPathBucketLiveCountBound
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocksPerBucket leafCount bucketIndex : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.buildPathBucket
+      blocksPerBucket leafCount bucketIndex blocks).liveCount ≤
+    blocksPerBucket :=
+  RuntimeOramHelperSemantics.buildPathBucket_liveCountBound
+    blocksPerBucket leafCount bucketIndex blocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathWriteCountMatchesWriteLogCapacity
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters) :
+  RuntimeOramHelperSemantics.rewritePathWriteCount parameters =
+    RuntimeOramWriteLogDiscipline.writeLogCapacity
+      (RuntimeOramHelperSemantics.rewriteWriteLogParameters parameters) :=
+  RuntimeOramHelperSemantics.rewritePathWriteCount_matchesWriteLogCapacity
+    parameters
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathAccessReadCountMatchesReadTranscriptCapacity
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters) :
+  RuntimeOramHelperSemantics.pathAccessReadCount parameters =
+    RuntimeOramWriteLogDiscipline.readTranscriptCapacity
+      (RuntimeOramHelperSemantics.rewriteWriteLogParameters parameters) :=
+  RuntimeOramHelperSemantics.pathAccessReadCount_matchesReadTranscriptCapacity
+    parameters
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathSummaryNextCounter
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (currentCounter : Nat)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  (RuntimeOramHelperSemantics.rewritePathSummary
+      parameters currentCounter loadOverflowed effectFailed
+      postUpdateStashLen postRebuildStashLen).nextCounter =
+    currentCounter + 1 :=
+  RuntimeOramHelperSemantics.rewritePathSummary_nextCounter
+    parameters currentCounter loadOverflowed effectFailed
+    postUpdateStashLen postRebuildStashLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathSummaryPhysicalWriteCount
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (currentCounter : Nat)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  (RuntimeOramHelperSemantics.rewritePathSummary
+      parameters currentCounter loadOverflowed effectFailed
+      postUpdateStashLen postRebuildStashLen).physicalWriteCount =
+    RuntimeOramHelperSemantics.rewritePathWriteCount parameters :=
+  RuntimeOramHelperSemantics.rewritePathSummary_physicalWriteCount
+    parameters currentCounter loadOverflowed effectFailed
+    postUpdateStashLen postRebuildStashLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedLoadOverflow
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters true effectFailed postUpdateStashLen postRebuildStashLen =
+    true :=
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed_loadOverflow
+    parameters effectFailed postUpdateStashLen postRebuildStashLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedEffectFailed
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (loadOverflowed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters loadOverflowed true postUpdateStashLen postRebuildStashLen =
+    true :=
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed_effectFailed
+    parameters loadOverflowed postUpdateStashLen postRebuildStashLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedPostUpdateOverflow
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat)
+  (hOverflow :
+    RuntimeOramHelperSemantics.rewriteWorkingStashBound parameters <
+      postUpdateStashLen) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters loadOverflowed effectFailed postUpdateStashLen
+      postRebuildStashLen = true :=
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed_postUpdateOverflow
+    parameters loadOverflowed effectFailed postUpdateStashLen
+    postRebuildStashLen hOverflow
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedPostRebuildOverflow
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat)
+  (hOverflow : parameters.stashBound < postRebuildStashLen) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters loadOverflowed effectFailed postUpdateStashLen
+      postRebuildStashLen = true :=
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed_postRebuildOverflow
+    parameters loadOverflowed effectFailed postUpdateStashLen
+    postRebuildStashLen hOverflow
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedNoFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (postUpdateStashLen postRebuildStashLen : Nat)
+  (hPostUpdate :
+    postUpdateStashLen ≤
+      RuntimeOramHelperSemantics.rewriteWorkingStashBound parameters)
+  (hPostRebuild : postRebuildStashLen ≤ parameters.stashBound) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters false false postUpdateStashLen postRebuildStashLen =
+    false :=
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed_noFailure
+    parameters postUpdateStashLen postRebuildStashLen hPostUpdate
+    hPostRebuild
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathSummaryNoFailure
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (currentCounter postUpdateStashLen postRebuildStashLen : Nat)
+  (hPostUpdate :
+    postUpdateStashLen ≤
+      RuntimeOramHelperSemantics.rewriteWorkingStashBound parameters)
+  (hPostRebuild : postRebuildStashLen ≤ parameters.stashBound) :
+  (RuntimeOramHelperSemantics.rewritePathSummary
+      parameters currentCounter false false postUpdateStashLen
+      postRebuildStashLen).updateFailed = false :=
+  RuntimeOramHelperSemantics.rewritePathSummary_noFailure
+    parameters currentCounter postUpdateStashLen postRebuildStashLen
+    hPostUpdate hPostRebuild
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketBytesMatchCodec
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {object : OramObjectManifest}
+  (hObject : WellFormedOramObject object) :
+  object.bucketSize =
+    RuntimeOramCodecSemantics.bucketBytes
+      object.blocksPerBucket
+      object.blockSize := by
+  exact RuntimeOramCodecSemantics.wellFormedOramBucketBytes_matchesCodec hObject
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramSurrogateBucketBytesMatchCodec
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {object : OramObjectManifest}
+  (hObject : WellFormedSurrogateOramObject object) :
+  object.bucketSize =
+    RuntimeOramCodecSemantics.bucketBytes
+      object.blocksPerBucket
+      object.blockSize := by
+  exact RuntimeOramCodecSemantics.wellFormedSurrogateBucketBytes_matchesCodec hObject
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramPathBucketBytesMatchCodec
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {object : OramObjectManifest}
+  (hObject : WellFormedPathOramObject object) :
+  object.bucketSize =
+    RuntimeOramCodecSemantics.bucketBytes
+      object.blocksPerBucket
+      object.blockSize := by
+  exact RuntimeOramCodecSemantics.wellFormedPathBucketBytes_matchesCodec hObject
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramSurrogateBlockBytesPublicFormula
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.surrogateBlockBytes keyBytes valueBytes =
+    RuntimeOramCodecSemantics.occupancyTagBytes + keyBytes + valueBytes := by
+  exact
+    RuntimeOramCodecSemantics.surrogateBlockBytes_public_formula
+      keyBytes valueBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramPathBlockBytesPublicFormula
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.pathBlockBytes keyBytes valueBytes =
+    RuntimeOramCodecSemantics.occupancyTagBytes +
+      RuntimeOramCodecSemantics.slotIndexBytes +
+      RuntimeOramCodecSemantics.leafLabelBytes +
+      keyBytes +
+      valueBytes := by
+  exact
+    RuntimeOramCodecSemantics.pathBlockBytes_public_formula
+      keyBytes valueBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketBytesPublicFormula
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blocksPerBucket blockBytes : Nat) :
+  RuntimeOramCodecSemantics.bucketBytes blocksPerBucket blockBytes =
+    oramBucketHeaderBytes +
+      blocksPerBucket * blockBytes := by
+  exact
+    RuntimeOramCodecSemantics.bucketBytes_public_formula
+      blocksPerBucket blockBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramDirectoryPageBytesPublicFormula
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (blockBytes : Nat) :
+  RuntimeOramCodecSemantics.directoryPageBytes blockBytes =
+    RuntimeOramCodecSemantics.directoryPageEntries * blockBytes := by
+  exact RuntimeOramCodecSemantics.directoryPageBytes_public_formula blockBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramPublicCountGuardAcceptsExact
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (expected : Nat) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected expected = some () := by
+  exact RuntimeOramCodecSemantics.publicCountGuard?_acceptsExact expected
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramDirectoryPagesRejectCountMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact RuntimeOramCodecSemantics.publicCountGuard?_rejectsMismatch hCount
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketsRejectCountMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact RuntimeOramCodecSemantics.publicCountGuard?_rejectsMismatch hCount
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapBufferRejectsCountMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact RuntimeOramCodecSemantics.publicCountGuard?_rejectsMismatch hCount
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathLiveSlotsRejectCountMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact RuntimeOramCodecSemantics.publicCountGuard?_rejectsMismatch hCount
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterFieldBytesMatchSlotIndex
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary) :
+  RuntimeOramCodecSemantics.counterFieldBytes =
+    RuntimeOramCodecSemantics.slotIndexBytes := by
+  exact RuntimeOramCodecSemantics.counterFieldBytes_matchesSlotIndexBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBucketHeaderBytesMatchesRuntimeHeader
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary) :
+  RuntimeOramCodecSemantics.codecBucketHeaderBytes =
+    oramBucketHeaderBytes := by
+  exact RuntimeOramCodecSemantics.codecBucketHeaderBytes_matchesRuntimeHeader
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBlockBytesSurrogateMatchesFormula
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.codecBlockBytes false keyBytes valueBytes =
+    RuntimeOramCodecSemantics.surrogateBlockBytes keyBytes valueBytes := by
+  exact
+    RuntimeOramCodecSemantics.codecBlockBytes_surrogate_matchesFormula
+      keyBytes valueBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBlockBytesPathMatchesFormula
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.codecBlockBytes true keyBytes valueBytes =
+    RuntimeOramCodecSemantics.pathBlockBytes keyBytes valueBytes := by
+  exact
+    RuntimeOramCodecSemantics.codecBlockBytes_path_matchesFormula
+      keyBytes valueBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBucketBytesMatchesRuntimeBucketBytes
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (isPath : Bool)
+  (blocksPerBucket keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.codecBucketBytes
+      isPath blocksPerBucket keyBytes valueBytes =
+    RuntimeOramCodecSemantics.bucketBytes blocksPerBucket
+      (RuntimeOramCodecSemantics.codecBlockBytes
+        isPath keyBytes valueBytes) := by
+  exact
+    RuntimeOramCodecSemantics.codecBucketBytes_matchesRuntimeBucketBytes
+      isPath blocksPerBucket keyBytes valueBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterEncodeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (counter : Nat) :
+  RuntimeOramCodecSemantics.CounterDecodeAccepted
+    (RuntimeOramCodecSemantics.encodeCounterField counter) := by
+  exact RuntimeOramCodecSemantics.encodeCounterField_accepted counter
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterEncodeLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (counter : Nat) :
+  (RuntimeOramCodecSemantics.encodeCounterField counter).length =
+    RuntimeOramCodecSemantics.counterFieldBytes := by
+  exact RuntimeOramCodecSemantics.encodeCounterField_length counter
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterEncodeValidBytes
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (counter : Nat) :
+  RuntimeOramCodecSemantics.ValidByteField
+    (RuntimeOramCodecSemantics.encodeCounterField counter) := by
+  exact RuntimeOramCodecSemantics.encodeCounterField_validBytes counter
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeExactEncode
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (counter : Nat) :
+  RuntimeOramCodecSemantics.decodeCounterExact?
+      (RuntimeOramCodecSemantics.encodeCounterField counter) =
+    some
+      (RuntimeOramCodecSemantics.decodeNatField
+        (RuntimeOramCodecSemantics.encodeCounterField counter)) := by
+  exact RuntimeOramCodecSemantics.decodeCounterExact_encodeCounterField counter
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  {counter : Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeCounterExact? bytes = some counter)
+  (hBytes : RuntimeOramCodecSemantics.ValidByteField bytes) :
+    RuntimeOramCodecSemantics.CounterDecodeAccepted bytes := by
+  exact RuntimeOramCodecSemantics.decodeCounterExact_some_accepted hDecode hBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  {counter : Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeCounterExact? bytes = some counter) :
+  bytes.length = RuntimeOramCodecSemantics.counterFieldBytes := by
+  exact RuntimeOramCodecSemantics.decodeCounterExact_some_length hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeValue
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {bytes : List Nat}
+  {counter : Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeCounterExact? bytes = some counter) :
+  counter = RuntimeOramCodecSemantics.decodeNatField bytes := by
+  exact RuntimeOramCodecSemantics.decodeCounterExact_some_value hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramBlockCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hBlock :
+    block.ValidShape isPath keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodeBlock?
+      isPath keyBytes valueBytes
+      (RuntimeOramCodecSemantics.encodeBlock isPath block) =
+    some block := by
+  exact RuntimeOramCodecSemantics.decodeBlock_encodeBlock hBlock
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlockCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hBlock :
+    block.ValidShape isPath keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodeBlockExact?
+      isPath keyBytes valueBytes
+      (RuntimeOramCodecSemantics.encodeBlock isPath block) =
+    some block := by
+  exact RuntimeOramCodecSemantics.decodeBlockExact_encodeBlock hBlock
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlockDecodeLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {bytes : List Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBlockExact?
+        isPath keyBytes valueBytes bytes = some block) :
+  bytes.length =
+    RuntimeOramCodecSemantics.codecBlockBytes
+      isPath keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.decodeBlockExact_some_exact_length hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlockDecodeValidShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {bytes : List Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBlockExact?
+        isPath keyBytes valueBytes bytes = some block) :
+  block.ValidShape isPath keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.decodeBlockExact_some_validShape hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramEncodeBlockLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hBlock :
+    block.ValidShape isPath keyBytes valueBytes) :
+  (RuntimeOramCodecSemantics.encodeBlock isPath block).length =
+    RuntimeOramCodecSemantics.codecBlockBytes
+      isPath keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.encodeBlock_length hBlock
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramEncodeBlocksLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hBlocks :
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes) :
+  (RuntimeOramCodecSemantics.encodeBlocks isPath blocks).length =
+    blocks.length *
+      RuntimeOramCodecSemantics.codecBlockBytes
+        isPath keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.encodeBlocks_length hBlocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlocksDecodeCount
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes count : Nat}
+  {bytes : List Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeExactBlocks?
+        isPath keyBytes valueBytes count bytes = some blocks) :
+  blocks.length = count := by
+  exact RuntimeOramCodecSemantics.decodeExactBlocks_some_block_count hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlocksCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hBlocks :
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodeExactBlocks?
+      isPath keyBytes valueBytes blocks.length
+      (RuntimeOramCodecSemantics.encodeBlocks isPath blocks) =
+    some blocks := by
+  exact RuntimeOramCodecSemantics.decodeExactBlocks_encodeBlocks hBlocks
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketCodecLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes : Nat}
+  {bucket : RuntimeOramCodecSemantics.CodecBucket}
+  (hBucket :
+    bucket.ValidShape isPath blocksPerBucket keyBytes valueBytes) :
+  (RuntimeOramCodecSemantics.encodeBucket isPath bucket).length =
+    RuntimeOramCodecSemantics.codecBucketBytes
+      isPath blocksPerBucket keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.encodeBucket_length hBucket
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBucketCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex : Nat}
+  {bucket : RuntimeOramCodecSemantics.CodecBucket}
+  (hBucket :
+    bucket.ValidShape isPath blocksPerBucket keyBytes valueBytes)
+  (hBucketIndex :
+    RuntimeOramCodecSemantics.decodeNatField bucket.bucketIndexField =
+      expectedBucketIndex)
+  (hLiveCount :
+    RuntimeOramCodecSemantics.decodeNatField bucket.liveEntryCountField =
+      RuntimeOramCodecSemantics.liveBlockCount bucket.blocks) :
+  RuntimeOramCodecSemantics.decodeBucketExact?
+      isPath blocksPerBucket keyBytes valueBytes expectedBucketIndex
+      (RuntimeOramCodecSemantics.encodeBucket isPath bucket) =
+    some
+      { bucketIndex := expectedBucketIndex
+      , liveEntryCount := RuntimeOramCodecSemantics.liveBlockCount bucket.blocks
+      , blocks := bucket.blocks
+      } := by
+  exact
+    RuntimeOramCodecSemantics.decodeBucketExact_encodeBucket
+      hBucket hBucketIndex hLiveCount
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBucketDecodeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBucketExact?
+        isPath blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        isPath blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket := by
+  exact
+    RuntimeOramCodecSemantics.decodeBucketExact_some_exact_length_and_accepted
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBucketDecodeBlockValidShapes
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBucketExact?
+        isPath blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        bytes = some payload) :
+  ∀ block, block ∈ payload.blocks →
+    block.ValidShape isPath keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.decodeBucketExact_some_block_validShapes hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketBoundedDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount := by
+  exact RuntimeOramCodecSemantics.decodePathBucketBoundedExact_some_shape hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketPathBoundedDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.LiveOnBucketPath leafCount expectedBucketIndex := by
+  exact
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact_some_shape
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketPositionMapBoundedDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {positionMap : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMap bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.LiveOnBucketPath leafCount expectedBucketIndex ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact_some_shape
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketUniquePositionMapBoundedDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {positionMap : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMap bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    RuntimeOramCodecSemantics.LiveSlotNoDuplicates payload.blocks ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.LiveOnBucketPath leafCount expectedBucketIndex ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact_some_shape
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapLiveSlotCoverage
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {positionMap : List (Option Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hCheck :
+    RuntimeOramCodecSemantics.checkPositionMapCoveredByLiveBlocks
+        positionMap blocks = true) :
+  RuntimeOramCodecSemantics.PositionMapCoveredByLiveBlocks
+    positionMap blocks := by
+  exact RuntimeOramCodecSemantics.checkPositionMapCoveredByLiveBlocks_true hCheck
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathBlocksPositionMapAgreement
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {positionMap : List (Option Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hCheck :
+    RuntimeOramCodecSemantics.checkPathBlocksPositionMapAgreement
+        positionMap blocks = true) :
+  ∀ block, block ∈ blocks →
+    block.AgreesWithPositionMap positionMap := by
+  exact RuntimeOramCodecSemantics.checkPathBlocksPositionMapAgreement_true hCheck
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathBlocksNoDuplicateLiveSlots
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hCheck :
+    RuntimeOramCodecSemantics.checkPathBlocksNoDuplicateLiveSlots blocks =
+      true) :
+  RuntimeOramCodecSemantics.LiveSlotNoDuplicates blocks := by
+  exact RuntimeOramCodecSemantics.checkPathBlocksNoDuplicateLiveSlots_true hCheck
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_oramDecodedBucketPayloadAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {expectedBucketIndex blocksPerBucket : Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hIndex : payload.bucketIndex = expectedBucketIndex)
+  (hBlocks : payload.blocks.length = blocksPerBucket)
+  (hLive :
+    RuntimeOramCodecSemantics.liveBlockCount payload.blocks =
+      payload.liveEntryCount) :
+  payload.Accepted expectedBucketIndex blocksPerBucket := by
+  exact
+    RuntimeOramCodecSemantics.decodedBucketPayload_accepted_of_exact_live_count
+      hIndex hBlocks hLive
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesCoverCapacity
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity : Nat) :
+  capacity ≤
+    RuntimeOramCodecSemantics.pathPositionMapPages capacity *
+      RuntimeOramCodecSemantics.directoryPageEntries := by
+  exact RuntimeOramCodecSemantics.pathPositionMapPages_covers_capacity capacity
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesPositive
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  (capacity : Nat) :
+  0 < RuntimeOramCodecSemantics.pathPositionMapPages capacity := by
+  exact RuntimeOramCodecSemantics.pathPositionMapPages_positive capacity
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathMetadataPageSplit
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {metadataPages capacity : Nat}
+  (hPages :
+    RuntimeOramCodecSemantics.pathPositionMapPages capacity ≤
+      metadataPages) :
+  RuntimeOramCodecSemantics.pathPositionMapPages capacity +
+      RuntimeOramCodecSemantics.pathStashPages metadataPages capacity =
+    metadataPages := by
+  exact RuntimeOramCodecSemantics.pathMetadataPageSplit_exact hPages
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_positionMapDecodeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {capacity leafCount : Nat}
+  {positionMap : List (Option Nat)}
+  (hCapacity : positionMap.length = capacity)
+  (hLeaves :
+    RuntimeOramCodecSemantics.PositionMapLeafBounded leafCount positionMap) :
+  RuntimeOramCodecSemantics.PositionMapDecodeAccepted
+      capacity leafCount positionMap := by
+  exact
+    RuntimeOramCodecSemantics.positionMapDecodeAccepted_of_exact_capacity_and_leaf_bound
+      hCapacity hLeaves
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapLeafDecodeBounded
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount : Nat}
+  {field : List Nat}
+  {entry : Option Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePositionMapLeaf? leafCount field =
+      some entry) :
+  RuntimeOramCodecSemantics.PositionMapEntryLeafBounded leafCount entry := by
+  exact RuntimeOramCodecSemantics.decodePositionMapLeaf_some_bounded hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapEntriesDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount count : Nat}
+  {bytes : List Nat}
+  {entries : List (Option Nat)}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePositionMapEntriesExact?
+        leafCount count bytes = some entries) :
+  entries.length = count ∧
+    RuntimeOramCodecSemantics.PositionMapLeafBounded leafCount entries := by
+  exact RuntimeOramCodecSemantics.decodePositionMapEntriesExact_some_shape hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageDecodeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount directoryPageBytes : Nat}
+  {bytes : List Nat}
+  {page : RuntimeOramCodecSemantics.DecodedPathPositionMapPage}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathPositionMapPageExact?
+        leafCount directoryPageBytes bytes = some page) :
+  bytes.length = directoryPageBytes ∧
+    page.Accepted leafCount directoryPageBytes := by
+  exact
+    RuntimeOramCodecSemantics.decodePathPositionMapPageExact_some_length_and_accepted
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageRejectsLengthMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount directoryPageBytes : Nat}
+  {bytes : List Nat}
+  (hLen : bytes.length ≠ directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPageExact?
+      leafCount directoryPageBytes bytes = none := by
+  exact
+    RuntimeOramCodecSemantics.decodePathPositionMapPageExact?_rejectsLengthMismatch
+      hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesAllDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount directoryPageBytes : Nat}
+  {pages : List (List Nat)}
+  {entries : List (Option Nat)}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathPositionMapPagesAll?
+        leafCount directoryPageBytes pages = some entries) :
+  entries.length =
+      pages.length * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.PositionMapLeafBounded leafCount entries := by
+  exact RuntimeOramCodecSemantics.decodePathPositionMapPagesAll_some_shape hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesDecodeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount directoryPageBytes capacity : Nat}
+  {pages : List (List Nat)}
+  {positionMap : List (Option Nat)}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathPositionMapPagesExact?
+        leafCount directoryPageBytes capacity pages = some positionMap) :
+  pages.length = RuntimeOramCodecSemantics.pathPositionMapPages capacity ∧
+    RuntimeOramCodecSemantics.PositionMapDecodeAccepted
+      capacity leafCount positionMap := by
+  exact
+    RuntimeOramCodecSemantics.decodePathPositionMapPagesExact_some_accepted
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesRejectsPageCountMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount directoryPageBytes capacity : Nat}
+  {pages : List (List Nat)}
+  (hCount :
+    pages.length ≠ RuntimeOramCodecSemantics.pathPositionMapPages capacity) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPagesExact?
+      leafCount directoryPageBytes capacity pages = none := by
+  exact
+    RuntimeOramCodecSemantics.decodePathPositionMapPagesExact?_rejectsPageCountMismatch
+      hCount
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {directoryPageBytes : Nat}
+  {positionMapPrefixBytes : List Nat}
+  (hLen : positionMapPrefixBytes.length ≤ directoryPageBytes) :
+  (RuntimeOramCodecSemantics.encodePathPositionMapPageBytes
+      directoryPageBytes positionMapPrefixBytes).length =
+    directoryPageBytes := by
+  exact RuntimeOramCodecSemantics.encodePathPositionMapPageBytes_length hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount directoryPageBytes : Nat}
+  {fields : List (List Nat)}
+  {entries : List (Option Nat)}
+  (hFields :
+    RuntimeOramCodecSemantics.PositionMapEntryFieldsEncode
+      leafCount fields entries)
+  (hEntryCount :
+    entries.length = RuntimeOramCodecSemantics.directoryPageEntries)
+  (hDirectoryBytes :
+    RuntimeOramCodecSemantics.pathPositionMapEntryBytes ≤
+      directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPageExact?
+      leafCount directoryPageBytes
+      (RuntimeOramCodecSemantics.encodePathPositionMapPageBytes
+        directoryPageBytes
+        (RuntimeOramCodecSemantics.encodePositionMapEntryFields fields)) =
+    some
+      { entries := entries
+      , padding :=
+          List.replicate
+            (directoryPageBytes -
+              RuntimeOramCodecSemantics.pathPositionMapEntryBytes) 0
+      } := by
+  exact
+    RuntimeOramCodecSemantics.decodePathPositionMapPageExact_encodePositionMapEntryFields
+      hFields hEntryCount hDirectoryBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {leafCount directoryPageBytes capacity : Nat}
+  {fieldPages : List (List (List Nat))}
+  {entryPages : List (List (Option Nat))}
+  (hPages :
+    RuntimeOramCodecSemantics.PositionMapPageEntryFieldsEncode
+      leafCount fieldPages entryPages)
+  (hPageCount :
+    entryPages.length =
+      RuntimeOramCodecSemantics.pathPositionMapPages capacity)
+  (hDirectoryBytes :
+    RuntimeOramCodecSemantics.pathPositionMapEntryBytes ≤
+      directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPagesExact?
+      leafCount directoryPageBytes capacity
+      (RuntimeOramCodecSemantics.encodePathPositionMapPagesBytes
+        directoryPageBytes fieldPages) =
+    some
+      ((RuntimeOramCodecSemantics.flattenPositionMapPages entryPages).take
+        capacity) := by
+  exact
+    RuntimeOramCodecSemantics.decodePathPositionMapPagesExact_encodePathPositionMapPagesBytes
+      hPages hPageCount hDirectoryBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageLength
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {directoryPageBytes : Nat}
+  {stashBlockBytes : List Nat}
+  (hLen : stashBlockBytes.length ≤ directoryPageBytes) :
+  (RuntimeOramCodecSemantics.encodePathStashPageBytes
+      directoryPageBytes stashBlockBytes).length =
+    directoryPageBytes := by
+  exact RuntimeOramCodecSemantics.encodePathStashPageBytes_length hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hBlockCount :
+    blocks.length = RuntimeOramCodecSemantics.directoryPageEntries)
+  (hBlocks :
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes)
+  (hDirectoryBytes :
+    directoryPageBytes =
+      RuntimeOramCodecSemantics.directoryPageEntries *
+        RuntimeOramCodecSemantics.codecBlockBytes
+          true keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodePathStashPageExact?
+      true keyBytes valueBytes directoryPageBytes
+      (RuntimeOramCodecSemantics.encodePathStashPageBytes
+        directoryPageBytes
+        (RuntimeOramCodecSemantics.encodeBlocks true blocks)) =
+    some { blocks := blocks } := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPageExact_encodeBlocks
+      hBlockCount hBlocks hDirectoryBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesCodecRoundtrip
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {keyBytes valueBytes directoryPageBytes stashPageCount : Nat}
+  {blockPages : List (List RuntimeOramCodecSemantics.CodecBlock)}
+  (hPages :
+    RuntimeOramCodecSemantics.PathStashPageBlocksValid
+      keyBytes valueBytes blockPages)
+  (hPageCount : blockPages.length = stashPageCount)
+  (hDirectoryBytes :
+    directoryPageBytes =
+      RuntimeOramCodecSemantics.directoryPageEntries *
+        RuntimeOramCodecSemantics.codecBlockBytes true keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodePathStashPagesExact?
+      true keyBytes valueBytes directoryPageBytes stashPageCount
+      (RuntimeOramCodecSemantics.encodePathStashPagesBytes
+        directoryPageBytes blockPages) =
+    some (RuntimeOramCodecSemantics.flattenStashPages blockPages) := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPagesExact_encodePathStashPagesBytes
+      hPages hPageCount hDirectoryBytes
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageDecodeAccepted
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {bytes : List Nat}
+  {page : RuntimeOramCodecSemantics.DecodedPathStashPage}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPageExact?
+        isPath keyBytes valueBytes directoryPageBytes bytes = some page) :
+  bytes.length = directoryPageBytes ∧
+    page.Accepted RuntimeOramCodecSemantics.directoryPageEntries := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPageExact_some_length_and_accepted
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageRejectsLengthMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {bytes : List Nat}
+  (hLen : bytes.length ≠ directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathStashPageExact?
+      isPath keyBytes valueBytes directoryPageBytes bytes = none := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPageExact?_rejectsLengthMismatch
+      hLen
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageDecodeBlockValidShapes
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {bytes : List Nat}
+  {page : RuntimeOramCodecSemantics.DecodedPathStashPage}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPageExact?
+        isPath keyBytes valueBytes directoryPageBytes bytes = some page) :
+  ∀ block, block ∈ page.blocks →
+    block.ValidShape isPath keyBytes valueBytes := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPageExact_some_block_validShapes
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes stashPageCount : Nat}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesExact?
+        isPath keyBytes valueBytes directoryPageBytes stashPageCount pages =
+      some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.decodePathStashPagesExact_some_shape hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesRejectsPageCountMismatch
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes stashPageCount : Nat}
+  {pages : List (List Nat)}
+  (hCount : pages.length ≠ stashPageCount) :
+  RuntimeOramCodecSemantics.decodePathStashPagesExact?
+      isPath keyBytes valueBytes directoryPageBytes stashPageCount pages =
+    none := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPagesExact?_rejectsPageCountMismatch
+      hCount
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesAllDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesAll?
+        isPath keyBytes valueBytes directoryPageBytes pages = some blocks) :
+  blocks.length =
+      pages.length * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤
+      pages.length * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes := by
+  exact RuntimeOramCodecSemantics.decodePathStashPagesAll_some_shape hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesBoundedDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {keyBytes valueBytes directoryPageBytes stashPageCount
+    capacity leafCount stashBound : Nat}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesBoundedExact?
+        keyBytes valueBytes directoryPageBytes stashPageCount
+        capacity leafCount stashBound pages = some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤ stashBound ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPagesBoundedExact_some_shape
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesPositionMapBoundedDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {keyBytes valueBytes directoryPageBytes stashPageCount
+    capacity leafCount stashBound : Nat}
+  {positionMap : List (Option Nat)}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesPositionMapBoundedExact?
+        keyBytes valueBytes directoryPageBytes stashPageCount
+        capacity leafCount stashBound positionMap pages = some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤ stashBound ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPagesPositionMapBoundedExact_some_shape
+      hDecode
+
+theorem RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesUniquePositionMapBoundedDecodeShape
+  (iface : RuntimeImplementationInterface)
+  (_h : iface.ResidualHelperShellBoundary)
+  {keyBytes valueBytes directoryPageBytes stashPageCount
+    capacity leafCount stashBound : Nat}
+  {positionMap : List (Option Nat)}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesUniquePositionMapBoundedExact?
+        keyBytes valueBytes directoryPageBytes stashPageCount
+        capacity leafCount stashBound positionMap pages = some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤ stashBound ∧
+    RuntimeOramCodecSemantics.LiveSlotNoDuplicates blocks ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeOramCodecSemantics.decodePathStashPagesUniquePositionMapBoundedExact_some_shape
+      hDecode
+
+def RuntimeImplementationInterface.SmallConfidentialKernelBoundary
+  (iface : RuntimeImplementationInterface) : Prop :=
+    iface.ResidualHelperShellBoundary ∧
+    iface.generatedKernelMachineMatchLeanGenerator ∧
+    iface.generatedValueOpsMatchLeanGenerator ∧
+    iface.generatedKernelSlotSupportMatchLeanGenerator ∧
+    iface.generatedConfidentialKernelMatchLeanGenerator ∧
     iface.kernelDelegatesToSharedBoundaryObjects ∧
-    iface.theoremFinalizerUsesSharedTraceBridge
+    iface.kernelDelegatesToSharedConfidentialInterpreter ∧
+    iface.sharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline ∧
+    iface.precompilesDefineLeanUoOpcodeVocabulary ∧
+    iface.allocatorSessionEnforcesScratchAndWipeDiscipline ∧
+    iface.runtimeAllocatorTelemetryUsesModeledBoxedResourceEvents ∧
+    iface.runtimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule ∧
+    iface.sharedConfidentialInterpreterUsesFixedBuffers ∧
+    iface.sharedConfidentialInterpreterUsesMaskedSelectionAndAbort ∧
+    iface.sharedConfidentialObjectsUseMaskedCellAndArrayUpdates ∧
+    iface.sharedConfidentialArrayAccessUsesMaskedFullScans ∧
+    iface.sharedConfidentialSmallMapUsesMaskedFullScanUpdates ∧
+    iface.sharedConfidentialSmallMapUsesMaskedFullScanLookup ∧
+    iface.surrogateOramPutUsesMaskedFullScanStateUpdates ∧
+    iface.pathOramSelectionUsesMaskedFullScans ∧
+    iface.pathOramGetUsesMaskedLookupAndTransitionSelection ∧
+    iface.pathOramPutUsesMaskedFullScanStateUpdates ∧
+    iface.pathOramStashRebuildUsesFixedCapacitySelection ∧
+    iface.pathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes ∧
+    iface.pathOramUsesTransitionShapedFreshLeafSchedule ∧
+    iface.pathOramWriteLogsUsePublicExactBatches ∧
+    iface.sharedConfidentialKernelConsumesLeanGeneratedProfiles ∧
+    iface.sharedConfidentialKernelConsumesLeanGeneratedInterpreter ∧
+    iface.sharedConfidentialInterpreterCentralizesStatementProfiles ∧
+    iface.sharedConfidentialInterpreterCentralizesExprProfiles ∧
+    iface.sharedConfidentialInterpreterCentralizesPureExprProfiles ∧
+    iface.sharedConfidentialInterpreterCentralizesSlotExprProfiles ∧
+    iface.sharedConfidentialInterpreterCentralizesSlotPureExprProfiles ∧
+    iface.sharedConfidentialKernelKeepsNamedToSlotLoweringExplicit ∧
+    iface.sharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit ∧
+    iface.sharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit ∧
+    iface.runtimeShadowStateUsesFixedSortedCommitTable ∧
+    iface.runtimeKernelSlotSupportRefinesLeanStagingModel ∧
+    iface.runtimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
+
+def RuntimeImplementationInterface.checkSmallConfidentialKernelBoundary
+  (iface : RuntimeImplementationInterface) : Bool :=
+    iface.checkResidualHelperShellBoundary &&
+    iface.checkGeneratedKernelMachineMatchLeanGenerator &&
+    iface.checkGeneratedValueOpsMatchLeanGenerator &&
+    iface.checkGeneratedKernelSlotSupportMatchLeanGenerator &&
+    iface.checkGeneratedConfidentialKernelMatchLeanGenerator &&
+    iface.checkKernelDelegatesToSharedBoundaryObjects &&
+    iface.checkKernelDelegatesToSharedConfidentialInterpreter &&
+    iface.checkSharedRuntimeKernelUsesBoundedScratchAndFinishDiscipline &&
+    iface.checkPrecompilesDefineLeanUoOpcodeVocabulary &&
+    iface.checkAllocatorSessionEnforcesScratchAndWipeDiscipline &&
+    iface.checkRuntimeAllocatorTelemetryUsesModeledBoxedResourceEvents &&
+    iface.checkRuntimeKernelMachineEffectsFollowPublicOpcodeAndScratchSchedule &&
+    iface.checkSharedConfidentialInterpreterUsesFixedBuffers &&
+    iface.checkSharedConfidentialInterpreterUsesMaskedSelectionAndAbort &&
+    iface.checkSharedConfidentialObjectsUseMaskedCellAndArrayUpdates &&
+    iface.checkSharedConfidentialArrayAccessUsesMaskedFullScans &&
+    iface.checkSharedConfidentialSmallMapUsesMaskedFullScanUpdates &&
+    iface.checkSharedConfidentialSmallMapUsesMaskedFullScanLookup &&
+    iface.checkSurrogateOramPutUsesMaskedFullScanStateUpdates &&
+    iface.checkPathOramSelectionUsesMaskedFullScans &&
+    iface.checkPathOramGetUsesMaskedLookupAndTransitionSelection &&
+    iface.checkPathOramPutUsesMaskedFullScanStateUpdates &&
+    iface.checkPathOramStashRebuildUsesFixedCapacitySelection &&
+    iface.checkPathOramFreshCoinPlanKeepsOpaqueBoxedEntryTapes &&
+    iface.checkPathOramUsesTransitionShapedFreshLeafSchedule &&
+    iface.checkPathOramWriteLogsUsePublicExactBatches &&
+    iface.checkSharedConfidentialKernelConsumesLeanGeneratedProfiles &&
+    iface.checkSharedConfidentialKernelConsumesLeanGeneratedInterpreter &&
+    iface.checkSharedConfidentialInterpreterCentralizesStatementProfiles &&
+    iface.checkSharedConfidentialInterpreterCentralizesExprProfiles &&
+    iface.checkSharedConfidentialInterpreterCentralizesPureExprProfiles &&
+    iface.checkSharedConfidentialInterpreterCentralizesSlotExprProfiles &&
+    iface.checkSharedConfidentialInterpreterCentralizesSlotPureExprProfiles &&
+    iface.checkSharedConfidentialKernelKeepsNamedToSlotLoweringExplicit &&
+    iface.checkSharedConfidentialInterpreterKeepsSlotEvaluationOrderExplicit &&
+    iface.checkSharedConfidentialInterpreterKeepsSlotStatementEvaluationOrderExplicit &&
+    iface.checkRuntimeShadowStateUsesFixedSortedCommitTable &&
+    iface.checkRuntimeKernelSlotSupportRefinesLeanStagingModel &&
+    iface.checkRuntimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
+
+@[simp] theorem runtimeImplementationInterface_checkSmallConfidentialKernelBoundary_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSmallConfidentialKernelBoundary = true ↔
+    iface.SmallConfidentialKernelBoundary := by
+  unfold RuntimeImplementationInterface.checkSmallConfidentialKernelBoundary
+    RuntimeImplementationInterface.SmallConfidentialKernelBoundary
+  simp [and_assoc]
+
+theorem RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+  (iface : RuntimeImplementationInterface)
+  (h : iface.SmallConfidentialKernelBoundary) :
+  iface.ResidualHelperShellBoundary :=
+  h.1
+
+theorem RuntimeImplementationInterface.smallConfidentialKernelBoundary_generatedValueOpsMatchLeanGenerator
+  (iface : RuntimeImplementationInterface)
+  (h : iface.SmallConfidentialKernelBoundary) :
+  iface.generatedValueOpsMatchLeanGenerator :=
+  h.2.2.1
+
+theorem RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+  (iface : RuntimeImplementationInterface)
+  (h : iface.SmallConfidentialKernelBoundary) :
+  iface.SlotAdapterBoundary := by
+  unfold RuntimeImplementationInterface.SmallConfidentialKernelBoundary at h
+  unfold RuntimeImplementationInterface.SlotAdapterBoundary
+  rcases h with
+    ⟨_
+    , _
+    , _
+    , hGeneratedKernelSlotSupport
+    , hGeneratedConfidentialKernel
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , hSharedGeneratedInterpreter
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , _
+    , hRuntimeKernelSlotSupportRefines
+    , hRuntimeKernelAdapterOnlyForwards
+    ⟩
+  exact ⟨ hGeneratedKernelSlotSupport
+    , hGeneratedConfidentialKernel
+    , hRuntimeKernelSlotSupportRefines
+    , hRuntimeKernelAdapterOnlyForwards
+    , hSharedGeneratedInterpreter
+    ⟩
+
+def RuntimeImplementationInterface.ConfidentialStatementTraceBridgeBoundary
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.statementTraceBridgeIsExact
+
+def RuntimeImplementationInterface.checkConfidentialStatementTraceBridgeBoundary
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.checkStatementTraceBridgeIsExact
+
+@[simp] theorem
+  runtimeImplementationInterface_checkConfidentialStatementTraceBridgeBoundary_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkConfidentialStatementTraceBridgeBoundary = true ↔
+    iface.ConfidentialStatementTraceBridgeBoundary := by
+  unfold RuntimeImplementationInterface.checkConfidentialStatementTraceBridgeBoundary
+    RuntimeImplementationInterface.ConfidentialStatementTraceBridgeBoundary
+  exact runtimeImplementationInterface_checkStatementTraceBridgeIsExact_eq_true_iff iface
+
+def RuntimeImplementationInterface.SharedConfidentialKernelBoundary
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.SmallConfidentialKernelBoundary ∧
+    iface.ConfidentialStatementTraceBridgeBoundary
+
+def RuntimeImplementationInterface.checkSharedConfidentialKernelBoundary
+  (iface : RuntimeImplementationInterface) : Bool :=
+  iface.checkSmallConfidentialKernelBoundary &&
+    iface.checkConfidentialStatementTraceBridgeBoundary
+
+@[simp] theorem runtimeImplementationInterface_checkSharedConfidentialKernelBoundary_eq_true_iff
+  (iface : RuntimeImplementationInterface) :
+  iface.checkSharedConfidentialKernelBoundary = true ↔
+    iface.SharedConfidentialKernelBoundary := by
+  unfold RuntimeImplementationInterface.checkSharedConfidentialKernelBoundary
+    RuntimeImplementationInterface.SharedConfidentialKernelBoundary
+  simp [runtimeImplementationInterface_checkSmallConfidentialKernelBoundary_eq_true_iff,
+    runtimeImplementationInterface_checkConfidentialStatementTraceBridgeBoundary_eq_true_iff]
+
+def RuntimeImplementationInterface.ConfinesSecretDependentWork
+  (iface : RuntimeImplementationInterface) : Prop :=
+  iface.PublicBridgeBoundary ∧
+    iface.SharedConfidentialKernelBoundary
+
+theorem RuntimeImplementationInterface.confinesSecretDependentWork_publicBridgeBoundary
+  (iface : RuntimeImplementationInterface)
+  (h : iface.ConfinesSecretDependentWork) :
+  iface.PublicBridgeBoundary :=
+  h.1
+
+theorem RuntimeImplementationInterface.confinesSecretDependentWork_sharedConfidentialKernelBoundary
+  (iface : RuntimeImplementationInterface)
+  (h : iface.ConfinesSecretDependentWork) :
+  iface.SharedConfidentialKernelBoundary :=
+  h.2
+
+theorem RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+  (iface : RuntimeImplementationInterface)
+  (h : iface.SharedConfidentialKernelBoundary) :
+  iface.SmallConfidentialKernelBoundary :=
+  h.1
+
+theorem RuntimeImplementationInterface.sharedConfidentialKernelBoundary_statementTraceBridgeIsExact
+  (iface : RuntimeImplementationInterface)
+  (h : iface.SharedConfidentialKernelBoundary) :
+  iface.ConfidentialStatementTraceBridgeBoundary :=
+  h.2
 
 def RuntimeImplementationInterface.Valid
   (iface : RuntimeImplementationInterface) : Prop :=
@@ -323,19 +12617,1247 @@ def RuntimeImplementationInterface.Valid
 
 def RuntimeImplementationInterface.checkValid
   (iface : RuntimeImplementationInterface) : Bool :=
-  iface.checkRuntimeOwnsBridgeModules &&
-    iface.checkEngineDelegatesToRuntimeBridge &&
-    iface.checkShellStaysPublicOnly &&
-    iface.checkStateStagesConfidentialCallsInsideRuntime &&
-    iface.checkKernelDelegatesToSharedBoundaryObjects &&
-    iface.checkTheoremFinalizerUsesSharedTraceBridge
+  iface.checkPublicBridgeBoundary &&
+    iface.checkSharedConfidentialKernelBoundary
 
 @[simp] theorem runtimeImplementationInterface_checkValid_eq_true_iff
   (iface : RuntimeImplementationInterface) :
   iface.checkValid = true ↔ iface.Valid := by
   unfold RuntimeImplementationInterface.checkValid RuntimeImplementationInterface.Valid
     RuntimeImplementationInterface.ConfinesSecretDependentWork
-  simp [and_assoc]
+  rw [Bool.and_eq_true]
+  simp [runtimeImplementationInterface_checkPublicBridgeBoundary_eq_true_iff,
+    runtimeImplementationInterface_checkSharedConfidentialKernelBoundary_eq_true_iff]
+
+structure RuntimeImplementationSharedConfidentialKernelBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  sharedBoundaryValid : implementationInterface.SharedConfidentialKernelBoundary
+
+theorem RuntimeImplementationSharedConfidentialKernelBoundary.sharedKernelConfinement
+  (boundary : RuntimeImplementationSharedConfidentialKernelBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary :=
+  boundary.sharedBoundaryValid
+
+theorem RuntimeImplementationSharedConfidentialKernelBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationSharedConfidentialKernelBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        boundary.implementationInterface boundary.sharedBoundaryValid)
+
+theorem RuntimeImplementationSharedConfidentialKernelBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationSharedConfidentialKernelBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        boundary.implementationInterface boundary.sharedBoundaryValid)
+
+theorem RuntimeImplementationSharedConfidentialKernelBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationSharedConfidentialKernelBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+      boundary.implementationInterface
+      (RuntimeImplementationSharedConfidentialKernelBoundary.residualHelperShellConfinement
+        boundary)
+
+theorem RuntimeImplementationSharedConfidentialKernelBoundary.hostVisibleErrorTaxonomy
+  (boundary : RuntimeImplementationSharedConfidentialKernelBoundary) :
+  boundary.implementationInterface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_hostVisibleErrorTaxonomy
+      boundary.implementationInterface
+      (RuntimeImplementationSharedConfidentialKernelBoundary.residualHelperShellConfinement
+        boundary)
+
+structure RuntimeImplementationPublicBridgeBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  publicBridgeValid : implementationInterface.PublicBridgeBoundary
+
+theorem RuntimeImplementationPublicBridgeBoundary.publicBridgeConfinement
+  (boundary : RuntimeImplementationPublicBridgeBoundary) :
+  boundary.implementationInterface.PublicBridgeBoundary :=
+  boundary.publicBridgeValid
+
+structure RuntimeImplementationSlotAdapterBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  slotAdapterValid : implementationInterface.SlotAdapterBoundary
+
+theorem RuntimeImplementationSlotAdapterBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationSlotAdapterBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary :=
+  boundary.slotAdapterValid
+
+structure RuntimeImplementationResidualHelperShellBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  residualBoundaryValid : implementationInterface.ResidualHelperShellBoundary
+
+theorem RuntimeImplementationResidualHelperShellBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary :=
+  boundary.residualBoundaryValid
+
+theorem RuntimeImplementationResidualHelperShellBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface boundary.residualBoundaryValid
+
+theorem RuntimeImplementationResidualHelperShellBoundary.hostVisibleErrorTaxonomy
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_hostVisibleErrorTaxonomy
+    boundary.implementationInterface boundary.residualBoundaryValid
+
+theorem RuntimeImplementationResidualHelperShellBoundary.generatedObjectHelpersMatchLeanGenerator
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.generatedObjectHelpersMatchLeanGenerator := by
+  have h := boundary.residualBoundaryValid
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  exact h.1
+
+theorem RuntimeImplementationResidualHelperShellBoundary.generatedOramCodecsMatchLeanGenerator
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.generatedOramCodecsMatchLeanGenerator := by
+  have h := boundary.residualBoundaryValid
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  exact h.2.1
+
+theorem RuntimeImplementationResidualHelperShellBoundary.generatedStoreCodecMatchLeanGenerator
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.generatedStoreCodecMatchLeanGenerator := by
+  have h := boundary.residualBoundaryValid
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  exact h.2.2.1
+
+theorem RuntimeImplementationResidualHelperShellBoundary.generatedStoreSurfaceMatchLeanGenerator
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.generatedStoreSurfaceMatchLeanGenerator := by
+  have h := boundary.residualBoundaryValid
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  exact h.2.2.2.1
+
+theorem RuntimeImplementationResidualHelperShellBoundary.generatedStoreHelpersMatchLeanGenerator
+  (boundary : RuntimeImplementationResidualHelperShellBoundary) :
+  boundary.implementationInterface.generatedStoreHelpersMatchLeanGenerator := by
+  have h := boundary.residualBoundaryValid
+  unfold RuntimeImplementationInterface.ResidualHelperShellBoundary at h
+  exact h.2.2.2.2.1
+
+structure RuntimeImplementationSmallConfidentialKernelBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  smallBoundaryValid : implementationInterface.SmallConfidentialKernelBoundary
+
+theorem RuntimeImplementationSmallConfidentialKernelBoundary.smallKernelConfinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary :=
+  boundary.smallBoundaryValid
+
+theorem RuntimeImplementationSmallConfidentialKernelBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary :=
+  RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+    boundary.implementationInterface boundary.smallBoundaryValid
+
+theorem RuntimeImplementationSmallConfidentialKernelBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary :=
+  RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+    boundary.implementationInterface boundary.smallBoundaryValid
+
+theorem RuntimeImplementationSmallConfidentialKernelBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationSmallConfidentialKernelBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+      boundary.implementationInterface
+      (RuntimeImplementationSmallConfidentialKernelBoundary.residualHelperShellConfinement
+        boundary)
+
+theorem RuntimeImplementationSmallConfidentialKernelBoundary.hostVisibleErrorTaxonomy
+  (boundary : RuntimeImplementationSmallConfidentialKernelBoundary) :
+  boundary.implementationInterface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_hostVisibleErrorTaxonomy
+      boundary.implementationInterface
+      (RuntimeImplementationSmallConfidentialKernelBoundary.residualHelperShellConfinement
+        boundary)
+
+structure RuntimeImplementationConfidentialStatementTraceBridgeBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  bridgeBoundaryValid : implementationInterface.ConfidentialStatementTraceBridgeBoundary
+
+theorem RuntimeImplementationConfidentialStatementTraceBridgeBoundary.bridgeConfinement
+  (boundary : RuntimeImplementationConfidentialStatementTraceBridgeBoundary) :
+  boundary.implementationInterface.ConfidentialStatementTraceBridgeBoundary :=
+  boundary.bridgeBoundaryValid
+
+structure RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  smallBoundaryValid : implementationInterface.SmallConfidentialKernelBoundary
+
+theorem RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.smallKernelConfinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary :=
+  boundary.smallBoundaryValid
+
+theorem RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary :=
+  RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+    boundary.implementationInterface boundary.smallBoundaryValid
+
+theorem RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.projects_to_refinesLeanKernelState
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelMachineFinishBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelMachineFinishBoundary
+
+noncomputable def
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  let runtimeBoundary :=
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelMachineFinishBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelMachineFinishBoundary
+
+theorem RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.machineFinishScheduleConsumed
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+  | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+  | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0 :=
+  boundary.runtimeKernelMachineFinishBoundary.expectedKernelScheduleConsumed
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxKernelOps :=
+  boundary.runtimeKernelMachineFinishBoundary.kernelStepBudgetRespected
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimePhaseEventCapacityRespected
+
+theorem RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.slotSemanticsExact
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+      some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.expectedKernelStepsExact,
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.emittedKernelStepsExact⟩
+
+theorem RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.nativeMachineRefinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hProjection :=
+    RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      boundary
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.smallKernelConfinement
+        boundary
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.projects_to_refinesLeanKernelState
+        boundary
+  · exact hProjection.2
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.machineFinishScheduleConsumed
+        boundary
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.slotSemanticsExact
+        boundary
+
+structure RuntimeImplementationSlotAdapterMachineRefinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  slotAdapterValid : implementationInterface.SlotAdapterBoundary
+
+theorem RuntimeImplementationSlotAdapterMachineRefinementBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary :=
+  boundary.slotAdapterValid
+
+theorem RuntimeImplementationSlotAdapterMachineRefinementBoundary.projects_to_refinesLeanKernelState
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelMachineFinishBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelMachineFinishBoundary
+
+noncomputable def
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  let runtimeBoundary :=
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelMachineFinishBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelMachineFinishBoundary
+
+theorem RuntimeImplementationSlotAdapterMachineRefinementBoundary.machineFinishScheduleConsumed
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+  | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+  | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0 :=
+  boundary.runtimeKernelMachineFinishBoundary.expectedKernelScheduleConsumed
+
+theorem
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxKernelOps :=
+  boundary.runtimeKernelMachineFinishBoundary.kernelStepBudgetRespected
+
+theorem
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimePhaseEventCapacityRespected
+
+theorem RuntimeImplementationSlotAdapterMachineRefinementBoundary.slotSemanticsExact
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+      some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.expectedKernelStepsExact,
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.emittedKernelStepsExact⟩
+
+theorem RuntimeImplementationSlotAdapterMachineRefinementBoundary.nativeMachineRefinement
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hProjection :=
+    RuntimeImplementationSlotAdapterMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      boundary
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationSlotAdapterMachineRefinementBoundary.slotAdapterConfinement
+        boundary
+  · exact
+      RuntimeImplementationSlotAdapterMachineRefinementBoundary.projects_to_refinesLeanKernelState
+        boundary
+  · exact hProjection.2
+  · exact
+      RuntimeImplementationSlotAdapterMachineRefinementBoundary.machineFinishScheduleConsumed
+        boundary
+  · exact
+      RuntimeImplementationSlotAdapterMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationSlotAdapterMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationSlotAdapterMachineRefinementBoundary.slotSemanticsExact
+        boundary
+
+theorem
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary.paperSlotAdapterMachineRefinement
+  (boundary : RuntimeImplementationSlotAdapterMachineRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary.nativeMachineRefinement
+    boundary
+
+noncomputable def
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.slotAdapterMachineRefinementBoundary
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary where
+  implementationInterface := boundary.implementationInterface
+  runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  slotAdapterValid :=
+    RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.slotAdapterConfinement
+      boundary
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.paperSlotAdapterMachineRefinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    RuntimeImplementationSlotAdapterMachineRefinementBoundary.paperSlotAdapterMachineRefinement
+      (RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.slotAdapterMachineRefinementBoundary
+        boundary)
+
+structure RuntimeImplementationPublicBridgeObserverRefinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  publicBridgeValid : implementationInterface.PublicBridgeBoundary
+  residualBoundaryValid : implementationInterface.ResidualHelperShellBoundary
+
+theorem RuntimeImplementationPublicBridgeObserverRefinementBoundary.publicBridgeConfinement
+  (boundary : RuntimeImplementationPublicBridgeObserverRefinementBoundary) :
+  boundary.implementationInterface.PublicBridgeBoundary :=
+  boundary.publicBridgeValid
+
+theorem RuntimeImplementationPublicBridgeObserverRefinementBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationPublicBridgeObserverRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary :=
+  boundary.residualBoundaryValid
+
+theorem RuntimeImplementationPublicBridgeObserverRefinementBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationPublicBridgeObserverRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface boundary.residualBoundaryValid
+
+theorem
+  RuntimeImplementationPublicBridgeObserverRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationPublicBridgeObserverRefinementBoundary) :
+  let runtimeBoundary :=
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelMachineFinishBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelMachineFinishBoundary
+
+theorem RuntimeImplementationPublicBridgeObserverRefinementBoundary.paperPublicBridgeObserverRefinement
+  (boundary : RuntimeImplementationPublicBridgeObserverRefinementBoundary) :
+  boundary.implementationInterface.PublicBridgeBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  have hProjection :=
+    RuntimeImplementationPublicBridgeObserverRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      boundary
+  refine ⟨?_, ?_, hProjection.2⟩
+  · exact
+      RuntimeImplementationPublicBridgeObserverRefinementBoundary.publicBridgeConfinement
+        boundary
+  · exact
+      RuntimeImplementationPublicBridgeObserverRefinementBoundary.handwrittenRuntimePublicOnly
+        boundary
+
+structure RuntimeImplementationResidualHelperShellMachineRefinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  residualBoundaryValid : implementationInterface.ResidualHelperShellBoundary
+
+theorem RuntimeImplementationResidualHelperShellMachineRefinementBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary :=
+  boundary.residualBoundaryValid
+
+theorem RuntimeImplementationResidualHelperShellMachineRefinementBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface boundary.residualBoundaryValid
+
+theorem RuntimeImplementationResidualHelperShellMachineRefinementBoundary.projects_to_refinesLeanKernelState
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelMachineFinishBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelMachineFinishBoundary
+
+noncomputable def
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  let runtimeBoundary :=
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelMachineFinishBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelMachineFinishBoundary
+
+theorem RuntimeImplementationResidualHelperShellMachineRefinementBoundary.machineFinishScheduleConsumed
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+  | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+  | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0 :=
+  boundary.runtimeKernelMachineFinishBoundary.expectedKernelScheduleConsumed
+
+theorem
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxKernelOps :=
+  boundary.runtimeKernelMachineFinishBoundary.kernelStepBudgetRespected
+
+theorem
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimePhaseEventCapacityRespected
+
+theorem RuntimeImplementationResidualHelperShellMachineRefinementBoundary.slotSemanticsExact
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+      some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.expectedKernelStepsExact,
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.emittedKernelStepsExact⟩
+
+theorem RuntimeImplementationResidualHelperShellMachineRefinementBoundary.nativeMachineRefinement
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hProjection :=
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      boundary
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationResidualHelperShellMachineRefinementBoundary.residualHelperShellConfinement
+        boundary
+  · exact
+      RuntimeImplementationResidualHelperShellMachineRefinementBoundary.projects_to_refinesLeanKernelState
+        boundary
+  · exact hProjection.2
+  · exact
+      RuntimeImplementationResidualHelperShellMachineRefinementBoundary.machineFinishScheduleConsumed
+        boundary
+  · exact
+      RuntimeImplementationResidualHelperShellMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationResidualHelperShellMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationResidualHelperShellMachineRefinementBoundary.slotSemanticsExact
+        boundary
+
+theorem RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hNative :=
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.nativeMachineRefinement
+      boundary
+  refine ⟨?_, hNative.2.1, hNative.2.2.1, hNative.2.2.2.1, hNative.2.2.2.2.1,
+    hNative.2.2.2.2.2.1, hNative.2.2.2.2.2.2⟩
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.handwrittenRuntimePublicOnly
+      boundary
+
+theorem
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+  (boundary : RuntimeImplementationResidualHelperShellMachineRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  have hNative :=
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.nativeMachineRefinement
+      boundary
+  refine ⟨hNative.1, ?_, hNative.2.2.1⟩
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.handwrittenRuntimePublicOnly
+      boundary
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary :=
+  RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+    boundary.implementationInterface
+    (RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.smallKernelConfinement
+      boundary)
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface
+    (RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.residualHelperShellConfinement
+      boundary)
+
+noncomputable def
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.residualHelperShellMachineRefinementBoundary
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary where
+  implementationInterface := boundary.implementationInterface
+  runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  residualBoundaryValid :=
+    RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.residualHelperShellConfinement
+      boundary
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement
+      (RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.residualHelperShellMachineRefinementBoundary
+        boundary)
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+      (RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.residualHelperShellMachineRefinementBoundary
+        boundary)
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.paperSmallKernelMachineRefinementWithPublicOnlyHandwrittenShell
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hNative :=
+    RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.nativeMachineRefinement
+      boundary
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact hNative.1
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.handwrittenRuntimePublicOnly
+        boundary
+  · exact hNative.2.1
+  · exact hNative.2.2.1
+  · exact hNative.2.2.2.1
+  · exact hNative.2.2.2.2.1
+  · exact hNative.2.2.2.2.2.1
+  · exact hNative.2.2.2.2.2.2
+
+theorem
+  RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.paperSmallKernelMachineObserverRefinement
+  (boundary : RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  have hObserver :=
+    RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+      boundary
+  refine ⟨?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.smallKernelConfinement
+        boundary
+  · exact
+      RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.handwrittenRuntimePublicOnly
+        boundary
+  · exact hObserver.2.2
+
+structure RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelFinishSlotBoundary : RuntimeKernelFinishSlotBoundary
+  bridgeBoundaryValid : implementationInterface.ConfidentialStatementTraceBridgeBoundary
+
+theorem RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary.bridgeConfinement
+  (boundary : RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary) :
+  boundary.implementationInterface.ConfidentialStatementTraceBridgeBoundary :=
+  boundary.bridgeBoundaryValid
+
+theorem RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary.projects_to_refinesLeanKernelState
+  (boundary : RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary) :
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelFinishSlotBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelFinishSlotBoundary
+
+noncomputable def
+  RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary) :
+  RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem
+  RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary) :
+  let runtimeBoundary := boundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelFinishSlotBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelFinishSlotBoundary
+
+structure RuntimeImplementationKernelMeetingBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  runtimeKernelFinishSlotBoundary : RuntimeKernelFinishSlotBoundary
+  smallBoundaryValid : implementationInterface.SmallConfidentialKernelBoundary
+  bridgeBoundaryValid : implementationInterface.ConfidentialStatementTraceBridgeBoundary
+  machineBoundaryMatchesFinishSlotBoundary :
+    runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary =
+      runtimeKernelFinishSlotBoundary
+
+theorem RuntimeImplementationKernelMeetingBoundary.smallKernelConfinement
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary :=
+  boundary.smallBoundaryValid
+
+theorem RuntimeImplementationKernelMeetingBoundary.bridgeConfinement
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  boundary.implementationInterface.ConfidentialStatementTraceBridgeBoundary :=
+  boundary.bridgeBoundaryValid
+
+theorem RuntimeImplementationKernelMeetingBoundary.sharedKernelConfinement
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary :=
+  And.intro boundary.smallBoundaryValid boundary.bridgeBoundaryValid
+
+theorem RuntimeImplementationKernelMeetingBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary :=
+  RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+    boundary.implementationInterface boundary.smallBoundaryValid
+
+theorem RuntimeImplementationKernelMeetingBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        boundary.implementationInterface
+        (RuntimeImplementationKernelMeetingBoundary.sharedKernelConfinement
+          boundary))
+
+theorem RuntimeImplementationKernelMeetingBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface
+    (RuntimeImplementationKernelMeetingBoundary.residualHelperShellConfinement
+      boundary)
+
+theorem RuntimeImplementationKernelMeetingBoundary.projects_to_refinesLeanKernelState
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelFinishSlotBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelFinishSlotBoundary
+
+noncomputable def RuntimeImplementationKernelMeetingBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeImplementationKernelMeetingBoundary) : RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem RuntimeImplementationKernelMeetingBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationKernelMeetingBoundary) :
+  let runtimeBoundary := boundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelFinishSlotBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelFinishSlotBoundary
+
+structure RuntimeImplementationSharedKernelRefinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelFinishSlotBoundary : RuntimeKernelFinishSlotBoundary
+  sharedBoundaryValid : implementationInterface.SharedConfidentialKernelBoundary
+
+theorem RuntimeImplementationSharedKernelRefinementBoundary.sharedKernelConfinement
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary :=
+  boundary.sharedBoundaryValid
+
+theorem RuntimeImplementationSharedKernelRefinementBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        boundary.implementationInterface boundary.sharedBoundaryValid)
+
+theorem
+  RuntimeImplementationSharedKernelRefinementBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        boundary.implementationInterface
+        (RuntimeImplementationSharedKernelRefinementBoundary.sharedKernelConfinement
+          boundary))
+
+theorem RuntimeImplementationSharedKernelRefinementBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface
+    (RuntimeImplementationSharedKernelRefinementBoundary.residualHelperShellConfinement
+      boundary)
+
+theorem RuntimeImplementationSharedKernelRefinementBoundary.projects_to_refinesLeanKernelState
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelFinishSlotBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelFinishSlotBoundary
+
+noncomputable def RuntimeImplementationSharedKernelRefinementBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) : RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelFinishSlotBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem RuntimeImplementationSharedKernelRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  let runtimeBoundary :=
+    boundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelFinishSlotBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelFinishSlotBoundary
+
+theorem RuntimeImplementationSharedKernelRefinementBoundary.paperSharedKernelRefinementWithPublicOnlyHandwrittenShell
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact RuntimeImplementationSharedKernelRefinementBoundary.sharedKernelConfinement boundary
+  · exact RuntimeImplementationSharedKernelRefinementBoundary.handwrittenRuntimePublicOnly boundary
+  · exact RuntimeImplementationSharedKernelRefinementBoundary.projects_to_refinesLeanKernelState boundary
+  · exact
+      (RuntimeImplementationSharedKernelRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+        boundary).2
+
+theorem RuntimeImplementationSharedKernelRefinementBoundary.paperSharedKernelObserverRefinement
+  (boundary : RuntimeImplementationSharedKernelRefinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  refine ⟨?_, ?_, ?_⟩
+  · exact RuntimeImplementationSharedKernelRefinementBoundary.sharedKernelConfinement boundary
+  · exact RuntimeImplementationSharedKernelRefinementBoundary.handwrittenRuntimePublicOnly boundary
+  · exact
+      (RuntimeImplementationSharedKernelRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+        boundary).2
+
+structure RuntimeImplementationSharedKernelMachineRefinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  sharedBoundaryValid : implementationInterface.SharedConfidentialKernelBoundary
+
+theorem RuntimeImplementationSharedKernelMachineRefinementBoundary.sharedKernelConfinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary :=
+  boundary.sharedBoundaryValid
+
+theorem RuntimeImplementationSharedKernelMachineRefinementBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        boundary.implementationInterface boundary.sharedBoundaryValid)
+
+theorem RuntimeImplementationSharedKernelMachineRefinementBoundary.projects_to_refinesLeanKernelState
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact RuntimeKernelMachineFinishBoundary.toRefinesLeanKernelState
+    boundary.runtimeKernelMachineFinishBoundary
+
+noncomputable def RuntimeImplementationSharedKernelMachineRefinementBoundary.runtimeKernelInterfaceSlotBoundary
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  RuntimeKernelInterfaceSlotBoundary :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelInterfaceSlotBoundary
+
+theorem RuntimeImplementationSharedKernelMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  let runtimeBoundary :=
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+  runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact RuntimeKernelMachineFinishBoundary.projects_to_runtimeKernelConfinementBoundary
+    boundary.runtimeKernelMachineFinishBoundary
+
+theorem RuntimeImplementationSharedKernelMachineRefinementBoundary.machineFinishScheduleConsumed
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+  | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+  | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0 :=
+  boundary.runtimeKernelMachineFinishBoundary.expectedKernelScheduleConsumed
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxKernelOps :=
+  boundary.runtimeKernelMachineFinishBoundary.kernelStepBudgetRespected
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimePhaseEventCapacityRespected
+
+theorem RuntimeImplementationSharedKernelMachineRefinementBoundary.slotSemanticsExact
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+      some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.expectedKernelStepsExact,
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.emittedKernelStepsExact⟩
+
+theorem RuntimeImplementationSharedKernelMachineRefinementBoundary.nativeMachineRefinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hProjection :=
+    RuntimeImplementationSharedKernelMachineRefinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      boundary
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.sharedKernelConfinement
+        boundary
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.projects_to_refinesLeanKernelState
+        boundary
+  · exact hProjection.2
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.machineFinishScheduleConsumed
+        boundary
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.machineFinishKernelStepBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.machineFinishRuntimePhaseBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.slotSemanticsExact
+        boundary
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        boundary.implementationInterface
+        (RuntimeImplementationSharedKernelMachineRefinementBoundary.sharedKernelConfinement
+          boundary))
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface
+    (RuntimeImplementationSharedKernelMachineRefinementBoundary.residualHelperShellConfinement
+      boundary)
+
+noncomputable def
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.residualHelperShellMachineRefinementBoundary
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary where
+  implementationInterface := boundary.implementationInterface
+  runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  residualBoundaryValid :=
+    RuntimeImplementationSharedKernelMachineRefinementBoundary.residualHelperShellConfinement
+      boundary
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement
+      (RuntimeImplementationSharedKernelMachineRefinementBoundary.residualHelperShellMachineRefinementBoundary
+        boundary)
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+      (RuntimeImplementationSharedKernelMachineRefinementBoundary.residualHelperShellMachineRefinementBoundary
+        boundary)
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.paperSharedKernelMachineRefinementWithPublicOnlyHandwrittenShell
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hNative :=
+    RuntimeImplementationSharedKernelMachineRefinementBoundary.nativeMachineRefinement boundary
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact hNative.1
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.handwrittenRuntimePublicOnly
+        boundary
+  · exact hNative.2.1
+  · exact hNative.2.2.1
+  · exact hNative.2.2.2.1
+  · exact hNative.2.2.2.2.1
+  · exact hNative.2.2.2.2.2.1
+  · exact hNative.2.2.2.2.2.2
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.paperSharedKernelMachineObserverRefinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  have hObserver :=
+    RuntimeImplementationSharedKernelMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+      boundary
+  refine ⟨?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.sharedKernelConfinement
+        boundary
+  · exact
+      RuntimeImplementationSharedKernelMachineRefinementBoundary.handwrittenRuntimePublicOnly
+        boundary
+  · exact hObserver.2.2
+
+noncomputable def
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.slotAdapterMachineRefinementBoundary
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary where
+  implementationInterface := boundary.implementationInterface
+  runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  slotAdapterValid :=
+    RuntimeImplementationSharedKernelMachineRefinementBoundary.slotAdapterConfinement
+      boundary
+
+theorem
+  RuntimeImplementationSharedKernelMachineRefinementBoundary.paperSlotAdapterMachineRefinement
+  (boundary : RuntimeImplementationSharedKernelMachineRefinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    RuntimeImplementationSlotAdapterMachineRefinementBoundary.paperSlotAdapterMachineRefinement
+      (RuntimeImplementationSharedKernelMachineRefinementBoundary.slotAdapterMachineRefinementBoundary
+        boundary)
 
 structure RuntimeImplementationConfinementBoundary where
   implementationInterface : RuntimeImplementationInterface
@@ -352,6 +13874,74 @@ theorem RuntimeImplementationConfinementBoundary.implementationConfinement
   boundary.implementationInterface.ConfinesSecretDependentWork :=
   boundary.implementationValid
 
+theorem RuntimeImplementationConfinementBoundary.sharedKernelConfinement
+  (boundary : RuntimeImplementationConfinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary :=
+  RuntimeImplementationInterface.confinesSecretDependentWork_sharedConfidentialKernelBoundary
+    boundary.implementationInterface
+    boundary.implementationValid
+
+theorem RuntimeImplementationConfinementBoundary.smallKernelConfinement
+  (boundary : RuntimeImplementationConfinementBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary :=
+  RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+    boundary.implementationInterface
+    (RuntimeImplementationConfinementBoundary.sharedKernelConfinement boundary)
+
+theorem RuntimeImplementationConfinementBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationConfinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationConfinementBoundary.smallKernelConfinement boundary)
+
+theorem RuntimeImplementationConfinementBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationConfinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationConfinementBoundary.smallKernelConfinement boundary)
+
+theorem RuntimeImplementationConfinementBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationConfinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface
+    (RuntimeImplementationConfinementBoundary.residualHelperShellConfinement boundary)
+
+theorem RuntimeImplementationConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell
+  (boundary : RuntimeImplementationConfinementBoundary) :
+  RuntimeImplementationInterface.ConfinesSecretDependentWork
+      boundary.implementationInterface ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness ∧
+    boundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    ⟨RuntimeImplementationConfinementBoundary.implementationConfinement boundary,
+      RuntimeImplementationConfinementBoundary.handwrittenRuntimePublicOnly boundary,
+      RuntimeKernelConfinementBoundary.toRefinesLeanKernelState
+        boundary.runtimeKernelConfinementBoundary,
+      RuntimeKernelConfinementBoundary.witness_refinesShellContract
+        boundary.runtimeKernelConfinementBoundary⟩
+
+theorem RuntimeImplementationConfinementBoundary.paperPublicBridgeObserverRefinement
+  (boundary : RuntimeImplementationConfinementBoundary) :
+  boundary.implementationInterface.PublicBridgeBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    ⟨RuntimeImplementationInterface.confinesSecretDependentWork_publicBridgeBoundary
+        boundary.implementationInterface
+        (RuntimeImplementationConfinementBoundary.implementationConfinement boundary),
+      RuntimeImplementationConfinementBoundary.handwrittenRuntimePublicOnly boundary,
+      RuntimeKernelConfinementBoundary.witness_refinesShellContract
+        boundary.runtimeKernelConfinementBoundary⟩
+
 theorem RuntimeImplementationConfinementBoundary.projects_to_runtimeKernelConfinementBoundary
   (boundary : RuntimeImplementationConfinementBoundary) :
   let runtimeBoundary := boundary.runtimeKernelConfinementBoundary
@@ -363,5 +13953,4384 @@ theorem RuntimeImplementationConfinementBoundary.projects_to_runtimeKernelConfin
   exact
     ⟨RuntimeKernelConfinementBoundary.toRefinesLeanKernelState runtimeBoundary,
       RuntimeKernelConfinementBoundary.witness_refinesShellContract runtimeBoundary⟩
+
+structure RuntimeImplementationKernelMachineConfinementBoundary where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  implementationValid : implementationInterface.Valid
+
+noncomputable def
+  RuntimeImplementationKernelMachineConfinementBoundary.runtimeImplementationConfinementBoundary
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  RuntimeImplementationConfinementBoundary :=
+  { implementationInterface := boundary.implementationInterface
+  , kernelInterfaceBundle :=
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.kernelInterfaceBundle
+  , implementationValid := boundary.implementationValid
+  , kernelInterfaceValid :=
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.kernelInterfaceBundle_valid
+  }
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.implementationConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.ConfinesSecretDependentWork :=
+  boundary.implementationValid
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.sharedKernelConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.SharedConfidentialKernelBoundary :=
+  RuntimeImplementationInterface.confinesSecretDependentWork_sharedConfidentialKernelBoundary
+    boundary.implementationInterface
+    boundary.implementationValid
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.smallKernelConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.SmallConfidentialKernelBoundary :=
+  RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+    boundary.implementationInterface
+    (RuntimeImplementationKernelMachineConfinementBoundary.sharedKernelConfinement boundary)
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.residualHelperShellConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_residualHelperShellBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationKernelMachineConfinementBoundary.smallKernelConfinement boundary)
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.slotAdapterConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_slotAdapterBoundary
+      boundary.implementationInterface
+      (RuntimeImplementationKernelMachineConfinementBoundary.smallKernelConfinement boundary)
+
+noncomputable def
+  RuntimeImplementationKernelMachineConfinementBoundary.slotAdapterMachineRefinementBoundary
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  RuntimeImplementationSlotAdapterMachineRefinementBoundary where
+  implementationInterface := boundary.implementationInterface
+  runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  slotAdapterValid :=
+    RuntimeImplementationKernelMachineConfinementBoundary.slotAdapterConfinement
+      boundary
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.paperSlotAdapterMachineRefinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.SlotAdapterBoundary ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    RuntimeImplementationSlotAdapterMachineRefinementBoundary.paperSlotAdapterMachineRefinement
+      (RuntimeImplementationKernelMachineConfinementBoundary.slotAdapterMachineRefinementBoundary
+        boundary)
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.handwrittenRuntimePublicOnly
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_handwrittenRuntimePublicOnly
+    boundary.implementationInterface
+    (RuntimeImplementationKernelMachineConfinementBoundary.residualHelperShellConfinement
+      boundary)
+
+noncomputable def
+  RuntimeImplementationKernelMachineConfinementBoundary.residualHelperShellMachineRefinementBoundary
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  RuntimeImplementationResidualHelperShellMachineRefinementBoundary where
+  implementationInterface := boundary.implementationInterface
+  runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  residualBoundaryValid :=
+    RuntimeImplementationKernelMachineConfinementBoundary.residualHelperShellConfinement
+      boundary
+
+theorem
+  RuntimeImplementationKernelMachineConfinementBoundary.paperPublicOnlyResidualHelperShellRefinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement
+      (RuntimeImplementationKernelMachineConfinementBoundary.residualHelperShellMachineRefinementBoundary
+        boundary)
+
+theorem
+  RuntimeImplementationKernelMachineConfinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.ResidualHelperShellBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement
+      (RuntimeImplementationKernelMachineConfinementBoundary.residualHelperShellMachineRefinementBoundary
+        boundary)
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.publicBridgeConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.PublicBridgeBoundary := by
+  exact
+    RuntimeImplementationInterface.confinesSecretDependentWork_publicBridgeBoundary
+      boundary.implementationInterface boundary.implementationValid
+
+noncomputable def
+  RuntimeImplementationKernelMachineConfinementBoundary.runtimeImplementationPublicBridgeObserverRefinementBoundary
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  RuntimeImplementationPublicBridgeObserverRefinementBoundary :=
+  { implementationInterface := boundary.implementationInterface
+  , runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  , publicBridgeValid := by
+      exact
+        RuntimeImplementationKernelMachineConfinementBoundary.publicBridgeConfinement
+          boundary
+  , residualBoundaryValid := by
+      exact
+        RuntimeImplementationKernelMachineConfinementBoundary.residualHelperShellConfinement
+          boundary
+  }
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.machineFinishScheduleConsumed
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+  | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+  | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0 :=
+  boundary.runtimeKernelMachineFinishBoundary.expectedKernelScheduleConsumed
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.machineFinishKernelStepBudgetRespected
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxKernelOps :=
+  boundary.runtimeKernelMachineFinishBoundary.kernelStepBudgetRespected
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.machineFinishRuntimePhaseBudgetRespected
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+    boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount :=
+  boundary.runtimeKernelMachineFinishBoundary.runtimePhaseEventCapacityRespected
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.slotSemanticsExact
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+      some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.expectedKernelStepsExact,
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.emittedKernelStepsExact⟩
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.pinsNativeMachineSemantics
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+    | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+    | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.machineFinishScheduleConsumed
+        boundary
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.machineFinishKernelStepBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.machineFinishRuntimePhaseBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.slotSemanticsExact
+        boundary
+
+theorem
+  RuntimeImplementationKernelMachineConfinementBoundary.projects_to_runtimeImplementationConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary
+  RuntimeImplementationInterface.ConfinesSecretDependentWork
+      runtimeBoundary.implementationInterface := by
+  exact
+    RuntimeImplementationConfinementBoundary.implementationConfinement
+      boundary.runtimeImplementationConfinementBoundary
+
+theorem
+  RuntimeImplementationKernelMachineConfinementBoundary.projects_via_runtimeImplementationConfinementBoundary
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary
+  runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationConfinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      boundary.runtimeImplementationConfinementBoundary
+
+theorem
+  RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary
+  RuntimeImplementationInterface.ConfinesSecretDependentWork
+      runtimeBoundary.implementationInterface ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hProjection :=
+    RuntimeImplementationConfinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      boundary.runtimeImplementationConfinementBoundary
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact
+      RuntimeImplementationConfinementBoundary.implementationConfinement
+        boundary.runtimeImplementationConfinementBoundary
+  · exact hProjection.1
+  · exact hProjection.2
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.machineFinishScheduleConsumed
+        boundary
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.machineFinishKernelStepBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.machineFinishRuntimePhaseBudgetRespected
+        boundary
+  · exact
+      RuntimeImplementationKernelMachineConfinementBoundary.slotSemanticsExact
+        boundary
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary
+  RuntimeImplementationInterface.ConfinesSecretDependentWork
+      runtimeBoundary.implementationInterface ∧
+    runtimeBoundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => boundary.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      boundary.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  have hPaper :=
+    RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinement
+      boundary
+  refine ⟨hPaper.1, ?_, hPaper.2.1, hPaper.2.2.1, hPaper.2.2.2.1,
+    hPaper.2.2.2.2.1, hPaper.2.2.2.2.2.1, hPaper.2.2.2.2.2.2⟩
+  exact
+    RuntimeImplementationConfinementBoundary.handwrittenRuntimePublicOnly
+      boundary.runtimeImplementationConfinementBoundary
+
+theorem RuntimeImplementationKernelMachineConfinementBoundary.paperPublicBridgeObserverRefinement
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  boundary.implementationInterface.PublicBridgeBoundary ∧
+    boundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      boundary.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationPublicBridgeObserverRefinementBoundary.paperPublicBridgeObserverRefinement
+      boundary.runtimeImplementationPublicBridgeObserverRefinementBoundary
+
+structure RuntimePaperNativeKernelAssumptions where
+  implementationInterface : RuntimeImplementationInterface
+  runtimeKernelMachineFinishBoundary : RuntimeKernelMachineFinishBoundary
+  implementationConfinement : implementationInterface.ConfinesSecretDependentWork
+
+theorem RuntimePaperNativeKernelAssumptions.publicBridgeValid
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.PublicBridgeBoundary := by
+  exact
+    RuntimeImplementationInterface.confinesSecretDependentWork_publicBridgeBoundary
+      assumptions.implementationInterface
+      assumptions.implementationConfinement
+
+theorem RuntimePaperNativeKernelAssumptions.sharedKernelValid
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.SharedConfidentialKernelBoundary := by
+  exact
+    RuntimeImplementationInterface.confinesSecretDependentWork_sharedConfidentialKernelBoundary
+      assumptions.implementationInterface
+      assumptions.implementationConfinement
+
+theorem RuntimePaperNativeKernelAssumptions.residualHelperShellValid
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.ResidualHelperShellBoundary := by
+  exact
+    (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.sharedKernelValid assumptions)).1
+
+theorem RuntimePaperNativeKernelAssumptions.handwrittenRuntimePublicOnly
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers := by
+  exact
+    RuntimeImplementationSharedConfidentialKernelBoundary.handwrittenRuntimePublicOnly
+      { implementationInterface := assumptions.implementationInterface
+      , sharedBoundaryValid := RuntimePaperNativeKernelAssumptions.sharedKernelValid assumptions
+      }
+
+theorem RuntimePaperNativeKernelAssumptions.handwrittenRuntimeLacksDirectSecretOps
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.handwrittenRuntimeLacksDirectSecretOps :=
+  RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers_lacksDirectSecretOps
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.handwrittenRuntimePublicOnly assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.hostCoordinationLacksSecretSerialization
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.handwrittenHostCoordinationLacksSecretSerialization :=
+  RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers_hostCoordinationLacksSecretSerialization
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.handwrittenRuntimePublicOnly assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.storeTraceUsesExactBoxedBacking
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.runtimeStoreUsesGeneratedRawBoxedSlotHelpers := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeTraceUsesExactBoxedBacking
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.generatedValueOpsMatchLeanGenerator
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.generatedValueOpsMatchLeanGenerator := by
+  exact
+    RuntimeImplementationInterface.smallConfidentialKernelBoundary_generatedValueOpsMatchLeanGenerator
+      assumptions.implementationInterface
+      (RuntimeImplementationInterface.sharedConfidentialKernelBoundary_smallConfidentialKernelBoundary
+        assumptions.implementationInterface
+        (RuntimePaperNativeKernelAssumptions.sharedKernelValid assumptions))
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsScalarCanonicalLengthsPublic
+  (_assumptions : RuntimePaperNativeKernelAssumptions) :
+  RuntimeValueOpsSemantics.boolCanonicalBytes = 1 ∧
+    RuntimeValueOpsSemantics.uintCanonicalBytes = 32 ∧
+    RuntimeValueOpsSemantics.bytes32CanonicalBytes = 32 ∧
+    RuntimeValueOpsSemantics.addressCanonicalBytes = 20 ∧
+    RuntimeValueOpsSemantics.canonicalLengthPrefixBytes = 8 :=
+  RuntimeValueOpsSemantics.scalarCanonicalLengths_public
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldLength
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (value : Nat) :
+  (RuntimeValueOpsSemantics.u128CanonicalByteField value).length =
+    RuntimeValueOpsSemantics.uintCanonicalBytes :=
+  RuntimeValueOpsSemantics.u128CanonicalByteField_length value
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldHighPrefixZero
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (value : Nat) :
+  (RuntimeValueOpsSemantics.u128CanonicalByteField value).take
+      RuntimeValueOpsSemantics.u128HighZeroBytes =
+    List.replicate RuntimeValueOpsSemantics.u128HighZeroBytes 0 :=
+  RuntimeValueOpsSemantics.u128CanonicalByteField_highPrefixZero value
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldValidBytes
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (value : Nat) :
+  RuntimeValueOpsSemantics.ValidByteField
+    (RuntimeValueOpsSemantics.u128CanonicalByteField value) :=
+  RuntimeValueOpsSemantics.u128CanonicalByteField_validBytes value
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsMaskedSelectBoolTrue
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : Bool) :
+  RuntimeValueOpsSemantics.maskedSelectBool true whenTrue whenFalse = whenTrue :=
+  RuntimeValueOpsSemantics.maskedSelectBool_true whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsMaskedSelectBoolFalse
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : Bool) :
+  RuntimeValueOpsSemantics.maskedSelectBool false whenTrue whenFalse = whenFalse :=
+  RuntimeValueOpsSemantics.maskedSelectBool_false whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsMaskedSelectBytesLengthOfEqual
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {cond : Bool}
+  {whenTrue whenFalse : List Nat}
+  (hLen : whenTrue.length = whenFalse.length) :
+  (RuntimeValueOpsSemantics.maskedSelectBytes cond whenTrue whenFalse).length =
+    whenTrue.length :=
+  RuntimeValueOpsSemantics.maskedSelectBytes_length_of_equal hLen
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsFixedBufferExtendPreservesCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {state next : RuntimeValueOpsSemantics.FixedByteBufferState}
+  {chunk : List Nat}
+  (hExtend : state.extend? chunk = some next) :
+  next.capacity = state.capacity :=
+  RuntimeValueOpsSemantics.fixedByteBuffer_extend?_some_preservesCapacity hExtend
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsFixedBufferExtendIncrementsInitialized
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {state next : RuntimeValueOpsSemantics.FixedByteBufferState}
+  {chunk : List Nat}
+  (hExtend : state.extend? chunk = some next) :
+  next.initialized = state.initialized + chunk.length :=
+  RuntimeValueOpsSemantics.fixedByteBuffer_extend?_some_initialized hExtend
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsFixedBufferExtendRejectsOverflow
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {state : RuntimeValueOpsSemantics.FixedByteBufferState}
+  {chunk : List Nat}
+  (hOverflow : state.capacity < state.initialized + chunk.length) :
+  state.extend? chunk = none :=
+  RuntimeValueOpsSemantics.fixedByteBuffer_extend?_rejectsOverflow hOverflow
+
+theorem RuntimePaperNativeKernelAssumptions.valueOpsFixedBufferFinishExactlyFilled
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {state : RuntimeValueOpsSemantics.FixedByteBufferState}
+  {capacity : Nat}
+  (hFinish : state.finish? = some capacity) :
+  state.initialized = state.capacity ∧ capacity = state.capacity :=
+  RuntimeValueOpsSemantics.fixedByteBuffer_finish?_some_exactlyFilled hFinish
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceZeroedBytesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (len : Nat) :
+  (RuntimeStoreCodecSemantics.zeroedBytes len).length = len :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceZeroedBytesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    len
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceZeroedBytesValid
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (len : Nat) :
+  ∀ byte,
+    byte ∈ RuntimeStoreCodecSemantics.zeroedBytes len →
+      RuntimeStoreCodecSemantics.ValidByte byte :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceZeroedBytesValid
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    len
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceReadExactRangeLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes out : List Nat}
+  {start len : Nat}
+  (hRead :
+    RuntimeStoreCodecSemantics.readExactRange? bytes start len =
+      some out) :
+  out.length = len :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceReadExactRangeLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hRead
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceReadExactRangeRejectsOutOfRange
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  {start len : Nat}
+  (hRange : ¬ start + len ≤ bytes.length) :
+  RuntimeStoreCodecSemantics.readExactRange? bytes start len = none :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceReadExactRangeRejectsOutOfRange
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hRange
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceCopyExactIntoShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {out input copied : List Nat}
+  (hCopy :
+    RuntimeStoreCodecSemantics.copyExactInto? out input =
+      some copied) :
+  copied = input ∧ copied.length = out.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceCopyExactIntoShape
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hCopy
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceCopyExactIntoRejectsLengthMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {out input : List Nat}
+  (hLen : out.length ≠ input.length) :
+  RuntimeStoreCodecSemantics.copyExactInto? out input = none :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceCopyExactIntoRejectsLengthMismatch
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceSealIntoAcceptsExactLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (payloadLen : Nat) :
+  RuntimeStoreCodecSemantics.sealAndWipeIntoSliceAccepted payloadLen
+    (RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceSealIntoAcceptsExactLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    payloadLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceSealIntoRejectsLengthMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen outLen : Nat}
+  (hLen :
+    outLen ≠ RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
+  ¬ RuntimeStoreCodecSemantics.sealAndWipeIntoSliceAccepted
+      payloadLen outLen :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceSealIntoRejectsLengthMismatch
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceOpenPayloadShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  RuntimeStoreCodecSemantics.openBoxedPayloadShape? payloadLen encoded =
+    some payloadLen :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceOpenPayloadShape
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceWipePreservesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (bytes : List Nat) :
+  (RuntimeStoreCodecSemantics.wipeBytes bytes).length = bytes.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceWipePreservesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    bytes
+
+theorem RuntimePaperNativeKernelAssumptions.storeSurfaceWipeZeros
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  {byte : Nat}
+  (hMem : byte ∈ RuntimeStoreCodecSemantics.wipeBytes bytes) :
+  byte = 0 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceWipeZeros
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hMem
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperTakeRawValueCopiesInput
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (value : List Nat) :
+  (RuntimeStoreHelperSemantics.takeBoxedRawStoreValue value).boxed = value :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperTakeRawValueCopiesInput
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    value
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperTakeRawValueWipesInputLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (value : List Nat) :
+  (RuntimeStoreHelperSemantics.takeBoxedRawStoreValue value).wiped.length =
+    value.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperTakeRawValueWipesInputLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    value
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperTakeRawValueWipesInputZeros
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {value : List Nat}
+  {byte : Nat}
+  (hMem :
+    byte ∈
+      (RuntimeStoreHelperSemantics.takeBoxedRawStoreValue value).wiped) :
+  byte = 0 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperTakeRawValueWipesInputZeros
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hMem
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperZeroedRawSlotsLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (objects : List String)
+  (slotLen : Nat) :
+  (RuntimeStoreHelperSemantics.zeroedRawSlots objects slotLen).length =
+    objects.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperZeroedRawSlotsLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    objects slotLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperLookupZeroedRawSlotsShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {objects : List String}
+  {object : String}
+  {slotLen : Nat}
+  {value : List Nat}
+  (hLookup :
+    RuntimeStoreHelperSemantics.lookupSlot object
+        (RuntimeStoreHelperSemantics.zeroedRawSlots objects slotLen) =
+      some value) :
+  value.length = slotLen ∧
+    ∀ byte,
+      byte ∈ value →
+        RuntimeStoreCodecSemantics.ValidByte byte ∧ byte = 0 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperLookupZeroedRawSlotsShape
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hLookup
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperInsertOrReplaceLookupSelf
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (slots : List RuntimeStoreHelperSemantics.StoreSlot)
+  (object : String)
+  (value : List Nat) :
+  RuntimeStoreHelperSemantics.lookupSlot object
+      (RuntimeStoreHelperSemantics.insertOrReplaceSlot object value slots) =
+    some value :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperInsertOrReplaceLookupSelf
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    slots object value
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperInsertOrReplaceLengthLeSucc
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (slots : List RuntimeStoreHelperSemantics.StoreSlot)
+  (object : String)
+  (value : List Nat) :
+  (RuntimeStoreHelperSemantics.insertOrReplaceSlot object value slots).length ≤
+    slots.length + 1 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperInsertOrReplaceLengthLeSucc
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    slots object value
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperAppendEventLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (events : List α)
+  (event : α) :
+  (RuntimeStoreHelperSemantics.appendBoxedEvent events event).length =
+    events.length + 1 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAppendEventLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    events event
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperAppendEventPreservesPrefix
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (events : List α)
+  (event : α) :
+  (RuntimeStoreHelperSemantics.appendBoxedEvent events event).take
+      events.length =
+    events :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAppendEventPreservesPrefix
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    events event
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperAppendEventAppendsSingleton
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (events : List α)
+  (event : α) :
+  (RuntimeStoreHelperSemantics.appendBoxedEvent events event).drop
+      events.length =
+    [event] :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAppendEventAppendsSingleton
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    events event
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperAllUpdateAppendUoUpdate
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {events : List RuntimeStoreHelperSemantics.StoreWriteShape}
+  (hEvents : RuntimeStoreHelperSemantics.allUpdate events)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreHelperSemantics.allUpdate
+    (RuntimeStoreHelperSemantics.appendBoxedEvent events
+      (RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen)) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperAllUpdateAppendUoUpdate
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hEvents object slotLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperBootstrappedUoSlotPublicLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (object : String)
+  (logicalLen : Nat) :
+  (RuntimeStoreHelperSemantics.bootstrappedUoSlotShape object logicalLen).value.length =
+    RuntimeStoreCodecSemantics.sealedEncodedLen logicalLen :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperBootstrappedUoSlotPublicLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    object logicalLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperBootstrappedUoSlotValidBytes
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (object : String)
+  (logicalLen : Nat) :
+  ∀ byte,
+    byte ∈
+        (RuntimeStoreHelperSemantics.bootstrappedUoSlotShape object logicalLen).value →
+      RuntimeStoreCodecSemantics.ValidByte byte :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperBootstrappedUoSlotValidBytes
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    object logicalLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperResealTracePublicUpdateShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreHelperSemantics.allUpdate
+      [RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen] ∧
+    RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted object slotLen
+      (RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperResealTracePublicUpdateShape
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    object slotLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperRecordReadIncrementsReadCounts
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics) :
+  (RuntimeStoreHelperSemantics.recordStoreRead metrics).logicalReads =
+      metrics.logicalReads + 1 ∧
+    (RuntimeStoreHelperSemantics.recordStoreRead metrics).physicalReads =
+      metrics.physicalReads + 1 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordReadIncrementsReadCounts
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    metrics
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperRecordWriteIncrementsWriteCounts
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics)
+  (zeroWrite : Bool) :
+  (RuntimeStoreHelperSemantics.recordStoreWrite metrics zeroWrite).logicalWrites =
+      metrics.logicalWrites + 1 ∧
+    (RuntimeStoreHelperSemantics.recordStoreWrite metrics zeroWrite).physicalWrites =
+      metrics.physicalWrites + 1 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordWriteIncrementsWriteCounts
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    metrics zeroWrite
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperRecordUoWriteZeroWritesUnchanged
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics)
+  (object : String)
+  (slotLen : Nat) :
+  (RuntimeStoreHelperSemantics.recordUoStoreWrite
+      metrics object slotLen).metrics.zeroWrites =
+    metrics.zeroWrites :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordUoWriteZeroWritesUnchanged
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    metrics object slotLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeHelperRecordUoWriteEventAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (metrics : RuntimeStoreHelperSemantics.StoreMetrics)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted object slotLen
+    (RuntimeStoreHelperSemantics.recordUoStoreWrite
+      metrics object slotLen).event :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_storeHelperRecordUoWriteEventAccepted
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    metrics object slotLen
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectNatTrue
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : Nat) :
+  RuntimeOramHelperSemantics.maskedSelectNat true whenTrue whenFalse =
+    whenTrue :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectNatTrue
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectNatFalse
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : Nat) :
+  RuntimeOramHelperSemantics.maskedSelectNat false whenTrue whenFalse =
+    whenFalse :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectNatFalse
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectBoolTrue
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : Bool) :
+  RuntimeOramHelperSemantics.maskedSelectBool true whenTrue whenFalse =
+    whenTrue :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectBoolTrue
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectBoolFalse
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : Bool) :
+  RuntimeOramHelperSemantics.maskedSelectBool false whenTrue whenFalse =
+    whenFalse :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectBoolFalse
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectOptionTrue
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.maskedSelectOption true whenTrue whenFalse =
+    whenTrue :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectOptionTrue
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectOptionFalse
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.maskedSelectOption false whenTrue whenFalse =
+    whenFalse :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectOptionFalse
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectTransitionKindTrue
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.PathTransitionKind) :
+  RuntimeOramHelperSemantics.maskedSelectTransitionKind
+      true whenTrue whenFalse = whenTrue :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectTransitionKindTrue
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperMaskedSelectTransitionKindFalse
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (whenTrue whenFalse : RuntimeOramHelperSemantics.PathTransitionKind) :
+  RuntimeOramHelperSemantics.maskedSelectTransitionKind
+      false whenTrue whenFalse = whenFalse :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperMaskedSelectTransitionKindFalse
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    whenTrue whenFalse
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionKindDelete
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (insertNew updateExisting : Bool) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind
+      insertNew updateExisting true =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeDelete :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindDelete
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    insertNew updateExisting
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionKindUpdate
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (insertNew : Bool) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind insertNew true false =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeUpdate :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindUpdate
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    insertNew
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionKindInsert
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind true false false =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeInsert :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindInsert
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionKindNoop
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  RuntimeOramHelperSemantics.pathPutTransitionKind false false false =
+    RuntimeOramHelperSemantics.PathTransitionKind.writeNoop :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionKindNoop
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathGetTransitionKindHit
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  RuntimeOramHelperSemantics.pathGetTransitionKind true =
+    RuntimeOramHelperSemantics.PathTransitionKind.readHit :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionKindHit
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathGetTransitionKindMiss
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  RuntimeOramHelperSemantics.pathGetTransitionKind false =
+    RuntimeOramHelperSemantics.PathTransitionKind.readMiss :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionKindMiss
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathGetTransitionFieldsMiss
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (accessLeaf freshLeaf : Nat) :
+  RuntimeOramHelperSemantics.pathGetTransitionFields
+      positionMap RuntimeOramHelperSemantics.noneOption
+      accessLeaf freshLeaf =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.readMiss
+    , freshLeaf := accessLeaf
+    , slotIndex := RuntimeOramHelperSemantics.noneOption
+    , priorLeaf := RuntimeOramHelperSemantics.noneOption
+    , nextLeaf := RuntimeOramHelperSemantics.noneOption
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionFieldsMiss
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap accessLeaf freshLeaf
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathGetTransitionFieldsHit
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {slotIndex accessLeaf freshLeaf : Nat}
+  {priorLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption}
+  (hLookup :
+    RuntimeOramHelperSemantics.lookupAt? positionMap slotIndex =
+      some priorLeaf) :
+  RuntimeOramHelperSemantics.pathGetTransitionFields
+      positionMap (RuntimeOramHelperSemantics.presentOption slotIndex)
+      accessLeaf freshLeaf =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.readHit
+    , freshLeaf
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption freshLeaf
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathGetTransitionFieldsHit
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hLookup
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionFieldsDelete
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (slotIndex priorLeaf accessLeaf nextLeafValue : Nat)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      true true (RuntimeOramHelperSemantics.presentOption slotIndex)
+      insertSlot (RuntimeOramHelperSemantics.presentOption priorLeaf)
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeDelete
+    , freshLeaf := accessLeaf
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.noneOption
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsDelete
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    slotIndex priorLeaf accessLeaf nextLeafValue insertSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionFieldsUpdate
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (slotIndex priorLeaf accessLeaf nextLeafValue : Nat)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      true false (RuntimeOramHelperSemantics.presentOption slotIndex)
+      insertSlot (RuntimeOramHelperSemantics.presentOption priorLeaf)
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeUpdate
+    , freshLeaf := nextLeafValue
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption nextLeafValue
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsUpdate
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    slotIndex priorLeaf accessLeaf nextLeafValue insertSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionFieldsInsert
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (insertSlot accessLeaf nextLeafValue : Nat) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      true false RuntimeOramHelperSemantics.noneOption
+      (RuntimeOramHelperSemantics.presentOption insertSlot)
+      RuntimeOramHelperSemantics.noneOption accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeInsert
+    , freshLeaf := nextLeafValue
+    , slotIndex := RuntimeOramHelperSemantics.presentOption insertSlot
+    , priorLeaf := RuntimeOramHelperSemantics.noneOption
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption nextLeafValue
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsInsert
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    insertSlot accessLeaf nextLeafValue
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionFieldsNoopAbsent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (valueIsZero : Bool)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (accessLeaf nextLeafValue : Nat) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      false valueIsZero RuntimeOramHelperSemantics.noneOption
+      insertSlot RuntimeOramHelperSemantics.noneOption
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeNoop
+    , freshLeaf := accessLeaf
+    , slotIndex := RuntimeOramHelperSemantics.noneOption
+    , priorLeaf := RuntimeOramHelperSemantics.noneOption
+    , nextLeaf := RuntimeOramHelperSemantics.noneOption
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsNoopAbsent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    valueIsZero insertSlot accessLeaf nextLeafValue
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutTransitionFieldsNoopPresentRetainsPrior
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (valueIsZero : Bool)
+  (slotIndex priorLeaf accessLeaf nextLeafValue : Nat)
+  (insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutTransitionFields
+      false valueIsZero (RuntimeOramHelperSemantics.presentOption slotIndex)
+      insertSlot (RuntimeOramHelperSemantics.presentOption priorLeaf)
+      accessLeaf nextLeafValue =
+    { kind := RuntimeOramHelperSemantics.PathTransitionKind.writeNoop
+    , freshLeaf := priorLeaf
+    , slotIndex := RuntimeOramHelperSemantics.presentOption slotIndex
+    , priorLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    , nextLeaf := RuntimeOramHelperSemantics.presentOption priorLeaf
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutTransitionFieldsNoopPresentRetainsPrior
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    valueIsZero slotIndex priorLeaf accessLeaf nextLeafValue insertSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveBlockValidationUnoccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationUnoccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap liveSlots hOccupied
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotsAfterUnoccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation
+      capacity leafCount positionMap liveSlots block = liveSlots :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotsAfterUnoccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap liveSlots hOccupied
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveBlockValidationValidOccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationValidOccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotsAfterValidOccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption) :
+  RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation
+      capacity leafCount positionMap liveSlots block =
+    RuntimeOramHelperSemantics.replaceAt liveSlots block.slotIndex
+      (RuntimeOramHelperSemantics.presentOption block.leaf) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotsAfterValidOccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveBlockValidationSlotOutOfRange
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : capacity ≤ block.slotIndex) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationSlotOutOfRange
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveBlockValidationDuplicateLiveSlot
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount liveLeaf : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption liveLeaf)) :
+  RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap liveSlots block = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveBlockValidationDuplicateLiveSlot
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotsAfterValidOccupiedLookup
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount : Nat}
+  {positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption) :
+  RuntimeOramHelperSemantics.lookupAt?
+      (RuntimeOramHelperSemantics.liveSlotsAfterBlockValidation
+        capacity leafCount positionMap liveSlots block)
+      block.slotIndex =
+    some (RuntimeOramHelperSemantics.presentOption block.leaf) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotsAfterValidOccupiedLookup
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot hLeaf hPosition hLive
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotCoverageEmpty
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed [] liveSlots = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoverageEmpty
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    liveSlots
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotCoverageMissingLiveSlot
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (leaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (leaf :: positionMap) [] = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoverageMissingLiveSlot
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    leaf positionMap
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotCoverageAbsentHead
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (liveSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (RuntimeOramHelperSemantics.noneOption :: positionMap)
+      (liveSlot :: liveSlots) =
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap liveSlots :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoverageAbsentHead
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap liveSlots liveSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotCoveragePresentLiveHead
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (leaf liveLeaf : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (RuntimeOramHelperSemantics.presentOption leaf :: positionMap)
+      (RuntimeOramHelperSemantics.presentOption liveLeaf :: liveSlots) =
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap liveSlots :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoveragePresentLiveHead
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    leaf liveLeaf positionMap liveSlots
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperLiveSlotCoveragePresentMissingHead
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (leaf : Nat)
+  (positionMap liveSlots : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      (RuntimeOramHelperSemantics.presentOption leaf :: positionMap)
+      (RuntimeOramHelperSemantics.noneOption :: liveSlots) = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperLiveSlotCoveragePresentMissingHead
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    leaf positionMap liveSlots
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperResetPathEntryCellsLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.resetPathEntryCells capacity).length =
+    capacity :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperResetPathEntryCellsLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperResetPathEntryCellsAllEmpty
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity : Nat}
+  {entry : RuntimeOramHelperSemantics.PathEntryCell}
+  (hEntry :
+    entry ∈ RuntimeOramHelperSemantics.resetPathEntryCells capacity) :
+  entry = RuntimeOramHelperSemantics.emptyPathEntryCell :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperResetPathEntryCellsAllEmpty
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hEntry
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInstallPathEntryFailedUnoccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (entries : List RuntimeOramHelperSemantics.PathEntryCell)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.installPathEntryFailed entries block = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFailedUnoccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    entries hOccupied
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInstallPathEntryFromBlockUnoccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (entries : List RuntimeOramHelperSemantics.PathEntryCell)
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.installPathEntryFromBlock entries block =
+    entries :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFromBlockUnoccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    entries hOccupied
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInstallPathEntryFailedOutOfRange
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {entries : List RuntimeOramHelperSemantics.PathEntryCell}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : entries.length ≤ block.slotIndex) :
+  RuntimeOramHelperSemantics.installPathEntryFailed entries block = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFailedOutOfRange
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInstallPathEntryFailedValidOccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {entries : List RuntimeOramHelperSemantics.PathEntryCell}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < entries.length) :
+  RuntimeOramHelperSemantics.installPathEntryFailed entries block = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFailedValidOccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInstallPathEntryFromBlockPreservesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (entries : List RuntimeOramHelperSemantics.PathEntryCell)
+  (block : RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.installPathEntryFromBlock
+    entries block).length = entries.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFromBlockPreservesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    entries block
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInstallPathEntryFromBlockValidOccupiedLookup
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {entries : List RuntimeOramHelperSemantics.PathEntryCell}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < entries.length) :
+  RuntimeOramHelperSemantics.lookupAt?
+      (RuntimeOramHelperSemantics.installPathEntryFromBlock entries block)
+      block.slotIndex =
+    some (RuntimeOramHelperSemantics.pathEntryCellFromBlock block) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInstallPathEntryFromBlockValidOccupiedLookup
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlockStepPriorFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (block : RuntimeOramHelperSemantics.StashBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block = state :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepPriorFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap block hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlockStepUnoccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hOccupied : block.occupied = false) :
+  RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block = state :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepUnoccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap hState hOccupied
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlockStepValidationFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots block = true) :
+  (RuntimeOramHelperSemantics.reconstructPathBlockStep
+    capacity leafCount positionMap state block).failed = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepValidationFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap hState hValidation
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlockStepInstallFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hValidation :
+    RuntimeOramHelperSemantics.livePathBlockValidationFailed
+      capacity leafCount positionMap state.liveSlots block = false)
+  (hInstall :
+    RuntimeOramHelperSemantics.installPathEntryFailed
+      state.entries block = true) :
+  (RuntimeOramHelperSemantics.reconstructPathBlockStep
+    capacity leafCount positionMap state block).failed = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepInstallFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap hState hValidation hInstall
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlockStepValidOccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount : Nat}
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hState : state.failed = false)
+  (hOccupied : block.occupied = true)
+  (hSlot : block.slotIndex < capacity)
+  (hLeaf : block.leaf < leafCount)
+  (hPosition :
+    RuntimeOramHelperSemantics.lookupAt? positionMap block.slotIndex =
+      some (RuntimeOramHelperSemantics.presentOption block.leaf))
+  (hLive :
+    RuntimeOramHelperSemantics.lookupAt? state.liveSlots block.slotIndex =
+      some RuntimeOramHelperSemantics.noneOption)
+  (hEntrySlot : block.slotIndex < state.entries.length) :
+  RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state block =
+    { liveSlots :=
+        RuntimeOramHelperSemantics.replaceAt
+          state.liveSlots block.slotIndex
+          (RuntimeOramHelperSemantics.presentOption block.leaf)
+    , entries :=
+        RuntimeOramHelperSemantics.replaceAt
+          state.entries block.slotIndex
+          (RuntimeOramHelperSemantics.pathEntryCellFromBlock block)
+    , failed := false
+    } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlockStepValidOccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hState hOccupied hSlot hLeaf hPosition hLive hEntrySlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathFinishFailedPriorFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed
+      positionMap state = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathFinishFailedPriorFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathFinishFailedCoverageFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (hFailed : state.failed = false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      positionMap state.liveSlots = true) :
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed
+      positionMap state = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathFinishFailedCoverageFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap hFailed hCoverage
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathFinishFailedSuccess
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (hFailed : state.failed = false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      positionMap state.liveSlots = false) :
+  RuntimeOramHelperSemantics.reconstructPathFinishFailed
+      positionMap state = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathFinishFailedSuccess
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap hFailed hCoverage
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlocksEmpty
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState) :
+  RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state [] = state :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlocksEmpty
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap state
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlocksCons
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState)
+  (block : RuntimeOramHelperSemantics.StashBlock)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state (block :: blocks) =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlockStep
+        capacity leafCount positionMap state block)
+      blocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlocksCons
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap state block blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBlocksPriorFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap state blocks = state :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBlocksPriorFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap blocks hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInitialReconstructionStateLiveSlotsLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.initialReconstructionState capacity).liveSlots.length =
+    capacity :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInitialReconstructionStateLiveSlotsLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInitialReconstructionStateEntriesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.initialReconstructionState capacity).entries.length =
+    capacity :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInitialReconstructionStateEntriesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperInitialReconstructionStateFailed
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity : Nat) :
+  (RuntimeOramHelperSemantics.initialReconstructionState capacity).failed =
+    false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperInitialReconstructionStateFailed
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBlocksStateStashThenBuckets
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlocks
+        capacity leafCount positionMap
+        (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+        stashBlocks)
+      bucketBlocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksStateStashThenBuckets
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBlocksStateNoBlocks
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap [] [] =
+    RuntimeOramHelperSemantics.initialReconstructionState capacity :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksStateNoBlocks
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBlocksStateStashFailureAbsorbs
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksStateStashFailureAbsorbs
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBlocksFailedPriorFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks).failed =
+        true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedPriorFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBlocksFailedSuccess
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks bucketBlocks).failed =
+        false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+        capacity leafCount positionMap stashBlocks bucketBlocks).liveSlots =
+        false) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedSuccess
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed hCoverage
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBlocksFailedStashFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks bucketBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedStashFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBlocksFailedNoBlocks
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap [] [] =
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed
+      positionMap
+      (List.replicate capacity RuntimeOramHelperSemantics.noneOption) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBlocksFailedNoBlocks
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockAdmissionFailedUnoccupied
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (leafCount bucketIndex leaf : Nat) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      { bucketIndex
+      , block := { occupied := false, slotIndex := 0, leaf }
+      } = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedUnoccupied
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    leafCount bucketIndex leaf
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockAdmissionFailedOnPath
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hPath :
+    RuntimeOramCodecSemantics.bucketOnLeafPath
+      leafCount bucketIndex block.leaf = true) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      { bucketIndex, block } = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedOnPath
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hPath
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBucketBlockAdmissionFailedOffPath
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount bucketIndex : Nat}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hPath :
+    RuntimeOramCodecSemantics.bucketOnLeafPath
+      leafCount bucketIndex block.leaf = false) :
+  RuntimeOramHelperSemantics.bucketBlockAdmissionFailed leafCount
+      { bucketIndex, block } = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBucketBlockAdmissionFailedOffPath
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hPath
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlockStepPriorFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (bucketBlock : RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock = state :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlockStepPriorFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap bucketBlock hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlockStepOffPathFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {bucketBlock : RuntimeOramHelperSemantics.BucketBlock}
+  (hState : state.failed = false)
+  (hAdmission :
+    RuntimeOramHelperSemantics.bucketBlockAdmissionFailed
+      leafCount bucketBlock = true) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock =
+    { state with failed := true } :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlockStepOffPathFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap hState hAdmission
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlockStepAdmitted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  {bucketBlock : RuntimeOramHelperSemantics.BucketBlock}
+  (hState : state.failed = false)
+  (hAdmission :
+    RuntimeOramHelperSemantics.bucketBlockAdmissionFailed
+      leafCount bucketBlock = false) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlockStep
+      capacity leafCount positionMap state bucketBlock =
+    RuntimeOramHelperSemantics.reconstructPathBlockStep
+      capacity leafCount positionMap state bucketBlock.block :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlockStepAdmitted
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap hState hAdmission
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlocksEmpty
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (state : RuntimeOramHelperSemantics.ReconstructionState) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state [] = state :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksEmpty
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap state
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathBucketBlocksPriorFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  {state : RuntimeOramHelperSemantics.ReconstructionState}
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed : state.failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap state bucketBlocks = state :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathBucketBlocksPriorFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap bucketBlocks hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsStateStashThenBuckets
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBucketBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.reconstructPathBlocks
+        capacity leafCount positionMap
+        (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+        stashBlocks)
+      bucketBlocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsStateStashThenBuckets
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsStateStashFailureAbsorbs
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks bucketBlocks =
+    RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsStateStashFailureAbsorbs
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsFailedStashFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathBlocks
+      capacity leafCount positionMap
+      (RuntimeOramHelperSemantics.initialReconstructionState capacity)
+      stashBlocks).failed = true) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsFailedStashFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperReconstructPathDecodedBucketsFailedSuccess
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity leafCount : Nat)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock)
+  (bucketBlocks : List RuntimeOramHelperSemantics.BucketBlock)
+  (hFailed :
+    (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks bucketBlocks).failed =
+        false)
+  (hCoverage :
+    RuntimeOramHelperSemantics.liveSlotCoverageFailed positionMap
+      (RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+        capacity leafCount positionMap stashBlocks bucketBlocks).liveSlots =
+        false) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks bucketBlocks = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperReconstructPathDecodedBucketsFailedSuccess
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    capacity leafCount positionMap stashBlocks bucketBlocks hFailed hCoverage
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperWorkingStashCapacityFormula
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.Parameters) :
+  RuntimeOramHelperSemantics.workingStashCapacity parameters =
+    parameters.stashBound +
+      parameters.bucketsPerAccess * parameters.blocksPerBucket :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperWorkingStashCapacityFormula
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperSlotForKeySomeWithinCapacity
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {keyMatches : List Bool}
+  {slot : Nat}
+  (hSlot : RuntimeOramHelperSemantics.slotForKey? keyMatches = some slot) :
+  slot < keyMatches.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSlotForKeySomeWithinCapacity
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperAllocateSlotSomeWithinCapacity
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {occupied : List Bool}
+  {slot : Nat}
+  (hSlot : RuntimeOramHelperSemantics.allocateSlot? occupied = some slot) :
+  slot < occupied.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperAllocateSlotSomeWithinCapacity
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperFirstVacantIndexSomeWithinCapacity
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {index : Nat}
+  (hIndex :
+    RuntimeOramHelperSemantics.firstVacantIndex blocks = some index) :
+  index < blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperFirstVacantIndexSomeWithinCapacity
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hIndex
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperClearFixedStashLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.clearFixedStash blocks).length =
+    blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperClearFixedStashLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperClearFixedStashAllEmpty
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hMem : block ∈ RuntimeOramHelperSemantics.clearFixedStash blocks) :
+  block = RuntimeOramHelperSemantics.emptyBlock :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperClearFixedStashAllEmpty
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hMem
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPushFixedStashPreservesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (overflowed : Bool)
+  (block : RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.pushFixedStash
+      blocks overflowed block).blocks.length =
+    blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPushFixedStashPreservesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocks overflowed block
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPushFixedStashVacantPreservesOverflow
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {overflowed : Bool}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  {index : Nat}
+  (hOccupied : block.occupied = true)
+  (hVacant :
+    RuntimeOramHelperSemantics.firstVacantIndex blocks = some index) :
+  (RuntimeOramHelperSemantics.pushFixedStash
+      blocks overflowed block).overflowed = overflowed :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPushFixedStashVacantPreservesOverflow
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hVacant
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPushFixedStashNoVacantOverflows
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {overflowed : Bool}
+  {block : RuntimeOramHelperSemantics.StashBlock}
+  (hOccupied : block.occupied = true)
+  (hVacant :
+    RuntimeOramHelperSemantics.firstVacantIndex blocks = none) :
+  (RuntimeOramHelperSemantics.pushFixedStash
+      blocks overflowed block).overflowed = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPushFixedStashNoVacantOverflows
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hOccupied hVacant
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperTakeSelectedBlockPreservesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {selectedIndex : Nat}
+  {present : Bool}
+  {result : RuntimeOramHelperSemantics.TakeResult}
+  (hTake :
+    RuntimeOramHelperSemantics.takeSelectedBlock
+        blocks selectedIndex present = some result) :
+  result.blocks.length = blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperTakeSelectedBlockPreservesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hTake
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperTakeSelectedBlockPresentSelectedInBounds
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocks : List RuntimeOramHelperSemantics.StashBlock}
+  {selectedIndex : Nat}
+  {result : RuntimeOramHelperSemantics.TakeResult}
+  (hTake :
+    RuntimeOramHelperSemantics.takeSelectedBlock
+        blocks selectedIndex true = some result) :
+  selectedIndex < blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperTakeSelectedBlockPresentSelectedInBounds
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hTake
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperSelectPositionMapLeafAbsent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.selectPositionMapLeaf positionMap slot =
+    RuntimeOramHelperSemantics.noneOption :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectPositionMapLeafAbsent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap slot hAbsent
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperSelectPositionMapLeafPresentGet
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {slot leaf : RuntimeOramHelperSemantics.MaskedUsizeOption}
+  (hPresent : slot.present = true)
+  (hGet :
+    RuntimeOramHelperSemantics.lookupAt? positionMap slot.value = some leaf) :
+  RuntimeOramHelperSemantics.selectPositionMapLeaf positionMap slot = leaf :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectPositionMapLeafPresentGet
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hPresent hGet
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperSelectValueAtAbsent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (values : List α)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (default : α)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.selectValueAt values slot default = default :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectValueAtAbsent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    values slot default hAbsent
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperSelectValueAtPresentGet
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {values : List α}
+  {slot : RuntimeOramHelperSemantics.MaskedUsizeOption}
+  {default value : α}
+  (hPresent : slot.present = true)
+  (hGet : RuntimeOramHelperSemantics.lookupAt? values slot.value = some value) :
+  RuntimeOramHelperSemantics.selectValueAt values slot default = value :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperSelectValueAtPresentGet
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    hPresent hGet
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperAccessLeafUsesFreshWhenNoPrior
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (freshLeaf : Nat)
+  (hNoPrior :
+    (RuntimeOramHelperSemantics.selectPositionMapLeaf
+      positionMap slot).present = false) :
+  RuntimeOramHelperSemantics.accessLeafForSlot
+      positionMap slot freshLeaf = freshLeaf :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperAccessLeafUsesFreshWhenNoPrior
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap slot freshLeaf hNoPrior
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperAccessLeafUsesPriorWhenPresent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (freshLeaf : Nat)
+  (hPrior :
+    (RuntimeOramHelperSemantics.selectPositionMapLeaf
+      positionMap slot).present = true) :
+  RuntimeOramHelperSemantics.accessLeafForSlot
+      positionMap slot freshLeaf =
+    (RuntimeOramHelperSemantics.selectPositionMapLeaf
+      positionMap slot).value :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperAccessLeafUsesPriorWhenPresent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap slot freshLeaf hPrior
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperUpdatePositionMapLeafPreservesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  (RuntimeOramHelperSemantics.updatePositionMapLeaf
+      positionMap slot nextLeaf).length = positionMap.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdatePositionMapLeafPreservesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap slot nextLeaf
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperUpdatePositionMapLeafAbsent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.updatePositionMapLeaf
+      positionMap slot nextLeaf = positionMap :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdatePositionMapLeafAbsent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap slot nextLeaf hAbsent
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperUpdatePositionMapLeafNextAbsent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : nextLeaf.present = false) :
+  RuntimeOramHelperSemantics.updatePositionMapLeaf
+      positionMap slot nextLeaf = positionMap :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdatePositionMapLeafNextAbsent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    positionMap slot nextLeaf hAbsent
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperUpdateStashLeafForSlotPreservesLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  (RuntimeOramHelperSemantics.updateStashLeafForSlot
+      blocks slot nextLeaf).length = blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdateStashLeafForSlotPreservesLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocks slot nextLeaf
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperUpdateStashLeafForSlotAbsent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : slot.present = false) :
+  RuntimeOramHelperSemantics.updateStashLeafForSlot
+      blocks slot nextLeaf = blocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdateStashLeafForSlotAbsent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocks slot nextLeaf hAbsent
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperUpdateStashLeafForSlotNextAbsent
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot nextLeaf : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hAbsent : nextLeaf.present = false) :
+  RuntimeOramHelperSemantics.updateStashLeafForSlot
+      blocks slot nextLeaf = blocks :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperUpdateStashLeafForSlotNextAbsent
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocks slot nextLeaf hAbsent
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutUpdateFailedNoApply
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (valueIsZero : Bool)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks false valueIsZero slot insertSlot = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedNoApply
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    entryCapacity blocks valueIsZero slot insertSlot
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutUpdateFailedUpdateMissing
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hSlot : slot.present = true)
+  (hMissing :
+    RuntimeOramHelperSemantics.stashContainsSlot
+      blocks slot.value = false) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks true false slot insertSlot = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedUpdateMissing
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    entryCapacity blocks slot insertSlot hSlot hMissing
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutUpdateFailedInsertNoVacancy
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hSlotAbsent : slot.present = false)
+  (hInsert : insertSlot.present = true)
+  (hVacant : RuntimeOramHelperSemantics.stashHasVacant blocks = false) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks true false slot insertSlot = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedInsertNoVacancy
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    entryCapacity blocks slot insertSlot hSlotAbsent hInsert hVacant
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathPutUpdateFailedInsertOutOfRange
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (entryCapacity : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock)
+  (slot insertSlot : RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (hSlotAbsent : slot.present = false)
+  (hInsert : insertSlot.present = true)
+  (hOutOfRange : entryCapacity ≤ insertSlot.value) :
+  RuntimeOramHelperSemantics.pathPutUpdateFailed
+      entryCapacity blocks true false slot insertSlot = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathPutUpdateFailedInsertOutOfRange
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    entryCapacity blocks slot insertSlot hSlotAbsent hInsert hOutOfRange
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBuildPathBucketBucketLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocksPerBucket leafCount bucketIndex : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.buildPathBucket
+      blocksPerBucket leafCount bucketIndex blocks).bucket.length =
+    blocksPerBucket :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBuildPathBucketBucketLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocksPerBucket leafCount bucketIndex blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBuildPathBucketStashLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocksPerBucket leafCount bucketIndex : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.buildPathBucket
+      blocksPerBucket leafCount bucketIndex blocks).stash.length =
+    blocks.length :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBuildPathBucketStashLength
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocksPerBucket leafCount bucketIndex blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperBuildPathBucketLiveCountBound
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocksPerBucket leafCount bucketIndex : Nat)
+  (blocks : List RuntimeOramHelperSemantics.StashBlock) :
+  (RuntimeOramHelperSemantics.buildPathBucket
+      blocksPerBucket leafCount bucketIndex blocks).liveCount ≤
+    blocksPerBucket :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperBuildPathBucketLiveCountBound
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    blocksPerBucket leafCount bucketIndex blocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathWriteCountMatchesWriteLogCapacity
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters) :
+  RuntimeOramHelperSemantics.rewritePathWriteCount parameters =
+    RuntimeOramWriteLogDiscipline.writeLogCapacity
+      (RuntimeOramHelperSemantics.rewriteWriteLogParameters parameters) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathWriteCountMatchesWriteLogCapacity
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperPathAccessReadCountMatchesReadTranscriptCapacity
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters) :
+  RuntimeOramHelperSemantics.pathAccessReadCount parameters =
+    RuntimeOramWriteLogDiscipline.readTranscriptCapacity
+      (RuntimeOramHelperSemantics.rewriteWriteLogParameters parameters) :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperPathAccessReadCountMatchesReadTranscriptCapacity
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathSummaryNextCounter
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (currentCounter : Nat)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  (RuntimeOramHelperSemantics.rewritePathSummary
+      parameters currentCounter loadOverflowed effectFailed
+      postUpdateStashLen postRebuildStashLen).nextCounter =
+    currentCounter + 1 :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathSummaryNextCounter
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters currentCounter loadOverflowed effectFailed
+    postUpdateStashLen postRebuildStashLen
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathSummaryPhysicalWriteCount
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (currentCounter : Nat)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  (RuntimeOramHelperSemantics.rewritePathSummary
+      parameters currentCounter loadOverflowed effectFailed
+      postUpdateStashLen postRebuildStashLen).physicalWriteCount =
+    RuntimeOramHelperSemantics.rewritePathWriteCount parameters :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathSummaryPhysicalWriteCount
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters currentCounter loadOverflowed effectFailed
+    postUpdateStashLen postRebuildStashLen
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathUpdateFailedLoadOverflow
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters true effectFailed postUpdateStashLen postRebuildStashLen =
+    true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedLoadOverflow
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters effectFailed postUpdateStashLen postRebuildStashLen
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathUpdateFailedEffectFailed
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (loadOverflowed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters loadOverflowed true postUpdateStashLen postRebuildStashLen =
+    true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedEffectFailed
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters loadOverflowed postUpdateStashLen postRebuildStashLen
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathUpdateFailedPostUpdateOverflow
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat)
+  (hOverflow :
+    RuntimeOramHelperSemantics.rewriteWorkingStashBound parameters <
+      postUpdateStashLen) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters loadOverflowed effectFailed postUpdateStashLen
+      postRebuildStashLen = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedPostUpdateOverflow
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters loadOverflowed effectFailed postUpdateStashLen
+    postRebuildStashLen hOverflow
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathUpdateFailedPostRebuildOverflow
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (loadOverflowed effectFailed : Bool)
+  (postUpdateStashLen postRebuildStashLen : Nat)
+  (hOverflow : parameters.stashBound < postRebuildStashLen) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters loadOverflowed effectFailed postUpdateStashLen
+      postRebuildStashLen = true :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedPostRebuildOverflow
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters loadOverflowed effectFailed postUpdateStashLen
+    postRebuildStashLen hOverflow
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathUpdateFailedNoFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (postUpdateStashLen postRebuildStashLen : Nat)
+  (hPostUpdate :
+    postUpdateStashLen ≤
+      RuntimeOramHelperSemantics.rewriteWorkingStashBound parameters)
+  (hPostRebuild : postRebuildStashLen ≤ parameters.stashBound) :
+  RuntimeOramHelperSemantics.rewritePathUpdateFailed
+      parameters false false postUpdateStashLen postRebuildStashLen =
+    false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathUpdateFailedNoFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters postUpdateStashLen postRebuildStashLen hPostUpdate
+    hPostRebuild
+
+theorem RuntimePaperNativeKernelAssumptions.oramHelperRewritePathSummaryNoFailure
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeOramHelperSemantics.RewriteParameters)
+  (currentCounter postUpdateStashLen postRebuildStashLen : Nat)
+  (hPostUpdate :
+    postUpdateStashLen ≤
+      RuntimeOramHelperSemantics.rewriteWorkingStashBound parameters)
+  (hPostRebuild : postRebuildStashLen ≤ parameters.stashBound) :
+  (RuntimeOramHelperSemantics.rewritePathSummary
+      parameters currentCounter false false postUpdateStashLen
+      postRebuildStashLen).updateFailed = false :=
+  RuntimeImplementationInterface.residualHelperShellBoundary_oramHelperRewritePathSummaryNoFailure
+    assumptions.implementationInterface
+    (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+    parameters currentCounter postUpdateStashLen postRebuildStashLen
+    hPostUpdate hPostRebuild
+
+theorem RuntimePaperNativeKernelAssumptions.slotSupportStageArgsAcceptsPrecondition
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (h : RuntimeKernelSlotSupport.Precondition program args) :
+  RuntimeKernelSlotSupport.stageArgs? program args =
+    some (RuntimeKernelSlotSupport.stageArgs program.slotCount args) :=
+  RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsAcceptsPrecondition
+    program args h
+
+theorem RuntimePaperNativeKernelAssumptions.slotSupportStageArgsRejectsArgCountMismatch
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (h : args.length ≠ program.paramCount) :
+  RuntimeKernelSlotSupport.stageArgs? program args = none :=
+  RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsRejectsArgCountMismatch
+    program args h
+
+theorem RuntimePaperNativeKernelAssumptions.slotSupportStageArgsRejectsParamSlotOverflow
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (h : ¬ program.paramCount ≤ program.slotCount) :
+  RuntimeKernelSlotSupport.stageArgs? program args = none :=
+  RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsRejectsParamSlotOverflow
+    program args h
+
+theorem RuntimePaperNativeKernelAssumptions.slotSupportStageArgsSomeStagesCallInputs
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (program : ConfidentialKernelSlotProgram)
+  (args : List Json)
+  (slots : RuntimeKernelSlotSupport.SlotFile)
+  (h : RuntimeKernelSlotSupport.stageArgs? program args = some slots) :
+  RuntimeKernelSlotSupport.StagesCallInputs program args slots :=
+  RuntimeImplementationInterface.runtimeKernelSlotSupport_stageArgsSomeStagesCallInputs
+    program args slots h
+
+theorem RuntimePaperNativeKernelAssumptions.statementTraceNamesMatchBodyLength
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (program : ConfidentialKernelSlotProgram) :
+  program.statementTraceNames.length =
+    RuntimeStatementTraceDiscipline.capacityForProgram program :=
+  RuntimeImplementationInterface.statementTraceModel_statementTraceNamesMatchBodyLength
+    program
+
+theorem RuntimePaperNativeKernelAssumptions.statementTraceRecordRejectsAtCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {trace : RuntimeStatementTraceDiscipline.Trace}
+  (statement : ConfidentialKernelSlotStatement)
+  (h : ¬ trace.len < trace.capacity) :
+  RuntimeStatementTraceDiscipline.recordStatement trace statement = none :=
+  RuntimeImplementationInterface.statementTraceModel_recordRejectsAtCapacity
+    statement h
+
+theorem RuntimePaperNativeKernelAssumptions.statementTraceRecordAppendsTraceName
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {trace next : RuntimeStatementTraceDiscipline.Trace}
+  {statement : ConfidentialKernelSlotStatement}
+  (h : RuntimeStatementTraceDiscipline.recordStatement trace statement = some next) :
+  next.names = trace.names ++ [statement.traceName] :=
+  RuntimeImplementationInterface.statementTraceModel_recordAppendsTraceName h
+
+theorem RuntimePaperNativeKernelAssumptions.statementTraceAcceptedHasExactNames
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {program : ConfidentialKernelSlotProgram}
+  {trace : RuntimeStatementTraceDiscipline.Trace}
+  (h : RuntimeStatementTraceDiscipline.acceptedTraceForProgram program trace) :
+  trace.names = program.statementTraceNames :=
+  RuntimeImplementationInterface.statementTraceModel_acceptedTraceHasExactNames h
+
+theorem RuntimePaperNativeKernelAssumptions.statementTraceBoxedTraceExact
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {program : ConfidentialKernelSlotProgram}
+  {trace : RuntimeStatementTraceDiscipline.Trace}
+  (h : RuntimeStatementTraceDiscipline.acceptedTraceForProgram program trace) :
+  RuntimeStatementTraceDiscipline.boxedTrace trace =
+    program.statementTraceNames :=
+  RuntimeImplementationInterface.statementTraceModel_boxedTraceExact h
+
+theorem RuntimePaperNativeKernelAssumptions.smallMapLookupStepAccumulatesMatch
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {trace : RuntimeSmallMapLookupDiscipline.Trace}
+  {keyMatch : Bool}
+  (h : trace.index < trace.capacity) :
+  (RuntimeSmallMapLookupDiscipline.step trace keyMatch).matched =
+    (trace.matched || keyMatch) :=
+  RuntimeImplementationInterface.smallMapLookupModel_stepAccumulatesMatchBeforeCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.smallMapLookupScanMatchesAcceptsExactPublicCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeSmallMapLookupDiscipline.Parameters)
+  (keyMatches : List Bool)
+  (h : RuntimeSmallMapLookupDiscipline.Precondition parameters keyMatches) :
+  RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches =
+    some
+      { capacity := parameters.capacity
+      , index := parameters.capacity
+      , matched := RuntimeSmallMapLookupDiscipline.scanMatches keyMatches
+      , overflowed := false
+      } :=
+  RuntimeImplementationInterface.smallMapLookupModel_scanMatchesAcceptsExactPublicCapacity
+    parameters keyMatches h
+
+theorem RuntimePaperNativeKernelAssumptions.smallMapLookupScanMatchesRejectsLengthMismatch
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  (parameters : RuntimeSmallMapLookupDiscipline.Parameters)
+  (keyMatches : List Bool)
+  (h : ¬ RuntimeSmallMapLookupDiscipline.Precondition parameters keyMatches) :
+  RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches = none :=
+  RuntimeImplementationInterface.smallMapLookupModel_scanMatchesRejectsLengthMismatch
+    parameters keyMatches h
+
+theorem RuntimePaperNativeKernelAssumptions.smallMapLookupScanMatchesSomeAcceptedLookup
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeSmallMapLookupDiscipline.Parameters}
+  {keyMatches : List Bool}
+  {trace : RuntimeSmallMapLookupDiscipline.Trace}
+  (h : RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches = some trace) :
+  RuntimeSmallMapLookupDiscipline.acceptedLookup parameters trace :=
+  RuntimeImplementationInterface.smallMapLookupModel_scanMatchesSomeAcceptedLookup h
+
+theorem RuntimePaperNativeKernelAssumptions.smallMapLookupScanMatchesSomeMatchedEqualsFold
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeSmallMapLookupDiscipline.Parameters}
+  {keyMatches : List Bool}
+  {trace : RuntimeSmallMapLookupDiscipline.Trace}
+  (h : RuntimeSmallMapLookupDiscipline.scanMatches? parameters keyMatches = some trace) :
+  trace.matched = RuntimeSmallMapLookupDiscipline.scanMatches keyMatches :=
+  RuntimeImplementationInterface.smallMapLookupModel_scanMatchesSomeMatchedEqualsFold h
+
+theorem RuntimePaperNativeKernelAssumptions.arrayAccessSelectedSlotAcceptsInBounds
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex : Nat}
+  (h : logicalIndex < parameters.capacity) :
+  RuntimeArrayAccessDiscipline.selectedSlot? parameters logicalIndex =
+    some logicalIndex :=
+  RuntimeImplementationInterface.arrayAccessModel_selectedSlotAcceptsInBounds h
+
+theorem RuntimePaperNativeKernelAssumptions.arrayAccessSelectedSlotRejectsOutOfRange
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex : Nat}
+  (h : ¬ logicalIndex < parameters.capacity) :
+  RuntimeArrayAccessDiscipline.selectedSlot? parameters logicalIndex = none :=
+  RuntimeImplementationInterface.arrayAccessModel_selectedSlotRejectsOutOfRange h
+
+theorem RuntimePaperNativeKernelAssumptions.arrayAccessSelectedSlotSomeSelectsSlot
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex slot : Nat}
+  (h : RuntimeArrayAccessDiscipline.selectedSlot? parameters logicalIndex = some slot) :
+  RuntimeArrayAccessDiscipline.selectsSlot parameters logicalIndex slot :=
+  RuntimeImplementationInterface.arrayAccessModel_selectedSlotSomeSelectsSlot h
+
+theorem RuntimePaperNativeKernelAssumptions.arrayAccessSelectsSlotUnique
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeArrayAccessDiscipline.Parameters}
+  {logicalIndex slot₁ slot₂ : Nat}
+  (h₁ : RuntimeArrayAccessDiscipline.selectsSlot parameters logicalIndex slot₁)
+  (h₂ : RuntimeArrayAccessDiscipline.selectsSlot parameters logicalIndex slot₂) :
+  slot₁ = slot₂ :=
+  RuntimeImplementationInterface.arrayAccessModel_selectsSlotUnique h₁ h₂
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushRejectsAtCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : log.capacity ≤ log.len) :
+  RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = none :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushRejectsAtCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushPreservesCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log next : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = some next) :
+  next.capacity = log.capacity :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushPreservesCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushUpdatesZeroWrites
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log next : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = some next) :
+  next.zeroWrites =
+    log.zeroWrites + if isZeroWrite then 1 else 0 :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushUpdatesZeroWrites h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushPreservesOverflowFlag
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log next : RuntimeOramWriteLogDiscipline.Log} {isZeroWrite : Bool}
+  (h : RuntimeOramWriteLogDiscipline.pushWrite log isZeroWrite = some next) :
+  next.overflowed = log.overflowed :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushPreservesOverflowFlag h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushUpdateRejectsAtCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : log.capacity ≤ log.len) :
+  RuntimeOramWriteLogDiscipline.pushUpdate log = none :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushUpdateRejectsAtCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushUpdatePreservesCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log next : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.pushUpdate log = some next) :
+  next.capacity = log.capacity :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushUpdatePreservesCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushUpdatePreservesZeroWrites
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log next : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.pushUpdate log = some next) :
+  next.zeroWrites = log.zeroWrites :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushUpdatePreservesZeroWrites h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogPushUpdatePreservesOverflowFlag
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {log next : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.pushUpdate log = some next) :
+  next.overflowed = log.overflowed :=
+  RuntimeImplementationInterface.oramWriteLogModel_pushUpdatePreservesOverflowFlag h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogExactBatchNoOverflow
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.exactBatchAccepted parameters log) :
+  log.overflowed = false :=
+  RuntimeImplementationInterface.oramWriteLogModel_exactBatchNoOverflow h
+
+theorem RuntimePaperNativeKernelAssumptions.oramWriteLogExactUpdateBatchNoOverflow
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {log : RuntimeOramWriteLogDiscipline.Log}
+  (h : RuntimeOramWriteLogDiscipline.exactUpdateBatchAccepted parameters log) :
+  log.overflowed = false :=
+  RuntimeImplementationInterface.oramWriteLogModel_exactUpdateBatchNoOverflow h
+
+theorem RuntimePaperNativeKernelAssumptions.oramReadTranscriptPushRejectsAtLogicalCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {builder : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h : builder.capacity ≤ builder.logicalLen) :
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder = none :=
+  RuntimeImplementationInterface.oramReadTranscriptModel_pushRejectsAtLogicalCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.oramReadTranscriptPushRejectsAtPhysicalReadCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {builder : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h : builder.capacity ≤ builder.physicalReadLen) :
+  RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder = none :=
+  RuntimeImplementationInterface.oramReadTranscriptModel_pushRejectsAtPhysicalReadCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.oramReadTranscriptPushPreservesCapacity
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {builder next : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder =
+      some next) :
+  next.capacity = builder.capacity :=
+  RuntimeImplementationInterface.oramReadTranscriptModel_pushPreservesCapacity h
+
+theorem RuntimePaperNativeKernelAssumptions.oramReadTranscriptPushPreservesOverflowFlag
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {builder next : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.pushReadTranscriptPair builder =
+      some next) :
+  next.overflowed = builder.overflowed :=
+  RuntimeImplementationInterface.oramReadTranscriptModel_pushPreservesOverflowFlag h
+
+theorem RuntimePaperNativeKernelAssumptions.oramReadTranscriptExactTranscriptNoOverflow
+  (_assumptions : RuntimePaperNativeKernelAssumptions)
+  {parameters : RuntimeOramWriteLogDiscipline.Parameters}
+  {builder : RuntimeOramWriteLogDiscipline.ReadTranscriptBuilder}
+  (h :
+    RuntimeOramWriteLogDiscipline.exactReadTranscriptAccepted
+      parameters builder) :
+  builder.overflowed = false :=
+  RuntimeImplementationInterface.oramReadTranscriptModel_exactTranscriptNoOverflow h
+
+theorem RuntimePaperNativeKernelAssumptions.kernelStateRefinesLeanKernel
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness := by
+  exact
+    RuntimeKernelMachineFinishBoundary.toRefinesLeanKernelState
+      assumptions.runtimeKernelMachineFinishBoundary
+
+theorem RuntimePaperNativeKernelAssumptions.shellTraceRefinesShellContract
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeKernelConfinementBoundary.witness_refinesShellContract
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary
+
+theorem RuntimePaperNativeKernelAssumptions.storeCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  (hBytes :
+    ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeNonzero
+      (RuntimeStoreCodecSemantics.encodeNonzero bytes) =
+    some bytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBytes
+
+theorem RuntimePaperNativeKernelAssumptions.storeCodecTransportShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  (hBytes :
+    ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
+  (RuntimeStoreCodecSemantics.encodeNonzero bytes).length = 2 * bytes.length ∧
+    ∀ nibble,
+      nibble ∈ RuntimeStoreCodecSemantics.encodeNonzero bytes →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecTransportShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBytes
+
+theorem RuntimePaperNativeKernelAssumptions.storeCodecDecodeSound
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {encoded bytes : List Nat}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeNonzero encoded = some bytes) :
+  encoded.length = 2 * bytes.length ∧
+    (∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) ∧
+    (∀ nibble,
+      nibble ∈ encoded →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeSound
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  (hBytes :
+    ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeNonzeroInto?
+      bytes.length (RuntimeStoreCodecSemantics.encodeNonzero bytes) =
+    some bytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBytes
+
+theorem RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoRejectsLengthMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {byteLen : Nat}
+  {encoded : List Nat}
+  (hLen : encoded.length ≠ 2 * byteLen) :
+  RuntimeStoreCodecSemantics.decodeNonzeroInto? byteLen encoded = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoRejectsLengthMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoSound
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {byteLen : Nat}
+  {encoded bytes : List Nat}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeNonzeroInto? byteLen encoded =
+      some bytes) :
+  encoded.length = 2 * byteLen ∧
+    bytes.length = byteLen ∧
+    (∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) ∧
+    (∀ nibble,
+      nibble ∈ encoded →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoSound
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedEncodedLen
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (payloadLen : Nat) :
+  RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen =
+    2 * (RuntimeStoreCodecSemantics.sealedMagicLen +
+      RuntimeStoreCodecSemantics.sealedNonceBytes +
+      payloadLen +
+      RuntimeStoreCodecSemantics.sealedTagBytes) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedEncodedLen
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      payloadLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedPlainLen
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (payloadLen : Nat) :
+  RuntimeStoreCodecSemantics.sealedPlainLen payloadLen =
+    RuntimeStoreCodecSemantics.sealedMagicLen +
+      RuntimeStoreCodecSemantics.sealedNonceBytes +
+      payloadLen +
+      RuntimeStoreCodecSemantics.sealedTagBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedPlainLen
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      payloadLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedRecordDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {encoded sealed : List Nat}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeNonzero encoded = some sealed)
+  (hEncodedLen :
+    encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
+  sealed.length = RuntimeStoreCodecSemantics.sealedPlainLen payloadLen ∧
+    ∃ parts,
+      RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen sealed =
+          some parts ∧
+        parts.ValidShape payloadLen := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode hEncodedLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedRecordOpenShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen ∧
+    parts.ValidOpenShape payloadLen := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordOpenShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsLengthMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  (hLen :
+    encoded.length ≠ RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordRejectsLengthMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedRecordOpenTransportSound
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen ∧
+    parts.ValidOpenShape payloadLen ∧
+    (∀ nibble,
+      nibble ∈ encoded →
+        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) ∧
+    ∃ sealed,
+      RuntimeStoreCodecSemantics.decodeNonzero encoded = some sealed ∧
+        RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen sealed =
+            some parts ∧
+          parts.bytes = sealed ∧
+          sealed.length = RuntimeStoreCodecSemantics.sealedPlainLen payloadLen ∧
+          (∀ byte, byte ∈ sealed →
+            RuntimeStoreCodecSemantics.ValidByte byte) ∧
+          (∀ byte, byte ∈ parts.bytes →
+            RuntimeStoreCodecSemantics.ValidByte byte) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordOpenTransportSound
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.storeUoSlotCiphertextShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {encoded : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hDecode :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+      some parts) :
+  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape
+    payloadLen encoded := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeUoSlotCiphertextShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedRecordTransportRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hOpenShape : parts.ValidOpenShape payloadLen)
+  (hBytes :
+    ∀ byte, byte ∈ parts.bytes →
+      RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen
+      (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) =
+    some parts := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordTransportRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hOpenShape hBytes
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedRecordEncodedLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hShape : parts.ValidShape payloadLen) :
+  (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes).length =
+      RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordEncodedLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hShape
+
+theorem RuntimePaperNativeKernelAssumptions.storeEncodedUoSlotCiphertextShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hShape : parts.ValidShape payloadLen)
+  (hBytes :
+    ∀ byte, byte ∈ parts.bytes →
+      RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape
+    payloadLen (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeEncodedUoSlotCiphertextShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hShape hBytes
+
+theorem RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsWrongMagic
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {payloadLen : Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hShape : parts.ValidShape payloadLen)
+  (hMagic : parts.magic ≠ RuntimeStoreCodecSemantics.sealedMagic)
+  (hBytes :
+    ∀ byte, byte ∈ parts.bytes →
+      RuntimeStoreCodecSemantics.ValidByte byte) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen
+      (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordRejectsWrongMagic
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hShape hMagic hBytes
+
+theorem RuntimePaperNativeKernelAssumptions.storeUoUpdateWriteShapeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (object : String)
+  (slotLen : Nat) :
+  RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted object slotLen
+    (RuntimeStoreCodecSemantics.uoStoreUpdateWriteShape object slotLen) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeUoUpdateWriteShapeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      object slotLen
+
+theorem RuntimePaperNativeKernelAssumptions.storeUoUpdateWritePublicShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {object : String}
+  {slotLen : Nat}
+  {write : RuntimeStoreCodecSemantics.StoreWriteShape}
+  (hAccepted :
+    RuntimeStoreCodecSemantics.UoStoreUpdateWriteAccepted
+      object slotLen write) :
+  write.object = object ∧
+    write.location = object ∧
+    write.len = slotLen ∧
+    write.writeClass = RuntimeStoreCodecSemantics.StoreWriteClass.update := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_storeUoUpdateWritePublicShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hAccepted
+
+theorem RuntimePaperNativeKernelAssumptions.oramBucketBytesMatchCodec
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {object : OramObjectManifest}
+  (hObject : WellFormedOramObject object) :
+  object.bucketSize =
+    RuntimeOramCodecSemantics.bucketBytes
+      object.blocksPerBucket
+      object.blockSize := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketBytesMatchCodec
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hObject
+
+theorem RuntimePaperNativeKernelAssumptions.oramSurrogateBucketBytesMatchCodec
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {object : OramObjectManifest}
+  (hObject : WellFormedSurrogateOramObject object) :
+  object.bucketSize =
+    RuntimeOramCodecSemantics.bucketBytes
+      object.blocksPerBucket
+      object.blockSize := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramSurrogateBucketBytesMatchCodec
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hObject
+
+theorem RuntimePaperNativeKernelAssumptions.oramPathBucketBytesMatchCodec
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {object : OramObjectManifest}
+  (hObject : WellFormedPathOramObject object) :
+  object.bucketSize =
+    RuntimeOramCodecSemantics.bucketBytes
+      object.blocksPerBucket
+      object.blockSize := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramPathBucketBytesMatchCodec
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hObject
+
+theorem RuntimePaperNativeKernelAssumptions.oramSurrogateBlockBytesPublicFormula
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.surrogateBlockBytes keyBytes valueBytes =
+    RuntimeOramCodecSemantics.occupancyTagBytes + keyBytes + valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramSurrogateBlockBytesPublicFormula
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      keyBytes valueBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramPathBlockBytesPublicFormula
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.pathBlockBytes keyBytes valueBytes =
+    RuntimeOramCodecSemantics.occupancyTagBytes +
+      RuntimeOramCodecSemantics.slotIndexBytes +
+      RuntimeOramCodecSemantics.leafLabelBytes +
+      keyBytes +
+      valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramPathBlockBytesPublicFormula
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      keyBytes valueBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramBucketBytesPublicFormula
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blocksPerBucket blockBytes : Nat) :
+  RuntimeOramCodecSemantics.bucketBytes blocksPerBucket blockBytes =
+    oramBucketHeaderBytes +
+      blocksPerBucket * blockBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketBytesPublicFormula
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      blocksPerBucket blockBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramDirectoryPageBytesPublicFormula
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (blockBytes : Nat) :
+  RuntimeOramCodecSemantics.directoryPageBytes blockBytes =
+    RuntimeOramCodecSemantics.directoryPageEntries * blockBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramDirectoryPageBytesPublicFormula
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      blockBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramPublicCountGuardAcceptsExact
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (expected : Nat) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected expected = some () := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramPublicCountGuardAcceptsExact
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      expected
+
+theorem RuntimePaperNativeKernelAssumptions.oramDirectoryPagesRejectCountMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramDirectoryPagesRejectCountMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCount
+
+theorem RuntimePaperNativeKernelAssumptions.oramBucketsRejectCountMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketsRejectCountMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCount
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapBufferRejectsCountMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapBufferRejectsCountMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCount
+
+theorem RuntimePaperNativeKernelAssumptions.pathLiveSlotsRejectCountMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {expected actual : Nat}
+  (hCount : actual ≠ expected) :
+  RuntimeOramCodecSemantics.publicCountGuard? expected actual = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathLiveSlotsRejectCountMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCount
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterFieldBytesMatchSlotIndex
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  RuntimeOramCodecSemantics.counterFieldBytes =
+    RuntimeOramCodecSemantics.slotIndexBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterFieldBytesMatchSlotIndex
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.oramCodecBucketHeaderBytesMatchesRuntimeHeader
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  RuntimeOramCodecSemantics.codecBucketHeaderBytes =
+    oramBucketHeaderBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBucketHeaderBytesMatchesRuntimeHeader
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+
+theorem RuntimePaperNativeKernelAssumptions.oramCodecBlockBytesSurrogateMatchesFormula
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.codecBlockBytes false keyBytes valueBytes =
+    RuntimeOramCodecSemantics.surrogateBlockBytes keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBlockBytesSurrogateMatchesFormula
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      keyBytes valueBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramCodecBlockBytesPathMatchesFormula
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.codecBlockBytes true keyBytes valueBytes =
+    RuntimeOramCodecSemantics.pathBlockBytes keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBlockBytesPathMatchesFormula
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      keyBytes valueBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramCodecBucketBytesMatchesRuntimeBucketBytes
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (isPath : Bool)
+  (blocksPerBucket keyBytes valueBytes : Nat) :
+  RuntimeOramCodecSemantics.codecBucketBytes
+      isPath blocksPerBucket keyBytes valueBytes =
+    RuntimeOramCodecSemantics.bucketBytes blocksPerBucket
+      (RuntimeOramCodecSemantics.codecBlockBytes
+        isPath keyBytes valueBytes) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCodecBucketBytesMatchesRuntimeBucketBytes
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      isPath blocksPerBucket keyBytes valueBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterEncodeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (counter : Nat) :
+  RuntimeOramCodecSemantics.CounterDecodeAccepted
+    (RuntimeOramCodecSemantics.encodeCounterField counter) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterEncodeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      counter
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterEncodeLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (counter : Nat) :
+  (RuntimeOramCodecSemantics.encodeCounterField counter).length =
+    RuntimeOramCodecSemantics.counterFieldBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterEncodeLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      counter
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterEncodeValidBytes
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (counter : Nat) :
+  RuntimeOramCodecSemantics.ValidByteField
+    (RuntimeOramCodecSemantics.encodeCounterField counter) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterEncodeValidBytes
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      counter
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterDecodeExactEncode
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (counter : Nat) :
+  RuntimeOramCodecSemantics.decodeCounterExact?
+      (RuntimeOramCodecSemantics.encodeCounterField counter) =
+    some
+      (RuntimeOramCodecSemantics.decodeNatField
+        (RuntimeOramCodecSemantics.encodeCounterField counter)) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeExactEncode
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      counter
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterDecodeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  {counter : Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeCounterExact? bytes = some counter)
+  (hBytes : RuntimeOramCodecSemantics.ValidByteField bytes) :
+  RuntimeOramCodecSemantics.CounterDecodeAccepted bytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode hBytes
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterDecodeLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  {counter : Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeCounterExact? bytes = some counter) :
+  bytes.length = RuntimeOramCodecSemantics.counterFieldBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.oramCounterDecodeValue
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {bytes : List Nat}
+  {counter : Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeCounterExact? bytes = some counter) :
+  counter = RuntimeOramCodecSemantics.decodeNatField bytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramCounterDecodeValue
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.oramBlockCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hBlock :
+    block.ValidShape isPath keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodeBlock?
+      isPath keyBytes valueBytes
+      (RuntimeOramCodecSemantics.encodeBlock isPath block) =
+    some block := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramBlockCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBlock
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBlockCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hBlock :
+    block.ValidShape isPath keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodeBlockExact?
+      isPath keyBytes valueBytes
+      (RuntimeOramCodecSemantics.encodeBlock isPath block) =
+    some block := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlockCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBlock
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBlockDecodeLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {bytes : List Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBlockExact?
+        isPath keyBytes valueBytes bytes = some block) :
+  bytes.length =
+    RuntimeOramCodecSemantics.codecBlockBytes
+      isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlockDecodeLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBlockDecodeValidShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {bytes : List Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBlockExact?
+        isPath keyBytes valueBytes bytes = some block) :
+  block.ValidShape isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlockDecodeValidShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.oramEncodeBlockLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {block : RuntimeOramCodecSemantics.CodecBlock}
+  (hBlock :
+    block.ValidShape isPath keyBytes valueBytes) :
+  (RuntimeOramCodecSemantics.encodeBlock isPath block).length =
+    RuntimeOramCodecSemantics.codecBlockBytes
+      isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramEncodeBlockLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBlock
+
+theorem RuntimePaperNativeKernelAssumptions.oramEncodeBlocksLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hBlocks :
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes) :
+  (RuntimeOramCodecSemantics.encodeBlocks isPath blocks).length =
+    blocks.length *
+      RuntimeOramCodecSemantics.codecBlockBytes
+        isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramEncodeBlocksLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBlocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBlocksDecodeCount
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes count : Nat}
+  {bytes : List Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeExactBlocks?
+        isPath keyBytes valueBytes count bytes = some blocks) :
+  blocks.length = count := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlocksDecodeCount
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBlocksCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hBlocks :
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodeExactBlocks?
+      isPath keyBytes valueBytes blocks.length
+      (RuntimeOramCodecSemantics.encodeBlocks isPath blocks) =
+    some blocks := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBlocksCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBlocks
+
+theorem RuntimePaperNativeKernelAssumptions.oramBucketCodecLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes : Nat}
+  {bucket : RuntimeOramCodecSemantics.CodecBucket}
+  (hBucket :
+    bucket.ValidShape isPath blocksPerBucket keyBytes valueBytes) :
+  (RuntimeOramCodecSemantics.encodeBucket isPath bucket).length =
+    RuntimeOramCodecSemantics.codecBucketBytes
+      isPath blocksPerBucket keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramBucketCodecLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBucket
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBucketCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex : Nat}
+  {bucket : RuntimeOramCodecSemantics.CodecBucket}
+  (hBucket :
+    bucket.ValidShape isPath blocksPerBucket keyBytes valueBytes)
+  (hBucketIndex :
+    RuntimeOramCodecSemantics.decodeNatField bucket.bucketIndexField =
+      expectedBucketIndex)
+  (hLiveCount :
+    RuntimeOramCodecSemantics.decodeNatField bucket.liveEntryCountField =
+      RuntimeOramCodecSemantics.liveBlockCount bucket.blocks) :
+  RuntimeOramCodecSemantics.decodeBucketExact?
+      isPath blocksPerBucket keyBytes valueBytes expectedBucketIndex
+      (RuntimeOramCodecSemantics.encodeBucket isPath bucket) =
+    some
+      { bucketIndex := expectedBucketIndex
+      , liveEntryCount := RuntimeOramCodecSemantics.liveBlockCount bucket.blocks
+      , blocks := bucket.blocks
+      } := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBucketCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBucket hBucketIndex hLiveCount
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBucketDecodeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBucketExact?
+        isPath blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        isPath blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBucketDecodeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.oramExactBucketDecodeBlockValidShapes
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodeBucketExact?
+        isPath blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        bytes = some payload) :
+  ∀ block, block ∈ payload.blocks →
+    block.ValidShape isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramExactBucketDecodeBlockValidShapes
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathBucketBoundedDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketBoundedDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathBucketPathBoundedDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.LiveOnBucketPath leafCount expectedBucketIndex := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketPathBoundedDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathBucketPositionMapBoundedDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {positionMap : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMap bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.LiveOnBucketPath leafCount expectedBucketIndex ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketPositionMapBoundedDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathBucketUniquePositionMapBoundedDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocksPerBucket keyBytes valueBytes expectedBucketIndex
+    capacity leafCount : Nat}
+  {positionMap : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMap bytes = some payload) :
+  bytes.length =
+      RuntimeOramCodecSemantics.codecBucketBytes
+        true blocksPerBucket keyBytes valueBytes ∧
+    payload.Accepted expectedBucketIndex blocksPerBucket ∧
+    RuntimeOramCodecSemantics.LiveSlotNoDuplicates payload.blocks ∧
+    ∀ block, block ∈ payload.blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.LiveOnBucketPath leafCount expectedBucketIndex ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathBucketUniquePositionMapBoundedDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapLiveSlotCoverage
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {positionMap : List (Option Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hCheck :
+    RuntimeOramCodecSemantics.checkPositionMapCoveredByLiveBlocks
+        positionMap blocks = true) :
+  RuntimeOramCodecSemantics.PositionMapCoveredByLiveBlocks
+    positionMap blocks := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapLiveSlotCoverage
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCheck
+
+theorem RuntimePaperNativeKernelAssumptions.pathBlocksPositionMapAgreement
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {positionMap : List (Option Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hCheck :
+    RuntimeOramCodecSemantics.checkPathBlocksPositionMapAgreement
+        positionMap blocks = true) :
+  ∀ block, block ∈ blocks →
+    block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathBlocksPositionMapAgreement
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCheck
+
+theorem RuntimePaperNativeKernelAssumptions.pathBlocksNoDuplicateLiveSlots
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hCheck :
+    RuntimeOramCodecSemantics.checkPathBlocksNoDuplicateLiveSlots blocks =
+      true) :
+  RuntimeOramCodecSemantics.LiveSlotNoDuplicates blocks := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathBlocksNoDuplicateLiveSlots
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCheck
+
+theorem RuntimePaperNativeKernelAssumptions.oramDecodedBucketPayloadAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {expectedBucketIndex blocksPerBucket : Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hIndex : payload.bucketIndex = expectedBucketIndex)
+  (hBlocks : payload.blocks.length = blocksPerBucket)
+  (hLive :
+    RuntimeOramCodecSemantics.liveBlockCount payload.blocks =
+      payload.liveEntryCount) :
+  payload.Accepted expectedBucketIndex blocksPerBucket := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_oramDecodedBucketPayloadAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hIndex hBlocks hLive
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPagesCoverCapacity
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity : Nat) :
+  capacity ≤
+    RuntimeOramCodecSemantics.pathPositionMapPages capacity *
+      RuntimeOramCodecSemantics.directoryPageEntries := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesCoverCapacity
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      capacity
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPagesPositive
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  (capacity : Nat) :
+  0 < RuntimeOramCodecSemantics.pathPositionMapPages capacity := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesPositive
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      capacity
+
+theorem RuntimePaperNativeKernelAssumptions.pathMetadataPageSplit
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {metadataPages capacity : Nat}
+  (hPages :
+    RuntimeOramCodecSemantics.pathPositionMapPages capacity ≤
+      metadataPages) :
+  RuntimeOramCodecSemantics.pathPositionMapPages capacity +
+      RuntimeOramCodecSemantics.pathStashPages metadataPages capacity =
+    metadataPages := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathMetadataPageSplit
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hPages
+
+theorem RuntimePaperNativeKernelAssumptions.positionMapDecodeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {capacity leafCount : Nat}
+  {positionMap : List (Option Nat)}
+  (hCapacity : positionMap.length = capacity)
+  (hLeaves :
+    RuntimeOramCodecSemantics.PositionMapLeafBounded leafCount positionMap) :
+  RuntimeOramCodecSemantics.PositionMapDecodeAccepted
+      capacity leafCount positionMap := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_positionMapDecodeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCapacity hLeaves
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapLeafDecodeBounded
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount : Nat}
+  {field : List Nat}
+  {entry : Option Nat}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePositionMapLeaf? leafCount field =
+      some entry) :
+  RuntimeOramCodecSemantics.PositionMapEntryLeafBounded leafCount entry := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapLeafDecodeBounded
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapEntriesDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount count : Nat}
+  {bytes : List Nat}
+  {entries : List (Option Nat)}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePositionMapEntriesExact?
+        leafCount count bytes = some entries) :
+  entries.length = count ∧
+    RuntimeOramCodecSemantics.PositionMapLeafBounded leafCount entries := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapEntriesDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPageDecodeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount directoryPageBytes : Nat}
+  {bytes : List Nat}
+  {page : RuntimeOramCodecSemantics.DecodedPathPositionMapPage}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathPositionMapPageExact?
+        leafCount directoryPageBytes bytes = some page) :
+  bytes.length = directoryPageBytes ∧
+    page.Accepted leafCount directoryPageBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageDecodeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPageRejectsLengthMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount directoryPageBytes : Nat}
+  {bytes : List Nat}
+  (hLen : bytes.length ≠ directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPageExact?
+      leafCount directoryPageBytes bytes = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageRejectsLengthMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hLen
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPagesAllDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount directoryPageBytes : Nat}
+  {pages : List (List Nat)}
+  {entries : List (Option Nat)}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathPositionMapPagesAll?
+        leafCount directoryPageBytes pages = some entries) :
+  entries.length =
+      pages.length * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.PositionMapLeafBounded leafCount entries := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesAllDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPagesDecodeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount directoryPageBytes capacity : Nat}
+  {pages : List (List Nat)}
+  {positionMap : List (Option Nat)}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathPositionMapPagesExact?
+        leafCount directoryPageBytes capacity pages = some positionMap) :
+  pages.length = RuntimeOramCodecSemantics.pathPositionMapPages capacity ∧
+    RuntimeOramCodecSemantics.PositionMapDecodeAccepted
+      capacity leafCount positionMap := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesDecodeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPagesRejectsPageCountMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount directoryPageBytes capacity : Nat}
+  {pages : List (List Nat)}
+  (hCount :
+    pages.length ≠ RuntimeOramCodecSemantics.pathPositionMapPages capacity) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPagesExact?
+      leafCount directoryPageBytes capacity pages = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesRejectsPageCountMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCount
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPageLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {directoryPageBytes : Nat}
+  {positionMapPrefixBytes : List Nat}
+  (hLen : positionMapPrefixBytes.length ≤ directoryPageBytes) :
+  (RuntimeOramCodecSemantics.encodePathPositionMapPageBytes
+      directoryPageBytes positionMapPrefixBytes).length =
+    directoryPageBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hLen
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPageCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount directoryPageBytes : Nat}
+  {fields : List (List Nat)}
+  {entries : List (Option Nat)}
+  (hFields :
+    RuntimeOramCodecSemantics.PositionMapEntryFieldsEncode
+      leafCount fields entries)
+  (hEntryCount :
+    entries.length = RuntimeOramCodecSemantics.directoryPageEntries)
+  (hDirectoryBytes :
+    RuntimeOramCodecSemantics.pathPositionMapEntryBytes ≤
+      directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPageExact?
+      leafCount directoryPageBytes
+      (RuntimeOramCodecSemantics.encodePathPositionMapPageBytes
+        directoryPageBytes
+        (RuntimeOramCodecSemantics.encodePositionMapEntryFields fields)) =
+    some
+      { entries := entries
+      , padding :=
+          List.replicate
+            (directoryPageBytes -
+              RuntimeOramCodecSemantics.pathPositionMapEntryBytes) 0
+      } := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPageCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hFields hEntryCount hDirectoryBytes
+
+theorem RuntimePaperNativeKernelAssumptions.pathPositionMapPagesCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {leafCount directoryPageBytes capacity : Nat}
+  {fieldPages : List (List (List Nat))}
+  {entryPages : List (List (Option Nat))}
+  (hPages :
+    RuntimeOramCodecSemantics.PositionMapPageEntryFieldsEncode
+      leafCount fieldPages entryPages)
+  (hPageCount :
+    entryPages.length =
+      RuntimeOramCodecSemantics.pathPositionMapPages capacity)
+  (hDirectoryBytes :
+    RuntimeOramCodecSemantics.pathPositionMapEntryBytes ≤
+      directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathPositionMapPagesExact?
+      leafCount directoryPageBytes capacity
+      (RuntimeOramCodecSemantics.encodePathPositionMapPagesBytes
+        directoryPageBytes fieldPages) =
+    some
+      ((RuntimeOramCodecSemantics.flattenPositionMapPages entryPages).take
+        capacity) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathPositionMapPagesCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hPages hPageCount hDirectoryBytes
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPageLength
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {directoryPageBytes : Nat}
+  {stashBlockBytes : List Nat}
+  (hLen : stashBlockBytes.length ≤ directoryPageBytes) :
+  (RuntimeOramCodecSemantics.encodePathStashPageBytes
+      directoryPageBytes stashBlockBytes).length =
+    directoryPageBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageLength
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hLen
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPageCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hBlockCount :
+    blocks.length = RuntimeOramCodecSemantics.directoryPageEntries)
+  (hBlocks :
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes)
+  (hDirectoryBytes :
+    directoryPageBytes =
+      RuntimeOramCodecSemantics.directoryPageEntries *
+        RuntimeOramCodecSemantics.codecBlockBytes
+          true keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodePathStashPageExact?
+      true keyBytes valueBytes directoryPageBytes
+      (RuntimeOramCodecSemantics.encodePathStashPageBytes
+        directoryPageBytes
+        (RuntimeOramCodecSemantics.encodeBlocks true blocks)) =
+    some { blocks := blocks } := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hBlockCount hBlocks hDirectoryBytes
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPagesCodecRoundtrip
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {keyBytes valueBytes directoryPageBytes stashPageCount : Nat}
+  {blockPages : List (List RuntimeOramCodecSemantics.CodecBlock)}
+  (hPages :
+    RuntimeOramCodecSemantics.PathStashPageBlocksValid
+      keyBytes valueBytes blockPages)
+  (hPageCount : blockPages.length = stashPageCount)
+  (hDirectoryBytes :
+    directoryPageBytes =
+      RuntimeOramCodecSemantics.directoryPageEntries *
+        RuntimeOramCodecSemantics.codecBlockBytes true keyBytes valueBytes) :
+  RuntimeOramCodecSemantics.decodePathStashPagesExact?
+      true keyBytes valueBytes directoryPageBytes stashPageCount
+      (RuntimeOramCodecSemantics.encodePathStashPagesBytes
+        directoryPageBytes blockPages) =
+    some (RuntimeOramCodecSemantics.flattenStashPages blockPages) := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesCodecRoundtrip
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hPages hPageCount hDirectoryBytes
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPageDecodeAccepted
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {bytes : List Nat}
+  {page : RuntimeOramCodecSemantics.DecodedPathStashPage}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPageExact?
+        isPath keyBytes valueBytes directoryPageBytes bytes = some page) :
+  bytes.length = directoryPageBytes ∧
+    page.Accepted RuntimeOramCodecSemantics.directoryPageEntries := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageDecodeAccepted
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPageRejectsLengthMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {bytes : List Nat}
+  (hLen : bytes.length ≠ directoryPageBytes) :
+  RuntimeOramCodecSemantics.decodePathStashPageExact?
+      isPath keyBytes valueBytes directoryPageBytes bytes = none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageRejectsLengthMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hLen
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPageDecodeBlockValidShapes
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {bytes : List Nat}
+  {page : RuntimeOramCodecSemantics.DecodedPathStashPage}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPageExact?
+        isPath keyBytes valueBytes directoryPageBytes bytes = some page) :
+  ∀ block, block ∈ page.blocks →
+    block.ValidShape isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPageDecodeBlockValidShapes
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPagesDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes stashPageCount : Nat}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesExact?
+        isPath keyBytes valueBytes directoryPageBytes stashPageCount pages =
+      some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPagesRejectsPageCountMismatch
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes stashPageCount : Nat}
+  {pages : List (List Nat)}
+  (hCount : pages.length ≠ stashPageCount) :
+  RuntimeOramCodecSemantics.decodePathStashPagesExact?
+      isPath keyBytes valueBytes directoryPageBytes stashPageCount pages =
+    none := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesRejectsPageCountMismatch
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hCount
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPagesAllDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {isPath : Bool}
+  {keyBytes valueBytes directoryPageBytes : Nat}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesAll?
+        isPath keyBytes valueBytes directoryPageBytes pages = some blocks) :
+  blocks.length =
+      pages.length * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤
+      pages.length * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape isPath keyBytes valueBytes := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesAllDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPagesBoundedDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {keyBytes valueBytes directoryPageBytes stashPageCount
+    capacity leafCount stashBound : Nat}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesBoundedExact?
+        keyBytes valueBytes directoryPageBytes stashPageCount
+        capacity leafCount stashBound pages = some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤ stashBound ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesBoundedDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPagesPositionMapBoundedDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {keyBytes valueBytes directoryPageBytes stashPageCount
+    capacity leafCount stashBound : Nat}
+  {positionMap : List (Option Nat)}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesPositionMapBoundedExact?
+        keyBytes valueBytes directoryPageBytes stashPageCount
+        capacity leafCount stashBound positionMap pages = some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤ stashBound ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesPositionMapBoundedDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.pathStashPagesUniquePositionMapBoundedDecodeShape
+  (assumptions : RuntimePaperNativeKernelAssumptions)
+  {keyBytes valueBytes directoryPageBytes stashPageCount
+    capacity leafCount stashBound : Nat}
+  {positionMap : List (Option Nat)}
+  {pages : List (List Nat)}
+  {blocks : List RuntimeOramCodecSemantics.CodecBlock}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathStashPagesUniquePositionMapBoundedExact?
+        keyBytes valueBytes directoryPageBytes stashPageCount
+        capacity leafCount stashBound positionMap pages = some blocks) :
+  pages.length = stashPageCount ∧
+    blocks.length =
+      stashPageCount * RuntimeOramCodecSemantics.directoryPageEntries ∧
+    RuntimeOramCodecSemantics.liveBlockCount blocks ≤ stashBound ∧
+    RuntimeOramCodecSemantics.LiveSlotNoDuplicates blocks ∧
+    ∀ block, block ∈ blocks →
+      block.ValidShape true keyBytes valueBytes ∧
+        block.LivePathWithinBounds capacity leafCount ∧
+        block.AgreesWithPositionMap positionMap := by
+  exact
+    RuntimeImplementationInterface.residualHelperShellBoundary_pathStashPagesUniquePositionMapBoundedDecodeShape
+      assumptions.implementationInterface
+      (RuntimePaperNativeKernelAssumptions.residualHelperShellValid assumptions)
+      hDecode
+
+theorem RuntimePaperNativeKernelAssumptions.machineFinishScheduleConsumed
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  match assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+  | some steps => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+  | none => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0 := by
+  exact assumptions.runtimeKernelMachineFinishBoundary.expectedKernelScheduleConsumed
+
+theorem RuntimePaperNativeKernelAssumptions.machineFinishKernelStepBudgetRespected
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+    assumptions.runtimeKernelMachineFinishBoundary.maxKernelOps := by
+  exact assumptions.runtimeKernelMachineFinishBoundary.kernelStepBudgetRespected
+
+theorem RuntimePaperNativeKernelAssumptions.machineFinishRuntimePhaseBudgetRespected
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+    assumptions.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount := by
+  exact assumptions.runtimeKernelMachineFinishBoundary.runtimePhaseEventCapacityRespected
+
+theorem RuntimePaperNativeKernelAssumptions.slotSemanticsExact
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+      some assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps := by
+  exact
+    ⟨ assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.expectedKernelStepsExact
+    , assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.emittedKernelStepsExact
+    ⟩
+
+theorem RuntimePaperNativeKernelAssumptions.paperPublicOnlyResidualHelperShellRefinement
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      assumptions.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      assumptions.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨ RuntimePaperNativeKernelAssumptions.handwrittenRuntimePublicOnly assumptions
+  , RuntimePaperNativeKernelAssumptions.kernelStateRefinesLeanKernel assumptions
+  , RuntimePaperNativeKernelAssumptions.shellTraceRefinesShellContract assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishScheduleConsumed assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishKernelStepBudgetRespected assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishRuntimePhaseBudgetRespected assumptions
+  , RuntimePaperNativeKernelAssumptions.slotSemanticsExact assumptions
+  ⟩
+
+theorem RuntimePaperNativeKernelAssumptions.paperPublicBridgeObserverRefinement
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.PublicBridgeBoundary ∧
+    assumptions.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract :=
+  ⟨ RuntimePaperNativeKernelAssumptions.publicBridgeValid assumptions
+  , RuntimePaperNativeKernelAssumptions.handwrittenRuntimePublicOnly assumptions
+  , RuntimePaperNativeKernelAssumptions.shellTraceRefinesShellContract assumptions
+  ⟩
+
+theorem RuntimePaperNativeKernelAssumptions.paperEndToEndConfinement
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.ConfinesSecretDependentWork ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      assumptions.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      assumptions.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨ assumptions.implementationConfinement
+  , RuntimePaperNativeKernelAssumptions.kernelStateRefinesLeanKernel assumptions
+  , RuntimePaperNativeKernelAssumptions.shellTraceRefinesShellContract assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishScheduleConsumed assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishKernelStepBudgetRespected assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishRuntimePhaseBudgetRespected assumptions
+  , RuntimePaperNativeKernelAssumptions.slotSemanticsExact assumptions
+  ⟩
+
+theorem RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell
+  (assumptions : RuntimePaperNativeKernelAssumptions) :
+  assumptions.implementationInterface.ConfinesSecretDependentWork ∧
+    assumptions.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confinementBoundary.refinementBoundary.kernelWitness.shellContract ∧
+    (match assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps with
+      | some steps => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = steps.length
+      | none => assumptions.runtimeKernelMachineFinishBoundary.expectedKernelStepIndex = 0) ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps.length ≤
+      assumptions.runtimeKernelMachineFinishBoundary.maxKernelOps ∧
+    assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length ≤
+      assumptions.runtimeKernelMachineFinishBoundary.maxRuntimePhaseEventCount ∧
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.expectedKernelSteps =
+        some assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps ∧
+      assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.runtimeKernelBoundary.kernelWitness.kernelSteps =
+        assumptions.runtimeKernelMachineFinishBoundary.runtimeKernelFinishSlotBoundary.confidentialSlotProgram.expectedRuntimeKernelSteps :=
+  ⟨ assumptions.implementationConfinement
+  , RuntimePaperNativeKernelAssumptions.handwrittenRuntimePublicOnly assumptions
+  , RuntimePaperNativeKernelAssumptions.kernelStateRefinesLeanKernel assumptions
+  , RuntimePaperNativeKernelAssumptions.shellTraceRefinesShellContract assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishScheduleConsumed assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishKernelStepBudgetRespected assumptions
+  , RuntimePaperNativeKernelAssumptions.machineFinishRuntimePhaseBudgetRespected assumptions
+  , RuntimePaperNativeKernelAssumptions.slotSemanticsExact assumptions
+  ⟩
+
+noncomputable def
+  RuntimeImplementationKernelMachineConfinementBoundary.toRuntimePaperNativeKernelAssumptions
+  (boundary : RuntimeImplementationKernelMachineConfinementBoundary) :
+  RuntimePaperNativeKernelAssumptions where
+  implementationInterface := boundary.implementationInterface
+  runtimeKernelMachineFinishBoundary := boundary.runtimeKernelMachineFinishBoundary
+  implementationConfinement :=
+    RuntimeImplementationKernelMachineConfinementBoundary.implementationConfinement boundary
+
+noncomputable def
+  RuntimeImplementationKernelMeetingBoundary.runtimeImplementationConfinementBoundary
+  (boundary : RuntimeImplementationKernelMeetingBoundary)
+  (hPublicBridge : boundary.implementationInterface.PublicBridgeBoundary) :
+  RuntimeImplementationConfinementBoundary :=
+  { implementationInterface := boundary.implementationInterface
+  , kernelInterfaceBundle := boundary.runtimeKernelFinishSlotBoundary.kernelInterfaceBundle
+  , implementationValid := by
+      exact ⟨hPublicBridge, boundary.sharedKernelConfinement⟩
+  , kernelInterfaceValid := boundary.runtimeKernelFinishSlotBoundary.kernelInterfaceBundle_valid
+  }
+
+theorem RuntimeImplementationKernelMeetingBoundary.projects_to_runtimeImplementationConfinement
+  (boundary : RuntimeImplementationKernelMeetingBoundary)
+  (hPublicBridge : boundary.implementationInterface.PublicBridgeBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary hPublicBridge
+  RuntimeImplementationInterface.ConfinesSecretDependentWork
+      runtimeBoundary.implementationInterface := by
+  exact
+    RuntimeImplementationConfinementBoundary.implementationConfinement
+      (boundary.runtimeImplementationConfinementBoundary hPublicBridge)
+
+theorem
+  RuntimeImplementationKernelMeetingBoundary.projects_via_runtimeImplementationConfinementBoundary
+  (boundary : RuntimeImplementationKernelMeetingBoundary)
+  (hPublicBridge : boundary.implementationInterface.PublicBridgeBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary hPublicBridge
+  runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationConfinementBoundary.projects_to_runtimeKernelConfinementBoundary
+      (boundary.runtimeImplementationConfinementBoundary hPublicBridge)
+
+theorem
+  RuntimeImplementationKernelMeetingBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell
+  (boundary : RuntimeImplementationKernelMeetingBoundary)
+  (hPublicBridge : boundary.implementationInterface.PublicBridgeBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary hPublicBridge
+  RuntimeImplementationInterface.ConfinesSecretDependentWork
+      runtimeBoundary.implementationInterface ∧
+    runtimeBoundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.RefinesLeanKernelState
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell
+      (boundary.runtimeImplementationConfinementBoundary hPublicBridge)
+
+theorem RuntimeImplementationKernelMeetingBoundary.paperPublicBridgeObserverRefinement
+  (boundary : RuntimeImplementationKernelMeetingBoundary)
+  (hPublicBridge : boundary.implementationInterface.PublicBridgeBoundary) :
+  let runtimeBoundary := boundary.runtimeImplementationConfinementBoundary hPublicBridge
+  runtimeBoundary.implementationInterface.PublicBridgeBoundary ∧
+    runtimeBoundary.implementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers ∧
+    runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.runtimeKernelRefinementWitness.shellTrace.Refines
+      runtimeBoundary.runtimeKernelConfinementBoundary.refinementBoundary.kernelWitness.shellContract := by
+  exact
+    RuntimeImplementationConfinementBoundary.paperPublicBridgeObserverRefinement
+      (boundary.runtimeImplementationConfinementBoundary hPublicBridge)
 
 end UOToolchain

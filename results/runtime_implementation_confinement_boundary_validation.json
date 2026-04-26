@@ -15,17 +15,41 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 73076,
+      "boundary_json_bytes": 1092020,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -36,7 +60,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 3887,
+      "kernel_interface_bundle_json_bytes": 3827,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -79,7 +103,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -92,12 +116,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -164,7 +182,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -215,22 +237,49 @@
         }
       },
       "scenario": "FixedSlotClassifier/uo/class0",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 73076,
+      "boundary_json_bytes": 1092020,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -241,7 +290,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 3887,
+      "kernel_interface_bundle_json_bytes": 3827,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -284,7 +333,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -297,12 +346,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -369,7 +412,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -420,22 +467,49 @@
         }
       },
       "scenario": "FixedSlotClassifier/uo/class1",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 77147,
+      "boundary_json_bytes": 1096091,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
@@ -451,7 +525,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 7958,
+      "kernel_interface_bundle_json_bytes": 7898,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -505,7 +579,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -566,12 +640,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -764,7 +832,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -832,22 +904,49 @@
         }
       },
       "scenario": "AuthScan/uo/class0",
-      "setup_calls": 2
+      "setup_calls": 2,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 77147,
+      "boundary_json_bytes": 1096091,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
@@ -863,7 +962,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 7958,
+      "kernel_interface_bundle_json_bytes": 7898,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -917,7 +1016,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -978,12 +1077,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -1176,7 +1269,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -1244,22 +1341,49 @@
         }
       },
       "scenario": "AuthScan/uo/class1",
-      "setup_calls": 2
+      "setup_calls": 2,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 75102,
+      "boundary_json_bytes": 1093986,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -1270,7 +1394,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 5913,
+      "kernel_interface_bundle_json_bytes": 5793,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1286,7 +1410,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1308,12 +1432,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1410,18 +1534,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1566,7 +1678,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -1617,22 +1733,49 @@
         }
       },
       "scenario": "RegistryCRUD/uo/class0",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 75102,
+      "boundary_json_bytes": 1093986,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -1643,7 +1786,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 5913,
+      "kernel_interface_bundle_json_bytes": 5793,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1659,7 +1802,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1681,12 +1824,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1783,18 +1926,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1939,7 +2070,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -1990,22 +2125,49 @@
         }
       },
       "scenario": "RegistryCRUD/uo/class1",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 77418,
+      "boundary_json_bytes": 1096302,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
@@ -2020,7 +2182,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 8229,
+      "kernel_interface_bundle_json_bytes": 8109,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2072,7 +2234,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2181,18 +2343,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2384,7 +2534,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -2450,22 +2604,49 @@
         }
       },
       "scenario": "ConfidentialMixer/fullscan/class0",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 77418,
+      "boundary_json_bytes": 1096302,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
@@ -2480,7 +2661,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 8229,
+      "kernel_interface_bundle_json_bytes": 8109,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2532,7 +2713,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2641,18 +2822,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2844,7 +3013,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -2910,22 +3083,49 @@
         }
       },
       "scenario": "ConfidentialMixer/fullscan/class1",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 78124,
+      "boundary_json_bytes": 1096948,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -2937,7 +3137,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 8935,
+      "kernel_interface_bundle_json_bytes": 8755,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -2982,7 +3182,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3175,24 +3375,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -3464,7 +3646,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -3519,22 +3705,49 @@
         }
       },
       "scenario": "ERC20Lite/fullscan/class0",
-      "setup_calls": 1
+      "setup_calls": 1,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 78124,
+      "boundary_json_bytes": 1096948,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -3546,7 +3759,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 8935,
+      "kernel_interface_bundle_json_bytes": 8755,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -3591,7 +3804,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3784,24 +3997,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -4073,7 +4268,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -4128,22 +4327,49 @@
         }
       },
       "scenario": "ERC20Lite/fullscan/class1",
-      "setup_calls": 1
+      "setup_calls": 1,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 80222,
+      "boundary_json_bytes": 1099106,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -4154,7 +4380,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 11033,
+      "kernel_interface_bundle_json_bytes": 10913,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4170,7 +4396,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -4192,12 +4418,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -4632,18 +4858,6 @@
             "words": null
           },
           {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
             "bytes": 32,
             "kind": "reserve_scratch",
             "region": "value_scratch",
@@ -4870,7 +5084,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -4921,22 +5139,49 @@
         }
       },
       "scenario": "SingleAccessMap/pathoram/put-class0",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 80222,
+      "boundary_json_bytes": 1099106,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
@@ -4947,7 +5192,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 11033,
+      "kernel_interface_bundle_json_bytes": 10913,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4963,7 +5208,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -4985,12 +5230,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -5423,18 +5668,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -5663,7 +5896,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -5714,22 +5951,49 @@
         }
       },
       "scenario": "SingleAccessMap/pathoram/put-class1",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 82962,
+      "boundary_json_bytes": 1101846,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
@@ -5741,7 +6005,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 13773,
+      "kernel_interface_bundle_json_bytes": 13653,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5786,7 +6050,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -6219,18 +6483,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -6658,7 +6910,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -6711,22 +6967,49 @@
         }
       },
       "scenario": "SingleAccessMap/pathoram/add-class0",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 82962,
+      "boundary_json_bytes": 1101846,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
@@ -6738,7 +7021,7 @@
           1
         ]
       },
-      "kernel_interface_bundle_json_bytes": 13773,
+      "kernel_interface_bundle_json_bytes": 13653,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -6783,7 +7066,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -7216,18 +7499,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -7655,7 +7926,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -7708,22 +7983,49 @@
         }
       },
       "scenario": "SingleAccessMap/pathoram/add-class1",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 105170,
+      "boundary_json_bytes": 1124054,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 12288,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
@@ -7738,7 +8040,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 35981,
+      "kernel_interface_bundle_json_bytes": 35861,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -7790,7 +8092,7 @@
           1,
           2
         ],
-        "resource_event_count": 428,
+        "resource_event_count": 426,
         "resource_events": [
           {
             "bytes": 8,
@@ -9531,18 +9833,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -10382,7 +10672,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -10448,22 +10742,49 @@
         }
       },
       "scenario": "ConfidentialMixer/pathoram/deposit",
-      "setup_calls": 0
+      "setup_calls": 0,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     },
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 171951,
+      "boundary_json_bytes": 1190715,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 16384,
+      "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "engine": 3951,
-        "kernel": 17944,
-        "runtime_evm_lib": 298,
-        "runtime_module": 1928,
-        "shell": 17723,
-        "state": 21126,
-        "theorem": 3807
+        "allocator": 14890,
+        "confidential_core": 46577,
+        "confidential_kernel": 95686,
+        "controller": 17468,
+        "core_lib": 6976,
+        "engine": 14895,
+        "fresh_coins": 3879,
+        "generated_confidential_kernel": 20843,
+        "generated_kernel_machine": 4681,
+        "generated_object_helpers": 22962,
+        "generated_oram_codecs": 83477,
+        "generated_store_codec": 1312,
+        "generated_store_helpers": 7106,
+        "generated_store_surface": 5832,
+        "kernel_runtime": 23758,
+        "kernel_slot_support": 3128,
+        "objects": 79113,
+        "oram": 51771,
+        "precompiles": 240,
+        "runtime_evm_lib": 60719,
+        "runtime_module": 2107,
+        "shell": 18981,
+        "state": 29902,
+        "store_codec": 5807,
+        "store_lib": 143,
+        "store_store": 2871,
+        "theorem": 3936,
+        "trace": 387197,
+        "trusted_kernel": 4518,
+        "types": 34087
       },
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 9,
@@ -10480,7 +10801,7 @@
           2
         ]
       },
-      "kernel_interface_bundle_json_bytes": 102762,
+      "kernel_interface_bundle_json_bytes": 102522,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -10536,7 +10857,7 @@
           1,
           2
         ],
-        "resource_event_count": 1334,
+        "resource_event_count": 1330,
         "resource_events": [
           {
             "bytes": 8,
@@ -15721,30 +16042,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 4
           },
           {
             "bytes": 20,
@@ -18566,7 +18863,11 @@
       },
       "lean_checker_input": "source-backed runtime implementation interface plus kernel-interface bundle",
       "lean_checker_kind": "runtime implementation confinement boundary",
-      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm kernel interface (17944 kernel bytes)",
+      "lean_stdout": "validated runtime implementation confinement boundary for source-backed uo-evm/shared-kernel interface (23758 shared-kernel bytes)",
+      "paper_end_to_end_confinement_with_public_only_handwritten_shell_theorem_checked": true,
+      "paper_public_bridge_observer_refinement_theorem_checked": true,
+      "residual_helper_shell_boundary_theorem_checked": true,
+      "runtime_kernel_confinement_projection_theorem_checked": true,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -18636,16 +18937,42 @@
         }
       },
       "scenario": "ERC20Lite/pathoram/transferFrom",
-      "setup_calls": 2
+      "setup_calls": 2,
+      "shared_confidential_kernel_boundary_theorem_checked": true,
+      "slot_adapter_boundary_theorem_checked": true,
+      "small_confidential_kernel_boundary_theorem_checked": true
     }
   ],
   "source_files": [
     "runtime/uo-evm/src/lib.rs",
     "runtime/uo-evm/src/engine.rs",
     "runtime/uo-evm/src/runtime.rs",
+    "runtime/uo-evm/src/fresh_coins.rs",
+    "runtime/uo-evm/src/controller.rs",
     "runtime/uo-evm/src/shell.rs",
     "runtime/uo-evm/src/state.rs",
-    "runtime/uo-evm/src/kernel.rs",
-    "runtime/uo-evm/src/theorem.rs"
+    "runtime/uo-kernel-runtime/src/lib.rs",
+    "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+    "runtime/uo-kernel-runtime/src/generated_machine.rs",
+    "runtime/uo-evm/src/generated_object_helpers.rs",
+    "runtime/uo-evm/src/generated_oram_codecs.rs",
+    "runtime/uo-evm/src/objects.rs",
+    "runtime/uo-evm/src/oram.rs",
+    "runtime/uo-evm/src/theorem.rs",
+    "crates/uo-core/src/confidential_kernel.rs",
+    "crates/uo-core/src/generated_confidential_kernel.rs",
+    "crates/uo-core/src/trace.rs",
+    "crates/uo-core/src/confidential_core.rs",
+    "crates/uo-core/src/trusted_kernel.rs",
+    "crates/uo-core/src/lib.rs",
+    "runtime/uo-precompiles/src/lib.rs",
+    "runtime/uo-allocator/src/lib.rs",
+    "runtime/uo-store/src/lib.rs",
+    "runtime/uo-store/src/codec.rs",
+    "runtime/uo-store/src/generated_codec.rs",
+    "runtime/uo-store/src/generated_surface.rs",
+    "runtime/uo-store/src/generated_store_helpers.rs",
+    "runtime/uo-store/src/store.rs",
+    "crates/uo-core/src/types.rs"
   ]
 }

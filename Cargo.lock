@@ -980,9 +980,21 @@ dependencies = [
  "tiny-keccak",
  "uo-allocator",
  "uo-core",
+ "uo-kernel-runtime",
  "uo-precompiles",
  "uo-solc",
  "uo-store",
+]
+
+[[package]]
+name = "uo-kernel-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tiny-keccak",
+ "uo-allocator",
+ "uo-core",
+ "uo-precompiles",
 ]
 
 [[package]]

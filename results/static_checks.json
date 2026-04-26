@@ -176,6 +176,84 @@
       "uses_proofgrade_umbrella": true
     },
     {
+      "file": "proof/lean/CheckProofGradeRuntimeConfidentialStatementTraceBridgeBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationConfinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationInterface.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationKernelMachineConfinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationKernelMeetingBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationKernelMeetingConfinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationPublicBridgeObserverRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationResidualHelperShellMachineRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationSharedKernelMachineRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationSharedKernelRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationSlotAdapterMachineRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
       "file": "proof/lean/CheckProofGradeRuntimeKernelConfinementBoundary.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
@@ -219,6 +297,18 @@
     },
     {
       "file": "proof/lean/CheckProofGradeRuntimeKernelLowering.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelMachineFinishBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeKernelMachineFinishWitness.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true
@@ -284,6 +374,24 @@
       "uses_proofgrade_umbrella": true
     },
     {
+      "file": "proof/lean/CheckProofGradeRuntimePublicBridgeBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeResidualHelperShellBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeSharedConfidentialKernelBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
       "file": "proof/lean/CheckProofGradeRuntimeShellBoundary.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
@@ -297,6 +405,18 @@
     },
     {
       "file": "proof/lean/CheckProofGradeRuntimeShellBoundarySlot.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeSlotAdapterBoundary.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeRuntimeSmallConfidentialKernelBoundary.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true
@@ -345,6 +465,12 @@
     },
     {
       "file": "proof/lean/CheckRuntimePathOramHiddenCertificate.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckRuntimeWitness.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true

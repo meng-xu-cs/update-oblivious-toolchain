@@ -384,6 +384,7 @@ schedule.
 structure RuntimeTrustedKernelSlotBundle where
   trustedKernelBundle : RuntimeTrustedKernelBundle
   confidentialSlotProgram : ConfidentialKernelSlotProgram
+  opcodeTrace : List String
 
 def RuntimeTrustedKernelSlotBundle.kernelSlotBundle?
   (bundle : RuntimeTrustedKernelSlotBundle) : Option RuntimeKernelSlotDslBundle :=
@@ -396,6 +397,7 @@ def RuntimeTrustedKernelSlotBundle.Valid
   (bundle : RuntimeTrustedKernelSlotBundle)
   (modelTags : SGXModelTags) : Prop :=
   bundle.trustedKernelBundle.ProofGradeValid modelTags ∧
+    bundle.opcodeTrace = bundle.confidentialSlotProgram.statementTraceNames ∧
     match bundle.kernelSlotBundle? with
     | none => False
     | some slotBundle => slotBundle.Valid
@@ -428,7 +430,7 @@ theorem runtimeTrustedKernelSlotBundle_schedule_exact
             , confidentialProgram := bundle.confidentialSlotProgram
             } := by
         simpa [RuntimeTrustedKernelSlotBundle.Valid,
-          RuntimeTrustedKernelSlotBundle.kernelSlotBundle?, hKernel] using hValid.2
+          RuntimeTrustedKernelSlotBundle.kernelSlotBundle?, hKernel] using hValid.2.2
       exact ⟨kernelWitness, rfl, hSlot.2.2.1, hSlot.2.2.2⟩
 
 theorem runtimeTrustedKernelSlotBundle_controllerObserver_valid

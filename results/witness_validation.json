@@ -264,7 +264,7 @@
       "scenario": "FixedSlotClassifier/uo/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 3904
+      "witness_json_bytes": 3905
     },
     {
       "accepted": true,
@@ -513,7 +513,7 @@
       "scenario": "FixedSlotClassifier/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 3903
+      "witness_json_bytes": 3904
     },
     {
       "accepted": true,
@@ -2817,7 +2817,7 @@
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 9952
+      "witness_json_bytes": 9953
     },
     {
       "accepted": true,
@@ -3993,7 +3993,7 @@
       "scenario": "ERC20Lite/fullscan/class0",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 12061
+      "witness_json_bytes": 12062
     },
     {
       "accepted": true,
@@ -4649,7 +4649,7 @@
       "scenario": "ERC20Lite/fullscan/class1",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 12062
+      "witness_json_bytes": 12061
     },
     {
       "accepted": true,
@@ -5486,7 +5486,7 @@
       "scenario": "SingleAccessMap/pathoram/put-class0",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 16051
+      "witness_json_bytes": 16067
     },
     {
       "accepted": true,
@@ -6323,7 +6323,7 @@
       "scenario": "SingleAccessMap/pathoram/put-class1",
       "setup_calls": 0,
       "shared_resource_events": 34,
-      "witness_json_bytes": 16055
+      "witness_json_bytes": 16071
     },
     {
       "accepted": true,
@@ -7367,7 +7367,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class0",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 23124
+      "witness_json_bytes": 23158
     },
     {
       "accepted": true,
@@ -8411,7 +8411,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class1",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 23124
+      "witness_json_bytes": 23156
     },
     {
       "accepted": true,
@@ -11211,7 +11211,7 @@
       "scenario": "ConfidentialMixer/pathoram/deposit",
       "setup_calls": 0,
       "shared_resource_events": 189,
-      "witness_json_bytes": 59361
+      "witness_json_bytes": 59384
     },
     {
       "accepted": true,
@@ -19465,7 +19465,7 @@
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
       "shared_resource_events": 723,
-      "witness_json_bytes": 191998
+      "witness_json_bytes": 192113
     }
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "format_version": 1,
+  "file_count": 1,
+  "files": [
+    {
+      "path": "tamper_validation.json",
+      "bytes": 255623,
+      "sha256": "5b847001369709130f2ff572e1c4eb937f310b0eb5015eb8b424f7d8390d6cb6"
+    }
+  ]
+}

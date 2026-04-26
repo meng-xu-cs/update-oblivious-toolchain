@@ -14,6 +14,8 @@ theorem importedBundleProjectsToFamilySlotAssurance
     bundle.runtime_paper_main_slot_family_bundle.confidential_slot_program.RuntimeNormalForm ∧
     bundle.runtime_paper_main_slot_family_bundle.confidential_slot_program.entrypoint_id =
       bundle.runtime_paper_main_slot_family_bundle.runtimePublicOutcome.entrypointId ∧
+    bundle.runtime_paper_main_slot_family_bundle.opcode_trace =
+      bundle.runtime_paper_main_slot_family_bundle.confidential_slot_program.statementTraceNames ∧
     ∀ seed, seed < bundle.runtime_paper_main_slot_family_bundle.family.seed_count →
       ∃ witness,
         bundle.runtime_paper_main_slot_family_bundle.family.witnessAt? seed = some witness ∧

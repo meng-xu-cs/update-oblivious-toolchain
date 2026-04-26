@@ -3,6 +3,7 @@ members = [
     "crates/uo-core",
     "runtime/uo-store",
     "runtime/uo-allocator",
+    "runtime/uo-kernel-runtime",
     "runtime/uo-precompiles",
     "runtime/uo-evm",
     "compiler/uo-solc",

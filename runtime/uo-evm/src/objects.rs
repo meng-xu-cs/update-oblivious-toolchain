@@ -1,19 +1,35 @@
 use crate::controller::CallRecorder;
-use crate::oram::{
-    decode_map_record, map_record_bytes, MapEntry, OramState, PathOramLeafCoinSource,
-};
+use crate::oram::{MapEntry, OramState, PathOramLeafCoinSource};
 use anyhow::{anyhow, bail, Result};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use std::collections::{BTreeMap, BTreeSet};
-use uo_allocator::{AllocatorSession, ScratchRegion};
+use std::collections::BTreeMap;
+use uo_allocator::AllocatorSession;
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
 use uo_core::manifest::PATH_ORAM_SCHEME;
-use uo_core::{RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness};
-use uo_core::{Type, Value};
+use uo_core::Value;
+use uo_core::{
+    FixedBoxBuilder, RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
+};
 use uo_store::StoreCipher;
 
-#[derive(Clone, Debug)]
+#[path = "generated_object_helpers.rs"]
+mod generated_object_helpers;
+
+use generated_object_helpers::{
+    clone_runtime_value_for_read, cold_commit_boxed_values, cold_commit_small_map_entries,
+    cold_commit_value_to_zero, cold_zero_boxed_values, cold_zero_small_map_entries,
+    cold_zero_small_map_entry, cold_zero_value, decode_array_values_from_storage,
+    decode_cell_value_from_storage, decode_small_map_entries_from_storage, raw_encode_value,
+    reconcile_array_commit_values, reconcile_cell_commit_value, reconcile_raw_map_committed_entry,
+    reconcile_small_map_commit_entries, seal_canonical_value_commit_slot, seal_map_record,
+    seal_map_record_commit_slot, seal_value, select_array_value_at_index,
+    select_small_map_value_for_key, update_array_value_at_index, update_masked_value,
+    update_small_map_entries_for_put, wipe_boxed_values_and_slots,
+    wipe_small_map_entries_and_slots, wipe_value_and_physical_slot,
+};
+
+#[derive(Debug)]
 pub(crate) struct CellObject {
     spec: StateObject,
     value: Value,
@@ -25,22 +41,43 @@ pub(crate) struct CellObject {
 }
 
 impl CellObject {
+    fn clone_committed_public(&self) -> Self {
+        Self {
+            spec: self.spec.clone(),
+            value: self.value.clone(),
+            physical: self.physical.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
+            accessed: false,
+            written: false,
+            rng: self.rng.clone(),
+        }
+    }
+
+    fn clone_committed_cold(&self) -> Self {
+        Self {
+            spec: self.spec.clone(),
+            value: cold_zero_value(&self.spec.value_type),
+            physical: self.physical.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
+            accessed: false,
+            written: false,
+            rng: self.rng.clone(),
+        }
+    }
+
     fn wipe_secrets(&mut self) {
-        self.value.wipe_secrets();
-        self.physical.fill(0);
+        wipe_value_and_physical_slot(&mut self.value, &mut self.physical);
         self.accessed = false;
         self.written = false;
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
     fn decode_value_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Value> {
-        let aad = cell_slot_aad(&self.spec.name);
-        decode_sealed_value(
-            &self.cipher,
-            &aad,
-            &self.physical,
-            &self.spec.value_type,
+        decode_cell_value_from_storage(
             &self.spec.name,
+            &self.spec.value_type,
+            &self.physical,
+            &self.cipher,
             allocator,
         )
     }
@@ -50,17 +87,18 @@ impl CellObject {
             spec: self.spec.clone(),
             value: self.decode_value_from_storage(allocator)?,
             physical: self.physical.clone(),
-            cipher: self.cipher.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written: false,
             rng: self.rng.clone(),
         })
     }
 
-    fn cold_commit(&mut self) {
-        self.value = Value::zero_for_type(&self.spec.value_type);
+    fn cold_commit(&mut self) -> Result<()> {
+        cold_commit_value_to_zero(&mut self.value, &self.spec.value_type);
         self.accessed = false;
         self.written = false;
+        Ok(())
     }
 }
 
@@ -70,66 +108,57 @@ impl Drop for CellObject {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct ArrayObject {
     spec: StateObject,
     values: Box<[Value]>,
     physical_slots: Box<[Box<[u8]>]>,
     cipher: StoreCipher,
     accessed: bool,
-    written_indices: BTreeSet<usize>,
+    written_slots: Box<[bool]>,
     rng: ChaCha20Rng,
 }
 
 impl ArrayObject {
+    fn clone_committed_public(&self) -> Self {
+        Self {
+            spec: self.spec.clone(),
+            values: self.values.clone(),
+            physical_slots: self.physical_slots.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
+            accessed: false,
+            written_slots: boxed_false_flags(self.physical_slots.len()),
+            rng: self.rng.clone(),
+        }
+    }
+
+    fn clone_committed_cold(&self) -> Self {
+        Self {
+            spec: self.spec.clone(),
+            values: cold_zero_boxed_values(self.values.len(), &self.spec.value_type),
+            physical_slots: self.physical_slots.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
+            accessed: false,
+            written_slots: boxed_false_flags(self.physical_slots.len()),
+            rng: self.rng.clone(),
+        }
+    }
+
     fn wipe_secrets(&mut self) {
-        for value in &mut self.values {
-            value.wipe_secrets();
-        }
-        for slot in &mut self.physical_slots {
-            slot.fill(0);
-        }
+        wipe_boxed_values_and_slots(&mut self.values, &mut self.physical_slots);
         self.accessed = false;
-        self.written_indices.clear();
+        clear_written_slots(&mut self.written_slots);
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
-    fn zero_values(&self) -> Box<[Value]> {
-        vec![Value::zero_for_type(&self.spec.value_type); self.physical_slots.len()]
-            .into_boxed_slice()
-    }
-
     fn decode_values_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Box<[Value]>> {
-        let mut values = self.zero_values();
-        self.decode_values_from_storage_into(allocator, &mut values)?;
-        Ok(values)
-    }
-
-    fn decode_values_from_storage_into(
-        &self,
-        allocator: &mut AllocatorSession,
-        values: &mut [Value],
-    ) -> Result<()> {
-        if values.len() != self.physical_slots.len() {
-            bail!(
-                "array decode buffer length {} mismatched public slot count {} for {}",
-                values.len(),
-                self.physical_slots.len(),
-                self.spec.name
-            );
-        }
-        for (index, physical) in self.physical_slots.iter().enumerate() {
-            let aad = array_slot_aad(&self.spec.name, index);
-            values[index] = decode_sealed_value(
-                &self.cipher,
-                &aad,
-                physical,
-                &self.spec.value_type,
-                &self.spec.name,
-                allocator,
-            )?;
-        }
-        Ok(())
+        decode_array_values_from_storage(
+            &self.spec.name,
+            &self.spec.value_type,
+            &self.physical_slots,
+            &self.cipher,
+            allocator,
+        )
     }
 
     fn clone_for_tx(&self, allocator: &mut AllocatorSession) -> Result<Self> {
@@ -137,20 +166,18 @@ impl ArrayObject {
             spec: self.spec.clone(),
             values: self.decode_values_from_storage(allocator)?,
             physical_slots: self.physical_slots.clone(),
-            cipher: self.cipher.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
-            written_indices: BTreeSet::new(),
+            written_slots: boxed_false_flags(self.physical_slots.len()),
             rng: self.rng.clone(),
         })
     }
 
-    fn cold_commit(&mut self) {
-        for value in self.values.iter_mut() {
-            value.wipe_secrets();
-            *value = Value::zero_for_type(&self.spec.value_type);
-        }
+    fn cold_commit(&mut self) -> Result<()> {
+        cold_commit_boxed_values(&mut self.values, &self.spec.value_type);
         self.accessed = false;
-        self.written_indices.clear();
+        clear_written_slots(&mut self.written_slots);
+        Ok(())
     }
 }
 
@@ -160,16 +187,26 @@ impl Drop for ArrayObject {
     }
 }
 
-#[derive(Clone, Debug)]
-struct RawMapEntry {
+#[derive(Debug)]
+pub(crate) struct RawMapEntry {
     value: Value,
     physical: Box<[u8]>,
 }
 
 impl RawMapEntry {
+    pub(crate) fn committed(value: Value, physical: Box<[u8]>) -> Self {
+        Self { value, physical }
+    }
+
+    fn clone_committed_public(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+            physical: self.physical.clone(),
+        }
+    }
+
     fn wipe_secrets(&mut self) {
-        self.value.wipe_secrets();
-        self.physical.fill(0);
+        wipe_value_and_physical_slot(&mut self.value, &mut self.physical);
     }
 }
 
@@ -179,14 +216,50 @@ impl Drop for RawMapEntry {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct RawMapObject {
     spec: StateObject,
     entries: BTreeMap<String, RawMapEntry>,
     staged: BTreeMap<String, (Value, Value)>,
 }
 
-#[derive(Clone, Debug)]
+impl RawMapObject {
+    fn clone_committed_public(&self) -> Self {
+        Self {
+            spec: self.spec.clone(),
+            entries: self
+                .entries
+                .iter()
+                .map(|(key, entry)| (key.clone(), entry.clone_committed_public()))
+                .collect(),
+            staged: BTreeMap::new(),
+        }
+    }
+
+    fn wipe_staged(&mut self) {
+        for (_key_name, (key, value)) in self.staged.iter_mut() {
+            key.wipe_secrets();
+            value.wipe_secrets();
+        }
+        self.staged.clear();
+    }
+
+    fn wipe_secrets(&mut self) {
+        for entry in self.entries.values_mut() {
+            entry.wipe_secrets();
+        }
+        self.entries.clear();
+        self.wipe_staged();
+    }
+}
+
+impl Drop for RawMapObject {
+    fn drop(&mut self) {
+        self.wipe_secrets();
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct SmallMapObject {
     spec: StateObject,
     entries: Box<[MapEntry]>,
@@ -198,13 +271,29 @@ pub(crate) struct SmallMapObject {
 }
 
 impl SmallMapObject {
+    fn clone_committed_cold(&self) -> Result<Self> {
+        let key_type = self
+            .spec
+            .key_type
+            .as_ref()
+            .ok_or_else(|| anyhow!("small-map object {} missing key type", self.spec.name))?;
+        Ok(Self {
+            spec: self.spec.clone(),
+            entries: cold_zero_small_map_entries(
+                self.entries.len(),
+                key_type,
+                &self.spec.value_type,
+            ),
+            physical_slots: self.physical_slots.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
+            accessed: false,
+            dirty: false,
+            rng: self.rng.clone(),
+        })
+    }
+
     fn wipe_secrets(&mut self) {
-        for entry in &mut self.entries {
-            entry.wipe_secrets();
-        }
-        for slot in &mut self.physical_slots {
-            slot.fill(0);
-        }
+        wipe_small_map_entries_and_slots(&mut self.entries, &mut self.physical_slots);
         self.accessed = false;
         self.dirty = false;
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
@@ -214,54 +303,12 @@ impl SmallMapObject {
         &self,
         allocator: &mut AllocatorSession,
     ) -> Result<Box<[MapEntry]>> {
-        let mut entries = self.zero_entries();
-        self.decode_entries_from_storage_into(allocator, &mut entries)?;
-        Ok(entries)
-    }
-
-    fn decode_entries_from_storage_into(
-        &self,
-        allocator: &mut AllocatorSession,
-        entries: &mut [MapEntry],
-    ) -> Result<()> {
-        let record_len = map_record_len(&self.spec)?;
-        if entries.len() != self.physical_slots.len() {
-            bail!(
-                "small-map decode buffer length {} mismatched public slot count {} for {}",
-                entries.len(),
-                self.physical_slots.len(),
-                self.spec.name
-            );
-        }
-        for (index, physical) in self.physical_slots.iter().enumerate() {
-            let aad = small_map_slot_aad(&self.spec.name, index);
-            let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, record_len)?;
-            entries[index] = self
-                .cipher
-                .with_opened_payload(aad.as_bytes(), record_len, physical, |payload| {
-                    decode_map_record(&self.spec, payload)
-                })
-                .ok_or_else(|| {
-                    anyhow!(
-                        "failed to decode sealed small-map slot {} for {}",
-                        index,
-                        self.spec.name
-                    )
-                })??;
-        }
-        Ok(())
-    }
-
-    fn zero_entries(&self) -> Box<[MapEntry]> {
-        let zero_key = Value::zero_for_type(
-            self.spec
-                .key_type
-                .as_ref()
-                .expect("small-map objects must have key types"),
-        );
-        let zero_value = Value::zero_for_type(&self.spec.value_type);
-        vec![MapEntry::new(false, zero_key, zero_value); self.physical_slots.len()]
-            .into_boxed_slice()
+        decode_small_map_entries_from_storage(
+            &self.spec,
+            &self.physical_slots,
+            &self.cipher,
+            allocator,
+        )
     }
 
     fn clone_for_tx(&self, allocator: &mut AllocatorSession) -> Result<Self> {
@@ -269,29 +316,23 @@ impl SmallMapObject {
             spec: self.spec.clone(),
             entries: self.decode_entries_from_storage(allocator)?,
             physical_slots: self.physical_slots.clone(),
-            cipher: self.cipher.clone(),
+            cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             dirty: false,
             rng: self.rng.clone(),
         })
     }
 
-    fn cold_commit(&mut self) {
-        for entry in self.entries.iter_mut() {
-            entry.wipe_secrets();
-            *entry = MapEntry::new(
-                false,
-                Value::zero_for_type(
-                    self.spec
-                        .key_type
-                        .as_ref()
-                        .expect("small-map objects must have key types"),
-                ),
-                Value::zero_for_type(&self.spec.value_type),
-            );
-        }
+    fn cold_commit(&mut self) -> Result<()> {
+        let key_type = self
+            .spec
+            .key_type
+            .as_ref()
+            .ok_or_else(|| anyhow!("small-map object {} missing key type", self.spec.name))?;
+        cold_commit_small_map_entries(&mut self.entries, key_type, &self.spec.value_type);
         self.accessed = false;
         self.dirty = false;
+        Ok(())
     }
 }
 
@@ -301,7 +342,7 @@ impl Drop for SmallMapObject {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct OramMapObject {
     spec: StateObject,
     oram: OramState,
@@ -312,17 +353,29 @@ pub(crate) struct OramMapObject {
 }
 
 impl OramMapObject {
+    fn clone_committed_cold(&self) -> Result<Self> {
+        Ok(Self {
+            spec: self.spec.clone(),
+            oram: self.oram.clone_committed_cold(&self.spec)?,
+            accessed: false,
+            dirty: false,
+            leaf_coin_source: PathOramLeafCoinSource::random(),
+            rng: self.rng.clone(),
+        })
+    }
+
     fn wipe_secrets(&mut self) {
         self.accessed = false;
         self.dirty = false;
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
-    fn cold_commit(&mut self) {
+    fn cold_commit(&mut self) -> Result<()> {
         self.oram.cold_commit();
         self.accessed = false;
         self.dirty = false;
         self.leaf_coin_source = PathOramLeafCoinSource::random();
+        Ok(())
     }
 }
 
@@ -379,13 +432,16 @@ impl RuntimeObject {
     }
 
     fn instantiate_from_rng(spec: &StateObject, master_rng: &mut ChaCha20Rng) -> Result<Self> {
+        if spec.confidential && matches!(spec.backend, BackendKind::Raw) {
+            bail!("confidential object {} uses raw backend", spec.name);
+        }
         let mut rng = ChaCha20Rng::seed_from_u64(master_rng.next_u64());
         match (&spec.kind, &spec.backend) {
             (ContainerKind::Cell, BackendKind::Raw) => {
-                let logical = Value::zero_for_type(&spec.value_type);
+                let logical = cold_zero_value(&spec.value_type);
                 Ok(Self::RawCell(CellObject {
                     spec: spec.clone(),
-                    physical: raw_encode(&logical),
+                    physical: raw_encode_value(&logical)?,
                     value: logical,
                     cipher: StoreCipher::from_rng(&mut rng),
                     accessed: false,
@@ -394,12 +450,12 @@ impl RuntimeObject {
                 }))
             }
             (ContainerKind::Cell, _) => {
-                let logical = Value::zero_for_type(&spec.value_type);
+                let logical = cold_zero_value(&spec.value_type);
                 let cipher = StoreCipher::from_rng(&mut rng);
                 let aad = cell_slot_aad(&spec.name);
                 Ok(Self::UoCell(CellObject {
                     spec: spec.clone(),
-                    physical: seal_value(&cipher, aad.as_bytes(), &logical, &mut rng),
+                    physical: seal_value(&aad, &logical, &cipher, &mut rng)?,
                     value: logical,
                     cipher,
                     accessed: false,
@@ -411,20 +467,20 @@ impl RuntimeObject {
                 let capacity = spec
                     .capacity
                     .ok_or_else(|| anyhow!("array {} is missing capacity", spec.name))?;
-                let values =
-                    vec![Value::zero_for_type(&spec.value_type); capacity].into_boxed_slice();
-                let physical_slots = values
-                    .iter()
-                    .map(raw_encode)
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice();
+                let mut values = FixedBoxBuilder::new(capacity);
+                let mut physical_slots = FixedBoxBuilder::new(capacity);
+                for _ in 0..capacity {
+                    let logical = cold_zero_value(&spec.value_type);
+                    physical_slots.push(raw_encode_value(&logical)?)?;
+                    values.push(logical)?;
+                }
                 Ok(Self::RawArray(ArrayObject {
                     spec: spec.clone(),
-                    values,
-                    physical_slots,
+                    values: values.finish()?,
+                    physical_slots: physical_slots.finish()?,
                     cipher: StoreCipher::from_rng(&mut rng),
                     accessed: false,
-                    written_indices: BTreeSet::new(),
+                    written_slots: boxed_false_flags(capacity),
                     rng,
                 }))
             }
@@ -432,25 +488,21 @@ impl RuntimeObject {
                 let capacity = spec
                     .capacity
                     .ok_or_else(|| anyhow!("array {} is missing capacity", spec.name))?;
-                let zero_value = Value::zero_for_type(&spec.value_type);
-                let zero_payload = zero_value.canonical_bytes_boxed();
-                let values = vec![zero_value; capacity].into_boxed_slice();
+                let zero_value = cold_zero_value(&spec.value_type);
                 let cipher = StoreCipher::from_rng(&mut rng);
-                let physical_slots = (0..capacity)
-                    .map(|index| {
-                        let aad = array_slot_aad(&spec.name, index);
-                        let mut payload = zero_payload.clone();
-                        cipher.seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
-                    })
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice();
+                let values = cold_zero_boxed_values(capacity, &spec.value_type);
+                let mut physical_slots = FixedBoxBuilder::new(capacity);
+                for index in 0..capacity {
+                    let aad = array_slot_aad(&spec.name, index);
+                    physical_slots.push(seal_value(&aad, &zero_value, &cipher, &mut rng)?)?;
+                }
                 Ok(Self::UoArray(ArrayObject {
                     spec: spec.clone(),
                     values,
-                    physical_slots,
+                    physical_slots: physical_slots.finish()?,
                     cipher,
                     accessed: false,
-                    written_indices: BTreeSet::new(),
+                    written_slots: boxed_false_flags(capacity),
                     rng,
                 }))
             }
@@ -463,30 +515,22 @@ impl RuntimeObject {
                 let capacity = spec
                     .capacity
                     .ok_or_else(|| anyhow!("map {} is missing capacity", spec.name))?;
-                let zero_key = Value::zero_for_type(
-                    spec.key_type
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?,
-                );
-                let zero_value = Value::zero_for_type(&spec.value_type);
-                let entries = (0..capacity)
-                    .map(|_| MapEntry::new(false, zero_key.clone(), zero_value.clone()))
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice();
-                let zero_record = map_record_bytes(&MapEntry::new(false, zero_key, zero_value));
+                let key_type = spec
+                    .key_type
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
+                let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);
+                let zero_entry = cold_zero_small_map_entry(key_type, &spec.value_type);
                 let cipher = StoreCipher::from_rng(&mut rng);
-                let physical_slots = (0..capacity)
-                    .map(|index| {
-                        let aad = small_map_slot_aad(&spec.name, index);
-                        let mut payload = zero_record.clone();
-                        cipher.seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
-                    })
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice();
+                let mut physical_slots = FixedBoxBuilder::new(capacity);
+                for index in 0..capacity {
+                    let aad = small_map_slot_aad(&spec.name, index);
+                    physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher, &mut rng)?)?;
+                }
                 Ok(Self::UoSmallMap(SmallMapObject {
                     spec: spec.clone(),
                     entries,
-                    physical_slots,
+                    physical_slots: physical_slots.finish()?,
                     cipher,
                     accessed: false,
                     dirty: false,
@@ -514,13 +558,9 @@ impl RuntimeObject {
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
         match self {
-            Self::RawCell(object) => Ok(Self::RawCell(object.clone())),
-            Self::RawArray(object) => Ok(Self::RawArray(object.clone())),
-            Self::RawMap(object) => Ok(Self::RawMap(RawMapObject {
-                spec: object.spec.clone(),
-                entries: object.entries.clone(),
-                staged: BTreeMap::new(),
-            })),
+            Self::RawCell(object) => Ok(Self::RawCell(object.clone_committed_public())),
+            Self::RawArray(object) => Ok(Self::RawArray(object.clone_committed_public())),
+            Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),
             Self::UoCell(object) => Ok(Self::UoCell(object.clone_for_tx(allocator)?)),
             Self::UoArray(object) => Ok(Self::UoArray(object.clone_for_tx(allocator)?)),
             Self::UoSmallMap(object) => Ok(Self::UoSmallMap(object.clone_for_tx(allocator)?)),
@@ -535,56 +575,61 @@ impl RuntimeObject {
         }
     }
 
-    pub(in crate::runtime) fn clone_committed_cold(&self) -> Self {
-        debug_assert!(self.committed_cache_is_cold());
-        match self {
-            Self::RawCell(object) => Self::RawCell(object.clone()),
-            Self::UoCell(object) => Self::UoCell(object.clone()),
-            Self::RawArray(object) => Self::RawArray(object.clone()),
-            Self::UoArray(object) => Self::UoArray(object.clone()),
-            Self::RawMap(object) => Self::RawMap(RawMapObject {
-                spec: object.spec.clone(),
-                entries: object.entries.clone(),
-                staged: BTreeMap::new(),
-            }),
-            Self::UoSmallMap(object) => Self::UoSmallMap(object.clone()),
-            Self::UoOramMap(object) => Self::UoOramMap(object.clone()),
-        }
+    pub(in crate::runtime) fn clone_committed_cold(&self) -> Result<Self> {
+        Ok(match self {
+            Self::RawCell(object) => Self::RawCell(object.clone_committed_public()),
+            Self::UoCell(object) => Self::UoCell(object.clone_committed_cold()),
+            Self::RawArray(object) => Self::RawArray(object.clone_committed_public()),
+            Self::UoArray(object) => Self::UoArray(object.clone_committed_cold()),
+            Self::RawMap(object) => Self::RawMap(object.clone_committed_public()),
+            Self::UoSmallMap(object) => Self::UoSmallMap(object.clone_committed_cold()?),
+            Self::UoOramMap(object) => Self::UoOramMap(object.clone_committed_cold()?),
+        })
     }
 
-    pub(in crate::runtime) fn into_cold_committed(mut self) -> Self {
+    pub(in crate::runtime) fn into_cold_committed(mut self) -> Result<Self> {
         match &mut self {
-            Self::UoCell(object) => object.cold_commit(),
-            Self::UoArray(object) => object.cold_commit(),
-            Self::UoSmallMap(object) => object.cold_commit(),
-            Self::UoOramMap(object) => object.cold_commit(),
+            Self::UoCell(object) => object.cold_commit()?,
+            Self::UoArray(object) => object.cold_commit()?,
+            Self::UoSmallMap(object) => object.cold_commit()?,
+            Self::UoOramMap(object) => object.cold_commit()?,
             _ => self.clear_transient(),
         }
-        self
+        Ok(self)
     }
 
     pub(in crate::runtime) fn committed_cache_is_cold(&self) -> bool {
+        // This boundary check is public-only. Secret zeroization is enforced by
+        // cold_commit/drop paths instead of rescanning cached confidential data.
+        match self {
+            Self::UoCell(object) => !object.accessed && !object.written,
+            Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),
+            Self::UoSmallMap(object) => !object.accessed && !object.dirty,
+            Self::UoOramMap(object) => !object.accessed && !object.dirty,
+            _ => true,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn force_committed_cache_hot_for_test(&mut self) -> Result<()> {
         match self {
             Self::UoCell(object) => {
-                object.value == Value::zero_for_type(&object.spec.value_type)
-                    && !object.accessed
-                    && !object.written
+                object.accessed = true;
+                Ok(())
             }
             Self::UoArray(object) => {
-                object
-                    .values
-                    .iter()
-                    .all(|value| *value == Value::zero_for_type(&object.spec.value_type))
-                    && !object.accessed
-                    && object.written_indices.is_empty()
+                object.accessed = true;
+                Ok(())
             }
             Self::UoSmallMap(object) => {
-                object.entries.iter().all(|entry| !entry.is_occupied())
-                    && !object.accessed
-                    && !object.dirty
+                object.accessed = true;
+                Ok(())
             }
-            Self::UoOramMap(object) => object.oram.is_cold() && !object.accessed && !object.dirty,
-            _ => true,
+            Self::UoOramMap(object) => {
+                object.accessed = true;
+                Ok(())
+            }
+            _ => bail!("{} is not a confidential UO object", self.name()),
         }
     }
 
@@ -611,6 +656,13 @@ impl RuntimeObject {
         matches!(
             self,
             Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME
+        )
+    }
+
+    pub(in crate::runtime) fn is_update_oblivious_backend(&self) -> bool {
+        matches!(
+            self,
+            Self::UoCell(_) | Self::UoArray(_) | Self::UoSmallMap(_) | Self::UoOramMap(_)
         )
     }
 
@@ -645,7 +697,7 @@ impl RuntimeObject {
                     object.spec.name.clone(),
                     object.physical.len(),
                 );
-                Ok(object.value.clone())
+                Ok(clone_runtime_value_for_read(&object.value))
             }
             _ => bail!("{} is not a cell", self.name()),
         }
@@ -659,7 +711,7 @@ impl RuntimeObject {
     ) -> Result<()> {
         let apply = predicate.unwrap_or(true);
         match self {
-            Self::RawCell(object) | Self::UoCell(object) => {
+            Self::RawCell(object) => {
                 object.accessed = true;
                 trace.logical_write("cell_set", &object.spec.name, "slot");
                 trace.physical_read(
@@ -671,6 +723,18 @@ impl RuntimeObject {
                     object.value = value;
                     object.written = true;
                 }
+                Ok(())
+            }
+            Self::UoCell(object) => {
+                object.accessed = true;
+                trace.logical_write("cell_set", &object.spec.name, "slot");
+                trace.physical_read(
+                    &object.spec.name,
+                    object.spec.name.clone(),
+                    object.physical.len(),
+                );
+                update_masked_value(&mut object.value, value, apply)?;
+                object.written = true;
                 Ok(())
             }
             _ => bail!("{} is not a cell", self.name()),
@@ -693,25 +757,25 @@ impl RuntimeObject {
                     )
                 })?;
                 trace.logical_read("array_get", &object.spec.name, format!("[{index}]"));
+                let physical = object.physical_slots.get(index).ok_or_else(|| {
+                    anyhow!(
+                        "raw array physical slot {} missing for {} despite value slot guard",
+                        index,
+                        object.spec.name
+                    )
+                })?;
                 trace.physical_read(
                     &object.spec.name,
                     format!("{}[{index}]", object.spec.name),
-                    object.physical_slots[index].len(),
+                    physical.len(),
                 );
                 Ok(value)
             }
             Self::UoArray(object) => {
                 object.accessed = true;
-                let value = object.values.get(index).cloned().ok_or_else(|| {
-                    anyhow!(
-                        "array index {} out of bounds for {}",
-                        index,
-                        object.spec.name
-                    )
-                })?;
-                trace.logical_read("array_get", &object.spec.name, format!("[{index}]"));
+                trace.logical_read("array_get", &object.spec.name, "oblivious");
                 record_array_scan(object, trace);
-                Ok(value)
+                select_array_value_at_index(&object.values, index, &object.spec.value_type)
             }
             _ => bail!("{} is not an array", self.name()),
         }
@@ -736,32 +800,43 @@ impl RuntimeObject {
                     )
                 })?;
                 trace.logical_write("array_set", &object.spec.name, format!("[{index}]"));
+                let physical = object.physical_slots.get(index).ok_or_else(|| {
+                    anyhow!(
+                        "raw array physical slot {} missing for {} despite value slot guard",
+                        index,
+                        object.spec.name
+                    )
+                })?;
                 trace.physical_read(
                     &object.spec.name,
                     format!("{}[{index}]", object.spec.name),
-                    object.physical_slots[index].len(),
+                    physical.len(),
                 );
                 if apply {
-                    object.values[index] = value;
-                    object.written_indices.insert(index);
+                    let value_slot = object.values.get_mut(index).ok_or_else(|| {
+                        anyhow!(
+                            "raw array value slot {} missing for {} despite value slot guard",
+                            index,
+                            object.spec.name
+                        )
+                    })?;
+                    let written_slot = object.written_slots.get_mut(index).ok_or_else(|| {
+                        anyhow!(
+                            "raw array written flag {} missing for {} despite value slot guard",
+                            index,
+                            object.spec.name
+                        )
+                    })?;
+                    *value_slot = value;
+                    *written_slot = true;
                 }
                 Ok(())
             }
             Self::UoArray(object) => {
                 object.accessed = true;
-                object.values.get(index).ok_or_else(|| {
-                    anyhow!(
-                        "array index {} out of bounds for {}",
-                        index,
-                        object.spec.name
-                    )
-                })?;
-                trace.logical_write("array_set", &object.spec.name, format!("[{index}]"));
+                trace.logical_write("array_set", &object.spec.name, "oblivious");
                 record_array_scan(object, trace);
-                if apply {
-                    object.values[index] = value;
-                    object.written_indices.insert(index);
-                }
+                update_array_value_at_index(&mut object.values, index, value, apply)?;
                 Ok(())
             }
             _ => bail!("{} is not an array", self.name()),
@@ -773,10 +848,10 @@ impl RuntimeObject {
         key: &Value,
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
-    ) -> Result<Value> {
+    ) -> Result<(Value, bool)> {
         match self {
             Self::RawMap(object) => {
-                let key_name = key.canonical_key();
+                let key_name = key.canonical_key()?;
                 trace.logical_read("raw_map_get", &object.spec.name, key_name.clone());
                 trace.physical_read(
                     &object.spec.name,
@@ -784,35 +859,26 @@ impl RuntimeObject {
                     32,
                 );
                 if let Some((_, staged_value)) = object.staged.get(&key_name) {
-                    return Ok(staged_value.clone());
+                    return Ok((staged_value.clone(), false));
                 }
-                Ok(object
+                let value = object
                     .entries
                     .get(&key_name)
                     .map(|entry| entry.value.clone())
-                    .unwrap_or_else(|| Value::zero_for_type(&object.spec.value_type)))
+                    .unwrap_or_else(|| cold_zero_value(&object.spec.value_type));
+                Ok((value, false))
             }
             Self::UoSmallMap(object) => {
                 object.accessed = true;
-                for index in 0..object.entries.len() {
-                    trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
-                    trace.physical_read(
-                        &object.spec.name,
-                        format!("{}#{index}", object.spec.name),
-                        object.physical_slots[index].len(),
-                    );
-                }
-                Ok(object
-                    .entries
-                    .iter()
-                    .find(|entry| entry.matches_key(key))
-                    .map(|entry| entry.value().clone())
-                    .unwrap_or_else(|| Value::zero_for_type(&object.spec.value_type)))
+                record_small_map_scan(object, trace)?;
+                let value =
+                    select_small_map_value_for_key(&object.entries, key, &object.spec.value_type)?;
+                Ok((value, false))
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, object.oram.parameters());
-                let (value, transcript) = object.oram.get(
+                let (value, transcript, update_failed) = object.oram.get(
                     &object.spec,
                     key,
                     allocator,
@@ -844,11 +910,12 @@ impl RuntimeObject {
                 for event in physical_reads {
                     trace.physical_read(&event.object, event.location, event.len);
                 }
-                for write in physical_writes {
+                physical_writes.for_each_write(|write| {
                     trace.physical_write(write.with_object(&object.spec.name));
-                }
+                    Ok(())
+                })?;
                 trace.add_zero_writes(zero_writes);
-                Ok(value)
+                Ok((value, update_failed))
             }
             _ => bail!("{} is not a map", self.name()),
         }
@@ -861,58 +928,38 @@ impl RuntimeObject {
         predicate: Option<bool>,
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let apply = predicate.unwrap_or(true);
         match self {
             Self::RawMap(object) => {
-                let key_name = key.canonical_key();
+                let key_name = key.canonical_key()?;
                 trace.logical_write("raw_map_put", &object.spec.name, key_name.clone());
                 if apply {
                     object.staged.insert(key_name, (key, value));
                 }
-                Ok(())
+                Ok(false)
             }
             Self::UoSmallMap(object) => {
                 object.accessed = true;
-                for index in 0..object.entries.len() {
-                    trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
-                    trace.physical_read(
-                        &object.spec.name,
-                        format!("{}#{index}", object.spec.name),
-                        object.physical_slots[index].len(),
-                    );
-                }
+                record_small_map_scan(object, trace)?;
                 trace.logical_write("uomap_put", &object.spec.name, "oblivious");
-                if apply {
-                    let value_is_zero = value.is_zero_like();
-                    if let Some(entry) = object
-                        .entries
-                        .iter_mut()
-                        .find(|entry| entry.matches_key(&key))
-                    {
-                        if value_is_zero {
-                            entry.set_vacant(Value::zero_for_type(&object.spec.value_type));
-                        } else {
-                            entry.set_value(value);
-                        }
-                    } else if !value_is_zero {
-                        let entry = object
-                            .entries
-                            .iter_mut()
-                            .find(|entry| !entry.is_occupied())
-                            .ok_or_else(|| {
-                                anyhow!("map {} exceeded public capacity", object.spec.name)
-                            })?;
-                        entry.occupy(key, value);
-                    }
-                    object.dirty = true;
-                }
-                Ok(())
+                let value_type = object.spec.value_type.clone();
+                let object_name = object.spec.name.clone();
+                let capacity_overflowed = update_small_map_entries_for_put(
+                    &mut object.entries,
+                    key,
+                    value,
+                    apply,
+                    &value_type,
+                    &object_name,
+                )?;
+                object.dirty = true;
+                Ok(capacity_overflowed)
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, object.oram.parameters());
-                let transcript = object.oram.put(
+                let (transcript, update_failed) = object.oram.put(
                     &object.spec,
                     key,
                     value,
@@ -946,15 +993,14 @@ impl RuntimeObject {
                 for event in physical_reads {
                     trace.physical_read(&event.object, event.location, event.len);
                 }
-                for write in physical_writes {
+                physical_writes.for_each_write(|write| {
                     trace.physical_write(write.with_object(&object.spec.name));
-                }
+                    Ok(())
+                })?;
                 trace.add_zero_writes(zero_writes);
                 trace.logical_write("uooram_put", &object.spec.name, "oblivious");
-                if apply {
-                    object.dirty = true;
-                }
-                Ok(())
+                object.dirty = true;
+                Ok(update_failed)
             }
             _ => bail!("{} is not a map", self.name()),
         }
@@ -969,10 +1015,10 @@ impl RuntimeObject {
     ) -> Result<Self> {
         match (self, old) {
             (Self::RawCell(new), Self::RawCell(old)) => {
-                let mut next = old.clone();
+                let mut next = old.clone_committed_public();
                 if !aborted && new.written {
-                    let new_physical = raw_encode(&new.value);
-                    trace.physical_write_from_buffers(
+                    let new_physical = raw_encode_value(&new.value)?;
+                    trace.raw_physical_write_from_buffers(
                         &new.spec.name,
                         new.spec.name.clone(),
                         &old.physical,
@@ -987,103 +1033,133 @@ impl RuntimeObject {
             }
             (Self::UoCell(new), Self::UoCell(old)) => {
                 let mut next = new;
-                let committed_value = if aborted {
-                    old.decode_value_from_storage(allocator)?
+                let restored_value = if aborted || !next.accessed {
+                    Some(old.decode_value_from_storage(allocator)?)
                 } else {
-                    next.value.clone()
+                    None
                 };
-                if next.accessed {
-                    let aad = cell_slot_aad(&next.spec.name);
-                    let _io_guard = allocator.reserve_guard(
-                        ScratchRegion::IoScratch,
-                        next.spec.value_type.canonical_len(),
-                    )?;
-                    let mut payload = committed_value.canonical_bytes_boxed();
-                    if !next.cipher.seal_and_wipe_into_slice(
-                        aad.as_bytes(),
-                        &mut payload,
-                        &mut next.rng,
-                        &mut next.physical,
-                    ) {
-                        bail!(
-                            "sealed cell buffer for {} fell below required public ciphertext size",
-                            next.spec.name
-                        );
-                    }
-                    trace.physical_write_from_buffers(
-                        &next.spec.name,
-                        next.spec.name.clone(),
-                        &old.physical,
-                        &next.physical,
-                    );
-                    next.value = committed_value;
-                } else {
-                    next.value = old.decode_value_from_storage(allocator)?;
-                }
+                let spec_name = next.spec.name.clone();
+                let cipher = &next.cipher;
+                let rng = &mut next.rng;
+                let physical = &mut next.physical;
+                reconcile_cell_commit_value(
+                    &mut next.value,
+                    restored_value,
+                    aborted,
+                    next.accessed,
+                    |committed_value| {
+                        seal_canonical_value_commit_slot(
+                            &spec_name,
+                            spec_name.clone(),
+                            cell_slot_aad(&spec_name),
+                            committed_value,
+                            physical,
+                            cipher,
+                            rng,
+                            trace,
+                            allocator,
+                        )
+                    },
+                )?;
                 next.accessed = false;
                 next.written = false;
                 Ok(Self::UoCell(next))
             }
             (Self::RawArray(new), Self::RawArray(old)) => {
-                let mut next = old.clone();
+                let mut next = old.clone_committed_public();
                 if !aborted {
-                    for index in &new.written_indices {
-                        let new_physical = raw_encode(&new.values[*index]);
-                        trace.physical_write_from_buffers(
+                    for (index, written) in new.written_slots.iter().enumerate() {
+                        if !*written {
+                            continue;
+                        }
+                        let new_value = new.values.get(index).ok_or_else(|| {
+                            anyhow!(
+                                "raw array new value slot {} missing for {} despite written flag",
+                                index,
+                                new.spec.name
+                            )
+                        })?;
+                        let old_physical = old.physical_slots.get(index).ok_or_else(|| {
+                            anyhow!(
+                        "raw array old physical slot {} missing for {} despite written flag",
+                        index,
+                        new.spec.name
+                    )
+                        })?;
+                        let new_physical = raw_encode_value(new_value)?;
+                        trace.raw_physical_write_from_buffers(
                             &new.spec.name,
                             format!("{}[{index}]", new.spec.name),
-                            &old.physical_slots[*index],
+                            old_physical,
                             &new_physical,
                         );
-                        next.values[*index] = new.values[*index].clone();
-                        next.physical_slots[*index] = new_physical;
+                        let next_value = next.values.get_mut(index).ok_or_else(|| {
+                            anyhow!(
+                                "raw array next value slot {} missing for {} despite written flag",
+                                index,
+                                new.spec.name
+                            )
+                        })?;
+                        let next_physical =
+                            next.physical_slots.get_mut(index).ok_or_else(|| {
+                                anyhow!(
+                        "raw array next physical slot {} missing for {} despite written flag",
+                        index,
+                        new.spec.name
+                    )
+                            })?;
+                        *next_value = new_value.clone();
+                        *next_physical = new_physical;
                     }
                 }
                 next.accessed = false;
-                next.written_indices.clear();
+                clear_written_slots(&mut next.written_slots);
                 Ok(Self::RawArray(next))
             }
             (Self::UoArray(new), Self::UoArray(old)) => {
                 let mut next = new;
-                if aborted || !next.accessed {
-                    old.decode_values_from_storage_into(allocator, &mut next.values)?;
-                }
-                if next.accessed {
-                    for index in 0..next.values.len() {
-                        let value = next.values[index].clone();
-                        let aad = array_slot_aad(&next.spec.name, index);
-                        let _io_guard = allocator.reserve_guard(
-                            ScratchRegion::IoScratch,
-                            next.spec.value_type.canonical_len(),
-                        )?;
-                        let mut payload = value.canonical_bytes_boxed();
-                        if !next.cipher.seal_and_wipe_into_slice(
-                            aad.as_bytes(),
-                            &mut payload,
-                            &mut next.rng,
-                            &mut next.physical_slots[index],
-                        ) {
-                            bail!(
-                                "sealed array slot buffer for {}[{}] fell below required public ciphertext size",
-                                next.spec.name,
-                                index
-                            );
-                        }
-                        trace.physical_write_from_buffers(
-                            &next.spec.name,
-                            format!("{}[{index}]", next.spec.name),
-                            &old.physical_slots[index],
-                            &next.physical_slots[index],
-                        );
-                        next.values[index] = value.clone();
-                    }
-                }
+                let restored_values = if aborted || !next.accessed {
+                    Some(old.decode_values_from_storage(allocator)?)
+                } else {
+                    None
+                };
+                let spec_name = next.spec.name.clone();
+                let cipher = &next.cipher;
+                let rng = &mut next.rng;
+                let physical_slots = &mut next.physical_slots;
+                reconcile_array_commit_values(
+                    &mut next.values,
+                    restored_values.as_deref(),
+                    aborted,
+                    next.accessed,
+                    |index, value| {
+                        let physical = physical_slots.get_mut(index).ok_or_else(|| {
+                            anyhow!(
+                                "UO array commit physical slot {} missing for {} despite generated public commit schedule",
+                                index,
+                                spec_name
+                            )
+                        })?;
+                        let slot_label = format!("{}[{index}]", spec_name);
+                        seal_canonical_value_commit_slot(
+                            &spec_name,
+                            slot_label,
+                            array_slot_aad(&spec_name, index),
+                            value,
+                            physical,
+                            cipher,
+                            rng,
+                            trace,
+                            allocator,
+                        )
+                    },
+                )?;
                 next.accessed = false;
-                next.written_indices.clear();
+                clear_written_slots(&mut next.written_slots);
                 Ok(Self::UoArray(next))
             }
             (Self::RawMap(new), Self::RawMap(old)) => {
-                let mut next = old.clone();
+                let mut next = old.clone_committed_public();
                 if !aborted {
                     for (key_name, (_key, value)) in &new.staged {
                         let zero_physical = [0u8; 32];
@@ -1092,24 +1168,19 @@ impl RuntimeObject {
                             .get(key_name)
                             .map(|entry| entry.physical.as_ref())
                             .unwrap_or(zero_physical.as_slice());
-                        let new_physical = raw_encode(value);
-                        trace.physical_write_from_buffers(
+                        let new_physical = raw_encode_value(value)?;
+                        trace.raw_physical_write_from_buffers(
                             &new.spec.name,
                             format!("{}::{key_name}", new.spec.name),
                             old_physical,
                             &new_physical,
                         );
-                        if value.is_zero_like() {
-                            next.entries.remove(key_name);
-                        } else {
-                            next.entries.insert(
-                                key_name.clone(),
-                                RawMapEntry {
-                                    value: value.clone(),
-                                    physical: new_physical,
-                                },
-                            );
-                        }
+                        reconcile_raw_map_committed_entry(
+                            &mut next.entries,
+                            key_name,
+                            value,
+                            new_physical,
+                        );
                     }
                 }
                 next.staged.clear();
@@ -1117,37 +1188,42 @@ impl RuntimeObject {
             }
             (Self::UoSmallMap(new), Self::UoSmallMap(old)) => {
                 let mut next = new;
-                if aborted || !next.accessed {
-                    old.decode_entries_from_storage_into(allocator, &mut next.entries)?;
-                }
-                if next.accessed {
-                    for index in 0..next.entries.len() {
-                        let entry = next.entries[index].clone();
-                        let aad = small_map_slot_aad(&next.spec.name, index);
-                        let _io_guard = allocator
-                            .reserve_guard(ScratchRegion::IoScratch, map_record_len(&next.spec)?)?;
-                        let mut payload = map_record_bytes(&entry);
-                        if !next.cipher.seal_and_wipe_into_slice(
-                            aad.as_bytes(),
-                            &mut payload,
-                            &mut next.rng,
-                            &mut next.physical_slots[index],
-                        ) {
-                            bail!(
-                                "sealed small-map slot buffer for {}#{} fell below required public ciphertext size",
-                                next.spec.name,
-                                index
-                            );
-                        }
-                        trace.physical_write_from_buffers(
-                            &next.spec.name,
-                            format!("{}#{index}", next.spec.name),
-                            &old.physical_slots[index],
-                            &next.physical_slots[index],
-                        );
-                        next.entries[index] = entry;
-                    }
-                }
+                let restored_entries = if aborted || !next.accessed {
+                    Some(old.decode_entries_from_storage(allocator)?)
+                } else {
+                    None
+                };
+                let spec_name = next.spec.name.clone();
+                let cipher = &next.cipher;
+                let rng = &mut next.rng;
+                let physical_slots = &mut next.physical_slots;
+                reconcile_small_map_commit_entries(
+                    &mut next.entries,
+                    restored_entries.as_deref(),
+                    aborted,
+                    next.accessed,
+                    |index, entry| {
+                        let physical = physical_slots.get_mut(index).ok_or_else(|| {
+                            anyhow!(
+                                "UO small-map commit physical slot {} missing for {} despite generated public commit schedule",
+                                index,
+                                spec_name
+                            )
+                        })?;
+                        let slot_label = format!("{}#{index}", spec_name);
+                        seal_map_record_commit_slot(
+                            &spec_name,
+                            slot_label,
+                            small_map_slot_aad(&spec_name, index),
+                            entry,
+                            physical,
+                            cipher,
+                            rng,
+                            trace,
+                            allocator,
+                        )
+                    },
+                )?;
                 next.accessed = false;
                 next.dirty = false;
                 Ok(Self::UoSmallMap(next))
@@ -1171,9 +1247,10 @@ impl RuntimeObject {
                             &mut next.rng,
                         )?;
                         let (next_oram, writes, zero_writes) = commit.into_object_commit_parts();
-                        for write in writes {
+                        writes.for_each_write(|write| {
                             trace.physical_write(write.with_object(&next.spec.name));
-                        }
+                            Ok(())
+                        })?;
                         trace.add_zero_writes(zero_writes);
                         next.oram = next_oram;
                     }
@@ -1195,10 +1272,10 @@ impl RuntimeObject {
             }
             Self::RawArray(object) | Self::UoArray(object) => {
                 object.accessed = false;
-                object.written_indices.clear();
+                clear_written_slots(&mut object.written_slots);
             }
             Self::RawMap(object) => {
-                object.staged.clear();
+                object.wipe_staged();
             }
             Self::UoSmallMap(object) => {
                 object.accessed = false;
@@ -1244,57 +1321,45 @@ impl RuntimeObject {
     }
 }
 
-fn raw_encode(value: &Value) -> Box<[u8]> {
-    if value.is_zero_like() {
-        vec![0u8; 32].into_boxed_slice()
-    } else {
-        let bytes = value.canonical_bytes_boxed();
-        if bytes.iter().all(|byte| *byte == 0) {
-            vec![1u8; 32].into_boxed_slice()
-        } else {
-            bytes
-        }
-    }
+fn boxed_false_flags(len: usize) -> Box<[bool]> {
+    FixedBoxBuilder::from_fn(len, |_| false)
 }
 
-fn seal_value(cipher: &StoreCipher, aad: &[u8], value: &Value, rng: &mut ChaCha20Rng) -> Box<[u8]> {
-    let mut payload = value.canonical_bytes_boxed();
-    cipher.seal_and_wipe_boxed(aad, &mut payload, rng)
+fn clear_written_slots(slots: &mut [bool]) {
+    slots.fill(false);
 }
 
-fn decode_sealed_value(
-    cipher: &StoreCipher,
-    aad: &str,
-    physical: &[u8],
-    ty: &Type,
-    object_name: &str,
-    allocator: &mut AllocatorSession,
-) -> Result<Value> {
-    let payload_len = ty.canonical_len();
-    let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;
-    cipher
-        .with_opened_payload(aad.as_bytes(), payload_len, physical, |payload| {
-            Value::decode_canonical(ty, payload)
-        })
-        .ok_or_else(|| anyhow!("failed to decode sealed value for {}", object_name))?
-}
-
-fn map_record_len(spec: &StateObject) -> Result<usize> {
-    let key_type = spec
-        .key_type
-        .as_ref()
-        .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
-    Ok(1 + key_type.canonical_len() + spec.value_type.canonical_len())
+fn no_written_slots(slots: &[bool]) -> bool {
+    !slots.iter().any(|written| *written)
 }
 
 fn record_array_scan(object: &ArrayObject, trace: &mut CallRecorder) {
-    for index in 0..object.physical_slots.len() {
+    for (index, physical) in object.physical_slots.iter().enumerate() {
         trace.physical_read(
             &object.spec.name,
             format!("{}[{index}]", object.spec.name),
-            object.physical_slots[index].len(),
+            physical.len(),
         );
     }
+}
+
+fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) -> Result<()> {
+    for (index, _) in object.entries.iter().enumerate() {
+        let physical = object.physical_slots.get(index).ok_or_else(|| {
+            anyhow!(
+                "UO small-map physical slot {} missing for {} despite entry scan schedule",
+                index,
+                object.spec.name
+            )
+        })?;
+        trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
+        trace.physical_read(
+            &object.spec.name,
+            format!("{}#{index}", object.spec.name),
+            physical.len(),
+        );
+    }
+    Ok(())
 }
 
 fn cell_slot_aad(object: &str) -> String {
@@ -1311,7 +1376,7 @@ fn small_map_slot_aad(object: &str, index: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{MapEntry, RuntimeObject};
+    use super::{no_written_slots, MapEntry, RuntimeObject};
     use uo_allocator::{AllocatorPlan, AllocatorSession};
     use uo_core::ir::{BackendKind, ContainerKind, StateObject};
     use uo_core::manifest::PATH_ORAM_SCHEME;
@@ -1324,6 +1389,7 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 0,
         })
+        .unwrap()
     }
 
     fn nested_value_type() -> Type {
@@ -1497,7 +1563,7 @@ mod tests {
                 ]
                 .into_boxed_slice();
                 array.accessed = true;
-                array.written_indices.extend([0, 1, 2]);
+                array.written_slots.fill(true);
             }
             _ => unreachable!(),
         }
@@ -1511,7 +1577,7 @@ mod tests {
                 assert_eq!(array.values, vec![zero; 3].into_boxed_slice());
                 assert_eq!(array.physical_slots, original_slots);
                 assert!(!array.accessed);
-                assert!(array.written_indices.is_empty());
+                assert!(no_written_slots(&array.written_slots));
             }
             _ => unreachable!(),
         }
@@ -1711,6 +1777,42 @@ mod tests {
     }
 
     #[test]
+    fn uo_cell_set_cell_with_false_predicate_preserves_prior_value() {
+        let spec = cell_spec();
+        let prior = nested_nonzero_value();
+        let mut object = RuntimeObject::instantiate_with_seed(&spec, 0xC014).unwrap();
+        match &mut object {
+            RuntimeObject::UoCell(cell) => {
+                cell.value = prior.clone();
+            }
+            _ => unreachable!(),
+        }
+
+        let replacement = Value::Struct(
+            vec![
+                ("flag".into(), Value::Bool(false)),
+                (
+                    "items".into(),
+                    Value::Array(vec![Value::Uint(21), Value::Uint(34)].into_boxed_slice()),
+                ),
+            ]
+            .into_boxed_slice(),
+        );
+        let mut recorder = crate::controller::CallRecorder::begin("set_cell_test", &[]);
+        object
+            .set_cell(replacement, Some(false), &mut recorder)
+            .unwrap();
+
+        match object {
+            RuntimeObject::UoCell(cell) => {
+                assert_eq!(cell.value, prior);
+                assert!(cell.accessed);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
     fn uo_array_commit_reads_old_state_from_storage_when_unaccessed() {
         let spec = array_spec();
         let zero = Value::zero_for_type(&spec.value_type);
@@ -1766,7 +1868,87 @@ mod tests {
                 assert_eq!(array.values.as_ptr(), values_ptr);
                 assert_eq!(array.physical_slots.as_ptr(), physical_slots_ptr);
                 assert!(!array.accessed);
-                assert!(array.written_indices.is_empty());
+                assert!(no_written_slots(&array.written_slots));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn uo_array_set_array_with_false_predicate_preserves_prior_value() {
+        let spec = array_spec();
+        let prior = Value::Struct(
+            vec![
+                ("owner".into(), Value::Address([0xB1; 20])),
+                ("count".into(), Value::Uint(19)),
+            ]
+            .into_boxed_slice(),
+        );
+        let mut object = RuntimeObject::instantiate_with_seed(&spec, 0xA663).unwrap();
+        match &mut object {
+            RuntimeObject::UoArray(array) => {
+                array.values[1] = prior.clone();
+            }
+            _ => unreachable!(),
+        }
+
+        let replacement = Value::Struct(
+            vec![
+                ("owner".into(), Value::Address([0xB2; 20])),
+                ("count".into(), Value::Uint(27)),
+            ]
+            .into_boxed_slice(),
+        );
+        let mut recorder = crate::controller::CallRecorder::begin("set_array_test", &[]);
+        object
+            .set_array(1, replacement, Some(false), &mut recorder)
+            .unwrap();
+
+        match object {
+            RuntimeObject::UoArray(array) => {
+                assert_eq!(array.values[1], prior);
+                assert!(array.accessed);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn uo_array_out_of_bounds_index_is_masked_no_match() {
+        let spec = array_spec();
+        let mut object = RuntimeObject::instantiate_with_seed(&spec, 0xA664).unwrap();
+        let prior = Value::Struct(
+            vec![
+                ("owner".into(), Value::Address([0xC1; 20])),
+                ("count".into(), Value::Uint(31)),
+            ]
+            .into_boxed_slice(),
+        );
+        match &mut object {
+            RuntimeObject::UoArray(array) => {
+                array.values[1] = prior.clone();
+            }
+            _ => unreachable!(),
+        }
+
+        let replacement = Value::Struct(
+            vec![
+                ("owner".into(), Value::Address([0xC2; 20])),
+                ("count".into(), Value::Uint(37)),
+            ]
+            .into_boxed_slice(),
+        );
+        let mut recorder = crate::controller::CallRecorder::begin("array_oob_test", &[]);
+        let read = object.get_array(99, &mut recorder).unwrap();
+        object
+            .set_array(99, replacement, Some(true), &mut recorder)
+            .unwrap();
+
+        assert_eq!(read, Value::zero_for_type(&spec.value_type));
+        match object {
+            RuntimeObject::UoArray(array) => {
+                assert_eq!(array.values[1], prior);
+                assert!(array.accessed);
             }
             _ => unreachable!(),
         }
@@ -1795,7 +1977,7 @@ mod tests {
             RuntimeObject::UoArray(array) => {
                 array.values[1] = committed_value.clone();
                 array.accessed = true;
-                array.written_indices.insert(1);
+                array.written_slots[1] = true;
             }
             _ => unreachable!(),
         }
@@ -1812,7 +1994,53 @@ mod tests {
                 assert_eq!(array.physical_slots[1].as_ptr(), slot_ptr);
                 assert_eq!(array.values[1], committed_value);
                 assert!(!array.accessed);
-                assert!(array.written_indices.is_empty());
+                assert!(no_written_slots(&array.written_slots));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn uo_small_map_put_map_with_false_predicate_preserves_prior_entry() {
+        let spec = small_map_spec();
+        let key = Value::Struct(
+            vec![
+                ("owner".into(), Value::Address([0x71; 20])),
+                ("nonce".into(), Value::Uint(4)),
+            ]
+            .into_boxed_slice(),
+        );
+        let original_key = key.clone();
+        let prior = nested_nonzero_value();
+        let mut object = RuntimeObject::instantiate_with_seed(&spec, 0x5C00).unwrap();
+        match &mut object {
+            RuntimeObject::UoSmallMap(map) => {
+                map.entries[0] = MapEntry::new(true, key.clone(), prior.clone());
+            }
+            _ => unreachable!(),
+        }
+
+        let replacement = Value::Struct(
+            vec![
+                ("flag".into(), Value::Bool(false)),
+                (
+                    "items".into(),
+                    Value::Array(vec![Value::Uint(21), Value::Uint(34)].into_boxed_slice()),
+                ),
+            ]
+            .into_boxed_slice(),
+        );
+        let mut recorder = crate::controller::CallRecorder::begin("put_map_test", &[]);
+        let mut allocator = tx_allocator();
+        object
+            .put_map(key, replacement, Some(false), &mut recorder, &mut allocator)
+            .unwrap();
+        allocator.finish().unwrap();
+
+        match object {
+            RuntimeObject::UoSmallMap(map) => {
+                assert_eq!(map.entries[0], MapEntry::new(true, original_key, prior));
+                assert!(map.accessed);
             }
             _ => unreachable!(),
         }
@@ -1929,7 +2157,11 @@ mod tests {
         );
         match &mut new {
             RuntimeObject::UoSmallMap(map) => {
-                map.entries[0] = committed_entry.clone();
+                map.entries[0] = MapEntry::new(
+                    committed_entry.is_occupied(),
+                    committed_entry.key().clone(),
+                    committed_entry.value().clone(),
+                );
                 map.accessed = true;
                 map.dirty = true;
             }

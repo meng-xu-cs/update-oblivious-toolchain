@@ -54,11 +54,11 @@ fn main() -> Result<()> {
         }
         OutputFormat::KernelFinish => {
             let bundle = trace.exact_runtime_kernel_finish_bundle()?;
-            println!("{}", bundle.to_json_pretty());
+            println!("{}", bundle.to_json_pretty()?);
         }
         OutputFormat::KernelWitness => {
             let witness = trace.exact_runtime_kernel_witness()?;
-            println!("{}", witness.to_json_pretty());
+            println!("{}", witness.to_json_pretty()?);
         }
         OutputFormat::KernelDsl => {
             let witness = trace.exact_runtime_kernel_witness()?;
@@ -80,7 +80,7 @@ fn main() -> Result<()> {
         }
         OutputFormat::KernelRefinementWitness => {
             let witness = trace.exact_runtime_kernel_refinement_witness()?;
-            println!("{}", witness.to_json_pretty());
+            println!("{}", witness.to_json_pretty()?);
         }
         OutputFormat::KernelInterface => {
             let bundle = trace.runtime_kernel_interface_bundle(&artifact)?;
@@ -118,7 +118,7 @@ fn main() -> Result<()> {
         }
         OutputFormat::RefinementWitness => {
             let witness = trace.runtime_refinement_witness()?;
-            println!("{}", witness.to_json_pretty());
+            println!("{}", witness.to_json_pretty()?);
         }
         OutputFormat::ConfidentialCore => {
             let bundle = trace.runtime_confidential_core_bundle(&artifact)?;

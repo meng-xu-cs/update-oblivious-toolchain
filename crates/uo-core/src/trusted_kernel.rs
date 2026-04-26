@@ -22,12 +22,17 @@ pub enum RuntimeTrustedKernelSlotBundleError {
         expected_entrypoint: String,
         program_entrypoint: String,
     },
+    #[error(
+        "runtime trusted-kernel slot bundle statement trace drifted from confidential_slot_program for '{entrypoint}'"
+    )]
+    ConfidentialSlotProgramOpcodeTraceMismatch { entrypoint: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeTrustedKernelSlotBundle {
     trusted_kernel_bundle: RuntimeTrustedKernelBundle,
     confidential_slot_program: ConfidentialKernelSlotProgram,
+    opcode_trace: Box<[String]>,
 }
 
 impl RuntimeTrustedKernelSlotBundle {
@@ -47,12 +52,17 @@ impl RuntimeTrustedKernelSlotBundle {
         &self.confidential_slot_program
     }
 
+    pub fn opcode_trace(&self) -> &[String] {
+        &self.opcode_trace
+    }
+
     pub fn program_matches_trusted_kernel_entrypoint(&self) -> bool {
         self.confidential_slot_program.entrypoint_id == self.entrypoint_id()
     }
 
     fn from_trusted_kernel_bundle(
         trusted_kernel_bundle: RuntimeTrustedKernelBundle,
+        opcode_trace: Box<[String]>,
         artifact: &CompiledArtifact,
     ) -> Result<Self, RuntimeTrustedKernelSlotBundleError> {
         let entrypoint = trusted_kernel_bundle
@@ -84,9 +94,17 @@ impl RuntimeTrustedKernelSlotBundle {
                 },
             );
         }
+        if opcode_trace.as_ref() != confidential_slot_program.statement_trace().as_ref() {
+            return Err(
+                RuntimeTrustedKernelSlotBundleError::ConfidentialSlotProgramOpcodeTraceMismatch {
+                    entrypoint: confidential_slot_program.entrypoint_id.clone(),
+                },
+            );
+        }
         Ok(Self {
             trusted_kernel_bundle,
             confidential_slot_program,
+            opcode_trace,
         })
     }
 }
@@ -97,6 +115,10 @@ impl ExecutionTrace {
         artifact: &CompiledArtifact,
     ) -> Result<RuntimeTrustedKernelSlotBundle, RuntimeTrustedKernelSlotBundleError> {
         let trusted_kernel_bundle = self.runtime_trusted_kernel_bundle()?;
-        RuntimeTrustedKernelSlotBundle::from_trusted_kernel_bundle(trusted_kernel_bundle, artifact)
+        RuntimeTrustedKernelSlotBundle::from_trusted_kernel_bundle(
+            trusted_kernel_bundle,
+            self.opcode_trace.clone(),
+            artifact,
+        )
     }
 }

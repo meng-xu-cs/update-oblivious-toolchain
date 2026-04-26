@@ -97,6 +97,51 @@ def ImportedRuntimeKernelFinishBundle.kernelInterfaceBundle?
     , expected_kernel_schedule := expectedKernelSchedule
     }
 
+theorem importedRuntimeKernelFinishBundle_kernelInterfaceBundle_exact
+  {bundle : ImportedRuntimeKernelFinishBundle}
+  {kernelInterfaceBundle : ImportedRuntimeKernelInterfaceBundle}
+  (hBundle : bundle.kernelInterfaceBundle? = some kernelInterfaceBundle) :
+  bundle.shellBoundaryBundle = kernelInterfaceBundle.shell_boundary_bundle ∧
+    bundle.kernelWitness.expected_kernel_steps =
+      some kernelInterfaceBundle.expected_kernel_steps ∧
+    bundle.kernelWitness.expected_public_object_ids =
+      some kernelInterfaceBundle.expected_public_object_ids ∧
+    bundle.kernelWitness.expectedKernelSchedule? =
+      some kernelInterfaceBundle.expected_kernel_schedule := by
+  unfold ImportedRuntimeKernelFinishBundle.kernelInterfaceBundle? at hBundle
+  let kernelWitness := bundle.kernelWitness
+  cases hExpectedSteps : kernelWitness.expected_kernel_steps with
+  | none =>
+      simp [kernelWitness, hExpectedSteps] at hBundle
+  | some expectedKernelSteps =>
+      cases hExpectedPublic : kernelWitness.expected_public_object_ids with
+      | none =>
+          simp [kernelWitness, hExpectedSteps, hExpectedPublic] at hBundle
+      | some expectedPublicObjectIds =>
+          cases hExpectedSchedule : kernelWitness.expectedKernelSchedule? with
+          | none =>
+              simp [kernelWitness, hExpectedSteps, hExpectedPublic, hExpectedSchedule] at hBundle
+          | some expectedKernelSchedule =>
+              have hBundleSome :
+                  some
+                      { shell_boundary_bundle := bundle.shellBoundaryBundle
+                      , expected_kernel_steps := expectedKernelSteps
+                      , expected_public_object_ids := expectedPublicObjectIds
+                      , expected_kernel_schedule := expectedKernelSchedule
+                      } =
+                    some kernelInterfaceBundle := by
+                simpa [kernelWitness, hExpectedSteps, hExpectedPublic, hExpectedSchedule] using
+                  hBundle
+              have hBundleEq :
+                  { shell_boundary_bundle := bundle.shellBoundaryBundle
+                  , expected_kernel_steps := expectedKernelSteps
+                  , expected_public_object_ids := expectedPublicObjectIds
+                  , expected_kernel_schedule := expectedKernelSchedule
+                  } = kernelInterfaceBundle := by
+                exact Option.some.inj hBundleSome
+              cases hBundleEq
+              simp [kernelWitness, hExpectedSteps, hExpectedPublic, hExpectedSchedule]
+
 def ImportedRuntimeKernelFinishBundle.Valid
   (bundle : ImportedRuntimeKernelFinishBundle) : Prop :=
   ∃ kernelInterfaceBundle,
@@ -118,6 +163,111 @@ def ImportedRuntimeKernelFinishBundle.checkValid
       simp
   | some kernelInterfaceBundle =>
       simp [importedRuntimeKernelInterfaceBundle_checkValid_eq_true_iff]
+
+noncomputable def ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle
+  {bundle : ImportedRuntimeKernelFinishBundle}
+  (hValid : bundle.Valid) : RuntimeKernelInterfaceBundle := by
+  classical
+  exact (Classical.choose hValid).toRuntimeKernelInterfaceBundle
+
+theorem importedRuntimeKernelFinishBundle_toRuntimeKernelInterfaceBundle_valid
+  {bundle : ImportedRuntimeKernelFinishBundle}
+  (hValid : bundle.Valid) :
+  (bundle.toRuntimeKernelInterfaceBundle hValid).Valid := by
+  classical
+  unfold ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle
+  exact
+    importedRuntimeKernelInterfaceBundle_toRuntimeValid
+      (Classical.choose hValid)
+      (Classical.choose_spec hValid).2
+
+theorem importedRuntimeKernelFinishBundle_toRuntimeKernelInterfaceBundle_kernelWitness_exact
+  {bundle : ImportedRuntimeKernelFinishBundle}
+  (hValid : bundle.Valid) :
+  (bundle.toRuntimeKernelInterfaceBundle hValid).shellBoundaryBundle.kernelWitness =
+    bundle.kernelWitness.toRuntimeKernelWitness := by
+  classical
+  unfold ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle
+  have hBundleExact :=
+    importedRuntimeKernelFinishBundle_kernelInterfaceBundle_exact
+      (bundle := bundle)
+      (kernelInterfaceBundle := Classical.choose hValid)
+      (Classical.choose_spec hValid).1
+  rcases hBundleExact with ⟨hShellBoundary, _hExpectedSteps, _hExpectedPublic, _hExpectedSchedule⟩
+  have hShellBoundaryRuntime :=
+    congrArg
+      (fun shellBoundaryBundle =>
+        shellBoundaryBundle.toRuntimeShellBoundaryBundle.kernelWitness)
+      hShellBoundary.symm
+  simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+    ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+    ImportedRuntimeKernelFinishBundle.shellBoundaryBundle] using hShellBoundaryRuntime
+
+theorem importedRuntimeKernelFinishBundle_toRuntimeKernelInterfaceBundle_runtimeKernelRefinementWitness_exact
+  {bundle : ImportedRuntimeKernelFinishBundle}
+  (hValid : bundle.Valid) :
+  (bundle.toRuntimeKernelInterfaceBundle hValid).shellBoundaryBundle.runtimeKernelRefinementWitness =
+    bundle.runtimeKernelRefinementWitness.toRuntimeKernelRefinementWitness := by
+  classical
+  unfold ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle
+  have hBundleExact :=
+    importedRuntimeKernelFinishBundle_kernelInterfaceBundle_exact
+      (bundle := bundle)
+      (kernelInterfaceBundle := Classical.choose hValid)
+      (Classical.choose_spec hValid).1
+  rcases hBundleExact with ⟨hShellBoundary, _hExpectedSteps, _hExpectedPublic, _hExpectedSchedule⟩
+  have hShellBoundaryRuntime :=
+    congrArg
+      (fun shellBoundaryBundle =>
+        shellBoundaryBundle.toRuntimeShellBoundaryBundle.runtimeKernelRefinementWitness)
+      hShellBoundary.symm
+  simpa [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle,
+    ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
+    ImportedRuntimeKernelFinishBundle.shellBoundaryBundle,
+    ImportedRuntimeKernelFinishBundle.runtimeKernelRefinementWitness] using hShellBoundaryRuntime
+
+theorem importedRuntimeKernelFinishBundle_toRuntimeKernelInterfaceBundle_expectedKernelSteps_exact
+  {bundle : ImportedRuntimeKernelFinishBundle}
+  (hValid : bundle.Valid) :
+  (bundle.toRuntimeKernelInterfaceBundle hValid).expectedKernelSteps =
+    bundle.expected_kernel_steps.map (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep) := by
+  classical
+  unfold ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle
+  have hBundleExact :=
+    importedRuntimeKernelFinishBundle_kernelInterfaceBundle_exact
+      (bundle := bundle)
+      (kernelInterfaceBundle := Classical.choose hValid)
+      (Classical.choose_spec hValid).1
+  exact
+    by
+      rcases hBundleExact with
+        ⟨_hShellBoundary, hExpectedSteps, _hExpectedPublic, _hExpectedSchedule⟩
+      simp [ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle,
+        ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle]
+      simpa [ImportedRuntimeKernelFinishBundle.kernelWitness] using
+        congrArg
+          (Option.map (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep))
+          hExpectedSteps.symm
+
+theorem importedRuntimeKernelFinishBundle_toRuntimeKernelInterfaceBundle_expectedPublicObjectIds_exact
+  {bundle : ImportedRuntimeKernelFinishBundle}
+  (hValid : bundle.Valid) :
+  (bundle.toRuntimeKernelInterfaceBundle hValid).expectedPublicObjectIds =
+    bundle.expected_public_object_ids := by
+  classical
+  unfold ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle
+  have hBundleExact :=
+    importedRuntimeKernelFinishBundle_kernelInterfaceBundle_exact
+      (bundle := bundle)
+      (kernelInterfaceBundle := Classical.choose hValid)
+      (Classical.choose_spec hValid).1
+  exact
+    by
+      rcases hBundleExact with
+        ⟨_hShellBoundary, _hExpectedSteps, hExpectedPublic, _hExpectedSchedule⟩
+      simp [ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle,
+        ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle]
+      simpa [ImportedRuntimeKernelFinishBundle.kernelWitness] using hExpectedPublic.symm
 
 noncomputable def ImportedRuntimeKernelFinishBundle.toRuntimeKernelRefinementBoundary
   {bundle : ImportedRuntimeKernelFinishBundle}

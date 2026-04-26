@@ -36,6 +36,7 @@ The repository has already frozen:
 - the runtime proof boundary: the emitted kernel / refinement /
   trusted-kernel proof objects together with the source-backed
   `RuntimeImplementationInterface` /
+  `RuntimeImplementationSharedKernelRefinementBoundary` /
   `RuntimeImplementationConfinementBoundary` over the real `uo-evm` runtime
   modules
 
@@ -112,9 +113,14 @@ and it is not the deployment observer claimed by the paper.
 The proof should not claim:
 
 - security for unsupported Solidity features
-- security for raw backends on confidential state
+- security for raw backends inside a confidential entrypoint schedule; those
+  targets are rejected by the direct Lean proof-grade translation checker and
+  by the compiler/runtime admission path rather than modeled as confidential
+  storage
 - security against observers below the modeled abstract/runtime interface
-- security of the current ad hoc nonzero codec as a cryptographic primitive
+- security of the current ad hoc nonzero codec as a cryptographic primitive;
+  only exact-size transport length, nonzero-byte shape, and valid-byte
+  encode/decode roundtrip facts are proved
 - SGX execution obliviousness against a malicious host
 - security against page-fault, cache, branch-predictor, interrupt, or other
   microarchitectural observers
@@ -405,7 +411,11 @@ L_sgx_micro =
 ```
 
 This is intentionally a controller-side leakage function. It is separate from
-the storage leakage function inherited from the ORAM backend.
+the storage leakage function inherited from the ORAM backend. On the
+implementation side, those region budgets are now accumulated by the fixed
+public `ControllerRegionCounters` table in `CallRecorder`, not by a generic
+map, and expected per-object ORAM access counts are recomputed from the
+observed public schedule when checking exactness.
 
 The current Lean scaffold instantiates this with a public controller-shape
 object derived from ORAM manifest leakage. Its phase skeleton is:
@@ -769,12 +779,156 @@ Current status:
   satisfy proof-grade replay checks for:
   manifest contract/mode exactness, state-object / manifest exactness,
   object-id coverage, entrypoint coverage, secret-arg agreement, confidential
-  raw-backend rejection, arena/stack budgets, logical read/write counters,
-  ORAM access counts and theorem-facing ORAM shape, `max_commit_ops`, and the
-  confidential kernel lowering / runtime-step schedule
+  raw-backend rejection, confidential kernel-step target non-rawness,
+  arena/stack budgets, logical read/write counters, ORAM access counts and
+  theorem-facing ORAM shape, `max_commit_ops`, and the confidential kernel
+  lowering / runtime-step schedule
+- the Lean side now also exports those checks as reusable theorems rather than
+  only as boolean acceptance: `TranslationValidationJson.lean` proves
+  source/artifact structural validity, per-function manifest exactness, and
+  exact confidential-kernel lowering/schedule agreement, plus a per-step
+  theorem that every object-bearing confidential kernel step resolves to a
+  non-raw state object, from
+  `ImportedProofRelevantTranslationBundle.ProofGradeValid`,
+  `CompilerExactness.lean` packages that result as the
+  `ProofGradeCompilerFacts` theorem facade, and `ProofGrade.lean` re-exports
+  the source-side theorem surface for the paper-facing route
+- `CompilerExactness.lean` now also contains a first compiler-to-ORAM witness
+  bridge: source-derived expected ORAM accesses can be lifted into a
+  theorem-facing `ManifestWitness`; the full expected-access list can be
+  rebuilt into concrete ORAM object witnesses reconstructed from the validated
+  state/manifest views; and the same source facts determine an exact
+  `OramEntrypointWitness` whose public fields match the validated entrypoint
+  while every emitted ORAM object witness is well formed. The per-access
+  witness theorem now also classifies multi-access source objects as
+  path-ORAM objects, so the proof route can appeal to a path-specific backend
+  theorem whenever the source analysis predicts more than one access. That
+  classification is now available both as an implication attached to the
+  generic per-access ORAM witness theorem and as a direct exported proof-grade
+  corollary for the `accesses > 1` case. The rebuilt ORAM object list is now
+  also tracked by an explicit alignment relation against the source-level
+  expected-access list, so downstream arguments can consume the rebuilt witness
+  list entry-by-entry without re-proving ordering preservation. The exact
+  `OramEntrypointWitness` theorem now comes in an aligned variant as well, so
+  the exact public witness fields and the ordered object-level evidence travel
+  together in a single proof-grade result. The same source-side route now also
+  proves a stronger combined lookup theorem for confidential entrypoints:
+  one proof-grade-valid source lookup determines the aligned exact
+  `OramEntrypointWitness`, determines the parsed named confidential program,
+  determines the recomputed slot-lowered kernel program obtained directly from
+  that named program, proves that recomputed lowered program is runtime-normal,
+  and proves that it still matches the stored manifest slot program accepted by
+  the direct checker. The proof-grade checker now also carries explicit
+  schedule-equality checks for the source-body-derived program against the
+  stored source program and for the stored source program against the manifest
+  program, and the Lean theorem surface exposes those schedule equalities
+  directly. The combined source lookup theorem therefore also pins the
+  manifest kernel-step schedule, the recomputed slot-lowered imported schedule,
+  and the runtime slot-program schedule to the same step list, rather than
+  leaving that agreement implicit in an opaque program-equality boolean. Those
+  bridge facts now sit inside
+  `ProofGradeCompilerFacts`, with `ProofGrade.lean` exporting source-side
+  wrappers for them, including
+  `proofGrade_source_expected_kernel_schedule_exact_of_lookup` and
+  `proofGrade_source_to_runtime_slot_schedule_exact_of_lookup`. The latter
+  packages the source-body-derived imported schedule, manifest imported
+  schedule, recomputed slot-lowered imported schedule, and runtime slot-program
+  schedule into one theorem-facing chain, including the imported-to-runtime
+  step-list conversion.
 - `uo-check` no longer sits on the proof-grade CLI path and no longer sends
   Rust-computed proof-relevant views to the proof-grade checker; the richer
   view bundle is now debug-only and outside proof-grade acceptance
+- the residual runtime helper-shell cut now has explicit theorem-facing codec
+  semantics attached to the generated helper/source boundary:
+  `RuntimeStoreCodecSemantics` proves the exact-size nonzero transport length,
+  nonzero-nibble invariant, successful-decode soundness, valid-byte
+  encode/decode roundtrip, sealed-record public length formula, and sealed
+  record split shape plus magic-header open shape and open-transport
+  soundness for the encoded nibbles, decoded sealed bytes, and split
+  magic/nonce/ciphertext/tag components after successful nonzero decoding,
+  plus transport roundtrip for a valid opened sealed-record split, while
+  `RuntimeOramCodecSemantics`
+  records the public ORAM block/bucket/directory page formulas, a byte-layout
+  model for ORAM blocks and buckets, block encode/decode roundtrip, bucket
+  encoded-length exactness, exact-length ORAM block decode/roundtrip and
+  decoded-block valid-shape facts, aggregate decoded bucket/stash block
+  valid-shape facts, exact-bucket decode acceptance that ties public byte
+  length, expected bucket index, exact block decoding, and live-count
+  agreement together, bounded Path bucket decode for occupied block
+  slot/leaf bounds, public bucket-on-leaf-path membership, and decoded
+  position-map agreement plus duplicate live-slot rejection and position-map
+  live-slot coverage, generic whole-block-list position-map agreement and
+  no-duplicate hooks, Path-ORAM
+  position-map page coverage, the public
+  metadata page split between position-map and stash pages, exact position-map
+  page decode acceptance under the public leaf bound, exact aggregate
+  position-map-pages decode acceptance for a capacity-sized position map,
+  exact stash-page decode acceptance, aggregate stash-pages decode
+  shape/block validity, bounded aggregate stash decode for public
+  stash/slot/leaf bounds, stash position-map agreement, stash duplicate
+  live-slot rejection, and Path-ORAM position-map/stash page padding
+  lengths. It also connects well-formed ORAM
+  objects to the bucket-size formula used by the generated runtime codec stack. The
+  `RuntimePaperNativeKernelAssumptions` facade derives the corresponding
+  store transport, sealed-length, sealed-record decode-shape, ORAM block,
+  sealed-record open-transport soundness, sealed-record transport roundtrip,
+  exact-bucket decode-acceptance, bounded
+  Path bucket/path/position-map/uniqueness/coverage decode,
+  aggregate block-list validation,
+  page-layout, and `oramBucketBytesMatchCodec` facts from the existing
+  residual helper-shell boundary, so these are not additional paper assumptions.
+  The same source-backed boundary now also pins the handwritten ORAM write-batch
+  consumer to `OramWriteBatch::for_each_write(...)`, which validates the public
+  batch length and populated public prefix before trace emission, and rejects
+  the older lossy `filter_map(Option::as_ref)` path; the focused report exposes
+  this as `oram_write_batch_iteration_is_checked` and also reports that
+  production handwritten `engine.rs` / `shell.rs` / `state.rs` / `objects.rs`
+  / `oram.rs` avoid `expect(`, `unwrap(`, and `panic!`; the stronger
+  `runtime_interface_production_avoids_panic_style_control_flow` report bit
+  extends that check to the whole production source-backed interface, including
+  `uo-allocator`, `uo-store`, generated helpers, and shared `uo-core`
+  trace/types support. The imported JSON
+  runtime-boundary theorem surface also exposes these derived facts through
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecRoundtrip`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecTransportShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeSound`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedEncodedLen`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordOpenShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordOpenTransportSound`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordTransportRoundtrip`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramBucketBytesMatchCodec`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramBlockCodecRoundtrip`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramExactBlockCodecRoundtrip`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramExactBlockDecodeLength`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramExactBlockDecodeValidShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramBucketCodecLength`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramExactBucketDecodeAccepted`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramExactBucketDecodeBlockValidShapes`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathBucketBoundedDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathBucketPathBoundedDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathBucketPositionMapBoundedDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathBucketUniquePositionMapBoundedDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathPositionMapLiveSlotCoverage`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathBlocksPositionMapAgreement`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathBlocksNoDuplicateLiveSlots`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramDecodedBucketPayloadAccepted`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathPositionMapPagesCoverCapacity`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathMetadataPageSplit`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_positionMapDecodeAccepted`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathPositionMapPageDecodeAccepted`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathPositionMapPagesDecodeAccepted`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathPositionMapPageLength`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathStashPageDecodeAccepted`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathStashPageDecodeBlockValidShapes`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathStashPagesDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathStashPagesBoundedDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathStashPagesPositionMapBoundedDecodeShape`,
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathStashPagesUniquePositionMapBoundedDecodeShape`,
+  and
+  `importedRuntimeImplementationKernelMachineConfinementBoundary_valid_pathStashPageLength`,
+  so later proofs can depend on the checked artifact rather than a separate
+  Rust-side codec checker
 - the probe now exercises that translation-validation path directly in both the
   focused static-check report and the bridge-validation report; insecure raw
   confidential artifacts are now reported there as explicit proof-grade
@@ -787,8 +941,9 @@ Remaining change:
   depends on that emitter at all: Lean recomputes the projection from the raw
   contract JSON extracted directly from separately materialized artifacts and
   exposes theorem-level exactness lemmas for both imported views. Remaining
-  translation-side work is therefore limited to debug-surface hygiene rather
-  than a substantive proof-boundary trust gap
+  translation-side work is therefore no longer about checker trust; it is now
+  the deeper semantic compiler theorem itself: admitted-source semantics,
+  source-to-IR correctness, and IR-to-kernel correctness
 
 ### 6.4 Keep the surrogate backend off the strengthened claim path
 

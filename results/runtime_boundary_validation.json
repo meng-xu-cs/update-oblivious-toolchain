@@ -3,9 +3,11 @@
   "all_kernel_restricted_signatures_present": true,
   "all_restricted_signatures_present": true,
   "all_state_restricted_signatures_present": true,
+  "allocator_resource_event_log_is_public_bounded": true,
   "allocator_surface_restricted": true,
   "allocator_tracks_kernel_ops_by_count_only": true,
   "allocator_uses_manifest_kernel_step_budget": true,
+  "array_object_derive_line": "#[derive(Debug)]",
   "call_recorder_derive_line": "#[derive(Debug, Default)]",
   "call_recorder_nonclone": true,
   "call_result_nonclone": true,
@@ -14,6 +16,7 @@
   "canonical_fresh_coin_theorem_input_fields_private": true,
   "canonical_fresh_coin_witness_family_api_is_explicit": true,
   "canonical_fresh_coin_witness_family_fields_private": true,
+  "cell_object_derive_line": "#[derive(Debug)]",
   "cell_objects_use_fixed_cipher_buffer": true,
   "checker_path": "checker/uo-check/src/lib.rs",
   "checker_uses_manifest_slot_schedule_directly": true,
@@ -28,12 +31,12 @@
   "committed_runtime_witness_snapshot_surface_restricted": true,
   "committed_runtime_witness_snapshot_uses_exact_boxed_builder": true,
   "committed_runtime_witness_snapshot_wipes_on_drop": true,
-  "confidential_call_inputs_derive_line": "#[derive(Debug)]",
+  "confidential_call_inputs_derive_line": "pub(super)",
   "confidential_call_inputs_iterates_boxed_args_directly": true,
   "confidential_call_inputs_nonclone": true,
   "confidential_call_inputs_surface_files": [
-    "crates/uo-core/src/confidential_kernel.rs",
-    "crates/uo-core/src/lib.rs"
+    "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+    "runtime/uo-kernel-runtime/src/lib.rs"
   ],
   "confidential_call_inputs_surface_restricted": true,
   "confidential_call_inputs_wipe_on_drop": true,
@@ -51,77 +54,79 @@
   "confidential_kernel_run_outcome_surface_files": [],
   "confidential_kernel_run_outcome_surface_restricted": true,
   "confidential_kernel_schedule_interfaces_use_exact_size_buffers": true,
-  "confidential_kernel_slot_state_derive_line": "#[derive(Debug)]",
+  "confidential_kernel_slot_state_derive_line": "pub(super)",
   "confidential_kernel_slot_state_nonclone": true,
   "confidential_kernel_slot_state_surface_files": [
-    "crates/uo-core/src/confidential_kernel.rs",
-    "crates/uo-core/src/lib.rs"
+    "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+    "runtime/uo-kernel-runtime/src/lib.rs"
   ],
   "confidential_kernel_slot_state_surface_restricted": true,
   "confidential_kernel_slot_state_wipes_on_drop": true,
+  "confidential_kernel_statement_trace_api_is_explicit": true,
   "confidential_object_api_surface_checks": [
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".get_cell(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".set_cell(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".get_array(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".set_array(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".get_map(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".put_map(",
       "restricted": true
     }
   ],
   "confidential_object_api_surface_restricted": true,
+  "confidential_object_structs_nonclone": true,
   "confidential_proof_bundle_family_checker_uses_shared_bundle": true,
   "confidential_proof_bundle_family_projects_to_runtime_boundary_interfaces": true,
   "confidential_proof_family_assurance_validation_uses_assurance_checker": true,
@@ -133,7 +138,8 @@
   "confidential_proof_family_slot_assurance_validation_uses_assurance_checker": true,
   "confidential_proof_family_slot_boundary_validation_uses_boundary_checker": true,
   "confidential_proof_family_validation_uses_bundle_checker": true,
-  "contract_instance_clone_uses_cold_runtime_clone": true,
+  "confidential_statement_trace_bridge_is_exact": true,
+  "contract_instance_public_clone_removed": true,
   "contract_runtime_entrypoint_surface_checks": [
     {
       "expected_files": [
@@ -191,9 +197,7 @@
   "diagnostic_api_gated_behind_feature": true,
   "diagnostic_call_api_exposes_runtime_telemetry": true,
   "diagnostic_call_result_nonclone": true,
-  "direct_store_open_surface_files": [
-    "runtime/uo-store/src/codec.rs"
-  ],
+  "direct_store_open_surface_files": [],
   "direct_store_open_surface_restricted": true,
   "direct_store_seal_surface_files": [],
   "direct_store_seal_surface_restricted": true,
@@ -234,6 +238,7 @@
   "execution_trace_runtime_trusted_kernel_bundle_prefers_stored_finish_bundle": true,
   "execution_trace_runtime_trusted_kernel_bundle_rejects_finish_bundle_drift": true,
   "execution_trace_serialization_omits_raw_runtime_witness_pair": true,
+  "execution_trace_statement_trace_bridge_is_exact": true,
   "execution_trace_struct_literal_files": [],
   "execution_trace_struct_literal_surface_restricted": true,
   "expected_committed_runtime_witness_snapshot_surface_files": [
@@ -242,13 +247,13 @@
     "runtime/uo-evm/src/state.rs"
   ],
   "expected_confidential_call_inputs_surface_files": [
-    "crates/uo-core/src/confidential_kernel.rs",
-    "crates/uo-core/src/lib.rs"
+    "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+    "runtime/uo-kernel-runtime/src/lib.rs"
   ],
   "expected_confidential_kernel_run_outcome_surface_files": [],
   "expected_confidential_kernel_slot_state_surface_files": [
-    "crates/uo-core/src/confidential_kernel.rs",
-    "crates/uo-core/src/lib.rs"
+    "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+    "runtime/uo-kernel-runtime/src/lib.rs"
   ],
   "expected_controller_theorem_trace_constructor_files": [],
   "expected_execution_trace_builder_surface_files": [
@@ -278,10 +283,7 @@
   "expected_runtime_call_outcome_theorem_consumer_surface_files": [
     "crates/uo-core/src/trace.rs"
   ],
-  "expected_runtime_confidential_call_inputs_surface_files": [
-    "runtime/uo-evm/src/kernel.rs",
-    "runtime/uo-evm/src/state.rs"
-  ],
+  "expected_runtime_confidential_call_inputs_surface_files": [],
   "expected_runtime_confidential_entrypoint_plan_surface_files": [
     "crates/uo-core/src/manifest.rs",
     "runtime/uo-evm/src/state.rs"
@@ -518,15 +520,46 @@
   "fresh_coin_plan_surface_restricted": true,
   "fresh_coin_plan_zeroizes_on_drop": true,
   "fresh_coins_path": "runtime/uo-evm/src/fresh_coins.rs",
+  "fullscan_array_access_uses_masked_full_scan": true,
   "fullscan_buffer_reuse_checks": [
     {
       "expected_files": [
-        "runtime/uo-evm/src/objects.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/objects.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs"
       ],
-      "pattern": "for value in self.values.iter_mut() {\n            value.wipe_secrets();\n            *value = Value::zero_for_type(&self.spec.value_type);",
+      "pattern": "pub(super) fn cold_commit_boxed_values(values: &mut [Value], value_type: &Type) {",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/generated_object_helpers.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_object_helpers.rs"
+      ],
+      "pattern": "pub(super) fn cold_commit_small_map_entries(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/generated_object_helpers.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_object_helpers.rs"
+      ],
+      "pattern": "pub(super) fn decode_array_values_from_storage(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/generated_object_helpers.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_object_helpers.rs"
+      ],
+      "pattern": "pub(super) fn decode_small_map_entries_from_storage(",
       "restricted": true
     },
     {
@@ -536,7 +569,7 @@
       "files": [
         "runtime/uo-evm/src/objects.rs"
       ],
-      "pattern": "for entry in self.entries.iter_mut() {\n            entry.wipe_secrets();\n            *entry = MapEntry::new(",
+      "pattern": "old.decode_values_from_storage(allocator)?",
       "restricted": true
     },
     {
@@ -546,37 +579,7 @@
       "files": [
         "runtime/uo-evm/src/objects.rs"
       ],
-      "pattern": "fn decode_values_from_storage_into(",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/objects.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/objects.rs"
-      ],
-      "pattern": "fn decode_entries_from_storage_into(",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/objects.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/objects.rs"
-      ],
-      "pattern": "old.decode_values_from_storage_into(allocator, &mut next.values)?;",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/objects.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/objects.rs"
-      ],
-      "pattern": "old.decode_entries_from_storage_into(allocator, &mut next.entries)?;",
+      "pattern": "old.decode_entries_from_storage(allocator)?",
       "restricted": true
     },
     {
@@ -594,6 +597,11 @@
   ],
   "fullscan_buffer_reuse_restricted": true,
   "fullscan_objects_use_fixed_box_buffers": true,
+  "generated_object_helpers_path": "runtime/uo-evm/src/generated_object_helpers.rs",
+  "generated_oram_codecs_path": "runtime/uo-evm/src/generated_oram_codecs.rs",
+  "generated_slot_support_path": "runtime/uo-kernel-runtime/src/generated_slot_support.rs",
+  "generated_store_codec_path": "runtime/uo-store/src/generated_codec.rs",
+  "handwritten_runtime_lacks_direct_secret_ops": true,
   "imported_kernel_interface_bundle_projects_to_runtime_bundle": true,
   "imported_kernel_interface_bundle_projects_to_runtime_confinement_boundary": true,
   "imported_kernel_interface_bundle_projects_to_runtime_interface": true,
@@ -632,15 +640,57 @@
   "kernel_avoids_raw_escape_hatches": true,
   "kernel_bounded_journal_checks": [
     {
-      "expected_files": [],
-      "files": [],
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
       "pattern": "struct BoundedJournal<T>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs",
+        "crates/uo-core/src/types.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs",
+        "crates/uo-core/src/types.rs"
+      ],
+      "pattern": "entries: Box<[MaybeUninit<T>]>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "pattern": "kernel_steps: BoundedJournal<RuntimeKernelStepWitness>",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "files": [
+        "crates/uo-core/src/trace.rs"
+      ],
+      "pattern": "events: BoundedJournal<RuntimeKernelRefinementEventWitness>",
       "restricted": true
     },
     {
       "expected_files": [],
       "files": [],
-      "pattern": "kernel_steps: BoundedJournal<RuntimeKernelStepWitness>",
+      "pattern": "emitted_kernel_steps: Vec<RuntimeKernelStepWitness>",
+      "restricted": true
+    },
+    {
+      "expected_files": [],
+      "files": [],
+      "pattern": "events: Vec<RuntimeKernelRefinementEventWitness>",
       "restricted": true
     },
     {
@@ -674,21 +724,19 @@
   "kernel_only_state_helper_surface_checks": [
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "committed.shadow_load(shadow_load_object_ids, &mut self.allocator)?",
+      "pattern": "committed.shadow_load(shadow_load_object_ids, allocator)",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "pattern": ".object_mut(object_id)?",
@@ -696,100 +744,52 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "objects.install_path_oram_leaf_coins(fresh_coins.into_entries())",
+      "pattern": "self.install_path_oram_leaf_coins(fresh_coins.into_entries())",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "objects.ensure_path_oram_leaf_coins_consumed()",
+      "pattern": "self.ensure_path_oram_leaf_coins_consumed()",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-kernel-runtime/src/generated_machine.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs"
+        "runtime/uo-kernel-runtime/src/generated_machine.rs"
       ],
-      "pattern": "objects.commit_against(committed, aborted, recorder, &mut self.allocator)?",
+      "pattern": "store.commit_against(committed, aborted, recorder, &mut self.allocator)?",
       "restricted": true
     }
   ],
   "kernel_only_state_helper_surface_restricted": true,
-  "kernel_path": "runtime/uo-evm/src/kernel.rs",
   "kernel_refinement_boundary_validation_uses_boundary_checker": true,
   "kernel_restricted_signature_checks": [
     {
       "present": true,
-      "signature": "pub(in crate::runtime) fn begin("
+      "signature": "runtime-local PublicRuntimeKernel module removed"
     },
     {
       "present": true,
-      "signature": "pub(in crate::runtime) fn note_hash_bytes"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn enforce_stack_words"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn wipe_hash_scratch"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn cell_get("
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn cell_set("
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn array_get("
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn array_set("
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn map_get("
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn map_put("
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn finish("
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn shadow_load_public_objects"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn commit_public_objects"
-    },
-    {
-      "present": true,
-      "signature": "pub(in crate::runtime) fn run_confidential_call"
+      "signature": "runtime-local PublicRuntimeKernel impl removed"
     }
   ],
   "kernel_runtime_phase_helper_path_restricted": true,
   "kernel_runtime_phase_tracker_uses_shared_transition_fn": true,
   "kernel_scratch_accounting_uses_object_type_lengths": true,
   "kernel_slot_boundary_validation_uses_boundary_checker": true,
+  "kernel_statement_trace_recorder_is_exact": true,
   "kernel_uses_core_execution_tracker": true,
   "kernel_uses_core_refinement_tracker": true,
   "kernel_uses_core_schedule_tracker": true,
@@ -798,6 +798,7 @@
   "kernel_uses_shared_shadow_state_interface": true,
   "kernel_witness_validation_tracks_confidential_kernel_lowering_errors": true,
   "kernel_witness_validation_uses_manifest_confidential_slot_program": true,
+  "legacy_runtime_kernel_path": "runtime/uo-evm/src/kernel.rs",
   "manifest_kernel_step_interfaces_use_exact_size_buffers": true,
   "map_entry_api_is_explicit": true,
   "map_entry_fields_private": true,
@@ -812,33 +813,63 @@
   "oram_bucket_uses_fixed_block_buffer": true,
   "oram_buffer_reuse_checks": [
     {
-      "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
+      "expected_files": [],
+      "files": [],
       "pattern": "impl Clone for OramState",
       "restricted": true
     },
     {
-      "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
+      "expected_files": [],
+      "files": [],
       "pattern": "entries: self.entries.clone(),",
       "restricted": true
     },
     {
       "expected_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "pattern": "entries: repeat_boxed_map_entries(state.parameters.capacity, &state.empty_entry)?,",
+      "restricted": true
+    },
+    {
+      "expected_files": [],
+      "files": [],
+      "pattern": "entries: repeat_boxed(state.parameters.capacity, state.empty_entry.clone())?,",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs",
         "runtime/uo-evm/src/oram.rs"
       ],
       "files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs",
         "runtime/uo-evm/src/oram.rs"
       ],
-      "pattern": "entries: vec![self.empty_entry.clone(); self.parameters.capacity].into_boxed_slice(),",
+      "pattern": "position_map: repeat_boxed_masked_usize_options(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "pattern": "pub(super) fn decode_path_metadata_pages_into(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "pattern": "pub(super) fn decode_path_position_map_pages_into(",
       "restricted": true
     },
     {
@@ -848,67 +879,47 @@
       "files": [
         "runtime/uo-evm/src/oram.rs"
       ],
-      "pattern": "position_map: vec![None; self.parameters.capacity].into_boxed_slice()",
+      "pattern": "let position_map = repeat_boxed_masked_usize_options(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "pattern": "decode_path_metadata_pages_into(",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "pattern": "decode_path_position_map_pages_into(",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "pattern": "position_map: vec![None; self.parameters.capacity].into_boxed_slice(),",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "pattern": "let position_map = decode_path_position_map_pages(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "let mut working_position_map = std::mem::take(&mut self.position_map);",
+      "pattern": "pub(super) fn path_position_map_from_storage(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "self.position_map = working_position_map;",
+      "pattern": "let mut working_position_map = std::mem::take(&mut state.position_map);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "pattern": "state.position_map = working_position_map;",
       "restricted": true
     },
     {
@@ -923,52 +934,54 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": ".directory_pages\n            .clone_from(&old.storage.directory_pages);",
+      "pattern": ".directory_pages\n        .clone_from(&old.storage.directory_pages);",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "self.storage.buckets.clone_from(&old.storage.buckets);",
+      "pattern": "state.storage.buckets.clone_from(&old.storage.buckets);",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": ".access_counter_slot\n            .clone_from(&old.storage.access_counter_slot);",
+      "pattern": ".access_counter_slot\n        .clone_from(&old.storage.access_counter_slot);",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "fn decode_surrogate_entries_from_storage_into(",
+      "pattern": "pub(super) fn decode_surrogate_entries_from_storage_into(",
       "restricted": true
     },
     {
       "expected_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs",
         "runtime/uo-evm/src/oram.rs"
       ],
       "files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs",
         "runtime/uo-evm/src/oram.rs"
       ],
-      "pattern": "Self::decode_surrogate_entries_from_storage_into(",
+      "pattern": "decode_surrogate_entries_from_storage_into(",
       "restricted": true
     },
     {
@@ -983,42 +996,42 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "rewrite_path_metadata_pages_in_place(",
+      "pattern": "pub(super) fn rewrite_path_metadata_pages_in_place(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "encode_path_position_map_page_into(",
+      "pattern": "pub(super) fn encode_path_position_map_page_into(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "encode_path_stash_page_into(",
+      "pattern": "pub(super) fn encode_path_stash_page_into(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "let mut payload = vec![0u8; parameters.directory_page_bytes];",
+      "pattern": "let mut payload = zeroed_boxed_bytes(parameters.directory_page_bytes)?;",
       "restricted": true
     },
     {
@@ -1037,7 +1050,12 @@
   "oram_buffer_reuse_restricted": true,
   "oram_commit_api_is_explicit": true,
   "oram_commit_fields_private": true,
+  "oram_map_object_derive_line": "#[derive(Debug)]",
   "oram_path": "runtime/uo-evm/src/oram.rs",
+  "oram_runtime_uses_shared_boxed_filler_helper": true,
+  "oram_runtime_uses_shared_boxed_seal_helper": true,
+  "oram_runtime_uses_shared_commit_reseal_helper": true,
+  "oram_runtime_uses_shared_open_decode_helper": true,
   "oram_state_api_is_explicit": true,
   "oram_state_derive_line": "#[derive(Debug)]",
   "oram_state_fields_private": true,
@@ -1054,22 +1072,22 @@
   "oram_working_stash_capacity_checks": [
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "pattern": "fn working_stash_capacity(parameters: &OramParameters) -> Result<usize>",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "stash: FixedStash::with_capacity(spec, working_stash_capacity(&self.parameters)?)?",
+      "pattern": "stash: FixedStash::with_capacity(spec, working_stash_capacity(&state.parameters)?)?,",
       "restricted": true
     },
     {
@@ -1084,30 +1102,20 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
-      "pattern": "let mut stash = FixedStash::with_capacity(spec, working_stash_capacity(parameters)?)?;",
+      "pattern": "let mut stash = fixed_stash_with_capacity(spec, working_stash_capacity(parameters)?)?;",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "pattern": "self.stash.clear();",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
       ],
       "pattern": "if working_stash.capacity() < required_stash_capacity {",
       "restricted": true
@@ -1115,6 +1123,8 @@
   ],
   "oram_working_stash_capacity_restricted": true,
   "oram_write_fields_private": true,
+  "oram_write_log_is_public_exact_batch": true,
+  "oram_write_log_update_only_zero_write_free": true,
   "oram_write_trace_is_shape_only": true,
   "oram_write_trace_projects_to_public_shape": true,
   "paper_main_end_to_end_boundary_projects_to_runtime_confinement_boundary": true,
@@ -1153,6 +1163,7 @@
   "paper_main_top_level_assumptions_use_minimal_runtime_boundary": true,
   "path_oram_leaf_coin_source_uses_fixed_tape": true,
   "path_oram_metadata_buffers_use_exact_page_slices": true,
+  "path_oram_placeholders_use_empty_boxed_slices": true,
   "path_oram_position_map_decode_stays_boxed": true,
   "path_oram_position_map_rewrite_stays_boxed": true,
   "path_oram_restore_reuses_in_place_buffers": true,
@@ -1214,87 +1225,27 @@
   "public_trace_helper_surface_restricted": true,
   "raw_kernel_private_surface_checks": [
     {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) struct RuntimeKernel {",
-      "private_present": true,
-      "required_private": "struct RuntimeKernel {",
+      "check": "uo-evm no longer defines a separate RuntimeKernel wrapper",
       "restricted": true
     },
     {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) trait RuntimeShadowObjectStore {",
-      "private_present": true,
-      "required_private": "trait RuntimeShadowObjectStore {",
+      "check": "runtime shadow stores only implement the shared kernel object-store trait locally",
       "restricted": true
     },
     {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) impl RuntimeShadowObjectStore for ConfidentialRuntimeShadowState {",
-      "private_present": true,
-      "required_private": "impl RuntimeShadowObjectStore for ConfidentialRuntimeShadowState {",
+      "check": "the shared confidential-kernel object-store interface lives in the dedicated kernel crate",
       "restricted": true
     },
     {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) impl RuntimeShadowObjectStore for PublicRuntimeShadowState {",
-      "private_present": true,
-      "required_private": "impl RuntimeShadowObjectStore for PublicRuntimeShadowState {",
+      "check": "raw boundary-tracker and machine-step helpers stay inside the shared kernel crate",
       "restricted": true
     },
     {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn record_kernel_step(",
-      "private_present": true,
-      "required_private": "fn record_kernel_step(",
+      "check": "uo-evm does not carry legacy monolithic raw-kernel helpers",
       "restricted": true
     },
     {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn cell_get(",
-      "private_present": true,
-      "required_private": "fn cell_get<S: RuntimeShadowObjectStore>(",
-      "restricted": true
-    },
-    {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn cell_set(",
-      "private_present": true,
-      "required_private": "fn cell_set<S: RuntimeShadowObjectStore>(",
-      "restricted": true
-    },
-    {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn array_get(",
-      "private_present": true,
-      "required_private": "fn array_get<S: RuntimeShadowObjectStore>(",
-      "restricted": true
-    },
-    {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn array_set(",
-      "private_present": true,
-      "required_private": "fn array_set<S: RuntimeShadowObjectStore>(",
-      "restricted": true
-    },
-    {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn map_get(",
-      "private_present": true,
-      "required_private": "fn map_get<S: RuntimeShadowObjectStore>(",
-      "restricted": true
-    },
-    {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn map_put(",
-      "private_present": true,
-      "required_private": "fn map_put<S: RuntimeShadowObjectStore>(",
-      "restricted": true
-    },
-    {
-      "forbidden_present": false,
-      "forbidden_pubcrate": "pub(crate) fn commit_objects(",
-      "private_present": true,
-      "required_private": "fn commit_objects<S: RuntimeShadowObjectStore>(",
+      "check": "uo-evm uses the shared kernel machine through a runtime-private alias",
       "restricted": true
     }
   ],
@@ -1394,11 +1345,9 @@
     "crates/uo-core/src/trace.rs"
   ],
   "runtime_call_outcome_theorem_consumer_surface_restricted": true,
-  "runtime_confidential_call_inputs_surface_files": [
-    "runtime/uo-evm/src/kernel.rs",
-    "runtime/uo-evm/src/state.rs"
-  ],
+  "runtime_confidential_call_inputs_surface_files": [],
   "runtime_confidential_call_inputs_surface_restricted": true,
+  "runtime_confidential_core_finish_slot_rechecks_statement_trace": true,
   "runtime_confidential_core_kernel_finish_slot_bundle_surface_present": true,
   "runtime_confidential_core_kernel_interface_slot_assurance_projects_to_runtime_kernel_interface_slot_boundary": true,
   "runtime_confidential_core_kernel_interface_slot_bundle_projects_to_runtime_kernel_confinement_boundary": true,
@@ -1440,6 +1389,8 @@
   "runtime_execution_trace_parts_constructor_surface_restricted": true,
   "runtime_execution_trace_parts_fields_private": true,
   "runtime_execution_trace_parts_prefers_finish_bundle": true,
+  "runtime_handwritten_confidential_work_lives_only_in_generated_helpers": true,
+  "runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumption_bundle_minimized": true,
   "runtime_kernel_finish_bundle_nonclone": true,
   "runtime_kernel_finish_bundle_surface_present": true,
   "runtime_kernel_finish_slot_boundary_projects_to_runtime_kernel_interface_slot_boundary": true,
@@ -1457,6 +1408,7 @@
   "runtime_kernel_schedule_witness_api_is_explicit": true,
   "runtime_kernel_schedule_witness_builder_path_restricted": true,
   "runtime_kernel_schedule_witness_fields_private": true,
+  "runtime_kernel_telemetry_resource_events_boxed": true,
   "runtime_kernel_witness_api_is_explicit": true,
   "runtime_kernel_witness_builder_path_restricted": true,
   "runtime_kernel_witness_export_prefers_stored_finish_bundle": true,
@@ -1465,6 +1417,7 @@
   "runtime_module_path": "runtime/uo-evm/src/runtime.rs",
   "runtime_object_derive_line": "#[derive(Debug)]",
   "runtime_object_graph_avoids_vec_u8_cipher_buffers": true,
+  "runtime_object_graph_uses_explicit_cold_clone_helpers": true,
   "runtime_object_nonclone": true,
   "runtime_observed_oram_access_witness_api_is_explicit": true,
   "runtime_oram_access_witness_api_is_explicit": true,
@@ -1502,12 +1455,14 @@
   "runtime_public_object_universe_uses_boxed_buffers": true,
   "runtime_refinement_witness_fresh_coin_accessors_use_boxed_buffers": true,
   "runtime_refinement_witness_uses_boxed_boundary_and_hidden_buffers": true,
+  "runtime_rejects_confidential_raw_backends": true,
+  "runtime_rejects_confidential_raw_kernel_targets": true,
   "runtime_secret_state_inventory": [
     {
-      "boundary": "shell projects only PublicCallSummary; engine.rs boxes call args once into a fixed-size slice for the traced-call/runtime path, the confidential runtime branch then hands that boxed payload into the fixed-size ConfidentialCallInputs buffer owned by uo-core before the kernel path begins, and that buffer is consumed only by the shared execute_confidential_kernel_slot_call path while runtime/uo-evm/src/kernel.rs supplies only the effect adapter and the buffered values wipe on drop",
+      "boundary": "shell projects only PublicCallSummary; engine.rs boxes call args once into a fixed-size slice for the traced-call/runtime path, state.rs passes that boxed payload directly into RuntimeKernelMachine, and the shared kernel runtime alone owns the fixed-size ConfidentialCallInputs wrapper, consumes it while staging the live slot file, and wipes the buffered values on drop before delegating into the generated shared interpreter",
       "checked": true,
       "name": "ConfidentialCallInputs",
-      "owner": "crates/uo-core/src/confidential_kernel.rs"
+      "owner": "runtime/uo-kernel-runtime/src/lib.rs"
     },
     {
       "boundary": "opaque public handle; raw per-object fresh-coin entries stay inside crate::runtime as boxed fixed-size coin tapes ordered by public object id, the handle is non-Clone and consumed by value, and the per-object tapes move into live shadow state without cloning",
@@ -1522,16 +1477,22 @@
       "owner": "runtime/uo-evm/src/oram.rs"
     },
     {
-      "boundary": "shared fixed-size slot-file state owned by the confidential kernel DSL; uo-core defines the boxed slot buffer, confidential-argument staging, live slot-word accounting, and wipe-on-drop semantics through the shared slot-call executor, the shared interpreter also stages confidential hash parts through an exact-size boxed buffer rather than a growable Vec<Value>, and runtime/uo-evm/src/kernel.rs now supplies only the effect adapter without defining a runtime-local slot-state clone or escape hatch",
+      "boundary": "the smaller shared kernel runtime now owns the boxed fixed-size slot file, confidential-argument staging, live slot-word accounting, and wipe-on-drop semantics through a Lean-generated slot-support module plus the private RuntimeKernelSlotCall adapter, while uo-core only provides the generated slot-program interpreter and exact-size hash-part buffer; uo-evm reaches that state only through RuntimeKernelMachine and no longer exposes a uo-core slot-state wrapper or call executor surface",
       "checked": true,
       "name": "ConfidentialKernelSlotState",
-      "owner": "crates/uo-core/src/confidential_kernel.rs"
+      "owner": "runtime/uo-kernel-runtime/src/generated_slot_support.rs and runtime/uo-kernel-runtime/src/lib.rs"
     },
     {
       "boundary": "shared per-call outcome bundle; construction is pinned to state.rs and shell.rs through an explicit constructor, the shared uo-core finalization path is the only production consumer of its theorem-packaging API, and engine.rs does not unpack it directly",
       "checked": true,
       "name": "RuntimeCallOutcome",
       "owner": "crates/uo-core/src/trace.rs"
+    },
+    {
+      "boundary": "live confidential statements are recorded by the runtime effect adapter, carried through the shared ExecutionTrace/RuntimeCallOutcome bridge, and rechecked against the fixed confidential slot program by both the pre-witness finish-slot bundle and the direct trusted-kernel slot bundle before proof export",
+      "checked": true,
+      "name": "ConfidentialStatementTraceBridge",
+      "owner": "runtime/uo-kernel-runtime/src/lib.rs and crates/uo-core/src/{confidential_kernel,trace,confidential_core,trusted_kernel}.rs"
     },
     {
       "boundary": "shared post-call handoff bundle capturing the after-call hidden witness snapshot plus RuntimeCallOutcome before final execution-trace packaging",
@@ -1582,22 +1543,22 @@
       "owner": "crates/uo-core/src/types.rs"
     },
     {
-      "boundary": "object-level confidential state is non-Clone, helper-restricted, and all secret-bearing ciphertext slots in the runtime object graph now use fixed boxed buffers, including the raw-backend map entry slot; the full-scan array/small-map bootstrap seal path and the small-map record plaintext helper now also stay on exact-size boxed buffers rather than growable Vec<u8> carriers",
+      "boundary": "object-level confidential state is non-Clone, helper-restricted, and all secret-bearing ciphertext slots in the runtime object graph now use fixed boxed buffers, including the raw-backend map entry slot; the full-scan array/small-map bootstrap seal path and the small-map record plaintext helper now also stay on exact-size boxed buffers rather than growable Vec<u8> carriers, and UO array reads/writes now compute the logical result through masked full-slot scans rather than direct secret-indexed value access",
       "checked": true,
       "name": "RuntimeObject graph",
       "owner": "runtime/uo-evm/src/objects.rs"
     },
     {
-      "boundary": "live ORAM logical state remains inside runtime with restricted helper use, a boxed fixed-shape entry array, a fixed-capacity stash, boxed public page arrays, a boxed fixed counter slot, a boxed fixed-capacity position map, fixed-shape bucket block buffers, and exact-size metadata-page scratch on both the surrogate and Path-ORAM sides; surrogate directory pages decode directly into caller-owned entry buffers, Path-ORAM position-map/stash pages are filled through exact-size slices rather than growable plaintext page vectors, and the live Path-ORAM position map now stays boxed across decode and rewrite instead of widening into a temporary Vec<Option<usize>> on the confidential path",
+      "boundary": "live ORAM logical state remains inside runtime with restricted helper use, a boxed fixed-shape entry array, a fixed-capacity stash whose allocate/reset/insert path now routes through Lean-generated helpers, boxed public page arrays, a boxed fixed counter slot, a boxed fixed-capacity position map, fixed-shape bucket block buffers, and exact-size metadata-page scratch on both the surrogate and Path-ORAM sides; surrogate directory pages decode directly into caller-owned entry buffers, Path-ORAM position-map/stash pages are filled through exact-size slices rather than growable plaintext page vectors, and the live Path-ORAM position map now stays boxed across decode and rewrite instead of widening into a temporary Vec<Option<usize>> on the confidential path",
       "checked": true,
       "name": "OramState",
       "owner": "runtime/uo-evm/src/oram.rs"
     },
     {
-      "boundary": "direct seal/open stays in codec; wipe-preserving helper surface is fixed, the nonzero transport plus sealed-payload encode/decode path now use exact-size buffers and in-place AEAD helpers rather than growable transport vectors, and the fixed-size raw/UO slot stores now keep their ciphertext cells in boxed buffers while the UO write path seals directly into those fixed-size boxed slots",
+      "boundary": "direct seal/open stays in codec; the deterministic nonzero transport helpers live in a Lean-generated codec fragment, the exact-size plaintext staging and wipe-on-drop shell now live in the Lean-generated surface fragment, and the handwritten codec shell is reduced to key lifecycle plus public delegating methods; the fixed-size raw/UO slot stores keep their ciphertext cells in boxed buffers via Lean-generated raw-slot allocation and copy-and-wipe helpers while the UO bootstrap/write path is forced through Lean-generated boxed-filler and seal-into helpers and records only public update-shape write evidence rather than cloning ciphertext snapshots",
       "checked": true,
       "name": "StoreCipher and plaintext staging",
-      "owner": "runtime/uo-store/src/codec.rs and runtime/uo-store/src/store.rs"
+      "owner": "runtime/uo-store/src/codec.rs, runtime/uo-store/src/generated_codec.rs, runtime/uo-store/src/generated_store_helpers.rs, and runtime/uo-store/src/store.rs"
     }
   ],
   "runtime_secret_state_inventory_complete": true,
@@ -1632,11 +1593,9 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "pattern": "CommittedRuntimeState",
@@ -1654,11 +1613,9 @@
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/kernel.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "pattern": "ConfidentialRuntimeShadowState",
@@ -1682,16 +1639,6 @@
         "runtime/uo-evm/src/state.rs"
       ],
       "pattern": "entries: Box<[RuntimeObjectEntry]>",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/state.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/state.rs"
-      ],
-      "pattern": "struct FixedBoxBuilder<T>",
       "restricted": true
     },
     {
@@ -1747,7 +1694,11 @@
   ],
   "runtime_state_surface_restricted": true,
   "runtime_state_uses_exact_boxed_builder": true,
+  "runtime_store_uo_writes_emit_public_update_shape": true,
+  "runtime_store_uses_shared_boxed_filler_helper": true,
+  "runtime_store_uses_shared_seal_into_helper": true,
   "runtime_trusted_kernel_bundle_nonclone": true,
+  "runtime_trusted_kernel_slot_rechecks_statement_trace": true,
   "runtime_vec_u8_field_lines": [],
   "seeded_runtime_paper_main_family_bundle_api_is_explicit": true,
   "seeded_runtime_paper_main_family_bundle_fields_private": true,
@@ -1757,10 +1708,13 @@
   "seeded_runtime_pathoram_witness_family_fields_private": true,
   "seeded_runtime_witness_family_api_is_explicit": true,
   "seeded_runtime_witness_family_fields_private": true,
+  "shared_kernel_runtime_path": "runtime/uo-kernel-runtime/src/lib.rs",
   "shell_confidential_surface_absent": true,
   "shell_path": "runtime/uo-evm/src/shell.rs",
   "shell_uses_public_runtime_kernel": true,
   "shell_uses_shadow_wrapper": true,
+  "small_map_lookup_uses_masked_full_scan": true,
+  "small_map_object_derive_line": "#[derive(Debug)]",
   "state_cold_commit_iterates_boxed_entries_directly": true,
   "state_commit_peekable_iterates_boxed_shadow_entries_directly": true,
   "state_committed_runtime_witness_snapshot_is_opaque": true,
@@ -1776,7 +1730,7 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": ".shadow_load_public_objects(self, public_object_ids)",
+      "pattern": "kernel.shadow_load_with(public_object_ids, |allocator| {",
       "restricted": true
     },
     {
@@ -1786,7 +1740,7 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": ".commit_public_objects(shadow, self, aborted, recorder)",
+      "pattern": "kernel.commit_objects(shadow, self, aborted, recorder)",
       "restricted": true
     },
     {
@@ -1796,7 +1750,7 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "let (committed_shadow, runtime_kernel_finish_bundle, aborted, return_value) = kernel\n            .run_confidential_call(",
+      "pattern": "let (\n            committed_shadow,\n            runtime_kernel_machine_finish_witness,\n            runtime_kernel_finish_bundle,\n            aborted,\n            return_value,\n        ) = kernel\n            .run_confidential_call::<ConfidentialRuntimeShadowState>(",
       "restricted": true
     }
   ],
@@ -1814,9 +1768,11 @@
     },
     {
       "expected_files": [
+        "runtime/uo-evm/src/objects.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "files": [
+        "runtime/uo-evm/src/objects.rs",
         "runtime/uo-evm/src/state.rs"
       ],
       "pattern": "clone_committed_cold()",
@@ -1859,7 +1815,7 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "entries.push(entry.into_cold_committed());",
+      "pattern": "entries.push(entry.into_cold_committed()?)?;",
       "restricted": true
     },
     {
@@ -1955,93 +1911,76 @@
   "state_wrapper_present": true,
   "store_cipher_exposes_wipe_helpers": true,
   "store_cipher_key_zeroizes_on_drop": true,
+  "store_cipher_surface_stays_in_codec": true,
   "store_cipher_uses_exact_size_nonzero_buffers": true,
   "store_codec_path": "runtime/uo-store/src/codec.rs",
-  "store_slots_use_boxed_buffers": true,
+  "store_slots_use_generated_boxed_helpers": true,
   "store_store_path": "runtime/uo-store/src/store.rs",
   "store_wipe_helper_surface_checks": [
     {
-      "expected_files": [
-        "runtime/uo-store/src/codec.rs"
-      ],
-      "files": [
-        "runtime/uo-store/src/codec.rs"
-      ],
+      "expected_files": [],
+      "files": [],
       "pattern": "seal_and_wipe(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/objects.rs",
-        "runtime/uo-evm/src/oram.rs",
-        "runtime/uo-store/src/codec.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs",
+        "runtime/uo-store/src/generated_surface.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/objects.rs",
-        "runtime/uo-evm/src/oram.rs",
-        "runtime/uo-store/src/codec.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs",
+        "runtime/uo-store/src/generated_surface.rs"
       ],
       "pattern": "seal_and_wipe_boxed(",
       "restricted": true
     },
     {
-      "expected_files": [
-        "runtime/uo-store/src/codec.rs"
-      ],
-      "files": [
-        "runtime/uo-store/src/codec.rs"
-      ],
+      "expected_files": [],
+      "files": [],
       "pattern": "filler(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/oram.rs",
-        "runtime/uo-store/src/codec.rs",
-        "runtime/uo-store/src/store.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs",
+        "runtime/uo-store/src/generated_surface.rs",
+        "runtime/uo-store/src/generated_store_helpers.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/oram.rs",
-        "runtime/uo-store/src/codec.rs",
-        "runtime/uo-store/src/store.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs",
+        "runtime/uo-store/src/generated_store_helpers.rs",
+        "runtime/uo-store/src/generated_surface.rs"
       ],
       "pattern": "filler_boxed(",
       "restricted": true
     },
     {
-      "expected_files": [
-        "runtime/uo-store/src/codec.rs"
-      ],
-      "files": [
-        "runtime/uo-store/src/codec.rs"
-      ],
+      "expected_files": [],
+      "files": [],
       "pattern": "seal_and_wipe_into(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/objects.rs",
-        "runtime/uo-evm/src/oram.rs",
-        "runtime/uo-store/src/codec.rs",
-        "runtime/uo-store/src/store.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs",
+        "runtime/uo-store/src/generated_surface.rs",
+        "runtime/uo-store/src/generated_store_helpers.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/objects.rs",
-        "runtime/uo-evm/src/oram.rs",
-        "runtime/uo-store/src/codec.rs",
-        "runtime/uo-store/src/store.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs",
+        "runtime/uo-store/src/generated_store_helpers.rs",
+        "runtime/uo-store/src/generated_surface.rs"
       ],
       "pattern": "seal_and_wipe_into_slice(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/objects.rs",
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/objects.rs",
-        "runtime/uo-evm/src/oram.rs"
+        "runtime/uo-evm/src/generated_object_helpers.rs"
       ],
       "pattern": ".with_opened_payload(",
       "restricted": true
@@ -2050,7 +1989,10 @@
   "store_wipe_helper_surface_restricted": true,
   "store_write_api_uses_mutable_plaintext": true,
   "surrogate_oram_directory_buffers_use_exact_page_slices": true,
+  "tamper_validation_covers_host_coordination_secret_serialization_drift": true,
   "tamper_validation_covers_kernel_interface_confinement_boundary_witness_drift": true,
+  "tamper_validation_covers_runtime_kernel_machine_capacity_drift": true,
+  "tamper_validation_covers_shell_canonical_hashing_guard_order_drift": true,
   "theorem_bridge_is_runtime_owned": true,
   "theorem_certificate_constructor_checks": [
     {
@@ -2237,6 +2179,7 @@
   ],
   "traced_runtime_call_witness_state_surface_restricted": true,
   "traced_runtime_call_witness_state_wipes_on_drop": true,
+  "translation_validation_rejects_confidential_raw_kernel_targets": true,
   "translation_validation_uses_canonical_kernel_step_manifest": true,
   "trusted_kernel_checker_uses_slot_bundle": true,
   "trusted_kernel_cli_uses_slot_bundle": true,

@@ -99,10 +99,16 @@ fn finalize_call_trace(
         public_call,
         recorder,
     } = context;
-    let (runtime_kernel_finish_bundle, aborted, return_value, opcode_trace, runtime_witness_state) =
-        traced_outcome
-            .into_finalized_call_trace_parts(runtime_call_start)
-            .into_execution_trace_inputs();
+    let (
+        runtime_kernel_machine_finish_witness,
+        runtime_kernel_finish_bundle,
+        aborted,
+        return_value,
+        opcode_trace,
+        runtime_witness_state,
+    ) = traced_outcome
+        .into_finalized_call_trace_parts(runtime_call_start)
+        .into_execution_trace_inputs();
     let (gas_used, zero_writes, trace_bundle) = finalize_public_call_trace(
         recorder,
         manifest_entry,
@@ -119,6 +125,7 @@ fn finalize_call_trace(
             opcode_trace,
             gas_used,
             Some(deploy_seed),
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_witness_state,
         ),

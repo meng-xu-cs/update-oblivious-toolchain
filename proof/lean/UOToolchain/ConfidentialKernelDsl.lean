@@ -271,6 +271,67 @@ def ConfidentialKernelSlotProgram.checkRuntimeNormalForm
 
 mutual
 
+def confidentialKernelStatementTraceNames : List String :=
+  ["declare", "assign", "require", "abort_if", "cell_set", "array_set", "map_put", "return"]
+
+def confidentialKernelStatementRuntimeNormalFormFlags : List Bool :=
+  [true, true, false, true, true, true, true, true]
+
+def confidentialKernelStatementEffectKinds : List String :=
+  ["store_slot", "store_slot", "guard_only", "abort_flag", "cell_set", "array_set", "map_put",
+    "return_value"]
+
+def confidentialKernelStatementEvaluatedOperands : List String :=
+  ["value", "value", "cond", "cond", "value,predicate?", "index,value,predicate?",
+    "key,value,predicate?", "value?"]
+
+def confidentialKernelStatementTailOpcodes : List String :=
+  ["", "", "", "", "CellSet", "ArraySet", "MapPut", ""]
+
+def confidentialKernelExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+
+def confidentialKernelExprTailOpcodes : List String :=
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+
+def confidentialKernelPureExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
+
+def confidentialKernelSlotStatementTraceNames : List String :=
+  confidentialKernelStatementTraceNames
+
+def confidentialKernelSlotStatementRuntimeNormalFormFlags : List Bool :=
+  confidentialKernelStatementRuntimeNormalFormFlags
+
+def confidentialKernelSlotStatementEffectKinds : List String :=
+  confidentialKernelStatementEffectKinds
+
+def confidentialKernelSlotStatementEvaluatedOperands : List String :=
+  confidentialKernelStatementEvaluatedOperands
+
+def confidentialKernelSlotStatementTailOpcodes : List String :=
+  confidentialKernelStatementTailOpcodes
+
+def confidentialKernelSlotExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+
+def confidentialKernelSlotExprTailOpcodes : List String :=
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+
+def confidentialKernelSlotPureExprEvaluatedOperands : List String :=
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
+
+def ConfidentialKernelSlotStatement.traceName :
+  ConfidentialKernelSlotStatement → String
+  | .declare _ _ => "declare"
+  | .assign _ _ => "assign"
+  | .require _ => "require"
+  | .abortIf _ => "abort_if"
+  | .cellSet _ _ _ => "cell_set"
+  | .arraySet _ _ _ _ => "array_set"
+  | .mapPut _ _ _ _ => "map_put"
+  | .ret _ => "return"
+
 def ConfidentialKernelSlotStatement.expectedRuntimeKernelSteps :
   ConfidentialKernelSlotStatement → List RuntimeKernelStep
   | .declare _ value => value.expectedRuntimeKernelSteps
@@ -354,6 +415,10 @@ def confidentialKernelSlotStatementListExpectedRuntimeKernelSteps :
         confidentialKernelSlotStatementListExpectedRuntimeKernelSteps stmts
 
 end
+
+def ConfidentialKernelSlotProgram.statementTraceNames
+  (program : ConfidentialKernelSlotProgram) : List String :=
+  program.body.map ConfidentialKernelSlotStatement.traceName
 
 def ConfidentialKernelSlotProgram.expectedRuntimeKernelSteps
   (program : ConfidentialKernelSlotProgram) : List RuntimeKernelStep :=

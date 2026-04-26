@@ -458,7 +458,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_lowering_bundle_json_bytes": 11461,
+      "confidential_core_lowering_bundle_json_bytes": 11462,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -2074,7 +2074,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_lowering_bundle_json_bytes": 11451,
+      "confidential_core_lowering_bundle_json_bytes": 11452,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -3014,7 +3014,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_lowering_bundle_json_bytes": 13100,
+      "confidential_core_lowering_bundle_json_bytes": 13101,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -3636,7 +3636,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_lowering_bundle_json_bytes": 13100,
+      "confidential_core_lowering_bundle_json_bytes": 13101,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -4258,7 +4258,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_lowering_bundle_json_bytes": 16738,
+      "confidential_core_lowering_bundle_json_bytes": 16754,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5065,7 +5065,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_lowering_bundle_json_bytes": 16740,
+      "confidential_core_lowering_bundle_json_bytes": 16755,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5872,7 +5872,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_lowering_bundle_json_bytes": 24192,
+      "confidential_core_lowering_bundle_json_bytes": 24222,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -6882,7 +6882,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_lowering_bundle_json_bytes": 24189,
+      "confidential_core_lowering_bundle_json_bytes": 24223,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -7892,7 +7892,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_lowering_bundle_json_bytes": 60855,
+      "confidential_core_lowering_bundle_json_bytes": 60885,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -10642,7 +10642,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_lowering_bundle_json_bytes": 195522,
+      "confidential_core_lowering_bundle_json_bytes": 195609,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",

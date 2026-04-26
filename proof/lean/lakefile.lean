@@ -11,6 +11,10 @@ lean_exe checkProofGradeRuntimeWitness where
   root := `CheckProofGradeRuntimeWitness
 
 @[default_target]
+lean_exe checkRuntimeWitness where
+  root := `CheckRuntimeWitness
+
+@[default_target]
 lean_exe checkProofGradeRuntimeKernelInterface where
   root := `CheckProofGradeRuntimeKernelInterface
 
@@ -27,6 +31,106 @@ lean_exe checkProofGradeRuntimeImplementationInterface where
   root := `CheckProofGradeRuntimeImplementationInterface
 
 @[default_target]
+lean_exe checkProofGradeRuntimeSmallConfidentialKernelBoundary where
+  root := `CheckProofGradeRuntimeSmallConfidentialKernelBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimePublicBridgeBoundary where
+  root := `CheckProofGradeRuntimePublicBridgeBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeSlotAdapterBoundary where
+  root := `CheckProofGradeRuntimeSlotAdapterBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationPublicBridgeObserverRefinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationPublicBridgeObserverRefinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeResidualHelperShellBoundary where
+  root := `CheckProofGradeRuntimeResidualHelperShellBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationResidualHelperShellMachineRefinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationResidualHelperShellMachineRefinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeConfidentialStatementTraceBridgeBoundary where
+  root := `CheckProofGradeRuntimeConfidentialStatementTraceBridgeBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationSlotAdapterMachineRefinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationSlotAdapterMachineRefinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationKernelMeetingBoundary where
+  root := `CheckProofGradeRuntimeImplementationKernelMeetingBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationKernelMeetingConfinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationKernelMeetingConfinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationKernelMachineConfinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationKernelMachineConfinementBoundary
+
+@[default_target]
+lean_exe generateConfidentialKernelRust where
+  root := `GenerateConfidentialKernelRust
+
+@[default_target]
+lean_exe generateRuntimeKernelSlotSupportRust where
+  root := `GenerateRuntimeKernelSlotSupportRust
+
+@[default_target]
+lean_exe generateRuntimeKernelMachineRust where
+  root := `GenerateRuntimeKernelMachineRust
+
+@[default_target]
+lean_exe generateRuntimeValueOpsRust where
+  root := `GenerateRuntimeValueOpsRust
+
+@[default_target]
+lean_exe generateRuntimeObjectHelpersRust where
+  root := `GenerateRuntimeObjectHelpersRust
+
+@[default_target]
+lean_exe generateRuntimeOramCodecsRust where
+  root := `GenerateRuntimeOramCodecsRust
+
+@[default_target]
+lean_exe generateRuntimeStoreHelpersRust where
+  root := `GenerateRuntimeStoreHelpersRust
+
+@[default_target]
+lean_exe generateRuntimeStoreSurfaceRust where
+  root := `GenerateRuntimeStoreSurfaceRust
+
+@[default_target]
+lean_exe generateRuntimeStoreCodecRust where
+  root := `GenerateRuntimeStoreCodecRust
+
+@[default_target]
+lean_exe checkProofGradeRuntimeSharedConfidentialKernelBoundary where
+  root := `CheckProofGradeRuntimeSharedConfidentialKernelBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationSharedKernelMachineRefinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationSharedKernelMachineRefinementBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeImplementationSharedKernelRefinementBoundary where
+  root := `CheckProofGradeRuntimeImplementationSharedKernelRefinementBoundary
+
+@[default_target]
 lean_exe checkProofGradeRuntimeImplementationConfinementBoundary where
   root := `CheckProofGradeRuntimeImplementationConfinementBoundary
 
@@ -41,6 +145,14 @@ lean_exe checkProofGradeRuntimeKernelConfinementBoundary where
 @[default_target]
 lean_exe checkProofGradeRuntimeKernelFinishBoundary where
   root := `CheckProofGradeRuntimeKernelFinishBoundary
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelMachineFinishWitness where
+  root := `CheckProofGradeRuntimeKernelMachineFinishWitness
+
+@[default_target]
+lean_exe checkProofGradeRuntimeKernelMachineFinishBoundary where
+  root := `CheckProofGradeRuntimeKernelMachineFinishBoundary
 
 @[default_target]
 lean_exe checkProofGradeRuntimeKernelInterfaceFamily where

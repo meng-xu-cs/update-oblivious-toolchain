@@ -44,5 +44,7 @@ Execution-model note:
 
 - accepted `uint256` syntax is executed by the current prototype in a bounded
   `u128` domain
-- confidential objects in UO artifacts may not use the raw backend; the proof
-  path is exact backends plus `path_oram_local_posmap_v1`
+- confidential entrypoints may not target raw-backend objects at all; the
+  direct Lean proof-grade checker, compiler lowering, and runtime admission
+  all enforce this, and the proof path is exact backends plus
+  `path_oram_local_posmap_v1`

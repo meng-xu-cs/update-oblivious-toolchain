@@ -9,8 +9,9 @@ use uo_core::manifest::{
     EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
 };
 use uo_core::{
-    CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram, ContractMetadata,
-    ProofRelevantTranslationBundle, ScalarType, StateMetadata, StructField, Type, Value,
+    CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram,
+    ConfidentialKernelSlotProgram, ContractMetadata, ProofRelevantTranslationBundle, ScalarType,
+    StateMetadata, StructField, Type, Value,
 };
 
 use solang_parser::{diagnostics::Diagnostic, parse, pt};
@@ -353,6 +354,10 @@ fn lower_function(
             body: uo_core::lower_confidential_kernel_statements(&lowered, &signature)?,
         };
         let confidential_slot_program = confidential_program.to_slot_program()?;
+        ensure_confidential_slot_program_uses_uo_backends(
+            &confidential_slot_program,
+            ctx.frontend,
+        )?;
         (Some(confidential_program), Some(confidential_slot_program))
     } else {
         (None, None)
@@ -367,6 +372,37 @@ fn lower_function(
         confidential_program,
         confidential_slot_program,
     })
+}
+
+fn ensure_confidential_slot_program_uses_uo_backends(
+    program: &ConfidentialKernelSlotProgram,
+    frontend: &Frontend,
+) -> Result<()> {
+    for step in program.expected_runtime_steps().iter() {
+        let Some(object_id) = step.object_id else {
+            continue;
+        };
+        let object = frontend
+            .state_by_name
+            .values()
+            .find(|object| object.id == object_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "confidential entrypoint {} references unknown state object id {}",
+                    program.entrypoint_id,
+                    object_id
+                )
+            })?;
+        if object.backend == BackendKind::Raw {
+            bail!(
+                "confidential entrypoint {} targets raw backend object {} ({})",
+                program.entrypoint_id,
+                object.name,
+                object_id
+            );
+        }
+    }
+    Ok(())
 }
 
 fn lower_block(statement: &pt::Statement, ctx: &mut LowerCtx<'_>) -> Result<Vec<Statement>> {
@@ -2380,6 +2416,40 @@ bounds:
         let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
         assert_eq!(artifact.contract.functions.len(), 1);
         assert!(artifact.contract.functions[0].confidential);
+    }
+
+    #[test]
+    fn rejects_confidential_entrypoint_targeting_public_raw_state() {
+        let source = write_temp(
+            "confidential-public-raw-target",
+            r#"
+            contract RawPublicTarget {
+                uint256 private last;
+                function classify(uint256 secret) public {
+                    last = secret & 1;
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: RawPublicTarget
+entrypoints:
+  classify(uint256):
+    secret_args: [secret]
+    confidential: true
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err.to_string().contains("targets raw backend object last"));
     }
 
     #[test]

@@ -363,11 +363,12 @@ theorem importedRuntimeTrustedKernelBundle_projects_to_paper_observer
     hValid.1
 
 def importedRuntimeTrustedKernelSlotBundleFieldNames : List String :=
-  ["trusted_kernel_bundle", "confidential_slot_program"]
+  ["trusted_kernel_bundle", "confidential_slot_program", "opcode_trace"]
 
 structure ImportedRuntimeTrustedKernelSlotBundle where
   trusted_kernel_bundle : ImportedRuntimeTrustedKernelBundle
   confidential_slot_program : ImportedConfidentialKernelSlotProgram
+  opcode_trace : List String
 deriving FromJson
 
 def ImportedRuntimeTrustedKernelSlotBundle.slotBundle
@@ -381,6 +382,7 @@ def ImportedRuntimeTrustedKernelSlotBundle.Valid
   (bundle : ImportedRuntimeTrustedKernelSlotBundle)
   (modelTags : SGXModelTags) : Prop :=
   bundle.trusted_kernel_bundle.ProofGradeValid modelTags ∧
+    bundle.opcode_trace = bundle.confidential_slot_program.statementTraceNames ∧
     match bundle.trusted_kernel_bundle.kernel_witness with
     | none => False
     | some kernelWitness => (bundle.slotBundle kernelWitness).Valid
@@ -389,6 +391,7 @@ def ImportedRuntimeTrustedKernelSlotBundle.checkValid
   (bundle : ImportedRuntimeTrustedKernelSlotBundle)
   (modelTags : SGXModelTags) : Bool :=
   bundle.trusted_kernel_bundle.checkProofGrade modelTags &&
+    decide (bundle.opcode_trace = bundle.confidential_slot_program.statementTraceNames) &&
     match bundle.trusted_kernel_bundle.kernel_witness with
     | none => false
     | some kernelWitness => (bundle.slotBundle kernelWitness).checkValid
@@ -397,6 +400,7 @@ def ImportedRuntimeTrustedKernelSlotBundle.toRuntimeTrustedKernelSlotBundle
   (bundle : ImportedRuntimeTrustedKernelSlotBundle) : RuntimeTrustedKernelSlotBundle :=
   { trustedKernelBundle := bundle.trusted_kernel_bundle.toRuntimeTrustedKernelBundle
   , confidentialSlotProgram := bundle.confidential_slot_program.toConfidentialKernelSlotProgram
+  , opcodeTrace := bundle.opcode_trace
   }
 
 @[simp] theorem importedRuntimeTrustedKernelSlotBundle_checkValid_eq_true_iff
@@ -412,7 +416,7 @@ def ImportedRuntimeTrustedKernelSlotBundle.toRuntimeTrustedKernelSlotBundle
         ImportedRuntimeTrustedKernelSlotBundle.Valid,
         ImportedRuntimeTrustedKernelSlotBundle.slotBundle, hKernel,
         importedRuntimeTrustedKernelBundle_checkProofGrade_eq_true_iff,
-        importedRuntimeKernelSlotDslBundle_checkValid_eq_true_iff]
+        importedRuntimeKernelSlotDslBundle_checkValid_eq_true_iff, and_assoc]
 
 theorem importedRuntimeTrustedKernelSlotBundle_toRuntimeValid
   (bundle : ImportedRuntimeTrustedKernelSlotBundle)
@@ -425,9 +429,17 @@ theorem importedRuntimeTrustedKernelSlotBundle_toRuntimeValid
   | some kernelWitness =>
       have hTrusted :
           bundle.trusted_kernel_bundle.ProofGradeValid modelTags := hValid.1
+      have hOpcodeTrace :
+          bundle.opcode_trace =
+            bundle.confidential_slot_program.toConfidentialKernelSlotProgram.statementTraceNames := by
+        calc
+          bundle.opcode_trace = bundle.confidential_slot_program.statementTraceNames := hValid.2.1
+          _ = bundle.confidential_slot_program.toConfidentialKernelSlotProgram.statementTraceNames := by
+            exact importedConfidentialKernelSlotProgram_statementTraceNames_toRuntime
+              bundle.confidential_slot_program
       have hImportedSlot :
           (bundle.slotBundle kernelWitness).Valid := by
-        simpa [ImportedRuntimeTrustedKernelSlotBundle.Valid, hKernel] using hValid.2
+        simpa [ImportedRuntimeTrustedKernelSlotBundle.Valid, hKernel] using hValid.2.2
       have hRuntimeTrusted :
           bundle.trusted_kernel_bundle.toRuntimeTrustedKernelBundle.ProofGradeValid modelTags := by
         have hRuntimeKernel :
@@ -462,12 +474,14 @@ theorem importedRuntimeTrustedKernelSlotBundle_toRuntimeValid
         ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram, hKernel] using
         (show
           bundle.trusted_kernel_bundle.toRuntimeTrustedKernelBundle.ProofGradeValid modelTags ∧
+            bundle.opcode_trace =
+              bundle.confidential_slot_program.toConfidentialKernelSlotProgram.statementTraceNames ∧
             RuntimeKernelSlotDslBundle.Valid
               { kernelWitness := kernelWitness.toRuntimeKernelWitness
               , confidentialProgram :=
                   bundle.confidential_slot_program.toConfidentialKernelSlotProgram
               } from
-          ⟨hRuntimeTrusted, hRuntimeSlot⟩)
+          ⟨hRuntimeTrusted, hOpcodeTrace, hRuntimeSlot⟩)
 
 def parseImportedRuntimeTrustedKernelSlotBundle
   (input : String) : Except String ImportedRuntimeTrustedKernelSlotBundle := do

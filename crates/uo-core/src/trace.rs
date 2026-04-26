@@ -7,7 +7,7 @@ use crate::ir::StateObject;
 use crate::manifest::{
     EntrypointManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
 };
-use crate::types::Value;
+use crate::types::{FixedBoxBuilder, Value};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -386,22 +386,76 @@ pub enum RuntimePathOramTransitionKind {
     WriteDelete,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+pub struct RuntimeMaskedUsizeOptionWitness {
+    pub present: bool,
+    pub value: usize,
+}
+
+impl RuntimeMaskedUsizeOptionWitness {
+    pub const fn none() -> Self {
+        Self {
+            present: false,
+            value: 0,
+        }
+    }
+
+    pub const fn some(value: usize) -> Self {
+        Self {
+            present: true,
+            value,
+        }
+    }
+
+    pub fn from_option(value: Option<usize>) -> Self {
+        match value {
+            Some(value) => Self::some(value),
+            None => Self::none(),
+        }
+    }
+
+    pub fn as_option(self) -> Option<usize> {
+        if self.present {
+            Some(self.value)
+        } else {
+            None
+        }
+    }
+
+    pub const fn is_some(self) -> bool {
+        self.present
+    }
+
+    pub const fn is_none(self) -> bool {
+        !self.present
+    }
+
+    pub const fn is_canonical(self) -> bool {
+        self.present || self.value == 0
+    }
+
+    fn wipe(&mut self) {
+        *self = Self::none();
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimePathOramTransitionWitness {
     pub object_id: u32,
     pub object_name: String,
     pub bucket_count: usize,
     pub kind: RuntimePathOramTransitionKind,
-    pub slot_index: Option<usize>,
-    pub prior_leaf: Option<usize>,
-    pub next_leaf: Option<usize>,
+    pub fresh_leaf: usize,
+    pub slot_index: RuntimeMaskedUsizeOptionWitness,
+    pub prior_leaf: RuntimeMaskedUsizeOptionWitness,
+    pub next_leaf: RuntimeMaskedUsizeOptionWitness,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimePathOramPositionMapWitness {
     pub object_id: u32,
     pub object_name: String,
-    pub leaves: Box<[Option<usize>]>,
+    pub leaves: Box<[RuntimeMaskedUsizeOptionWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -532,10 +586,113 @@ pub struct RuntimeKernelScheduleTracker {
     expected_kernel_step_index: usize,
 }
 
+struct BoundedJournal<T> {
+    entries: Box<[MaybeUninit<T>]>,
+    len: usize,
+}
+
+impl<T> BoundedJournal<T> {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            entries: Box::<[T]>::new_uninit_slice(capacity),
+            len: 0,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn capacity(&self) -> usize {
+        self.entries.len()
+    }
+
+    fn as_slice(&self) -> &[T] {
+        unsafe { std::slice::from_raw_parts(self.entries.as_ptr() as *const T, self.len) }
+    }
+
+    fn push(&mut self, value: T) -> Result<(), T> {
+        if self.len == self.entries.len() {
+            return Err(value);
+        }
+        let Some(slot) = self.entries.get_mut(self.len) else {
+            return Err(value);
+        };
+        slot.write(value);
+        self.len += 1;
+        Ok(())
+    }
+
+    fn to_boxed_slice(&self) -> Box<[T]>
+    where
+        T: Clone,
+    {
+        let mut entries = Box::<[T]>::new_uninit_slice(self.len);
+        for (slot, entry) in entries.iter_mut().zip(self.as_slice().iter().cloned()) {
+            slot.write(entry);
+        }
+        let raw = Box::into_raw(entries) as *mut [T];
+        unsafe { Box::from_raw(raw) }
+    }
+
+    fn into_boxed_slice(mut self) -> Box<[T]> {
+        let mut entries = Box::<[T]>::new_uninit_slice(self.len);
+        for (slot, entry) in entries
+            .iter_mut()
+            .zip(self.entries.iter_mut().take(self.len))
+        {
+            slot.write(unsafe { entry.assume_init_read() });
+        }
+        self.len = 0;
+        let raw = Box::into_raw(entries) as *mut [T];
+        unsafe { Box::from_raw(raw) }
+    }
+}
+
+impl<T: Clone> Clone for BoundedJournal<T> {
+    fn clone(&self) -> Self {
+        let mut journal = Self::with_capacity(self.capacity());
+        for (slot, entry) in journal
+            .entries
+            .iter_mut()
+            .zip(self.as_slice().iter().cloned())
+        {
+            slot.write(entry);
+        }
+        journal.len = self.len;
+        journal
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for BoundedJournal<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BoundedJournal")
+            .field("entries", &self.as_slice())
+            .field("capacity", &self.capacity())
+            .finish()
+    }
+}
+
+impl<T: PartialEq> PartialEq for BoundedJournal<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.capacity() == other.capacity() && self.as_slice() == other.as_slice()
+    }
+}
+
+impl<T: Eq> Eq for BoundedJournal<T> {}
+
+impl<T> Drop for BoundedJournal<T> {
+    fn drop(&mut self) {
+        for entry in self.entries.iter_mut().take(self.len) {
+            unsafe { entry.assume_init_drop() };
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuntimeKernelExecutionTracker {
     expected_kernel_schedule: RuntimeKernelScheduleTracker,
-    emitted_kernel_steps: Vec<RuntimeKernelStepWitness>,
+    kernel_steps: BoundedJournal<RuntimeKernelStepWitness>,
     max_kernel_ops: usize,
 }
 
@@ -548,7 +705,7 @@ pub struct RuntimeKernelBoundaryTracker {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuntimeKernelRefinementTracker {
-    events: Vec<RuntimeKernelRefinementEventWitness>,
+    events: BoundedJournal<RuntimeKernelRefinementEventWitness>,
     max_event_count: usize,
     phase: RuntimeKernelRefinementPhase,
 }
@@ -734,7 +891,7 @@ pub struct RuntimeKernelTelemetrySnapshot {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    resource_events: Vec<RuntimeKernelResourceEventWitness>,
+    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -778,6 +935,39 @@ pub struct RuntimeKernelFinishBundle {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeKernelMachineFinishWitness {
+    entrypoint_id: String,
+    arena_bytes: usize,
+    max_stack_words: usize,
+    scratch_bytes: usize,
+    peak_stack_words: usize,
+    value_scratch_peak_bytes: usize,
+    value_scratch_live_bytes_end: usize,
+    value_scratch_wipe_count: usize,
+    hash_scratch_peak_bytes: usize,
+    hash_scratch_live_bytes_end: usize,
+    hash_scratch_wipe_count: usize,
+    io_scratch_peak_bytes: usize,
+    io_scratch_live_bytes_end: usize,
+    io_scratch_wipe_count: usize,
+    #[serde(default)]
+    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+    #[serde(default)]
+    expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
+    expected_kernel_step_index: usize,
+    #[serde(default)]
+    public_object_ids: Box<[u32]>,
+    #[serde(default)]
+    expected_public_object_ids: Option<Box<[u32]>>,
+    #[serde(default)]
+    kernel_steps: Box<[RuntimeKernelStepWitness]>,
+    max_kernel_ops: usize,
+    max_runtime_phase_event_count: usize,
+    #[serde(default)]
+    runtime_phase_events_before_finish: Box<[RuntimeKernelRefinementEventWitness]>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SeededRuntimeWitnessFamily {
     seed_count: usize,
     witnesses: Box<[RuntimeRefinementWitness]>,
@@ -805,6 +995,7 @@ pub struct SeededRuntimePaperMainSlotFamilyBundle {
     public_outcome: PublicOutcomeTrace,
     #[serde(default)]
     boundary_schedule: Box<[BoundaryEvent]>,
+    opcode_trace: Box<[String]>,
     confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
@@ -839,8 +1030,11 @@ pub enum RefinementWitnessError {
     HiddenCertificateTraceMismatch,
     TrustedKernelBundleTraceMismatch,
     KernelWitnessTraceMismatch,
+    RuntimeKernelMachineFinishWitnessTraceMismatch,
+    RuntimeKernelMachineFinishWitnessFinishBundleMismatch,
     KernelWitnessFinishBundleMismatch,
     RuntimeKernelRefinementWitnessFinishBundleMismatch,
+    RuntimeKernelMachineFinishWitness(RuntimeKernelMachineFinishWitnessError),
     KernelWitness(KernelWitnessError),
     RuntimeKernelRefinement(RuntimeKernelRefinementWitnessError),
     UnknownOramLogicalObject {
@@ -1009,6 +1203,14 @@ pub enum KernelWitnessError {
     ConfidentialArrayIndex {
         entrypoint: String,
     },
+    NonFinalReturn {
+        entrypoint: String,
+        index: usize,
+    },
+    FixedBufferInvariant {
+        entrypoint: String,
+        detail: String,
+    },
     MissingExpectedKernelSteps {
         entrypoint: String,
     },
@@ -1084,11 +1286,38 @@ pub enum RuntimeKernelFinishBundleError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RuntimeKernelMachineFinishWitnessError {
+    ExpectedKernelScheduleNotFullyConsumed {
+        consumed_steps: usize,
+        expected_steps: usize,
+    },
+    UnexpectedExpectedKernelStepIndexWithoutSchedule {
+        consumed_steps: usize,
+    },
+    KernelStepBudgetExceeded {
+        emitted_steps: usize,
+        budget: usize,
+    },
+    RuntimePhaseEventCapacityMismatch {
+        witnessed_budget: usize,
+        expected_budget: usize,
+    },
+    RuntimePhaseEventCapacityExceeded {
+        witnessed_events: usize,
+        budget: usize,
+    },
+    InvalidProjectedFinishBundle(RuntimeKernelFinishBundleError),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuntimeKernelFinishBundleAccessError {
     MissingRuntimeKernelFinishBundle,
+    MissingRuntimeKernelMachineFinishWitness,
+    RuntimeKernelMachineFinishWitnessFinishBundleMismatch,
     KernelWitnessFinishBundleMismatch,
     RuntimeKernelRefinementWitnessFinishBundleMismatch,
     InvalidRuntimeKernelFinishBundle(RuntimeKernelFinishBundleError),
+    InvalidRuntimeKernelMachineFinishWitness(RuntimeKernelMachineFinishWitnessError),
 }
 
 impl From<ConfidentialKernelLoweringError> for KernelWitnessError {
@@ -1115,6 +1344,12 @@ impl From<ConfidentialKernelLoweringError> for KernelWitnessError {
             }
             ConfidentialKernelLoweringError::ConfidentialArrayIndex { entrypoint } => {
                 Self::ConfidentialArrayIndex { entrypoint }
+            }
+            ConfidentialKernelLoweringError::NonFinalReturn { entrypoint, index } => {
+                Self::NonFinalReturn { entrypoint, index }
+            }
+            ConfidentialKernelLoweringError::FixedBufferInvariant { entrypoint, detail } => {
+                Self::FixedBufferInvariant { entrypoint, detail }
             }
         }
     }
@@ -1180,6 +1415,7 @@ pub enum SeededRuntimePaperMainSlotFamilyBundleError {
     EmittedKernelStepsMismatch {
         index: usize,
     },
+    OpcodeTraceMismatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1278,6 +1514,14 @@ impl fmt::Display for RefinementWitnessError {
                 f,
                 "stored runtime trusted kernel bundle disagrees with execution trace kernel witness"
             ),
+            Self::RuntimeKernelMachineFinishWitnessTraceMismatch => write!(
+                f,
+                "stored runtime kernel machine finish witness disagrees with execution trace reconstruction"
+            ),
+            Self::RuntimeKernelMachineFinishWitnessFinishBundleMismatch => write!(
+                f,
+                "stored runtime kernel machine finish witness disagrees with stored runtime kernel finish bundle"
+            ),
             Self::KernelWitnessFinishBundleMismatch => write!(
                 f,
                 "stored runtime kernel witness disagrees with stored runtime kernel finish bundle"
@@ -1286,6 +1530,12 @@ impl fmt::Display for RefinementWitnessError {
                 f,
                 "stored runtime kernel refinement witness disagrees with stored runtime kernel finish bundle"
             ),
+            Self::RuntimeKernelMachineFinishWitness(err) => {
+                write!(
+                    f,
+                    "runtime refinement witness carries an invalid runtime kernel machine finish witness: {err}"
+                )
+            }
             Self::KernelWitness(err) => {
                 write!(f, "runtime refinement witness carries an invalid kernel witness: {err}")
             }
@@ -1609,6 +1859,16 @@ impl fmt::Display for KernelWitnessError {
                 "confidential entrypoint {} contains unsupported array indexing in the confidential fragment",
                 entrypoint
             ),
+            Self::NonFinalReturn { entrypoint, index } => write!(
+                f,
+                "confidential entrypoint {} contains statement {} after a return; returns must be final in the admitted public schedule",
+                entrypoint, index
+            ),
+            Self::FixedBufferInvariant { entrypoint, detail } => write!(
+                f,
+                "confidential entrypoint {} fixed lowering buffer invariant failed: {}",
+                entrypoint, detail
+            ),
             Self::MissingExpectedKernelSteps { entrypoint } => write!(
                 f,
                 "confidential runtime kernel witness for {} is missing the artifact-derived expected step trace",
@@ -1773,12 +2033,73 @@ impl std::error::Error for RuntimeKernelFinishBundleError {
     }
 }
 
+impl fmt::Display for RuntimeKernelMachineFinishWitnessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ExpectedKernelScheduleNotFullyConsumed {
+                consumed_steps,
+                expected_steps,
+            } => write!(
+                f,
+                "runtime kernel machine finish witness did not fully consume the expected kernel schedule: consumed {} of {} steps",
+                consumed_steps, expected_steps
+            ),
+            Self::UnexpectedExpectedKernelStepIndexWithoutSchedule { consumed_steps } => write!(
+                f,
+                "runtime kernel machine finish witness reports consumed schedule index {} without a bound expected schedule",
+                consumed_steps
+            ),
+            Self::KernelStepBudgetExceeded {
+                emitted_steps,
+                budget,
+            } => write!(
+                f,
+                "runtime kernel machine finish witness exceeds kernel-op budget: emitted {} steps with budget {}",
+                emitted_steps, budget
+            ),
+            Self::RuntimePhaseEventCapacityMismatch {
+                witnessed_budget,
+                expected_budget,
+            } => write!(
+                f,
+                "runtime kernel machine finish witness reports runtime-phase event budget {} but the live tracker formula requires {}",
+                witnessed_budget, expected_budget
+            ),
+            Self::RuntimePhaseEventCapacityExceeded {
+                witnessed_events,
+                budget,
+            } => write!(
+                f,
+                "runtime kernel machine finish witness exceeds runtime-phase event budget: witnessed {} events with budget {}",
+                witnessed_events, budget
+            ),
+            Self::InvalidProjectedFinishBundle(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RuntimeKernelMachineFinishWitnessError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::InvalidProjectedFinishBundle(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for RuntimeKernelFinishBundleAccessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingRuntimeKernelFinishBundle => {
                 write!(f, "execution trace is missing runtime kernel finish bundle")
             }
+            Self::MissingRuntimeKernelMachineFinishWitness => {
+                write!(f, "execution trace is missing runtime kernel machine finish witness")
+            }
+            Self::RuntimeKernelMachineFinishWitnessFinishBundleMismatch => write!(
+                f,
+                "stored runtime kernel machine finish witness disagrees with stored runtime kernel finish bundle"
+            ),
             Self::KernelWitnessFinishBundleMismatch => write!(
                 f,
                 "stored runtime kernel witness disagrees with stored runtime kernel finish bundle"
@@ -1787,6 +2108,7 @@ impl fmt::Display for RuntimeKernelFinishBundleAccessError {
                 f,
                 "stored runtime kernel refinement witness disagrees with stored runtime kernel finish bundle"
             ),
+            Self::InvalidRuntimeKernelMachineFinishWitness(err) => err.fmt(f),
             Self::InvalidRuntimeKernelFinishBundle(err) => err.fmt(f),
         }
     }
@@ -1795,6 +2117,7 @@ impl fmt::Display for RuntimeKernelFinishBundleAccessError {
 impl std::error::Error for RuntimeKernelFinishBundleAccessError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::InvalidRuntimeKernelMachineFinishWitness(err) => Some(err),
             Self::InvalidRuntimeKernelFinishBundle(err) => Some(err),
             _ => None,
         }
@@ -1899,6 +2222,10 @@ impl fmt::Display for SeededRuntimePaperMainSlotFamilyBundleError {
                 f,
                 "seeded runtime paper-main slot family witness at index {} does not emit the shared slot program's exact kernel schedule",
                 index
+            ),
+            Self::OpcodeTraceMismatch => write!(
+                f,
+                "seeded runtime paper-main slot family bundle does not carry the exact confidential statement trace for its shared slot program",
             ),
         }
     }
@@ -2247,12 +2574,12 @@ impl RuntimeRefinementWitness {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("runtime refinement witness is JSON serializable")
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
-    pub fn to_json_pretty(&self) -> String {
-        serde_json::to_string_pretty(self).expect("runtime refinement witness is JSON serializable")
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
     }
 
     pub fn path_oram_fresh_coin_scaffold(&self) -> Option<Box<[RuntimeOramLeafScaffoldWitness]>> {
@@ -2325,13 +2652,12 @@ impl RuntimeTrustedKernelBundle {
         self.to_witness().map(|_| ())
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("runtime trusted kernel bundle is JSON serializable")
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("runtime trusted kernel bundle is JSON serializable")
     }
 }
 
@@ -2366,7 +2692,7 @@ impl RuntimeKernelTelemetrySnapshot {
         io_scratch_peak_bytes: usize,
         io_scratch_live_bytes_end: usize,
         io_scratch_wipe_count: usize,
-        resource_events: Vec<RuntimeKernelResourceEventWitness>,
+        resource_events: impl Into<Box<[RuntimeKernelResourceEventWitness]>>,
     ) -> Self {
         Self {
             arena_bytes,
@@ -2382,7 +2708,7 @@ impl RuntimeKernelTelemetrySnapshot {
             io_scratch_peak_bytes,
             io_scratch_live_bytes_end,
             io_scratch_wipe_count,
-            resource_events,
+            resource_events: resource_events.into(),
         }
     }
 
@@ -2442,7 +2768,7 @@ impl RuntimeKernelFinishSnapshot {
             io_scratch_peak_bytes: self.telemetry.io_scratch_peak_bytes,
             io_scratch_live_bytes_end: self.telemetry.io_scratch_live_bytes_end,
             io_scratch_wipe_count: self.telemetry.io_scratch_wipe_count,
-            resource_events: self.telemetry.resource_events.into_boxed_slice(),
+            resource_events: self.telemetry.resource_events,
             expected_kernel_steps,
             public_object_ids: self.public_object_ids,
             expected_public_object_ids: self.expected_public_object_ids,
@@ -2477,6 +2803,168 @@ impl RuntimeKernelFinishSnapshot {
     > {
         let (_, kernel_witness, runtime_phase_witness) = self.into_finish_products()?;
         Ok((kernel_witness, runtime_phase_witness))
+    }
+
+    pub fn machine_finish_witness(&self) -> RuntimeKernelMachineFinishWitness {
+        RuntimeKernelMachineFinishWitness {
+            entrypoint_id: self.entrypoint_id.clone(),
+            arena_bytes: self.telemetry.arena_bytes,
+            max_stack_words: self.telemetry.max_stack_words,
+            scratch_bytes: self.telemetry.scratch_bytes,
+            peak_stack_words: self.telemetry.peak_stack_words,
+            value_scratch_peak_bytes: self.telemetry.value_scratch_peak_bytes,
+            value_scratch_live_bytes_end: self.telemetry.value_scratch_live_bytes_end,
+            value_scratch_wipe_count: self.telemetry.value_scratch_wipe_count,
+            hash_scratch_peak_bytes: self.telemetry.hash_scratch_peak_bytes,
+            hash_scratch_live_bytes_end: self.telemetry.hash_scratch_live_bytes_end,
+            hash_scratch_wipe_count: self.telemetry.hash_scratch_wipe_count,
+            io_scratch_peak_bytes: self.telemetry.io_scratch_peak_bytes,
+            io_scratch_live_bytes_end: self.telemetry.io_scratch_live_bytes_end,
+            io_scratch_wipe_count: self.telemetry.io_scratch_wipe_count,
+            resource_events: self.telemetry.resource_events.clone(),
+            expected_kernel_steps: self
+                .kernel_execution
+                .expected_kernel_schedule
+                .expected_kernel_steps
+                .clone(),
+            expected_kernel_step_index: self
+                .kernel_execution
+                .expected_kernel_schedule
+                .expected_kernel_step_index,
+            public_object_ids: self.public_object_ids.clone(),
+            expected_public_object_ids: self.expected_public_object_ids.clone(),
+            kernel_steps: self.kernel_execution.kernel_steps.to_boxed_slice(),
+            max_kernel_ops: self.kernel_execution.max_kernel_ops,
+            max_runtime_phase_event_count: self.runtime_phase_events.max_event_count,
+            runtime_phase_events_before_finish: self.runtime_phase_events.events.to_boxed_slice(),
+        }
+    }
+}
+
+impl RuntimeKernelMachineFinishWitness {
+    pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {
+        self.expected_kernel_steps.as_deref()
+    }
+
+    pub fn expected_kernel_step_index(&self) -> usize {
+        self.expected_kernel_step_index
+    }
+
+    pub fn max_kernel_ops(&self) -> usize {
+        self.max_kernel_ops
+    }
+
+    pub fn max_runtime_phase_event_count(&self) -> usize {
+        self.max_runtime_phase_event_count
+    }
+
+    pub fn projected_finish_bundle(&self) -> RuntimeKernelFinishBundle {
+        RuntimeKernelFinishBundle {
+            entrypoint_id: self.entrypoint_id.clone(),
+            arena_bytes: self.arena_bytes,
+            max_stack_words: self.max_stack_words,
+            scratch_bytes: self.scratch_bytes,
+            peak_stack_words: self.peak_stack_words,
+            value_scratch_peak_bytes: self.value_scratch_peak_bytes,
+            value_scratch_live_bytes_end: self.value_scratch_live_bytes_end,
+            value_scratch_wipe_count: self.value_scratch_wipe_count,
+            hash_scratch_peak_bytes: self.hash_scratch_peak_bytes,
+            hash_scratch_live_bytes_end: self.hash_scratch_live_bytes_end,
+            hash_scratch_wipe_count: self.hash_scratch_wipe_count,
+            io_scratch_peak_bytes: self.io_scratch_peak_bytes,
+            io_scratch_live_bytes_end: self.io_scratch_live_bytes_end,
+            io_scratch_wipe_count: self.io_scratch_wipe_count,
+            resource_events: self.resource_events.clone(),
+            expected_kernel_steps: self.expected_kernel_steps.clone(),
+            public_object_ids: self.public_object_ids.clone(),
+            expected_public_object_ids: self.expected_public_object_ids.clone(),
+            kernel_steps: self.kernel_steps.clone(),
+            runtime_phase_events_before_finish: self.runtime_phase_events_before_finish.clone(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeKernelMachineFinishWitnessError> {
+        match self.expected_kernel_steps.as_ref() {
+            Some(expected_kernel_steps) => {
+                if self.expected_kernel_step_index != expected_kernel_steps.len() {
+                    return Err(
+                        RuntimeKernelMachineFinishWitnessError::ExpectedKernelScheduleNotFullyConsumed {
+                            consumed_steps: self.expected_kernel_step_index,
+                            expected_steps: expected_kernel_steps.len(),
+                        },
+                    );
+                }
+            }
+            None => {
+                if self.expected_kernel_step_index != 0 {
+                    return Err(
+                        RuntimeKernelMachineFinishWitnessError::UnexpectedExpectedKernelStepIndexWithoutSchedule {
+                            consumed_steps: self.expected_kernel_step_index,
+                        },
+                    );
+                }
+            }
+        }
+
+        if self.kernel_steps.len() > self.max_kernel_ops {
+            return Err(
+                RuntimeKernelMachineFinishWitnessError::KernelStepBudgetExceeded {
+                    emitted_steps: self.kernel_steps.len(),
+                    budget: self.max_kernel_ops,
+                },
+            );
+        }
+
+        let expected_runtime_phase_budget = max_runtime_kernel_refinement_event_count(
+            self.public_object_ids.len(),
+            self.max_kernel_ops,
+        )
+        .map_err(|_| {
+            RuntimeKernelMachineFinishWitnessError::RuntimePhaseEventCapacityMismatch {
+                witnessed_budget: self.max_runtime_phase_event_count,
+                expected_budget: usize::MAX,
+            }
+        })?;
+        if self.max_runtime_phase_event_count != expected_runtime_phase_budget {
+            return Err(
+                RuntimeKernelMachineFinishWitnessError::RuntimePhaseEventCapacityMismatch {
+                    witnessed_budget: self.max_runtime_phase_event_count,
+                    expected_budget: expected_runtime_phase_budget,
+                },
+            );
+        }
+        if self.runtime_phase_events_before_finish.len() > self.max_runtime_phase_event_count {
+            return Err(
+                RuntimeKernelMachineFinishWitnessError::RuntimePhaseEventCapacityExceeded {
+                    witnessed_events: self.runtime_phase_events_before_finish.len(),
+                    budget: self.max_runtime_phase_event_count,
+                },
+            );
+        }
+
+        self.projected_finish_bundle()
+            .validate()
+            .map_err(RuntimeKernelMachineFinishWitnessError::InvalidProjectedFinishBundle)
+    }
+
+    pub fn to_witness_pair(
+        &self,
+    ) -> Result<
+        (RuntimeKernelWitness, RuntimeKernelRefinementWitness),
+        RuntimeKernelMachineFinishWitnessError,
+    > {
+        self.validate()?;
+        self.projected_finish_bundle()
+            .to_witness_pair()
+            .map_err(RuntimeKernelMachineFinishWitnessError::InvalidProjectedFinishBundle)
+    }
+
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
     }
 }
 
@@ -2607,13 +3095,12 @@ impl RuntimeKernelFinishBundle {
         self.to_witness_pair().map(|_| ())
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("runtime kernel finish bundle is JSON serializable")
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("runtime kernel finish bundle is JSON serializable")
     }
 }
 
@@ -2656,7 +3143,7 @@ impl RuntimeKernelWitness {
             telemetry.io_scratch_peak_bytes,
             telemetry.io_scratch_live_bytes_end,
             telemetry.io_scratch_wipe_count,
-            telemetry.resource_events.into_boxed_slice(),
+            telemetry.resource_events,
             expected_kernel_steps,
             public_object_ids,
             expected_public_object_ids,
@@ -2780,28 +3267,12 @@ impl RuntimeKernelWitness {
     }
 
     pub fn emitted_kernel_schedule(&self) -> RuntimeKernelScheduleWitness {
-        RuntimeKernelScheduleWitness::new(
-            self.kernel_steps
-                .iter()
-                .map(RuntimeKernelStepWitness::projected_opcode)
-                .collect(),
-            self.kernel_steps.to_vec(),
-        )
-        .expect("kernel witness already validates emitted schedule shape")
+        RuntimeKernelScheduleWitness::from_steps(self.kernel_steps.clone())
     }
 
     pub fn expected_kernel_schedule(&self) -> Option<RuntimeKernelScheduleWitness> {
         let steps = self.expected_kernel_steps.as_ref()?;
-        Some(
-            RuntimeKernelScheduleWitness::new(
-                steps
-                    .iter()
-                    .map(RuntimeKernelStepWitness::projected_opcode)
-                    .collect(),
-                steps.to_vec(),
-            )
-            .expect("manifest-backed expected kernel schedule must satisfy shape invariants"),
-        )
+        Some(RuntimeKernelScheduleWitness::from_steps(steps.clone()))
     }
 
     pub fn validate_shape(&self) -> Result<(), KernelWitnessError> {
@@ -3013,9 +3484,11 @@ impl RuntimeKernelWitness {
             event.validate_shape()?;
             match event.kind {
                 RuntimeKernelResourceEventKindWitness::StackCheck => {
-                    let words = event
-                        .words
-                        .expect("validated stack-check event carries words");
+                    let Some(words) = event.words else {
+                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                            witnessed: vec![event.clone()],
+                        });
+                    };
                     if words > self.max_stack_words {
                         return Err(KernelWitnessError::PeakStackWordsExceeded {
                             peak: words,
@@ -3025,12 +3498,16 @@ impl RuntimeKernelWitness {
                     state.peak_stack_words = state.peak_stack_words.max(words);
                 }
                 RuntimeKernelResourceEventKindWitness::ReserveScratch => {
-                    let bytes = event
-                        .bytes
-                        .expect("validated reserve-scratch event carries bytes");
-                    let region = event
-                        .region
-                        .expect("validated reserve-scratch event carries region");
+                    let Some(bytes) = event.bytes else {
+                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                            witnessed: vec![event.clone()],
+                        });
+                    };
+                    let Some(region) = event.region else {
+                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                            witnessed: vec![event.clone()],
+                        });
+                    };
                     if bytes > self.scratch_bytes {
                         return Err(match region {
                             RuntimeKernelScratchRegionWitness::ValueScratch => {
@@ -3058,9 +3535,11 @@ impl RuntimeKernelWitness {
                     usage.peak_bytes = usage.peak_bytes.max(bytes);
                 }
                 RuntimeKernelResourceEventKindWitness::WipeScratch => {
-                    let region = event
-                        .region
-                        .expect("validated wipe-scratch event carries region");
+                    let Some(region) = event.region else {
+                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                            witnessed: vec![event.clone()],
+                        });
+                    };
                     let usage = state.usage_mut(region);
                     usage.live_bytes = 0;
                     usage.wipe_count += 1;
@@ -3143,12 +3622,12 @@ impl RuntimeKernelWitness {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("runtime kernel witness is JSON serializable")
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
-    pub fn to_json_pretty(&self) -> String {
-        serde_json::to_string_pretty(self).expect("runtime kernel witness is JSON serializable")
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
     }
 }
 
@@ -3189,22 +3668,28 @@ impl RuntimeKernelStepWitness {
 
 impl From<ConfidentialKernelStep> for RuntimeKernelStepWitness {
     fn from(step: ConfidentialKernelStep) -> Self {
-        Self::new(step.opcode, step.object_id)
-            .expect("confidential kernel step should satisfy runtime witness shape")
+        Self {
+            opcode: step.opcode,
+            object_id: step.object_id,
+        }
     }
 }
 
 impl From<&ConfidentialKernelStep> for RuntimeKernelStepWitness {
     fn from(step: &ConfidentialKernelStep) -> Self {
-        Self::new(step.opcode, step.object_id)
-            .expect("confidential kernel step should satisfy runtime witness shape")
+        Self {
+            opcode: step.opcode,
+            object_id: step.object_id,
+        }
     }
 }
 
 impl From<&RuntimeKernelStepManifest> for RuntimeKernelStepWitness {
     fn from(step: &RuntimeKernelStepManifest) -> Self {
-        Self::new(step.opcode, step.object_id)
-            .expect("manifest kernel step should satisfy runtime witness shape")
+        Self {
+            opcode: step.opcode,
+            object_id: step.object_id,
+        }
     }
 }
 
@@ -3286,17 +3771,51 @@ impl RuntimeKernelResourceReplayState {
     }
 }
 
+fn boxed_projected_kernel_opcodes(steps: &[RuntimeKernelStepWitness]) -> Box<[UoOpcode]> {
+    FixedBoxBuilder::from_fn(steps.len(), |index| {
+        steps
+            .get(index)
+            .map(RuntimeKernelStepWitness::projected_opcode)
+            .unwrap_or(UoOpcode::Wipe)
+    })
+}
+
 impl RuntimeKernelScheduleWitness {
     pub fn new(
-        opcodes: Vec<UoOpcode>,
-        steps: Vec<RuntimeKernelStepWitness>,
+        opcodes: Box<[UoOpcode]>,
+        steps: Box<[RuntimeKernelStepWitness]>,
     ) -> Result<Self, KernelWitnessError> {
-        let witness = Self {
-            opcodes: opcodes.into_boxed_slice(),
-            steps: steps.into_boxed_slice(),
-        };
+        let witness = Self { opcodes, steps };
         witness.validate_shape()?;
         Ok(witness)
+    }
+
+    pub fn from_steps(steps: Box<[RuntimeKernelStepWitness]>) -> Self {
+        let opcodes = boxed_projected_kernel_opcodes(&steps);
+        Self { opcodes, steps }
+    }
+
+    pub fn from_projected_refinement_events(
+        events: &[RuntimeKernelRefinementEventWitness],
+    ) -> Self {
+        let step_count = events
+            .iter()
+            .filter(|event| event.projected_kernel_step().is_some())
+            .count();
+        let mut cursor = 0usize;
+        let steps = FixedBoxBuilder::from_fn(step_count, |_| {
+            while let Some(event) = events.get(cursor) {
+                cursor += 1;
+                if let Some(step) = event.projected_kernel_step() {
+                    return step;
+                }
+            }
+            RuntimeKernelStepWitness {
+                opcode: UoOpcode::Wipe,
+                object_id: None,
+            }
+        });
+        Self::from_steps(steps)
     }
 
     pub fn opcodes(&self) -> &[UoOpcode] {
@@ -3308,11 +3827,21 @@ impl RuntimeKernelScheduleWitness {
     }
 
     pub fn public_object_schedule(&self) -> Box<[u32]> {
-        self.steps
+        let object_count = self
+            .steps
             .iter()
-            .filter_map(RuntimeKernelStepWitness::object_id)
-            .collect::<Vec<_>>()
-            .into_boxed_slice()
+            .filter(|step| step.object_id().is_some())
+            .count();
+        let mut cursor = 0usize;
+        FixedBoxBuilder::from_fn(object_count, |_| {
+            while let Some(step) = self.steps.get(cursor) {
+                cursor += 1;
+                if let Some(object_id) = step.object_id() {
+                    return object_id;
+                }
+            }
+            0
+        })
     }
 
     pub fn validate_shape(&self) -> Result<(), KernelWitnessError> {
@@ -3400,7 +3929,7 @@ impl RuntimeKernelExecutionTracker {
     pub fn with_kernel_op_budget(max_kernel_ops: usize) -> Self {
         Self {
             expected_kernel_schedule: RuntimeKernelScheduleTracker::default(),
-            emitted_kernel_steps: Vec::with_capacity(max_kernel_ops.max(1)),
+            kernel_steps: BoundedJournal::with_capacity(max_kernel_ops),
             max_kernel_ops,
         }
     }
@@ -3417,15 +3946,22 @@ impl RuntimeKernelExecutionTracker {
         &mut self,
         observed: RuntimeKernelStepWitness,
     ) -> Result<(), KernelWitnessError> {
-        if self.emitted_kernel_steps.len() >= self.max_kernel_ops {
+        if self.kernel_steps.len() >= self.max_kernel_ops {
             return Err(KernelWitnessError::KernelStepBudgetExceeded {
-                attempted_steps: self.emitted_kernel_steps.len() + 1,
+                attempted_steps: self.kernel_steps.len() + 1,
                 budget: self.max_kernel_ops,
             });
         }
         self.expected_kernel_schedule
             .observe_step(observed.clone())?;
-        self.emitted_kernel_steps.push(observed);
+        let attempted_steps = self.kernel_steps.len() + 1;
+        let budget = self.max_kernel_ops.min(self.kernel_steps.capacity());
+        self.kernel_steps.push(observed).map_err(|_observed| {
+            KernelWitnessError::KernelStepBudgetExceeded {
+                attempted_steps,
+                budget,
+            }
+        })?;
         Ok(())
     }
 
@@ -3444,11 +3980,11 @@ impl RuntimeKernelExecutionTracker {
     }
 
     pub fn emitted_kernel_steps(&self) -> &[RuntimeKernelStepWitness] {
-        &self.emitted_kernel_steps
+        self.kernel_steps.as_slice()
     }
 
     pub fn into_emitted_kernel_steps(self) -> Box<[RuntimeKernelStepWitness]> {
-        self.emitted_kernel_steps.into_boxed_slice()
+        self.kernel_steps.into_boxed_slice()
     }
 }
 
@@ -3579,7 +4115,7 @@ impl RuntimeKernelRefinementTracker {
         let max_event_count =
             max_runtime_kernel_refinement_event_count(public_object_count, max_kernel_ops)?;
         Ok(Self {
-            events: Vec::with_capacity(max_event_count.max(1)),
+            events: BoundedJournal::with_capacity(max_event_count),
             max_event_count,
             phase: RuntimeKernelRefinementPhase::BeforeBegin,
         })
@@ -3602,7 +4138,14 @@ impl RuntimeKernelRefinementTracker {
                     event: event.clone(),
                 }
             })?;
-        self.events.push(event);
+        let attempted_events = self.events.len() + 1;
+        let max_events = self.max_event_count.min(self.events.capacity());
+        self.events.push(event).map_err(|_event| {
+            RuntimeKernelRefinementTrackerError::EventCapacityExceeded {
+                attempted_events,
+                max_events,
+            }
+        })?;
         self.phase = next_phase;
         Ok(())
     }
@@ -3684,7 +4227,7 @@ impl RuntimeKernelRefinementTracker {
 
     pub fn shadow_load_object_schedule(&self) -> Box<[u32]> {
         runtime_kernel_refinement_event_object_schedule(
-            &self.events,
+            self.events.as_slice(),
             RuntimeKernelRefinementEventKindWitness::ShadowLoadObject,
         )
     }
@@ -3702,7 +4245,10 @@ impl RuntimeKernelRefinementTracker {
 }
 
 fn is_canonical_object_id_schedule(object_ids: &[u32]) -> bool {
-    object_ids.windows(2).all(|window| window[0] < window[1])
+    object_ids.windows(2).all(|window| match window {
+        [left, right] => left < right,
+        _ => true,
+    })
 }
 
 fn canonical_runtime_kernel_step_object_schedule(steps: &[RuntimeKernelStepWitness]) -> Box<[u32]> {
@@ -4000,21 +4546,7 @@ impl RuntimeKernelRefinementWitness {
     }
 
     pub fn projected_kernel_schedule(&self) -> RuntimeKernelScheduleWitness {
-        let steps = self
-            .events
-            .iter()
-            .filter_map(RuntimeKernelRefinementEventWitness::projected_kernel_step)
-            .collect::<Vec<_>>();
-        RuntimeKernelScheduleWitness::new(
-            steps
-                .iter()
-                .map(RuntimeKernelStepWitness::projected_opcode)
-                .collect(),
-            steps,
-        )
-        .expect(
-            "projected kernel schedule derived from validated events must satisfy shape invariants",
-        )
+        RuntimeKernelScheduleWitness::from_projected_refinement_events(&self.events)
     }
 
     pub fn shadow_load_object_schedule(&self) -> Box<[u32]> {
@@ -4138,13 +4670,12 @@ impl RuntimeKernelRefinementWitness {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("runtime kernel refinement witness is JSON serializable")
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("runtime kernel refinement witness is JSON serializable")
     }
 }
 
@@ -4245,14 +4776,12 @@ impl RuntimePathOramHiddenCertificate {
         })
     }
 
-    pub fn to_json(&self) -> String {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
-            .expect("runtime path-ORAM hidden certificate is JSON serializable")
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("runtime path-ORAM hidden certificate is JSON serializable")
     }
 
     pub fn validate(&self) -> Result<(), RefinementWitnessError> {
@@ -4351,13 +4880,12 @@ impl SeededRuntimeWitnessFamily {
         validate_seeded_runtime_witnesses(self.seed_count, &self.witnesses)
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("seeded runtime witness family is JSON serializable")
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("seeded runtime witness family is JSON serializable")
     }
 }
 
@@ -4401,14 +4929,12 @@ impl SeededRuntimePathOramWitnessFamily {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
-            .expect("seeded path-ORAM runtime witness family is JSON serializable")
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("seeded path-ORAM runtime witness family is JSON serializable")
     }
 }
 
@@ -4468,14 +4994,12 @@ impl SeededRuntimePaperMainFamilyBundle {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
-            .expect("seeded runtime paper-main family bundle is JSON serializable")
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("seeded runtime paper-main family bundle is JSON serializable")
     }
 }
 
@@ -4492,6 +5016,10 @@ impl SeededRuntimePaperMainSlotFamilyBundle {
         &self.boundary_schedule
     }
 
+    pub fn opcode_trace(&self) -> &[String] {
+        &self.opcode_trace
+    }
+
     pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
         &self.confidential_slot_program
     }
@@ -4500,12 +5028,22 @@ impl SeededRuntimePaperMainSlotFamilyBundle {
         family: SeededRuntimePathOramWitnessFamily,
         confidential_slot_program: ConfidentialKernelSlotProgram,
     ) -> Result<Self, SeededRuntimePaperMainSlotFamilyBundleError> {
+        let opcode_trace = confidential_slot_program.statement_trace();
+        Self::new_with_opcode_trace(family, confidential_slot_program, opcode_trace)
+    }
+
+    pub fn new_with_opcode_trace(
+        family: SeededRuntimePathOramWitnessFamily,
+        confidential_slot_program: ConfidentialKernelSlotProgram,
+        opcode_trace: Box<[String]>,
+    ) -> Result<Self, SeededRuntimePaperMainSlotFamilyBundleError> {
         let paper_main_bundle = SeededRuntimePaperMainFamilyBundle::new(family.clone())
             .map_err(SeededRuntimePaperMainSlotFamilyBundleError::Family)?;
         let bundle = Self {
             family,
             public_outcome: paper_main_bundle.public_outcome.clone(),
             boundary_schedule: paper_main_bundle.boundary_schedule.clone(),
+            opcode_trace,
             confidential_slot_program,
         };
         bundle.validate()?;
@@ -4530,6 +5068,9 @@ impl SeededRuntimePaperMainSlotFamilyBundle {
                     entrypoint: expected_entrypoint.clone(),
                 },
             );
+        }
+        if self.opcode_trace.as_ref() != self.confidential_slot_program.statement_trace().as_ref() {
+            return Err(SeededRuntimePaperMainSlotFamilyBundleError::OpcodeTraceMismatch);
         }
         let expected_kernel_steps = self
             .confidential_slot_program
@@ -4556,14 +5097,12 @@ impl SeededRuntimePaperMainSlotFamilyBundle {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
-            .expect("seeded runtime paper-main slot family bundle is JSON serializable")
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("seeded runtime paper-main slot family bundle is JSON serializable")
     }
 }
 
@@ -4653,10 +5192,17 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
                     },
                 );
             }
-            if by_seed[seed].is_some() {
+            let Some(slot) = by_seed.get_mut(seed) else {
+                return Err(
+                    CanonicalFreshCoinWitnessFamilyError::CanonicalFreshCoinValuesMismatch {
+                        index,
+                    },
+                );
+            };
+            if slot.is_some() {
                 return Err(CanonicalFreshCoinWitnessFamilyError::DuplicateCanonicalSeed { seed });
             }
-            by_seed[seed] = Some(witness);
+            *slot = Some(witness);
         }
 
         let mut ordered = Vec::with_capacity(canonical_seed_count);
@@ -4706,7 +5252,7 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
             let extracted_values = witness.path_oram_fresh_coin_values().ok_or(
                 CanonicalFreshCoinWitnessFamilyError::FreshCoinValuesExtractionMismatch { index },
             )?;
-            if extracted_values
+            if Some(extracted_values)
                 != canonical_path_oram_leaf_values_of_seed(&self.public_fresh_coin_scaffold, index)
             {
                 return Err(
@@ -4719,14 +5265,12 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
-            .expect("canonical fresh-coin path-ORAM runtime witness family is JSON serializable")
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("canonical fresh-coin path-ORAM runtime witness family is JSON serializable")
     }
 }
 
@@ -4811,7 +5355,7 @@ impl CanonicalFreshCoinRuntimePathOramTheoremInput {
             .representative_witness
             .path_oram_fresh_coin_values()
             .ok_or(CanonicalFreshCoinTheoremInputError::FreshCoinValuesExtractionMismatch)?;
-        if extracted_values
+        if Some(extracted_values)
             != canonical_path_oram_leaf_values_of_seed(
                 &self.public_fresh_coin_scaffold,
                 self.representative_seed,
@@ -4826,14 +5370,12 @@ impl CanonicalFreshCoinRuntimePathOramTheoremInput {
         Ok(())
     }
 
-    pub fn to_json(&self) -> String {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
-            .expect("canonical fresh-coin path-ORAM theorem input is JSON serializable")
     }
 
-    pub fn to_json_pretty(&self) -> String {
+    pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
-            .expect("canonical fresh-coin path-ORAM theorem input is JSON serializable")
     }
 }
 
@@ -5236,7 +5778,9 @@ fn reconstruct_oram_accesses_from_logical_trace(
     let mut accesses = Vec::new();
     let mut index = 0usize;
     while index < logical_accesses.len() {
-        let event = &logical_accesses[index];
+        let Some(event) = logical_accesses.get(index) else {
+            break;
+        };
         if !is_oram_logical_kind(&event.kind) {
             index += 1;
             continue;
@@ -5248,12 +5792,13 @@ fn reconstruct_oram_accesses_from_logical_trace(
                 detail_prefix: "counter".into(),
             });
         }
-        let object = runtime_oram_object_by_name(oram_objects, &event.object)?;
+        let object_name = event.object.clone();
+        let object = runtime_oram_object_by_name(oram_objects, &object_name)?;
         index += 1;
         index = consume_expected_oram_logical_events(
             logical_accesses,
             index,
-            &event.object,
+            &object_name,
             object.metadata_event_kind()?,
             object.metadata_pages,
             "page:",
@@ -5261,7 +5806,7 @@ fn reconstruct_oram_accesses_from_logical_trace(
         index = consume_expected_oram_logical_events(
             logical_accesses,
             index,
-            &event.object,
+            &object_name,
             object.bucket_event_kind()?,
             object.buckets_per_access,
             "bucket:",
@@ -5301,7 +5846,9 @@ fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
     let mut scaffold = Vec::new();
     let mut index = 0usize;
     while index < logical_accesses.len() {
-        let event = &logical_accesses[index];
+        let Some(event) = logical_accesses.get(index) else {
+            break;
+        };
         if !is_oram_logical_kind(&event.kind) {
             index += 1;
             continue;
@@ -5313,12 +5860,13 @@ fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
                 detail_prefix: "counter".into(),
             });
         }
-        let object = runtime_oram_object_by_name(oram_objects, &event.object)?;
+        let object_name = event.object.clone();
+        let object = runtime_oram_object_by_name(oram_objects, &object_name)?;
         index += 1;
         index = consume_expected_oram_logical_events(
             logical_accesses,
             index,
-            &event.object,
+            &object_name,
             object.metadata_event_kind()?,
             object.metadata_pages,
             "page:",
@@ -5326,7 +5874,7 @@ fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
         index = consume_expected_oram_logical_events(
             logical_accesses,
             index,
-            &event.object,
+            &object_name,
             object.bucket_event_kind()?,
             object.buckets_per_access,
             "bucket:",
@@ -5421,22 +5969,34 @@ fn runtime_path_oram_fresh_coin_scaffold_of_step(
     match transition.kind {
         RuntimePathOramTransitionKind::ReadMiss => Some(Box::from([scaffold_step])),
         RuntimePathOramTransitionKind::ReadHit => {
-            transition.next_leaf.map(|_| Box::from([scaffold_step]))
+            if transition.next_leaf.is_some() {
+                Some(Box::from([scaffold_step]))
+            } else {
+                None
+            }
         }
-        RuntimePathOramTransitionKind::WriteNoop => Some(if transition.slot_index.is_some() {
-            Box::<[RuntimeOramLeafScaffoldWitness]>::default()
-        } else {
-            Box::from([scaffold_step])
-        }),
-        RuntimePathOramTransitionKind::WriteInsert => transition
-            .next_leaf
-            .map(|_| Box::from([scaffold_step.clone(), scaffold_step])),
+        RuntimePathOramTransitionKind::WriteNoop => {
+            if transition.slot_index.is_some() {
+                Some(Box::default())
+            } else {
+                Some(Box::from([scaffold_step]))
+            }
+        }
+        RuntimePathOramTransitionKind::WriteInsert => {
+            if transition.next_leaf.is_some() {
+                Some(vec![scaffold_step.clone(), scaffold_step].into_boxed_slice())
+            } else {
+                None
+            }
+        }
         RuntimePathOramTransitionKind::WriteUpdate => {
-            transition.next_leaf.map(|_| Box::from([scaffold_step]))
+            if transition.next_leaf.is_some() {
+                Some(Box::from([scaffold_step]))
+            } else {
+                None
+            }
         }
-        RuntimePathOramTransitionKind::WriteDelete => {
-            Some(Box::<[RuntimeOramLeafScaffoldWitness]>::default())
-        }
+        RuntimePathOramTransitionKind::WriteDelete => Some(Box::default()),
     }
 }
 
@@ -5453,20 +6013,34 @@ fn runtime_path_oram_fresh_coin_values_of_step(
     match transition.kind {
         RuntimePathOramTransitionKind::ReadMiss => Some(Box::from([leaf.leaf])),
         RuntimePathOramTransitionKind::ReadHit => {
-            transition.next_leaf.map(|next_leaf| Box::from([next_leaf]))
+            if transition.next_leaf.is_some() {
+                Some(Box::from([transition.next_leaf.value]))
+            } else {
+                None
+            }
         }
-        RuntimePathOramTransitionKind::WriteNoop => Some(if transition.slot_index.is_some() {
-            Box::<[usize]>::default()
-        } else {
-            Box::from([leaf.leaf])
-        }),
-        RuntimePathOramTransitionKind::WriteInsert => transition
-            .next_leaf
-            .map(|next_leaf| Box::from([leaf.leaf, next_leaf])),
+        RuntimePathOramTransitionKind::WriteNoop => {
+            if transition.slot_index.is_some() {
+                Some(Box::default())
+            } else {
+                Some(Box::from([leaf.leaf]))
+            }
+        }
+        RuntimePathOramTransitionKind::WriteInsert => {
+            if transition.next_leaf.is_some() {
+                Some(Box::from([leaf.leaf, transition.next_leaf.value]))
+            } else {
+                None
+            }
+        }
         RuntimePathOramTransitionKind::WriteUpdate => {
-            transition.next_leaf.map(|next_leaf| Box::from([next_leaf]))
+            if transition.next_leaf.is_some() {
+                Some(Box::from([transition.next_leaf.value]))
+            } else {
+                None
+            }
         }
-        RuntimePathOramTransitionKind::WriteDelete => Some(Box::<[usize]>::default()),
+        RuntimePathOramTransitionKind::WriteDelete => Some(Box::default()),
     }
 }
 
@@ -5477,15 +6051,19 @@ pub fn extract_runtime_path_oram_fresh_coin_scaffold(
     if leaf_schedule.len() != transitions.len() {
         return None;
     }
-    let mut scaffold = Vec::with_capacity(leaf_schedule.len().saturating_mul(2));
+    let mut scaffold_len = 0usize;
     for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
-        scaffold.extend(
-            runtime_path_oram_fresh_coin_scaffold_of_step(leaf, transition)?
-                .iter()
-                .cloned(),
-        );
+        scaffold_len = scaffold_len
+            .checked_add(runtime_path_oram_fresh_coin_scaffold_of_step(leaf, transition)?.len())?;
     }
-    Some(scaffold.into_boxed_slice())
+    let mut scaffold = FixedBoxBuilder::new(scaffold_len);
+    for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
+        let step_scaffold = runtime_path_oram_fresh_coin_scaffold_of_step(leaf, transition)?;
+        for step in step_scaffold.iter().cloned() {
+            scaffold.push(step).ok()?;
+        }
+    }
+    scaffold.finish().ok()
 }
 
 pub fn extract_runtime_path_oram_fresh_coin_values(
@@ -5495,15 +6073,19 @@ pub fn extract_runtime_path_oram_fresh_coin_values(
     if leaf_schedule.len() != transitions.len() {
         return None;
     }
-    let mut values = Vec::with_capacity(leaf_schedule.len().saturating_mul(2));
+    let mut values_len = 0usize;
     for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
-        values.extend(
-            runtime_path_oram_fresh_coin_values_of_step(leaf, transition)?
-                .iter()
-                .copied(),
-        );
+        values_len = values_len
+            .checked_add(runtime_path_oram_fresh_coin_values_of_step(leaf, transition)?.len())?;
     }
-    Some(values.into_boxed_slice())
+    let mut values = FixedBoxBuilder::new(values_len);
+    for (leaf, transition) in leaf_schedule.iter().zip(transitions.iter()) {
+        let step_values = runtime_path_oram_fresh_coin_values_of_step(leaf, transition)?;
+        for value in step_values.iter().copied() {
+            values.push(value).ok()?;
+        }
+    }
+    values.finish().ok()
 }
 
 pub fn canonical_path_oram_leaf_seed_space_size(
@@ -5517,21 +6099,26 @@ pub fn canonical_path_oram_leaf_seed_space_size(
 pub fn canonical_path_oram_leaf_values_of_seed(
     scaffold: &[RuntimeOramLeafScaffoldWitness],
     seed: usize,
-) -> Box<[usize]> {
-    fn go(scaffold: &[RuntimeOramLeafScaffoldWitness], seed: usize, output: &mut Vec<usize>) {
+) -> Option<Box<[usize]>> {
+    fn go(
+        scaffold: &[RuntimeOramLeafScaffoldWitness],
+        seed: usize,
+        output: &mut FixedBoxBuilder<usize>,
+    ) -> Option<()> {
         if let Some((head, tail)) = scaffold.split_first() {
-            let tail_size = canonical_path_oram_leaf_seed_space_size(tail)
-                .expect("tail seed space should fit in usize")
-                .max(1);
-            output.push(seed / tail_size);
-            debug_assert!(path_oram_leaf_choice_count(head.bucket_count) > 0);
-            go(tail, seed % tail_size, output);
+            let tail_size = canonical_path_oram_leaf_seed_space_size(tail)?.max(1);
+            if path_oram_leaf_choice_count(head.bucket_count) == 0 {
+                return None;
+            }
+            output.push(seed / tail_size).ok()?;
+            go(tail, seed % tail_size, output)?;
         }
+        Some(())
     }
 
-    let mut values = Vec::with_capacity(scaffold.len());
-    go(scaffold, seed, &mut values);
-    values.into_boxed_slice()
+    let mut values = FixedBoxBuilder::new(scaffold.len());
+    go(scaffold, seed, &mut values)?;
+    values.finish().ok()
 }
 
 pub fn canonical_path_oram_seed_of_leaf_values(
@@ -5594,10 +6181,17 @@ fn validate_path_oram_leaf_schedule(
         .collect())
 }
 
+fn runtime_masked_usize_option_witness_in_domain(
+    witness: RuntimeMaskedUsizeOptionWitness,
+    bound: usize,
+) -> bool {
+    witness.is_canonical() && (witness.is_none() || witness.value < bound)
+}
+
 fn runtime_path_oram_state_by_object(
     states: &[RuntimePathOramPositionMapWitness],
     oram_objects: &[RuntimeOramObjectWitness],
-) -> Result<BTreeMap<u32, Box<[Option<usize>]>>, RefinementWitnessError> {
+) -> Result<BTreeMap<u32, Box<[RuntimeMaskedUsizeOptionWitness]>>, RefinementWitnessError> {
     let mut by_object = BTreeMap::new();
     for object in oram_objects
         .iter()
@@ -5614,8 +6208,7 @@ fn runtime_path_oram_state_by_object(
         if state
             .leaves
             .iter()
-            .flatten()
-            .any(|leaf| *leaf >= leaf_count)
+            .any(|leaf| !runtime_masked_usize_option_witness_in_domain(*leaf, leaf_count))
         {
             return Err(RefinementWitnessError::OramLeafStateMismatch);
         }
@@ -5653,21 +6246,30 @@ fn validate_path_oram_leaf_state(
             || object.object_name != step.object_name
             || object.bucket_count != step.bucket_count
             || step.leaf >= path_oram_leaf_choice_count(step.bucket_count)
+            || transition.fresh_leaf >= path_oram_leaf_choice_count(step.bucket_count)
         {
             return Err(RefinementWitnessError::OramLeafStateMismatch);
         }
         let state = current
             .get_mut(&step.object_id)
             .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+        let leaf_count = path_oram_leaf_choice_count(step.bucket_count);
+        if !runtime_masked_usize_option_witness_in_domain(transition.slot_index, state.len())
+            || !runtime_masked_usize_option_witness_in_domain(transition.prior_leaf, leaf_count)
+            || !runtime_masked_usize_option_witness_in_domain(transition.next_leaf, leaf_count)
+        {
+            return Err(RefinementWitnessError::OramLeafStateMismatch);
+        }
         if transition.prior_leaf.is_some() && transition.slot_index.is_none() {
             return Err(RefinementWitnessError::OramLeafStateMismatch);
         }
-        if let Some(slot_index) = transition.slot_index {
-            if slot_index >= state.len() {
-                return Err(RefinementWitnessError::OramLeafStateMismatch);
-            }
-            if let Some(prior_leaf) = transition.prior_leaf {
-                if state[slot_index] != Some(prior_leaf) {
+        if transition.slot_index.is_some() {
+            let slot_index = transition.slot_index.value;
+            if transition.prior_leaf.is_some() {
+                let observed = state
+                    .get(slot_index)
+                    .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+                if *observed != RuntimeMaskedUsizeOptionWitness::some(transition.prior_leaf.value) {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
             }
@@ -5677,88 +6279,104 @@ fn validate_path_oram_leaf_state(
                 if transition.slot_index.is_some()
                     || transition.prior_leaf.is_some()
                     || transition.next_leaf.is_some()
+                    || step.leaf != transition.fresh_leaf
                 {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
             }
             RuntimePathOramTransitionKind::ReadHit => {
-                let (slot_index, prior_leaf, next_leaf) = match (
-                    transition.slot_index,
-                    transition.prior_leaf,
-                    transition.next_leaf,
-                ) {
-                    (Some(slot_index), Some(prior_leaf), Some(next_leaf)) => {
-                        (slot_index, prior_leaf, next_leaf)
-                    }
-                    _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
-                };
-                if step.leaf != prior_leaf
-                    || next_leaf >= path_oram_leaf_choice_count(step.bucket_count)
+                if transition.slot_index.is_none()
+                    || transition.prior_leaf.is_none()
+                    || transition.next_leaf.is_none()
                 {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
-                state[slot_index] = Some(next_leaf);
+                let slot_index = transition.slot_index.value;
+                let prior_leaf = transition.prior_leaf.value;
+                let next_leaf = transition.next_leaf.value;
+                if step.leaf != prior_leaf || next_leaf != transition.fresh_leaf {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                let slot = state
+                    .get_mut(slot_index)
+                    .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+                *slot = RuntimeMaskedUsizeOptionWitness::some(next_leaf);
             }
-            RuntimePathOramTransitionKind::WriteNoop => match (
-                transition.slot_index,
-                transition.prior_leaf,
-                transition.next_leaf,
-            ) {
-                (None, None, None) => {}
-                (Some(_slot_index), Some(prior_leaf), Some(next_leaf)) => {
-                    if step.leaf != prior_leaf || next_leaf != prior_leaf {
-                        return Err(RefinementWitnessError::OramLeafStateMismatch);
-                    }
-                }
-                _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
-            },
-            RuntimePathOramTransitionKind::WriteInsert => {
-                let (slot_index, next_leaf) = match (
-                    transition.slot_index,
-                    transition.prior_leaf,
-                    transition.next_leaf,
+            RuntimePathOramTransitionKind::WriteNoop => {
+                match (
+                    transition.slot_index.is_some(),
+                    transition.prior_leaf.is_some(),
+                    transition.next_leaf.is_some(),
                 ) {
-                    (Some(slot_index), None, Some(next_leaf)) => (slot_index, next_leaf),
+                    (false, false, false) => {
+                        if step.leaf != transition.fresh_leaf {
+                            return Err(RefinementWitnessError::OramLeafStateMismatch);
+                        }
+                    }
+                    (true, true, true) => {
+                        let prior_leaf = transition.prior_leaf.value;
+                        let next_leaf = transition.next_leaf.value;
+                        if step.leaf != prior_leaf
+                            || next_leaf != prior_leaf
+                            || transition.fresh_leaf != prior_leaf
+                        {
+                            return Err(RefinementWitnessError::OramLeafStateMismatch);
+                        }
+                    }
                     _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
-                };
-                if state[slot_index].is_some()
-                    || next_leaf >= path_oram_leaf_choice_count(step.bucket_count)
+                }
+            }
+            RuntimePathOramTransitionKind::WriteInsert => {
+                if transition.slot_index.is_none()
+                    || transition.prior_leaf.is_some()
+                    || transition.next_leaf.is_none()
                 {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
-                state[slot_index] = Some(next_leaf);
+                let slot_index = transition.slot_index.value;
+                let next_leaf = transition.next_leaf.value;
+                let slot = state
+                    .get_mut(slot_index)
+                    .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+                if slot.is_some() || next_leaf != transition.fresh_leaf {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                *slot = RuntimeMaskedUsizeOptionWitness::some(next_leaf);
             }
             RuntimePathOramTransitionKind::WriteUpdate => {
-                let (slot_index, prior_leaf, next_leaf) = match (
-                    transition.slot_index,
-                    transition.prior_leaf,
-                    transition.next_leaf,
-                ) {
-                    (Some(slot_index), Some(prior_leaf), Some(next_leaf)) => {
-                        (slot_index, prior_leaf, next_leaf)
-                    }
-                    _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
-                };
-                if step.leaf != prior_leaf
-                    || next_leaf >= path_oram_leaf_choice_count(step.bucket_count)
+                if transition.slot_index.is_none()
+                    || transition.prior_leaf.is_none()
+                    || transition.next_leaf.is_none()
                 {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
-                state[slot_index] = Some(next_leaf);
-            }
-            RuntimePathOramTransitionKind::WriteDelete => {
-                let (slot_index, prior_leaf) = match (
-                    transition.slot_index,
-                    transition.prior_leaf,
-                    transition.next_leaf,
-                ) {
-                    (Some(slot_index), Some(prior_leaf), None) => (slot_index, prior_leaf),
-                    _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
-                };
-                if step.leaf != prior_leaf {
+                let slot_index = transition.slot_index.value;
+                let prior_leaf = transition.prior_leaf.value;
+                let next_leaf = transition.next_leaf.value;
+                if step.leaf != prior_leaf || next_leaf != transition.fresh_leaf {
                     return Err(RefinementWitnessError::OramLeafStateMismatch);
                 }
-                state[slot_index] = None;
+                let slot = state
+                    .get_mut(slot_index)
+                    .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+                *slot = RuntimeMaskedUsizeOptionWitness::some(next_leaf);
+            }
+            RuntimePathOramTransitionKind::WriteDelete => {
+                if transition.slot_index.is_none()
+                    || transition.prior_leaf.is_none()
+                    || transition.next_leaf.is_some()
+                {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                let slot_index = transition.slot_index.value;
+                let prior_leaf = transition.prior_leaf.value;
+                if step.leaf != prior_leaf || transition.fresh_leaf != prior_leaf {
+                    return Err(RefinementWitnessError::OramLeafStateMismatch);
+                }
+                let slot = state
+                    .get_mut(slot_index)
+                    .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+                *slot = RuntimeMaskedUsizeOptionWitness::none();
             }
         }
     }
@@ -5836,6 +6454,8 @@ pub struct ExecutionTrace {
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
     #[serde(default)]
     runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    runtime_kernel_machine_finish_witness: Option<RuntimeKernelMachineFinishWitness>,
     #[serde(default)]
     runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,
     #[serde(default)]
@@ -5873,7 +6493,7 @@ fn wipe_runtime_oram_access_counters(witnesses: &mut [RuntimeOramAccessCounterWi
 fn wipe_runtime_oram_position_maps(witnesses: &mut [RuntimePathOramPositionMapWitness]) {
     for witness in witnesses.iter_mut() {
         for leaf in witness.leaves.iter_mut() {
-            *leaf = None;
+            leaf.wipe();
         }
     }
 }
@@ -5948,11 +6568,22 @@ impl CommittedRuntimeWitnessSnapshotBuilder {
         runtime_oram_access_counter: RuntimeOramAccessCounterWitness,
         runtime_oram_position_map: RuntimePathOramPositionMapWitness,
     ) -> Result<(), CommittedRuntimeWitnessSnapshotBuilderError> {
-        if self.initialized >= self.runtime_oram_access_counters.len() {
+        let index = self.initialized;
+        if index >= self.runtime_oram_access_counters.len()
+            || index >= self.runtime_oram_position_maps.len()
+        {
             return Err(CommittedRuntimeWitnessSnapshotBuilderError::Overflow);
         }
-        self.runtime_oram_access_counters[self.initialized].write(runtime_oram_access_counter);
-        self.runtime_oram_position_maps[self.initialized].write(runtime_oram_position_map);
+        let counter_slot = self
+            .runtime_oram_access_counters
+            .get_mut(index)
+            .ok_or(CommittedRuntimeWitnessSnapshotBuilderError::Overflow)?;
+        let position_map_slot = self
+            .runtime_oram_position_maps
+            .get_mut(index)
+            .ok_or(CommittedRuntimeWitnessSnapshotBuilderError::Overflow)?;
+        counter_slot.write(runtime_oram_access_counter);
+        position_map_slot.write(runtime_oram_position_map);
         self.initialized += 1;
         Ok(())
     }
@@ -5981,10 +6612,18 @@ impl CommittedRuntimeWitnessSnapshotBuilder {
 
 impl Drop for CommittedRuntimeWitnessSnapshotBuilder {
     fn drop(&mut self) {
-        for entry in &mut self.runtime_oram_access_counters[..self.initialized] {
+        for entry in self
+            .runtime_oram_access_counters
+            .iter_mut()
+            .take(self.initialized)
+        {
             unsafe { entry.assume_init_drop() };
         }
-        for entry in &mut self.runtime_oram_position_maps[..self.initialized] {
+        for entry in self
+            .runtime_oram_position_maps
+            .iter_mut()
+            .take(self.initialized)
+        {
             unsafe { entry.assume_init_drop() };
         }
     }
@@ -6047,6 +6686,7 @@ impl TracedRuntimeCallOutcome {
 
 #[derive(Debug)]
 pub struct RuntimeCallOutcome {
+    runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
     runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
     aborted: bool,
     return_value: Option<Value>,
@@ -6055,12 +6695,14 @@ pub struct RuntimeCallOutcome {
 
 impl RuntimeCallOutcome {
     pub fn from_runtime_execution(
+        runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
         runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
         aborted: bool,
         return_value: Option<Value>,
         opcode_trace: Box<[String]>,
     ) -> Self {
         Self {
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             aborted,
             return_value,
@@ -6071,12 +6713,14 @@ impl RuntimeCallOutcome {
     pub fn into_theorem_trace_parts(
         self,
     ) -> (
+        RuntimeKernelMachineFinishWitness,
         RuntimeKernelFinishBundle,
         bool,
         Option<Value>,
         Box<[String]>,
     ) {
         (
+            self.runtime_kernel_machine_finish_witness,
             self.runtime_kernel_finish_bundle,
             self.aborted,
             self.return_value,
@@ -6154,6 +6798,7 @@ impl FinalizedRuntimeCallTraceParts {
     pub fn into_execution_trace_inputs(
         self,
     ) -> (
+        RuntimeKernelMachineFinishWitness,
         RuntimeKernelFinishBundle,
         bool,
         Option<Value>,
@@ -6164,9 +6809,15 @@ impl FinalizedRuntimeCallTraceParts {
             runtime_call_outcome,
             runtime_witness_state,
         } = self;
-        let (runtime_kernel_finish_bundle, aborted, return_value, opcode_trace) =
-            runtime_call_outcome.into_theorem_trace_parts();
+        let (
+            runtime_kernel_machine_finish_witness,
+            runtime_kernel_finish_bundle,
+            aborted,
+            return_value,
+            opcode_trace,
+        ) = runtime_call_outcome.into_theorem_trace_parts();
         (
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             aborted,
             return_value,
@@ -6217,6 +6868,7 @@ impl RuntimePublicCallTraceBundle {
         opcode_trace: Box<[String]>,
         gas_used: u64,
         runtime_seed: Option<u64>,
+        runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
         runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
         runtime_witness_state: TracedRuntimeCallWitnessState,
     ) -> RuntimeExecutionTraceFinalizationInput {
@@ -6245,6 +6897,7 @@ impl RuntimePublicCallTraceBundle {
             gas_used,
             theorem_trace,
             runtime_seed,
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
             runtime_oram_leaf_schedule,
@@ -6267,6 +6920,7 @@ pub struct RuntimeExecutionTraceFinalizationInput {
     gas_used: u64,
     theorem_trace: TheoremTrace,
     runtime_seed: Option<u64>,
+    runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
     runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
     runtime_controller_certificate: RuntimeControllerCertificate,
     runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
@@ -6289,6 +6943,7 @@ pub(crate) struct RuntimeExecutionTraceParts {
     runtime_seed: Option<u64>,
     runtime_kernel_witness: Option<RuntimeKernelWitness>,
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    runtime_kernel_machine_finish_witness: Option<RuntimeKernelMachineFinishWitness>,
     runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
     runtime_controller_certificate: Option<RuntimeControllerCertificate>,
     runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
@@ -6301,6 +6956,29 @@ pub(crate) struct RuntimeExecutionTraceParts {
 }
 
 impl RuntimeExecutionTraceParts {
+    fn validate_runtime_kernel_machine_finish_witness_against_finish_bundle(
+        runtime_kernel_machine_finish_witness: Option<&RuntimeKernelMachineFinishWitness>,
+        runtime_kernel_finish_bundle: Option<&RuntimeKernelFinishBundle>,
+    ) -> Result<(), RefinementWitnessError> {
+        let Some(runtime_kernel_machine_finish_witness) = runtime_kernel_machine_finish_witness
+        else {
+            return Ok(());
+        };
+        runtime_kernel_machine_finish_witness
+            .validate()
+            .map_err(RefinementWitnessError::RuntimeKernelMachineFinishWitness)?;
+        if let Some(runtime_kernel_finish_bundle) = runtime_kernel_finish_bundle {
+            if runtime_kernel_machine_finish_witness.projected_finish_bundle()
+                != runtime_kernel_finish_bundle.duplicate()
+            {
+                return Err(
+                    RefinementWitnessError::RuntimeKernelMachineFinishWitnessFinishBundleMismatch,
+                );
+            }
+        }
+        Ok(())
+    }
+
     fn validate_runtime_kernel_witness_pair_against_finish_bundle(
         runtime_kernel_witness: Option<RuntimeKernelWitness>,
         runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
@@ -6347,6 +7025,7 @@ impl RuntimeExecutionTraceParts {
         runtime_seed: Option<u64>,
         runtime_kernel_witness: Option<RuntimeKernelWitness>,
         runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+        runtime_kernel_machine_finish_witness: Option<RuntimeKernelMachineFinishWitness>,
         runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
         runtime_controller_certificate: Option<RuntimeControllerCertificate>,
         runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
@@ -6357,6 +7036,10 @@ impl RuntimeExecutionTraceParts {
         runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
         runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
     ) -> Result<Self, RefinementWitnessError> {
+        Self::validate_runtime_kernel_machine_finish_witness_against_finish_bundle(
+            runtime_kernel_machine_finish_witness.as_ref(),
+            runtime_kernel_finish_bundle.as_ref(),
+        )?;
         Self::validate_runtime_kernel_witness_pair_against_finish_bundle(
             runtime_kernel_witness.clone(),
             runtime_kernel_refinement_witness.clone(),
@@ -6373,6 +7056,7 @@ impl RuntimeExecutionTraceParts {
             runtime_seed,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
             runtime_oram_objects,
@@ -6397,6 +7081,7 @@ impl RuntimeExecutionTraceFinalizationInput {
         gas_used: u64,
         theorem_trace: TheoremTrace,
         runtime_seed: Option<u64>,
+        runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
         runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
         runtime_controller_certificate: RuntimeControllerCertificate,
         runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
@@ -6415,6 +7100,7 @@ impl RuntimeExecutionTraceFinalizationInput {
             gas_used,
             theorem_trace,
             runtime_seed,
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
             runtime_oram_leaf_schedule,
@@ -6436,6 +7122,31 @@ impl ExecutionTrace {
         self.runtime_kernel_finish_bundle.as_ref()
     }
 
+    pub fn exact_runtime_kernel_machine_finish_witness(
+        &self,
+    ) -> Result<RuntimeKernelMachineFinishWitness, RuntimeKernelFinishBundleAccessError> {
+        let runtime_kernel_machine_finish_witness = self
+            .runtime_kernel_machine_finish_witness
+            .as_ref()
+            .cloned()
+            .ok_or(
+                RuntimeKernelFinishBundleAccessError::MissingRuntimeKernelMachineFinishWitness,
+            )?;
+        runtime_kernel_machine_finish_witness.validate().map_err(
+            RuntimeKernelFinishBundleAccessError::InvalidRuntimeKernelMachineFinishWitness,
+        )?;
+        if let Some(runtime_kernel_finish_bundle) = self.runtime_kernel_finish_bundle.as_ref() {
+            if runtime_kernel_machine_finish_witness.projected_finish_bundle()
+                != runtime_kernel_finish_bundle.duplicate()
+            {
+                return Err(
+                    RuntimeKernelFinishBundleAccessError::RuntimeKernelMachineFinishWitnessFinishBundleMismatch,
+                );
+            }
+        }
+        Ok(runtime_kernel_machine_finish_witness)
+    }
+
     pub fn exact_runtime_kernel_finish_bundle(
         &self,
     ) -> Result<RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError> {
@@ -6444,6 +7155,21 @@ impl ExecutionTrace {
             .as_ref()
             .map(RuntimeKernelFinishBundle::duplicate)
             .ok_or(RuntimeKernelFinishBundleAccessError::MissingRuntimeKernelFinishBundle)?;
+        RuntimeExecutionTraceParts::validate_runtime_kernel_machine_finish_witness_against_finish_bundle(
+            self.runtime_kernel_machine_finish_witness.as_ref(),
+            Some(&runtime_kernel_finish_bundle),
+        )
+        .map_err(|err| match err {
+            RefinementWitnessError::RuntimeKernelMachineFinishWitnessFinishBundleMismatch => {
+                RuntimeKernelFinishBundleAccessError::RuntimeKernelMachineFinishWitnessFinishBundleMismatch
+            }
+            RefinementWitnessError::RuntimeKernelMachineFinishWitness(err) => {
+                RuntimeKernelFinishBundleAccessError::InvalidRuntimeKernelMachineFinishWitness(err)
+            }
+            _ => {
+                unreachable!("machine-finish validation only reports machine-finish witness errors")
+            }
+        })?;
         RuntimeExecutionTraceParts::validate_runtime_kernel_witness_pair_against_finish_bundle(
             self.runtime_kernel_witness.clone(),
             self.runtime_kernel_refinement_witness.clone(),
@@ -6502,6 +7228,7 @@ impl ExecutionTrace {
             runtime_seed,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
             runtime_oram_objects,
@@ -6524,6 +7251,7 @@ impl ExecutionTrace {
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
             runtime_kernel_finish_bundle,
+            runtime_kernel_machine_finish_witness,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate,
             runtime_oram_objects,
@@ -6550,6 +7278,7 @@ impl ExecutionTrace {
             gas_used,
             theorem_trace,
             runtime_seed,
+            runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
             runtime_oram_leaf_schedule,
@@ -6570,6 +7299,7 @@ impl ExecutionTrace {
             runtime_seed,
             None,
             None,
+            Some(runtime_kernel_machine_finish_witness),
             Some(runtime_kernel_finish_bundle),
             Some(runtime_controller_certificate),
             runtime_oram_objects(artifact),
@@ -6587,7 +7317,7 @@ impl ExecutionTrace {
         Ok(trace)
     }
 
-    pub fn hashes(&self) -> TraceHashBundle {
+    pub fn hashes(&self) -> Result<TraceHashBundle, serde_json::Error> {
         let normalized_physical = self
             .physical_writes
             .iter()
@@ -6605,14 +7335,14 @@ impl ExecutionTrace {
             .iter()
             .map(|event| (event.object.clone(), event.location.clone(), event.len))
             .collect::<Vec<_>>();
-        TraceHashBundle {
-            opcode_trace_hash: hash_json(&self.opcode_trace),
-            logical_access_trace_hash: hash_json(&self.logical_accesses),
-            logical_write_trace_hash: hash_json(&self.logical_writes),
-            physical_read_trace_hash: hash_json(&normalized_reads),
-            physical_write_trace_hash: hash_json(&normalized_physical),
-            physical_access_trace_hash: hash_json(&(normalized_reads, normalized_physical)),
-        }
+        Ok(TraceHashBundle {
+            opcode_trace_hash: hash_json(&self.opcode_trace)?,
+            logical_access_trace_hash: hash_json(&self.logical_accesses)?,
+            logical_write_trace_hash: hash_json(&self.logical_writes)?,
+            physical_read_trace_hash: hash_json(&normalized_reads)?,
+            physical_write_trace_hash: hash_json(&normalized_physical)?,
+            physical_access_trace_hash: hash_json(&(normalized_reads, normalized_physical))?,
+        })
     }
 
     fn refinement_trace(&self) -> RefinementTrace {
@@ -6934,9 +7664,10 @@ impl ExecutionTrace {
                     entrypoint: entrypoint.clone(),
                 }
             })?;
-        SeededRuntimePaperMainSlotFamilyBundle::new(
+        SeededRuntimePaperMainSlotFamilyBundle::new_with_opcode_trace(
             paper_main_bundle.family().clone(),
             confidential_slot_program,
+            self.opcode_trace.clone(),
         )
         .map_err(RuntimePaperMainSlotFamilyBundleError::PaperMainSlot)
     }
@@ -7071,11 +7802,11 @@ pub fn classify_write(old: &[u8], new: &[u8]) -> WriteClass {
     }
 }
 
-fn hash_json<T: Serialize>(value: &T) -> String {
-    let payload = serde_json::to_vec(value).expect("trace hashing requires serialization");
+fn hash_json<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
+    let payload = serde_json::to_vec(value)?;
     let mut hasher = DefaultHasher::new();
     payload.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
+    Ok(format!("{:016x}", hasher.finish()))
 }
 
 #[cfg(test)]
@@ -7084,7 +7815,8 @@ mod tests {
         canonical_path_oram_leaf_seed_space_size, canonical_path_oram_seed_of_leaf_values,
         classify_write, collect_kernel_steps_from_expr,
         extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
-        max_runtime_kernel_refinement_event_count, CanonicalFreshCoinRuntimePathOramTheoremInput,
+        max_runtime_kernel_refinement_event_count, runtime_path_oram_fresh_coin_scaffold_of_step,
+        runtime_path_oram_fresh_coin_values_of_step, CanonicalFreshCoinRuntimePathOramTheoremInput,
         CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
         CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
         LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
@@ -7097,8 +7829,8 @@ mod tests {
         RuntimeKernelRefinementTracker, RuntimeKernelRefinementTrackerError,
         RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
         RuntimeKernelStepWitness, RuntimeKernelTelemetrySnapshot, RuntimeKernelWitness,
-        RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
-        RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
+        RuntimeMaskedUsizeOptionWitness, RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness,
+        RuntimeOramLeafWitness, RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
         RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
         RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
         SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
@@ -7449,6 +8181,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
                 Some(finish_bundle),
                 None,
                 vec![].into_boxed_slice(),
@@ -7492,6 +8225,7 @@ mod tests {
                 vec![].into_boxed_slice(),
                 0,
                 TheoremTrace::default(),
+                None,
                 None,
                 None,
                 None,
@@ -7547,6 +8281,7 @@ mod tests {
                 None,
                 Some(drifted_kernel_witness),
                 None,
+                None,
                 Some(sample_runtime_kernel_finish_bundle()),
                 None,
                 vec![].into_boxed_slice(),
@@ -7582,6 +8317,7 @@ mod tests {
                 None,
                 None,
                 Some(drifted_runtime_kernel_refinement_witness),
+                None,
                 Some(sample_runtime_kernel_finish_bundle()),
                 None,
                 vec![].into_boxed_slice(),
@@ -7872,8 +8608,8 @@ mod tests {
     }
 
     fn sample_path_oram_position_map_before() -> Vec<RuntimePathOramPositionMapWitness> {
-        let mut leaves = vec![None; 16];
-        leaves[0] = Some(0);
+        let mut leaves = vec![RuntimeMaskedUsizeOptionWitness::none(); 16];
+        leaves[0] = RuntimeMaskedUsizeOptionWitness::some(0);
         vec![RuntimePathOramPositionMapWitness {
             object_id: 7,
             object_name: "records".into(),
@@ -7882,8 +8618,8 @@ mod tests {
     }
 
     fn sample_path_oram_position_map_after() -> Vec<RuntimePathOramPositionMapWitness> {
-        let mut leaves = vec![None; 16];
-        leaves[0] = Some(3);
+        let mut leaves = vec![RuntimeMaskedUsizeOptionWitness::none(); 16];
+        leaves[0] = RuntimeMaskedUsizeOptionWitness::some(3);
         vec![RuntimePathOramPositionMapWitness {
             object_id: 7,
             object_name: "records".into(),
@@ -7897,9 +8633,10 @@ mod tests {
             object_name: "records".into(),
             bucket_count: 31,
             kind: RuntimePathOramTransitionKind::ReadHit,
-            slot_index: Some(0),
-            prior_leaf: Some(0),
-            next_leaf: Some(3),
+            fresh_leaf: 3,
+            slot_index: RuntimeMaskedUsizeOptionWitness::some(0),
+            prior_leaf: RuntimeMaskedUsizeOptionWitness::some(0),
+            next_leaf: RuntimeMaskedUsizeOptionWitness::some(3),
         }]
     }
 
@@ -7910,7 +8647,7 @@ mod tests {
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let path = sample_path_bucket_indices();
         ExecutionTrace {
-            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
             logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
             logical_writes: vec![].into_boxed_slice(),
             physical_reads: path
@@ -7945,6 +8682,7 @@ mod tests {
             runtime_seed: Some(seed),
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
+            runtime_kernel_machine_finish_witness: None,
             runtime_kernel_finish_bundle: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
@@ -8052,7 +8790,8 @@ mod tests {
                     value: ConfidentialKernelSlotExpr::CellGet { object_id: 7 },
                 },
                 ConfidentialKernelSlotStatement::Return { value: None },
-            ],
+            ]
+            .into_boxed_slice(),
         }
     }
 
@@ -8189,7 +8928,8 @@ mod tests {
             cond: ConfidentialKernelSlotExpr::Literal {
                 value: Value::Bool(true),
             },
-        }];
+        }]
+        .into_boxed_slice();
         manifest_entry.kernel_steps = program.expected_runtime_step_manifest().into_vec();
 
         let err = manifest_entry
@@ -8315,7 +9055,7 @@ mod tests {
         let controller_shape = controller_certificate.controller_shape();
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
             logical_accesses: sample_read_miss_logical_accesses().into_boxed_slice(),
             logical_writes: vec![].into_boxed_slice(),
             physical_reads: vec![PhysicalReadEvent {
@@ -8352,13 +9092,13 @@ mod tests {
             runtime_oram_position_map_before: vec![RuntimePathOramPositionMapWitness {
                 object_id: 9,
                 object_name: "tiny_records".into(),
-                leaves: vec![None; 4].into_boxed_slice(),
+                leaves: vec![RuntimeMaskedUsizeOptionWitness::none(); 4].into_boxed_slice(),
             }]
             .into_boxed_slice(),
             runtime_oram_position_map_after: vec![RuntimePathOramPositionMapWitness {
                 object_id: 9,
                 object_name: "tiny_records".into(),
-                leaves: vec![None; 4].into_boxed_slice(),
+                leaves: vec![RuntimeMaskedUsizeOptionWitness::none(); 4].into_boxed_slice(),
             }]
             .into_boxed_slice(),
             runtime_oram_leaf_state_transitions: vec![RuntimePathOramTransitionWitness {
@@ -8366,9 +9106,10 @@ mod tests {
                 object_name: "tiny_records".into(),
                 bucket_count: 1,
                 kind: RuntimePathOramTransitionKind::ReadMiss,
-                slot_index: None,
-                prior_leaf: None,
-                next_leaf: None,
+                fresh_leaf: 0,
+                slot_index: RuntimeMaskedUsizeOptionWitness::none(),
+                prior_leaf: RuntimeMaskedUsizeOptionWitness::none(),
+                next_leaf: RuntimeMaskedUsizeOptionWitness::none(),
             }]
             .into_boxed_slice(),
             ..ExecutionTrace::default()
@@ -8987,7 +9728,8 @@ mod tests {
     fn runtime_trusted_kernel_bundle_rejects_invalid_stored_kernel() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
         let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
-        bundle.hidden_certificate.oram_position_map_after[0].leaves[0] = Some(2);
+        bundle.hidden_certificate.oram_position_map_after[0].leaves[0] =
+            RuntimeMaskedUsizeOptionWitness::some(2);
         trace.runtime_trusted_kernel_bundle = Some(bundle);
         assert_eq!(
             trace.runtime_trusted_kernel_bundle().unwrap_err(),
@@ -9021,7 +9763,8 @@ mod tests {
     fn runtime_trusted_kernel_bundle_rejects_path_oram_state_drift() {
         let trace = sample_runtime_execution_trace_with_seed(0);
         let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
-        bundle.hidden_certificate.oram_position_map_after[0].leaves[0] = Some(2);
+        bundle.hidden_certificate.oram_position_map_after[0].leaves[0] =
+            RuntimeMaskedUsizeOptionWitness::some(2);
         assert_eq!(
             bundle.to_witness().unwrap_err(),
             RefinementWitnessError::OramLeafStateMismatch
@@ -9177,9 +9920,9 @@ mod tests {
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let path = sample_path_bucket_indices();
         let mut drifted_after = sample_path_oram_position_map_after();
-        drifted_after[0].leaves[0] = Some(2);
+        drifted_after[0].leaves[0] = RuntimeMaskedUsizeOptionWitness::some(2);
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
             logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
             logical_writes: vec![].into_boxed_slice(),
             physical_reads: path
@@ -9214,6 +9957,7 @@ mod tests {
             runtime_seed: None,
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
+            runtime_kernel_machine_finish_witness: None,
             runtime_kernel_finish_bundle: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
@@ -9241,9 +9985,9 @@ mod tests {
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let path = sample_path_bucket_indices();
         let mut drifted_after = sample_path_oram_position_map_after();
-        drifted_after[0].leaves[0] = Some(2);
+        drifted_after[0].leaves[0] = RuntimeMaskedUsizeOptionWitness::some(2);
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into()].into_boxed_slice(),
+            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
             logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
             logical_writes: vec![].into_boxed_slice(),
             physical_reads: path
@@ -9278,6 +10022,7 @@ mod tests {
             runtime_seed: None,
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
+            runtime_kernel_machine_finish_witness: None,
             runtime_kernel_finish_bundle: None,
             runtime_trusted_kernel_bundle: None,
             runtime_controller_certificate: Some(controller_certificate),
@@ -9446,13 +10191,13 @@ mod tests {
     #[test]
     fn seeded_runtime_paper_main_slot_family_bundle_rejects_non_runtime_normal_form_program() {
         let mut slot_program = sample_runtime_paper_main_slot_program();
-        slot_program
-            .body
-            .push(ConfidentialKernelSlotStatement::Require {
-                cond: ConfidentialKernelSlotExpr::Literal {
-                    value: Value::Bool(true),
-                },
-            });
+        let mut body = slot_program.body.into_vec();
+        body.push(ConfidentialKernelSlotStatement::Require {
+            cond: ConfidentialKernelSlotExpr::Literal {
+                value: Value::Bool(true),
+            },
+        });
+        slot_program.body = body.into_boxed_slice();
         assert_eq!(
             SeededRuntimePaperMainSlotFamilyBundle::new(
                 SeededRuntimePathOramWitnessFamily::new(vec![
@@ -9465,6 +10210,22 @@ mod tests {
             SeededRuntimePaperMainSlotFamilyBundleError::SlotProgramNotRuntimeNormalForm {
                 entrypoint: "put(bytes32,uint256)".into(),
             }
+        );
+    }
+
+    #[test]
+    fn seeded_runtime_paper_main_slot_family_bundle_rejects_opcode_trace_drift() {
+        assert_eq!(
+            SeededRuntimePaperMainSlotFamilyBundle::new_with_opcode_trace(
+                SeededRuntimePathOramWitnessFamily::new(vec![
+                    sample_runtime_refinement_witness_with_seed_and_kernel(0),
+                ])
+                .unwrap(),
+                sample_runtime_paper_main_slot_program(),
+                vec!["tampered_statement".into()].into_boxed_slice(),
+            )
+            .unwrap_err(),
+            SeededRuntimePaperMainSlotFamilyBundleError::OpcodeTraceMismatch
         );
     }
 
@@ -9500,6 +10261,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
         );
+        assert_eq!(bundle.opcode_trace(), trace.opcode_trace.as_ref());
     }
 
     #[test]
@@ -9548,6 +10310,69 @@ mod tests {
             }])
         );
         assert_eq!(values, Box::from([3]));
+    }
+
+    #[test]
+    fn extract_runtime_path_oram_fresh_coins_matches_write_insert_transition_shape() {
+        let leaf = RuntimeOramLeafWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            bucket_count: 31,
+            leaf: 2,
+        };
+        let transition = RuntimePathOramTransitionWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            bucket_count: 31,
+            kind: RuntimePathOramTransitionKind::WriteInsert,
+            fresh_leaf: 11,
+            slot_index: RuntimeMaskedUsizeOptionWitness::none(),
+            prior_leaf: RuntimeMaskedUsizeOptionWitness::none(),
+            next_leaf: RuntimeMaskedUsizeOptionWitness::some(5),
+        };
+        let scaffold = runtime_path_oram_fresh_coin_scaffold_of_step(&leaf, &transition).unwrap();
+        let values = runtime_path_oram_fresh_coin_values_of_step(&leaf, &transition).unwrap();
+        assert_eq!(
+            scaffold,
+            vec![
+                RuntimeOramLeafScaffoldWitness {
+                    object_id: 7,
+                    object_name: "records".into(),
+                    bucket_count: 31,
+                },
+                RuntimeOramLeafScaffoldWitness {
+                    object_id: 7,
+                    object_name: "records".into(),
+                    bucket_count: 31,
+                },
+            ]
+            .into_boxed_slice()
+        );
+        assert_eq!(values, Box::from([2, 5]));
+    }
+
+    #[test]
+    fn extract_runtime_path_oram_fresh_coins_skips_write_noop_slot_reuse() {
+        let leaf = RuntimeOramLeafWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            bucket_count: 31,
+            leaf: 2,
+        };
+        let transition = RuntimePathOramTransitionWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            bucket_count: 31,
+            kind: RuntimePathOramTransitionKind::WriteNoop,
+            fresh_leaf: 11,
+            slot_index: RuntimeMaskedUsizeOptionWitness::some(0),
+            prior_leaf: RuntimeMaskedUsizeOptionWitness::some(2),
+            next_leaf: RuntimeMaskedUsizeOptionWitness::some(2),
+        };
+        let scaffold = runtime_path_oram_fresh_coin_scaffold_of_step(&leaf, &transition).unwrap();
+        let values = runtime_path_oram_fresh_coin_values_of_step(&leaf, &transition).unwrap();
+        assert!(scaffold.is_empty());
+        assert!(values.is_empty());
     }
 
     #[test]

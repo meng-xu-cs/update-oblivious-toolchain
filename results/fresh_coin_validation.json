@@ -39,7 +39,7 @@
       "seed_count": 256,
       "setup_calls": 0,
       "validation_status": "accepted",
-      "witness_family_json_bytes": 4105222
+      "witness_family_json_bytes": 4109158
     },
     {
       "accepted": true,
@@ -67,7 +67,7 @@
       "seed_count": 4096,
       "setup_calls": 0,
       "validation_status": "accepted",
-      "witness_family_json_bytes": 94647675
+      "witness_family_json_bytes": 94773627
     },
     {
       "accepted": true,
@@ -90,16 +90,16 @@
       "seed_count": 262144,
       "setup_calls": 0,
       "size_estimate": {
-        "avg_witness_json_bytes": 59326,
-        "estimated_family_json_bytes": 15553003520,
-        "max_witness_json_bytes": 59326,
+        "avg_witness_json_bytes": 59356,
+        "estimated_family_json_bytes": 15560867840,
+        "max_witness_json_bytes": 59356,
         "public_fresh_coin_scaffold_steps": 3,
         "public_leaf_scaffold_steps": 2,
         "sampled_seed_count": 8,
         "seed_count": 262144
       },
       "symbolic_seed_space_instantiated": true,
-      "theorem_input_json_bytes": 59753,
+      "theorem_input_json_bytes": 59783,
       "validation_status": "accepted_compact_theorem_input"
     },
     {
@@ -123,16 +123,16 @@
       "seed_count": 17592186044416,
       "setup_calls": 2,
       "size_estimate": {
-        "avg_witness_json_bytes": 191964,
-        "estimated_family_json_bytes": 3377066401831321600,
-        "max_witness_json_bytes": 191964,
+        "avg_witness_json_bytes": 192054,
+        "estimated_family_json_bytes": 3378649698575319040,
+        "max_witness_json_bytes": 192054,
         "public_fresh_coin_scaffold_steps": 7,
         "public_leaf_scaffold_steps": 6,
         "sampled_seed_count": 8,
         "seed_count": 17592186044416
       },
       "symbolic_seed_space_instantiated": true,
-      "theorem_input_json_bytes": 192887,
+      "theorem_input_json_bytes": 192977,
       "validation_status": "accepted_compact_theorem_input"
     }
   ],

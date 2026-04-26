@@ -435,15 +435,51 @@ def ImportedRuntimePathOramTransitionKind.toRuntimePathOramTransitionKind :
   | .WriteUpdate => .writeUpdate
   | .WriteDelete => .writeDelete
 
+structure ImportedRuntimeMaskedUsizeOptionWitness where
+  present : Bool
+  value : Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimeMaskedUsizeOptionWitness.toOption
+  (witness : ImportedRuntimeMaskedUsizeOptionWitness) : Option Nat :=
+  if witness.present then some witness.value else none
+
+def ImportedRuntimeMaskedUsizeOptionWitness.Valid
+  (witness : ImportedRuntimeMaskedUsizeOptionWitness) : Prop :=
+  witness.present = true ∨ witness.value = 0
+
+def ImportedRuntimeMaskedUsizeOptionWitness.checkValid
+  (witness : ImportedRuntimeMaskedUsizeOptionWitness) : Bool :=
+  witness.present || witness.value == 0
+
+@[simp] theorem importedRuntimeMaskedUsizeOptionWitness_checkValid_eq_true_iff
+  (witness : ImportedRuntimeMaskedUsizeOptionWitness) :
+  witness.checkValid = true ↔ witness.Valid := by
+  cases witness.present <;>
+    simp [ImportedRuntimeMaskedUsizeOptionWitness.checkValid,
+      ImportedRuntimeMaskedUsizeOptionWitness.Valid]
+
+theorem importedRuntimeMaskedUsizeOptionWitness_rejects_noncanonical_absent
+  (value : Nat) :
+  ({ present := false, value := value + 1 } :
+      ImportedRuntimeMaskedUsizeOptionWitness).checkValid = false := by
+  simp [ImportedRuntimeMaskedUsizeOptionWitness.checkValid]
+
 structure ImportedRuntimePathOramTransitionCertificate where
   object_id : Nat
   object_name : String
   bucket_count : Nat
   kind : ImportedRuntimePathOramTransitionKind
-  slot_index : Option Nat
-  prior_leaf : Option Nat
-  next_leaf : Option Nat
+  slot_index : ImportedRuntimeMaskedUsizeOptionWitness
+  prior_leaf : ImportedRuntimeMaskedUsizeOptionWitness
+  next_leaf : ImportedRuntimeMaskedUsizeOptionWitness
 deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimePathOramTransitionCertificate.maskedOptionShapeValid
+  (transition : ImportedRuntimePathOramTransitionCertificate) : Bool :=
+  transition.slot_index.checkValid &&
+    transition.prior_leaf.checkValid &&
+    transition.next_leaf.checkValid
 
 def ImportedRuntimePathOramTransitionCertificate.toRuntimePathOramTransitionCertificate
   (transition : ImportedRuntimePathOramTransitionCertificate) :
@@ -452,23 +488,27 @@ def ImportedRuntimePathOramTransitionCertificate.toRuntimePathOramTransitionCert
   , objectName := transition.object_name
   , bucketCount := transition.bucket_count
   , kind := transition.kind.toRuntimePathOramTransitionKind
-  , slotIndex := transition.slot_index
-  , priorLeaf := transition.prior_leaf
-  , nextLeaf := transition.next_leaf
+  , slotIndex := transition.slot_index.toOption
+  , priorLeaf := transition.prior_leaf.toOption
+  , nextLeaf := transition.next_leaf.toOption
   }
 
 structure ImportedRuntimePathOramPositionMapCertificate where
   object_id : Nat
   object_name : String
-  leaves : List (Option Nat)
+  leaves : List ImportedRuntimeMaskedUsizeOptionWitness
 deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedRuntimePathOramPositionMapCertificate.maskedOptionShapeValid
+  (state : ImportedRuntimePathOramPositionMapCertificate) : Bool :=
+  state.leaves.all ImportedRuntimeMaskedUsizeOptionWitness.checkValid
 
 def ImportedRuntimePathOramPositionMapCertificate.toRuntimePathOramPositionMapCertificate
   (state : ImportedRuntimePathOramPositionMapCertificate) :
   RuntimePathOramPositionMapCertificate :=
   { objectId := state.object_id
   , objectName := state.object_name
-  , leaves := state.leaves
+  , leaves := state.leaves.map ImportedRuntimeMaskedUsizeOptionWitness.toOption
   }
 
 structure ImportedRuntimeOramObjectCertificate where
@@ -536,13 +576,24 @@ def ImportedRuntimePathOramHiddenCertificate.toRuntimePathOramHiddenCertificate
       ImportedRuntimePathOramTransitionCertificate.toRuntimePathOramTransitionCertificate
   }
 
+def ImportedRuntimePathOramHiddenCertificate.maskedOptionShapeValid
+  (certificate : ImportedRuntimePathOramHiddenCertificate) : Bool :=
+  certificate.oram_position_map_before.all
+      ImportedRuntimePathOramPositionMapCertificate.maskedOptionShapeValid &&
+    certificate.oram_position_map_after.all
+      ImportedRuntimePathOramPositionMapCertificate.maskedOptionShapeValid &&
+    certificate.oram_leaf_state_transitions.all
+      ImportedRuntimePathOramTransitionCertificate.maskedOptionShapeValid
+
 def ImportedRuntimePathOramHiddenCertificate.Valid
   (certificate : ImportedRuntimePathOramHiddenCertificate) : Prop :=
-  certificate.toRuntimePathOramHiddenCertificate.Valid
+  certificate.toRuntimePathOramHiddenCertificate.Valid ∧
+    certificate.maskedOptionShapeValid = true
 
 def ImportedRuntimePathOramHiddenCertificate.checkValid
   (certificate : ImportedRuntimePathOramHiddenCertificate) : Bool :=
-  certificate.toRuntimePathOramHiddenCertificate.checkValid
+  certificate.toRuntimePathOramHiddenCertificate.checkValid &&
+    certificate.maskedOptionShapeValid
 
 def importedRuntimeKernelOpcodeNames : List String :=
   [ "Begin"
@@ -1510,6 +1561,15 @@ def ImportedRuntimeRefinementWitness.toRuntimeWitness
       ImportedRuntimePathOramTransitionCertificate.toRuntimePathOramTransitionCertificate
   }
 
+def ImportedRuntimeRefinementWitness.maskedOptionShapeValid
+  (witness : ImportedRuntimeRefinementWitness) : Bool :=
+  witness.oram_position_map_before.all
+      ImportedRuntimePathOramPositionMapCertificate.maskedOptionShapeValid &&
+    witness.oram_position_map_after.all
+      ImportedRuntimePathOramPositionMapCertificate.maskedOptionShapeValid &&
+    witness.oram_leaf_state_transitions.all
+      ImportedRuntimePathOramTransitionCertificate.maskedOptionShapeValid
+
 def ImportedRuntimeRefinementWitness.kernelWitnessValid
   (witness : ImportedRuntimeRefinementWitness) : Prop :=
   match witness.kernel_witness with
@@ -1575,28 +1635,32 @@ def ImportedRuntimeRefinementWitness.Valid
   (modelTags : SGXModelTags) : Prop :=
   witness.toRuntimeWitness.Valid modelTags ∧
     witness.kernelWitnessValid ∧
-    witness.runtimeKernelRefinementWitnessValid
+    witness.runtimeKernelRefinementWitnessValid ∧
+    witness.maskedOptionShapeValid = true
 
 def ImportedRuntimeRefinementWitness.checkValid
   (witness : ImportedRuntimeRefinementWitness)
   (modelTags : SGXModelTags) : Bool :=
   witness.toRuntimeWitness.checkValid modelTags &&
     witness.checkKernelWitness &&
-    witness.checkRuntimeKernelRefinementWitness
+    witness.checkRuntimeKernelRefinementWitness &&
+    witness.maskedOptionShapeValid
 
 def ImportedRuntimeRefinementWitness.ProofGradeValid
   (witness : ImportedRuntimeRefinementWitness)
   (modelTags : SGXModelTags) : Prop :=
   witness.toRuntimeWitness.Valid modelTags ∧
     witness.proofGradeKernelWitnessValid ∧
-    witness.proofGradeRuntimeKernelRefinementWitnessValid
+    witness.proofGradeRuntimeKernelRefinementWitnessValid ∧
+    witness.maskedOptionShapeValid = true
 
 def ImportedRuntimeRefinementWitness.checkProofGrade
   (witness : ImportedRuntimeRefinementWitness)
   (modelTags : SGXModelTags) : Bool :=
   witness.toRuntimeWitness.checkValid modelTags &&
     witness.checkProofGradeKernelWitness &&
-    witness.checkProofGradeRuntimeKernelRefinementWitness
+    witness.checkProofGradeRuntimeKernelRefinementWitness &&
+    witness.maskedOptionShapeValid
 
 def parseImportedRuntimeRefinementWitness
   (input : String) : Except String ImportedRuntimeRefinementWitness := do
@@ -1705,7 +1769,8 @@ def loadAndCheckImportedProofGradeRuntimeRefinementWitness
   witness.Valid modelTags ↔
     witness.toRuntimeWitness.Valid modelTags ∧
       witness.kernelWitnessValid ∧
-      witness.runtimeKernelRefinementWitnessValid := by
+      witness.runtimeKernelRefinementWitnessValid ∧
+      witness.maskedOptionShapeValid = true := by
   rfl
 
 @[simp] theorem importedWitness_checkValid_eq_true_iff
@@ -1731,8 +1796,8 @@ theorem importedWitness_proofGradeValid_implies_valid
   (modelTags : SGXModelTags)
   (hValid : witness.ProofGradeValid modelTags) :
   witness.Valid modelTags := by
-  rcases hValid with ⟨hRuntimeValid, hKernelProofGrade, hRefinementProofGrade⟩
-  refine ⟨hRuntimeValid, ?_, ?_⟩
+  rcases hValid with ⟨hRuntimeValid, hKernelProofGrade, hRefinementProofGrade, hMaskedShape⟩
+  refine ⟨hRuntimeValid, ?_, ?_, hMaskedShape⟩
   · cases hKernel : witness.kernel_witness with
     | none =>
         simp [ImportedRuntimeRefinementWitness.kernelWitnessValid, hKernel]
@@ -1782,7 +1847,7 @@ theorem importedRuntimeRefinementWitness_toRuntimeWitness_proofGradeValid
   (modelTags : SGXModelTags)
   (hValid : witness.ProofGradeValid modelTags) :
   witness.toRuntimeWitness.ProofGradeValid modelTags := by
-  rcases hValid with ⟨hRuntimeValid, hKernelValid, hRefinementValid⟩
+  rcases hValid with ⟨hRuntimeValid, hKernelValid, hRefinementValid, _hMaskedShape⟩
   refine ⟨hRuntimeValid, ?_, ?_⟩
   · unfold RuntimeRefinementWitness.proofGradeKernelWitnessValid
       ImportedRuntimeRefinementWitness.proofGradeKernelWitnessValid at *
@@ -1894,7 +1959,7 @@ theorem importedWitness_proofGradeRuntimeKernelRefinementProjection_exact
         kernelWitness.toRuntimeKernelWitness.emittedKernelSchedule := by
   have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid := by
     unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
-    exact hValid.2.2
+    exact hValid.2.2.1
   cases hKernel : witness.kernel_witness with
   | none =>
       cases hRefinement : witness.runtime_kernel_refinement_witness with
@@ -1929,7 +1994,7 @@ theorem importedWitness_proofGradeRuntimeKernelRefinementBoundaryExact
         kernelWitness.toRuntimeKernelWitness.publicObjectIds := by
   have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid := by
     unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
-    exact hValid.2.2
+    exact hValid.2.2.1
   cases hKernel : witness.kernel_witness with
   | none =>
       cases hRefinement : witness.runtime_kernel_refinement_witness with
@@ -1965,7 +2030,7 @@ theorem importedWitness_proofGradeKernelStateRefinement
     exact hValid.2.1
   have hRefinementValid : witness.proofGradeRuntimeKernelRefinementWitnessValid := by
     unfold ImportedRuntimeRefinementWitness.ProofGradeValid at hValid
-    exact hValid.2.2
+    exact hValid.2.2.1
   cases hKernel : witness.kernel_witness with
   | none =>
       cases hRefinement : witness.runtime_kernel_refinement_witness with
@@ -2187,7 +2252,9 @@ def loadAndCheckImportedRuntimeControllerObserverCertificate
 
 @[simp] theorem importedRuntimePathOramHiddenCertificate_valid_iff
   (certificate : ImportedRuntimePathOramHiddenCertificate) :
-  certificate.Valid ↔ certificate.toRuntimePathOramHiddenCertificate.Valid := by
+  certificate.Valid ↔
+    certificate.toRuntimePathOramHiddenCertificate.Valid ∧
+      certificate.maskedOptionShapeValid = true := by
   rfl
 
 @[simp] theorem importedRuntimePathOramHiddenCertificate_checkValid_eq_true_iff
@@ -2195,8 +2262,7 @@ def loadAndCheckImportedRuntimeControllerObserverCertificate
   certificate.checkValid = true ↔ certificate.Valid := by
   unfold ImportedRuntimePathOramHiddenCertificate.checkValid
     ImportedRuntimePathOramHiddenCertificate.Valid
-  exact runtimePathOramHiddenCertificate_checkValid_eq_true_iff
-    certificate.toRuntimePathOramHiddenCertificate
+  simp [runtimePathOramHiddenCertificate_checkValid_eq_true_iff]
 
 def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
   { trace :=

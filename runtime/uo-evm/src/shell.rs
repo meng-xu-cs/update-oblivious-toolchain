@@ -1,5 +1,4 @@
 use crate::controller::CallRecorder;
-use crate::runtime::kernel::PublicRuntimeKernel;
 use crate::runtime::state::{ContractRuntime, PublicRuntimeShadowState};
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
@@ -8,6 +7,7 @@ use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::manifest::EntrypointManifest;
 use uo_core::{RuntimeCallOutcome, Value};
+use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;
 
 #[derive(Clone, Debug)]
 struct PublicExecutionOutcome {
@@ -29,7 +29,7 @@ pub(in crate::runtime) fn run_public_entrypoint(
     contract: &CompiledContract,
     entrypoint: &str,
     manifest_entry: &EntrypointManifest,
-    public_args: Vec<Value>,
+    public_args: Box<[Value]>,
     recorder: &mut CallRecorder,
 ) -> Result<RuntimeCallOutcome> {
     let function = contract
@@ -38,7 +38,7 @@ pub(in crate::runtime) fn run_public_entrypoint(
         .find(|function| function.signature == entrypoint)
         .ok_or_else(|| anyhow!("unknown public entrypoint: {entrypoint}"))?;
     let allocator = AllocatorPlan::from_manifest(manifest_entry);
-    let public_object_ids = runtime.public_object_ids();
+    let public_object_ids = runtime.public_object_ids()?;
     let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.as_ref())?;
     let mut shadow = runtime.prepare_public_shadow(&mut kernel, public_object_ids.as_ref())?;
     let execution = interpret_public_entrypoint(
@@ -50,13 +50,15 @@ pub(in crate::runtime) fn run_public_entrypoint(
         &mut kernel,
     )?;
     runtime.commit_public_shadow(&mut kernel, &mut shadow, execution.aborted, recorder)?;
-    let runtime_kernel_finish_bundle = kernel.finish(&function.signature)?;
-    runtime.replace_with_cold_public_shadow(shadow);
+    let (runtime_kernel_machine_finish_witness, runtime_kernel_finish_bundle) =
+        kernel.finish_with_machine_witness(&function.signature)?;
+    runtime.replace_with_cold_public_shadow(shadow)?;
     runtime.ensure_cold_call_boundary(
         &public_object_ids,
         "after completing the call and returning to committed storage",
     )?;
     Ok(RuntimeCallOutcome::from_runtime_execution(
+        runtime_kernel_machine_finish_witness,
         runtime_kernel_finish_bundle,
         execution.aborted,
         execution.return_value,
@@ -67,17 +69,20 @@ pub(in crate::runtime) fn run_public_entrypoint(
 fn interpret_public_entrypoint(
     contract: &CompiledContract,
     function: &CompiledFunction,
-    public_args: Vec<Value>,
+    public_args: Box<[Value]>,
     objects: &mut PublicRuntimeShadowState,
     recorder: &mut CallRecorder,
     kernel: &mut PublicRuntimeKernel,
 ) -> Result<PublicExecutionOutcome> {
-    debug_assert!(
-        !function.confidential,
-        "public shell must not execute confidential entrypoints"
-    );
+    if function.confidential {
+        bail!("public shell must not execute confidential entrypoints");
+    }
     let mut state = ExecState::default();
-    for ((param_name, _), arg) in function.params.iter().zip(public_args.into_iter()) {
+    for ((param_name, _), arg) in function
+        .params
+        .iter()
+        .zip(std::iter::IntoIterator::into_iter(public_args))
+    {
         store_env_value(&mut state, kernel, param_name, arg)?;
     }
     let mut opcode_trace = Vec::with_capacity(function.body.len().max(1));
@@ -108,10 +113,9 @@ fn exec_block(
     recorder: &mut CallRecorder,
     kernel: &mut PublicRuntimeKernel,
 ) -> Result<()> {
-    debug_assert!(
-        !function.confidential,
-        "public shell must not execute confidential blocks"
-    );
+    if function.confidential {
+        bail!("public shell must not execute confidential blocks");
+    }
     for statement in statements {
         if state.returned {
             break;
@@ -310,10 +314,9 @@ fn eval_expr(
     recorder: &mut CallRecorder,
     kernel: &mut PublicRuntimeKernel,
 ) -> Result<Value> {
-    debug_assert!(
-        !function.confidential,
-        "public shell must not evaluate confidential expressions"
-    );
+    if function.confidential {
+        bail!("public shell must not evaluate confidential expressions");
+    }
     match expr {
         Expr::Literal(value) => Ok(value.clone()),
         Expr::Var(name) => state
@@ -371,7 +374,9 @@ fn eval_expr(
         }
         Expr::MapGet { object_id, key } => {
             let key = eval_expr(contract, function, key, objects, state, recorder, kernel)?;
-            kernel.map_get(objects, recorder, *object_id, &key)
+            let (value, overflowed) = kernel.map_get(objects, recorder, *object_id, &key)?;
+            state.aborted |= overflowed;
+            Ok(value)
         }
         Expr::StructField { base, field } => {
             let base = eval_expr(contract, function, base, objects, state, recorder, kernel)?;
@@ -499,7 +504,7 @@ mod tests {
             .next()
             .expect("shell.rs should contain a test boundary marker");
         assert!(
-            source.contains("use crate::runtime::kernel::PublicRuntimeKernel;"),
+            source.contains("use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;"),
             "shell.rs should run through the public kernel facade"
         );
         assert!(

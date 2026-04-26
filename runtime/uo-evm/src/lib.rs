@@ -14,8 +14,11 @@ mod tests {
     use super::ContractInstance;
     #[cfg(feature = "diagnostics")]
     use super::PathOramFreshCoinPlan;
+    use uo_core::ir::BackendKind;
     #[cfg(feature = "diagnostics")]
-    use uo_core::canonical_path_oram_leaf_values_of_seed;
+    use uo_core::{
+        canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
+    };
     use uo_core::{
         ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, RefinementWitnessError,
         RuntimeConfidentialCoreKernelInterfaceSlotBundleError,
@@ -36,7 +39,7 @@ mod tests {
     }
 
     #[test]
-    fn raw_classifier_leaks_update_class() {
+    fn confidential_raw_classifier_is_rejected() {
         let artifact = compile_bench(
             "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
             include_str!(
@@ -44,24 +47,33 @@ mod tests {
             ),
             ProgramMode::Raw,
         );
-        let mut raw_zero = ContractInstance::deploy(artifact.clone()).unwrap();
-        let zero = raw_zero
-            .call("classify(uint256)", vec![Value::Uint(0)])
-            .unwrap();
-        let mut raw_one = ContractInstance::deploy(artifact).unwrap();
-        let one = raw_one
+        let err = ContractInstance::deploy(artifact).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("confidential object last uses raw backend"),
+            "unexpected error: {err:?}"
+        );
+    }
+
+    #[test]
+    fn confidential_entrypoint_rejects_public_raw_kernel_target_after_artifact_tamper() {
+        let mut artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        artifact.contract.state[0].backend = BackendKind::Raw;
+        artifact.contract.state[0].confidential = false;
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let err = instance
             .call("classify(uint256)", vec![Value::Uint(1)])
-            .unwrap();
-        assert_eq!(
-            zero.trace.hashes().opcode_trace_hash,
-            one.trace.hashes().opcode_trace_hash
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("targets raw backend object last"),
+            "unexpected error: {err:?}"
         );
-        assert_eq!(
-            zero.trace.hashes().logical_access_trace_hash,
-            one.trace.hashes().logical_access_trace_hash
-        );
-        assert_eq!(zero.trace.physical_writes[0].class, WriteClass::Same);
-        assert_eq!(one.trace.physical_writes[0].class, WriteClass::Set);
     }
 
     #[test]
@@ -92,8 +104,8 @@ mod tests {
             .iter()
             .all(|event| event.class == WriteClass::Update));
         assert_eq!(
-            zero.trace.hashes().physical_access_trace_hash,
-            one.trace.hashes().physical_access_trace_hash
+            zero.trace.hashes().unwrap().physical_access_trace_hash,
+            one.trace.hashes().unwrap().physical_access_trace_hash
         );
         assert_eq!(zero.trace.gas_used, 4096);
         assert_eq!(one.trace.gas_used, 4096);
@@ -141,16 +153,16 @@ mod tests {
         let miss = inst1.call("auth(bytes32)", vec![token_absent]).unwrap();
 
         assert_eq!(
-            hit.trace.hashes().opcode_trace_hash,
-            miss.trace.hashes().opcode_trace_hash
+            hit.trace.hashes().unwrap().opcode_trace_hash,
+            miss.trace.hashes().unwrap().opcode_trace_hash
         );
         assert_eq!(
-            hit.trace.hashes().logical_access_trace_hash,
-            miss.trace.hashes().logical_access_trace_hash
+            hit.trace.hashes().unwrap().logical_access_trace_hash,
+            miss.trace.hashes().unwrap().logical_access_trace_hash
         );
         assert_eq!(
-            hit.trace.hashes().physical_access_trace_hash,
-            miss.trace.hashes().physical_access_trace_hash
+            hit.trace.hashes().unwrap().physical_access_trace_hash,
+            miss.trace.hashes().unwrap().physical_access_trace_hash
         );
         assert_eq!(hit.trace.gas_used, 8192);
         assert_eq!(miss.trace.gas_used, 8192);
@@ -226,8 +238,8 @@ mod tests {
         assert_eq!(ok.trace.gas_used, 16384);
         assert_eq!(abort.trace.gas_used, 16384);
         assert_eq!(
-            ok.trace.hashes().physical_access_trace_hash,
-            abort.trace.hashes().physical_access_trace_hash
+            ok.trace.hashes().unwrap().physical_access_trace_hash,
+            abort.trace.hashes().unwrap().physical_access_trace_hash
         );
         assert_eq!(ok.return_value, Some(Value::Uint(2)));
         assert_eq!(abort.return_value, None);
@@ -379,9 +391,9 @@ mod tests {
         assert_eq!(slot_family.family(), family.family());
 
         let decoded_family: SeededRuntimePaperMainFamilyBundle =
-            serde_json::from_str(&family.to_json()).unwrap();
+            serde_json::from_str(&family.to_json().unwrap()).unwrap();
         let decoded_slot_family: SeededRuntimePaperMainSlotFamilyBundle =
-            serde_json::from_str(&slot_family.to_json()).unwrap();
+            serde_json::from_str(&slot_family.to_json().unwrap()).unwrap();
         assert_eq!(decoded_family, family);
         assert_eq!(decoded_slot_family, slot_family);
     }
@@ -1166,7 +1178,7 @@ mod tests {
             .unwrap();
 
         let mut tampered_artifact = artifact.clone();
-        tampered_artifact
+        let confidential_program = tampered_artifact
             .contract
             .manifest
             .entrypoints
@@ -1174,9 +1186,10 @@ mod tests {
             .unwrap()
             .confidential_program
             .as_mut()
-            .unwrap()
-            .body
-            .pop();
+            .unwrap();
+        let mut tampered_body = confidential_program.body.clone().into_vec();
+        tampered_body.pop();
+        confidential_program.body = tampered_body.into_boxed_slice();
 
         assert_eq!(
             result
@@ -1352,7 +1365,10 @@ mod tests {
 
         assert_eq!(first_result.trace.runtime_seed(), Some(17));
         assert_eq!(second_result.trace.runtime_seed(), Some(17));
-        assert_eq!(first_result.trace.hashes(), second_result.trace.hashes());
+        assert_eq!(
+            first_result.trace.hashes().unwrap(),
+            second_result.trace.hashes().unwrap()
+        );
         assert_eq!(
             first_result.trace.runtime_refinement_witness().unwrap(),
             second_result.trace.runtime_refinement_witness().unwrap()
@@ -1378,7 +1394,10 @@ mod tests {
             .unwrap();
         let baseline_witness = baseline_result.trace.runtime_refinement_witness().unwrap();
         let fresh_coin_scaffold = baseline_witness.path_oram_fresh_coin_scaffold().unwrap();
-        let canonical_values = canonical_path_oram_leaf_values_of_seed(&fresh_coin_scaffold, 1234);
+        let seed_count = canonical_path_oram_leaf_seed_space_size(&fresh_coin_scaffold).unwrap();
+        let canonical_values =
+            canonical_path_oram_leaf_values_of_seed(&fresh_coin_scaffold, 1234 % seed_count)
+                .unwrap();
         let fresh_coin_plan = PathOramFreshCoinPlan::from_scaffold_and_values(
             &fresh_coin_scaffold,
             &canonical_values,
@@ -1425,10 +1444,12 @@ mod tests {
         let baseline_witness = baseline_result.trace.runtime_refinement_witness().unwrap();
         let fresh_coin_scaffold = baseline_witness.path_oram_fresh_coin_scaffold().unwrap();
         let mut short_plan = PathOramFreshCoinPlan::new();
-        short_plan.insert_object_coins(
-            fresh_coin_scaffold[0].object_id,
-            vec![0, 1].into_boxed_slice(),
-        );
+        short_plan
+            .insert_object_coins(
+                fresh_coin_scaffold[0].object_id,
+                vec![0; fresh_coin_scaffold.len().saturating_sub(1)].into_boxed_slice(),
+            )
+            .unwrap();
 
         let mut injected = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
         let err = injected
