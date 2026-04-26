@@ -1521,9 +1521,48 @@ Current status update:
   than as an implementation-only admission check.
   Those witness facts are now included in `ProofGradeCompilerFacts` and
   re-exported through `ProofGrade`.
-- Still open: these are exactness/export theorems for the proof-grade bundle,
-  not yet a full semantics-preserving source-to-IR or IR-to-kernel compiler
-  correctness theorem for the admitted Solidity subset.
+- Subtask W4.1 landed (commit `6e234df`,
+  [proof/lean/UOToolchain/IRSyntax.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/IRSyntax.lean)
+  and
+  [proof/lean/UOToolchain/IRSemantics.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/IRSemantics.lean)):
+  the placeholder `abbrev Semantics := Config → Trace` is replaced by a
+  real operational evaluator type
+  `abbrev Semantics := IR.OperationalConfig → IR.Outcome`. The structured
+  IR mirror in `IRSyntax.lean` covers `crates/uo-core/src/{ir,types}.rs` —
+  `ProgramMode`, `ContainerKind`, `BackendKind`, `StateObject`, `UnaryOp`,
+  `BinaryOp`, `Expr`, `Statement`, `CompiledFunction`, `CompiledContract`,
+  plus the `Value` / `Ty` universe with composite struct/array variants.
+  The `IR.Outcome` carries the existing `Trace`, the entrypoint's public
+  return value, the per-object ORAM-access counts, the manifest-relevant
+  kernel-step list, and an explicit `EvalStatus` (`completed`,
+  `requireFailed`, `abortedByUser`, `unsupported kind`, `evalError msg`).
+  The W4.1 evaluator handles `Expr.{literal,var,unary,binary,select,
+  cellGet}` and `Statement.{declare,assign,require,abortIf,cellSet,
+  retStmt}` exactly; statements/expressions outside that subset return an
+  explicit `EvalStatus.unsupported` so downstream theorems are honest
+  about coverage. The abstract trace-producer abbreviation is preserved
+  as `TraceSemantics := TraceConfig → Trace` so the abstract
+  `ExactObjects` / `Composition` / `TeeDeployment` /
+  `SgxExactProjection` / `PathOramLocalPosmapV1` / `Legacy*` composition
+  theorems remain unchanged, projected over `TraceSemantics` rather than
+  the new evaluator surface.
+- Subtask W4.1b landed in the same commit:
+  `compilerSecrecyPreservation` and `publicGasSecretIndependent` are now
+  also stated against the new evaluator surface as
+  `evaluatorCompilerSecrecyPreservation` and
+  `evaluatorPublicGasSecretIndependent` (with a matching
+  `EvaluatorPublicGasSafe` predicate over `IR.OperationalConfig`).
+  The original trace-side statements remain so the abstract composition
+  theorems still consume them directly.
+- Still open: a *real* source-to-IR correctness theorem (W4.2), a
+  confidential-fragment admission/rejection theorem (W4.3), an
+  IR-to-kernel correctness theorem (W4.4), the manifest-exactness
+  semantics-preserving lift (W4.5), and the direct artifact checker
+  demotion (W4.6). The evaluator coverage of W4.1 also still leaves
+  `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
+  `Expr.{arrayGet,mapGet,structField,arrayIndex,keccak256}` reporting
+  `EvalStatus.unsupported`; those will be admitted incrementally as
+  W4.2-W4.4 work proves the corresponding lowering correctness facts.
 
 Exit gate:
 

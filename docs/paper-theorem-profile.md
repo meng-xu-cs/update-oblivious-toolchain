@@ -244,6 +244,24 @@ What is still open:
   confidential-kernel lowering, runtime-step schedules, hash bounds,
   confidential kernel-step non-raw target facts, and the compiler-to-ORAM
   witness bridge for source-derived manifest / expected-access objects.
+  Subtasks W4.1 / W4.1b have landed: the placeholder
+  `abbrev Semantics := Config → Trace` is replaced by a real operational
+  evaluator `abbrev Semantics := IR.OperationalConfig → IR.Outcome` over a
+  structured Lean mirror of `crates/uo-core/src/{ir,types}.rs`, and
+  `compilerSecrecyPreservation` / `publicGasSecretIndependent` are
+  re-stated as `evaluatorCompilerSecrecyPreservation` /
+  `evaluatorPublicGasSecretIndependent` against that evaluator surface.
+  The W4.1 evaluator covers `Expr.{literal,var,unary,binary,select,
+  cellGet}` and `Statement.{declare,assign,require,abortIf,cellSet,
+  retStmt}`; remaining IR constructs return an explicit
+  `EvalStatus.unsupported` and will be admitted incrementally as W4.2-W4.4
+  prove their lowering correctness. W4.2 (source-to-IR), W4.3
+  (confidential-fragment admission/rejection), W4.4 (IR-to-kernel),
+  W4.5 (manifest-exactness semantics-preserving lift), and W4.6
+  (artifact-checker demotion) all remain open. `uo-solc` therefore
+  remains in the trusted surface for source-to-IR / IR-to-kernel
+  semantics; W4.1 only adds the Lean-side operational evaluator the WP4
+  theorems will refine against.
 - WP5 (concrete backend assumptions): full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
