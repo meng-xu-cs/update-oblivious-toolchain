@@ -275,7 +275,7 @@ def Expr.fragmentStats : Expr → FragmentStats
         ((Expr.fragmentStats cond).add (Expr.fragmentStats whenTrue)).add
           (Expr.fragmentStats whenFalse)
       let armPenalty : Nat :=
-        if branchlessPureExpr whenTrue && branchlessPureExpr whenFalse then 0 else 1
+        _root_.cond (branchlessPureExpr whenTrue && branchlessPureExpr whenFalse) 0 1
       { inner with
         selectCount := inner.selectCount + 1
       , nonBranchlessSelectArmCount := inner.nonBranchlessSelectArmCount + armPenalty
@@ -357,21 +357,40 @@ def confidentialFragmentEntrypointWitnessOf
   , nonBranchlessSelectArmCount := stats.nonBranchlessSelectArmCount
   }
 
-/-! ### Helper lemmas for the deferred characterization theorem
+/-! ### Characterization theorem: count-validity ↔ structural validity
 
-The W4.3 characterization theorem
-`(confidentialFragmentEntrypointWitnessOf fn).Valid ↔ fn.fragmentValid`
-is deferred to a follow-up commit because the natural proof strategy
-is structural induction on `Expr` / `Statement`, which Lean 4's
-default `induction` tactic does not yet support for the nested-
-inductive `Expr` / `Statement` types defined in `IRSyntax.lean`.
-A follow-up commit will use `Expr.recOn` / `Statement.recOn` directly
-or restructure the IR types as explicitly mutual inductives so the
-induction tactic applies. The `add_zero_forbidden_iff` simp lemma
-below is the additive-split primitive that proof will rely on.
+The W4.3 deliverable: the count-based confidential-fragment witness
+is `Valid` iff the function body satisfies the structural fragment-
+validity predicate. The proof goes via per-expression and per-
+statement iff lemmas, lifted through the function body.
+
+Proofs use mutual recursive `theorem` blocks (paired with the list
+companions) because Lean 4.30's `induction` tactic does not handle
+nested-inductive `Expr` / `Statement` types directly.
 -/
 
+/-- The three forbidden-construct counts are all zero. -/
+def FragmentStats.forbidden_zero (s : FragmentStats) : Prop :=
+  s.structFieldCount = 0 ∧ s.arrayIndexCount = 0 ∧ s.nonBranchlessSelectArmCount = 0
+
+@[simp] theorem FragmentStats.forbidden_zero_empty :
+    FragmentStats.empty.forbidden_zero := by
+  simp [FragmentStats.forbidden_zero, FragmentStats.empty]
+
 /-- The forbidden-construct counts on a sum split additively. -/
+@[simp] theorem FragmentStats.forbidden_zero_add
+    {lhs rhs : FragmentStats} :
+    (lhs.add rhs).forbidden_zero ↔ lhs.forbidden_zero ∧ rhs.forbidden_zero := by
+  simp only [FragmentStats.forbidden_zero, FragmentStats.add]
+  constructor
+  · rintro ⟨hSF, hAI, hNB⟩
+    refine ⟨⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩ <;> omega
+  · rintro ⟨⟨hLSF, hLAI, hLNB⟩, hRSF, hRAI, hRNB⟩
+    refine ⟨?_, ?_, ?_⟩ <;> omega
+
+/-- The forbidden-construct counts on a sum split additively (long
+form). Retained for backwards compatibility with the W4.3 definitions
+commit; new lemmas should prefer `forbidden_zero_add`. -/
 @[simp] theorem FragmentStats.add_zero_forbidden_iff
     {lhs rhs : FragmentStats} :
     (lhs.add rhs).structFieldCount = 0 ∧
@@ -381,12 +400,249 @@ below is the additive-split primitive that proof will rely on.
           lhs.nonBranchlessSelectArmCount = 0) ∧
         (rhs.structFieldCount = 0 ∧ rhs.arrayIndexCount = 0 ∧
           rhs.nonBranchlessSelectArmCount = 0) := by
-  simp only [FragmentStats.add]
-  constructor
-  · rintro ⟨hSF, hAI, hNB⟩
-    refine ⟨⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩ <;> omega
-  · rintro ⟨⟨hLSF, hLAI, hLNB⟩, hRSF, hRAI, hRNB⟩
-    refine ⟨?_, ?_, ?_⟩ <;> omega
+  have h := @FragmentStats.forbidden_zero_add lhs rhs
+  simpa [FragmentStats.forbidden_zero] using h
+
+mutual
+
+/-- Per-expression characterization: the stats are forbidden-free iff
+the expression is structurally fragment-valid. Mutually recursive with
+the list companion to handle the nested `List Expr` inside
+`Expr.keccak256`. -/
+theorem Expr.fragmentStats_valid_iff :
+    ∀ e : Expr, e.fragmentStats.forbidden_zero ↔ e.fragmentValid = true
+  | .literal _ => by
+      simp [Expr.fragmentStats, Expr.fragmentValid]
+  | .var _ => by
+      simp [Expr.fragmentStats, Expr.fragmentValid]
+  | .unary _ inner => by
+      simp only [Expr.fragmentStats, Expr.fragmentValid]
+      exact Expr.fragmentStats_valid_iff inner
+  | .binary _ lhs rhs => by
+      simp only [Expr.fragmentStats, Expr.fragmentValid,
+        FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+      rw [Expr.fragmentStats_valid_iff lhs, Expr.fragmentStats_valid_iff rhs]
+  | .select condE wt wf => by
+      have ihC := Expr.fragmentStats_valid_iff condE
+      have ihT := Expr.fragmentStats_valid_iff wt
+      have ihF := Expr.fragmentStats_valid_iff wf
+      -- Case-split on the branchless-pure boolean to eliminate the `cond` cleanly.
+      cases hAnd : branchlessPureExpr wt && branchlessPureExpr wf with
+      | true =>
+        have hBPwt : branchlessPureExpr wt = true := by
+          cases hWt : branchlessPureExpr wt
+          · simp [hWt] at hAnd
+          · rfl
+        have hBPwf : branchlessPureExpr wf = true := by
+          cases hWf : branchlessPureExpr wf
+          · simp [hBPwt, hWf] at hAnd
+          · rfl
+        constructor
+        · intro hForbidden
+          -- LHS unfolded: forbidden_zero of the modified inner stats.
+          -- Build each subexpression's validity from hForbidden + IH.
+          -- Use `show` to make the structural-side goal explicit.
+          show Expr.fragmentValid (Expr.select condE wt wf) = true
+          rw [show Expr.fragmentValid (Expr.select condE wt wf) =
+              (Expr.fragmentValid condE && Expr.fragmentValid wt
+                && Expr.fragmentValid wf
+                && branchlessPureExpr wt && branchlessPureExpr wf) from rfl]
+          have hCv : Expr.fragmentValid condE = true := by
+            apply ihC.mp
+            simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
+              FragmentStats.add, hAnd, _root_.cond] at hForbidden
+            refine ⟨?_, ?_, ?_⟩ <;> omega
+          have hTv : Expr.fragmentValid wt = true := by
+            apply ihT.mp
+            simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
+              FragmentStats.add, hAnd, _root_.cond] at hForbidden
+            refine ⟨?_, ?_, ?_⟩ <;> omega
+          have hFv : Expr.fragmentValid wf = true := by
+            apply ihF.mp
+            simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
+              FragmentStats.add, hAnd, _root_.cond] at hForbidden
+            refine ⟨?_, ?_, ?_⟩ <;> omega
+          rw [hCv, hTv, hFv, hBPwt, hBPwf]; rfl
+        · intro hValid
+          show ((Expr.select condE wt wf).fragmentStats).forbidden_zero
+          have hValidUnfold :
+              Expr.fragmentValid condE = true ∧
+              Expr.fragmentValid wt = true ∧
+              Expr.fragmentValid wf = true := by
+            -- hValid : (... && ... && ... && bpWt && bpWf) = true, with bpWt = bpWf = true
+            cases hC : Expr.fragmentValid condE <;>
+              cases hT : Expr.fragmentValid wt <;>
+              cases hF : Expr.fragmentValid wf <;>
+              simp [Expr.fragmentValid, hC, hT, hF, hBPwt, hBPwf] at hValid <;>
+              first | (exact ⟨rfl, rfl, rfl⟩) | (cases hValid)
+          rcases hValidUnfold with ⟨hCv, hTv, hFv⟩
+          have hC := ihC.mpr hCv
+          have hT := ihT.mpr hTv
+          have hF := ihF.mpr hFv
+          rcases hC with ⟨hCsf, hCai, hCarm⟩
+          rcases hT with ⟨hTsf, hTai, hTarm⟩
+          rcases hF with ⟨hFsf, hFai, hFarm⟩
+          simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
+            FragmentStats.add, hAnd, _root_.cond]
+          refine ⟨?_, ?_, ?_⟩ <;> omega
+      | false =>
+        -- armPenalty = 1, so arm count is positive ⇒ forbidden_zero is false.
+        -- And on the structural side, fragmentValid requires bp(wt) = true ∧
+        -- bp(wf) = true, which contradicts hAnd : ... = false.
+        simp only [Expr.fragmentStats, Expr.fragmentValid,
+          FragmentStats.forbidden_zero, FragmentStats.add,
+          hAnd, _root_.cond]
+        constructor
+        · rintro ⟨_, _, hArm⟩
+          exfalso; omega
+        · -- The `fragmentValid` branch implies bp(wt) && bp(wf) = true; case-split
+          -- on each Bool to get a direct contradiction with hAnd.
+          intro hValid
+          cases hWt : branchlessPureExpr wt
+          · -- bpWt = false ⇒ hValid (which contains bpWt) is false
+            simp [hWt] at hValid
+          · cases hWf : branchlessPureExpr wf
+            · -- bpWf = false ⇒ hValid (which contains bpWf) is false
+              simp [hWt, hWf] at hValid
+            · -- bpWt = bpWf = true ⇒ hAnd contradicts (true && true ≠ false)
+              simp [hWt, hWf] at hAnd
+  | .cellGet _ => by
+      simp [Expr.fragmentStats, Expr.fragmentValid]
+  | .arrayGet _ index => by
+      simp only [Expr.fragmentStats, Expr.fragmentValid]
+      exact Expr.fragmentStats_valid_iff index
+  | .mapGet _ key => by
+      simp only [Expr.fragmentStats, Expr.fragmentValid]
+      exact Expr.fragmentStats_valid_iff key
+  | .structField base _ => by
+      simp only [Expr.fragmentStats, Expr.fragmentValid, FragmentStats.forbidden_zero]
+      constructor
+      · rintro ⟨hSF, _, _⟩; omega
+      · intro h; exact (Bool.false_ne_true h).elim
+  | .arrayIndex base index => by
+      simp only [Expr.fragmentStats, Expr.fragmentValid, FragmentStats.forbidden_zero,
+        FragmentStats.add]
+      constructor
+      · rintro ⟨_, hAI, _⟩; omega
+      · intro h; exact (Bool.false_ne_true h).elim
+  | .keccak256 parts => by
+      simp only [Expr.fragmentStats, Expr.fragmentValid]
+      exact Expr.fragmentStatsList_valid_iff parts
+
+/-- List companion: the aggregate stats are forbidden-free iff every
+expression in the list is structurally fragment-valid. -/
+theorem Expr.fragmentStatsList_valid_iff :
+    ∀ es : List Expr,
+      (Expr.fragmentStatsList es).forbidden_zero ↔
+        Expr.fragmentValidList es = true
+  | [] => by
+      simp [Expr.fragmentStatsList, Expr.fragmentValidList]
+  | e :: rest => by
+      simp only [Expr.fragmentStatsList, Expr.fragmentValidList,
+        FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+      rw [Expr.fragmentStats_valid_iff e, Expr.fragmentStatsList_valid_iff rest]
+
+end
+
+mutual
+
+/-- Per-statement characterization: the stats are forbidden-free iff
+the statement is structurally fragment-valid. Mutually recursive with
+the list companion to handle the nested `List Statement` inside
+`Statement.ifStmt` and `Statement.forLoop`. -/
+theorem Statement.fragmentStats_valid_iff :
+    ∀ s : Statement, s.fragmentStats.forbidden_zero ↔ s.fragmentValid = true
+  | .declare _ _ value => by
+      simp only [Statement.fragmentStats, Statement.fragmentValid]
+      exact Expr.fragmentStats_valid_iff value
+  | .assign _ value => by
+      simp only [Statement.fragmentStats, Statement.fragmentValid]
+      exact Expr.fragmentStats_valid_iff value
+  | .require cond => by
+      simp only [Statement.fragmentStats, Statement.fragmentValid]
+      exact Expr.fragmentStats_valid_iff cond
+  | .abortIf cond => by
+      simp only [Statement.fragmentStats, Statement.fragmentValid]
+      exact Expr.fragmentStats_valid_iff cond
+  | .ifStmt cond thenBody elseBody => by
+      simp only [Statement.fragmentStats, Statement.fragmentValid,
+        FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+      rw [Expr.fragmentStats_valid_iff cond,
+          Statement.fragmentStatsList_valid_iff thenBody,
+          Statement.fragmentStatsList_valid_iff elseBody]
+  | .forLoop _ _ start_ end_ body => by
+      simp only [Statement.fragmentStats, Statement.fragmentValid,
+        FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+      rw [Expr.fragmentStats_valid_iff start_,
+          Expr.fragmentStats_valid_iff end_,
+          Statement.fragmentStatsList_valid_iff body]
+  | .cellSet _ value pred => by
+      cases pred with
+      | none =>
+          simp only [Statement.fragmentStats, Statement.fragmentValid,
+            FragmentStats.add_zero, Bool.and_true]
+          exact Expr.fragmentStats_valid_iff value
+      | some p =>
+          simp only [Statement.fragmentStats, Statement.fragmentValid,
+            FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+          rw [Expr.fragmentStats_valid_iff value, Expr.fragmentStats_valid_iff p]
+  | .arraySet _ index value pred => by
+      cases pred with
+      | none =>
+          simp only [Statement.fragmentStats, Statement.fragmentValid,
+            FragmentStats.add_zero, Bool.and_true,
+            FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+          rw [Expr.fragmentStats_valid_iff index, Expr.fragmentStats_valid_iff value]
+      | some p =>
+          simp only [Statement.fragmentStats, Statement.fragmentValid,
+            FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+          rw [Expr.fragmentStats_valid_iff index, Expr.fragmentStats_valid_iff value,
+              Expr.fragmentStats_valid_iff p]
+  | .mapPut _ key value pred => by
+      cases pred with
+      | none =>
+          simp only [Statement.fragmentStats, Statement.fragmentValid,
+            FragmentStats.add_zero, Bool.and_true,
+            FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+          rw [Expr.fragmentStats_valid_iff key, Expr.fragmentStats_valid_iff value]
+      | some p =>
+          simp only [Statement.fragmentStats, Statement.fragmentValid,
+            FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+          rw [Expr.fragmentStats_valid_iff key, Expr.fragmentStats_valid_iff value,
+              Expr.fragmentStats_valid_iff p]
+  | .retStmt none => by
+      simp [Statement.fragmentStats, Statement.fragmentValid]
+  | .retStmt (some value) => by
+      simp only [Statement.fragmentStats, Statement.fragmentValid]
+      exact Expr.fragmentStats_valid_iff value
+
+/-- List companion: the aggregate stats are forbidden-free iff every
+statement in the list is structurally fragment-valid. -/
+theorem Statement.fragmentStatsList_valid_iff :
+    ∀ ss : List Statement,
+      (Statement.fragmentStatsList ss).forbidden_zero ↔
+        Statement.fragmentValidList ss = true
+  | [] => by
+      simp [Statement.fragmentStatsList, Statement.fragmentValidList]
+  | s :: rest => by
+      simp only [Statement.fragmentStatsList, Statement.fragmentValidList,
+        FragmentStats.forbidden_zero_add, Bool.and_eq_true]
+      rw [Statement.fragmentStats_valid_iff s,
+          Statement.fragmentStatsList_valid_iff rest]
+
+end
+
+/-- Function-level characterization: the count-based confidential-
+fragment witness is `Valid` iff the function body is structurally
+fragment-valid. -/
+theorem confidentialFragmentEntrypointWitnessOf_valid_iff
+    (fn : CompiledFunction) :
+    (confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+      fn.fragmentValid = true := by
+  unfold confidentialFragmentEntrypointWitnessOf
+  unfold ConfidentialFragmentEntrypointWitness.Valid
+  unfold CompiledFunction.fragmentStats CompiledFunction.fragmentValid
+  exact Statement.fragmentStatsList_valid_iff fn.body
 
 end IR
 

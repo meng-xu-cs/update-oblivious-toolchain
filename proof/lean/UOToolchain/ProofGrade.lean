@@ -545,4 +545,22 @@ theorem proofGrade_source_oram_entrypoint_runtime_slot_program_exact_of_lookup
   · simpa [ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram] using hWitnessEntrypoint
   · simpa [ImportedConfidentialKernelSlotProgram.toConfidentialKernelSlotProgram] using hWitnessSecrets
 
+/-! ## W4.3: Confidential-fragment characterization (paper facade)
+
+`proofGrade_confidential_fragment_valid_iff_structurally_valid`
+re-exports the W4.3 characterization theorem so the paper-facing
+facade can cite a single named handle: "the count-based confidential-
+fragment witness is `Valid` iff the function body is structurally
+fragment-valid (no `Expr.structField`, no `Expr.arrayIndex`, no
+non-branchless `Expr.select` arm)." This pins the WP4 admission/
+rejection theorem against the structured `IRSyntax`-mirrored AST,
+not against a string view.
+-/
+
+theorem proofGrade_confidential_fragment_valid_iff_structurally_valid
+    (fn : IR.CompiledFunction) :
+    (IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+      fn.fragmentValid = true :=
+  IR.confidentialFragmentEntrypointWitnessOf_valid_iff fn
+
 end UOToolchain
