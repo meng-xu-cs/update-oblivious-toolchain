@@ -19,12 +19,15 @@ Solidity subset compiled to a tiny confidential kernel running inside
 a TEE under a hostile-host adversary (M+ model).
 
 You are now picking up **Work Package 4: Prove Source-To-Kernel
-Compiler Correctness**. Work Packages 0–3 are closed.
+Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
+**W4.1** (real operational evaluator surface) and **W4.1b**
+(secrecy-lemma re-statement against the new evaluator) are landed
+as commits `6e234df` and `267dc89`.
 
 ## First, Read These Files In This Exact Order
 
 1. `docs/wp4-handoff-runbook.md` — your charter for this work
-   package, the existing infrastructure, and the recommended starting
+   package, the existing infrastructure, and the recommended next
    subtask. This is the document that tells you *what to do*.
 2. `docs/coding-agent-conventions.md` — the engineering process for
    this repository. This is the document that tells you *how to do
@@ -41,6 +44,23 @@ Compiler Correctness**. Work Packages 0–3 are closed.
 5. `docs/formal-proof-plan.md` — the broader proof structure.
 
 Then read the WP4-relevant Lean and Rust files listed in the runbook.
+Pay special attention to:
+
+- `proof/lean/UOToolchain/IRSyntax.lean` — the structured IR mirror
+  of `crates/uo-core/src/{ir,types}.rs` that landed in W4.1.
+- `proof/lean/UOToolchain/IRSemantics.lean` — the new operational
+  evaluator (`Semantics := IR.OperationalConfig → IR.Outcome`,
+  `evalContract`) plus the preserved abstract trace-producer surface
+  (`TraceSemantics`).
+- `proof/lean/UOToolchain/CompilerInvariant.lean` — both the
+  trace-side `compilerSecrecyPreservation` and the new evaluator-side
+  `evaluatorCompilerSecrecyPreservation`.
+- `proof/lean/UOToolchain/ConfidentialFragment.lean` — the count-
+  based witness that W4.3 will lift to a structural characterization.
+- `crates/uo-core/src/ir.rs` — the canonical surface the Lean IR
+  mirror tracks.
+- `crates/uo-core/src/fragment.rs` — the Rust confidential-fragment
+  classifier whose Lean mirror is part of W4.3.
 
 ## Operating Posture
 
@@ -59,10 +79,11 @@ Then read the WP4-relevant Lean and Rust files listed in the runbook.
   edit a generated file directly, update the generator/source-freeze
   checks in the same checkpoint.
 - **Run the validation slice before declaring success.** Probe exit
-  code 0, top-level `"accepted": true` in each report,
-  `git diff --check` clean, tamper-validation `rejected: true` count
-  matches scenario count. The conventions doc has the exact slice;
-  the runbook has the WP4-augmented slice.
+  code 0, top-level `"accepted": true` in each non-static report,
+  static-checks restriction flags all `true`, `git diff --check`
+  clean, tamper-validation `rejected: true` count matches scenario
+  count. The conventions doc has the exact slice; the runbook has
+  the WP4-augmented slice.
 - **Preserve unrelated dirty files.** Do not run `git checkout .`,
   `git restore .`, or any destructive git command without confirming
   with the user.
@@ -78,6 +99,7 @@ residual-helper-shell route or the direct kernel-machine-confinement
 route, stop and reconsider — that is WP3 territory. WP4 theorems
 land in:
 
+- `proof/lean/UOToolchain/IRSyntax.lean`
 - `proof/lean/UOToolchain/IRSemantics.lean`
 - `proof/lean/UOToolchain/CompilerInvariant.lean`
 - `proof/lean/UOToolchain/ConfidentialFragment.lean`
@@ -85,31 +107,49 @@ land in:
 - `proof/lean/UOToolchain/ProofGrade.lean`
 - and as needed `proof/lean/UOToolchain/TranslationValidationJson.lean`
 
-## Recommended First Step
+## Recommended Next Subtask
 
-Subtask **W4.1**: replace the
-`abbrev Semantics := Config → Trace` placeholder in
-`proof/lean/UOToolchain/IRSemantics.lean` with a real operational
-semantics for the admitted Solidity subset. This is a prerequisite
-for every other WP4 deliverable.
+Subtask **W4.3** is recommended as the next checkpoint because it
+lives entirely on the IR side of the boundary (no Solidity source
+semantics required), it is cleanly bounded, and the existing
+`ConfidentialFragmentEntrypointWitness` already pins the right shape.
 
-The admitted subset is whatever `uo-solc` already accepts. The Rust
-IR (`crates/uo-core/src/ir.rs`) is the canonical surface; mirror
-those data types as Lean inductives, then define an evaluator that
-produces an `Outcome` carrying the public projection, gas used, and
-the manifest-relevant trace data (ORAM accesses, kernel steps).
+**Subtask W4.3: Prove a confidential-fragment characterization
+theorem against the structured IR.**
 
-Re-state `compilerSecrecyPreservation` and
-`publicGasSecretIndependent` against the real evaluator. Audit every
-importer of `IRSemantics` and confirm the new `Semantics` definition
-flows through correctly.
+Concretely:
 
-Land subtask W4.1 as one or more coherent commits, run the validation
-slice, then proceed in sequence:
+- Define a Lean-side classifier
+  `confidentialFragmentClassify : IR.CompiledFunction →
+  ConfidentialFragmentEntrypointWitness` in
+  `ConfidentialFragment.lean`. It walks the structured IR
+  (`Statement`, `Expr` cases) and counts the same fields the existing
+  Rust classifier in `crates/uo-core/src/fragment.rs` produces.
+- Define a structural predicate `FragmentValidStructure` over
+  `IR.CompiledFunction` that says "no `Expr.structField` anywhere",
+  "no `Expr.arrayIndex` anywhere", "no non-branchless `Expr.select`
+  anywhere", and the matching constraints on `Statement`.
+- Prove the characterization theorem
+  `confidentialFragmentClassify(fn).Valid ↔
+  FragmentValidStructure fn`. This is the W4.3 deliverable.
+- Optional but valuable: prove that for any `OperationalConfig`
+  whose entrypoint's function body satisfies
+  `FragmentValidStructure`, `evalContract` returns an `Outcome` whose
+  status is one of `completed` / `requireFailed` / `abortedByUser`
+  (i.e., never `unsupported`). This proves the W4.1 evaluator covers
+  the confidential-fragment surface.
 
-- W4.2 — source-to-IR correctness theorem.
-- W4.3 — confidential-fragment admission/rejection theorem.
-- W4.4 — IR-to-kernel correctness theorem.
+If you would prefer to drive W4.2 (source-to-IR correctness) first
+instead, the runbook's "Recommended Starting Subtask" section
+explains the AST-pull-back framing that makes W4.2 tractable. W4.2
+is roughly 2-3× the effort of W4.3 because it requires either a
+partial Lean Solidity semantics or a Lean mirror of `uo-solc`'s
+parser intermediate AST.
+
+After W4.3 lands, the natural sequence is:
+
+- W4.2 — source-to-IR correctness theorem (deliverable 1).
+- W4.4 — IR-to-kernel correctness theorem (deliverable 2).
 - W4.5 — manifest-exactness lift (from exactness/export to
   semantics-preserving, per field).
 - W4.6 — demote the direct artifact checker (charter task 6).
@@ -120,7 +160,8 @@ slice, then proceed in sequence:
 cd <repo-root>
 cargo fmt --all
 cd proof/lean
-lake build UOToolchain.IRSemantics \
+lake build UOToolchain.IRSyntax \
+  UOToolchain.IRSemantics \
   UOToolchain.CompilerInvariant \
   UOToolchain.CompilerExactness \
   UOToolchain.ConfidentialFragment \
@@ -164,7 +205,9 @@ classify each WP4 claim explicitly:
 - **Source-frozen / static-drift checked.** Probe rejects drift in
   Rust source; not a semantic theorem.
 - **Trusted.** `uo-solc` is currently in this bucket; the WP4 exit
-  gate removes it.
+  gate removes it. W4.1 / W4.1b did *not* remove it — they only
+  added the Lean-side operational evaluator the WP4 theorems will
+  refine against.
 
 Never write "WP4 proves source-to-kernel correctness" unless
 deliverables 1, 2, 3 are all real semantics-preserving theorems
@@ -195,10 +238,16 @@ for the content requirements.
 - Do not regress WP3. The runtime residual-helper-shell route and
   the direct kernel-machine-confinement route stay green.
 - Do not weaken `ProofGradeCompilerFacts`. Strengthen it.
+- Do not weaken the W4.1 evaluator. Adding new evaluator cases is
+  fine; *removing* existing cases or downgrading them to
+  `EvalStatus.unsupported` is a regression of the evaluator's
+  coverage surface.
 - Do not promote source-freeze checks to "proved." Demote the
   direct artifact checker (charter task 6); do not invert this.
 - Do not reintroduce `uo-check` as a gating step.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The first technical step is W4.1.
+Begin with the runbook. The first technical step is W4.3 (or W4.2 if
+you prefer strict deliverable order — see the runbook for the AST-
+pull-back framing).

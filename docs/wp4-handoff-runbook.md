@@ -12,26 +12,55 @@ belong in a process doc.
 
 ## Where We Are
 
-WP3 closed on 2026-04-26. The runtime/below-interface story is now:
+WP3 closed on 2026-04-26. WP4 then opened with the goal of replacing
+the placeholder `abbrev Semantics := Config → Trace` and proving real
+source-to-kernel correctness for the admitted Solidity subset.
 
-- A source-backed `RuntimeImplementationInterface` cut, exact-string
-  pinned to the actual `runtime/uo-evm`, `runtime/uo-allocator`,
-  `runtime/uo-store`, `runtime/uo-kernel-runtime`, and
-  `runtime/uo-precompiles` source files.
-- A residual-helper-shell route and a direct kernel-machine-confinement
-  route that *both* expose the same helper/kernel theorems through
-  matching report bits.
-- A Lean-modeled Path-ORAM helper-and-codec semantics layer
-  (`RuntimeOramHelperSemantics`, `RuntimeOramCodecSemantics`,
-  `RuntimeStoreCodecSemantics`, `RuntimeStoreHelperSemantics`) projected
-  through the five-layer pattern.
-- A pinned crypto-primitive identity (`chacha20poly1305` AEAD,
-  `tiny_keccak::Keccak::v256`) at the source-backed boundary.
+Subtasks **W4.1** and **W4.1b** landed on 2026-04-26 (commits
+`6e234df` and `267dc89`):
 
-The WP4 entry conditions are met: the runtime side is stable, the
-proof-grade exactness/export layer for manifest fields has landed, and
-the compiler-to-ORAM bridge already produces source-derived witnesses.
-What is open is the actual semantics-preserving lowering theorem stack.
+- A structured Lean mirror of `crates/uo-core/src/{ir,types}.rs` lives
+  in [`proof/lean/UOToolchain/IRSyntax.lean`](../proof/lean/UOToolchain/IRSyntax.lean).
+  It covers `ProgramMode`, `ContainerKind`, `BackendKind`,
+  `StateObject`, `UnaryOp`, `BinaryOp`, `Expr`, `Statement`,
+  `CompiledFunction`, `CompiledContract`, plus a `Value` / `Ty`
+  universe with composite struct/array variants.
+- The placeholder `abbrev Semantics := Config → Trace` is replaced by
+  `abbrev Semantics := IR.OperationalConfig → IR.Outcome` in
+  [`proof/lean/UOToolchain/IRSemantics.lean`](../proof/lean/UOToolchain/IRSemantics.lean).
+  `IR.Outcome` carries the existing `Trace`, the entrypoint's public
+  return value, the per-object ORAM-access counts, the manifest-
+  relevant kernel-step list, and an explicit `EvalStatus`
+  (`completed`, `requireFailed`, `abortedByUser`, `unsupported kind`,
+  `evalError msg`).
+- `evalContract : IR.OperationalConfig → IR.Outcome` is a real big-
+  step evaluator handling `Expr.{literal,var,unary,binary,select,
+  cellGet}` and `Statement.{declare,assign,require,abortIf,cellSet,
+  retStmt}` exactly. IR constructs not yet admitted to this cut return
+  an explicit `EvalStatus.unsupported`. The unsupported set is the
+  natural W4.2-W4.4 work surface:
+  `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
+  `Expr.{arrayGet,mapGet,structField,arrayIndex,keccak256}`.
+- `compilerSecrecyPreservation` and `publicGasSecretIndependent` were
+  re-stated against the new evaluator surface as
+  `evaluatorCompilerSecrecyPreservation` and
+  `evaluatorPublicGasSecretIndependent` (with a matching
+  `EvaluatorPublicGasSafe` predicate). The original trace-side
+  statements remain so the abstract `ExactObjects` / `Composition`
+  composition theorems continue to consume them directly.
+- The abstract trace-producer abbreviation is preserved as
+  `TraceSemantics := TraceConfig → Trace`, with `Config` /
+  `Program` / `Input` / `PublicProjection` /
+  `samePublicProjection` retained as alias `abbrev`s. The downstream
+  modules `ExactObjects.lean`, `Composition.lean`,
+  `LegacyComposition.lean`, `LegacyTeeDeployment.lean`,
+  `TeeDeployment.lean`, `SgxExactProjection.lean`, and
+  `PathOramLocalPosmapV1.lean` were updated to reference
+  `TraceSemantics` rather than the new evaluator type.
+
+The WP4 entry conditions therefore now also include the operational
+evaluator surface; what is open is the actual semantics-preserving
+lowering theorem stack on top of it.
 
 ## WP4 Charter (Verbatim From The Roadmap)
 
@@ -41,8 +70,8 @@ checking.
 
 Concrete tasks:
 
-1. Define the admitted Solidity subset semantics precisely enough for
-   theorem-level compilation claims.
+1. *(landed in W4.1 / W4.1b)* Define the admitted Solidity subset
+   semantics precisely enough for theorem-level compilation claims.
 2. Prove correctness of lowering into the UO IR.
 3. Prove correctness of confidential-fragment admission and rejection.
 4. Prove correctness of lowering into the kernel DSL and its public
@@ -67,26 +96,30 @@ admitted language.
 These files already exist and are the right place to build on, not
 parallel-track around:
 
+- [`proof/lean/UOToolchain/IRSyntax.lean`](../proof/lean/UOToolchain/IRSyntax.lean)
+  (~190 lines, *new in W4.1*). The structured Lean mirror of
+  `crates/uo-core/src/{ir,types}.rs`. Add new IR cases here (kept in
+  lockstep with `ir.rs`) before extending the evaluator.
 - [`proof/lean/UOToolchain/IRSemantics.lean`](../proof/lean/UOToolchain/IRSemantics.lean)
-  (~73 lines). Stub: `ObjectShape`, `Program`, `Input`, `Config`,
-  `PublicProjection`, `abbrev Semantics := Config → Trace`,
-  `samePublicProjection` lemmas. **This is where the precise
-  operational semantics has to land.** The `Semantics := Config →
-  Trace` abbreviation is a placeholder; WP4 task 1 replaces it with an
-  actual interpreter that captures the admitted Solidity subset.
+  (~520 lines, *rewritten in W4.1*). Houses the operational
+  `OperationalConfig` / `Outcome` / `Semantics` types, the abstract
+  `TraceConfig` / `TraceProgram` / `TraceInput` / `TracePublicProjection` /
+  `TraceSemantics` types preserved for backwards compatibility, and
+  the real `evalContract` evaluator skeleton.
 - [`proof/lean/UOToolchain/CompilerInvariant.lean`](../proof/lean/UOToolchain/CompilerInvariant.lean)
-  (~36 lines). Has `ManifestWitness`, `PublicGasSafe`,
-  `compilerSecrecyPreservation`, `publicGasSecretIndependent`. These
-  are placeholder secrecy lemmas over the abstract `Semantics`
-  abbreviation; they need to be re-stated against the real semantics
-  once it lands.
+  (~100 lines, *re-stated in W4.1b*). Now exposes both
+  `PublicGasSafe` / `compilerSecrecyPreservation` /
+  `publicGasSecretIndependent` over `TraceSemantics` and
+  `EvaluatorPublicGasSafe` / `evaluatorCompilerSecrecyPreservation` /
+  `evaluatorPublicGasSecretIndependent` over the new `Semantics`
+  evaluator.
 - [`proof/lean/UOToolchain/ConfidentialFragment.lean`](../proof/lean/UOToolchain/ConfidentialFragment.lean)
   (~94 lines). Has `ConfidentialFragmentEntrypointWitness` /
   `ConfidentialFragmentWitness` with `selectCount`, `structFieldCount`,
   `arrayIndexCount`, `nonBranchlessSelectArmCount` fields plus a
   `Valid`/`checkValid` bridge. The shape is right; what is missing is
   a *theorem* showing that `Valid` implies the source program lies in
-  the admitted confidential fragment under the new semantics.
+  the admitted confidential fragment under the new semantics. (W4.3.)
 - [`proof/lean/UOToolchain/CompilerExactness.lean`](../proof/lean/UOToolchain/CompilerExactness.lean)
   (~1466 lines). Holds `ProofGradeCompilerFacts` (line 1165) — the
   exactness/export bundle that proves manifest fields, confidential
@@ -94,7 +127,7 @@ parallel-track around:
   witnesses are exact consequences of `bundle.ProofGradeValid`. **This
   is exactness, not semantics-preserving correctness.** WP4 lifts
   these facts from "the same data appears on both sides" to "the
-  compiler preserves the source semantics."
+  compiler preserves the source semantics." (W4.5, per field.)
 - [`proof/lean/UOToolchain/TranslationValidationJson.lean`](../proof/lean/UOToolchain/TranslationValidationJson.lean)
   (~3545 lines). Imported view structures and JSON projection layer.
   Touch only when a new theorem-facing field needs to be exposed.
@@ -110,9 +143,11 @@ parallel-track around:
 - [`crates/uo-core/src/ir.rs`](../crates/uo-core/src/ir.rs) (~191
   lines). The UO IR data types: `ProgramMode`, `StateObject`,
   `Statement`, `Expr`, `CompiledFunction`, `CompiledContract`. The
-  Lean side currently models a much smaller `Program` /
-  `ObjectShape`; the WP4 IR model in Lean must match these data types
-  field-for-field.
+  Lean-side mirror in `IRSyntax.lean` follows this file field-for-
+  field and constructor-for-constructor. **If `ir.rs` changes, the
+  Lean mirror must move with it.** A static-drift check is not yet in
+  place — adding one is in scope for any commit that extends the
+  mirror.
 - [`crates/uo-core/src/kernel_dsl.rs`](../crates/uo-core/src/kernel_dsl.rs)
   (~496 lines). Kernel DSL data types and slot lowering. The
   IR-to-kernel correctness theorem refines the Rust side of this
@@ -156,43 +191,64 @@ claim before declaring success. Never say "WP4 proves source-to-kernel
 correctness" until the deliverables are all real semantics-preserving
 theorems projected through the paper-facing facade.
 
+W4.1 / W4.1b explicitly do *not* move any compiler claim from
+exactness/export to semantics-preserving. They establish the
+operational evaluator surface that the W4.2-W4.5 theorems will refine
+against; `uo-solc` therefore remains in the trusted surface.
+
 ## Recommended Starting Subtask
 
-Charter task 1 is the prerequisite for tasks 2–5. Start there:
+Charter task 1 is now landed (W4.1/W4.1b). The next charter task that
+unblocks the largest amount of downstream work is task 3 — confidential-
+fragment admission/rejection (W4.3). Task 3 lives entirely on the IR
+side of the boundary: it does *not* require defining a Solidity source
+semantics, and its theorem can be stated directly against the new
+evaluator surface and the structured IR mirror.
 
-**Subtask W4.1: Replace the `IRSemantics.Semantics := Config → Trace`
-abbreviation with a precise operational semantics for the admitted
-subset.**
+**Subtask W4.3: Prove a confidential-fragment characterization theorem
+against the structured IR.**
 
 Concretely:
 
-- Decide the admitted-subset surface in Lean. The Rust IR already
-  pins it (`ir.rs`'s `Statement` / `Expr` enums); the Lean side should
-  mirror these as inductives, not strings.
-- Define environment / store / public-state / secret-state types.
-- Define a `bigStep` (or `smallStep`) evaluator: `Config → Result
-  Outcome` (where `Outcome` carries the public projection, the gas
-  used, and the ORAM-access trace fields the manifest depends on).
-- Re-state `compilerSecrecyPreservation` and
-  `publicGasSecretIndependent` against the real evaluator.
-- Audit every place in `CompilerExactness.lean` that uses the
-  abbreviated `Semantics` to confirm the new evaluator is the right
-  drop-in. Most call sites are likely paper-facing facade lines that
-  will tighten naturally; some may need a richer `Outcome` type.
+- Strengthen `ConfidentialFragmentEntrypointWitness.Valid` from
+  count-based (`structFieldCount = 0 ∧ arrayIndexCount = 0 ∧
+  nonBranchlessSelectArmCount = 0`) to a structural predicate over the
+  IR: a function's body contains no `Expr.structField`,
+  no `Expr.arrayIndex`, no `Expr.select` whose arms are not branchless,
+  and (depending on the design) no `Statement.{ifStmt,forLoop}` whose
+  guards depend on a secret.
+- Define a Lean-side classifier `confidentialFragmentClassify :
+  IR.CompiledFunction → ConfidentialFragmentEntrypointWitness` that
+  walks the structured IR and produces the witness counts/flags. This
+  parallels the Rust classifier in `crates/uo-core/src/fragment.rs` —
+  if the Rust file changes, the Lean classifier must move with it.
+- Prove a *characterization* theorem in
+  `ConfidentialFragment.lean`:
+  `confidentialFragmentClassify(fn).Valid ↔ FragmentValidStructure fn`
+  where `FragmentValidStructure` is the structural predicate (no
+  forbidden constructs anywhere in the AST). This is the W4.3
+  deliverable: the count-based witness is exactly the structural
+  property.
+- (Optional but valuable) Connect the structural predicate to the
+  evaluator: prove that for any `OperationalConfig` whose entrypoint's
+  function body satisfies `FragmentValidStructure`, `evalContract`
+  returns an `Outcome` whose status is one of `completed` /
+  `requireFailed` / `abortedByUser` (i.e., never `unsupported`). This
+  proves the evaluator's coverage *at minimum* matches the
+  confidential-fragment surface.
 
-This subtask alone may be a ~one-week checkpoint. Land it as one
-coherent commit, run the validation slice, then proceed to subtask
-W4.2 (source-to-IR lowering correctness — i.e., the compiler from the
-admitted Solidity AST to the IR refines the new evaluator).
+The W4.3 work is roughly one session. After it lands, the natural
+sequence is:
 
-After W4.1 lands, the natural sequence is:
-
-- W4.2 — source-to-IR correctness theorem (deliverable 1).
-- W4.3 — confidential-fragment admission/rejection theorem (charter
-  task 3): show that
-  `ConfidentialFragmentEntrypointWitness.Valid` exactly characterizes
-  the subset of source programs whose IR lies in the confidential
-  fragment.
+- W4.2 — source-to-IR correctness theorem (deliverable 1). This is
+  the deeper one because it requires either a partial Lean Solidity
+  semantics or a Lean mirror of `uo-solc`'s parser intermediate AST.
+  Recommendation: pull back via the AST option — mirror the
+  `solang_parser::pt::Statement` / `pt::Expression` shapes in Lean
+  and prove that `uo-solc::lower_block` is a faithful translation
+  from that AST to `IR.Statement`. The "source" semantics in this
+  framing is the AST-level evaluator; full Solidity is treated as the
+  trusted parser step.
 - W4.4 — IR-to-kernel correctness theorem (deliverable 2): refine
   `crates/uo-core/src/kernel_dsl.rs`'s lowering against a Lean kernel
   DSL semantics, reusing the helper-layer end-to-end theorems already
@@ -218,7 +274,8 @@ plus the WP4-relevant scenarios:
 cd <repo-root>
 cargo fmt --all
 cd proof/lean
-lake build UOToolchain.IRSemantics \
+lake build UOToolchain.IRSyntax \
+  UOToolchain.IRSemantics \
   UOToolchain.CompilerInvariant \
   UOToolchain.CompilerExactness \
   UOToolchain.ConfidentialFragment \
@@ -247,8 +304,15 @@ schema changes), run `scripts/run_validation.sh` to exercise the full
 suite.
 
 Cross-checks before declaring success: probe exit code 0, top-level
-`"accepted": true` in each report, `git diff --check` clean,
-tamper-validation scenario count matches `rejected: true` count.
+`"accepted": true` in each non-static report, the static-checks
+restriction flags
+(`legacy_axiom_definition_surface_restricted`,
+`legacy_theorem_symbol_surface_restricted`,
+`proofgrade_checker_import_surface_restricted`,
+`proofgrade_checker_legacy_symbol_mentions_absent`,
+`proofgrade_core_module_import_surface_restricted`)
+all `true`, `git diff --check` clean, tamper-validation scenario count
+matches `rejected: true` count.
 
 ## What WP4 Must NOT Do
 
@@ -262,6 +326,10 @@ tamper-validation scenario count matches `rejected: true` count.
 - Do not weaken `ProofGradeCompilerFacts`. The exactness/export layer
   is the floor; semantics-preserving theorems strengthen it, they
   don't replace it.
+- Do not weaken the W4.1 evaluator. Adding new evaluator cases is
+  fine; *removing* existing cases or downgrading them to
+  `EvalStatus.unsupported` is a regression of the evaluator's coverage
+  surface.
 - Do not reintroduce `uo-check` as a gating step. The proof-grade
   acceptance path still goes through direct Lean source/artifact
   checking.
@@ -302,19 +370,22 @@ to WP4 directly:
 ## Suggested Per-Checkpoint Commit Cadence
 
 The user has authorized checkpointing during implementation work
-(see *Working Practices For Coding Agents* and the recent WP3
-session log). Each coherent technical step that passes the
-validation slice should be its own commit:
+(see *Working Practices For Coding Agents* and the WP3 / W4.1 session
+logs). Each coherent technical step that passes the validation slice
+should be its own commit:
 
-- IR semantics inductives + evaluator skeleton.
-- `compilerSecrecyPreservation` re-stated against the real evaluator.
-- Source-to-IR lowering theorem (probably split into
+- *(landed)* IR semantics inductives + evaluator skeleton + secrecy
+  lemma re-statement (W4.1 / W4.1b, commit `6e234df`).
+- *(landed)* Roadmap / theorem-profile status update (commit
+  `267dc89`).
+- *(next)* Confidential-fragment classifier + structural
+  characterization theorem (W4.3).
+- Source-to-IR lowering theorem (W4.2, probably split into
   expression-level, statement-level, function-level).
-- Confidential-fragment admission theorem.
-- IR-to-kernel lowering theorem (likely split per kernel-DSL
+- IR-to-kernel lowering theorem (W4.4, likely split per kernel-DSL
   construct).
-- Manifest exactness lift (per-field).
-- Direct artifact-checker demotion (doc + roadmap update).
+- Manifest exactness lift (W4.5, per-field).
+- Direct artifact-checker demotion (W4.6, doc + roadmap update).
 
 Commit messages should explain *what assumption moved from
 exactness/export to semantics-preserving in this checkpoint, and what
@@ -330,18 +401,23 @@ a regression in the static-drift suite three weeks later.
   storage layout, ABI encoding edge cases), stop and re-read the
   charter. The admitted subset is whatever `uo-solc` already accepts,
   no more.
-- **Rust IR drift.** The Lean IR model has to follow `crates/uo-core/src/ir.rs`.
-  If `ir.rs` changes during WP4, the Lean side must move with it,
-  ideally via a generator that emits Lean inductives from the Rust
-  enums. If a manual mirror is used, add an exact-string drift check
-  to the probe.
-- **`Semantics := Config → Trace` users.** Several files import
-  `IRSemantics`. When you change the `Semantics` definition, audit
-  every importer; do not silently change the type and let downstream
-  files compile against a different abstraction. `lake build` will
-  catch most of this; the static-drift suite catches the rest.
+- **Rust IR drift.** The Lean IR mirror in `IRSyntax.lean` has to
+  follow `crates/uo-core/src/{ir,types}.rs` constructor-for-
+  constructor. If `ir.rs` changes during WP4, the Lean side must move
+  with it. There is no static-drift check for the IR mirror yet —
+  add one (in `mplus-probe`) when extending the mirror, or accept
+  that drift is caught only at the next `lake build` of the
+  evaluator.
+- **`Semantics` vs `TraceSemantics` confusion.** The new `Semantics`
+  is the operational evaluator (`IR.OperationalConfig → IR.Outcome`).
+  The abstract trace-producer abbreviation is `TraceSemantics`
+  (`TraceConfig → Trace`). Both names are now load-bearing. When
+  introducing new theorems, classify which surface you mean and use
+  the matching abbreviation; mixing them up will produce
+  type-mismatch errors that look like "applied `Semantics` where
+  `TraceSemantics` expected" or vice versa.
 - **Confidential-fragment witness shape.** The current
-  `ConfidentialFragmentEntrypointWitness` carries counts. The WP4
+  `ConfidentialFragmentEntrypointWitness` carries counts. The W4.3
   theorem may want stronger structural facts (e.g., "no
   `StructField` expression appears anywhere in the AST"). It is
   fine to extend the witness, but every extension means extending
@@ -352,14 +428,24 @@ a regression in the static-drift suite three weeks later.
   trusted. Do not change the WP4 status paragraph to "compiler is
   no longer in the TCB" until the source-to-IR and IR-to-kernel
   theorems exist and are projected through `ProofGrade.lean`.
+- **Evaluator coverage gaps.** The W4.1 evaluator returns
+  `EvalStatus.unsupported` for `Statement.{ifStmt,forLoop,arraySet,
+  mapPut}` and `Expr.{arrayGet,mapGet,structField,arrayIndex,
+  keccak256}`. Theorems that need to evaluate programs containing
+  those constructs must either extend the evaluator first or scope
+  themselves to the supported subset.
 
 ## Where The Handoff Stops
 
-This runbook hands off to subtask W4.1 with:
+This runbook hands off to subtask W4.3 (or W4.2 if you prefer to
+sequence the deliverables strictly) with:
 
-- A clean main branch at WP3 closure (commit `b43624b` or later).
-- All validation gates green at the doc-only `git diff --check`
-  level on creation of this handoff.
+- Clean main branch at commit `267dc89` (W4.1/W4.1b landing + status
+  update).
+- All validation gates green at the standard WP4 validation slice
+  (probe exit codes 0; `"accepted": true` on all non-static probe
+  reports; static-checks restriction flags all `true`; full
+  `lake build` 403/403; `git diff --check` clean).
 - The companion handoff prompt
   [`wp4-handoff-prompt.md`](./wp4-handoff-prompt.md) ready to be
   pasted into a fresh coding-agent session.
