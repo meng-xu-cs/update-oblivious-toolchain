@@ -21,12 +21,14 @@ a TEE under a hostile-host adversary (M+ model).
 You are now picking up **Work Package 4: Prove Source-To-Kernel
 Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
 **W4.1** (real operational evaluator surface), **W4.1b** (secrecy-
-lemma re-statement against the new evaluator), and **W4.3** (the
+lemma re-statement against the new evaluator), **W4.3** (the
 full confidential-fragment characterization theorem
 `(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
-fn.fragmentValid = true` plus paper-facing facade) are landed as
-commits `6e234df`, `267dc89`, `63cdd36`, `4f30757`, `5ef3bdd`, and
-`08f669a`.
+fn.fragmentValid = true` plus paper-facing facade), and **W4.1+**
+(evaluator coverage extension to
+`Statement.{ifStmt,forLoop,arraySet,mapPut}` and `Expr.arrayGet`)
+are landed as commits `6e234df`, `267dc89`, `63cdd36`, `4f30757`,
+`5ef3bdd`, `08f669a`, `94ba337`, and `9f0e45e`.
 
 ## First, Read These Files In This Exact Order
 

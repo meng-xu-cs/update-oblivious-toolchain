@@ -275,6 +275,14 @@ What is still open:
   classifier surfaces the WP4 lowering theorems will refine against.
   Rust / Lean classifier agreement is a source-freeze obligation,
   handled by the existing static-drift checks.
+  W4.1+ (evaluator coverage extension) has also landed:
+  `evalContract` now handles `Statement.{ifStmt,forLoop,arraySet,
+  mapPut}` and `Expr.arrayGet`, with `evalStatement` / `evalBody` /
+  `evalForLoop` in a single `mutual` block. The remaining
+  unsupported set is `Expr.{mapGet,keccak256}` (need a `Value.map`
+  variant and a Keccak hash model) and the forbidden
+  `Expr.{structField,arrayIndex}` constructors that
+  `fragmentValid` already rejects.
 - WP5 (concrete backend assumptions): full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,

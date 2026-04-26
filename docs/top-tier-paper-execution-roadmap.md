@@ -1608,15 +1608,25 @@ Current status update:
   does not support for nested-inductive types; the follow-up commit
   will use `Expr.recOn` / `Statement.recOn` directly or restructure
   the IR data types as explicitly mutual inductives.
+- Subtask W4.1+ (evaluator coverage extension) landed (commit
+  `9f0e45e`,
+  [proof/lean/UOToolchain/IRSemantics.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/IRSemantics.lean)):
+  `evalContract` now also handles
+  `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
+  `Expr.arrayGet`, with `evalStatement`/`evalBody`/`evalForLoop` in a
+  single `mutual` block so that `ifStmt` / `forLoop` can recurse into
+  nested statement bodies. The remaining unsupported set is
+  `Expr.{mapGet,keccak256}` (need value-model extensions: a
+  `Value.map` variant and a Keccak hash model) and
+  `Expr.{structField,arrayIndex}` (forbidden by `Expr.fragmentValid`
+  and therefore never in an accepted IR program). The evaluator
+  coverage now matches the structural admitted fragment except for
+  the two value-model gaps.
 - Still open: the *real* source-to-IR correctness theorem (W4.2),
   the IR-to-kernel correctness theorem (W4.4), the manifest-
-  exactness semantics-preserving lift (W4.5), and the direct
-  artifact checker demotion (W4.6). The evaluator coverage of W4.1
-  also still leaves `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
-  `Expr.{arrayGet,mapGet,structField,arrayIndex,keccak256}`
-  reporting `EvalStatus.unsupported`; those will be admitted
-  incrementally as W4.2-W4.4 work proves the corresponding
-  lowering correctness facts.
+  exactness semantics-preserving lift (W4.5), the direct
+  artifact checker demotion (W4.6), and the value-model extensions
+  needed to cover `Expr.{mapGet,keccak256}` in the evaluator.
 
 Exit gate:
 

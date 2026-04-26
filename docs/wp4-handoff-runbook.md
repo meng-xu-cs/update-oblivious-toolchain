@@ -16,9 +16,10 @@ WP3 closed on 2026-04-26. WP4 then opened with the goal of replacing
 the placeholder `abbrev Semantics := Config → Trace` and proving real
 source-to-kernel correctness for the admitted Solidity subset.
 
-Subtasks **W4.1**, **W4.1b**, and **W4.3 (full theorem)** landed on
-2026-04-26 (commits `6e234df`, `267dc89`, `63cdd36`, `4f30757`,
-`5ef3bdd`, and `08f669a`):
+Subtasks **W4.1**, **W4.1b**, **W4.3 (full theorem)**, and **W4.1+
+(evaluator coverage extension)** landed on 2026-04-26 (commits
+`6e234df`, `267dc89`, `63cdd36`, `4f30757`, `5ef3bdd`, `08f669a`,
+`94ba337`, and `9f0e45e`):
 
 - A structured Lean mirror of `crates/uo-core/src/{ir,types}.rs` lives
   in [`proof/lean/UOToolchain/IRSyntax.lean`](../proof/lean/UOToolchain/IRSyntax.lean).
@@ -90,6 +91,18 @@ Subtasks **W4.1**, **W4.1b**, and **W4.3 (full theorem)** landed on
   `if ... then ... else ...` on a Bool, because `if`-on-Bool
   silently introduces `decide` wrappers through Lean's Decidable
   elaboration.
+- W4.1+ extension landed in
+  [`proof/lean/UOToolchain/IRSemantics.lean`](../proof/lean/UOToolchain/IRSemantics.lean):
+  `evalContract` now handles `Statement.{ifStmt,forLoop,arraySet,
+  mapPut}` (statement evaluator restructured into a single `mutual`
+  block with `evalBody` and a new `evalForLoop` helper) and
+  `Expr.arrayGet` (using `Value.array` storage indexing). The
+  remaining unsupported set is `Expr.{mapGet,keccak256}` (need
+  value-model extensions: a `Value.map` variant and a Keccak hash
+  model) and `Expr.{structField,arrayIndex}` (forbidden by
+  `Expr.fragmentValid` and never in an accepted IR program). The
+  W4.1+ extension means the evaluator's coverage now matches the
+  structural admitted fragment except for the two value-model gaps.
 
 The WP4 entry conditions therefore now also include the operational
 evaluator surface; what is open is the actual semantics-preserving
@@ -441,8 +454,15 @@ should be its own commit:
   (`(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
   fn.fragmentValid`) plus paper-facing facade in `ProofGrade.lean`
   (commit `08f669a`).
+- *(landed)* WP4 status / handoff status update for W4.3 theorem
+  (commit `94ba337`).
+- *(landed)* W4.1+ evaluator coverage extension
+  (`Statement.{ifStmt,forLoop,arraySet,mapPut}` and
+  `Expr.arrayGet`, commit `9f0e45e`).
 - *(next)* W4.4 IR-to-kernel correctness theorem (or W4.2 source-
-  to-IR if strict deliverable order is preferred).
+  to-IR if strict deliverable order is preferred; or extend the
+  evaluator further with `Value.map` + Keccak model to close the
+  last two `unsupported` cases).
 - Source-to-IR lowering theorem (W4.2, probably split into
   expression-level, statement-level, function-level).
 - IR-to-kernel lowering theorem (W4.4, likely split per kernel-DSL
