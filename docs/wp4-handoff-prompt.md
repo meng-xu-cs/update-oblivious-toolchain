@@ -24,11 +24,14 @@ Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
 lemma re-statement against the new evaluator), **W4.3** (the
 full confidential-fragment characterization theorem
 `(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
-fn.fragmentValid = true` plus paper-facing facade), and **W4.1+**
+fn.fragmentValid = true` plus paper-facing facade), **W4.1+**
 (evaluator coverage extension to
-`Statement.{ifStmt,forLoop,arraySet,mapPut}` and `Expr.arrayGet`)
-are landed as commits `6e234df`, `267dc89`, `63cdd36`, `4f30757`,
-`5ef3bdd`, `08f669a`, `94ba337`, and `9f0e45e`.
+`Statement.{ifStmt,forLoop,arraySet,mapPut}` and `Expr.arrayGet`),
+and **W4.1++** (`Value.map` + `Value.beq` + `Value.keccak256Mock`,
+plus `Expr.{mapGet,keccak256}` evaluator handling) are landed as
+commits `6e234df`, `267dc89`, `63cdd36`, `4f30757`, `5ef3bdd`,
+`08f669a`, `94ba337`, `9f0e45e`, `5d79540`, and `2a6aa8b`. The W4.1
+evaluator is now total over the structural admitted fragment.
 
 ## First, Read These Files In This Exact Order
 

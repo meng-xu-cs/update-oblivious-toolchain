@@ -96,13 +96,21 @@ Subtasks **W4.1**, **W4.1b**, **W4.3 (full theorem)**, and **W4.1+
   `evalContract` now handles `Statement.{ifStmt,forLoop,arraySet,
   mapPut}` (statement evaluator restructured into a single `mutual`
   block with `evalBody` and a new `evalForLoop` helper) and
-  `Expr.arrayGet` (using `Value.array` storage indexing). The
-  remaining unsupported set is `Expr.{mapGet,keccak256}` (need
-  value-model extensions: a `Value.map` variant and a Keccak hash
-  model) and `Expr.{structField,arrayIndex}` (forbidden by
-  `Expr.fragmentValid` and never in an accepted IR program). The
-  W4.1+ extension means the evaluator's coverage now matches the
-  structural admitted fragment except for the two value-model gaps.
+  `Expr.arrayGet` (using `Value.array` storage indexing).
+- W4.1++ landing in `IRSyntax.lean` and `IRSemantics.lean` closes
+  the last value-model gaps:
+  `Value.map (entries : List (Value × Value))` constructor added;
+  manual structural `Value.beq` (with `beqList` /
+  `beqStructFields` / `beqMapEntries` mutual companions, plus a
+  `BEq Value` instance and a `Value.mapLookup` helper) handles
+  value equality without depending on `deriving BEq`;
+  `Value.keccak256Mock` provides a deterministic placeholder for
+  Keccak-256. `evalExpr` now handles `Expr.mapGet` (lookup
+  `Value.map` entries by key) and `Expr.keccak256` (evaluate parts,
+  apply the mock). The W4.1 evaluator is now total over the
+  structural admitted fragment; the only `unsupported` constructors
+  are `Expr.{structField,arrayIndex}`, which `Expr.fragmentValid`
+  already rejects.
 
 The WP4 entry conditions therefore now also include the operational
 evaluator surface; what is open is the actual semantics-preserving
@@ -459,10 +467,14 @@ should be its own commit:
 - *(landed)* W4.1+ evaluator coverage extension
   (`Statement.{ifStmt,forLoop,arraySet,mapPut}` and
   `Expr.arrayGet`, commit `9f0e45e`).
+- *(landed)* WP4 status / handoff status update for W4.1+
+  (commit `5d79540`).
+- *(landed)* W4.1++ evaluator value-model gaps closed
+  (`Value.map`, `Value.beq`, `Value.mapLookup`,
+  `Value.keccak256Mock`, `Expr.{mapGet,keccak256}`,
+  commit `2a6aa8b`).
 - *(next)* W4.4 IR-to-kernel correctness theorem (or W4.2 source-
-  to-IR if strict deliverable order is preferred; or extend the
-  evaluator further with `Value.map` + Keccak model to close the
-  last two `unsupported` cases).
+  to-IR if strict deliverable order is preferred).
 - Source-to-IR lowering theorem (W4.2, probably split into
   expression-level, statement-level, function-level).
 - IR-to-kernel lowering theorem (W4.4, likely split per kernel-DSL

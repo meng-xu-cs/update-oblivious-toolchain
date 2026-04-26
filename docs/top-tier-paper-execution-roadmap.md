@@ -1615,18 +1615,28 @@ Current status update:
   `Statement.{ifStmt,forLoop,arraySet,mapPut}` and
   `Expr.arrayGet`, with `evalStatement`/`evalBody`/`evalForLoop` in a
   single `mutual` block so that `ifStmt` / `forLoop` can recurse into
-  nested statement bodies. The remaining unsupported set is
-  `Expr.{mapGet,keccak256}` (need value-model extensions: a
-  `Value.map` variant and a Keccak hash model) and
-  `Expr.{structField,arrayIndex}` (forbidden by `Expr.fragmentValid`
-  and therefore never in an accepted IR program). The evaluator
-  coverage now matches the structural admitted fragment except for
-  the two value-model gaps.
+  nested statement bodies.
+- Subtask W4.1++ (evaluator value-model gaps closed) landed (commit
+  `2a6aa8b`,
+  [proof/lean/UOToolchain/IRSyntax.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/IRSyntax.lean)
+  and `IRSemantics.lean`): `Value.map (entries : List (Value × Value))`
+  added, plus a manual `Value.beq` (with mutual companions
+  `beqList` / `beqStructFields` / `beqMapEntries`) registered as a
+  `BEq Value` instance, plus `Value.mapLookup` and a deterministic
+  `Value.keccak256Mock` placeholder. `evalExpr` now handles
+  `Expr.mapGet` (search `Value.map` entries by key) and
+  `Expr.keccak256` (evaluate parts in order, apply the mock). The
+  W4.1 evaluator is now total over the structural admitted fragment;
+  the only `unsupported` constructors are `Expr.{structField,
+  arrayIndex}`, which `Expr.fragmentValid` already rejects.
 - Still open: the *real* source-to-IR correctness theorem (W4.2),
   the IR-to-kernel correctness theorem (W4.4), the manifest-
-  exactness semantics-preserving lift (W4.5), the direct
-  artifact checker demotion (W4.6), and the value-model extensions
-  needed to cover `Expr.{mapGet,keccak256}` in the evaluator.
+  exactness semantics-preserving lift (W4.5), and the direct
+  artifact checker demotion (W4.6). The evaluator's `cellSet` /
+  `arraySet` / `mapPut` cases currently track the kernel step but
+  don't actually update the store; threading store updates through
+  `evalStatement` is a separate refactor (the predicate-driven
+  masked-store semantics is non-trivial and is bundled with W4.4).
 
 Exit gate:
 
