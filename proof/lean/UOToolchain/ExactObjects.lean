@@ -5,19 +5,19 @@ namespace UOToolchain
 def exactBackend (backend : String) : Prop :=
   backend = "uocell" ∨ backend = "uoarray" ∨ backend = "full_scan"
 
-def ExactUO (run : Semantics) : Prop :=
+def ExactUO (run : TraceSemantics) : Prop :=
   ∀ cfg₁ cfg₂, samePublicProjection cfg₁ cfg₂ → viewMPlus (run cfg₁) = viewMPlus (run cfg₂)
 
-def ExactUOFamily : List Semantics → Prop
+def ExactUOFamily : List TraceSemantics → Prop
   | [] => True
   | run :: runs => ExactUO run ∧ ExactUOFamily runs
 
-def composeExactRuns : List Semantics → Semantics
+def composeExactRuns : List TraceSemantics → TraceSemantics
   | [] => fun _ => Trace.empty
   | run :: runs => fun cfg => Trace.append (run cfg) (composeExactRuns runs cfg)
 
 theorem exactObjectTheorem
-  (run : Semantics)
+  (run : TraceSemantics)
   (hExact : ExactUO run)
   (cfg₁ cfg₂ : Config) :
   samePublicProjection cfg₁ cfg₂ →
@@ -29,7 +29,7 @@ theorem exactUO_empty : ExactUO (fun _ => Trace.empty) := by
   intro cfg₁ cfg₂ _hPublic
   simp
 
-theorem exactUO_append {lhs rhs : Semantics}
+theorem exactUO_append {lhs rhs : TraceSemantics}
   (hLhs : ExactUO lhs)
   (hRhs : ExactUO rhs) :
   ExactUO (fun cfg => Trace.append (lhs cfg) (rhs cfg)) := by
@@ -40,7 +40,7 @@ theorem exactUO_append {lhs rhs : Semantics}
     viewMPlus_injective (hRhs cfg₁ cfg₂ hPublic)
   simp [hLhsTrace, hRhsTrace]
 
-theorem exactUO_compose : ∀ {runs : List Semantics}, ExactUOFamily runs → ExactUO (composeExactRuns runs)
+theorem exactUO_compose : ∀ {runs : List TraceSemantics}, ExactUOFamily runs → ExactUO (composeExactRuns runs)
   | [], _ => exactUO_empty
   | run :: runs, hFamily =>
       let hRun : ExactUO run := hFamily.left

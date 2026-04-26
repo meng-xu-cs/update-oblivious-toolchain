@@ -144,7 +144,7 @@ def PathOramLocalPosmapV1PaperTheoremBoundary
 
 def PathOramLocalPosmapV1ArtifactPaperMainBoundary
   {modelTags : SGXModelTags}
-  (runs : List Semantics)
+  (runs : List TraceSemantics)
   (manifest : ManifestWitness)
   (bundle : SeededRuntimePaperMainBundle modelTags)
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
@@ -482,7 +482,7 @@ theorem pathOramLocalPosmapV1_paperMain_jointSecurity_projects_to_sgxExecution
 
 theorem pathOramLocalPosmapV1_artifactPaperMainBoundary
   {modelTags : SGXModelTags}
-  (runs : List Semantics)
+  (runs : List TraceSemantics)
   (manifest : ManifestWitness)
   (bundle : SeededRuntimePaperMainBundle modelTags)
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions)

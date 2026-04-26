@@ -42,7 +42,7 @@ theorem legacyComputationalUO_projects_to_teeStorage
       hOutputShape
 
 abbrev legacyTEEStorageSecurity
-  (exactRun : Semantics)
+  (exactRun : TraceSemantics)
   (exactTermination : Config → Bool)
   (exactOutputShape : Config → OutputShape)
   (oramRun : OramSemantics)
@@ -58,7 +58,7 @@ abbrev legacyTEEStorageSecurity
     oramOutputShape
 
 theorem artifactSecurity_projects_to_teeStorage
-  {exactRun : Semantics}
+  {exactRun : TraceSemantics}
   {exactTermination : Config → Bool}
   {exactOutputShape : Config → OutputShape}
   {oramRun : OramSemantics}

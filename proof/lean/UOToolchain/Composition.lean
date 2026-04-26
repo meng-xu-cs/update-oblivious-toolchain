@@ -4,41 +4,41 @@ import UOToolchain.OramModel
 
 namespace UOToolchain
 
-def withPublicGas (run : Semantics) (budget : Nat) : Semantics :=
+def withPublicGas (run : TraceSemantics) (budget : Nat) : TraceSemantics :=
   fun cfg =>
     { (run cfg) with gasUsed := budget }
 
-def exactEntrypointSemantics (runs : List Semantics) (manifest : ManifestWitness) : Semantics :=
+def exactEntrypointSemantics (runs : List TraceSemantics) (manifest : ManifestWitness) : TraceSemantics :=
   withPublicGas (composeExactRuns runs) manifest.publicGasBudget
 
 def ArtifactSecurityWith
   (security : OramSecurityInterface)
-  (exactRun : Semantics)
+  (exactRun : TraceSemantics)
   (oramRun : OramSemantics) : Prop :=
   ExactUO exactRun ∧ ComputationalUOWith security oramRun
 
-theorem exactUO_withPublicGas {run : Semantics} {budget : Nat}
+theorem exactUO_withPublicGas {run : TraceSemantics} {budget : Nat}
   (hExact : ExactUO run) :
   ExactUO (withPublicGas run budget) := by
   intro cfg₁ cfg₂ hPublic
   exact viewMPlus_overwriteGas (budget := budget) (hExact cfg₁ cfg₂ hPublic)
 
 theorem exactEntrypointPublicGasSafe
-  (runs : List Semantics)
+  (runs : List TraceSemantics)
   (manifest : ManifestWitness) :
   PublicGasSafe (exactEntrypointSemantics runs manifest) manifest := by
   intro cfg
   simp [exactEntrypointSemantics, withPublicGas]
 
 theorem compositionTheorem
-  (runs : List Semantics)
+  (runs : List TraceSemantics)
   (manifest : ManifestWitness)
   (hRuns : ExactUOFamily runs) :
   ExactUO (exactEntrypointSemantics runs manifest) := by
   exact exactUO_withPublicGas (exactUO_compose hRuns)
 
 theorem compositionGasTheorem
-  (runs : List Semantics)
+  (runs : List TraceSemantics)
   (manifest : ManifestWitness)
   (cfg₁ cfg₂ : Config) :
   samePublicProjection cfg₁ cfg₂ →
@@ -55,7 +55,7 @@ theorem compositionGasTheorem
 
 theorem mixedArtifactCompositionWith
   (security : OramSecurityInterface)
-  (runs : List Semantics)
+  (runs : List TraceSemantics)
   (manifest : ManifestWitness)
   (hRuns : ExactUOFamily runs)
   (oramRun : OramSemantics)

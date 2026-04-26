@@ -34,7 +34,7 @@ def sgxViewOfTrace
   }
 
 def exactToSGXSemantics
-  (run : Semantics)
+  (run : TraceSemantics)
   (publicOutcome : Config → SGXPublicOutcome)
   (boundarySchedule : Config → List BoundaryEvent)
   (microTrace : Config → SGXMicroTrace) :
@@ -92,7 +92,7 @@ theorem exactControllerMicroTrace_public
   exact hController cfg₁ cfg₂ hPublic
 
 theorem exactControllerMicroDistribution_normalized
-  {run : Semantics}
+  {run : TraceSemantics}
   {publicOutcome : Config → SGXPublicOutcome}
   {boundarySchedule : Config → List BoundaryEvent}
   {controllerShape : Config → SGXControllerShape}
@@ -116,7 +116,7 @@ theorem exactControllerMicroDistribution_normalized
       (controllerShape cfg)
 
 theorem exactUO_projects_to_sgxExecution
-  {run : Semantics}
+  {run : TraceSemantics}
   {publicOutcome : Config → SGXPublicOutcome}
   {boundarySchedule : Config → List BoundaryEvent}
   {controllerShape : Config → SGXControllerShape}
@@ -151,7 +151,7 @@ theorem exactUO_projects_to_sgxExecution
     exactSGXViewRelation_of_singleton_eq hView [] (exactMicroLeakage publicOutcome controllerShape modelTags cfg₁)
 
 theorem exactUO_projects_to_sgxExecution_with_normalizedController
-  {run : Semantics}
+  {run : TraceSemantics}
   {publicOutcome : Config → SGXPublicOutcome}
   {boundarySchedule : Config → List BoundaryEvent}
   {controllerShape : Config → SGXControllerShape}
@@ -261,7 +261,7 @@ theorem exactUO_projects_to_sgxExecution_with_normalizedController
 /-- Paper-facing main theorem profile:
 exact public boundary schedule plus normalized SGX micro observer. -/
 theorem paperMain_exactUO_projects_to_sgxExecution
-  {run : Semantics}
+  {run : TraceSemantics}
   {publicOutcome : Config → SGXPublicOutcome}
   {boundarySchedule : Config → List BoundaryEvent}
   {controllerShape : Config → SGXControllerShape}

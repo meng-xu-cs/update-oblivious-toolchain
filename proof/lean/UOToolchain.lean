@@ -1,5 +1,6 @@
 import UOToolchain.TraceModel
 import UOToolchain.FiniteDistribution
+import UOToolchain.IRSyntax
 import UOToolchain.IRSemantics
 import UOToolchain.ExactObjects
 import UOToolchain.CompilerInvariant

@@ -3,11 +3,11 @@ import UOToolchain.OramGame
 
 namespace UOToolchain
 
-abbrev legacyArtifactSecurity (exactRun : Semantics) (oramRun : OramSemantics) : Prop :=
+abbrev legacyArtifactSecurity (exactRun : TraceSemantics) (oramRun : OramSemantics) : Prop :=
   ArtifactSecurityWith legacyOramSecurityInterface exactRun oramRun
 
 theorem legacyMixedArtifactComposition
-  (runs : List Semantics)
+  (runs : List TraceSemantics)
   (manifest : ManifestWitness)
   (hRuns : ExactUOFamily runs)
   (oramRun : OramSemantics)

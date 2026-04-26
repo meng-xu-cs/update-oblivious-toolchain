@@ -26,7 +26,7 @@ deriving Repr, DecidableEq
 abbrev DeploymentSemantics := Config → DeploymentResult
 
 def withPublicBoundary
-  (run : Semantics)
+  (run : TraceSemantics)
   (termination : Config → Bool)
   (outputShape : Config → OutputShape) : DeploymentSemantics :=
   fun cfg =>
@@ -59,10 +59,10 @@ def ExactTEEStorageOblivious (run : DeploymentSemantics) : Prop :=
 theorem samePublicProjection_entrypoint_eq {lhs rhs : Config} :
     samePublicProjection lhs rhs → lhs.program.entrypoint = rhs.program.entrypoint := by
   intro h
-  exact congrArg Program.entrypoint (samePublicProjection_program_eq h)
+  exact congrArg TraceProgram.entrypoint (samePublicProjection_program_eq h)
 
 theorem exactUO_projects_to_teeStorage
-  {run : Semantics}
+  {run : TraceSemantics}
   {termination : Config → Bool}
   {outputShape : Config → OutputShape}
   (hExact : ExactUO run)
@@ -179,7 +179,7 @@ theorem computationalUOWith_projects_to_teeStorage
 
 def TEEStorageSecurityWith
   (security : OramSecurityInterface)
-  (exactRun : Semantics)
+  (exactRun : TraceSemantics)
   (exactTermination : Config → Bool)
   (exactOutputShape : Config → OutputShape)
   (oramRun : OramSemantics)
@@ -190,7 +190,7 @@ def TEEStorageSecurityWith
 
 theorem artifactSecurityWith_projects_to_teeStorage
   (security : OramSecurityInterface)
-  {exactRun : Semantics}
+  {exactRun : TraceSemantics}
   {exactTermination : Config → Bool}
   {exactOutputShape : Config → OutputShape}
   {oramRun : OramSemantics}
