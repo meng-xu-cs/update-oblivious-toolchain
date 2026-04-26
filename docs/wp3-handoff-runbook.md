@@ -103,6 +103,17 @@ This checkpoint completed:
   non-failed state stays non-failed when validation and install both succeed
   for the running buffers (and admission also succeeds for bucket-blocks).
   These match the runtime's per-block `?` propagation pattern.
+- Fold-level non-failure preservation: the recursive well-formedness
+  predicates `StashWellFormedFrom` and `BucketBlocksWellFormedFrom` thread
+  per-block validation, install, and admission hypotheses through the list
+  against the running reconstruction state. From these the helper layer
+  proves
+  `reconstructPathBlocks_preservesNonFailure_of_wellFormed`,
+  `reconstructPathBucketBlocks_preservesNonFailure_of_wellFormed`,
+  `reconstructPathDecodedBucketsState_preservesNonFailure`, and
+  `reconstructPathDecodedBucketsListState_preservesNonFailure`, giving the
+  runtime "well-formed input → reconstruction does not fail" at every fold
+  level.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,
@@ -178,13 +189,13 @@ checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
 Recommended next steps:
 
-1. Lift the per-step non-failure preservation to the fold level: introduce a
-   well-formedness predicate
-   `reconstructPathBlocksWellFormed state blocks` (resp.
-   `reconstructPathBucketBlocksWellFormed state bucketBlocks`) that recursively
-   asks for validation+install (and admission) success at the running
-   reconstruction state, and prove the corresponding fold-level
-   `*_preservesNonFailure_of_wellFormed` theorems by induction on the list.
+1. Pair the fold-level non-failure preservation with a final-coverage success
+   theorem. Right now the helper layer proves the fold doesn't fail under
+   well-formed input but doesn't directly tie that to
+   `liveSlotCoverageFailed = false`. A dedicated predicate connecting
+   well-formed input + position-map coverage hypothesis to
+   `reconstructPathDecodedBucketsListFailed = false` would close the
+   end-to-end "successful reconstruction" theorem at the helper layer.
 2. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.

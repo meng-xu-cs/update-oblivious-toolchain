@@ -2111,6 +2111,24 @@ If implementation resumes immediately, the next concrete sequence should be:
    `oram_helper_reconstruct_path_block_step_preserves_non_failure_theorem_checked`
    and
    `oram_helper_reconstruct_path_bucket_block_step_preserves_non_failure_admitted_theorem_checked`.
+   That preservation is now lifted to the fold level through the recursive
+   well-formedness predicates `StashWellFormedFrom` and
+   `BucketBlocksWellFormedFrom`, which thread per-block validation, install,
+   and admission hypotheses through the list against the running
+   reconstruction state. The fold-level success theorems
+   `reconstructPathBlocks_preservesNonFailure_of_wellFormed`,
+   `reconstructPathBucketBlocks_preservesNonFailure_of_wellFormed`,
+   `reconstructPathDecodedBucketsState_preservesNonFailure`, and
+   `reconstructPathDecodedBucketsListState_preservesNonFailure` give the
+   runtime a clean "well-formed input → reconstruction does not fail" shell
+   at every level. These bits land at every layer as
+   `oram_helper_stash_well_formed_from_nil_theorem_checked`,
+   `oram_helper_bucket_blocks_well_formed_from_nil_theorem_checked`,
+   `oram_helper_reconstruct_path_blocks_preserves_non_failure_of_well_formed_theorem_checked`,
+   `oram_helper_reconstruct_path_bucket_blocks_preserves_non_failure_of_well_formed_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_state_preserves_non_failure_theorem_checked`,
+   and
+   `oram_helper_reconstruct_path_decoded_buckets_list_state_preserves_non_failure_theorem_checked`.
    Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,

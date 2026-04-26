@@ -3122,6 +3122,146 @@ theorem reconstructPathBucketBlockStep_preservesNonFailure_admitted
   exact reconstructPathBlockStep_preservesNonFailure
     hState hValidation hInstall
 
+/-! ### Fold-level well-formedness and non-failure preservation -/
+
+def StashWellFormedFrom
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ReconstructionState → List StashBlock → Prop
+  | _, [] => True
+  | state, block :: blocks =>
+      livePathBlockValidationFailed capacity leafCount positionMap
+          state.liveSlots block = false ∧
+      installPathEntryFailed state.entries block = false ∧
+      StashWellFormedFrom capacity leafCount positionMap
+        (reconstructPathBlockStep capacity leafCount positionMap state block)
+        blocks
+
+def BucketBlocksWellFormedFrom
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ReconstructionState → List BucketBlock → Prop
+  | _, [] => True
+  | state, bucketBlock :: bucketBlocks =>
+      bucketBlockAdmissionFailed leafCount bucketBlock = false ∧
+      livePathBlockValidationFailed capacity leafCount positionMap
+          state.liveSlots bucketBlock.block = false ∧
+      installPathEntryFailed state.entries bucketBlock.block = false ∧
+      BucketBlocksWellFormedFrom capacity leafCount positionMap
+        (reconstructPathBucketBlockStep capacity leafCount positionMap state
+          bucketBlock)
+        bucketBlocks
+
+theorem stashWellFormedFrom_nil
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState) :
+    StashWellFormedFrom capacity leafCount positionMap state [] := by
+  trivial
+
+theorem bucketBlocksWellFormedFrom_nil
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (state : ReconstructionState) :
+    BucketBlocksWellFormedFrom capacity leafCount positionMap state [] := by
+  trivial
+
+theorem reconstructPathBlocks_preservesNonFailure_of_wellFormed
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState) (blocks : List StashBlock),
+      state.failed = false →
+      StashWellFormedFrom capacity leafCount positionMap state blocks →
+      (reconstructPathBlocks capacity leafCount positionMap state
+          blocks).failed = false := by
+  intro state blocks
+  induction blocks generalizing state with
+  | nil =>
+      intro hState _hWellFormed
+      rcases state with ⟨_, _, _⟩
+      simp at hState
+      simp [reconstructPathBlocks, hState]
+  | cons block blocks ih =>
+      intro hState hWellFormed
+      rcases hWellFormed with ⟨hValidation, hInstall, hRest⟩
+      have hStepFailed :=
+        reconstructPathBlockStep_preservesNonFailure
+          hState hValidation hInstall
+      rw [reconstructPathBlocks_cons]
+      exact ih _ hStepFailed hRest
+
+theorem reconstructPathBucketBlocks_preservesNonFailure_of_wellFormed
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption) :
+    ∀ (state : ReconstructionState) (bucketBlocks : List BucketBlock),
+      state.failed = false →
+      BucketBlocksWellFormedFrom capacity leafCount positionMap state
+        bucketBlocks →
+      (reconstructPathBucketBlocks capacity leafCount positionMap state
+          bucketBlocks).failed = false := by
+  intro state bucketBlocks
+  induction bucketBlocks generalizing state with
+  | nil =>
+      intro hState _hWellFormed
+      rcases state with ⟨_, _, _⟩
+      simp at hState
+      simp [reconstructPathBucketBlocks, hState]
+  | cons bb tail ih =>
+      intro hState hWellFormed
+      rcases hWellFormed with ⟨hAdmission, hValidation, hInstall, hRest⟩
+      have hStepFailed :=
+        reconstructPathBucketBlockStep_preservesNonFailure_admitted
+          hState hAdmission hValidation hInstall
+      rw [reconstructPathBucketBlocks_cons]
+      exact ih _ hStepFailed hRest
+
+theorem reconstructPathDecodedBucketsState_preservesNonFailure
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (bucketBlocks : List BucketBlock)
+    (hStashWellFormed :
+      StashWellFormedFrom capacity leafCount positionMap
+        (initialReconstructionState capacity) stashBlocks)
+    (hBucketWellFormed :
+      BucketBlocksWellFormedFrom capacity leafCount positionMap
+        (reconstructPathBlocks capacity leafCount positionMap
+          (initialReconstructionState capacity) stashBlocks)
+        bucketBlocks) :
+    (reconstructPathDecodedBucketsState capacity leafCount positionMap
+        stashBlocks bucketBlocks).failed = false := by
+  unfold reconstructPathDecodedBucketsState
+  have hStashFailed :=
+    reconstructPathBlocks_preservesNonFailure_of_wellFormed
+      capacity leafCount positionMap
+      (initialReconstructionState capacity) stashBlocks
+      (initialReconstructionState_failed capacity)
+      hStashWellFormed
+  exact reconstructPathBucketBlocks_preservesNonFailure_of_wellFormed
+    capacity leafCount positionMap _ bucketBlocks
+    hStashFailed hBucketWellFormed
+
+theorem reconstructPathDecodedBucketsListState_preservesNonFailure
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket)
+    (hStashWellFormed :
+      StashWellFormedFrom capacity leafCount positionMap
+        (initialReconstructionState capacity) stashBlocks)
+    (hBucketWellFormed :
+      BucketBlocksWellFormedFrom capacity leafCount positionMap
+        (reconstructPathBlocks capacity leafCount positionMap
+          (initialReconstructionState capacity) stashBlocks)
+        (bucketBlocksOfDecodedBuckets decodedBuckets)) :
+    (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+        stashBlocks decodedBuckets).failed = false := by
+  unfold reconstructPathDecodedBucketsListState
+  exact reconstructPathDecodedBucketsState_preservesNonFailure
+    capacity leafCount positionMap stashBlocks
+    (bucketBlocksOfDecodedBuckets decodedBuckets)
+    hStashWellFormed hBucketWellFormed
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain
