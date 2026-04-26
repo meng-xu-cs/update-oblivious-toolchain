@@ -824,6 +824,22 @@ JSON checker, and emitted as
 `oram_helper_reconstruct_path_decoded_buckets_state_bucket_blocks_of_codec_blocks_theorem_checked`,
 and
 `oram_helper_reconstruct_path_decoded_buckets_failed_bucket_blocks_of_codec_blocks_theorem_checked`.
+The bridge now also has higher-level composed forms that consume codec
+acceptance directly, so call sites do not need to restate `LiveOnBucketPath`:
+whenever path-bucket bytes decode through `decodePathBucketPathBoundedExact?`,
+`decodePathBucketPositionMapBoundedExact?`, or
+`decodePathBucketUniquePositionMapBoundedExact?`, the bucket-indexed
+reconstruction state and final failure predicate over the bridged bucket
+blocks coincide with the flat-list reconstruction over the bridged stash
+blocks. Those composed theorems are projected through the same layers and
+emitted as
+`oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_path_bounded_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_path_bounded_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_position_map_bounded_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_position_map_bounded_theorem_checked`,
+`oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_unique_position_map_bounded_theorem_checked`,
+and
+`oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
 The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it

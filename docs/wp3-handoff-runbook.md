@@ -65,6 +65,13 @@ This checkpoint completed:
   the bucket-indexed reconstruction; the bucket-indexed reconstruction state
   and final failure predicate over a decoded bucket payload coincide with the
   flat-list state and predicate over the bridged stash blocks.
+- Composed codec→helper bridge: when a decoded path bucket payload comes from
+  `decodePathBucketPathBoundedExact?`,
+  `decodePathBucketPositionMapBoundedExact?`, or
+  `decodePathBucketUniquePositionMapBoundedExact?`, the bucket-indexed
+  reconstruction state/failure on the bridged bucket-block list collapses to
+  the flat-list reconstruction state/failure on the bridged stash-block list
+  without restating `LiveOnBucketPath` at the call site.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,
@@ -122,35 +129,34 @@ Then run the validation slice above before editing. Do not rely on stale local
 mental state.
 
 The next best technical target is to continue the same shrink-and-prove pattern
-on the remaining Path-ORAM reconstruction and codec side. The codec-to-helper
-bridge has now landed: `bucketBlockOfCodecBlock`, `bucketBlocksOfCodecBlocks`,
+on the remaining Path-ORAM reconstruction and codec side. Both the bridge and
+the composed codec→helper forms have now landed:
+`bucketBlockOfCodecBlock`, `bucketBlocksOfCodecBlocks`,
 `bucketBlockAdmissionFailed_bridge_liveOnBucketPath`,
 `bucketBlocksOfCodecBlocks_admitted_of_liveOnBucketPath`,
 `reconstructPathBucketBlocks_eq_reconstructPathBlocks_of_admitted`,
 `reconstructPathBucketBlocks_bucketBlocksOfCodecBlocks`,
-`reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks`, and
-`reconstructPathDecodedBucketsFailed_bucketBlocksOfCodecBlocks` are now
-projected through the implementation interface, the imported JSON checker, and
-both the residual-helper-shell and direct machine-confinement boundary
+`reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks`,
+`reconstructPathDecodedBucketsFailed_bucketBlocksOfCodecBlocks`,
+`reconstructPathDecodedBucketsState_decodedPathBucket{Path,PositionMap,UniquePositionMap}Bounded`,
+and
+`reconstructPathDecodedBucketsFailed_decodedPathBucket{Path,PositionMap,UniquePositionMap}Bounded`
+are projected through the implementation interface, the imported JSON checker,
+and both the residual-helper-shell and direct machine-confinement boundary
 checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
 Recommended next steps:
 
-1. Strengthen the bridge by composing with the codec acceptance theorems
-   `decodePathBucketPathBoundedExact_some_shape` /
-   `decodePathBucketPositionMapBoundedExact_some_shape` /
-   `decodePathBucketUniquePositionMapBoundedExact_some_shape` so that
-   "the bytes for a path bucket decode" implies "the bridged bucket-block list
-   admits and reduces to the flat reconstruction" without restating
-   `LiveOnBucketPath` per call site.
-2. Model the exact runtime callback structure:
+1. Model the exact runtime callback structure:
    `with_opened_oram_payload` -> `decode_bucket_payload` -> per-block admission
    -> validation/update -> install. Tie each callback edge to the matching
-   bridge theorem.
-3. Move any remaining public-only but currently handwritten reconstruction
+   composed bridge theorem so the residual-helper-shell theorem chain reaches
+   "decoded path bucket bytes accept" as a single hypothesis at the runtime
+   boundary, not just at the helper layer.
+2. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.
-4. Extend the static drift suite to reject reintroduction of direct indexing,
+3. Extend the static drift suite to reject reintroduction of direct indexing,
    variable-size buffers, or secret-dependent control flow in those paths.
 
 ## End-To-End Completion Path

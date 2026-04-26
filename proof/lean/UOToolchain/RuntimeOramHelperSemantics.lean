@@ -2438,6 +2438,149 @@ theorem reconstructPathDecodedBucketsFailed_bucketBlocksOfCodecBlocks
   rw [reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks
     positionMap stashBlocks codecBlocks hLive]
 
+/-! ### Composed bridges over codec acceptance for path-ORAM bucket payloads -/
+
+theorem reconstructPathDecodedBucketsState_decodedPathBucketPathBounded
+    {capacity leafCount blocksPerBucket keyBytes valueBytes
+      expectedBucketIndex : Nat}
+    {bytes : List Nat}
+    {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+          blocksPerBucket keyBytes valueBytes expectedBucketIndex
+          capacity leafCount bytes = some payload)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock) :
+    reconstructPathDecodedBucketsState capacity leafCount positionMap
+        stashBlocks
+        (bucketBlocksOfCodecBlocks expectedBucketIndex payload.blocks) =
+      reconstructPathDecodedBlocksState capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks payload.blocks) := by
+  have hShape :=
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact_some_shape hDecode
+  have hLive : ∀ block, block ∈ payload.blocks →
+      block.LiveOnBucketPath leafCount expectedBucketIndex := by
+    intro block hMem
+    exact (hShape.2.2 block hMem).2.2
+  exact reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks
+    positionMap stashBlocks payload.blocks hLive
+
+theorem reconstructPathDecodedBucketsFailed_decodedPathBucketPathBounded
+    {capacity leafCount blocksPerBucket keyBytes valueBytes
+      expectedBucketIndex : Nat}
+    {bytes : List Nat}
+    {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+          blocksPerBucket keyBytes valueBytes expectedBucketIndex
+          capacity leafCount bytes = some payload)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock) :
+    reconstructPathDecodedBucketsFailed capacity leafCount positionMap
+        stashBlocks
+        (bucketBlocksOfCodecBlocks expectedBucketIndex payload.blocks) =
+      reconstructPathDecodedBlocksFailed capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks payload.blocks) := by
+  unfold reconstructPathDecodedBucketsFailed reconstructPathDecodedBlocksFailed
+  rw [reconstructPathDecodedBucketsState_decodedPathBucketPathBounded
+    hDecode positionMap stashBlocks]
+
+theorem reconstructPathDecodedBucketsState_decodedPathBucketPositionMapBounded
+    {capacity leafCount blocksPerBucket keyBytes valueBytes
+      expectedBucketIndex : Nat}
+    {positionMapEntries : List (Option Nat)}
+    {bytes : List Nat}
+    {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+          blocksPerBucket keyBytes valueBytes expectedBucketIndex
+          capacity leafCount positionMapEntries bytes = some payload)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock) :
+    reconstructPathDecodedBucketsState capacity leafCount positionMap
+        stashBlocks
+        (bucketBlocksOfCodecBlocks expectedBucketIndex payload.blocks) =
+      reconstructPathDecodedBlocksState capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks payload.blocks) := by
+  have hShape :=
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact_some_shape
+      hDecode
+  have hLive : ∀ block, block ∈ payload.blocks →
+      block.LiveOnBucketPath leafCount expectedBucketIndex := by
+    intro block hMem
+    exact (hShape.2.2 block hMem).2.2.1
+  exact reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks
+    positionMap stashBlocks payload.blocks hLive
+
+theorem reconstructPathDecodedBucketsFailed_decodedPathBucketPositionMapBounded
+    {capacity leafCount blocksPerBucket keyBytes valueBytes
+      expectedBucketIndex : Nat}
+    {positionMapEntries : List (Option Nat)}
+    {bytes : List Nat}
+    {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+          blocksPerBucket keyBytes valueBytes expectedBucketIndex
+          capacity leafCount positionMapEntries bytes = some payload)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock) :
+    reconstructPathDecodedBucketsFailed capacity leafCount positionMap
+        stashBlocks
+        (bucketBlocksOfCodecBlocks expectedBucketIndex payload.blocks) =
+      reconstructPathDecodedBlocksFailed capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks payload.blocks) := by
+  unfold reconstructPathDecodedBucketsFailed reconstructPathDecodedBlocksFailed
+  rw [reconstructPathDecodedBucketsState_decodedPathBucketPositionMapBounded
+    hDecode positionMap stashBlocks]
+
+theorem reconstructPathDecodedBucketsState_decodedPathBucketUniquePositionMapBounded
+    {capacity leafCount blocksPerBucket keyBytes valueBytes
+      expectedBucketIndex : Nat}
+    {positionMapEntries : List (Option Nat)}
+    {bytes : List Nat}
+    {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+          blocksPerBucket keyBytes valueBytes expectedBucketIndex
+          capacity leafCount positionMapEntries bytes = some payload)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock) :
+    reconstructPathDecodedBucketsState capacity leafCount positionMap
+        stashBlocks
+        (bucketBlocksOfCodecBlocks expectedBucketIndex payload.blocks) =
+      reconstructPathDecodedBlocksState capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks payload.blocks) := by
+  have hShape :=
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact_some_shape
+      hDecode
+  have hLive : ∀ block, block ∈ payload.blocks →
+      block.LiveOnBucketPath leafCount expectedBucketIndex := by
+    intro block hMem
+    exact (hShape.2.2.2 block hMem).2.2.1
+  exact reconstructPathDecodedBucketsState_bucketBlocksOfCodecBlocks
+    positionMap stashBlocks payload.blocks hLive
+
+theorem reconstructPathDecodedBucketsFailed_decodedPathBucketUniquePositionMapBounded
+    {capacity leafCount blocksPerBucket keyBytes valueBytes
+      expectedBucketIndex : Nat}
+    {positionMapEntries : List (Option Nat)}
+    {bytes : List Nat}
+    {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+    (hDecode :
+      RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+          blocksPerBucket keyBytes valueBytes expectedBucketIndex
+          capacity leafCount positionMapEntries bytes = some payload)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock) :
+    reconstructPathDecodedBucketsFailed capacity leafCount positionMap
+        stashBlocks
+        (bucketBlocksOfCodecBlocks expectedBucketIndex payload.blocks) =
+      reconstructPathDecodedBlocksFailed capacity leafCount positionMap
+        stashBlocks (stashBlocksOfCodecBlocks payload.blocks) := by
+  unfold reconstructPathDecodedBucketsFailed reconstructPathDecodedBlocksFailed
+  rw [reconstructPathDecodedBucketsState_decodedPathBucketUniquePositionMapBounded
+    hDecode positionMap stashBlocks]
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain

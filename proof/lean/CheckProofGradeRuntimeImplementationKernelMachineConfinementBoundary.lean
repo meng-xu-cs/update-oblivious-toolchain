@@ -1840,6 +1840,154 @@ theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsFailed
     importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsFailedBucketBlocksOfCodecBlocks
       hValid positionMap stashBlocks codecBlocks hLive
 
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsStateDecodedPathBucketPathBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount blocksPerBucket keyBytes valueBytes
+    expectedBucketIndex : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount bytes = some payload)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks
+        expectedBucketIndex payload.blocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks payload.blocks) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsStateDecodedPathBucketPathBounded
+      hValid hDecode positionMap stashBlocks
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsFailedDecodedPathBucketPathBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount blocksPerBucket keyBytes valueBytes
+    expectedBucketIndex : Nat}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPathBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount bytes = some payload)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks
+        expectedBucketIndex payload.blocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks payload.blocks) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsFailedDecodedPathBucketPathBounded
+      hValid hDecode positionMap stashBlocks
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsStateDecodedPathBucketPositionMapBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount blocksPerBucket keyBytes valueBytes
+    expectedBucketIndex : Nat}
+  {positionMapEntries : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMapEntries bytes = some payload)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks
+        expectedBucketIndex payload.blocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks payload.blocks) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsStateDecodedPathBucketPositionMapBounded
+      hValid hDecode positionMap stashBlocks
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsFailedDecodedPathBucketPositionMapBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount blocksPerBucket keyBytes valueBytes
+    expectedBucketIndex : Nat}
+  {positionMapEntries : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketPositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMapEntries bytes = some payload)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks
+        expectedBucketIndex payload.blocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks payload.blocks) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsFailedDecodedPathBucketPositionMapBounded
+      hValid hDecode positionMap stashBlocks
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsStateDecodedPathBucketUniquePositionMapBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount blocksPerBucket keyBytes valueBytes
+    expectedBucketIndex : Nat}
+  {positionMapEntries : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMapEntries bytes = some payload)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks
+        expectedBucketIndex payload.blocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksState
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks payload.blocks) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsStateDecodedPathBucketUniquePositionMapBounded
+      hValid hDecode positionMap stashBlocks
+
+theorem importedBoundaryPaperNativeOramHelperReconstructPathDecodedBucketsFailedDecodedPathBucketUniquePositionMapBounded
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {capacity leafCount blocksPerBucket keyBytes valueBytes
+    expectedBucketIndex : Nat}
+  {positionMapEntries : List (Option Nat)}
+  {bytes : List Nat}
+  {payload : RuntimeOramCodecSemantics.DecodedBucketPayload}
+  (hDecode :
+    RuntimeOramCodecSemantics.decodePathBucketUniquePositionMapBoundedExact?
+        blocksPerBucket keyBytes valueBytes expectedBucketIndex
+        capacity leafCount positionMapEntries bytes = some payload)
+  (positionMap : List RuntimeOramHelperSemantics.MaskedUsizeOption)
+  (stashBlocks : List RuntimeOramHelperSemantics.StashBlock) :
+  RuntimeOramHelperSemantics.reconstructPathDecodedBucketsFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.bucketBlocksOfCodecBlocks
+        expectedBucketIndex payload.blocks) =
+    RuntimeOramHelperSemantics.reconstructPathDecodedBlocksFailed
+      capacity leafCount positionMap stashBlocks
+      (RuntimeOramHelperSemantics.stashBlocksOfCodecBlocks payload.blocks) := by
+  exact
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_oramHelperReconstructPathDecodedBucketsFailedDecodedPathBucketUniquePositionMapBounded
+      hValid hDecode positionMap stashBlocks
+
 theorem importedBoundaryPaperNativeOramHelperWorkingStashCapacityFormula
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)

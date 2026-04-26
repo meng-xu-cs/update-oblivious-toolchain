@@ -2032,6 +2032,22 @@ If implementation resumes immediately, the next concrete sequence should be:
    `oram_helper_reconstruct_path_decoded_buckets_state_bucket_blocks_of_codec_blocks_theorem_checked`,
    and
    `oram_helper_reconstruct_path_decoded_buckets_failed_bucket_blocks_of_codec_blocks_theorem_checked`.
+   The bridge now also composes directly with the codec acceptance theorems
+   `decodePathBucketPathBoundedExact_some_shape`,
+   `decodePathBucketPositionMapBoundedExact_some_shape`, and
+   `decodePathBucketUniquePositionMapBoundedExact_some_shape`, so once
+   path-bucket bytes decode through any of those exact-decoders the
+   bucket-indexed reconstruction state and final failure predicate over the
+   bridged bucket blocks already coincide with the flat-list reconstruction
+   over the bridged stash blocks without restating `LiveOnBucketPath` per
+   call site. Those composed theorems land at every layer and are emitted as
+   `oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_path_bounded_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_path_bounded_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_position_map_bounded_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_position_map_bounded_theorem_checked`,
+   `oram_helper_reconstruct_path_decoded_buckets_state_decoded_path_bucket_unique_position_map_bounded_theorem_checked`,
+   and
+   `oram_helper_reconstruct_path_decoded_buckets_failed_decoded_path_bucket_unique_position_map_bounded_theorem_checked`.
    Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,
