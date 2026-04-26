@@ -114,6 +114,11 @@ This checkpoint completed:
   `reconstructPathDecodedBucketsListState_preservesNonFailure`, giving the
   runtime "well-formed input → reconstruction does not fail" at every fold
   level.
+- End-to-end reconstruction success: pairing well-formed input with the
+  coverage hypothesis closes the helper-layer accept condition for the
+  entire `for index in 0..bucket_count` fold:
+  `reconstructPathDecodedBucketsFailed_success_of_wellFormed` and
+  `reconstructPathDecodedBucketsListFailed_success_of_wellFormed`.
 - Projection of the new bucket-indexed checkpoint and codec-to-helper bridge
   through:
   `RuntimeImplementationInterface`,
@@ -189,13 +194,16 @@ checkers, with corresponding `*_theorem_checked` bits in the probe reports.
 
 Recommended next steps:
 
-1. Pair the fold-level non-failure preservation with a final-coverage success
-   theorem. Right now the helper layer proves the fold doesn't fail under
-   well-formed input but doesn't directly tie that to
-   `liveSlotCoverageFailed = false`. A dedicated predicate connecting
-   well-formed input + position-map coverage hypothesis to
-   `reconstructPathDecodedBucketsListFailed = false` would close the
-   end-to-end "successful reconstruction" theorem at the helper layer.
+1. Tighten the well-formedness predicates against the codec acceptance side:
+   for each `DecodedBucket b` produced by `decodePathBucket{Path,
+   PositionMap, UniquePositionMap}BoundedExact?`, derive
+   `bucketBlockAdmissionFailed = false` automatically from the codec
+   `LiveOnBucketPath` fact already proved. The current
+   `BucketBlocksWellFormedFrom` predicate accepts admission as a separate
+   hypothesis; the next step is a higher-level theorem that combines
+   `decodedBucket_liveOnBucketPath_of_decodedPathBucket{...}Bounded` with
+   `bucketBlockAdmissionFailed_bridge_liveOnBucketPath` per bucket so the
+   user only needs validation+install hypotheses for each block.
 2. Move any remaining public-only but currently handwritten reconstruction
    loops into generated Lean-backed helpers if the code still does meaningful
    work over decoded confidential payloads outside the helper model.

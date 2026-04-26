@@ -2129,6 +2129,15 @@ If implementation resumes immediately, the next concrete sequence should be:
    `oram_helper_reconstruct_path_decoded_buckets_state_preserves_non_failure_theorem_checked`,
    and
    `oram_helper_reconstruct_path_decoded_buckets_list_state_preserves_non_failure_theorem_checked`.
+   Combining well-formed input with the position-map coverage hypothesis
+   closes the end-to-end "successful reconstruction" theorem at the helper
+   layer: `reconstructPathDecodedBucketsFailed_success_of_wellFormed` and
+   `reconstructPathDecodedBucketsListFailed_success_of_wellFormed` give the
+   runtime its accept condition for the entire `for index in 0..bucket_count`
+   fold. The bits land at every layer as
+   `oram_helper_reconstruct_path_decoded_buckets_failed_success_of_well_formed_theorem_checked`
+   and
+   `oram_helper_reconstruct_path_decoded_buckets_list_failed_success_of_well_formed_theorem_checked`.
    Public metadata,
    bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
    live-slot-buffer drift is therefore rejected before any unchecked page,

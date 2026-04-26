@@ -926,6 +926,18 @@ shell theorem at every fold level. The bits land at every layer as
 `oram_helper_reconstruct_path_decoded_buckets_state_preserves_non_failure_theorem_checked`,
 and
 `oram_helper_reconstruct_path_decoded_buckets_list_state_preserves_non_failure_theorem_checked`.
+Combining well-formed input with the position-map coverage hypothesis gives
+the end-to-end "successful reconstruction" theorem at the helper layer:
+`reconstructPathDecodedBucketsFailed_success_of_wellFormed` and
+`reconstructPathDecodedBucketsListFailed_success_of_wellFormed` show that
+when the stash is well-formed against the initial reconstruction state, the
+bucket-block list is well-formed against the post-stash state, and the live
+slots cover the position map at the final state, the runtime's coverage
+predicate `reconstructPathDecodedBucketsFailed = false` (resp.
+`...ListFailed = false`). These are emitted as
+`oram_helper_reconstruct_path_decoded_buckets_failed_success_of_well_formed_theorem_checked`
+and
+`oram_helper_reconstruct_path_decoded_buckets_list_failed_success_of_well_formed_theorem_checked`.
 The checked helper shell therefore rejects metadata,
 bucket-count, entry-tail, position-map-buffer, fixed-block-slot, or
 live-slot-buffer drift before page, slice, or decoded-slot access, and it

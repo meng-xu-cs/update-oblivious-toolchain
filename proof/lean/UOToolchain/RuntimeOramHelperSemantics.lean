@@ -3262,6 +3262,60 @@ theorem reconstructPathDecodedBucketsListState_preservesNonFailure
     (bucketBlocksOfDecodedBuckets decodedBuckets)
     hStashWellFormed hBucketWellFormed
 
+/-! ### End-to-end reconstruction success -/
+
+theorem reconstructPathDecodedBucketsFailed_success_of_wellFormed
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (bucketBlocks : List BucketBlock)
+    (hStashWellFormed :
+      StashWellFormedFrom capacity leafCount positionMap
+        (initialReconstructionState capacity) stashBlocks)
+    (hBucketWellFormed :
+      BucketBlocksWellFormedFrom capacity leafCount positionMap
+        (reconstructPathBlocks capacity leafCount positionMap
+          (initialReconstructionState capacity) stashBlocks)
+        bucketBlocks)
+    (hCoverage :
+      liveSlotCoverageFailed positionMap
+        (reconstructPathDecodedBucketsState capacity leafCount positionMap
+          stashBlocks bucketBlocks).liveSlots = false) :
+    reconstructPathDecodedBucketsFailed capacity leafCount positionMap
+        stashBlocks bucketBlocks = false := by
+  exact reconstructPathDecodedBucketsFailed_success
+    capacity leafCount positionMap stashBlocks bucketBlocks
+    (reconstructPathDecodedBucketsState_preservesNonFailure
+      capacity leafCount positionMap stashBlocks bucketBlocks
+      hStashWellFormed hBucketWellFormed)
+    hCoverage
+
+theorem reconstructPathDecodedBucketsListFailed_success_of_wellFormed
+    (capacity leafCount : Nat)
+    (positionMap : List MaskedUsizeOption)
+    (stashBlocks : List StashBlock)
+    (decodedBuckets : List DecodedBucket)
+    (hStashWellFormed :
+      StashWellFormedFrom capacity leafCount positionMap
+        (initialReconstructionState capacity) stashBlocks)
+    (hBucketWellFormed :
+      BucketBlocksWellFormedFrom capacity leafCount positionMap
+        (reconstructPathBlocks capacity leafCount positionMap
+          (initialReconstructionState capacity) stashBlocks)
+        (bucketBlocksOfDecodedBuckets decodedBuckets))
+    (hCoverage :
+      liveSlotCoverageFailed positionMap
+        (reconstructPathDecodedBucketsListState capacity leafCount positionMap
+          stashBlocks decodedBuckets).liveSlots = false) :
+    reconstructPathDecodedBucketsListFailed capacity leafCount positionMap
+        stashBlocks decodedBuckets = false := by
+  unfold reconstructPathDecodedBucketsListFailed
+  unfold reconstructPathDecodedBucketsListState at hCoverage
+  exact reconstructPathDecodedBucketsFailed_success_of_wellFormed
+    capacity leafCount positionMap stashBlocks
+    (bucketBlocksOfDecodedBuckets decodedBuckets)
+    hStashWellFormed hBucketWellFormed hCoverage
+
 end RuntimeOramHelperSemantics
 
 end UOToolchain
