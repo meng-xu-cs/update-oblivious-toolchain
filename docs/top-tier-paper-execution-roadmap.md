@@ -2673,3 +2673,14 @@ cargo run -q -p mplus-probe -- --only tamper-validation --out-dir /tmp/uo-tamper
 
 Any phase that broadens the theorem, observer, or TCB must update the paper
 docs and the Lean interface in the same change set.
+
+## Working Practices
+
+For follow-on coding agents: the engineering process — five-layer
+projection pattern, naming conventions, validation-slice protocol,
+tamper-suite interpretation, common pitfalls, and the onboarding read
+order — is documented in
+[`coding-agent-conventions.md`](./coding-agent-conventions.md).
+That file is work-package-agnostic and should be the first reference for
+how to land changes in this repository, regardless of which work package
+is active.

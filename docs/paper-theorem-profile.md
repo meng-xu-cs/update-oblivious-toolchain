@@ -5,6 +5,10 @@ the explicit assumption profile, and the current trusted-surface statement.
 It also records what the current repository already proves at that frozen
 interface and what still remains open.
 
+For the engineering process behind landing new theorems and runtime cuts
+into this profile, see
+[`coding-agent-conventions.md`](./coding-agent-conventions.md).
+
 ## Frozen Theorem Box
 
 The final paper should aim at exactly one theorem:
