@@ -979,19 +979,358 @@ theorem lowerExpr_preserves_semantics_cellGet
       | some _ => rfl
   | some _ => rfl
 
-/-! The full mutual-recursion preservation theorem
-(`lowerExpr_preserves_semantics` covering `unary` / `binary` /
-`select` / `arrayGet` / `mapGet` / `keccak256` plus
-`lowerPureExpr_preserves_semantics` and the list companions) is
-deferred. Each inductive case needs a careful do-bind reduction
-(`(lowerExpr e).bind fun ke' => .ok (.unary op ke') = .ok ke` →
-`∃ ke', lowerExpr e = .ok ke' ∧ ke = .unary op ke'`) which my
-preliminary attempts haven't fully nailed via `simp at h`. The
-proof shape works but the tactic fragment for extracting the
-witness from the do-bind needs polish. The trivial cases above
-exercise the underlying `evalExpr` ↔ `evalKernelExpr` equivalence
-on `cellGet` (the only non-trivial direct case) and confirm that
-the post-refactor `def`-style evaluators reduce as expected. -/
+mutual
+
+/-- Per-Expr semantics preservation: `lowerExpr e = .ok ke →
+evalExpr cfg env e = evalKernelExpr cfg env ke`. Mutually recursive
+with `lowerPureExpr_preserves_semantics`,
+`lowerExprList_preserves_semantics`, and
+`lowerPureExprList_preserves_semantics` so that the `select` and
+`keccak256` cases can use the appropriate sub-evaluator agreement.
+
+The proof for each inductive case follows a fixed shape: case-split
+on each sub-lowering's success/error, extract the kernel-side
+witness via `Except.ok.inj`, substitute, then unfold both
+evaluators and apply the IH. -/
+theorem lowerExpr_preserves_semantics
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (e : Expr) (ke : KernelExpr),
+      lowerExpr e = .ok ke → evalExpr cfg env e = evalKernelExpr cfg env ke
+  | .literal _, _, h => by
+      simp only [lowerExpr] at h; cases h; rfl
+  | .var _, _, h => by
+      simp only [lowerExpr] at h; cases h; rfl
+  | .unary op e, ke, h => by
+      cases hL : lowerExpr e with
+      | error err =>
+          have : lowerExpr (.unary op e) = .error err := by
+            unfold lowerExpr; rw [hL]; rfl
+          rw [this] at h; cases h
+      | ok kp =>
+          have hUn : lowerExpr (.unary op e) = .ok (.unary op kp) := by
+            unfold lowerExpr; rw [hL]; rfl
+          rw [hUn] at h
+          have : ke = .unary op kp := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env e kp hL
+          unfold evalExpr evalKernelExpr; rw [ih]; rfl
+  | .binary op lhs rhs, ke, h => by
+      cases hL : lowerExpr lhs with
+      | error err =>
+          have : lowerExpr (.binary op lhs rhs) = .error err := by
+            unfold lowerExpr; rw [hL]; rfl
+          rw [this] at h; cases h
+      | ok kl =>
+          cases hR : lowerExpr rhs with
+          | error err =>
+              have : lowerExpr (.binary op lhs rhs) = .error err := by
+                unfold lowerExpr; rw [hL, hR]; rfl
+              rw [this] at h; cases h
+          | ok kr =>
+              have hBin : lowerExpr (.binary op lhs rhs) = .ok (.binary op kl kr) := by
+                unfold lowerExpr; rw [hL, hR]; rfl
+              rw [hBin] at h
+              have : ke = .binary op kl kr := (Except.ok.inj h).symm
+              subst this
+              have ihL := lowerExpr_preserves_semantics cfg env lhs kl hL
+              have ihR := lowerExpr_preserves_semantics cfg env rhs kr hR
+              unfold evalExpr evalKernelExpr; rw [ihL, ihR]; rfl
+  | .select cond wt wf, ke, h => by
+      cases hC : lowerExpr cond with
+      | error err =>
+          have : lowerExpr (.select cond wt wf) = .error err := by
+            unfold lowerExpr; rw [hC]; rfl
+          rw [this] at h; cases h
+      | ok kc =>
+          cases hT : lowerPureExpr wt with
+          | error err =>
+              have : lowerExpr (.select cond wt wf) = .error err := by
+                unfold lowerExpr; rw [hC, hT]; rfl
+              rw [this] at h; cases h
+          | ok kt =>
+              cases hF : lowerPureExpr wf with
+              | error err =>
+                  have : lowerExpr (.select cond wt wf) = .error err := by
+                    unfold lowerExpr; rw [hC, hT, hF]; rfl
+                  rw [this] at h; cases h
+              | ok kf =>
+                  have hSel : lowerExpr (.select cond wt wf) = .ok (.select kc kt kf) := by
+                    unfold lowerExpr; rw [hC, hT, hF]; rfl
+                  rw [hSel] at h
+                  have : ke = .select kc kt kf := (Except.ok.inj h).symm
+                  subst this
+                  have ihC := lowerExpr_preserves_semantics cfg env cond kc hC
+                  have ihT := lowerPureExpr_preserves_semantics cfg env wt kt hT
+                  have ihF := lowerPureExpr_preserves_semantics cfg env wf kf hF
+                  unfold evalExpr evalKernelExpr
+                  rw [ihC]
+                  cases evalKernelExpr cfg env kc with
+                  | status _ => rfl
+                  | value v =>
+                      cases v with
+                      | bool b => cases b <;> simp [ihT, ihF]
+                      | uint _ => rfl
+                      | bytes32 _ => rfl
+                      | address _ => rfl
+                      | structValue _ => rfl
+                      | array _ => rfl
+                      | map _ => rfl
+  | .cellGet objectId, _, h => by
+      simp only [lowerExpr] at h
+      cases h
+      unfold evalExpr evalKernelExpr OperationalConfig.readObject
+      cases cfg.publicState.lookup objectId with
+      | none =>
+          cases cfg.secretState.lookup objectId with
+          | none => rfl
+          | some _ => rfl
+      | some _ => rfl
+  | .arrayGet objectId index, ke, h => by
+      cases hI : lowerExpr index with
+      | error err =>
+          have : lowerExpr (.arrayGet objectId index) = .error err := by
+            unfold lowerExpr; rw [hI]; rfl
+          rw [this] at h; cases h
+      | ok ki =>
+          have hAG : lowerExpr (.arrayGet objectId index) = .ok (.arrayGet objectId ki) := by
+            unfold lowerExpr; rw [hI]; rfl
+          rw [hAG] at h
+          have : ke = .arrayGet objectId ki := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env index ki hI
+          unfold evalExpr evalKernelExpr
+          rw [ih]
+          cases evalKernelExpr cfg env ki with
+          | status _ => rfl
+          | value v =>
+              cases v with
+              | uint _ =>
+                  unfold OperationalConfig.readObject
+                  cases cfg.publicState.lookup objectId with
+                  | none =>
+                      cases cfg.secretState.lookup objectId with
+                      | none => rfl
+                      | some v' => cases v' <;> rfl
+                  | some v' => cases v' <;> rfl
+              | bool _ => rfl
+              | bytes32 _ => rfl
+              | address _ => rfl
+              | structValue _ => rfl
+              | array _ => rfl
+              | map _ => rfl
+  | .mapGet objectId key, ke, h => by
+      cases hK : lowerExpr key with
+      | error err =>
+          have : lowerExpr (.mapGet objectId key) = .error err := by
+            unfold lowerExpr; rw [hK]; rfl
+          rw [this] at h; cases h
+      | ok kk =>
+          have hMG : lowerExpr (.mapGet objectId key) = .ok (.mapGet objectId kk) := by
+            unfold lowerExpr; rw [hK]; rfl
+          rw [hMG] at h
+          have : ke = .mapGet objectId kk := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env key kk hK
+          unfold evalExpr evalKernelExpr
+          rw [ih]
+          cases evalKernelExpr cfg env kk with
+          | status _ => rfl
+          | value _ =>
+              unfold OperationalConfig.readObject
+              cases cfg.publicState.lookup objectId with
+              | none =>
+                  cases cfg.secretState.lookup objectId with
+                  | none => rfl
+                  | some v' => cases v' <;> rfl
+              | some v' => cases v' <;> rfl
+  | .structField _ _, _, h => by simp [lowerExpr] at h
+  | .arrayIndex _ _, _, h => by simp [lowerExpr] at h
+  | .keccak256 parts, ke, h => by
+      cases hP : lowerExprList parts with
+      | error err =>
+          have : lowerExpr (.keccak256 parts) = .error err := by
+            unfold lowerExpr; rw [hP]; rfl
+          rw [this] at h; cases h
+      | ok kparts =>
+          have hK : lowerExpr (.keccak256 parts) = .ok (.keccak256 kparts) := by
+            unfold lowerExpr; rw [hP]; rfl
+          rw [hK] at h
+          have : ke = .keccak256 kparts := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExprList_preserves_semantics cfg env parts kparts hP
+          unfold evalExpr evalKernelExpr
+          rw [ih]; rfl
+
+/-- List-companion preservation for `evalExpr` / `evalKernelExpr`. -/
+theorem lowerExprList_preserves_semantics
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (es : List Expr) (kes : List KernelExpr),
+      lowerExprList es = .ok kes →
+        evalExprList cfg env es = evalKernelExprList cfg env kes
+  | [], _, h => by
+      simp only [lowerExprList] at h; cases h; rfl
+  | e :: rest, kes, h => by
+      cases hH : lowerExpr e with
+      | error err =>
+          have : lowerExprList (e :: rest) = .error err := by
+            unfold lowerExprList; rw [hH]; rfl
+          rw [this] at h; cases h
+      | ok ke =>
+          cases hT : lowerExprList rest with
+          | error err =>
+              have : lowerExprList (e :: rest) = .error err := by
+                unfold lowerExprList; rw [hH, hT]; rfl
+              rw [this] at h; cases h
+          | ok krest =>
+              have hCons : lowerExprList (e :: rest) = .ok (ke :: krest) := by
+                unfold lowerExprList; rw [hH, hT]; rfl
+              rw [hCons] at h
+              have : kes = ke :: krest := (Except.ok.inj h).symm
+              subst this
+              have ihH := lowerExpr_preserves_semantics cfg env e ke hH
+              have ihT := lowerExprList_preserves_semantics cfg env rest krest hT
+              unfold evalExprList evalKernelExprList
+              rw [ihH, ihT]
+              rfl
+
+/-- Per-pure-Expr semantics preservation. -/
+theorem lowerPureExpr_preserves_semantics
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (e : Expr) (ke : KernelPureExpr),
+      lowerPureExpr e = .ok ke →
+        evalExpr cfg env e = evalKernelPureExpr cfg env ke
+  | .literal _, _, h => by
+      simp only [lowerPureExpr] at h; cases h; rfl
+  | .var _, _, h => by
+      simp only [lowerPureExpr] at h; cases h; rfl
+  | .unary op e, ke, h => by
+      cases hL : lowerPureExpr e with
+      | error err =>
+          have : lowerPureExpr (.unary op e) = .error err := by
+            unfold lowerPureExpr; rw [hL]; rfl
+          rw [this] at h; cases h
+      | ok kp =>
+          have hUn : lowerPureExpr (.unary op e) = .ok (.unary op kp) := by
+            unfold lowerPureExpr; rw [hL]; rfl
+          rw [hUn] at h
+          have : ke = .unary op kp := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerPureExpr_preserves_semantics cfg env e kp hL
+          unfold evalExpr evalKernelPureExpr; rw [ih]; rfl
+  | .binary op lhs rhs, ke, h => by
+      cases hL : lowerPureExpr lhs with
+      | error err =>
+          have : lowerPureExpr (.binary op lhs rhs) = .error err := by
+            unfold lowerPureExpr; rw [hL]; rfl
+          rw [this] at h; cases h
+      | ok kl =>
+          cases hR : lowerPureExpr rhs with
+          | error err =>
+              have : lowerPureExpr (.binary op lhs rhs) = .error err := by
+                unfold lowerPureExpr; rw [hL, hR]; rfl
+              rw [this] at h; cases h
+          | ok kr =>
+              have hBin : lowerPureExpr (.binary op lhs rhs) = .ok (.binary op kl kr) := by
+                unfold lowerPureExpr; rw [hL, hR]; rfl
+              rw [hBin] at h
+              have : ke = .binary op kl kr := (Except.ok.inj h).symm
+              subst this
+              have ihL := lowerPureExpr_preserves_semantics cfg env lhs kl hL
+              have ihR := lowerPureExpr_preserves_semantics cfg env rhs kr hR
+              unfold evalExpr evalKernelPureExpr; rw [ihL, ihR]; rfl
+  | .select cond wt wf, ke, h => by
+      cases hC : lowerPureExpr cond with
+      | error err =>
+          have : lowerPureExpr (.select cond wt wf) = .error err := by
+            unfold lowerPureExpr; rw [hC]; rfl
+          rw [this] at h; cases h
+      | ok kc =>
+          cases hT : lowerPureExpr wt with
+          | error err =>
+              have : lowerPureExpr (.select cond wt wf) = .error err := by
+                unfold lowerPureExpr; rw [hC, hT]; rfl
+              rw [this] at h; cases h
+          | ok kt =>
+              cases hF : lowerPureExpr wf with
+              | error err =>
+                  have : lowerPureExpr (.select cond wt wf) = .error err := by
+                    unfold lowerPureExpr; rw [hC, hT, hF]; rfl
+                  rw [this] at h; cases h
+              | ok kf =>
+                  have hSel : lowerPureExpr (.select cond wt wf) = .ok (.select kc kt kf) := by
+                    unfold lowerPureExpr; rw [hC, hT, hF]; rfl
+                  rw [hSel] at h
+                  have : ke = .select kc kt kf := (Except.ok.inj h).symm
+                  subst this
+                  have ihC := lowerPureExpr_preserves_semantics cfg env cond kc hC
+                  have ihT := lowerPureExpr_preserves_semantics cfg env wt kt hT
+                  have ihF := lowerPureExpr_preserves_semantics cfg env wf kf hF
+                  unfold evalExpr evalKernelPureExpr
+                  rw [ihC]
+                  cases evalKernelPureExpr cfg env kc with
+                  | status _ => rfl
+                  | value v =>
+                      cases v with
+                      | bool b => cases b <;> simp [ihT, ihF]
+                      | uint _ => rfl
+                      | bytes32 _ => rfl
+                      | address _ => rfl
+                      | structValue _ => rfl
+                      | array _ => rfl
+                      | map _ => rfl
+  | .cellGet _, _, h => by simp [lowerPureExpr] at h
+  | .arrayGet _ _, _, h => by simp [lowerPureExpr] at h
+  | .mapGet _ _, _, h => by simp [lowerPureExpr] at h
+  | .structField _ _, _, h => by simp [lowerPureExpr] at h
+  | .arrayIndex _ _, _, h => by simp [lowerPureExpr] at h
+  | .keccak256 parts, ke, h => by
+      cases hP : lowerPureExprList parts with
+      | error err =>
+          have : lowerPureExpr (.keccak256 parts) = .error err := by
+            unfold lowerPureExpr; rw [hP]; rfl
+          rw [this] at h; cases h
+      | ok kparts =>
+          have hK : lowerPureExpr (.keccak256 parts) = .ok (.keccak256 kparts) := by
+            unfold lowerPureExpr; rw [hP]; rfl
+          rw [hK] at h
+          have : ke = .keccak256 kparts := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerPureExprList_preserves_semantics cfg env parts kparts hP
+          unfold evalExpr evalKernelPureExpr
+          rw [ih]; rfl
+
+/-- List-companion preservation for pure expressions. -/
+theorem lowerPureExprList_preserves_semantics
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (es : List Expr) (kes : List KernelPureExpr),
+      lowerPureExprList es = .ok kes →
+        evalExprList cfg env es = evalKernelPureExprList cfg env kes
+  | [], _, h => by
+      simp only [lowerPureExprList] at h; cases h; rfl
+  | e :: rest, kes, h => by
+      cases hH : lowerPureExpr e with
+      | error err =>
+          have : lowerPureExprList (e :: rest) = .error err := by
+            unfold lowerPureExprList; rw [hH]; rfl
+          rw [this] at h; cases h
+      | ok ke =>
+          cases hT : lowerPureExprList rest with
+          | error err =>
+              have : lowerPureExprList (e :: rest) = .error err := by
+                unfold lowerPureExprList; rw [hH, hT]; rfl
+              rw [this] at h; cases h
+          | ok krest =>
+              have hCons : lowerPureExprList (e :: rest) = .ok (ke :: krest) := by
+                unfold lowerPureExprList; rw [hH, hT]; rfl
+              rw [hCons] at h
+              have : kes = ke :: krest := (Except.ok.inj h).symm
+              subst this
+              have ihH := lowerPureExpr_preserves_semantics cfg env e ke hH
+              have ihT := lowerPureExprList_preserves_semantics cfg env rest krest hT
+              unfold evalExprList evalKernelPureExprList
+              rw [ihH, ihT]; rfl
+
+end
 
 mutual
 
