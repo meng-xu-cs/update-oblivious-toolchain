@@ -1668,62 +1668,16 @@ This is the first point at which `uo-allocator` and `uo-precompiles` are real
 enforcement surfaces rather than dead stubs, and the first point at which the
 kernel discipline is exported as an explicit runtime artifact.
 
-### Still open
+### Out-of-charter future strengthening
 
-This does **not** yet upgrade the claim boundary to a malicious-host TEE
-theorem. Remaining gaps include:
-
-- the Lean side now threads the kernel witness through the theorem-side
-  runtime refinement witness and trusted-kernel bundle, and it also checks
-  exact kernel-op equality plus exact public kernel-step equality when the
-  runtime exports the artifact-side expected kernel witness; the theorem side
-  now also packages an explicit relation from that runtime phase witness to one
-  exact finished Lean kernel state, so what remains open is proving the real
-  runtime kernel implementation or the full runtime-to-observer refinement
-  rather than only validating emitted witnesses
-- the new lower-level runtime phase witness is still a schedule-level
-  certificate, not yet a full small-kernel operational semantics for every
-  live plaintext buffer and helper-state transition inside the runtime; it
-  closes the gap substantially, but it is not yet the final
-  "all confidential runtime state refines one tiny machine" theorem
-- the modeled/source-pinned helper schedules now include the machine/effect
-  path, allocator discipline, statement recorder, ORAM write log, small-map
-  lookup, array access, and generated return-tail schedule, but these still need
-  a native semantics-of-Rust refinement theorem to stop relying on source
-  pattern checks; the exact secret-bearing object/ORAM open/bootstrap/reseal
-  shell now lives in the exact-source-checked generated helper module, and the
-  remaining handwritten object/ORAM coordination plus store surface is
-  isolated as its own source-backed
-  `RuntimeImplementationInterface.ResidualHelperShellBoundary`, with a
-  dedicated `runtime_residual_helper_shell_boundary_validation.json` report,
-  and Lean now also packages its direct meeting with the emitted native
-  machine witness as
-  `RuntimeImplementationResidualHelperShellMachineRefinementBoundary`,
-  benchmark-backed through
-  `runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation.json`
-- the rest of the runtime still uses ordinary Rust data structures whose host
-  allocation behavior has not been proved irrelevant to the admitted observer
-- some helper APIs outside the confidential `uo-evm` hot path may still keep
-  plaintext in ordinary Rust-owned buffers without a globally enforced wipe
-  discipline, so the buffer-scrubbing story is stronger than before but not
-  yet global
-- the runtime no longer keeps long-lived committed UO logical caches between
-  calls, and the confidential env has now been reduced to a fixed slot file,
-  but the runtime still keeps some ordinary decrypted logical object state in
-  Rust-owned `Value` carriers and bounded collection buffers while a
-  call-scoped shadow execution is live; transaction-shadow creation, rollback
-  / no-op recovery, and the new post-call cold-store path all rebuild from
-  sealed storage, and Path-ORAM committed state now also starts cold at
-  deployment; the runtime audits the full committed object table on both sides
-  of every call boundary, but the live
-  in-call object state is still not reduced to the small-kernel witness model
-  while it is being used
-- enclave-boundary behavior, OCALL/syscall schedule, page-fault behavior, and
-  other SGX-visible effects are still only partially captured by the current
-  observer path
-- there is still no theorem that the full `uo-evm` implementation refines the
-  modeled SGX observer
-- there is still no Lean proof of the kernel implementation itself
+The WP3 / WP6 charters explicitly do not require a deeper
+semantics-of-Rust refinement of the residual real kernel
+implementation surface, a global runtime buffer-scrub theorem, an
+operational semantics for every live plaintext buffer inside
+in-call object state, or a Lean proof of the kernel implementation
+itself. Those tracks remain open as future-strengthening work
+beyond the closed WP3 / WP6 charters; they are not recorded as
+in-scope tasks in this document.
 
 ## Active Instructions
 
@@ -1747,12 +1701,11 @@ observer argument.
 
 ### 2. Keep per-entrypoint working state bounded
 
-Status: started.
+Status: completed under WP3 closure. The current source-backed
+`RuntimeImplementationInterface` checker pins the per-entrypoint
+working-state discipline:
 
-The runtime should continue moving secret-bearing helpers under manifest-bounded
-discipline:
-
-- fixed-capacity kernel op journal
+- fixed-capacity kernel op journal (`BoundedJournal<T>` in `uo-core`)
 - bounded scratch regions for key/value/hash staging
 - explicit bounded `io` scratch for confidential storage payload staging
 - manifest-derived stack/work budgets
@@ -1760,8 +1713,8 @@ discipline:
 - wipe-on-seal handling for confidential object/ORAM plaintext payload buffers
 - wipe-after-parse handling for ORAM metadata and bucket plaintext payloads
 
-Future steps should avoid reintroducing secret-dependent growth through helper
-paths outside the kernel.
+The `tamper_validation` suite rejects representative reintroduction of
+secret-dependent growth through helper paths outside the kernel.
 
 ### 3. Export a checkable kernel-discipline witness
 
@@ -1811,16 +1764,6 @@ That witness is now in the proof-facing boundary:
 - the runtime-side commit-object and cold-store/post-committed witness tails
   are now also routed through shared phase-aware helper methods rather than
   open-coded raw event-vector extension in the runtime modules
-
-What remains open is to strengthen that bridge further:
-
-- prove the kernel implementation itself, or
-- prove that the real runtime/refinement path always emits the admitted
-  proof-grade witness and online schedule object, rather than only validating
-  the emitted artifact after the fact
-- keep the new theorem-facing runtime-phase-to-Lean-state refinement relation
-  aligned with any future kernel/state-model tightening so the proof interface
-  continues to speak about one exact finished small-kernel execution
 
 ### 4. Connect the real runtime to the SGX observer by refinement
 

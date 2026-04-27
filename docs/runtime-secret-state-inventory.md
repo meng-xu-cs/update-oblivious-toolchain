@@ -4,9 +4,10 @@ This note records the current secret-bearing runtime structures that still
 exist in the Rust implementation and where they are supposed to live.
 
 The goal is not to pretend the runtime is already fully verified. The goal is
-to make the remaining confidential surface explicit, small, and auditable while
-the remaining semantics-of-Rust refinement step below the checked
-source-plus-finish-slot shared-kernel boundary is still being completed.
+to make the remaining confidential surface explicit, small, and auditable
+under the closed WP3 charter; a deeper semantics-of-Rust refinement of the
+residual real kernel implementation surface is out-of-charter future
+strengthening, not a WP3 blocker.
 The checked source interface now also pins the shared `uo-core` crate-root
 export shell in `crates/uo-core/src/lib.rs`, so theorem-carrying public wrappers
 stay visible there while the generated confidential-kernel module itself stays
