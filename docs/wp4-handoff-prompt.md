@@ -20,18 +20,16 @@ a TEE under a hostile-host adversary (M+ model).
 
 You are now picking up **Work Package 4: Prove Source-To-Kernel
 Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
-**W4.1** (real operational evaluator surface), **W4.1b** (secrecy-
-lemma re-statement against the new evaluator), **W4.3** (the
-full confidential-fragment characterization theorem
-`(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
-fn.fragmentValid = true` plus paper-facing facade), **W4.1+**
-(evaluator coverage extension to
-`Statement.{ifStmt,forLoop,arraySet,mapPut}` and `Expr.arrayGet`),
-and **W4.1++** (`Value.map` + `Value.beq` + `Value.keccak256Mock`,
-plus `Expr.{mapGet,keccak256}` evaluator handling) are landed as
-commits `6e234df`, `267dc89`, `63cdd36`, `4f30757`, `5ef3bdd`,
-`08f669a`, `94ba337`, `9f0e45e`, `5d79540`, and `2a6aa8b`. The W4.1
-evaluator is now total over the structural admitted fragment.
+**W4.1**, **W4.1b**, **W4.3** (full theorem + paper facade),
+**W4.1+**, **W4.1++**, **W4.1+++** (store-update threading), and
+**W4.4 Session A** (typed kernel DSL + semantics + lowering
+definitions in `proof/lean/UOToolchain/KernelDsl.lean`) are all
+landed. The W4.1 evaluator is total over the structural admitted
+fragment with masked-store semantics; the kernel-DSL Lean mirror
+shares the same `IR.Outcome` type so the W4.4 preservation theorem
+can be a literal outcome equality. The next subtasks are W4.4
+Session B (lowering iff theorems + semantics-preservation theorem)
+and Session C (paper-facing facade).
 
 ## First, Read These Files In This Exact Order
 
@@ -125,48 +123,42 @@ land in:
 
 ## Recommended Next Subtask
 
-W4.3 is fully landed; the next subtask per the runbook's deliverable
-ordering is **W4.4** (charter task 4: IR-to-kernel correctness).
-W4.4 has a clearer structural path than W4.2 because the kernel-DSL
-Lean mirror already exists (`ImportedConfidentialKernelStatement`
-etc. in `RuntimeKernelDslJson.lean`).
+W4.4 Session A is landed; the next subtask is **W4.4 Session B**:
+the lowering succeeds-iff-precondition iff theorems plus the
+semantics-preservation theorem.
 
-**Subtask W4.4: Prove the IR-to-kernel correctness theorem.**
+**Subtask W4.4 Session B: Lowering iff + semantics-preservation.**
 
 Concretely:
 
-1. Define a Lean-side semantics for
-   `ImportedConfidentialKernelStatement` (kernel-DSL operational
-   evaluator over the existing mutual inductives) producing an
-   `IR.Outcome`-shaped result. Probably lands in a new
-   `RuntimeKernelDslSemantics.lean` file.
-2. Mirror the Rust lowering function
-   `lower_confidential_kernel_*` from
-   `crates/uo-core/src/confidential_kernel.rs` as a Lean-side
-   `lowerToKernel : IR.CompiledFunction → Except Error
-   ImportedConfidentialKernelProgram`. The lowering is partial:
-   `IR.Statement.{ifStmt,forLoop}` cannot lower to the straight-
-   line kernel DSL. The W4.3 `Expr.fragmentValid` predicate is
-   precisely the precondition for the expression-side lowering;
-   the statement-side adds "no `ifStmt`, no `forLoop`."
-3. Prove the IR-to-kernel correctness theorem:
-   `lowerToKernel fn = .ok kp →
-     ∀ cfg, evalContract cfg = evalKernel kp cfg`
-   (suitably projected — public projections must agree, secret-side
-   side effects are folded into the kernel evaluator's outcome).
-4. Project through `ProofGrade.lean` as
-   `proofGrade_ir_to_kernel_correctness` (or similar).
+1. Prove four lowering iff theorem families in `KernelDsl.lean`,
+   each as a mutual `theorem` block with its list companion:
+   - `branchlessPureExpr_iff_lowerPureExpr_ok` /
+     `branchlessPureExprList_iff_lowerPureExprList_ok`
+   - `fragmentValid_iff_lowerExpr_ok` /
+     `fragmentValidList_iff_lowerExprList_ok`
+   - `kernelLowerable_iff_lowerStatement_ok`
+   - `kernelLowerableSchedule_iff_lowerStatements_ok`
 
-W4.4 is a multi-session effort (~2× the size of W4.3). Recommend
-splitting into:
-
-- Session A: kernel-DSL semantics (`RuntimeKernelDslSemantics.lean`)
-  + lowering definitions + lowering succeeds-iff-precondition
-  theorem. No semantics-preservation theorem yet — that's session B.
-- Session B: semantics-preservation theorem proper, proved by
-  mutual recursion mirroring the W4.3 proof structure.
-- Session C: `ProofGrade.lean` projection + status / handoff doc
-  updates.
+   The proofs are structural mutual recursions analogous to W4.3.
+   The Session A corollary
+   `branchlessPureExpr_implies_fragmentValid` is the helper for the
+   `Expr.select` case. Session A had a draft attempt that hit
+   tactic-mechanics issues with `simp` / `rcases` / `cases`
+   patterns; a clean restart with `simp only` everywhere and
+   careful `cases` on the lowering result should work.
+2. Prove the semantics-preservation theorem:
+   `lowerCompiledFunction fn = .ok kp →
+     ∀ cfg, evalContract { cfg with contract.functions including fn } =
+       evalKernelProgram kp cfg`
+   (or a suitable form — the IR evaluator looks up the entrypoint
+   via `cfg.entrypoint`, so the equation needs to handle the
+   entrypoint resolution side too). Strategy: prove the per-`Expr`
+   and per-`Statement` preservation lemmas first, then lift to the
+   program level.
+3. Session C will project this through `ProofGrade.lean` as
+   `proofGrade_ir_to_kernel_correctness` and update the WP4 status
+   text.
 
 If you would prefer to drive **W4.2** (source-to-IR correctness)
 instead, see the runbook's "Recommended Starting Subtask" section
@@ -274,7 +266,8 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The first technical step is W4.4 (IR-to-
-kernel correctness). If you prefer strict deliverable order, the
-runbook's "Recommended Starting Subtask" section also documents the
-W4.2 source-to-IR AST-pull-back framing.
+Begin with the runbook. The first technical step is W4.4 Session B
+(lowering iff theorems + semantics-preservation theorem). If you
+prefer strict deliverable order, the runbook's "Recommended
+Starting Subtask" section also documents the W4.2 source-to-IR
+AST-pull-back framing.

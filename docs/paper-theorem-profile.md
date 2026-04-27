@@ -275,12 +275,19 @@ What is still open:
   classifier surfaces the WP4 lowering theorems will refine against.
   Rust / Lean classifier agreement is a source-freeze obligation,
   handled by the existing static-drift checks.
-  W4.1+ (evaluator coverage extension) and W4.1++ (`Value.map`
+  W4.1+ (evaluator coverage extension), W4.1++ (`Value.map`
   variant + `Value.beq` instance + `Value.mapLookup` +
   `Value.keccak256Mock` placeholder + `Expr.mapGet` /
-  `Expr.keccak256` handling) have also landed: `evalContract` is now
-  total over the structural admitted fragment. The only
-  `unsupported` constructors are `Expr.{structField,arrayIndex}`,
+  `Expr.keccak256` handling), and W4.1+++ (store-update threading
+  for `cellSet` / `arraySet` / `mapPut` with the masked-store
+  semantics) have also landed: `evalContract` is now total over the
+  structural admitted fragment, and store updates persist through
+  the statement evaluator. W4.4 Session A landed in
+  `proof/lean/UOToolchain/KernelDsl.lean` with the typed kernel-DSL
+  inductives, operational semantics (sharing `IR.Outcome`), lowering
+  definitions, and lowering preconditions; the iff theorems and the
+  semantics-preservation theorem are deferred to Session B. The only
+  `unsupported` evaluator cases are `Expr.{structField,arrayIndex}`,
   which `fragmentValid` rejects, so they cannot appear in an
   accepted IR program.
 - WP5 (concrete backend assumptions): full discharge of the concrete

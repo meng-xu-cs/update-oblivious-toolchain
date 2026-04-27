@@ -111,6 +111,40 @@ Subtasks **W4.1**, **W4.1b**, **W4.3 (full theorem)**, and **W4.1+
   structural admitted fragment; the only `unsupported` constructors
   are `Expr.{structField,arrayIndex}`, which `Expr.fragmentValid`
   already rejects.
+- W4.1+++ landing in `IRSemantics.lean` threads the updated
+  `OperationalConfig` through `evalStatement` / `evalBody` /
+  `evalForLoop` so `cellSet` / `arraySet` / `mapPut` perform the
+  masked-store update. New helpers
+  `OperationalConfig.{objectIsConfidential,writeObject,readObject}`
+  route writes to the public store (non-confidential objects) or
+  secret store (confidential), and `Value.{arraySetAt,mapInsert}`
+  perform the structured value updates. The masked-store semantics
+  writes when the predicate is `none` or `true` and leaves the cell
+  unchanged when the predicate is `false`; the kernel step is
+  recorded unconditionally to mirror the runtime's always-write
+  access pattern. `evalContract` discards the final `cfg` and
+  returns the outcome unchanged.
+- W4.4 Session A landed in
+  [`proof/lean/UOToolchain/KernelDsl.lean`](../proof/lean/UOToolchain/KernelDsl.lean):
+  typed Lean mirror of the kernel DSL (`KernelExpr` /
+  `KernelPureExpr` / `KernelStatement` / `KernelProgram`) using
+  `IR.UnaryOp` / `IR.BinaryOp` / `IR.Ty` instead of the
+  `RuntimeKernelDslJson.lean` JSON-typed versions; operational
+  semantics sharing `IR.Outcome` / `OperationalConfig` / `LocalEnv`
+  with the IR evaluator (`evalKernelExpr` / `evalKernelPureExpr` /
+  `evalKernelStatement` / `evalKernelBody` / `evalKernelProgram`);
+  IR-to-kernel lowering definitions (`lowerExpr` / `lowerPureExpr` /
+  `lowerStatement` / `lowerStatementsAux` / `lowerStatements` /
+  `lowerCompiledFunction`) mirroring the Rust
+  `lower_confidential_kernel_*` functions; lowering precondition
+  predicates (`Statement.kernelLowerable` /
+  `Statement.kernelLowerableSchedule` /
+  `CompiledFunction.kernelLowerable`); and a structural corollary
+  `branchlessPureExpr_implies_fragmentValid` (with companion
+  `branchlessPureExprList_implies_fragmentValidList`) that the
+  Session B lowering iff theorem will use for the `Expr.select`
+  case. The lowering iff theorems and semantics-preservation
+  theorem are deferred to Session B.
 
 The WP4 entry conditions therefore now also include the operational
 evaluator surface; what is open is the actual semantics-preserving
@@ -473,8 +507,28 @@ should be its own commit:
   (`Value.map`, `Value.beq`, `Value.mapLookup`,
   `Value.keccak256Mock`, `Expr.{mapGet,keccak256}`,
   commit `2a6aa8b`).
-- *(next)* W4.4 IR-to-kernel correctness theorem (or W4.2 source-
-  to-IR if strict deliverable order is preferred).
+- *(landed)* WP4 status / handoff status update for W4.1++
+  (commit `e4c38e0`).
+- *(landed)* W4.1+++ store-update threading
+  (`OperationalConfig.{objectIsConfidential,writeObject,
+  readObject}`, `Value.{arraySetAt,mapInsert}`, masked-store
+  semantics for `cellSet` / `arraySet` / `mapPut`,
+  commit `b4442f7`).
+- *(landed)* W4.4 Session A: typed kernel DSL inductives,
+  operational semantics, lowering definitions, lowering
+  precondition predicates, and `branchlessPureExpr_implies_
+  fragmentValid` corollary in `KernelDsl.lean` (commit `1bd6180`).
+- *(next)* W4.4 Session B: lowering succeeds-iff-precondition iff
+  theorems (`branchlessPureExpr_iff_lowerPureExpr_ok` and three
+  more theorem families) plus the semantics-preservation theorem
+  (`evalContract cfg = evalKernelProgram (lowerCompiledFunction
+  fn) cfg` when the lowering succeeds). The iff proofs are
+  structural mutual recursions analogous to W4.3; the preservation
+  proof is a longer structural mutual recursion comparing
+  `evalExpr` / `evalKernelExpr` outcomes after lowering.
+- *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
+  projection of the W4.4 preservation theorem and status / handoff
+  doc updates.
 - Source-to-IR lowering theorem (W4.2, probably split into
   expression-level, statement-level, function-level).
 - IR-to-kernel lowering theorem (W4.4, likely split per kernel-DSL

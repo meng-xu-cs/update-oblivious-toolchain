@@ -1616,6 +1616,45 @@ Current status update:
   `Expr.arrayGet`, with `evalStatement`/`evalBody`/`evalForLoop` in a
   single `mutual` block so that `ifStmt` / `forLoop` can recurse into
   nested statement bodies.
+- Subtask W4.1+++ (store-update threading) landed (commit `b4442f7`,
+  [proof/lean/UOToolchain/IRSemantics.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/IRSemantics.lean)):
+  `evalStatement` / `evalBody` / `evalForLoop` now thread the updated
+  `OperationalConfig` so that `cellSet` / `arraySet` / `mapPut` actually
+  modify the store, and so a later `cellGet` / `arrayGet` / `mapGet`
+  observes the written value. The masked-store semantics writes when
+  the predicate is `none` or evaluates to `true`, and leaves the store
+  unchanged when the predicate is `false`; the kernel step (`CellSet`,
+  `ArraySet`, `MapPut`) is recorded unconditionally, mirroring the
+  runtime's always-write access pattern. New helpers
+  `OperationalConfig.{objectIsConfidential,writeObject,readObject}`
+  and `Value.{arraySetAt,mapInsert}` keep store-routing (public vs
+  secret based on `StateObject.confidential`) and structured value
+  updates clean. `evalContract` discards the final `cfg` and returns
+  the outcome unchanged.
+- Subtask W4.4 Session A (kernel DSL definitions) landed (commit
+  `1bd6180`, new file
+  [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)):
+  typed Lean mirror of the kernel DSL types
+  (`IR.KernelExpr` / `KernelPureExpr` / `KernelStatement` /
+  `KernelProgram`) using `IR.UnaryOp` / `IR.BinaryOp` / `IR.Ty`
+  instead of the JSON-typed `RuntimeKernelDslJson.lean` versions, so
+  operational semantics is well-defined; operational semantics
+  (`evalKernelExpr` / `evalKernelPureExpr` / `evalKernelStatement` /
+  `evalKernelBody` / `evalKernelProgram`) sharing the same
+  `IR.Outcome` / `OperationalConfig` / `LocalEnv` types as the
+  IR evaluator (so the W4.4 preservation theorem can be a literal
+  outcome equality); IR-to-kernel lowering definitions
+  (`lowerExpr` / `lowerPureExpr` / `lowerStatement` /
+  `lowerStatementsAux` / `lowerStatements` /
+  `lowerCompiledFunction`) mirroring the Rust
+  `lower_confidential_kernel_*` functions; lowering precondition
+  predicates `Statement.kernelLowerable` /
+  `Statement.kernelLowerableSchedule` /
+  `CompiledFunction.kernelLowerable`; and a structural corollary
+  `branchlessPureExpr_implies_fragmentValid`. Deferred to Session B:
+  the lowering succeeds-iff-precondition theorems (forward
+  direction needed by the preservation theorem) and the
+  semantics-preservation theorem itself.
 - Subtask W4.1++ (evaluator value-model gaps closed) landed (commit
   `2a6aa8b`,
   [proof/lean/UOToolchain/IRSyntax.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/IRSyntax.lean)
@@ -1630,13 +1669,10 @@ Current status update:
   the only `unsupported` constructors are `Expr.{structField,
   arrayIndex}`, which `Expr.fragmentValid` already rejects.
 - Still open: the *real* source-to-IR correctness theorem (W4.2),
-  the IR-to-kernel correctness theorem (W4.4), the manifest-
-  exactness semantics-preserving lift (W4.5), and the direct
-  artifact checker demotion (W4.6). The evaluator's `cellSet` /
-  `arraySet` / `mapPut` cases currently track the kernel step but
-  don't actually update the store; threading store updates through
-  `evalStatement` is a separate refactor (the predicate-driven
-  masked-store semantics is non-trivial and is bundled with W4.4).
+  the W4.4 Session B (lowering iff theorem + semantics-preservation
+  theorem) and Session C (`ProofGrade.lean` projection), the
+  manifest-exactness semantics-preserving lift (W4.5), and the
+  direct artifact checker demotion (W4.6).
 
 Exit gate:
 
