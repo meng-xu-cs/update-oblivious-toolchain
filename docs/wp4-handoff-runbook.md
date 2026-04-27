@@ -599,13 +599,25 @@ should be its own commit:
   [proof/lean/UOToolchain/KernelDsl.lean](../proof/lean/UOToolchain/KernelDsl.lean)
   +
   [proof/lean/UOToolchain/ProofGrade.lean](../proof/lean/UOToolchain/ProofGrade.lean)).
-- *(next)* Body-level / program-level runtime-vs-static lift
-  extending the per-statement W4.5 cuts (requires either the
-  `evalKernelExpr_status_ne_completed` invariant or a structural
-  "all-sub-expressions-succeed" predicate); WP4 charter task 6
-  (artifact-checker demotion, W4.6). The W4.4 reverse iff
-  direction (lowering succeeds → precondition holds) is also a
-  useful but optional W4.6 building block.
+- *(landed)* W4.5 body-level / program-level runtime-vs-static
+  lift (commits `a4ce975` + `6dbf2fe` + `43df9e2`): the
+  `evalKernelExpr_status_ne_completed` invariant, plus the
+  per-statement / body-level / program-level
+  `kernelSteps`-vs-static theorems. Paper-facing facades
+  `proofGrade_kernel_program_runtime_kernel_steps_eq_expected`
+  and
+  `proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected`
+  in
+  [proof/lean/UOToolchain/ProofGrade.lean](../proof/lean/UOToolchain/ProofGrade.lean)
+  expose the program-level fact and its source-side composition
+  with the W4.5 enabling theorem. The W4.5 chain is now Lean-
+  proved end-to-end on the happy path: source → IR → kernel
+  runtime → static kernel-program schedule → manifest
+  `kernel_steps` field.
+- *(next)* WP4 charter task 6 (artifact-checker demotion, W4.6).
+  The W4.4 reverse iff direction (lowering succeeds →
+  precondition holds) is also a useful but optional W4.6
+  building block.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

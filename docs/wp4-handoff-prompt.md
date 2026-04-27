@@ -61,15 +61,25 @@ kp cfg`. The W4.5 main body adds static projections on
 `IR.KernelProgram` (`expectedKernelSteps`,
 `expectedKernelStepCount`, `expectedObjectWriteIds`), paper-facing
 facades exposing each, source-side handles via the lowering chain,
-and narrow per-statement runtime-vs-static lifts for the masked-
-store statements.
+and per-statement / body-level / program-level runtime-vs-static
+lifts. The supporting invariant
+`evalKernelExpr_status_ne_completed` (the kernel-DSL expression
+evaluator never returns `.status .completed`) is the prerequisite
+for the runtime-vs-static lift; with it, the per-statement
+`evalKernelStatement_kernelSteps_eq_expected_of_completed`,
+body-level
+`evalKernelBody_kernelSteps_eq_expected_of_completed`, and program-
+level
+`evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed`
+theorems are all Lean-proved end-to-end. Paper-facing facades
+`proofGrade_kernel_program_runtime_kernel_steps_eq_expected` and
+`proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected` expose
+the program-level fact and its source-side composition.
 
 WP4 charter task **6** (direct artifact-checker demotion) remains
-open. The W4.5 body-level / program-level runtime-vs-static lift
-extending the per-statement cuts is the natural W4.5 follow-up.
-The W4.4 reverse iff direction (lowering succeeds → precondition
-holds) is also still deferred (useful for W4.6 but not required by
-W4.4).
+open. The W4.4 reverse iff direction (lowering succeeds →
+precondition holds) is also still deferred (useful for W4.6 but
+not required by W4.4).
 
 ## First, Read These Files In This Exact Order
 
@@ -173,19 +183,13 @@ the semantics-preservation theorem.
 
 The next subtask is one of:
 
-**Option (a) — W4.5 body-level / program-level runtime-vs-static lift.**
-The W4.5 main-body per-statement narrow lifts are landed
-(`proofGrade_kernel_cell_set_none_kernelSteps` and friends in
-`ProofGrade.lean`); they certify that each masked-store statement's
-runtime `kernelSteps` equals the static expected schedule under
-"value sub-expression returns `.value _`" preconditions. The natural
-extension is to lift these per-statement results through
-`evalKernelBody` and `evalKernelProgram`, giving a program-level
-"runtime `kernelSteps` equals `kp.expectedKernelSteps` under
-`.completed` outcome" theorem. This requires either the
-`evalKernelExpr_status_ne_completed` invariant lemma (proving the
-kernel-expression evaluator never returns `.status .completed`) or
-a structural "all-sub-expressions-succeed" predicate on the body.
+**Option (a) — W4.6 direct artifact-checker demotion.**
+With W4.2 + W4.4 + W4.5 all closed, the only remaining "compiler-
+side" charter task is W4.6: demote `checkProofGradeTranslationArtifacts`
+from "main trust argument" to "executable proof witness for the
+proven compiler story." This requires the reverse direction of the
+W4.4 lowering iff (`lowerExpr e = .ok ke → Expr.fragmentValid e =
+true`) plus a doc update to the WP4 trust narrative.
 
 **Option (b) — W4.6 direct artifact-checker demotion.**
 Demote the existing `checkProofGradeTranslationArtifacts` Lean
@@ -196,14 +200,10 @@ This requires the reverse direction of the W4.4 lowering iff
 (`lowerExpr e = .ok ke → Expr.fragmentValid e = true`) plus a doc
 update to the WP4 trust narrative.
 
-Recommend option (a) — W4.5 — because both W4.2 and W4.4
-preservation theorems are the natural foundation for it, and W4.5
-closes the last remaining "compiler-side" charter task. Option (b)
-is small but mostly a doc / role-swap task.
+Recommend option (a) — W4.6 — as the last remaining compiler-side
+charter task; the W4.5 chain is now fully landed.
 
-After W4.5 lands, the natural sequence is:
-
-- W4.6 — demote the direct artifact checker (charter task 6).
+After W4.6 lands, all six WP4 charter tasks are closed.
 
 ## Validation Slice (Standard WP4 Variant)
 
@@ -301,7 +301,6 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The recommended next subtask is W4.5
-(manifest-exactness semantics-preserving lift). Alternative
-option is W4.6 (artifact-checker demotion, smaller scope but
-mostly a role-swap).
+Begin with the runbook. The recommended next subtask is W4.6
+(artifact-checker demotion, the last remaining "compiler-side"
+charter task — smaller scope but mostly a doc / role-swap).

@@ -1806,12 +1806,39 @@ Current status update:
   `evalKernelExpr_status_ne_completed` invariant lemma or a
   structural "all-sub-expressions-succeed" predicate on the
   body).
-- Still open: the body-level / program-level runtime-vs-static
-  lift extending the per-statement W4.5 cuts; the direct
-  artifact checker demotion (W4.6); and the reverse direction
-  of the W4.4 lowering iff (lowering succeeds → precondition
-  holds; useful for W4.6 but not strictly required by the
-  preservation theorem).
+- **W4.5 body-level / program-level runtime-vs-static lift
+  landed** (commits `a4ce975` + `6dbf2fe` + `43df9e2`,
+  [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)
+  +
+  [proof/lean/UOToolchain/ProofGrade.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)):
+  the supporting invariant `evalKernelExpr_status_ne_completed`
+  (proving the kernel-DSL expression evaluator never returns
+  `.status .completed`) discharges the otherwise-pathological
+  case that blocked the per-statement lift under `.completed`
+  preconditions. Per-statement
+  (`evalKernelStatement_kernelSteps_eq_expected_of_completed`),
+  body-level
+  (`evalKernelBody_kernelSteps_eq_expected_of_completed`), and
+  program-level
+  (`evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed`)
+  theorems are all Lean-proved end-to-end. The program-level
+  theorem says: when `evalKernelProgram kp cfg` produces a
+  fully-completed outcome (no error, no early `retStmt (some
+  _)` setting `publicResult`), the runtime `kernelSteps` equals
+  `kp.expectedKernelSteps`. Paper-facing facades
+  `proofGrade_kernel_program_runtime_kernel_steps_eq_expected`
+  and
+  `proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected`
+  expose the program-level fact and its source-side composition
+  with the W4.5 enabling theorem. The full chain is now Lean-
+  proved end-to-end on the happy path: source → IR → kernel
+  runtime → static kernel-program schedule → manifest
+  `kernel_steps` field (the last link via the existing
+  `manifestFieldsExact` exactness fact).
+- Still open: the direct artifact checker demotion (W4.6) and
+  the reverse direction of the W4.4 lowering iff (lowering
+  succeeds → precondition holds; useful for W4.6 but not
+  strictly required by the preservation theorem).
 
 Exit gate:
 
