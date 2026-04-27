@@ -911,4 +911,48 @@ theorem proofGrade_kernel_map_put_none_kernelSteps_fresh
   simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
     hKey, hValue, hRead]
 
+/-! ### W4.5 program-level runtime-vs-static `kernelSteps` lift
+
+`proofGrade_kernel_program_runtime_kernel_steps_eq_expected` exposes
+the W4.5 program-level theorem: when `evalKernelProgram kp cfg`
+produces a fully-completed outcome (no error, no early `retStmt
+(some _)` setting `publicResult`), the runtime `kernelSteps` equals
+`kp.expectedKernelSteps`. The `evalKernelExpr_status_ne_completed`
+invariant on the kernel-DSL evaluator is the supporting fact that
+allows the per-statement (`.completed` + `publicResult preserved`)
+lift to discharge the otherwise-pathological `.status .completed`
+cases on sub-expression evaluation.
+
+Combined with the W4.5 enabling theorem
+`proofGrade_sol_to_kernel_outcome_preservation`, this gives a
+complete source-side runtime-vs-static handle: under the same
+"happy-path" preconditions on the source-side `Sol.evalFunction`,
+the runtime `kernelSteps` equals `kp.expectedKernelSteps`, which in
+turn matches the manifest's `kernel_steps` field via the existing
+`manifestFieldsExact` exactness fact. -/
+
+theorem proofGrade_kernel_program_runtime_kernel_steps_eq_expected
+    (kp : IR.KernelProgram) (cfg : IR.OperationalConfig)
+    (hStatus : (IR.evalKernelProgram kp cfg).status = .completed)
+    (hPub : (IR.evalKernelProgram kp cfg).publicResult = none) :
+    (IR.evalKernelProgram kp cfg).kernelSteps = kp.expectedKernelSteps :=
+  IR.evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
+    kp cfg hStatus hPub
+
+/-- Source-side W4.5 lift: combining the W4.5 enabling theorem with
+the program-level runtime-vs-static lift, the `Sol.evalFunction`'s
+runtime `kernelSteps` equals the kernel program's static expected
+schedule whenever the source-side run completes successfully. -/
+theorem proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected
+    (fn : Sol.Function) (kp : IR.KernelProgram)
+    (cfg : IR.OperationalConfig)
+    (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
+    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn))
+    (hStatus : (Sol.evalFunction fn cfg).status = .completed)
+    (hPub : (Sol.evalFunction fn cfg).publicResult = none) :
+    (Sol.evalFunction fn cfg).kernelSteps = kp.expectedKernelSteps := by
+  rw [proofGrade_sol_to_kernel_outcome_preservation fn kp cfg hLow hEntry] at *
+  exact IR.evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
+    kp cfg hStatus hPub
+
 end UOToolchain
