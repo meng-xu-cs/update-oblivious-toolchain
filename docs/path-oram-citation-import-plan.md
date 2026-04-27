@@ -358,11 +358,12 @@ documented as future strengthening in
 in-scope tasks. Subsequent agents should not re-open them without an
 explicit user redirect.
 
-## Next Non-Doc Step
+## Citation-Route Closure
 
-The next non-documentation step for the current paper is no longer figuring out
-what to cite. It is just executing the citation-route writeup cleanly. The
-stronger import route remains future work.
-
-For a more explicit go / no-go evaluation of the stronger import route, see
-`docs/stronger-import-route-feasibility.md`.
+After the W5.1 / W5.2 import-vs-companion fork was resolved
+2026-04-27 in favor of the citation route, the citation-route
+content frozen in the W5.4 `pathOramLocalPosmapV1_cryptoProvenance`
+record and the W5.3 `pathOramLocalPosmapV1_stashOverflowProvenance`
+record is the paper-main provenance. The W5.6 closure audit
+`pathOramLocalPosmapV1_assumptionAudit_allCited` pins the bundle as
+fully Cited at the Lean type level. WP5 is closed.

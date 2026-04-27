@@ -174,12 +174,5 @@ What is now fixed for the current paper-main route:
   canonical fresh-coin runtime-family interface rather than carried as a
   separate assumption field
 
-Future strengthening beyond that route would be:
-
-- package a genuinely external machine-checked theorem object at the same
-  interface
-- separately import or mechanize the cryptographic/backend proofs behind the
-  explicit assumption bundle rather than stating them as assumptions
-
 The concrete recommended literature source, fallback source, and theorem-field
 mapping are collected in `docs/path-oram-citation-import-plan.md`.

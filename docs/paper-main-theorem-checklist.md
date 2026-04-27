@@ -1,16 +1,15 @@
 # Paper-Main Theorem Checklist
 
-This checklist fixes the theorem-source strategy for a paper after the current
-repo decision:
+This checklist fixes the theorem-source strategy for a paper after the
+W5.1 / W5.2 import-vs-companion fork was resolved 2026-04-27 in favor
+of the citation route:
 
 - the paper route and the appendix / artifact route share the same frozen
   theorem interface, but they are not symmetric as provenance claims
-- the current paper choice is to use the citation route for the standard Path
+- the paper choice is to use the citation route for the standard Path
   ORAM result at that interface
-- the repo should keep the current self-instantiated closure only as appendix /
+- the repo keeps the current self-instantiated closure only as appendix /
   executable-artifact support at exactly the same theorem interface
-- the stronger import route should stay documented only as future work until a
-  real external theorem artifact exists
 
 This does not change the theorem boundary. It changes only the provenance and
 presentation of the ORAM core theorem object.
@@ -19,10 +18,9 @@ For the concrete recommended literature sources and the detailed
 source-to-interface mapping, see
 `docs/path-oram-citation-import-plan.md`.
 
-Status labels:
+Status label:
 
-- `cleared`: fixed for the current citation-route paper profile
-- `future-work`: only needed for a stronger external-theorem import story
+- `cleared`: fixed for the citation-route paper profile
 
 ## Checklist
 
@@ -95,13 +93,6 @@ Status labels:
   separate assumption field. This is an explicit assumption profile, not a new
   mechanized cryptographic proof.
 
-- `future-work` Upgrade the citation route to a genuinely external
-  machine-checked theorem import at the same frozen interface.
-  Evidence:
-  `docs/stronger-import-route-feasibility.md`.
-  The stronger import route remains worth pursuing, but it is not the current
-  paper claim.
-
 ## Candidate Theorem Objects
 
 The docs already suggest a small ordered menu of candidate theorem objects.
@@ -151,8 +142,10 @@ discharges the theorem-side leaf-seed-space realization directly.
 
 ## Exit Condition
 
-This checklist is complete for the current paper when the repo fixes the JACM
-citation route at `PaperMainPathOramTheoremSourceAt`, keeps the appendix route
-as an artifact-side cross-check at the same interface, and states the explicit
-`PathOramLocalPosmapV1SecurityAssumptions` profile without changing the theorem
-boundary. A genuinely external theorem import remains future work.
+This checklist is complete: the repo fixes the JACM citation route at
+`PaperMainPathOramTheoremSourceAt`, keeps the appendix route as an
+artifact-side cross-check at the same interface, and states the
+explicit `PathOramLocalPosmapV1SecurityAssumptions` profile without
+changing the theorem boundary. The W5.6 closure audit
+`pathOramLocalPosmapV1_assumptionAudit_allCited` pins the bundle as
+fully **Cited / externally justified** at the Lean type level.

@@ -30,9 +30,6 @@ The repo path here is:
 Status labels:
 
 - `cleared`: implemented and exercised in the current repo
-- `optional`: useful paper-presentation or future-proofing work, but not
-  required for the imported-theorem bridge to be complete under the current
-  explicit assumption bundle
 
 ## Checklist
 
@@ -201,15 +198,12 @@ Status labels:
   seeded/canonical witness-family, theorem-input, and pair-certificate
   interfaces.
 
-- `optional` The paper-main theorem provenance step is tracked separately in
-  `docs/paper-main-theorem-checklist.md`: supply or cite an external
-  literature-proof object at exactly the same frozen interface while keeping
-  the current self-instantiated route for executable artifact closure. This is
-  still a theorem provenance choice, not a repo-completeness blocker.
-
 ## Exit Condition
 
-This checklist is complete when every non-optional item above is `cleared`
-without weakening the theorem boundary and without introducing backend
-assumptions beyond the explicit `PathOramLocalPosmapV1SecurityAssumptions`
-bundle.
+This checklist is complete: every item above is `cleared`, the
+theorem boundary has not been weakened, and no backend assumption
+beyond the explicit `PathOramLocalPosmapV1SecurityAssumptions`
+bundle has been introduced. The bundle itself was discharged at the
+**Cited / externally justified** level by W5.3 / W5.4 / W5.6 (see
+`docs/top-tier-paper-execution-roadmap.md` "Work Package 5" and the
+Lean record `pathOramLocalPosmapV1_assumptionAudit_allCited`).
