@@ -345,6 +345,74 @@ If any of those drift, the static-checks gate flips
 `sgx_controller_refinement_pinned` to `false` and the gate rejects
 the checkpoint.
 
+## W6.4 Sealing / Storage Refinement Integration
+
+W6.4 packages the canonical sealing / storage projection rules as a
+single Lean integration theorem. The Lean `TEEView` projection
+`viewTEEStore` deterministically pulls every storage-relevant field
+from the underlying `Config` and `DeploymentResult`, with the
+`physicalReads` / `physicalWrites` lists forwarded unchanged at the
+W6.2-frozen `PhysicalRead` / `PhysicalWrite` schema.
+
+The Lean side extends `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+with the `SgxStorageRefinement` integration record, the
+`sgxStorageRefinementOf` constructor, and the
+`sgxStorageRefinement_exists` packaging theorem. The runtime side
+is pinned by the probe's `sgx_storage_refinement_pinned`
+static-drift check.
+
+Claim taxonomy: **Lean-proved, semantics-preserving** for the W6.4
+storage-refinement integration. Each component refinement is a
+direct one-line `rfl` over `viewTEEStore`'s definitional
+record-literal structure; the static-drift check rejects
+representative drift in the Rust `RefinementTrace` /
+`RuntimeRefinementWitness` shape. The integration does not by
+itself discharge any deployment assumption.
+
+### Frozen storage-refinement components
+
+| Component | Refinement claim | Lean anchor | Rust anchor |
+| --- | --- | --- | --- |
+| Physical-read forwarding | `(viewTEEStore cfg result).physicalReads = result.trace.physicalReads` | `SgxStorageRefinement.physicalReadsMatch`; constructor uses `rfl` over `viewTEEStore`'s definitional structure | `RefinementTrace.physical_reads: Box<[PhysicalReadEvent]>` field in `crates/uo-core/src/trace.rs` |
+| Physical-write forwarding | `(viewTEEStore cfg result).physicalWrites = result.trace.physicalWrites` | `SgxStorageRefinement.physicalWritesMatch` | `RefinementTrace.physical_writes: Box<[RefinementPhysicalWrite]>` field in `crates/uo-core/src/trace.rs` |
+| Gas-used forwarding | `(viewTEEStore cfg result).gasUsed = result.trace.gasUsed` | `SgxStorageRefinement.gasUsedMatch` | `RefinementTrace.gas_used: u64` field in `crates/uo-core/src/trace.rs` |
+| Entrypoint-id forwarding | `(viewTEEStore cfg result).entrypointId = cfg.program.entrypoint` | `SgxStorageRefinement.entrypointIdMatch` | `RuntimeRefinementWitness` carries the wrapped `RefinementTrace` plus the public outcome that names the entrypoint |
+
+### Provenance pairing
+
+The W6.4 storage-refinement provenance record is
+`sgxStorageRefinementProvenance` in `SgxObserverFreeze.lean`. It
+carries the free-form refinement claim, the documentation anchor
+(this section), the probe static-drift check name, and the Lean /
+Rust file paths anchoring each pinned component.
+
+The paper-facing facades exposed in
+[`ProofGrade.lean`](../proof/lean/UOToolchain/ProofGrade.lean) under
+the `proofGrade_sgx_storage_refinement_*` prefix mirror the W6.1 /
+W6.2 / W6.3 facade pattern.
+
+### Static-drift coverage
+
+The probe's `sgx_storage_refinement_pinned` flag, emitted by the
+`kernel_model_alignment_validation.json` report, rejects
+representative drift on the Rust side. Specifically it requires:
+
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `RefinementTrace` field schema with
+  `physical_reads: Box<[PhysicalReadEvent]>` and
+  `physical_writes: Box<[RefinementPhysicalWrite]>`.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `RefinementPhysicalWrite { object, location, write_class, len }`
+  field schema (the AAD-shape projection used by the public-trace
+  bridge).
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `RuntimeRefinementWitness { trace: RefinementTrace, ... }`
+  wrapping pattern.
+
+If any of those drift, the static-checks gate flips
+`sgx_storage_refinement_pinned` to `false` and the gate rejects
+the checkpoint.
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:

@@ -1669,4 +1669,63 @@ theorem proofGrade_sgx_controller_refinement_provenance_static_drift_check :
       "sgx_controller_refinement_pinned" :=
   sgxControllerRefinementProvenance_staticDriftCheckName
 
+/-! ### WP6.4 Sealing / Storage Refinement Integration Facades
+
+The facades below expose the W6.4 sealing / storage refinement: the
+canonical Lean `TEEView` projection `viewTEEStore` deterministically
+pulls each storage-relevant field from the underlying `Config` and
+`DeploymentResult`, with the `physicalReads` / `physicalWrites`
+lists forwarded unchanged at the W6.2-frozen `PhysicalRead` /
+`PhysicalWrite` schema.
+
+Claim taxonomy: these facades are **Lean-proved,
+semantics-preserving**. The Lean equalities are direct one-line
+forwarders over `viewTEEStore`'s definitional structure; the
+runtime side is pinned by the probe's
+`sgx_storage_refinement_pinned` static-drift check. -/
+
+/-- Paper-facing W6.4 facade: every `(cfg, result)` pair admits a
+storage-refinement witness packaging the four canonical structural
+equalities. -/
+theorem proofGrade_sgx_storage_refinement_exists
+    (cfg : Config) (result : DeploymentResult) :
+    Nonempty (SgxStorageRefinement cfg result) :=
+  sgxStorageRefinement_exists cfg result
+
+/-- Paper-facing W6.4 facade: the `viewTEEStore` projection forwards
+the underlying trace's `physicalReads` list unchanged. -/
+theorem proofGrade_sgx_storage_refinement_physical_reads_match
+    (cfg : Config) (result : DeploymentResult) :
+    (viewTEEStore cfg result).physicalReads = result.trace.physicalReads :=
+  (sgxStorageRefinementOf cfg result).physicalReadsMatch
+
+/-- Paper-facing W6.4 facade: the `viewTEEStore` projection forwards
+the underlying trace's `physicalWrites` list unchanged. -/
+theorem proofGrade_sgx_storage_refinement_physical_writes_match
+    (cfg : Config) (result : DeploymentResult) :
+    (viewTEEStore cfg result).physicalWrites = result.trace.physicalWrites :=
+  (sgxStorageRefinementOf cfg result).physicalWritesMatch
+
+/-- Paper-facing W6.4 facade: the `viewTEEStore` projection forwards
+the underlying trace's `gasUsed` value unchanged. -/
+theorem proofGrade_sgx_storage_refinement_gas_used_match
+    (cfg : Config) (result : DeploymentResult) :
+    (viewTEEStore cfg result).gasUsed = result.trace.gasUsed :=
+  (sgxStorageRefinementOf cfg result).gasUsedMatch
+
+/-- Paper-facing W6.4 facade: the `viewTEEStore` projection forwards
+the underlying config's `program.entrypoint` value unchanged. -/
+theorem proofGrade_sgx_storage_refinement_entrypoint_id_match
+    (cfg : Config) (result : DeploymentResult) :
+    (viewTEEStore cfg result).entrypointId = cfg.program.entrypoint :=
+  (sgxStorageRefinementOf cfg result).entrypointIdMatch
+
+/-- Paper-facing W6.4 facade: the storage-refinement provenance
+record references the `sgx_storage_refinement_pinned` probe
+static-drift check. -/
+theorem proofGrade_sgx_storage_refinement_provenance_static_drift_check :
+    sgxStorageRefinementProvenance.staticDriftCheckName =
+      "sgx_storage_refinement_pinned" :=
+  sgxStorageRefinementProvenance_staticDriftCheckName
+
 end UOToolchain

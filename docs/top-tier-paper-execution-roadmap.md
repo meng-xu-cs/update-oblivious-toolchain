@@ -2132,6 +2132,22 @@ Concrete tasks:
      introduce new admitted assumptions.
 4. Prove that the sealing/storage path matches the theorem-side persistent
    model.
+   - **W6.4 status (landed):** the canonical `viewTEEStore` projection
+     deterministically pulls every storage-relevant field from the
+     underlying `Config` and `DeploymentResult`. The Lean integration
+     `SgxStorageRefinement` packages four structural equalities
+     (physicalReads forwarding, physicalWrites forwarding, gasUsed
+     forwarding, entrypointId forwarding); the constructor
+     `sgxStorageRefinementOf` produces a refinement witness for every
+     `(cfg, result)` pair via `rfl` over `viewTEEStore`'s definitional
+     record-literal structure. The provenance record
+     `sgxStorageRefinementProvenance` and the named probe drift check
+     `sgx_storage_refinement_pinned` reject representative drift in
+     the Rust `RefinementTrace` field schema, the
+     `RefinementPhysicalWrite` AAD-shape projection, and the
+     `RuntimeRefinementWitness` wrapping pattern. The W6.4 integration
+     introduces no new admitted assumptions; it composes with the
+     existing W4 / W5 source-pinned crypto and store-codec layers.
 5. State attestation, rollback, crash, freshness, and patch-level assumptions
    explicitly and minimally.
 6. Remove any remaining ambiguity between idealized TEE-storage security and

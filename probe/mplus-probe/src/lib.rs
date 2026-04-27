@@ -29697,6 +29697,33 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // theorem is `sgxControllerObserverRefinementOf`. The
     // refinement is documented in `docs/tee-runtime-hardening.md`
     // under "W6.3 Controller-Refinement Integration".
+    // W6.4: pin the canonical hostile-host sealing / storage
+    // refinement — the runtime's `RefinementTrace` keeps
+    // `physical_reads: Box<[PhysicalReadEvent]>` and
+    // `physical_writes: Box<[RefinementPhysicalWrite]>` lists in
+    // boxed, fixed-shape buffers, the `RuntimeRefinementWitness`
+    // wraps that trace plus the controller and runtime-kernel
+    // witnesses, and the public-trace projection forwards each
+    // storage-relevant field deterministically. The matching Lean
+    // provenance record is `sgxStorageRefinementProvenance`; the
+    // W6.4 integration is `sgxStorageRefinementOf`. The
+    // refinement is documented in
+    // `docs/tee-runtime-hardening.md` under
+    // "W6.4 Sealing / Storage Refinement Integration".
+    let sgx_storage_refinement_pinned = core_trace_source.contains("pub struct RefinementTrace {")
+        && core_trace_source.contains("    pub opcode_trace: Box<[String]>,")
+        && core_trace_source.contains("    pub logical_accesses: Box<[LogicalEvent]>,")
+        && core_trace_source.contains("    pub logical_writes: Box<[LogicalEvent]>,")
+        && core_trace_source.contains("    pub physical_reads: Box<[PhysicalReadEvent]>,")
+        && core_trace_source.contains("    pub physical_writes: Box<[RefinementPhysicalWrite]>,")
+        && core_trace_source.contains("    pub gas_used: u64,")
+        && core_trace_source.contains("pub struct RefinementPhysicalWrite {")
+        && core_trace_source.contains("    pub object: String,")
+        && core_trace_source.contains("    pub location: String,")
+        && core_trace_source.contains("    pub write_class: String,")
+        && core_trace_source.contains("    pub len: usize,")
+        && core_trace_source.contains("pub struct RuntimeRefinementWitness {")
+        && core_trace_source.contains("    trace: RefinementTrace,");
     let sgx_controller_refinement_pinned = core_trace_source
         .contains("let mut controller_phase_order = vec![ControllerPhase::EnclaveEnter];")
         && core_trace_source
@@ -34192,6 +34219,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && sgx_boundary_call_model_pinned
         && sgx_persistent_io_model_pinned
         && sgx_controller_refinement_pinned
+        && sgx_storage_refinement_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34881,6 +34909,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             sgx_persistent_io_model_pinned,
         "sgx_controller_refinement_pinned":
             sgx_controller_refinement_pinned,
+        "sgx_storage_refinement_pinned":
+            sgx_storage_refinement_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":

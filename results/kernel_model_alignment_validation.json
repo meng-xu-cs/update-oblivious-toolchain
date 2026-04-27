@@ -1994,6 +1994,7 @@
   "sgx_controller_refinement_pinned": true,
   "sgx_observer_surface_pinned": true,
   "sgx_persistent_io_model_pinned": true,
+  "sgx_storage_refinement_pinned": true,
   "shell_boundary_bundle_refinement_guard_present": true,
   "shell_boundary_exact_bridge_checks": [
     {

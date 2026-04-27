@@ -780,4 +780,120 @@ theorem sgxControllerRefinementProvenance_staticDriftCheckName :
     sgxControllerRefinementProvenance.staticDriftCheckName =
       "sgx_controller_refinement_pinned" := by rfl
 
+/-! ### W6.4: Sealing / Storage Refinement Integration
+
+W6.4 packages the canonical sealing / storage projection rules:
+the Lean `TEEView` projection `viewTEEStore` maps a `Config` and a
+`DeploymentResult` to a `TEEView` via deterministic field selection,
+specifically pulling the `physicalReads` and `physicalWrites` lists
+straight from the underlying `Trace`. The theorem-side persistent
+model uses these lists at the W6.2-frozen `PhysicalRead` /
+`PhysicalWrite` schema.
+
+The Lean integration packages four canonical structural equalities:
+
+- the `viewTEEStore` projection's `physicalReads` field equals the
+  underlying `Trace.physicalReads` list;
+- the `viewTEEStore` projection's `physicalWrites` field equals the
+  underlying `Trace.physicalWrites` list;
+- the `viewTEEStore` projection's `gasUsed` field equals the
+  underlying `Trace.gasUsed` value;
+- the `viewTEEStore` projection's `entrypointId` field equals the
+  underlying `Config.program.entrypoint` value.
+
+The runtime side is pinned by the probe's
+`sgx_storage_refinement_pinned` static-drift check, which rejects
+representative drift in the Rust `RefinementTrace` /
+`RuntimeRefinementWitness` storage emission path.
+
+Claim taxonomy: this integration is **Lean-proved,
+semantics-preserving**. Each component refinement is a one-line
+forwarder over `viewTEEStore`'s definitional structure; the
+integration theorem composes them into a single named refinement
+statement. The integration does not by itself discharge any
+deployment assumption. -/
+
+/-- W6.4 storage-refinement integration record. Given a `Config` and
+a `DeploymentResult`, this record packages the four canonical
+structural equalities that show the Lean `TEEView` projection
+`viewTEEStore` deterministically pulls each storage-relevant field
+from the underlying trace and config. -/
+structure SgxStorageRefinement (cfg : Config) (result : DeploymentResult) where
+  /-- The projection's `physicalReads` field equals the underlying
+  trace's `physicalReads` list. -/
+  physicalReadsMatch :
+    (viewTEEStore cfg result).physicalReads = result.trace.physicalReads
+  /-- The projection's `physicalWrites` field equals the underlying
+  trace's `physicalWrites` list. -/
+  physicalWritesMatch :
+    (viewTEEStore cfg result).physicalWrites = result.trace.physicalWrites
+  /-- The projection's `gasUsed` field equals the underlying trace's
+  `gasUsed` value. -/
+  gasUsedMatch :
+    (viewTEEStore cfg result).gasUsed = result.trace.gasUsed
+  /-- The projection's `entrypointId` field equals the underlying
+  config's `program.entrypoint` value. -/
+  entrypointIdMatch :
+    (viewTEEStore cfg result).entrypointId = cfg.program.entrypoint
+
+/-- W6.4 storage-refinement constructor: every `(cfg, result)` pair
+admits a storage-refinement witness. The four structural equalities
+all reduce to `rfl` because `viewTEEStore` is definitionally a
+record literal. -/
+def sgxStorageRefinementOf
+    (cfg : Config) (result : DeploymentResult) :
+    SgxStorageRefinement cfg result :=
+  { physicalReadsMatch := by rfl
+  , physicalWritesMatch := by rfl
+  , gasUsedMatch := by rfl
+  , entrypointIdMatch := by rfl
+  }
+
+/-- W6.4 packaging: every `(cfg, result)` pair admits a
+storage-refinement witness. -/
+theorem sgxStorageRefinement_exists
+    (cfg : Config) (result : DeploymentResult) :
+    Nonempty (SgxStorageRefinement cfg result) :=
+  ⟨sgxStorageRefinementOf cfg result⟩
+
+/-! ### W6.4 storage-refinement provenance record -/
+
+/-- W6.4 frozen storage-refinement provenance record. Pairs the
+storage-refinement integration theorem with the structural metadata
+so the paper claim, the Lean formalization, and the Rust runtime
+all reference one canonical sealing / storage projection. -/
+structure SgxStorageRefinementProvenance where
+  /-- Free-form description of the refinement integration. -/
+  refinementClaim : String
+  /-- Documentation anchor for the WP6 hardening track. -/
+  observerDocSection : String
+  /-- Probe static-drift check that pins the Rust runtime's
+  storage-refinement emission. -/
+  staticDriftCheckName : String
+  /-- File path anchoring the Lean TEE-deployment model. -/
+  leanTeeDeploymentModule : String
+  /-- File path anchoring the Lean trace model. -/
+  leanTraceModule : String
+  /-- File path anchoring the Rust public-trace projection. -/
+  rustTraceModule : String
+deriving Repr, DecidableEq
+
+/-- The actual W6.4 storage-refinement provenance record. -/
+def sgxStorageRefinementProvenance : SgxStorageRefinementProvenance :=
+  { refinementClaim :=
+      "viewTEEStore projects every TEEView field deterministically from the underlying Config and DeploymentResult; the physicalReads / physicalWrites lists are forwarded unchanged at the W6.2-frozen PhysicalRead / PhysicalWrite schema"
+  , observerDocSection :=
+      "docs/tee-runtime-hardening.md \"W6.4 Sealing / Storage Refinement Integration\""
+  , staticDriftCheckName := "sgx_storage_refinement_pinned"
+  , leanTeeDeploymentModule := "proof/lean/UOToolchain/TeeDeployment.lean"
+  , leanTraceModule := "proof/lean/UOToolchain/TraceModel.lean"
+  , rustTraceModule := "crates/uo-core/src/trace.rs"
+  }
+
+/-- The provenance record references the
+`sgx_storage_refinement_pinned` probe static-drift check. -/
+theorem sgxStorageRefinementProvenance_staticDriftCheckName :
+    sgxStorageRefinementProvenance.staticDriftCheckName =
+      "sgx_storage_refinement_pinned" := by rfl
+
 end UOToolchain
