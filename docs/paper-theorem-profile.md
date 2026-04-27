@@ -292,9 +292,17 @@ What is still open:
   `Statement.kernelLowerableSchedule → lowerStatements ok`, and the
   program-level corollary
   `CompiledFunction.kernelLowerable → lowerCompiledFunction ok`).
-  The W4.4 semantics-preservation theorem (Session B-2) and the
-  paper-facing facade (Session C) remain open; the iff reverse
-  directions are also still deferred. The only
+  W4.4 Session B-2 then landed the per-Expr semantics-preservation
+  theorem `IR.lowerExpr_preserves_semantics` (with mutual companions
+  for pure expressions and list companions), enabled by a
+  partial→def evaluator refactor that makes `evalExpr` /
+  `evalKernelExpr` reducible by `rfl` / `simp`. A paper-facing
+  facade `proofGrade_ir_to_kernel_expr_preservation` (and a
+  pure-expression variant) re-exports through `ProofGrade.lean`.
+  The Statement / Body / Program-level lifts (which mechanically
+  lift the per-Expr result through statement evaluation, body
+  evaluation, and entrypoint resolution) and the iff reverse
+  directions are still deferred. The only
   `unsupported` evaluator cases are `Expr.{structField,arrayIndex}`,
   which `fragmentValid` rejects, so they cannot appear in an
   accepted IR program.

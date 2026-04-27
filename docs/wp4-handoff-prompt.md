@@ -23,15 +23,16 @@ Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
 **W4.1**, **W4.1b**, **W4.3** (full theorem + paper facade),
 **W4.1+**, **W4.1++**, **W4.1+++** (store-update threading),
 **W4.4 Session A** (typed kernel DSL + semantics + lowering
-definitions), and **W4.4 Session B-1** (forward-direction lowering
-iff theorems at all four levels: Expr / Statement / schedule /
-program) are all landed. The W4.1 evaluator is total over the
-structural admitted fragment with masked-store semantics; the
-kernel-DSL Lean mirror shares the same `IR.Outcome` type so the
-W4.4 preservation theorem can be a literal outcome equality; and
-every kernel-lowerable IR program is now provably lowerable to a
-kernel program. The next subtask is W4.4 Session B-2 (semantics-
-preservation theorem) followed by Session C (paper-facing facade).
+definitions), **W4.4 Session B-1** (forward-direction lowering
+iff theorems at all four levels), and the **partial→def evaluator
+refactor + W4.4 Session B-2 per-Expr semantics-preservation +
+ProofGrade projection** are all landed. The W4.4 charter task 4
+is now Lean-proved at the per-expression level: `IR.lowerExpr_
+preserves_semantics` covers all 11 `Expr` constructors, mutually
+with pure-expression and list companions, projected through
+`ProofGrade.lean` as `proofGrade_ir_to_kernel_expr_preservation`.
+The next deliverable is the Statement / Body / Program-level lifts
+(mechanical mutual recursion over the per-Expr base).
 
 ## First, Read These Files In This Exact Order
 
@@ -128,47 +129,50 @@ land in:
 W4.4 Session B-1 is landed; the next subtask is **W4.4 Session B-2**:
 the semantics-preservation theorem.
 
-**Subtask W4.4 Session B-2: Semantics-preservation theorem.**
+**Subtask W4.4 Statement/Body/Program-level preservation lifts.**
 
-**Important blocker** discovered while attempting B-2 in the
-previous session (commit `831457c`): all of the W4.1 / W4.4 Session
-A evaluators (`evalExpr`, `evalStatement`, `evalBody`, `evalForLoop`,
-`evalKernelExpr`, `evalKernelPureExpr`, `evalKernelStatement`,
-`evalKernelBody`) are declared as `partial def`. Lean 4 does *not*
-automatically reduce `partial def` calls by `rfl` / `simp`, so
-proving even the trivial
-`lowerExpr (.literal v) = .ok ke → evalExpr cfg env (.literal v) =
-evalKernelExpr cfg env ke` requires either:
+The per-Expr preservation theorem (`IR.lowerExpr_preserves_semantics`
+plus pure / list companions) is landed and projected through
+`ProofGrade.lean` as `proofGrade_ir_to_kernel_expr_preservation`.
+The remaining work for the full W4.4 IR-to-kernel correctness
+deliverable is the structural lift through statement / body /
+program evaluation.
 
-(a) **Evaluator refactor.** Change every evaluator from `partial
-def` to `def` with explicit `termination_by` / `decreasing_by`
-clauses. The recursion measures are tractable:
-- `evalExpr` / `evalKernelExpr`: `sizeOf` of the input expression.
-- `evalForLoop`: `(endN - i)`.
-- `evalBody` / `evalKernelBody`: list length plus subterm sizes.
-This is invasive — every existing callsite stays the same, but
-each evaluator's termination must be verified. Estimated 1-2
-sessions for the refactor.
+Concretely:
 
-(b) **Use `partial def` opaque lemmas.** Lean 4 generates
-`evalExpr.eq_*` lemmas under `Lean.Elab.WF.eqns_*` for `partial def`
-unfolding. They can be invoked via `unfold evalExpr` or via direct
-`rw` against `evalExpr.eq_def` (auto-generated). This avoids the
-refactor but the proof structure is more involved.
+1. Prove `lowerStatement_preserves_semantics`: per-Statement
+   preservation. Each statement constructor case follows the
+   same pattern as the per-Expr proof:
+   - case-split on each sub-lowering's success/error
+   - extract the kernel-side witness via `Except.ok.inj`
+   - substitute, unfold both evaluators
+   - apply per-Expr IH for sub-expressions; then close by `rfl`.
+   The `cellSet` / `arraySet` / `mapPut` cases need additional
+   case-splits on the predicate option and on the evaluated
+   predicate boolean to align both evaluators' masked-store
+   semantics.
 
-(c) **Structural recursion via `Expr.rec`.** Define the preservation
-theorem directly via `Expr.rec` / `Statement.rec` motives, providing
-each constructor case explicitly. This sidesteps the evaluator
-reduction issue but requires explicit recursor application for
-nested-inductive types.
+2. Prove `lowerStatementsAux_preserves_semantics` /
+   `lowerStatements_preserves_semantics`: list-level lifts using
+   the per-Statement theorem. The `sawReturn` parameter threads
+   through both `evalBody` and `lowerStatementsAux`.
 
-Recommended path: option (a) — the evaluator refactor. The clean
-`def`-based reduction makes downstream theorem work much easier
-and is the canonical Lean 4 pattern.
+3. Prove `lowerCompiledFunction_preserves_semantics`: program-
+   level theorem. The IR's `evalContract` looks up the entrypoint
+   in `cfg.contract.functions`; the kernel's `evalKernelProgram`
+   takes the program directly. The theorem requires that
+   `cfg.entrypoint` resolves to `fn` for the IR side, and the
+   kernel program is `lowerCompiledFunction fn = .ok kp`. Then
+   `evalContract cfg = evalKernelProgram kp cfg`.
 
-After resolving the blocker, prove per-Expr / per-Statement /
-program-level preservation lemmas mirroring the Session B-1
-forward iff structure.
+4. Project the program-level theorem through `ProofGrade.lean` as
+   `proofGrade_ir_to_kernel_program_preservation`.
+
+The proofs should mirror the W4.4 Session B-2 per-Expr structure
+(`unfold + Except.ok.inj + subst + rw [ih] + rfl`).
+
+Estimated: 1-2 sessions for the Statement/Body/Program lifts plus
+ProofGrade projection.
 
 If you would prefer to drive **W4.2** (source-to-IR correctness)
 instead, see the runbook's "Recommended Starting Subtask" section
@@ -277,8 +281,8 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The first technical step is W4.4 Session
-B-2 (semantics-preservation theorem; B-1 forward iffs are landed).
-If you prefer strict deliverable order, the runbook's "Recommended
-Starting Subtask" section also documents the W4.2 source-to-IR
-AST-pull-back framing.
+Begin with the runbook. The first technical step is the W4.4
+Statement / Body / Program-level preservation lifts (per-Expr is
+landed). If you prefer strict deliverable order, the runbook's
+"Recommended Starting Subtask" section also documents the W4.2
+source-to-IR AST-pull-back framing.

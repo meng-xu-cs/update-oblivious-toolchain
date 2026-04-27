@@ -546,17 +546,38 @@ should be its own commit:
 - *(landed)* WP4 status / handoff status update for B-1 (commit
   `703f9ac`).
 - *(landed, deferral note)* W4.4 Session B-2 placeholder + concrete
-  blocker (commits `2a05c72`, `831457c`): identified that all of
-  the W4.1 / W4.4 Session A evaluators are `partial def`, which
-  Lean 4 does not auto-reduce by `rfl` / `simp`; the per-Expr
-  preservation theorem cannot be closed without first either
-  refactoring the evaluators to `def` (with `termination_by`),
-  using `Lean.Elab.WF.eqns_*` opaque lemmas, or proving via
-  structural recursion principles directly. This is a *policy
-  decision* about which path to take.
-- *(next, blocked on policy)* W4.4 Session B-2: semantics-
-  preservation theorem proper. Three candidate paths documented in
-  the `KernelDsl.lean` deferral comment.
+  blocker (commits `2a05c72`, `831457c`, `786923e`).
+- *(landed)* `partial def → def` evaluator refactor (commit
+  `de979bb`): `evalExpr` / `evalExprList` / `evalStatement` /
+  `evalBody` / `evalForLoop` / `evalKernelExpr` /
+  `evalKernelExprList` / `evalKernelPureExpr` /
+  `evalKernelPureExprList` / `evalKernelStatement` /
+  `evalKernelBody` are all now `def`. Most are structurally
+  recursive (Lean auto-infers); `evalForLoop` uses an explicit
+  `(sizeOf body, endN - i)` lex measure for well-founded
+  recursion. The evaluators now reduce by `rfl` / `simp` /
+  `unfold`, unblocking semantics-preservation proofs.
+- *(landed)* W4.4 Session B-2 trivial cases (commit `81b4953`):
+  literal / var / cellGet preservation, exercising the
+  `evalExpr.cellGet` ↔ `OperationalConfig.readObject` equivalence.
+- *(landed)* W4.4 Session B-2 full per-Expr preservation (commit
+  `326d710`): `IR.lowerExpr_preserves_semantics` covering all 11
+  `Expr` constructors, plus the pure-expression and list-companion
+  versions. Each inductive case case-splits on sub-lowering
+  success, extracts the kernel-side witness via `Except.ok.inj`,
+  substitutes via `subst`, then unfolds both evaluators and
+  applies the IH.
+- *(landed)* W4.4 Session C (partial) — paper-facing facade
+  (commit `849c1ae`): `proofGrade_ir_to_kernel_expr_preservation`
+  and `proofGrade_ir_to_kernel_pure_expr_preservation` in
+  `ProofGrade.lean`.
+- *(next)* W4.4 Statement / Body / Program-level preservation
+  lifts. Mechanical mutual recursion mirroring the W4.4 Session
+  B-1 forward iffs but lifting the per-Expr preservation through
+  `evalStatement` / `evalBody` / `evalContract`. Then project
+  through `ProofGrade.lean` as
+  `proofGrade_ir_to_kernel_statement_preservation` /
+  `_body_preservation` / `_program_preservation`.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

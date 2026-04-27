@@ -1631,6 +1631,32 @@ Current status update:
   secret based on `StateObject.confidential`) and structured value
   updates clean. `evalContract` discards the final `cfg` and returns
   the outcome unchanged.
+- Subtask W4.4 Session B-2 (per-Expr semantics-preservation
+  theorem) landed (commits `de979bb` for the partial→def
+  evaluator refactor, `326d710` for the proof, `849c1ae` for the
+  ProofGrade projection). The W4.1 / W4.4 Session A evaluators
+  (`evalExpr`, `evalExprList`, `evalStatement`, `evalBody`,
+  `evalForLoop`, `evalKernelExpr`, `evalKernelPureExpr`,
+  `evalKernelExprList`, `evalKernelPureExprList`,
+  `evalKernelStatement`, `evalKernelBody`) are now `def` (not
+  `partial def`) so their equations reduce by `rfl` / `simp` /
+  `unfold`. The for-loop case in `IRSemantics.lean` uses an
+  explicit `(sizeOf body, endN - i)` lex measure for well-founded
+  recursion. The full per-Expr semantics-preservation theorem
+  `IR.lowerExpr_preserves_semantics` (with mutual companions
+  `lowerExprList_preserves_semantics`,
+  `lowerPureExpr_preserves_semantics`,
+  `lowerPureExprList_preserves_semantics`) covers all 11 `Expr`
+  constructors. Each inductive case case-splits on the
+  sub-lowering's success/error, extracts the kernel-side witness
+  via `Except.ok.inj`, substitutes via `subst`, then unfolds both
+  evaluators and applies the IH. The
+  `select` and `arrayGet` / `mapGet` cases additionally case-split
+  on the evaluated condition or storage value to align the IR-side
+  inline lookups with the kernel-side `OperationalConfig.readObject`
+  helper. A paper-facing facade
+  `proofGrade_ir_to_kernel_expr_preservation` (and a pure-expression
+  variant) re-exports through `ProofGrade.lean`.
 - Subtask W4.4 Session B-1 (forward-direction lowering iff
   theorems) landed (commits `1be2c58`, `90e9cde`, `1dcd8ef`,
   [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)):
@@ -1687,13 +1713,15 @@ Current status update:
   the only `unsupported` constructors are `Expr.{structField,
   arrayIndex}`, which `Expr.fragmentValid` already rejects.
 - Still open: the *real* source-to-IR correctness theorem (W4.2),
-  W4.4 Session B-2 (semantics-preservation theorem) and Session C
-  (`ProofGrade.lean` projection), the manifest-exactness
-  semantics-preserving lift (W4.5), and the direct artifact
-  checker demotion (W4.6). The reverse direction of the W4.4
-  lowering iff (lowering succeeds → precondition holds) is also
-  deferred; it is useful for W4.6 but not strictly required by the
-  preservation theorem.
+  the Statement / Body / Program-level lifts of the W4.4
+  preservation theorem (which mechanically lift the per-Expr
+  result through statement evaluation, body evaluation, and
+  entrypoint resolution), the manifest-exactness semantics-
+  preserving lift (W4.5), and the direct artifact checker
+  demotion (W4.6). The reverse direction of the W4.4 lowering iff
+  (lowering succeeds → precondition holds) is also deferred; it is
+  useful for W4.6 but not strictly required by the preservation
+  theorem.
 
 Exit gate:
 
