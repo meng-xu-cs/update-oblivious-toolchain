@@ -368,6 +368,19 @@ What is still open:
   kernel sides; the per-field W4.5 manifest-exactness lifts
   proceed by relating each manifest field to the appropriate
   projection of this shared outcome.
+  **W4.5 main body landed**: static projections on
+  `IR.KernelProgram` (`expectedKernelSteps`,
+  `expectedKernelStepCount`, `expectedObjectWriteIds`) give each
+  runtime-meaningful manifest field a Lean-side semantic
+  referent; paper-facing facades expose each as a single named
+  handle and pin the kernel-side projections back to the source
+  via `Sol.lowerFunction` and `IR.lowerCompiledFunction`. Narrow
+  per-statement runtime-vs-static lifts certify that the runtime
+  `kernelSteps` bookkeeping equals the static expected schedule
+  for each masked-store statement (`cellSet`/`arraySet`/`mapPut`
+  with `predicate = none`) under structural "value sub-expression
+  returns `.value _`" preconditions. The body-level /
+  program-level extension is the natural W4.5 follow-up.
 - WP5 (concrete backend assumptions): full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,

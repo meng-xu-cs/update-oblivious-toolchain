@@ -589,13 +589,23 @@ should be its own commit:
   composes W4.2 + W4.4 into a single source-to-kernel runtime
   handle. The per-field manifest-exactness lifts of W4.5 build
   on this composition.
-- *(next)* WP4 charter task 5 main body (per-field manifest-
-  exactness semantics-preserving lifts: kernel_steps,
-  oram_accesses, read/write counts, max_commit_ops,
-  max_hash_part_bytes, etc.), or charter task 6 (artifact-
-  checker demotion, W4.6). The W4.4 reverse iff direction
-  (lowering succeeds → precondition holds) is also a useful but
-  optional W4.6 building block.
+- *(landed)* W4.5 main body — static projections on
+  `IR.KernelProgram` (`expectedKernelSteps`,
+  `expectedKernelStepCount`, `expectedObjectWriteIds`), paper-
+  facing facades exposing each as a single named handle, source-
+  side handles via the lowering chain, and narrow per-statement
+  runtime-vs-static lifts for the masked-store statements (commit
+  `0bfd756`,
+  [proof/lean/UOToolchain/KernelDsl.lean](../proof/lean/UOToolchain/KernelDsl.lean)
+  +
+  [proof/lean/UOToolchain/ProofGrade.lean](../proof/lean/UOToolchain/ProofGrade.lean)).
+- *(next)* Body-level / program-level runtime-vs-static lift
+  extending the per-statement W4.5 cuts (requires either the
+  `evalKernelExpr_status_ne_completed` invariant or a structural
+  "all-sub-expressions-succeed" predicate); WP4 charter task 6
+  (artifact-checker demotion, W4.6). The W4.4 reverse iff
+  direction (lowering succeeds → precondition holds) is also a
+  useful but optional W4.6 building block.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

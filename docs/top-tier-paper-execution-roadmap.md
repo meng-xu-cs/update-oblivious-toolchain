@@ -1778,14 +1778,40 @@ Current status update:
   IR, and kernel sides; the per-field W4.5 lifts proceed by
   relating each manifest field to the appropriate projection of
   this shared outcome.
-- Still open: the per-field manifest-exactness semantics-
-  preserving lifts (W4.5 main body — kernel_steps,
-  oram_accesses, read/write counts, max_commit_ops,
-  max_hash_part_bytes, etc.), the direct artifact checker
-  demotion (W4.6), and the reverse direction of the W4.4
-  lowering iff (lowering succeeds → precondition holds; useful
-  for W4.6 but not strictly required by the preservation
-  theorem).
+- **W4.5 main body (per-field manifest-exactness handles)
+  landed** (commit `0bfd756`,
+  [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)
+  +
+  [proof/lean/UOToolchain/ProofGrade.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)):
+  static projections on `IR.KernelProgram` (`expectedKernelSteps`,
+  `expectedKernelStepCount`, `expectedObjectWriteIds`) give each
+  runtime-meaningful manifest field a Lean-side semantic referent.
+  Paper-facing facades (`proofGrade_kernel_program_expected_kernel_steps`,
+  `_expected_kernel_step_count`, `_expected_object_write_ids`,
+  `_secret_args`, `_param_names`) expose each as a single named
+  handle. Source-side handles
+  (`proofGrade_sol_function_secret_args_via_lowering`,
+  `_params_via_lowering`,
+  `proofGrade_lowered_compiled_function_secret_args`, `_params`)
+  pin the kernel-side projections back to the source. Narrow
+  runtime-vs-static lifts
+  (`proofGrade_kernel_cell_set_none_kernelSteps`,
+  `_array_set_none_kernelSteps`,
+  `_map_put_none_kernelSteps_existing`, `_fresh`) prove the
+  runtime `kernelSteps` bookkeeping equals the static expected
+  schedule for each masked-store statement under structural
+  "value sub-expression returns `.value _`" preconditions; the
+  body-level / program-level lift is the natural follow-up
+  (requires either the
+  `evalKernelExpr_status_ne_completed` invariant lemma or a
+  structural "all-sub-expressions-succeed" predicate on the
+  body).
+- Still open: the body-level / program-level runtime-vs-static
+  lift extending the per-statement W4.5 cuts; the direct
+  artifact checker demotion (W4.6); and the reverse direction
+  of the W4.4 lowering iff (lowering succeeds → precondition
+  holds; useful for W4.6 but not strictly required by the
+  preservation theorem).
 
 Exit gate:
 

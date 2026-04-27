@@ -57,13 +57,19 @@ projects this composition through `ProofGrade.lean`: for every Sol
 function `fn` whose lowering to a kernel program `kp` succeeds and
 every IR `OperationalConfig` whose entrypoint resolves to the
 lowered function, `Sol.evalFunction fn cfg = IR.evalKernelProgram
-kp cfg`.
+kp cfg`. The W4.5 main body adds static projections on
+`IR.KernelProgram` (`expectedKernelSteps`,
+`expectedKernelStepCount`, `expectedObjectWriteIds`), paper-facing
+facades exposing each, source-side handles via the lowering chain,
+and narrow per-statement runtime-vs-static lifts for the masked-
+store statements.
 
-WP4 charter task **5 main body** (per-field manifest-exactness
-semantics-preserving lifts) and task **6** (direct artifact-checker
-demotion) remain open; the W4.4 reverse iff direction (lowering
-succeeds → precondition holds) is also still deferred (useful for
-W4.6 but not required by W4.4).
+WP4 charter task **6** (direct artifact-checker demotion) remains
+open. The W4.5 body-level / program-level runtime-vs-static lift
+extending the per-statement cuts is the natural W4.5 follow-up.
+The W4.4 reverse iff direction (lowering succeeds → precondition
+holds) is also still deferred (useful for W4.6 but not required by
+W4.4).
 
 ## First, Read These Files In This Exact Order
 
@@ -167,21 +173,19 @@ the semantics-preservation theorem.
 
 The next subtask is one of:
 
-**Option (a) — W4.5 main body (per-field manifest-exactness lifts).**
-The W4.5 enabling theorem (`proofGrade_sol_to_kernel_outcome_
-preservation` in `ProofGrade.lean`) is now landed; it composes
-W4.2 + W4.4 into a single source-to-kernel runtime handle. The
-remaining W4.5 work is to upgrade each field of
-`ProofGradeCompilerFacts.manifestFieldsExact` (currently in the
-exactness/export layer: `secret_args`, `param_names`, manifest
-boundary lengths, `kernel_steps`, `oram_accesses`, read/write
-counts, `max_commit_ops`, `max_hash_part_bytes`) to a
-semantics-preserving statement that relates the field to the
-appropriate projection of the shared `Sol`/`IR`/`Kernel` runtime
-outcome. Recommend starting with `kernel_steps` (most directly
-semantic), which needs an additional kernel-DSL theorem
-(`KernelProgram.expectedKernelSteps` matches the runtime
-`oc.kernelSteps` on completion).
+**Option (a) — W4.5 body-level / program-level runtime-vs-static lift.**
+The W4.5 main-body per-statement narrow lifts are landed
+(`proofGrade_kernel_cell_set_none_kernelSteps` and friends in
+`ProofGrade.lean`); they certify that each masked-store statement's
+runtime `kernelSteps` equals the static expected schedule under
+"value sub-expression returns `.value _`" preconditions. The natural
+extension is to lift these per-statement results through
+`evalKernelBody` and `evalKernelProgram`, giving a program-level
+"runtime `kernelSteps` equals `kp.expectedKernelSteps` under
+`.completed` outcome" theorem. This requires either the
+`evalKernelExpr_status_ne_completed` invariant lemma (proving the
+kernel-expression evaluator never returns `.status .completed`) or
+a structural "all-sub-expressions-succeed" predicate on the body.
 
 **Option (b) — W4.6 direct artifact-checker demotion.**
 Demote the existing `checkProofGradeTranslationArtifacts` Lean
