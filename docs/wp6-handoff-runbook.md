@@ -62,13 +62,16 @@ post-WP5 status of the explicit
   expose the bundle-closure facts.
 
 WP5 charter tasks **1 and 2** (machine-checked import vs companion
-mechanization) remain open as a research-scope policy fork. Per
+mechanization) were resolved on 2026-04-27 in favor of the citation
+route by user decision (see
 [`docs/stronger-import-route-feasibility.md`](./stronger-import-route-feasibility.md),
-no external machine-checked Path-ORAM theorem object cleanly matches
-`PaperMainPathOramTheoremSourceAt` today; closing W5.1 / W5.2 requires
-either obtaining an external artifact whose Path-ORAM theorem matches
-that interface or building a companion theorem-adapter project. Both
-options are real research-scope decisions, not in-repo work.
+"Decision (2026-04-27)"). The repo's paper-main provenance is fixed at
+the **Cited / externally justified** route delivered by W5.3 / W5.4.
+W5.1 (external machine-checked import) and W5.2 (companion
+mechanization) remain documented as future strengthening, not as open
+in-scope tasks. WP5 is therefore closed in the practical sense; the
+next agent should not re-open W5.1 / W5.2 unless the user explicitly
+redirects.
 
 WP6 now opens with the goal of upgrading the idealized TEE-storage
 theorem to a real malicious-host execution theorem over an explicit
@@ -311,12 +314,12 @@ This runbook hands off to subtask **W6.1** (observer freeze) with:
   [`wp6-handoff-prompt.md`](./wp6-handoff-prompt.md) ready to be
   pasted into a fresh coding-agent session.
 
-The W5.1 / W5.2 import-vs-companion mechanization fork remains open
-and is documented in
-[`docs/stronger-import-route-feasibility.md`](./stronger-import-route-feasibility.md).
-The user must make this research-scope policy decision (companion
-mechanization vs citation-route fall-back) separately from the WP6
-work.
+The W5.1 / W5.2 import-vs-companion mechanization fork was resolved
+in favor of the citation route on 2026-04-27 (see
+[`docs/stronger-import-route-feasibility.md`](./stronger-import-route-feasibility.md),
+"Decision (2026-04-27)"). The repo's paper-main provenance is fixed
+at the **Cited / externally justified** route; W5.1 and W5.2 are
+documented as future strengthening, not in-scope work.
 
 When the next agent finishes a checkpoint, they update:
 

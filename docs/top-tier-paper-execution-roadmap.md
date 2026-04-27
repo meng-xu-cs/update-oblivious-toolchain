@@ -1956,9 +1956,15 @@ Exit gate:
 
 - every remaining backend assumption is concrete, justified, and unavoidable
 
-Status as of 2026-04-27: WP5 closed for charter tasks **3, 4, 5, 6**.
-W5.1 / W5.2 (machine-checked import vs companion mechanization) remain
-open as a research-scope policy fork. Charter-task closure summary:
+Status as of 2026-04-27: WP5 **closed**. Charter tasks **3, 4, 5, 6**
+are landed; the W5.1 / W5.2 import-vs-companion mechanization fork was
+resolved in favor of the citation route by user decision on 2026-04-27
+(documented in `docs/stronger-import-route-feasibility.md`,
+"Decision (2026-04-27)"). The repo's paper-main provenance route is
+fixed at the **Cited / externally justified** route. W5.1 (external
+machine-checked import) and W5.2 (companion mechanization) remain as
+documented future strengthening, not as open in-scope tasks.
+Charter-task closure summary:
 
 - **W5.5 (store/codec semantic alignment):** the existing 43-theorem
   `RuntimeStoreCodecSemantics` layer was extended with the
@@ -2008,16 +2014,19 @@ open as a research-scope policy fork. Charter-task closure summary:
   `proofGrade_path_oram_local_posmap_v1_assumption_audit_*` facades
   expose the bundle-closure facts.
 
-The W5.1 / W5.2 import-vs-companion fork remains open. Per
-`docs/stronger-import-route-feasibility.md`, no external machine-checked
-Path-ORAM theorem object cleanly matches `PaperMainPathOramTheoremSourceAt`
-today (the FM 2024 Isabelle/HOL Path-ORAM case study is manual-proof
-material, and the CoqPL 2023 work is a proposal). The next step is a
-research-scope decision: invest in a companion mechanization /
-theorem-adapter project, or keep the paper on the citation route and
-present the stronger import route as future strengthening. WP5 charter
-tasks 3–6 are closed; the remaining policy-fork decision belongs to
-the user.
+The W5.1 / W5.2 import-vs-companion fork was resolved on 2026-04-27 in
+favor of the citation route. Per
+`docs/stronger-import-route-feasibility.md` ("Decision (2026-04-27)"),
+the user selected the **Cited / externally justified** route as the
+paper-main provenance: the citation route is already crisp and
+complete via the W5.3 / W5.4 pairings, the W5.6 audit confirms every
+surviving assumption is paired with a provenance record and a named
+probe drift check, and a companion mechanization (W5.2) is real proof
+engineering at the scale of a separate paper or follow-up artifact
+contribution that is not in scope for the current submission. W5.1
+(external machine-checked import) and W5.2 (companion mechanization)
+remain documented as future strengthening but are no longer open
+in-scope tasks. WP5 is therefore closed in the practical sense.
 
 ## Work Package 6: Close The Hostile-Host TEE Theorem
 

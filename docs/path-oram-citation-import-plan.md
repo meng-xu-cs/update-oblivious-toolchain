@@ -349,12 +349,14 @@ The audit is exposed on the paper-facing surface through
 and
 [`proofGrade_path_oram_local_posmap_v1_assumption_audit_all_cited`](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean).
 
-After W5.6, the W5.1 / W5.2 import-vs-companion mechanization decision
-is the only remaining WP5 step. That fork is a research-scope policy
-decision (see `docs/stronger-import-route-feasibility.md`); the
-citation route the repo currently takes is the **Cited / externally
-justified** fall-back path documented above. The stronger import route
-remains open future work.
+After W5.6, the W5.1 / W5.2 import-vs-companion mechanization fork was
+resolved in favor of the citation route on 2026-04-27. The user
+selected the **Cited / externally justified** route as the paper-main
+provenance, closing WP5 in the practical sense. W5.1 and W5.2 remain
+documented as future strengthening in
+`docs/stronger-import-route-feasibility.md` but are no longer open
+in-scope tasks. Subsequent agents should not re-open them without an
+explicit user redirect.
 
 ## Next Non-Doc Step
 

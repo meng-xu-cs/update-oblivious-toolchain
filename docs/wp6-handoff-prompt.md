@@ -19,10 +19,15 @@ Solidity subset compiled to a tiny confidential kernel running inside
 a TEE under a hostile-host adversary (M+ model).
 
 You are now picking up **Work Package 6: Close The Hostile-Host TEE
-Theorem**. Work Packages 0–4 are closed. WP5 charter tasks **3, 4, 5,
-6** are also closed (last commit `77a7ef1`); W5.1 / W5.2 (import vs
-companion mechanization) remain open as a research-scope policy fork
-documented in `docs/stronger-import-route-feasibility.md`.
+Theorem**. Work Packages 0–4 are closed. WP5 is also closed: charter
+tasks 3, 4, 5, 6 are landed (last commit `77a7ef1`), and the W5.1 /
+W5.2 import-vs-companion mechanization fork was resolved on 2026-04-27
+in favor of the citation route by user decision (see
+`docs/stronger-import-route-feasibility.md`, "Decision (2026-04-27)").
+The repo's paper-main provenance is fixed at the **Cited / externally
+justified** route; W5.1 and W5.2 are documented as future
+strengthening, not in-scope work. Do not re-open them unless the user
+explicitly redirects.
 
 The post-WP5 status of the explicit
 `PathOramLocalPosmapV1SecurityAssumptions` bundle:

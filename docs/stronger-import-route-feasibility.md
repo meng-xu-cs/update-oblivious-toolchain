@@ -162,3 +162,28 @@ Proceeding further now requires a research-scope choice:
   as future work
 
 That is not a repo-plumbing decision anymore; it is a project-scope decision.
+
+## Decision (2026-04-27)
+
+The user has selected the **citation route** as the paper-main provenance for
+the Path-ORAM theorem. Reasoning:
+
+- the citation route is already crisp and complete via the W5.3 / W5.4
+  pairings (Stefanov et al. JACM 2018 Theorem 5.1 plus deployed-parameter
+  substitution; RFC 8439 + Procter 2014 IACR ePrint for the AEAD primitive)
+- the W5.6 audit confirms that every surviving assumption in the bundle is
+  **Cited / externally justified** with a paired provenance record and a named
+  probe drift check
+- a companion mechanization (W5.2) is real proof engineering at the scale of
+  a separate paper or follow-up artifact contribution; it is not in scope for
+  the current submission
+
+This decision closes WP5 in the practical sense. W5.1 (machine-checked external
+import) and W5.2 (companion mechanization) remain documented in this note as
+**future strengthening**, not as open in-scope tasks. The repo's paper-main
+provenance route is fixed at the citation route until the user revisits this
+decision.
+
+The next agent picking up this repository should treat this section as
+authoritative on provenance scope: do not re-open W5.1 / W5.2 unless the user
+explicitly redirects.
