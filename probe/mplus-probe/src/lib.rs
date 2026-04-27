@@ -29697,6 +29697,46 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // theorem is `sgxControllerObserverRefinementOf`. The
     // refinement is documented in `docs/tee-runtime-hardening.md`
     // under "W6.3 Controller-Refinement Integration".
+    // W6.5: pin the hostile-host TEE deployment-assumption bundle
+    // surface in the Lean source. The five canonical fields
+    // (`attestationAuthenticity`, `enclaveMemoryIsolation`,
+    // `rollbackResistance`, `crashRecoveryDiscipline`,
+    // `patchLevelTrust`) plus their explicit provenance records
+    // referencing Intel SGX specifications must remain present in
+    // `proof/lean/UOToolchain/SgxObserverFreeze.lean`. The matching
+    // Lean provenance list is `sgxDeploymentAssumptionProvenances`;
+    // the W6.5 deployment-assumption bundle is documented in
+    // `docs/tee-runtime-hardening.md` under
+    // "W6.5 Hostile-Host TEE Deployment-Assumption Bundle".
+    let lean_sgx_observer_freeze_path =
+        repo_root().join("proof/lean/UOToolchain/SgxObserverFreeze.lean");
+    let lean_sgx_observer_freeze_source = fs::read_to_string(&lean_sgx_observer_freeze_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_sgx_observer_freeze_path)
+            )
+        })?;
+    let sgx_deployment_assumption_bundle_pinned = lean_sgx_observer_freeze_source
+        .contains("structure SgxDeploymentAssumptions where")
+        && lean_sgx_observer_freeze_source.contains("attestationAuthenticity : Prop")
+        && lean_sgx_observer_freeze_source.contains("enclaveMemoryIsolation : Prop")
+        && lean_sgx_observer_freeze_source.contains("rollbackResistance : Prop")
+        && lean_sgx_observer_freeze_source.contains("crashRecoveryDiscipline : Prop")
+        && lean_sgx_observer_freeze_source.contains("patchLevelTrust : Prop")
+        && lean_sgx_observer_freeze_source
+            .contains("def sgxDeploymentProvenance_attestationAuthenticity")
+        && lean_sgx_observer_freeze_source
+            .contains("def sgxDeploymentProvenance_enclaveMemoryIsolation")
+        && lean_sgx_observer_freeze_source
+            .contains("def sgxDeploymentProvenance_rollbackResistance")
+        && lean_sgx_observer_freeze_source
+            .contains("def sgxDeploymentProvenance_crashRecoveryDiscipline")
+        && lean_sgx_observer_freeze_source.contains("def sgxDeploymentProvenance_patchLevelTrust")
+        && lean_sgx_observer_freeze_source.contains("\"IntelSGXAttestationReference\"")
+        && lean_sgx_observer_freeze_source.contains("\"IntelSGXSDM3D\"")
+        && lean_sgx_observer_freeze_source.contains("\"IntelSGXSDKDeveloperReference\"")
+        && lean_sgx_observer_freeze_source.contains("\"IntelSGXSecurityCenter\"");
     // W6.4: pin the canonical hostile-host sealing / storage
     // refinement — the runtime's `RefinementTrace` keeps
     // `physical_reads: Box<[PhysicalReadEvent]>` and
@@ -34220,6 +34260,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && sgx_persistent_io_model_pinned
         && sgx_controller_refinement_pinned
         && sgx_storage_refinement_pinned
+        && sgx_deployment_assumption_bundle_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34911,6 +34952,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             sgx_controller_refinement_pinned,
         "sgx_storage_refinement_pinned":
             sgx_storage_refinement_pinned,
+        "sgx_deployment_assumption_bundle_pinned":
+            sgx_deployment_assumption_bundle_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":

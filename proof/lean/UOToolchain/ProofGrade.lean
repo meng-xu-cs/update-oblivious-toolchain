@@ -1728,4 +1728,80 @@ theorem proofGrade_sgx_storage_refinement_provenance_static_drift_check :
       "sgx_storage_refinement_pinned" :=
   sgxStorageRefinementProvenance_staticDriftCheckName
 
+/-! ### WP6.5 Hostile-Host TEE Deployment-Assumption Bundle Facades
+
+The facades below expose the W6.5 deployment-assumption bundle: the
+five irreducible TEE deployment assumptions
+(`attestationAuthenticity`, `enclaveMemoryIsolation`,
+`rollbackResistance`, `crashRecoveryDiscipline`,
+`patchLevelTrust`) packaged as `SgxDeploymentAssumptions` plus the
+matching provenance records pairing each assumption with an Intel
+SGX specification citation.
+
+Claim taxonomy: these facades are **Cited / externally justified**
+for every assumption field. The bundle does not Lean-discharge any
+of the five assumptions; they are part of the deployment TCB and
+are honored by the TEE platform under deployment. The facades give
+each assumption an explicit Lean-side provenance pairing accessible
+at the Lean type level. -/
+
+/-- Paper-facing W6.5 facade: the deployment-assumption provenance
+list contains exactly five entries — one per bundle field. -/
+theorem proofGrade_sgx_deployment_assumption_provenances_length :
+    sgxDeploymentAssumptionProvenances.length = 5 :=
+  sgxDeploymentAssumptionProvenances_length
+
+/-- Paper-facing W6.5 facade: every entry in the deployment-
+assumption provenance list is classified as "Cited / externally
+justified". This pin documents that the deployment-assumption
+bundle stays explicit and externally cited; no entry is silently
+Lean-discharged or source-frozen-only. -/
+theorem proofGrade_sgx_deployment_assumption_provenances_all_cited :
+    ∀ entry, entry ∈ sgxDeploymentAssumptionProvenances →
+      entry.classification = "Cited / externally justified" :=
+  sgxDeploymentAssumptionProvenances_allCited
+
+/-- Paper-facing W6.5 facade: every entry in the deployment-
+assumption provenance list references the same named probe drift
+check (`sgx_deployment_assumption_bundle_pinned`), which pins the
+deployment-assumption bundle's runtime-facing surface in
+lockstep. -/
+theorem proofGrade_sgx_deployment_assumption_provenances_shared_drift_check :
+    ∀ entry, entry ∈ sgxDeploymentAssumptionProvenances →
+      entry.staticDriftCheckName =
+        "sgx_deployment_assumption_bundle_pinned" :=
+  sgxDeploymentAssumptionProvenances_sharedDriftCheck
+
+/-- Paper-facing W6.5 facade: the `attestationAuthenticity`
+provenance record's pinned BibTeX key is
+`IntelSGXAttestationReference`. -/
+theorem proofGrade_sgx_deployment_attestation_authenticity_bibKey :
+    sgxDeploymentProvenance_attestationAuthenticity.primaryBibKey =
+      "IntelSGXAttestationReference" := by rfl
+
+/-- Paper-facing W6.5 facade: the `enclaveMemoryIsolation`
+provenance record's pinned BibTeX key is `IntelSGXSDM3D`. -/
+theorem proofGrade_sgx_deployment_enclave_memory_isolation_bibKey :
+    sgxDeploymentProvenance_enclaveMemoryIsolation.primaryBibKey =
+      "IntelSGXSDM3D" := by rfl
+
+/-- Paper-facing W6.5 facade: the `rollbackResistance` provenance
+record's pinned BibTeX key is `IntelSGXSDKDeveloperReference`. -/
+theorem proofGrade_sgx_deployment_rollback_resistance_bibKey :
+    sgxDeploymentProvenance_rollbackResistance.primaryBibKey =
+      "IntelSGXSDKDeveloperReference" := by rfl
+
+/-- Paper-facing W6.5 facade: the `crashRecoveryDiscipline`
+provenance record's pinned BibTeX key is
+`IntelSGXSDKDeveloperReference`. -/
+theorem proofGrade_sgx_deployment_crash_recovery_discipline_bibKey :
+    sgxDeploymentProvenance_crashRecoveryDiscipline.primaryBibKey =
+      "IntelSGXSDKDeveloperReference" := by rfl
+
+/-- Paper-facing W6.5 facade: the `patchLevelTrust` provenance
+record's pinned BibTeX key is `IntelSGXSecurityCenter`. -/
+theorem proofGrade_sgx_deployment_patch_level_trust_bibKey :
+    sgxDeploymentProvenance_patchLevelTrust.primaryBibKey =
+      "IntelSGXSecurityCenter" := by rfl
+
 end UOToolchain

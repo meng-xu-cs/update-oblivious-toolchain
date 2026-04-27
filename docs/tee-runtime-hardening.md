@@ -413,6 +413,80 @@ If any of those drift, the static-checks gate flips
 `sgx_storage_refinement_pinned` to `false` and the gate rejects
 the checkpoint.
 
+## W6.5 Hostile-Host TEE Deployment-Assumption Bundle
+
+W6.5 states the irreducible TEE deployment assumptions explicitly,
+in one named bundle paired with explicit Intel SGX provenance
+citations. These assumptions are **part of the deployment TCB**: the
+hostile-host SGX execution-oblivious theorem holds against a TEE
+platform that honors them. The bundle stays explicit at the Lean
+type level — never silently absorbed into prose — and each field is
+paired with a structured provenance record that names the
+specification and BibTeX key.
+
+The Lean side extends `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+with the `SgxDeploymentAssumptions` structure and five canonical
+provenance records. The runtime side is pinned by the probe's
+`sgx_deployment_assumption_bundle_pinned` static-drift check, which
+reads the Lean source itself and rejects regressions that delete the
+bundle, drop one of its fields, or remove a citation BibTeX key.
+
+Claim taxonomy (per
+[`docs/coding-agent-conventions.md`](./coding-agent-conventions.md#claim-and-tcb-discipline)):
+**Cited / externally justified** for every assumption field. The
+bundle does not Lean-discharge any of the five assumptions; they
+are honored by the TEE platform under deployment.
+
+### Frozen deployment-assumption components
+
+| Field | Role | Provenance citation | BibTeX key |
+| --- | --- | --- | --- |
+| `attestationAuthenticity` | platform attestation produces a quote whose authenticity is established by the Intel Provisioning Service / DCAP attestation chain | Intel SGX Attestation Services Programming Reference (Intel Corporation, Reference Number 332680-008US) plus the DCAP Quote Generation Library Programming Reference | `IntelSGXAttestationReference` |
+| `enclaveMemoryIsolation` | enclave memory pages are protected by the Memory Encryption Engine (MEE) for confidentiality and integrity against a hostile host | Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3D: Intel SGX (chapter on EPC Memory Encryption Engine), and Intel SGX Developer Reference, Memory Protection model section | `IntelSGXSDM3D` |
+| `rollbackResistance` | sealed state cannot be silently rolled back to a prior epoch; replay protection comes from monotonic counters and `sgx_get_trusted_time` | Intel SGX SDK Developer Reference: `sgx_create_monotonic_counter` / `sgx_increment_monotonic_counter` and `sgx_get_trusted_time` interfaces | `IntelSGXSDKDeveloperReference` |
+| `crashRecoveryDiscipline` | crash recovery from sealed state does not leak partial confidential state; the runtime's commit / wipe boundary is honored across enclave power transitions | Intel SGX SDK Developer Reference: Power transitions, sealing & unsealing chapter (`sgx_seal_data` / `sgx_unseal_data` discipline) | `IntelSGXSDKDeveloperReference` |
+| `patchLevelTrust` | the deployed platform's security patch / microcode level supports the SGX security claims (no known unmitigated TEE vulnerabilities below the deployment patch level) | Intel Security Center: Intel SGX Platform Software (Intel SGX PSW), Trusted Computing Base (TCB) recovery, and Intel CPU microcode update advisories at https://www.intel.com/content/www/us/en/security-center/ | `IntelSGXSecurityCenter` |
+
+### Provenance pairing
+
+The W6.5 deployment-assumption provenance list is
+`sgxDeploymentAssumptionProvenances` in `SgxObserverFreeze.lean`. It
+contains five entries — one per bundle field — each with an Intel
+SGX citation and BibTeX key. The Lean theorem
+`sgxDeploymentAssumptionProvenances_allCited` proves every entry is
+classified `"Cited / externally justified"`; the theorem
+`sgxDeploymentAssumptionProvenances_sharedDriftCheck` proves every
+entry references the same probe drift check name, so a single named
+hook keeps the entire bundle pinned in lockstep.
+
+The paper-facing facades exposed in
+[`ProofGrade.lean`](../proof/lean/UOToolchain/ProofGrade.lean) under
+the `proofGrade_sgx_deployment_*` prefix mirror the W5.4 / W5.3
+provenance facade pattern.
+
+### Static-drift coverage
+
+The probe's `sgx_deployment_assumption_bundle_pinned` flag, emitted
+by the `kernel_model_alignment_validation.json` report, rejects
+regressions in the Lean-side deployment-assumption surface itself.
+Specifically it requires:
+
+- `proof/lean/UOToolchain/SgxObserverFreeze.lean` keeps the
+  `SgxDeploymentAssumptions` structure declaration plus its five
+  `Prop` fields (`attestationAuthenticity`,
+  `enclaveMemoryIsolation`, `rollbackResistance`,
+  `crashRecoveryDiscipline`, `patchLevelTrust`).
+- `proof/lean/UOToolchain/SgxObserverFreeze.lean` keeps the five
+  `def sgxDeploymentProvenance_*` provenance constants.
+- `proof/lean/UOToolchain/SgxObserverFreeze.lean` keeps the four
+  canonical Intel SGX BibTeX keys (`IntelSGXAttestationReference`,
+  `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`,
+  `IntelSGXSecurityCenter`).
+
+If any of those drift, the static-checks gate flips
+`sgx_deployment_assumption_bundle_pinned` to `false` and the gate
+rejects the checkpoint.
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:

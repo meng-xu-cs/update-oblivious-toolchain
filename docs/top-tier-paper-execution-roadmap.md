@@ -2150,6 +2150,26 @@ Concrete tasks:
      existing W4 / W5 source-pinned crypto and store-codec layers.
 5. State attestation, rollback, crash, freshness, and patch-level assumptions
    explicitly and minimally.
+   - **W6.5 status (landed):** the explicit
+     `SgxDeploymentAssumptions` bundle now carries five canonical
+     `Prop` fields (`attestationAuthenticity`,
+     `enclaveMemoryIsolation`, `rollbackResistance`,
+     `crashRecoveryDiscipline`, `patchLevelTrust`) — each paired
+     with a structured provenance record citing the relevant Intel
+     SGX specification (`IntelSGXAttestationReference`,
+     `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`,
+     `IntelSGXSecurityCenter`). The five-element provenance list
+     `sgxDeploymentAssumptionProvenances` and its closure theorems
+     `sgxDeploymentAssumptionProvenances_length`,
+     `sgxDeploymentAssumptionProvenances_allCited`, and
+     `sgxDeploymentAssumptionProvenances_sharedDriftCheck` pin the
+     bundle at the Lean type level. The named probe drift check
+     `sgx_deployment_assumption_bundle_pinned` reads the Lean source
+     itself and rejects regressions that delete the bundle, drop a
+     field, or remove a citation BibTeX key. Per the WP6 claim
+     taxonomy, every entry is **Cited / externally justified** —
+     the bundle does not Lean-discharge any of the five assumptions;
+     they are honored by the TEE platform under deployment.
 6. Remove any remaining ambiguity between idealized TEE-storage security and
    malicious-host execution obliviousness.
 

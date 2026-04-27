@@ -896,4 +896,203 @@ theorem sgxStorageRefinementProvenance_staticDriftCheckName :
     sgxStorageRefinementProvenance.staticDriftCheckName =
       "sgx_storage_refinement_pinned" := by rfl
 
+/-! ### W6.5: Hostile-Host TEE Deployment-Assumption Bundle
+
+W6.5 states the irreducible TEE deployment assumptions explicitly,
+in one named bundle, paired with explicit provenance citations. The
+bundle stays explicit at the Lean type level rather than being
+hidden in prose; each assumption is paired with the Intel SGX
+specification it relies on.
+
+The five canonical fields capture the load-bearing TEE deployment
+assumptions called out by the WP6 charter:
+
+- `attestationAuthenticity` — Intel SGX attestation produces a
+  quote signed by the platform's attestation key whose
+  authenticity is established by the Intel Provisioning Service /
+  DCAP attestation chain;
+- `enclaveMemoryIsolation` — enclave memory pages are protected by
+  the Memory Encryption Engine (MEE) for confidentiality and
+  integrity;
+- `rollbackResistance` — sealed state cannot be silently rolled
+  back to an earlier epoch (sgx_get_trusted_time / monotonic
+  counters / replay protection);
+- `crashRecoveryDiscipline` — crash recovery from sealed state does
+  not leak partial confidential state;
+- `patchLevelTrust` — the deployed platform's security
+  patch / microcode level supports the SGX security claims.
+
+Claim taxonomy (per
+[`docs/coding-agent-conventions.md`](./coding-agent-conventions.md#claim-and-tcb-discipline)):
+**Cited / externally justified** — the assumptions remain explicit
+in the bundle, paired with provenance citations to the Intel SGX
+specifications. They are not Lean-discharged; they are part of the
+deployment TCB and must be honored by the TEE platform under
+deployment. -/
+
+/-- Explicit hostile-host TEE deployment-assumption bundle. The five
+fields are the irreducible deployment-side trust assumptions for
+the hostile-host SGX execution-oblivious theorem. Each field is
+paired with an explicit provenance record (defined below). -/
+structure SgxDeploymentAssumptions where
+  /-- The platform's attestation produces a quote whose authenticity
+  is established by the Intel Provisioning Service / DCAP
+  attestation chain. -/
+  attestationAuthenticity : Prop
+  /-- Enclave memory pages are protected by the Memory Encryption
+  Engine for both confidentiality and integrity against a hostile
+  host. -/
+  enclaveMemoryIsolation : Prop
+  /-- Sealed state cannot be silently rolled back to a prior epoch
+  (monotonic counters / `sgx_get_trusted_time` / replay
+  protection). -/
+  rollbackResistance : Prop
+  /-- Crash recovery from sealed state does not leak partial
+  confidential state. -/
+  crashRecoveryDiscipline : Prop
+  /-- The deployed platform's security patch / microcode level
+  supports the SGX security claims (no known unmitigated TEE
+  vulnerabilities below the deployment patch level). -/
+  patchLevelTrust : Prop
+
+/-- Generic provenance-marker structure for one TEE deployment
+assumption. Pairs the assumption-bundle field name with the
+canonical Intel SGX citation, the BibTeX key, the IETF / NIST
+specification reference, and the named probe drift check. -/
+structure SgxDeploymentAssumptionProvenance where
+  /-- Assumption-bundle field name. -/
+  fieldName : String
+  /-- Plain-language description of the assumption's role. -/
+  role : String
+  /-- WP6 claim taxonomy classification ("Cited / externally
+  justified"). -/
+  classification : String
+  /-- Human-readable Intel SGX specification citation. -/
+  primaryCitation : String
+  /-- BibTeX key for the Intel SGX specification. -/
+  primaryBibKey : String
+  /-- Probe static-drift check name pinning the runtime / build
+  artifact surface that the deployment assumption talks about. -/
+  staticDriftCheckName : String
+deriving Repr, DecidableEq
+
+/-- Provenance record for `attestationAuthenticity`. Cites the Intel
+SGX Attestation Services Programming Reference and the DCAP
+quoting library reference. -/
+def sgxDeploymentProvenance_attestationAuthenticity :
+    SgxDeploymentAssumptionProvenance :=
+  { fieldName := "attestationAuthenticity"
+  , role :=
+      "platform attestation produces a quote whose authenticity is established by the Intel Provisioning Service / DCAP attestation chain"
+  , classification := "Cited / externally justified"
+  , primaryCitation :=
+      "Intel Software Guard Extensions (SGX) Attestation Services Programming Reference. Intel Corporation, 2018-revised. Reference Number 332680-008US (Attestation Services), and DCAP Quote Generation Library Programming Reference."
+  , primaryBibKey := "IntelSGXAttestationReference"
+  , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+  }
+
+/-- Provenance record for `enclaveMemoryIsolation`. Cites the Intel
+SGX Developer Reference / Programming Reference (MEE chapter). -/
+def sgxDeploymentProvenance_enclaveMemoryIsolation :
+    SgxDeploymentAssumptionProvenance :=
+  { fieldName := "enclaveMemoryIsolation"
+  , role :=
+      "enclave memory pages are protected by the Memory Encryption Engine (MEE) for confidentiality and integrity against a hostile host"
+  , classification := "Cited / externally justified"
+  , primaryCitation :=
+      "Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3D: Intel SGX (chapter on EPC Memory Encryption Engine), and Intel SGX Developer Reference, Memory Protection model section."
+  , primaryBibKey := "IntelSGXSDM3D"
+  , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+  }
+
+/-- Provenance record for `rollbackResistance`. Cites the Intel SGX
+SDK monotonic counter / trusted time interfaces. -/
+def sgxDeploymentProvenance_rollbackResistance :
+    SgxDeploymentAssumptionProvenance :=
+  { fieldName := "rollbackResistance"
+  , role :=
+      "sealed state cannot be silently rolled back to a prior epoch; replay protection comes from monotonic counters and sgx_get_trusted_time"
+  , classification := "Cited / externally justified"
+  , primaryCitation :=
+      "Intel SGX SDK Developer Reference: sgx_create_monotonic_counter / sgx_increment_monotonic_counter and sgx_get_trusted_time interfaces. Sealing & freshness chapter."
+  , primaryBibKey := "IntelSGXSDKDeveloperReference"
+  , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+  }
+
+/-- Provenance record for `crashRecoveryDiscipline`. Cites the Intel
+SGX SDK power transitions / sealing notes. -/
+def sgxDeploymentProvenance_crashRecoveryDiscipline :
+    SgxDeploymentAssumptionProvenance :=
+  { fieldName := "crashRecoveryDiscipline"
+  , role :=
+      "crash recovery from sealed state does not leak partial confidential state; the runtime's commit / wipe boundary is honored across enclave power transitions"
+  , classification := "Cited / externally justified"
+  , primaryCitation :=
+      "Intel SGX SDK Developer Reference: Power transitions, sealing & unsealing chapter (`sgx_seal_data` / `sgx_unseal_data` discipline)."
+  , primaryBibKey := "IntelSGXSDKDeveloperReference"
+  , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+  }
+
+/-- Provenance record for `patchLevelTrust`. Cites the Intel SGX
+platform / microcode update advisory channel. -/
+def sgxDeploymentProvenance_patchLevelTrust :
+    SgxDeploymentAssumptionProvenance :=
+  { fieldName := "patchLevelTrust"
+  , role :=
+      "the deployed platform's security patch / microcode level supports the SGX security claims (no known unmitigated TEE vulnerabilities below the deployment patch level)"
+  , classification := "Cited / externally justified"
+  , primaryCitation :=
+      "Intel Security Center: Intel SGX Platform Software (Intel SGX PSW), Trusted Computing Base (TCB) recovery, and Intel CPU microcode update advisories at https://www.intel.com/content/www/us/en/security-center/."
+  , primaryBibKey := "IntelSGXSecurityCenter"
+  , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+  }
+
+/-- Five-element provenance list for the deployment-assumption
+bundle, in canonical declaration order. -/
+def sgxDeploymentAssumptionProvenances :
+    List SgxDeploymentAssumptionProvenance :=
+  [ sgxDeploymentProvenance_attestationAuthenticity
+  , sgxDeploymentProvenance_enclaveMemoryIsolation
+  , sgxDeploymentProvenance_rollbackResistance
+  , sgxDeploymentProvenance_crashRecoveryDiscipline
+  , sgxDeploymentProvenance_patchLevelTrust
+  ]
+
+/-- The deployment-assumption provenance list has exactly five
+entries — one per bundle field. -/
+theorem sgxDeploymentAssumptionProvenances_length :
+    sgxDeploymentAssumptionProvenances.length = 5 := by rfl
+
+/-- Every entry in the deployment-assumption provenance list is
+classified as "Cited / externally justified". -/
+theorem sgxDeploymentAssumptionProvenances_allCited :
+    ∀ entry, entry ∈ sgxDeploymentAssumptionProvenances →
+      entry.classification = "Cited / externally justified" := by
+  intro entry hMem
+  unfold sgxDeploymentAssumptionProvenances at hMem
+  simp at hMem
+  rcases hMem with h | h | h | h | h
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+
+/-- Every entry references the same probe drift check name,
+`sgx_deployment_assumption_bundle_pinned`, which pins the
+deployment-assumption bundle's runtime-facing surface in lockstep. -/
+theorem sgxDeploymentAssumptionProvenances_sharedDriftCheck :
+    ∀ entry, entry ∈ sgxDeploymentAssumptionProvenances →
+      entry.staticDriftCheckName =
+        "sgx_deployment_assumption_bundle_pinned" := by
+  intro entry hMem
+  unfold sgxDeploymentAssumptionProvenances at hMem
+  simp at hMem
+  rcases hMem with h | h | h | h | h
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+
 end UOToolchain

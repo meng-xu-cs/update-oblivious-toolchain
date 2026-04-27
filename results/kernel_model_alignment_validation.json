@@ -1992,6 +1992,7 @@
   "seeded_runtime_paper_main_slot_family_bundle_field_names_match": true,
   "sgx_boundary_call_model_pinned": true,
   "sgx_controller_refinement_pinned": true,
+  "sgx_deployment_assumption_bundle_pinned": true,
   "sgx_observer_surface_pinned": true,
   "sgx_persistent_io_model_pinned": true,
   "sgx_storage_refinement_pinned": true,
