@@ -2328,6 +2328,59 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
             ));
         }
     }
+    out.push('\n');
+
+    out.push_str("## WP6 Closure Audit\n\n");
+    out.push_str(
+        "Mirrors the `sgxHostileHostClosureAudit` Lean record in \
+        `proof/lean/UOToolchain/SgxObserverFreeze.lean`. The Lean \
+        closure-audit theorems pin the same content at the type \
+        level: `sgxHostileHostClosureAudit_length` (= 6), \
+        `sgxHostileHostClosureAudit_leanProvedEntries` (W6.1–W6.4 \
+        Lean-proved), `sgxHostileHostClosureAudit_allClassified`, \
+        and `sgxHostileHostClosureAudit_driftCheckNames`.\n\n",
+    );
+    out.push_str(
+        "| Checkpoint | Role | Classification | Lean Anchor | Static-Drift Check |\n",
+    );
+    out.push_str("| --- | --- | --- | --- | --- |\n");
+    if let Some(entries) = summary["wp6_closure_audit"].as_array() {
+        for entry in entries {
+            out.push_str(&format!(
+                "| `{}` | {} | {} | `{}` | `{}` |\n",
+                entry["checkpoint"].as_str().unwrap_or("unknown"),
+                markdown_escape(entry["role"].as_str().unwrap_or("unknown")),
+                entry["classification"].as_str().unwrap_or("unknown"),
+                entry["lean_anchor"].as_str().unwrap_or("unknown"),
+                entry["static_drift_check_name"]
+                    .as_str()
+                    .unwrap_or("unknown"),
+            ));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## Static-Drift Check Inventory\n\n");
+    out.push_str(
+        "Every named static-drift check the probe runs at every gated \
+        validation slice. The acceptance gate requires every listed \
+        check to be `true` in the corresponding report field.\n\n",
+    );
+    out.push_str(
+        "| Static-Drift Check | Work Package | Target | Report Field |\n",
+    );
+    out.push_str("| --- | --- | --- | --- |\n");
+    if let Some(entries) = summary["static_drift_check_inventory"].as_array() {
+        for entry in entries {
+            out.push_str(&format!(
+                "| `{}` | `{}` | {} | `{}` |\n",
+                entry["name"].as_str().unwrap_or("unknown"),
+                entry["work_package"].as_str().unwrap_or("unknown"),
+                markdown_escape(entry["target"].as_str().unwrap_or("unknown")),
+                entry["report_field"].as_str().unwrap_or("unknown"),
+            ));
+        }
+    }
 
     Ok(out)
 }
@@ -2668,7 +2721,125 @@ fn build_reviewer_summary(
         "tcb_size": trusted_surface_loc_summary()?,
         "current_tcb": current_tcb_summary(),
         "explicit_assumptions": explicit_assumption_summary(),
+        "wp6_closure_audit": wp6_closure_audit_summary(),
+        "static_drift_check_inventory": static_drift_check_inventory(),
     }))
+}
+
+/// W7.6 reviewer-summary surface: the W6.6 closure audit summary.
+///
+/// Mirrors `sgxHostileHostClosureAudit` in
+/// `proof/lean/UOToolchain/SgxObserverFreeze.lean` so reviewers can
+/// see the six WP6 surface checkpoints without reading the Lean
+/// source. The Lean closure-audit theorems
+/// `sgxHostileHostClosureAudit_length`,
+/// `sgxHostileHostClosureAudit_leanProvedEntries`,
+/// `sgxHostileHostClosureAudit_allClassified`, and
+/// `sgxHostileHostClosureAudit_driftCheckNames` pin the same content
+/// at the Lean type level.
+fn wp6_closure_audit_summary() -> JsonValue {
+    json!([
+        {
+            "checkpoint": "W6.1",
+            "role": "frozen SGX observer surface (page-region names, controller-phase vocabulary, page-event / exit-event vocabularies, shared-resource pattern literal, page-event encoding formula)",
+            "classification": "Lean-proved, semantics-preserving",
+            "lean_anchor": "sgxObserverSurfaceProvenance",
+            "static_drift_check_name": "sgx_observer_surface_pinned",
+        },
+        {
+            "checkpoint": "W6.2 boundary-call",
+            "role": "frozen boundary-call model (oram_access API literal, Enter/Exit direction vocabulary, boundary-event budget formula, schedule structural shape)",
+            "classification": "Lean-proved, semantics-preserving",
+            "lean_anchor": "sgxBoundaryCallProvenance",
+            "static_drift_check_name": "sgx_boundary_call_model_pinned",
+        },
+        {
+            "checkpoint": "W6.2 persistent-I/O",
+            "role": "frozen persistent-I/O model (PhysicalRead / PhysicalWrite field schemas, WriteClass vocabulary)",
+            "classification": "Lean-proved, semantics-preserving",
+            "lean_anchor": "sgxPersistentIoProvenance",
+            "static_drift_check_name": "sgx_persistent_io_model_pinned",
+        },
+        {
+            "checkpoint": "W6.3",
+            "role": "controller-refinement integration (canonical Lean controller-shape constructor refines the W6.1 / W6.2 frozen observer in page-region names, workset-region names, boundary-event budget, and shared-resource pattern)",
+            "classification": "Lean-proved, semantics-preserving",
+            "lean_anchor": "sgxControllerRefinementProvenance",
+            "static_drift_check_name": "sgx_controller_refinement_pinned",
+        },
+        {
+            "checkpoint": "W6.4",
+            "role": "sealing / storage-refinement integration (viewTEEStore field projection forwards physicalReads / physicalWrites / gasUsed / entrypointId deterministically from the underlying Trace and Config)",
+            "classification": "Lean-proved, semantics-preserving",
+            "lean_anchor": "sgxStorageRefinementProvenance",
+            "static_drift_check_name": "sgx_storage_refinement_pinned",
+        },
+        {
+            "checkpoint": "W6.5",
+            "role": "explicit hostile-host TEE deployment-assumption bundle (attestation authenticity, enclave memory isolation, rollback resistance, freshness guarantee, crash recovery discipline, patch-level trust) paired with Intel SGX provenance citations",
+            "classification": "Cited / externally justified",
+            "lean_anchor": "SgxDeploymentAssumptions + sgxDeploymentAssumptionProvenances",
+            "static_drift_check_name": "sgx_deployment_assumption_bundle_pinned",
+        },
+    ])
+}
+
+/// W7.6 reviewer-summary surface: the static-drift check inventory.
+///
+/// Pins every named static-drift check the probe runs, with its
+/// target surface and the work package it serves. The acceptance
+/// gate requires all listed checks to be `true`.
+fn static_drift_check_inventory() -> JsonValue {
+    json!([
+        {
+            "name": "sgx_observer_surface_pinned",
+            "work_package": "W6.1",
+            "target": "page-region names, controller-phase vocabulary, page-event / exit-event vocabularies, shared-resource pattern literal, and page-event encoding formula in `crates/uo-core/src/trace.rs` and the matching frozen Lean records in `proof/lean/UOToolchain/SgxObserverFreeze.lean`",
+            "report_field": "kernel_model_alignment_validation.sgx_observer_surface_pinned",
+        },
+        {
+            "name": "sgx_boundary_call_model_pinned",
+            "work_package": "W6.2 boundary-call",
+            "target": "oram_access API literal, Enter/Exit direction vocabulary, boundary-event budget formula `2 * total_oram_accesses + 2`, and schedule structural shape",
+            "report_field": "kernel_model_alignment_validation.sgx_boundary_call_model_pinned",
+        },
+        {
+            "name": "sgx_persistent_io_model_pinned",
+            "work_package": "W6.2 persistent-I/O",
+            "target": "PhysicalRead / PhysicalWrite field schemas and the `WriteClass` vocabulary `[Set, Clear, Same, Update]`",
+            "report_field": "kernel_model_alignment_validation.sgx_persistent_io_model_pinned",
+        },
+        {
+            "name": "sgx_controller_refinement_pinned",
+            "work_package": "W6.3",
+            "target": "canonical Lean controller-shape constructor (`SgxControllerObserverRefinement`) and the W6.3 integration theorem `sgxControllerObserverRefinementOf`",
+            "report_field": "kernel_model_alignment_validation.sgx_controller_refinement_pinned",
+        },
+        {
+            "name": "sgx_storage_refinement_pinned",
+            "work_package": "W6.4",
+            "target": "the `viewTEEStore` field projection (`SgxStorageRefinement`) forwarding physicalReads / physicalWrites / gasUsed / entrypointId deterministically",
+            "report_field": "kernel_model_alignment_validation.sgx_storage_refinement_pinned",
+        },
+        {
+            "name": "sgx_deployment_assumption_bundle_pinned",
+            "work_package": "W6.5",
+            "target": "the `SgxDeploymentAssumptions` Lean record's six `Prop` fields and the matching six `SgxDeploymentAssumptionProvenance` records carrying `IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, and `IntelSGXSecurityCenter` citations",
+            "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_bundle_pinned",
+        },
+        {
+            "name": "runtime_crypto_primitive_identity_pinned",
+            "work_package": "W5.4",
+            "target": "the `chacha20poly1305` AEAD primitive and the `tiny_keccak::Keccak::v256()` hash primitive (with the workspace `Cargo.toml` versions) in the runtime crypto surface",
+            "report_field": "kernel_model_alignment_validation.runtime_crypto_primitive_identity_pinned",
+        },
+        {
+            "name": "path_oram_deployed_stash_parameters_pinned",
+            "work_package": "W5.3",
+            "target": "the deployed Path-ORAM `Z = 5` / `stash_bound = max(capacity, 1)` parameters in `crates/uo-core/src/manifest.rs`",
+            "report_field": "kernel_model_alignment_validation.path_oram_deployed_stash_parameters_pinned",
+        },
+    ])
 }
 
 fn collect_json_byte_metrics(report_name: &str, value: &JsonValue, out: &mut Vec<JsonValue>) {
