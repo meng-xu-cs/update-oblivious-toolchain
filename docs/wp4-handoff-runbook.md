@@ -307,16 +307,16 @@ against; `uo-solc` therefore remains in the trusted surface.
 
 ## Recommended Starting Subtask
 
-Charter task 1 (W4.1 / W4.1b) and charter task 3 (W4.3) are now
-landed. The next still-open subtask per the runbook's deliverable
-ordering is **W4.4** (charter task 4: IR-to-kernel correctness),
-which has a clearer structural path than W4.2 because the kernel-
-DSL Lean mirror already exists in
-`proof/lean/UOToolchain/RuntimeKernelDslJson.lean`
-(`ImportedConfidentialKernelStatement` /
-`ImportedConfidentialKernelExpr` /
-`ImportedConfidentialKernelPureExpr` are mutual inductives that
-mirror the kernel-DSL Rust types).
+Charter tasks 1 (W4.1 / W4.1b), 2 (W4.2), 3 (W4.3), and 4 (W4.4)
+are all now landed end-to-end. The next still-open subtasks are
+W4.5 (manifest-exactness semantics-preserving lift) and W4.6
+(direct artifact-checker demotion). Recommend W4.5 first because
+the W4.2 + W4.4 preservation theorems are the natural foundation
+for it.
+
+The original "next subtask" notes for W4.4 follow for historical
+reference; they describe the kernel-DSL pull-back framing that the
+landed W4.4 work used.
 
 **Subtask W4.4: Prove the IR-to-kernel correctness theorem.**
 
@@ -357,28 +357,19 @@ characterization). Recommend splitting it into:
    forLoop`.
 3. Prove the semantics-preservation theorem.
 
-Alternative ordering: drive **W4.2** (source-to-IR correctness)
-first instead. W4.2 is roughly 2-3× the effort of W4.3 because it
-requires either a partial Lean Solidity semantics or a Lean mirror
-of `uo-solc`'s parser intermediate AST (`solang_parser::pt`).
-Recommendation: pull back via the AST option — mirror the
-`pt::Statement` / `pt::Expression` shapes for the *admitted subset*
-in Lean and prove that `uo-solc::lower_block` is a faithful
-translation from that AST to `IR.Statement`. The "source"
-semantics in this framing is the AST-level evaluator; full Solidity
-is treated as the trusted parser step.
-
 After W4.4 lands, the natural sequence is:
 
-- W4.2 — source-to-IR correctness theorem (deliverable 1). This is
-  the deeper one because it requires either a partial Lean Solidity
-  semantics or a Lean mirror of `uo-solc`'s parser intermediate AST.
-  Recommendation: pull back via the AST option — mirror the
-  `solang_parser::pt::Statement` / `pt::Expression` shapes in Lean
-  and prove that `uo-solc::lower_block` is a faithful translation
-  from that AST to `IR.Statement`. The "source" semantics in this
-  framing is the AST-level evaluator; full Solidity is treated as the
-  trusted parser step.
+- W4.2 — source-to-IR correctness theorem (deliverable 1). The
+  AST-pull-back framing: mirror the `solang_parser::pt::Statement` /
+  `pt::Expression` shapes in Lean (post-resolution form, with state-
+  name resolution / capacity lookup / abi.encodePacked unwrapping /
+  helper inlining done by the trusted parser), then prove that
+  `uo-solc::lower_block` is a faithful translation from that AST to
+  `IR.Statement`. The "source" semantics in this framing is the
+  AST-level evaluator; the parser-level syntactic preprocessing
+  (`solang_parser` plus the resolution passes above) is the trusted
+  front-end. *(W4.2 has now landed end-to-end; this remains as
+  documentation of the chosen framing.)*
 - W4.4 — IR-to-kernel correctness theorem (deliverable 2): refine
   `crates/uo-core/src/kernel_dsl.rs`'s lowering against a Lean kernel
   DSL semantics, reusing the helper-layer end-to-end theorems already
@@ -579,22 +570,23 @@ should be its own commit:
   correctness) is now closed end-to-end at the program level.**
 - *(landed)* W4.2 — Sol AST mirror, evaluator, AST → IR lowering,
   and per-Expr / per-Statement / Body / Function preservation
-  theorems plus the corresponding paper-facing facades (commit
-  `1ec7da6`,
+  theorems plus the corresponding paper-facing facades (commits
+  `1ec7da6` + `d267e80`,
   [proof/lean/UOToolchain/Sol.lean](../proof/lean/UOToolchain/Sol.lean)).
   **WP4 charter task 2 (source-to-IR correctness) is now closed
-  end-to-end at the program level for the structural fragment of
-  the admitted Solidity subset.** Combined with the W4.4 program-
-  level theorem, this completes the source-to-kernel correctness
-  chain at the structural fragment.
+  end-to-end at the program level for the full admitted post-
+  resolution Sol AST.** Combined with the W4.4 program-level
+  theorem, this completes the source-to-kernel correctness chain.
+  The parser-level syntactic preprocessing (state-name resolution,
+  capacity lookup, `abi.encodePacked` unwrapping, helper inlining,
+  `AssignAdd`-style desugaring) is treated as the trusted front-end
+  that produces the post-resolution Sol AST consumed by the W4.2
+  theorem.
 - *(next)* WP4 charter task 5 (manifest-exactness semantics-
   preserving lift, W4.5), or charter task 6 (artifact-checker
-  demotion, W4.6), or the context-dependent extensions of the
-  W4.2 source surface (state-variable accesses, `MemberAccess
-  ".length"`, `abi.encodePacked` keccak wrapping, helper
-  inlining). The W4.4 reverse iff direction (lowering succeeds →
-  precondition holds) is also a useful but optional W4.6
-  building block.
+  demotion, W4.6). The W4.4 reverse iff direction (lowering
+  succeeds → precondition holds) is also a useful but optional
+  W4.6 building block.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

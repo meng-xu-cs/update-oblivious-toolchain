@@ -1728,40 +1728,45 @@ Current status update:
   W4.1 evaluator is now total over the structural admitted fragment;
   the only `unsupported` constructors are `Expr.{structField,
   arrayIndex}`, which `Expr.fragmentValid` already rejects.
-- **Charter task 2 (source-to-IR correctness) closed for the
-  structural fragment of the admitted Solidity subset** (commit
-  `1ec7da6`,
+- **Charter task 2 (source-to-IR correctness) closed end-to-end at
+  the program level for the full admitted post-resolution Sol AST**
+  (commits `1ec7da6` + `d267e80`,
   [proof/lean/UOToolchain/Sol.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/Sol.lean)):
-  a typed Lean mirror of `solang_parser::pt::Statement` /
-  `pt::Expression` covers literals, variables, unary / binary /
-  conditional / `keccak256` expressions, declare / assign-to-local /
-  require / if / for / return statements, and an entrypoint
-  `Function`. An operational semantics
-  (`Sol.evalExpr` / `evalStatement` / `evalBody` / `evalForLoop` /
-  `evalFunction`) defined with `def` + `termination_by` reduces by
-  `rfl` / `unfold + rw`, mirroring the W4.4 evaluator style. The
-  AST → IR lowering (`lowerExpr` / `lowerStatement` /
-  `lowerStatementList` / `lowerFunction`) follows the structural
-  cases of `compiler/uo-solc/src/lib.rs` constructor-for-constructor.
-  The per-Expr / per-Statement / Body / Function preservation
-  theorems are Lean-proved end-to-end in the Session B-2 style;
-  the Function-level theorem is conditional on the IR config's
+  a typed Lean mirror of the post-resolution Sol AST that `uo-solc`
+  produces — covering literals, variables, unary / binary /
+  conditional expressions, `keccak256`, declare / assign-to-local /
+  require / abortIf / if / for / return statements (the source-
+  syntax constructors), plus the resolved-state constructors
+  `cellGet` / `arrayGet` / `mapGet` / `structField` / `arrayIndex` /
+  `cellSet` / `arraySet` / `mapPut` carrying the object id /
+  predicate that the parser's name-resolution pass has filled in.
+  An operational semantics (`Sol.evalExpr` / `evalStatement` /
+  `evalBody` / `evalForLoop` / `evalFunction`) defined with `def` +
+  `termination_by` reduces by `rfl` / `unfold + rw`, mirroring the
+  W4.4 evaluator style and matching every IR evaluator branch
+  exactly. The AST → IR lowering (`lowerExpr` / `lowerStatement` /
+  `lowerStatementList` / `lowerFunction`) maps each Sol constructor
+  to its same-named IR counterpart constructor-for-constructor. The
+  per-Expr / per-Statement / Body / Function preservation theorems
+  are Lean-proved end-to-end in the Session B-2 style; the
+  Function-level theorem is conditional on the IR config's
   entrypoint resolving to the lowered function (the same
   precondition shape as the W4.4 program-level theorem). Paper-
   facing facades `proofGrade_sol_to_ir_{expr,statement,body,
   program}_preservation` re-export through `ProofGrade.lean`.
   Combined with `proofGrade_ir_to_kernel_program_preservation`,
   this completes the source-to-kernel correctness chain at the
-  structural fragment, leaving only the context-dependent lowering
-  cases (state-variable accesses, `MemberAccess ".length"`,
-  `abi.encodePacked` keccak wrapping, helper inlining) as a
-  follow-up extension.
+  full admitted Sol AST. The parser-level transformations that
+  precede the Sol AST (state-name resolution, capacity literal
+  lookup, `abi.encodePacked` unwrapping, helper-function inlining,
+  `AssignAdd`-style desugaring) are syntactic preprocessing that
+  belong to the trusted `solang_parser` step; the entire semantic
+  Sol → IR step is now Lean-proved with no remaining surface.
 - Still open: the manifest-exactness semantics-preserving lift
-  (W4.5), the direct artifact checker demotion (W4.6), the
-  context-dependent extensions of the W4.2 source surface, and
-  the reverse direction of the W4.4 lowering iff (lowering
-  succeeds → precondition holds; useful for W4.6 but not strictly
-  required by the preservation theorem).
+  (W4.5), the direct artifact checker demotion (W4.6), and the
+  reverse direction of the W4.4 lowering iff (lowering succeeds →
+  precondition holds; useful for W4.6 but not strictly required by
+  the preservation theorem).
 
 Exit gate:
 

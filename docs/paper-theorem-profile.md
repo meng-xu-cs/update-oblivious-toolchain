@@ -267,17 +267,19 @@ What is still open:
   `theorem` blocks plus the function-level corollary, with a paper-
   facing facade
   `proofGrade_confidential_fragment_valid_iff_structurally_valid`
-  in `ProofGrade.lean`. W4.4 (IR-to-kernel) is now Lean-proved end-
-  to-end (see below); W4.5 (manifest-exactness semantics-preserving
-  lift) and W4.6 (artifact-checker demotion) remain open, and W4.2
-  (source-to-IR) is now Lean-proved end-to-end on the structural
-  fragment with context-dependent extensions (state-variable
-  accesses, `MemberAccess ".length"`, `abi.encodePacked` keccak
-  wrapping, helper inlining) deferred to a follow-up. `uo-solc`
-  remains in the trusted surface only for those deferred context-
-  dependent cases; the structural fragment is no longer trusted.
-  W4.1 / W4.3 add Lean-side operational and structural-classifier
-  surfaces the WP4 lowering theorems refine against.
+  in `ProofGrade.lean`. W4.2 (source-to-IR) and W4.4 (IR-to-kernel)
+  are now Lean-proved end-to-end at the program level for the full
+  admitted post-resolution Sol AST (see below); W4.5 (manifest-
+  exactness semantics-preserving lift) and W4.6 (artifact-checker
+  demotion) remain open. `uo-solc` is no longer in the trusted
+  surface for the semantic Sol → IR step; the parser-level
+  syntactic preprocessing (`solang_parser` plus state-name
+  resolution, capacity lookup, `abi.encodePacked` unwrapping,
+  helper-function inlining, `AssignAdd`-style desugaring) remains
+  trusted as the front-end that produces the post-resolution Sol
+  AST consumed by the W4.2 theorem. W4.1 / W4.3 add Lean-side
+  operational and structural-classifier surfaces the WP4 lowering
+  theorems refine against.
   Rust / Lean classifier agreement is a source-freeze obligation,
   handled by the existing static-drift checks.
   W4.1+ (evaluator coverage extension), W4.1++ (`Value.map`
@@ -321,17 +323,24 @@ What is still open:
   `fragmentValid` rejects, so they cannot appear in an accepted
   IR program.
   **W4.2 charter task 2 (source-to-IR correctness) is now Lean-
-  proved end-to-end at the program level for the structural
-  fragment of the admitted Solidity subset.** A typed Lean mirror
-  of `solang_parser::pt::Statement` / `pt::Expression` lives in
-  `proof/lean/UOToolchain/Sol.lean`, with operational semantics
+  proved end-to-end at the program level for the full admitted
+  post-resolution Sol AST.** A typed Lean mirror of the post-
+  resolution Sol AST lives in `proof/lean/UOToolchain/Sol.lean`,
+  covering both the source-syntax constructors (literals,
+  variables, unary/binary/conditional, keccak256, declare,
+  assign-to-local, require, abortIf, if/else, for, return) and
+  the resolved-state constructors (cellGet, arrayGet, mapGet,
+  structField, arrayIndex, cellSet, arraySet, mapPut) carrying
+  the object id / predicate that the parser's name-resolution
+  pass has filled in. The operational semantics
   (`Sol.evalExpr` / `evalStatement` / `evalBody` / `evalForLoop` /
-  `evalFunction`) defined as `def` + `termination_by` so the
-  evaluator reduces by `rfl` / `unfold + rw` for proofs. The
-  AST → IR lowering (`Sol.lowerExpr` / `lowerStatement` /
-  `lowerStatementList` / `lowerFunction`) maps each Sol
-  constructor to its same-named IR counterpart. The per-Expr /
-  per-Statement / Body / Function preservation theorems
+  `evalFunction`) defined as `def` + `termination_by` reduces by
+  `rfl` / `unfold + rw` and matches the IR evaluator branches
+  exactly. The AST → IR lowering (`Sol.lowerExpr` /
+  `lowerStatement` / `lowerStatementList` / `lowerFunction`)
+  maps each Sol constructor to its same-named IR counterpart
+  constructor-for-constructor. The per-Expr / per-Statement /
+  Body / Function preservation theorems
   (`Sol.lowerExpr_preserves_semantics`,
   `Sol.lowerStatement_preserves_semantics`,
   `Sol.lowerStatementList_preserves_semantics`,
@@ -341,10 +350,12 @@ What is still open:
   `_statement_preservation`, `_body_preservation`, and
   `_program_preservation` re-export through `ProofGrade.lean`.
   Combined with the W4.4 program-level theorem, this completes
-  the source-to-kernel correctness chain at the structural
-  fragment. Context-dependent lowering (state-variable accesses,
-  `MemberAccess ".length"`, `abi.encodePacked` keccak wrapping,
-  helper-function inlining) is the only remaining W4.2 surface.
+  the source-to-kernel correctness chain. The parser-level
+  syntactic preprocessing (state-name resolution, capacity
+  literal lookup, `abi.encodePacked` unwrapping, helper-function
+  inlining, `AssignAdd`-style desugaring) is the trusted
+  front-end that produces the post-resolution Sol AST consumed
+  here; the entire semantic Sol → IR step is Lean-proved.
 - WP5 (concrete backend assumptions): full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
@@ -1145,7 +1156,7 @@ before lowering instead of truncating execution through a runtime
 | Explicit backend / cryptographic / deployment assumptions | trusted assumptions | keep explicit and minimize |
 | `uo-check` | not in the proof-grade TCB | not in the TCB |
 | `mplus-probe` | not in the proof-grade TCB | not in the TCB |
-| `uo-solc` | not trusted for current artifact-level acceptance; source-level compiler correctness now Lean-proved end-to-end at both the source-to-IR level (W4.2, structural fragment) and the IR-to-kernel level (W4.4); the only remaining trusted surface is the W4.2 context-dependent extensions (state-variable accesses, `MemberAccess ".length"`, `abi.encodePacked` keccak wrapping, helper inlining) and the manifest-exactness lift (W4.5) | remove from TCB by closing the W4.2 context-dependent cases and the W4.5 sub-claim |
+| `uo-solc` | not trusted for current artifact-level acceptance; semantic compiler correctness now Lean-proved end-to-end at both the source-to-IR level (W4.2, full admitted post-resolution Sol AST) and the IR-to-kernel level (W4.4); the only remaining trusted surface inside `uo-solc` is the parser-level syntactic preprocessing (`solang_parser` plus state-name resolution, capacity literal lookup, `abi.encodePacked` unwrapping, helper-function inlining, `AssignAdd`-style desugaring) that produces the post-resolution Sol AST, and the manifest-exactness lift (W4.5) | remove the manifest-exactness lift from TCB by closing W4.5; the parser preprocessing remains a trusted front-end equivalent to `solang_parser` |
 | Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for the implementation side of the checked runtime proof/interface route, now frozen explicitly through `PaperMainRuntimeKernelBoundary`, `PaperMainRuntimeKernelSlotBoundary`, `RuntimeImplementationInterface`, `RuntimeImplementationPublicBridgeBoundary`, `RuntimeImplementationSlotAdapterBoundary`, `RuntimeImplementationResidualHelperShellBoundary`, `RuntimeImplementationSmallConfidentialKernelBoundary`, `RuntimeImplementationConfidentialStatementTraceBridgeBoundary`, `RuntimeImplementationSharedConfidentialKernelBoundary`, `RuntimeImplementationPublicBridgeObserverRefinementBoundary`, `RuntimeImplementationSlotAdapterMachineRefinementBoundary`, `RuntimeImplementationResidualHelperShellMachineRefinementBoundary`, `RuntimeImplementationSmallConfidentialKernelMachineRefinementBoundary`, `RuntimeImplementationConfidentialStatementTraceBridgeRefinementBoundary`, `RuntimeImplementationKernelMeetingBoundary`, `RuntimeImplementationKernelMeetingConfinementBoundary`, `RuntimeImplementationKernelMachineConfinementBoundary`, `RuntimeImplementationSharedKernelMachineRefinementBoundary`, `RuntimeImplementationSharedKernelRefinementBoundary`, and `RuntimeImplementationConfinementBoundary`; that checked interface now reaches the shared `uo-core` confidential-kernel interpreter and masked-selection/value layer used by the live runtime, plus the live Path ORAM masked full-scan lookup/update/stash-rebuild layer, boxed generated public-capacity ORAM read transcripts, fixed-public-batch ORAM write evidence, masked UO small-map lookup, masked UO array read/write access with UO-path out-of-range no-match behavior, the public generated-kernel return-tail schedule backed by `RuntimeReturnScheduleDiscipline`, the exact transition-shaped fresh-leaf schedule used by the modeled witness extractor, and the shared `uo-core` crate-root export shell in `crates/uo-core/src/lib.rs`, where the theorem-carrying public API for controller certificates, shell traces/contracts, runtime outcomes, and trusted-kernel bundles is frozen while the generated confidential-kernel module remains non-exported; the Rust/Lean kernel-model alignment route now also pins centralized confidential statement, named-expression, named-pure-expression, slot-expression, and slot-pure-expression profile tables together with the `RuntimeKernelMachineFinishWitness` field schema and the source-backed runtime implementation, public-bridge, slot-adapter, residual-helper-shell, public-bridge observer-refinement, slot-adapter-machine-refinement, small-confidential-kernel, confidential-statement-trace-bridge, shared-confidential-kernel, residual-helper-shell-machine-refinement, small-confidential-kernel-machine-refinement, confidential-statement-trace-bridge-refinement, kernel-meeting, kernel-meeting-confinement, and kernel-machine-confinement JSON schemas, while the source-backed implementation interface also pins the explicit named-to-slot lowering bridge and the concrete slot-statement / slot-expression / slot-pure-expression evaluator order used by the live interpreter; the closer-to-implementation emitted `RuntimeKernelMachineFinishWitness` now meets that checked inner source cut directly first at the standalone public-bridge boundary, where the abstract engine/runtime/shell/state/theorem split is checked on its own and the tamper suite rejects representative bridge-module ownership, engine-bridge bypass, shell confidentiality bleed, state staging bypass, theorem-side manual trace materialization drift, and shared `uo-core` crate-root generated-kernel export drift, then at the dedicated slot-adapter boundary, where the handwritten `uo-kernel-runtime` forwarding shell is isolated explicitly and the drift suite rejects representative generated slot-support argument-count drift, generated confidential-interpreter drift, shared-kernel interpreter-bypass drift, and raw confidential-argument observation in the handwritten adapter, then at the dedicated machine-backed slot-adapter boundary, where the same smaller source cut is paired directly with the live machine-finish witness and fixed slot program/opcode trace and the drift suite rejects expected-schedule-index drift, kernel-op/runtime-phase capacity drift, slot-program body drift, opcode-trace drift, generated confidential-interpreter drift, shared-kernel interpreter-bypass drift, generated post-return-break drift, generated slot-support argument-count drift, and raw confidential-argument observation in the handwritten adapter, and whose paper-facing conjunction is now projected explicitly through the wider small-confidential-kernel-machine, shared-kernel-machine, kernel-meeting-confinement, implementation-confinement, and direct kernel-machine-confinement routes, with each emitted report marking `paper_slot_adapter_machine_refinement_theorem_checked`, then at the residual-helper-shell boundary, where Lean packages the machine-backed public-only shell claim as `RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellRefinement` and the narrower observer-side slice as `RuntimeImplementationResidualHelperShellMachineRefinementBoundary.paperPublicOnlyResidualHelperShellObserverRefinement`, and also through the dedicated machine-backed public-bridge observer route `RuntimeImplementationPublicBridgeObserverRefinementBoundary.paperPublicBridgeObserverRefinement`, which now stands as its own checked boundary instead of only appearing as an outer corollary. The direct machine-confinement boundary then projects through that dedicated public-observer cut and reconstructs the same outer theorem from the full source-backed implementation interface plus the live machine-finish witness and fixed slot program/opcode trace without depending on the separate emitted finish-slot meeting artifact; Lean now packages that direct route as `RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell`, while the matching direct outer public-observer slice remains exposed separately as `RuntimeImplementationKernelMachineConfinementBoundary.paperPublicBridgeObserverRefinement`; together those theorems state source confinement, that handwritten runtime confidential work lives only in generated helpers, Lean-kernel refinement, shell-trace refinement, schedule consumption, kernel-op and runtime-phase capacity bounds, and slot-program/kernel-step exactness together; the tamper suite rejects representative named-expression profile-table drift, named-pure-expression profile-table drift, named-to-slot lowering drift, statement-trace drift on both the standalone confidential-statement-trace bridge and smaller finish-slot artifact sides, machine-finish schedule/capacity drift on the standalone machine-witness and on the combined machine-backed public-bridge observer, slot-adapter, residual-helper-shell, small-kernel, shared-kernel, meeting-confinement, implementation-confinement, and direct machine-confinement routes, direct tiny-kernel secret-branch / ORAM early-exit scan drift at both the standalone and machine-backed small-confidential-kernel cuts, slot-adapter source-side drift on the generated slot-support / generated confidential-interpreter / shared-kernel bridge / handwritten adapter surfaces, UO array direct-index/OOB-branch drift, UO small-map lookup early-exit drift, ORAM write-log growable-vector drift, generated-interpreter post-return-break drift on the machine-backed slot-adapter route and on the direct machine-confinement route, finish-slot slot-program/opcode/public-schedule drift on the combined confidential-statement-trace bridge refinement route and the kernel-meeting / kernel-meeting-confinement routes, direct machine-confinement schedule/capacity/slot-program/opcode/public-schedule/source-side/statement-trace drift, standalone public-bridge boundary source-side drift on its own bridge-module / engine / shell / state / theorem cut, standalone and machine-backed shared `uo-core` crate-root generated-kernel export drift, dedicated public-bridge observer route slot-program/opcode drift plus source-side/object/ORAM/store/statement-trace drift, meeting-route source-side drift on both the small-kernel and statement-trace sides, and reintroduction of the older single-fresh-leaf approximation across the standalone implementation-interface, standalone public-bridge-boundary, standalone slot-adapter-boundary, standalone residual-helper-shell-boundary, standalone small-confidential-kernel-boundary, standalone confidential-statement-trace-bridge-boundary, standalone shared-confidential-kernel-boundary, public-bridge observer-refinement-boundary, slot-adapter machine-refinement-boundary, residual-helper-shell machine-refinement-boundary, small-confidential-kernel machine-refinement-boundary, confidential-statement-trace bridge refinement-boundary, kernel-meeting-boundary, kernel-meeting-confinement-boundary, direct kernel-machine-confinement-boundary, shared-kernel machine-refinement-boundary, shared-kernel-refinement-boundary, and combined implementation-confinement-boundary routes | keep the kernel tiny and push to a deeper semantics-of-Rust refinement below the strengthened runtime/shared-kernel source interface |
 | Rust code outside the tiny kernel | no longer part of the current confidential-work claim; the checked source-backed implementation interface pins it to the public bridge side and tamper validation rejects representative drift | keep it public-only or remove it from the runtime path entirely |
 

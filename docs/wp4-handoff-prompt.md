@@ -31,11 +31,13 @@ tasks **1, 2, 3, and 4 are now Lean-proved**:
   preservation` theorem certifies that for every Sol function
   `fn` and IR `OperationalConfig` whose entrypoint resolves to
   `lowerFunction fn`, the Sol-side `evalFunction` and the IR-side
-  `evalContract` produce identical outcomes. Closed for the
-  structural fragment of the admitted Solidity subset; the
-  context-dependent extensions (state-variable accesses,
-  `MemberAccess ".length"`, `abi.encodePacked` keccak wrapping,
-  helper inlining) are deferred.
+  `evalContract` produce identical outcomes. Closed end-to-end
+  for the full admitted post-resolution Sol AST. The parser-level
+  syntactic preprocessing (state-name resolution, capacity
+  literal lookup, `abi.encodePacked` unwrapping, helper-function
+  inlining, `AssignAdd`-style desugaring) is the trusted
+  front-end that produces the post-resolution Sol AST consumed by
+  the theorem.
 - W4.3 (full theorem + paper facade):
   `(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
   fn.fragmentValid = true`.
@@ -49,13 +51,13 @@ tasks **1, 2, 3, and 4 are now Lean-proved**:
   identical outcomes.
 
 Combined, W4.2 + W4.4 yield the source-to-kernel correctness chain
-at the structural fragment.
+end-to-end on the full admitted post-resolution Sol AST.
 
 WP4 charter tasks **5** (manifest-exactness semantics-preserving
 lift) and **6** (direct artifact-checker demotion) remain open;
-the W4.2 context-dependent extensions and the W4.4 reverse iff
-direction (lowering succeeds → precondition holds) are also still
-deferred (the latter useful for W4.6 but not required by W4.4).
+the W4.4 reverse iff direction (lowering succeeds → precondition
+holds) is also still deferred (useful for W4.6 but not required
+by W4.4).
 
 ## First, Read These Files In This Exact Order
 
@@ -177,28 +179,14 @@ This requires the reverse direction of the W4.4 lowering iff
 (`lowerExpr e = .ok ke → Expr.fragmentValid e = true`) plus a doc
 update to the WP4 trust narrative.
 
-**Option (c) — W4.2 context-dependent extensions.** Extend
-`proof/lean/UOToolchain/Sol.lean` to cover the constructors
-deferred in the structural fragment: `ArraySubscript base index`
-→ `IR.ArrayGet` / `MapGet` / `ArrayIndex` based on the state-
-object table; `MemberAccess base ".length"` → `IR.Literal length`
-when `base` is a state with declared capacity; `Assign lhs rhs`
-where `lhs` is a state variable → `IR.CellSet` / `ArraySet` /
-`MapPut`; `FunctionCall keccak256 (abi.encodePacked args)` →
-`IR.Keccak256 args`; helper-function inlining via
-`ctx.frontend.helpers`. Each constructor needs lowering plus a
-preservation theorem in the same B-2 style.
-
 Recommend option (a) — W4.5 — because both W4.2 and W4.4
 preservation theorems are the natural foundation for it, and W4.5
 closes the last remaining "compiler-side" charter task. Option (b)
-is small but mostly a doc / role-swap task. Option (c) extends the
-W4.2 surface and is independent of the rest of WP4.
+is small but mostly a doc / role-swap task.
 
 After W4.5 lands, the natural sequence is:
 
 - W4.6 — demote the direct artifact checker (charter task 6).
-- W4.2 context-dependent extensions — the deferred Sol surface.
 
 ## Validation Slice (Standard WP4 Variant)
 
@@ -298,7 +286,5 @@ for the content requirements.
 
 Begin with the runbook. The recommended next subtask is W4.5
 (manifest-exactness semantics-preserving lift). Alternative
-options are W4.6 (artifact-checker demotion, smaller scope but
-mostly a role-swap) and the W4.2 context-dependent extensions
-(state-variable accesses, `MemberAccess ".length"`,
-`abi.encodePacked` keccak wrapping, helper inlining).
+option is W4.6 (artifact-checker demotion, smaller scope but
+mostly a role-swap).
