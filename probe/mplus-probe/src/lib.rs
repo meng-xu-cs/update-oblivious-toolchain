@@ -24839,6 +24839,14 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // file as the canonical pin for the JACM Theorem 5.1 parameter
     // substitution.
     let manifest_alignment_path = repo_root().join("crates/uo-core/src/manifest.rs");
+    // W6.1: pin the SGX observer surface — page-region names,
+    // controller-phase vocabulary, page-event-kind / exit-event-kind
+    // vocabularies, shared-resource pattern literal, and the
+    // page/exit encoding rules — in the Rust runtime controller
+    // recorder and public-trace projection. The Lean provenance
+    // record `sgxObserverSurfaceProvenance` references these files
+    // as the canonical pins for the W6.1 frozen observer surface.
+    let runtime_controller_path = repo_root().join("runtime/uo-evm/src/controller.rs");
     let lean_runtime_implementation_interface_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterface.lean");
     let lean_runtime_implementation_interface_json_path =
@@ -25040,6 +25048,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         })?;
     let manifest_alignment_source = fs::read_to_string(&manifest_alignment_path)
         .with_context(|| format!("reading {}", display_report_path(&manifest_alignment_path)))?;
+    let runtime_controller_source = fs::read_to_string(&runtime_controller_path)
+        .with_context(|| format!("reading {}", display_report_path(&runtime_controller_path)))?;
     let workspace_cargo_toml_source =
         fs::read_to_string(&workspace_cargo_toml_path).with_context(|| {
             format!(
@@ -29638,6 +29648,64 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && manifest_alignment_source.contains("if self.stash_bound != capacity.max(1) {")
         && manifest_alignment_source
             .contains("bail!(\"path ORAM stash_bound must equal max(capacity, 1)\");");
+    // W6.1: pin the hostile-host SGX observer surface — page-region
+    // names, controller-phase vocabulary, page-event-kind /
+    // exit-event-kind vocabularies, shared-resource pattern literal,
+    // and the page-event / exit-event encoding formulas — in the
+    // runtime controller recorder and the public-trace projection.
+    // The matching Lean provenance record is
+    // `sgxObserverSurfaceProvenance`; the matching paper-facing
+    // facades are exposed under the `proofGrade_sgx_observer_*`
+    // prefix in `proof/lean/UOToolchain/ProofGrade.lean`. The
+    // canonical observer-surface freeze is documented in
+    // `docs/tee-runtime-hardening.md` under "W6.1 Frozen SGX
+    // Observer Surface".
+    let sgx_observer_surface_pinned = runtime_controller_source
+        .contains("const METADATA_REGION: &str = \"metadata\";")
+        && runtime_controller_source
+            .contains("const POSITION_MAP_REGION: &str = \"position_map\";")
+        && runtime_controller_source.contains("const PATH_REGION: &str = \"path\";")
+        && runtime_controller_source.contains("const STASH_REGION: &str = \"stash\";")
+        && runtime_controller_source.contains("const CONTROLLER_REGIONS: [ControllerRegion; 4]")
+        && runtime_controller_source.contains("ControllerPhase::EnclaveEnter")
+        && runtime_controller_source.contains("ControllerPhase::StageRequest")
+        && runtime_controller_source.contains("ControllerPhase::DescendPositionMap")
+        && runtime_controller_source.contains("ControllerPhase::LoadMetadata")
+        && runtime_controller_source.contains("ControllerPhase::FetchPath")
+        && runtime_controller_source.contains("ControllerPhase::ScanStash")
+        && runtime_controller_source.contains("ControllerPhase::RewritePath")
+        && runtime_controller_source.contains("ControllerPhase::AscendPositionMap")
+        && runtime_controller_source.contains("ControllerPhase::SealPersistentState")
+        && runtime_controller_source.contains("ControllerPhase::EnclaveExit")
+        && core_trace_source.contains("pub enum ControllerPhase {")
+        && core_trace_source.contains("    EnclaveEnter,")
+        && core_trace_source.contains("    StageRequest,")
+        && core_trace_source.contains("    DescendPositionMap,")
+        && core_trace_source.contains("    LoadMetadata,")
+        && core_trace_source.contains("    FetchPath,")
+        && core_trace_source.contains("    ScanStash,")
+        && core_trace_source.contains("    RewritePath,")
+        && core_trace_source.contains("    AscendPositionMap,")
+        && core_trace_source.contains("    SealPersistentState,")
+        && core_trace_source.contains("    EnclaveExit,")
+        && core_trace_source.contains("pub enum PageEventKind {")
+        && core_trace_source.contains("    FaultIn,")
+        && core_trace_source.contains("    EvictOut,")
+        && core_trace_source.contains("pub enum ExitEvent {")
+        && core_trace_source.contains("    InterruptExit,")
+        && core_trace_source.contains("    Resume,")
+        && core_trace_source.contains("    Terminate,")
+        && core_trace_source.contains(
+            "vec![\"shared_resource_tick\".into(); self.shared_resource_budget].into_boxed_slice();",
+        )
+        && core_trace_source.contains("kind: if index % 2 == 0 {")
+        && core_trace_source.contains("PageEventKind::FaultIn")
+        && core_trace_source.contains("PageEventKind::EvictOut")
+        && core_trace_source.contains("if index + 1 == self.exit_trace_budget {")
+        && core_trace_source.contains("ExitEvent::Terminate")
+        && core_trace_source.contains("} else if index % 2 == 0 {")
+        && core_trace_source.contains("ExitEvent::Resume")
+        && core_trace_source.contains("ExitEvent::InterruptExit");
     let rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names =
         extract_rust_struct_fields(
             &probe_source,
@@ -34032,6 +34100,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present
         && runtime_crypto_primitive_identity_pinned
         && path_oram_deployed_stash_parameters_pinned
+        && sgx_observer_surface_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34713,6 +34782,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_crypto_primitive_identity_pinned,
         "path_oram_deployed_stash_parameters_pinned":
             path_oram_deployed_stash_parameters_pinned,
+        "sgx_observer_surface_pinned":
+            sgx_observer_surface_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":

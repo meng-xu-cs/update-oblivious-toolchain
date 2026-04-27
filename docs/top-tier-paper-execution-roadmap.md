@@ -2042,6 +2042,7 @@ Primary files:
 - [proof/lean/UOToolchain/SgxExactProjection.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/SgxExactProjection.lean)
 - [proof/lean/UOToolchain/SgxOramProjection.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/SgxOramProjection.lean)
 - [proof/lean/UOToolchain/SgxJointProjection.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/SgxJointProjection.lean)
+- [proof/lean/UOToolchain/SgxObserverFreeze.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/SgxObserverFreeze.lean)
 - [proof/lean/UOToolchain/TeeDeployment.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/TeeDeployment.lean)
 - [docs/tee-runtime-hardening.md](/home/m285xu/update-oblivious-toolchain/docs/tee-runtime-hardening.md)
 
@@ -2049,6 +2050,27 @@ Concrete tasks:
 
 1. Freeze the exact hostile-host observer and keep it aligned across docs and
    Lean.
+   - **W6.1 status (landed):** the SGX observer surface is now frozen
+     explicitly in `proof/lean/UOToolchain/SgxObserverFreeze.lean`. The
+     module pins the four canonical page-region names (`metadata`,
+     `position_map`, `path`, `stash`), the ten canonical controller
+     phases, the two `PageEventKind` constructors, the three `ExitEvent`
+     constructors, the public shared-resource pattern literal
+     `"shared_resource_tick"`, and the canonical page-event /
+     exit-event encoding rules. Each component is paired with a
+     structural Lean theorem (`controllerPageTraceRegionsOfLeakage_pageKinds`,
+     `controllerWorksetRegionsOfLeakage_pageKinds`,
+     `controllerSharedResourcePatternOfShape_value`,
+     `controllerPageEventOfIndex_*`) and exposed through 14
+     `proofGrade_sgx_observer_*` facades in
+     `proof/lean/UOToolchain/ProofGrade.lean`. The provenance record
+     `sgxObserverSurfaceProvenance` carries the documentation anchor
+     (`docs/tee-runtime-hardening.md` "W6.1 Frozen SGX Observer
+     Surface") and the named probe drift check
+     `sgx_observer_surface_pinned`. The drift check, emitted by the
+     `kernel_model_alignment_validation.json` report, rejects
+     representative drift on the Rust observer surface in
+     `runtime/uo-evm/src/controller.rs` and `crates/uo-core/src/trace.rs`.
 2. Model enclave-boundary calls, persistent I/O, exits, and any admitted
    shared-resource or paging observations.
 3. Prove that the real controller/runtime behavior refines that observer.

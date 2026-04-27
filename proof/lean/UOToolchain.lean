@@ -20,6 +20,7 @@ import UOToolchain.SgxController
 import UOToolchain.SgxControllerTrace
 import UOToolchain.SgxMicroModel
 import UOToolchain.SgxMicroGame
+import UOToolchain.SgxObserverFreeze
 import UOToolchain.RuntimeRefinement
 import UOToolchain.RuntimeTrustedKernel
 import UOToolchain.RuntimeShellBoundary

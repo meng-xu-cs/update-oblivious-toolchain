@@ -16,6 +16,7 @@ import UOToolchain.SgxMicroModel
 import UOToolchain.SgxOramProjection
 import UOToolchain.SgxExactProjection
 import UOToolchain.SgxJointProjection
+import UOToolchain.SgxObserverFreeze
 import UOToolchain.RuntimeRefinement
 import UOToolchain.RuntimeTrustedKernel
 import UOToolchain.RuntimeShellBoundary
@@ -1286,5 +1287,162 @@ theorem proofGrade_path_oram_local_posmap_v1_assumption_audit_all_cited :
     ∀ entry, entry ∈ pathOramLocalPosmapV1_assumptionAudit →
       entry.classification = "Cited / externally justified" :=
   pathOramLocalPosmapV1_assumptionAudit_allCited
+
+/-! ### WP6.1 SGX Observer-Surface Freeze Facades
+
+The facades below expose the W6.1 hostile-host SGX observer-surface
+freeze metadata: every paper claim about hostile-host SGX execution
+obliviousness goes through one fixed observer signature. The freeze
+covers the four page-region names, the ten controller phases, the
+two page-event kinds, the three exit-event kinds, and the
+shared-resource pattern literal that is shared between the Lean
+controller-trace constructors (`SgxController.lean` /
+`SgxControllerTrace.lean` / `SgxMicroModel.lean`) and the Rust
+runtime controller / public-trace projection
+(`runtime/uo-evm/src/controller.rs`, `crates/uo-core/src/trace.rs`).
+
+Claim taxonomy: these facades are **Lean-proved,
+semantics-preserving**. The Lean side carries explicit equalities
+pinning each component to its canonical value; the runtime side is
+pinned by the probe's `sgx_observer_surface_pinned` static-drift
+check. The freeze does not by itself discharge any deployment
+assumption — it locks the boundary-observer signature so the W6.2 /
+W6.3 / W6.4 refinements have a stable target. -/
+
+/-- Paper-facing W6.1 facade: the canonical observer page-region
+names are exactly four — metadata, position_map, path, stash — in
+this canonical order. Both the Lean controller-trace constructor and
+the Rust runtime recorder enumerate exactly these four kinds. -/
+theorem proofGrade_sgx_observer_page_region_names :
+    sgxObserverPageRegionNames =
+      ["metadata", "position_map", "path", "stash"] :=
+  sgxObserverPageRegionNames_value
+
+/-- Paper-facing W6.1 facade: the page-region names produced by the
+controller-trace constructor `controllerPageTraceRegionsOfLeakage`
+are exactly the canonical observer page-region list, regardless of
+which leakage list is supplied. This pins the canonical ordering
+inside the Lean controller projection. -/
+theorem proofGrade_sgx_observer_controller_page_trace_region_names
+    (leakage : List OramAccessLeakage) :
+    (controllerPageTraceRegionsOfLeakage leakage).map
+        (fun region => region.pageKind) =
+      sgxObserverPageRegionNames :=
+  controllerPageTraceRegionsOfLeakage_pageKinds leakage
+
+/-- Paper-facing W6.1 facade: the page-region names produced by the
+controller-workset constructor `controllerWorksetRegionsOfLeakage`
+are also exactly the canonical observer page-region list. -/
+theorem proofGrade_sgx_observer_controller_workset_region_names
+    (leakage : List OramAccessLeakage) :
+    (controllerWorksetRegionsOfLeakage leakage).map
+        (fun region => region.pageKind) =
+      sgxObserverPageRegionNames :=
+  controllerWorksetRegionsOfLeakage_pageKinds leakage
+
+/-- Paper-facing W6.1 facade: the canonical observer controller-phase
+list has exactly ten entries, matching the ten `SGXControllerPhase`
+constructors in canonical declaration order. -/
+theorem proofGrade_sgx_observer_controller_phases_length :
+    sgxObserverControllerPhases.length = 10 :=
+  sgxObserverControllerPhases_length
+
+/-- Paper-facing W6.1 facade: the canonical observer
+controller-phase-name list has exactly ten entries, matching the
+canonical Rust `ControllerPhase` enum variant order. -/
+theorem proofGrade_sgx_observer_controller_phase_names_length :
+    sgxObserverControllerPhaseNames.length = 10 :=
+  sgxObserverControllerPhaseNames_length
+
+/-- Paper-facing W6.1 facade: the canonical observer page-event-kind
+list has exactly two entries — `faultIn` and `evictOut`. -/
+theorem proofGrade_sgx_observer_page_event_kinds_length :
+    sgxObserverPageEventKinds.length = 2 :=
+  sgxObserverPageEventKinds_length
+
+/-- Paper-facing W6.1 facade: the canonical observer exit-event-kind
+list has exactly three entries — `interruptExit`, `resume`,
+`terminate`. -/
+theorem proofGrade_sgx_observer_exit_events_length :
+    sgxObserverExitEvents.length = 3 :=
+  sgxObserverExitEvents_length
+
+/-- Paper-facing W6.1 facade: the public shared-resource pattern
+literal is exactly `"shared_resource_tick"`, matching both the Lean
+controller projection and the Rust public-trace projection. -/
+theorem proofGrade_sgx_observer_shared_resource_tick :
+    sgxObserverSharedResourceTick = "shared_resource_tick" :=
+  sgxObserverSharedResourceTick_value
+
+/-- Paper-facing W6.1 facade: the controller's shared-resource
+projection is exactly a list of the canonical
+`sgxObserverSharedResourceTick` literal, repeated by the public
+shared-resource budget. This pins the canonical literal as the only
+string the Lean controller projects under that budget. -/
+theorem proofGrade_sgx_observer_controller_shared_resource_pattern
+    (shape : SGXControllerShape) :
+    controllerSharedResourcePatternOfShape shape =
+      List.replicate shape.sharedResourceBudget
+        sgxObserverSharedResourceTick :=
+  controllerSharedResourcePatternOfShape_value shape
+
+/-- Paper-facing W6.1 facade: the page-event encoding's `pageId` rule
+is `index / 2`, matching the Rust `normalized_micro_trace`
+projection. -/
+theorem proofGrade_sgx_observer_page_event_pageId_rule
+    (pageKind : String) (index : Nat) :
+    (controllerPageEventOfIndex pageKind index).pageId = index / 2 :=
+  controllerPageEventOfIndex_pageId pageKind index
+
+/-- Paper-facing W6.1 facade: even-indexed page events are
+`faultIn`, matching the Rust alternation pattern. -/
+theorem proofGrade_sgx_observer_page_event_kind_even
+    (pageKind : String) (index : Nat)
+    (hEven : index % 2 = 0) :
+    (controllerPageEventOfIndex pageKind index).kind =
+      PageEventKind.faultIn :=
+  controllerPageEventOfIndex_kind_even pageKind index hEven
+
+/-- Paper-facing W6.1 facade: odd-indexed page events are
+`evictOut`, matching the Rust alternation pattern. -/
+theorem proofGrade_sgx_observer_page_event_kind_odd
+    (pageKind : String) (index : Nat)
+    (hOdd : index % 2 = 1) :
+    (controllerPageEventOfIndex pageKind index).kind =
+      PageEventKind.evictOut :=
+  controllerPageEventOfIndex_kind_odd pageKind index hOdd
+
+/-- Paper-facing W6.1 facade: the observer-surface provenance
+record's pinned static-drift check name. The named probe drift check
+rejects representative drift if the Rust controller / public-trace
+surface stops using the canonical observer vocabulary. -/
+theorem proofGrade_sgx_observer_surface_provenance_static_drift_check :
+    sgxObserverSurfaceProvenance.staticDriftCheckName =
+      "sgx_observer_surface_pinned" :=
+  sgxObserverSurfaceProvenance_staticDriftCheckName
+
+/-- Paper-facing W6.1 facade: the observer-surface provenance
+record's pinned page-region names match the canonical
+`sgxObserverPageRegionNames`. -/
+theorem proofGrade_sgx_observer_surface_provenance_page_region_names :
+    sgxObserverSurfaceProvenance.pageRegionNames =
+      sgxObserverPageRegionNames :=
+  sgxObserverSurfaceProvenance_pageRegionNames
+
+/-- Paper-facing W6.1 facade: the observer-surface provenance
+record's pinned controller-phase names match the canonical
+`sgxObserverControllerPhaseNames`. -/
+theorem proofGrade_sgx_observer_surface_provenance_controller_phase_names :
+    sgxObserverSurfaceProvenance.controllerPhaseNames =
+      sgxObserverControllerPhaseNames :=
+  sgxObserverSurfaceProvenance_controllerPhaseNames
+
+/-- Paper-facing W6.1 facade: the observer-surface provenance
+record's pinned shared-resource tick matches the canonical
+`sgxObserverSharedResourceTick`. -/
+theorem proofGrade_sgx_observer_surface_provenance_shared_resource_tick :
+    sgxObserverSurfaceProvenance.sharedResourceTick =
+      sgxObserverSharedResourceTick :=
+  sgxObserverSurfaceProvenance_sharedResourceTick
 
 end UOToolchain

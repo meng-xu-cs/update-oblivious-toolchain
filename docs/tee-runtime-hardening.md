@@ -63,6 +63,88 @@ reasonable." It is:
 3. prove the rest of the runtime is public-only with respect to this observer
 4. then close the hostile-host deployment theorem at exactly this observer
 
+## W6.1 Frozen SGX Observer Surface
+
+The W6 hostile-host theorem rests on the observer signature shared
+across three artifacts:
+
+- the Lean models in `proof/lean/UOToolchain/SgxBoundary.lean`,
+  `SgxRelation.lean`, `SgxController.lean`, `SgxControllerTrace.lean`,
+  and `SgxMicroModel.lean`;
+- the Rust runtime controller recorder in
+  `runtime/uo-evm/src/controller.rs`;
+- the Rust public-trace projection in `crates/uo-core/src/trace.rs`.
+
+W6.1 freezes the public observer signature explicitly so the W6.2
+(boundary-call modeling) / W6.3 (controller refinement) / W6.4
+(sealing-storage refinement) refinements have a stable target. The
+Lean side carries a dedicated module
+[`SgxObserverFreeze.lean`](../proof/lean/UOToolchain/SgxObserverFreeze.lean)
+that pins each observer-surface component as an explicit constant
+plus a structural theorem; the Rust side is pinned by the probe's
+`sgx_observer_surface_pinned` static-drift check.
+
+Claim taxonomy (per
+[`docs/coding-agent-conventions.md`](./coding-agent-conventions.md#claim-and-tcb-discipline)):
+**Lean-proved, semantics-preserving** for the W6.1 component freezes
+themselves. The Lean equalities are exact and rejected by the build
+if they ever drift; the static-drift check rejects representative
+runtime drift. The freeze does not by itself discharge any
+deployment assumption — it locks the observer signature so the
+remaining hostile-host theorem work targets one fixed surface.
+
+### Frozen components
+
+| Component | Canonical value | Lean anchor | Rust anchor |
+| --- | --- | --- | --- |
+| Page-region vocabulary | `["metadata", "position_map", "path", "stash"]` | `sgxObserverPageRegionNames` (`SgxObserverFreeze.lean`); paired with `controllerPageTraceRegionsOfLeakage_pageKinds` and `controllerWorksetRegionsOfLeakage_pageKinds` over the controller projections in `SgxController.lean` | `METADATA_REGION` / `POSITION_MAP_REGION` / `PATH_REGION` / `STASH_REGION` constants + `CONTROLLER_REGIONS` array in `runtime/uo-evm/src/controller.rs`; the controller's `bump_region` / `bump_workset` paths route through these names exclusively |
+| Controller-phase vocabulary | 10 phases (enclaveEnter → stageRequest → descendPositionMap → loadMetadata → fetchPath → scanStash → rewritePath → ascendPositionMap → sealPersistentState → enclaveExit) | `SGXControllerPhase` inductive in `SgxRelation.lean`; canonical list `sgxObserverControllerPhases` and name list `sgxObserverControllerPhaseNames` in `SgxObserverFreeze.lean` | `ControllerPhase` enum in `crates/uo-core/src/trace.rs` (`EnclaveEnter` … `EnclaveExit`); used by `runtime/uo-evm/src/controller.rs` to record the public phase order |
+| Page-event-kind vocabulary | `[faultIn, evictOut]` | `PageEventKind` inductive in `SgxBoundary.lean`; canonical list `sgxObserverPageEventKinds` and name list `sgxObserverPageEventKindNames` in `SgxObserverFreeze.lean` | `PageEventKind` enum in `crates/uo-core/src/trace.rs` (`FaultIn`, `EvictOut`); used by the public `normalized_micro_trace()` projection |
+| Exit-event-kind vocabulary | `[interruptExit, resume, terminate]` | `ExitEvent` inductive in `SgxBoundary.lean`; canonical list `sgxObserverExitEvents` and name list `sgxObserverExitEventNames` in `SgxObserverFreeze.lean` | `ExitEvent` enum in `crates/uo-core/src/trace.rs` (`InterruptExit`, `Resume`, `Terminate`); used by the public `normalized_micro_trace()` exit pattern |
+| Shared-resource pattern literal | `"shared_resource_tick"` | `sgxObserverSharedResourceTick` in `SgxObserverFreeze.lean`; paired with `controllerSharedResourcePatternOfShape_value` over the Lean controller projection in `SgxControllerTrace.lean` | The `vec!["shared_resource_tick".into(); self.shared_resource_budget]` literal in `SgxControllerShapeTrace::normalized_micro_trace` (`crates/uo-core/src/trace.rs`) |
+| Page-event encoding formula | `pageId = index / 2`, `kind = if index % 2 = 0 then faultIn else evictOut` | `controllerPageEventOfIndex` in `SgxControllerTrace.lean`; paired with `controllerPageEventOfIndex_pageId`, `controllerPageEventOfIndex_kind_even`, `controllerPageEventOfIndex_kind_odd` in `SgxObserverFreeze.lean` | The `index / 2` / parity `if` block inside `SgxControllerShapeTrace::normalized_micro_trace` (`crates/uo-core/src/trace.rs`) |
+
+### Provenance pairing
+
+The W6.1 provenance record is `sgxObserverSurfaceProvenance` in
+`SgxObserverFreeze.lean`. It carries:
+
+- the four canonical name lists and the shared-resource tick literal;
+- the documentation anchor (this section);
+- the probe static-drift check name (`sgx_observer_surface_pinned`);
+- the Lean and Rust file paths anchoring each pinned component.
+
+The paper-facing facades exposed in
+[`ProofGrade.lean`](../proof/lean/UOToolchain/ProofGrade.lean) under
+the `proofGrade_sgx_observer_*` prefix mirror the W5.4 / W5.3
+provenance facade pattern: each facade is a one-line forwarder that
+gives the paper a Lean theorem object referencing the canonical
+constant or projection equality.
+
+### Static-drift coverage
+
+The probe's `sgx_observer_surface_pinned` flag, emitted by the
+`kernel_model_alignment_validation.json` report, rejects
+representative drift on the Rust side. Specifically it requires:
+
+- `runtime/uo-evm/src/controller.rs` keeps the
+  `METADATA_REGION = "metadata"`, `POSITION_MAP_REGION = "position_map"`,
+  `PATH_REGION = "path"`, and `STASH_REGION = "stash"` constants.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `ControllerPhase`, `PageEventKind`, and `ExitEvent` enum variants
+  in their declared order.
+- `crates/uo-core/src/trace.rs` keeps the
+  `vec!["shared_resource_tick".into(); self.shared_resource_budget]`
+  literal inside `SgxControllerShapeTrace::normalized_micro_trace`.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `index / 2` / `index % 2 == 0` page-event alternation rule and the
+  `if index + 1 == self.exit_trace_budget` / `index % 2 == 0`
+  exit-pattern rule.
+
+If any of those drift, the static-checks gate flips
+`sgx_observer_surface_pinned` to `false` and the gate rejects the
+checkpoint.
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:
