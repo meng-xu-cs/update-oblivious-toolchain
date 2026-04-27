@@ -1,5 +1,24 @@
 import UOToolchain.TeeDeployment
 
+/-! # SGX boundary-data layer
+
+This file pins the SGX boundary-event vocabulary
+(`BoundaryDirection` / `BoundaryEvent`), the page-event and
+exit-event vocabularies (`PageEventKind` / `PageEvent` /
+`ExitEvent`), and the shared-resource trace abbreviation. It also
+defines the paper-facing `SGXView` record, the deterministic SGX
+execution view (`SGXExecutionView`), the ambient `SGXSemantics` /
+`SGXSecurityRelation` types, and the top-level
+`SGXExecutionOblivious` predicate.
+
+This is a pure data layer; no theorems are stated here. The W6
+freeze records `sgxObserverSurfaceProvenance`,
+`sgxBoundaryCallProvenance`, `sgxPersistentIoProvenance` (in
+`SgxObserverFreeze.lean`) pin the ABI-style vocabulary literals of
+this layer; the projection chain `SgxRelation.lean` →
+`SgxExactProjection.lean` / `SgxOramProjection.lean` /
+`SgxJointProjection.lean` then carries the paper-main theorems. -/
+
 namespace UOToolchain
 
 inductive BoundaryDirection where

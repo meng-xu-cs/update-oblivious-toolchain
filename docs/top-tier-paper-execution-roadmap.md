@@ -2251,6 +2251,38 @@ Current artifact-side realization: the full probe bundle emits
 reviewer-facing table over proof/report cost, artifact sizes, runtime
 overheads, TCB surface, and explicit assumptions.
 
+Status of charter task 1 (theorem-stack refactor): each SGX projection-chain
+layer now exposes one abstraction function and one paper-main theorem with
+clearly-marked file-local helpers. The W7.1 cleanup landed in commits
+`ecc3a97` (W7.1.a SgxExactProjection canonicalization + four
+`proofGrade_sgx_projection_*` paper-facade aliases in `ProofGrade.lean`),
+`d3924f7` (W7.1.b SgxOramProjection: drop bare /
+`_with_controller` / `_with_budgetController` /
+`_with_canonicalController` alternatives plus matching legacy mirrors and
+the `oramSGXProofRelationWith` /
+`oramBudgetSGXProofRelationWith` /
+`oramCanonicalizedSGXProofRelationWith` /
+`publicSGXMicroRelation` defs), `280fecd` (W7.1.c SgxMicroModel: drop
+`publicControllerMicroSemantics` and its six smoke-test theorems plus
+the entire `budgetConsistentSGXMicroRelation` / canonicalized-relation
+infrastructure), `d3a973b` (W7.1.d drop `MicroTraceConsistentWithLeakage`
+and the `_consistentWithLeakage` helpers in `SgxRelation.lean` /
+`SgxControllerTrace.lean`), `5434cdd` (W7.1.e SgxJointProjection +
+legacy joint-mirror trim, plus probe `legacy_theorem_symbol_surface_checks`
+update for the now-empty `legacySgxMicroLocalTheorem` reference in
+`LegacySgxJointProjection.lean`), and the matching layer-level
+docstrings in `SgxBoundary.lean` / `SgxRelation.lean` /
+`SgxController.lean` / `SgxControllerTrace.lean` /
+`SgxExactProjection.lean` / `SgxOramProjection.lean` /
+`SgxJointProjection.lean` / `SgxMicroModel.lean` identifying the single
+abstraction function and single main theorem of each layer. The
+paper-facing entry points are now exposed under
+`proofGrade_sgx_projection_tee_storage_to_exact_sgx`,
+`proofGrade_sgx_projection_paper_main_exact_uo`,
+`proofGrade_sgx_projection_paper_main_computational_uo`, and
+`proofGrade_sgx_projection_paper_main_joint_security` in
+`ProofGrade.lean`.
+
 Exit gate:
 
 - the paper and artifact tell the same minimal story with no hidden branches

@@ -1,5 +1,25 @@
 import UOToolchain.SgxBoundary
 
+/-! # SGX view-relation layer
+
+This file projects an `SGXView` into its component public outcome,
+storage trace, and micro trace, and ties together the pieces a
+paper-grade SGX security claim consumes:
+
+* **Abstraction function:** `sgxViewOfDeployment` (lifts a
+  `DeploymentResult` to an `SGXView`). The companion
+  `deploymentToSGXSemantics` lifts a `DeploymentSemantics` to an
+  `SGXSemantics Config`.
+* **Main theorem:** `exactTEEStorage_projects_to_exactSGX` — every
+  deployment satisfying `ExactTEEStorageOblivious` lifts to
+  `SGXExecutionSecurity` against `exactSGXProofRelation`.
+
+The file also defines the foundational predicates
+`ExactProjectionRelation`, `SGXViewRelation`, `SGXExecutionSecurity`,
+`PublicStorageLeakage`, `PublicMicroLeakage` consumed by the rest of
+the SGX projection chain (`SgxExactProjection.lean`,
+`SgxOramProjection.lean`, `SgxJointProjection.lean`). -/
+
 namespace UOToolchain
 
 structure SGXPublicOutcome where

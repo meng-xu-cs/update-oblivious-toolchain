@@ -1,5 +1,20 @@
 import UOToolchain.SgxController
 
+/-! # SGX controller-trace layer
+
+This file constructs the canonical SGX micro trace
+(`controllerMicroTraceOfShape`) from an `SGXControllerShape` and lifts
+it through the ORAM-config abstraction.
+
+* **Abstraction function:** `controllerMicroTraceOfShape`
+  (`SGXControllerShape → SGXMicroTrace`); the companion
+  `oramControllerMicroTrace` composes it with `oramControllerShape`.
+* **Main theorem:** `oramControllerMicroTrace_eq_of_samePublicProjection`
+  — same-public ORAM configs share the same controller micro trace.
+
+All other declarations are file-local helpers used to define the
+canonical page/exit/shared-resource trace pattern. -/
+
 namespace UOToolchain
 
 def controllerPageEventOfIndex

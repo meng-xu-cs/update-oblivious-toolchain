@@ -1,6 +1,30 @@
 import UOToolchain.OramGame
 import UOToolchain.SgxRelation
 
+/-! # SGX controller-shape layer
+
+This file defines the canonical SGX controller shape an ORAM execution
+leakage induces — phase trace, page-region budgets, workset regions,
+exit-trace budget, shared-resource budget, recursion depth, stash
+bound — and lifts the shape into an `SGXMicroLeakage`.
+
+* **Abstraction function:** `oramControllerShape` (lifts an
+  `OramConfig` to an `SGXControllerShape` via
+  `sgxControllerShapeOfExecutionLeakage`). The companion
+  `oramControllerMicroLeakage` lifts the shape further into an
+  `SGXMicroLeakage`.
+* **Main theorem:** `oramControllerShape_eq_of_samePublicProjection`
+  — same-public ORAM configs share the same controller shape. The
+  derived consequence
+  `oramControllerMicroLeakage_eq_of_samePublicProjection` is the
+  paper-relevant public-leakage equality.
+
+All other declarations are file-local helpers (`maxNatList`,
+`concatLists`, `controllerExitEventOfIndex`,
+`controllerExitPatternOfShape`,
+`controllerSharedResourcePatternOfShape`,
+`sgxMicroLeakageOfController_eq_of_eq`). -/
+
 namespace UOToolchain
 
 structure SGXControllerShape where

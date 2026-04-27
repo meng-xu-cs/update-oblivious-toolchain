@@ -267,6 +267,26 @@ Each coherent technical step that passes the validation slice should
 be its own commit:
 
 - W7.1 — theorem-stack refactor, one commit per refactored layer.
+  Landed:
+  - `ecc3a97` — W7.1.a SgxExactProjection canonicalization +
+    `proofGrade_sgx_projection_*` SGX paper-main facades.
+  - `d3924f7` — W7.1.b SgxOramProjection: drop alternative-controller
+    chain (bare / `_with_controller` /
+    `_with_budgetController` / `_with_canonicalController`) plus
+    matching legacy mirrors and unused alternative-relation defs.
+  - `280fecd` — W7.1.c SgxMicroModel: drop
+    `publicControllerMicroSemantics` smoke-test family plus the
+    entire `budgetConsistentSGXMicroRelation` /
+    `canonicalizedSGXMicroRelation` / canonical-trace infra.
+  - `d3a973b` — W7.1.d drop dead
+    `MicroTraceConsistentWithLeakage` /
+    `_consistentWithLeakage` helpers in `SgxRelation.lean` /
+    `SgxControllerTrace.lean`.
+  - `5434cdd` — W7.1.e SgxJointProjection + legacy joint-mirror
+    trim, plus probe `legacy_theorem_symbol_surface_checks` update
+    for the canonicalized legacy axiom-symbol footprint.
+  - Final layer-level docstring pass: SgxBoundary, SgxRelation,
+    SgxController, SgxControllerTrace, plus the rest.
 - W7.2 — proof-grade checker theorem-tightening, one commit per
   checker.
 - W7.3 — compatibility-shim removal, one commit per shim category.
