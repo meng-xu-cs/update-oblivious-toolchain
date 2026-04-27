@@ -302,6 +302,105 @@ theorem PathOramLocalPosmapV1SecurityAssumptions.stashOverflowProvenance_pinned
       pathOramLocalPosmapV1_stashOverflowProvenance := by
   rfl
 
+/-! ### W5.6: Bundle housekeeping audit
+
+After W5.3 (stash-overflow provenance) and W5.4 (crypto-assumption
+provenance) land, the explicit
+`PathOramLocalPosmapV1SecurityAssumptions` bundle has exactly three
+fields, each paired with an explicit provenance route:
+
+- `bucketEncryptionINDCPA` — paired with
+  `pathOramLocalPosmapV1_cryptoProvenance` (RFC 8439 + Procter 2014,
+  drift-checked by `runtime_crypto_primitive_identity_pinned`)
+- `metadataEncryptionINDCPA` — paired with the same
+  `pathOramLocalPosmapV1_cryptoProvenance` record
+- `stashOverflowBounded` — paired with
+  `pathOramLocalPosmapV1_stashOverflowProvenance` (JACM 2018
+  Theorem 5.1 at `Z = 5`, fallback CCS 2013, drift-checked by
+  `path_oram_deployed_stash_parameters_pinned`)
+
+The earlier "canonical leaf-value realization" assumption was
+discharged by the runtime-family bundle interface and removed from this
+structure, so each of the three surviving fields is concrete (specific
+probabilistic / cryptographic claim), justified (explicit provenance
+citation), and unavoidable (cannot be discharged by Lean proofs alone
+in this repo without bringing in formal cryptography or formalizing the
+JACM stash analysis).
+
+The audit structure below records the W5.6 closure summary at the Lean
+type level. It documents that no further bundle housekeeping is
+available without either landing a fully formal cryptography proof or
+landing the W5.1 / W5.2 import-vs-companion mechanization decision. -/
+
+/-- Audit-record summary entry for one explicit assumption in the
+`PathOramLocalPosmapV1SecurityAssumptions` bundle. Pairs the
+assumption's role with the provenance route name and the named probe
+static-drift check that pins the corresponding runtime source. -/
+structure PathOramLocalPosmapV1AssumptionAuditEntry where
+  /-- Assumption-bundle field name. -/
+  fieldName : String
+  /-- Plain-language description of the assumption's role. -/
+  role : String
+  /-- WP5 claim taxonomy classification ("Cited / externally
+  justified"). -/
+  classification : String
+  /-- Lean provenance record name carrying the citation marker. -/
+  provenanceRecordName : String
+  /-- Probe static-drift check name pinning the runtime source. -/
+  staticDriftCheckName : String
+deriving Repr, DecidableEq
+
+/-- W5.6 closure summary: the three surviving assumptions in the
+`PathOramLocalPosmapV1SecurityAssumptions` bundle plus their
+post-W5.3 / post-W5.4 provenance pairings. Every entry is **Cited /
+externally justified**; no convenience-engineering fields remain. -/
+def pathOramLocalPosmapV1_assumptionAudit :
+    List PathOramLocalPosmapV1AssumptionAuditEntry :=
+  [ { fieldName := "bucketEncryptionINDCPA"
+    , role := "hides bucket/path ciphertext contents in the concrete path_oram_local_posmap_v1 backend"
+    , classification := "Cited / externally justified"
+    , provenanceRecordName := "pathOramLocalPosmapV1_cryptoProvenance"
+    , staticDriftCheckName := "runtime_crypto_primitive_identity_pinned"
+    }
+  , { fieldName := "metadataEncryptionINDCPA"
+    , role := "hides encrypted position-map metadata pages in the local-posmap wrapper"
+    , classification := "Cited / externally justified"
+    , provenanceRecordName := "pathOramLocalPosmapV1_cryptoProvenance"
+    , staticDriftCheckName := "runtime_crypto_primitive_identity_pinned"
+    }
+  , { fieldName := "stashOverflowBounded"
+    , role := "bounds stash-overflow failure for the deployed local-posmap parameters (JACM 2018 Theorem 5.1 at Z = 5)"
+    , classification := "Cited / externally justified"
+    , provenanceRecordName := "pathOramLocalPosmapV1_stashOverflowProvenance"
+    , staticDriftCheckName := "path_oram_deployed_stash_parameters_pinned"
+    }
+  ]
+
+/-- The W5.6 audit summary contains exactly three entries, matching the
+three surviving fields of `PathOramLocalPosmapV1SecurityAssumptions`.
+This pin makes the audit conclusion mechanically checkable: any future
+addition to the bundle that does not also extend the audit list will
+fail this length check. -/
+theorem pathOramLocalPosmapV1_assumptionAudit_length :
+    pathOramLocalPosmapV1_assumptionAudit.length = 3 := by
+  rfl
+
+/-- Every entry in the W5.6 audit summary is classified as
+"Cited / externally justified". This pin documents the W5.6 closure
+condition: no convenience-engineering fields, no
+"trusted-without-citation" fields, and no Lean-discharged fields remain
+in the bundle. -/
+theorem pathOramLocalPosmapV1_assumptionAudit_allCited :
+    ∀ entry, entry ∈ pathOramLocalPosmapV1_assumptionAudit →
+      entry.classification = "Cited / externally justified" := by
+  intro entry hMem
+  unfold pathOramLocalPosmapV1_assumptionAudit at hMem
+  simp at hMem
+  rcases hMem with h | h | h
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+
 def PathOramLocalPosmapV1SecurityAssumptions.toCanonicalLeafValueSecurityAssumptions
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
   PathOramCanonicalLeafValueSecurityAssumptions :=

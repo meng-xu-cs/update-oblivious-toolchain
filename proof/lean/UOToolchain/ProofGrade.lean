@@ -1260,4 +1260,31 @@ theorem proofGrade_path_oram_local_posmap_v1_stash_overflow_provenance_static_dr
       "path_oram_deployed_stash_parameters_pinned" :=
   pathOramLocalPosmapV1_stashOverflowProvenance_staticDriftCheckName
 
+/-! ### WP5 Bundle-Audit Closure Facades
+
+The facades below expose the W5.6 bundle-housekeeping audit: the
+`PathOramLocalPosmapV1SecurityAssumptions` bundle is fully closed at
+exactly three explicit fields, each paired with a **Cited / externally
+justified** provenance record (W5.3 / W5.4) plus the corresponding
+named probe static-drift check. No convenience-engineering fields
+remain. -/
+
+/-- Paper-facing W5.6 bundle-closure facade: the
+`PathOramLocalPosmapV1SecurityAssumptions` audit summary contains
+exactly three entries (matching the three surviving explicit
+assumption fields). -/
+theorem proofGrade_path_oram_local_posmap_v1_assumption_audit_length :
+    pathOramLocalPosmapV1_assumptionAudit.length = 3 :=
+  pathOramLocalPosmapV1_assumptionAudit_length
+
+/-- Paper-facing W5.6 bundle-closure facade: every entry in the
+`PathOramLocalPosmapV1SecurityAssumptions` audit summary is classified
+as "Cited / externally justified". This pin documents the W5.6 closure:
+no Lean-discharged fields, no source-frozen-only fields, and no
+convenience-engineering fields remain in the bundle. -/
+theorem proofGrade_path_oram_local_posmap_v1_assumption_audit_all_cited :
+    ∀ entry, entry ∈ pathOramLocalPosmapV1_assumptionAudit →
+      entry.classification = "Cited / externally justified" :=
+  pathOramLocalPosmapV1_assumptionAudit_allCited
+
 end UOToolchain

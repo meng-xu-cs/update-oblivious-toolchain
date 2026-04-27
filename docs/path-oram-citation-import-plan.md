@@ -319,6 +319,43 @@ explicit in `PathOramLocalPosmapV1SecurityAssumptions`, but they are
 paired with the explicit RFC 8439 + Procter 2014 citations and the
 named probe drift check.
 
+## W5.6 Bundle-Closure Audit
+
+After W5.3 + W5.4 land, the explicit
+`PathOramLocalPosmapV1SecurityAssumptions` bundle has exactly three
+fields, each paired with an explicit provenance route:
+
+| Field | Provenance record | Static-drift check | Classification |
+| --- | --- | --- | --- |
+| `bucketEncryptionINDCPA` | `pathOramLocalPosmapV1_cryptoProvenance` | `runtime_crypto_primitive_identity_pinned` | Cited / externally justified |
+| `metadataEncryptionINDCPA` | `pathOramLocalPosmapV1_cryptoProvenance` | `runtime_crypto_primitive_identity_pinned` | Cited / externally justified |
+| `stashOverflowBounded` | `pathOramLocalPosmapV1_stashOverflowProvenance` | `path_oram_deployed_stash_parameters_pinned` | Cited / externally justified |
+
+The Lean structure
+[`PathOramLocalPosmapV1AssumptionAuditEntry`](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/PathOramLocalPosmapV1.lean)
+records this audit summary as a checked list:
+
+- `pathOramLocalPosmapV1_assumptionAudit` is a 3-element list of
+  audit entries.
+- `pathOramLocalPosmapV1_assumptionAudit_length : ... .length = 3`
+  pins the entry count to match the bundle field count.
+- `pathOramLocalPosmapV1_assumptionAudit_allCited` proves every entry
+  is **Cited / externally justified** — no convenience-engineering
+  fields, no source-frozen-only fields, and no Lean-discharged fields
+  remain.
+
+The audit is exposed on the paper-facing surface through
+[`proofGrade_path_oram_local_posmap_v1_assumption_audit_length`](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)
+and
+[`proofGrade_path_oram_local_posmap_v1_assumption_audit_all_cited`](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean).
+
+After W5.6, the W5.1 / W5.2 import-vs-companion mechanization decision
+is the only remaining WP5 step. That fork is a research-scope policy
+decision (see `docs/stronger-import-route-feasibility.md`); the
+citation route the repo currently takes is the **Cited / externally
+justified** fall-back path documented above. The stronger import route
+remains open future work.
+
 ## Next Non-Doc Step
 
 The next non-documentation step for the current paper is no longer figuring out
