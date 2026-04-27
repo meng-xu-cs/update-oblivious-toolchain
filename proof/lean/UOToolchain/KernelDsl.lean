@@ -127,8 +127,10 @@ for-constructor.
 mutual
 
 /-- Big-step evaluator for `KernelExpr`. Mirrors `evalExpr` from
-`IRSemantics.lean` constructor-for-constructor. -/
-partial def evalKernelExpr (cfg : OperationalConfig) (env : LocalEnv) :
+`IRSemantics.lean` constructor-for-constructor. Defined as `def`
+(not `partial def`) so its equations reduce by `rfl`/`simp` for
+the W4.4 preservation theorem. -/
+def evalKernelExpr (cfg : OperationalConfig) (env : LocalEnv) :
     KernelExpr → ExprResult
   | .literal v => .value v
   | .var name =>
@@ -194,22 +196,25 @@ partial def evalKernelExpr (cfg : OperationalConfig) (env : LocalEnv) :
           | none =>
               .status (.evalError s!"mapGet on unknown object {objectId}")
   | .keccak256 parts =>
-      let rec evalParts : List KernelExpr → Except EvalStatus (List Value)
-        | [] => .ok []
-        | p :: rest =>
-            match evalKernelExpr cfg env p with
-            | .status s => .error s
-            | .value v =>
-                match evalParts rest with
-                | .ok vs => .ok (v :: vs)
-                | .error s => .error s
-      match evalParts parts with
+      match evalKernelExprList cfg env parts with
       | .error s => .status s
       | .ok vs => .value (Value.keccak256Mock vs)
 
+/-- List companion for `evalKernelExpr` (`keccak256` case). -/
+def evalKernelExprList (cfg : OperationalConfig) (env : LocalEnv) :
+    List KernelExpr → Except EvalStatus (List Value)
+  | [] => .ok []
+  | p :: rest =>
+      match evalKernelExpr cfg env p with
+      | .status s => .error s
+      | .value v =>
+          match evalKernelExprList cfg env rest with
+          | .ok vs => .ok (v :: vs)
+          | .error s => .error s
+
 /-- Big-step evaluator for `KernelPureExpr`. Pure expressions never
 read storage. -/
-partial def evalKernelPureExpr (cfg : OperationalConfig) (env : LocalEnv) :
+def evalKernelPureExpr (cfg : OperationalConfig) (env : LocalEnv) :
     KernelPureExpr → ExprResult
   | .literal v => .value v
   | .var name =>
@@ -240,18 +245,21 @@ partial def evalKernelPureExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value (.bool false) => evalKernelPureExpr cfg env wf
       | .value _ => .status (.evalError "select condition not boolean")
   | .keccak256 parts =>
-      let rec evalParts : List KernelPureExpr → Except EvalStatus (List Value)
-        | [] => .ok []
-        | p :: rest =>
-            match evalKernelPureExpr cfg env p with
-            | .status s => .error s
-            | .value v =>
-                match evalParts rest with
-                | .ok vs => .ok (v :: vs)
-                | .error s => .error s
-      match evalParts parts with
+      match evalKernelPureExprList cfg env parts with
       | .error s => .status s
       | .ok vs => .value (Value.keccak256Mock vs)
+
+/-- List companion for `evalKernelPureExpr` (`keccak256` case). -/
+def evalKernelPureExprList (cfg : OperationalConfig) (env : LocalEnv) :
+    List KernelPureExpr → Except EvalStatus (List Value)
+  | [] => .ok []
+  | p :: rest =>
+      match evalKernelPureExpr cfg env p with
+      | .status s => .error s
+      | .value v =>
+          match evalKernelPureExprList cfg env rest with
+          | .ok vs => .ok (v :: vs)
+          | .error s => .error s
 
 end
 
@@ -260,7 +268,7 @@ mutual
 /-- Big-step statement evaluator for the kernel DSL. Threads the
 `OperationalConfig` so masked-store updates persist into subsequent
 statements, mirroring the W4.1+++ IR statement evaluator. -/
-partial def evalKernelStatement
+def evalKernelStatement
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     KernelStatement → OperationalConfig × LocalEnv × Outcome
   | .declare name _ value =>
@@ -377,7 +385,7 @@ partial def evalKernelStatement
       | .value v => (cfg, env, { oc with publicResult := some v })
       | .status s => (cfg, env, { oc with status := s })
 
-partial def evalKernelBody
+def evalKernelBody
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     List KernelStatement → OperationalConfig × LocalEnv × Outcome
   | [] => (cfg, env, oc)

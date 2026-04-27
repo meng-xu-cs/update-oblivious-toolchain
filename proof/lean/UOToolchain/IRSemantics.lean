@@ -378,10 +378,12 @@ mutual
 
 /-- Big-step expression evaluator over the structured IR.
 
-The evaluator is intentionally partial: cases that the W4.1 cut does not
-yet model return an explicit `EvalStatus.unsupported` so downstream
-theorems are honest about coverage. -/
-partial def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
+Defined as `def` (not `partial def`) so the equations can be reduced
+by `rfl` / `simp`, which downstream WP4 preservation proofs require.
+The mutual companion `evalExprList` walks the parts of `keccak256`
+without the `partial`-only `let rec` form. Termination is proved
+structurally on `sizeOf` of the input. -/
+def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
     Expr → ExprResult
   | .literal v => .value v
   | .var name =>
@@ -467,24 +469,26 @@ partial def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       -- `Expr.arrayIndex` is forbidden by `Expr.fragmentValid`.
       .status (.unsupported "Expr.arrayIndex")
   | .keccak256 parts =>
-      -- Use the deterministic `Value.keccak256Mock` placeholder. Each
-      -- sub-expression is evaluated in order; the W4.1 evaluator only
-      -- uses the resulting list shape (every element evaluated to a
-      -- value), not the actual hash bits. The W4.4 preservation
-      -- theorem will hold because both IR and kernel evaluators use
-      -- the same mock.
-      let rec evalParts : List Expr → Except EvalStatus (List Value)
-        | [] => .ok []
-        | p :: rest =>
-            match evalExpr cfg env p with
-            | .status s => .error s
-            | .value v =>
-                match evalParts rest with
-                | .ok vs => .ok (v :: vs)
-                | .error s => .error s
-      match evalParts parts with
+      -- Each sub-expression is evaluated in order via the mutual companion
+      -- `evalExprList`; the W4.1 evaluator only uses the resulting list
+      -- shape (every element evaluated to a value), not the actual hash
+      -- bits. The W4.4 preservation theorem holds because both IR and
+      -- kernel evaluators use the same `Value.keccak256Mock`.
+      match evalExprList cfg env parts with
       | .error s => .status s
       | .ok vs => .value (Value.keccak256Mock vs)
+
+/-- List companion for `evalExpr`, used for the `keccak256` case. -/
+def evalExprList (cfg : OperationalConfig) (env : LocalEnv) :
+    List Expr → Except EvalStatus (List Value)
+  | [] => .ok []
+  | p :: rest =>
+      match evalExpr cfg env p with
+      | .status s => .error s
+      | .value v =>
+          match evalExprList cfg env rest with
+          | .ok vs => .ok (v :: vs)
+          | .error s => .error s
 
 end
 
@@ -558,7 +562,7 @@ statements observe the new store.
 `evalStatement` and `evalBody` are mutually recursive so that
 `Statement.ifStmt` and `Statement.forLoop` can recurse into nested
 statement bodies via `evalBody`. -/
-partial def evalStatement
+def evalStatement
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     Statement → OperationalConfig × LocalEnv × Outcome
   | .declare name _ value =>
@@ -705,8 +709,9 @@ partial def evalStatement
       match evalExpr cfg env value with
       | .value v => (cfg, env, { oc with publicResult := some v })
       | .status s => (cfg, env, { oc with status := s })
+termination_by s => (sizeOf s, 0)
 
-partial def evalBody
+def evalBody
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     List Statement → OperationalConfig × LocalEnv × Outcome
   | [] => (cfg, env, oc)
@@ -717,12 +722,13 @@ partial def evalBody
           if oc'.publicResult.isSome then (cfg', env', oc')
           else evalBody cfg' env' oc' rest
       | _ => (cfg', env', oc')
+termination_by stmts => (sizeOf stmts, 0)
 
 /-- Bounded for-loop helper. The loop runs from `i` (inclusive) to `endN`
 (exclusive). Each iteration binds `indexVar` to `Value.uint i` and
 walks `body` via `evalBody`, threading the updated config through. The
 loop exits early on a `retStmt` or any non-`completed` status. -/
-partial def evalForLoop
+def evalForLoop
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
     (indexVar : String) (i endN : Nat) (body : List Statement) :
     OperationalConfig × LocalEnv × Outcome :=
@@ -735,6 +741,7 @@ partial def evalForLoop
         if oc'.publicResult.isSome then (cfg', env'', oc')
         else evalForLoop cfg' env'' oc' indexVar (i + 1) endN body
     | _ => (cfg', env'', oc')
+termination_by (sizeOf body, endN - i)
 
 end
 
