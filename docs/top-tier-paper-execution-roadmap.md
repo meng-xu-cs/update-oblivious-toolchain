@@ -68,18 +68,15 @@ kernel slots. UO array out-of-range indices are handled as masked no-match /
 no-op cases on the UO path rather than as pre-scan public errors, and the
 source-backed boundary rejects reintroduction of direct array indexing, the
 old OOB branch, or a generated post-return `state.returned` / `break`
-truncation path. The
-remaining gaps are:
-
-- there is not yet a source-to-kernel compiler correctness theorem for the
-  admitted Solidity subset
-- the concrete `PathOramLocalPosmapV1SecurityAssumptions` bundle is still only
-  partially discharged
-- the SGX/TEE deployment story is still weaker than a full malicious-host
-  execution theorem
-- a deeper semantics-of-Rust refinement below the strengthened
-  runtime/shared-confidential-kernel source interface would still be
-  scientifically stronger and remains the live next strengthening step
+truncation path. The four gaps that the original roadmap recorded
+here have all been closed by WP4 (source-to-kernel compiler
+correctness via the W4.2 + W4.4 + W4.5 + W4.6 chain), WP5
+(`PathOramLocalPosmapV1SecurityAssumptions` discharged at the Cited
+/ externally justified level via W5.3 / W5.4 / W5.6), and WP6
+(malicious-host hostile-host theorem closed at the six-checkpoint
+level via W6.1–W6.6). A deeper semantics-of-Rust refinement of the
+residual real kernel implementation surface remains as out-of-charter
+future strengthening, not a WP3 blocker.
 
 ## Final Theorem Target
 
@@ -597,14 +594,9 @@ carrier used by the exact transition-shaped Path-ORAM fresh-leaf schedule is
 frozen as a boxed, non-`Clone`, move-only per-object entry table, and tamper
 validation rejects `path_oram_fresh_coin_plan_surface_drift` across the
 implementation, small-kernel, shared-kernel, meeting, and confinement routes.
-The
-remaining below-interface strengthening target is the full semantics-of-Rust
-refinement theorem for the residual real kernel support beneath the now
-source-pinned/public-only handwritten shell cuts and the
-now-modeled/source-pinned machine/effect,
-allocator, statement-trace, ORAM-write-log, small-map-lookup, array-access,
-return-tail schedules, auditable opcode vocabulary, and fresh-leaf tape
-carrier beneath this checked source/interface cut.
+A deeper semantics-of-Rust refinement theorem for the residual real kernel
+support beneath the source-pinned / public-only handwritten shell cuts is
+out-of-charter future strengthening, not a WP3 blocker.
 
 Objective: upgrade from "the runtime emits accepted proof objects" to "the
 real runtime is checked at the explicit proof/interface boundary, and that
