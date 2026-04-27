@@ -2289,21 +2289,32 @@ discharge; the WP6 entry now distinguishes the closed six-checkpoint
 surface from the open future-strengthening step). The W7.3 cleanup
 landed in commit `b1cfd59`.
 
-Status of charter task 2 (proof-grade checker theorem-tightening): each of
-the previously-minimal-form proof-grade checker entrypoints now exposes
-at least one named paper-grade witness theorem at file scope. The W7.2
-cleanup landed in commits `52f8056` (seven core minimal-form checkers:
-`CheckProofGradeRuntimeKernelDsl`, `CheckProofGradeRuntimeKernelInterfaceBundle`,
+Status of charter task 2 (proof-grade checker theorem-tightening):
+every `CheckProofGrade*.lean` file in `proof/lean/` now exposes at
+least one named paper-grade witness theorem at file scope; zero
+bare-`main`-only proof-grade checkers remain. The W7.2 cleanup landed
+in three batches: commit `52f8056` (seven core minimal-form
+checkers: `CheckProofGradeRuntimeKernelDsl`,
+`CheckProofGradeRuntimeKernelInterfaceBundle`,
 `CheckProofGradeRuntimeKernelLowering`,
-`CheckProofGradeRuntimeKernelSlotDsl`, `CheckProofGradeRuntimeKernelWitness`,
+`CheckProofGradeRuntimeKernelSlotDsl`,
+`CheckProofGradeRuntimeKernelWitness`,
 `CheckProofGradeRuntimeShellBoundary`,
-`CheckProofGradeRuntimeShellBoundaryLowering`) and `9ec9d34` (four
-follow-up checkers: `CheckProofGradeRuntimeShellBoundarySlot`,
+`CheckProofGradeRuntimeShellBoundaryLowering`), commit `9ec9d34`
+(four further checkers: `CheckProofGradeRuntimeShellBoundarySlot`,
 `CheckProofGradeRuntimeKernelRefinementWitness`,
 `CheckProofGradeRuntimeTrustedKernel`,
-`CheckProofGradeRuntimeWitness`). Each new witness theorem is a one-line
-forwarding over an existing `UOToolchain.imported<...>_*` theorem so the
-checker file's Lean output is theorem-tight.
+`CheckProofGradeRuntimeWitness`), and commit `7b53fe1` (the final
+thirteen: every `CheckProofGradeRuntimeConfidentialCore*` variant
+plus `CheckProofGradeRuntimeConfidentialProofBundleFamily`,
+`CheckProofGradeRuntimeWitnessFamily`,
+`CheckProofGradeRuntimeKernelInterfaceFamily`,
+`CheckProofGradeRuntimePaperMainFamily`,
+`CheckProofGradeRuntimePaperMainFamilyBundle`,
+`CheckProofGradeRuntimePaperMainSlotFamilyBundle`, and
+`CheckProofGradeTranslationArtifacts`). Each witness theorem is a
+one-line forwarding over an existing `UOToolchain.imported<…>_*`
+theorem so the checker file's Lean output is theorem-tight.
 
 Status of charter task 1 (theorem-stack refactor): each SGX projection-chain
 layer now exposes one abstraction function and one paper-main theorem with

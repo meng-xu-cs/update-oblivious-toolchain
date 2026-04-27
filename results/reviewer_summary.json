@@ -233,8 +233,8 @@
     },
     {
       "assumption": "TEE deployment assumptions",
-      "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model",
-      "status": "required by the final malicious-host deployment theorem; not yet fully closed in Lean"
+      "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust",
+      "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification (`IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, `IntelSGXSecurityCenter`); the static-drift check `sgx_deployment_assumption_bundle_pinned` pins the bundle's Prop-field shape and the six provenance citations; W6.6 audits these as the six closed checkpoint entries of `sgxHostileHostClosureAudit`"
     }
   ],
   "proof_checking_cost_ms": {
@@ -334,6 +334,56 @@
       }
     ]
   },
+  "static_drift_check_inventory": [
+    {
+      "name": "sgx_observer_surface_pinned",
+      "report_field": "kernel_model_alignment_validation.sgx_observer_surface_pinned",
+      "target": "page-region names, controller-phase vocabulary, page-event / exit-event vocabularies, shared-resource pattern literal, and page-event encoding formula in `crates/uo-core/src/trace.rs` and the matching frozen Lean records in `proof/lean/UOToolchain/SgxObserverFreeze.lean`",
+      "work_package": "W6.1"
+    },
+    {
+      "name": "sgx_boundary_call_model_pinned",
+      "report_field": "kernel_model_alignment_validation.sgx_boundary_call_model_pinned",
+      "target": "oram_access API literal, Enter/Exit direction vocabulary, boundary-event budget formula `2 * total_oram_accesses + 2`, and schedule structural shape",
+      "work_package": "W6.2 boundary-call"
+    },
+    {
+      "name": "sgx_persistent_io_model_pinned",
+      "report_field": "kernel_model_alignment_validation.sgx_persistent_io_model_pinned",
+      "target": "PhysicalRead / PhysicalWrite field schemas and the `WriteClass` vocabulary `[Set, Clear, Same, Update]`",
+      "work_package": "W6.2 persistent-I/O"
+    },
+    {
+      "name": "sgx_controller_refinement_pinned",
+      "report_field": "kernel_model_alignment_validation.sgx_controller_refinement_pinned",
+      "target": "canonical Lean controller-shape constructor (`SgxControllerObserverRefinement`) and the W6.3 integration theorem `sgxControllerObserverRefinementOf`",
+      "work_package": "W6.3"
+    },
+    {
+      "name": "sgx_storage_refinement_pinned",
+      "report_field": "kernel_model_alignment_validation.sgx_storage_refinement_pinned",
+      "target": "the `viewTEEStore` field projection (`SgxStorageRefinement`) forwarding physicalReads / physicalWrites / gasUsed / entrypointId deterministically",
+      "work_package": "W6.4"
+    },
+    {
+      "name": "sgx_deployment_assumption_bundle_pinned",
+      "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_bundle_pinned",
+      "target": "the `SgxDeploymentAssumptions` Lean record's six `Prop` fields and the matching six `SgxDeploymentAssumptionProvenance` records carrying `IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, and `IntelSGXSecurityCenter` citations",
+      "work_package": "W6.5"
+    },
+    {
+      "name": "runtime_crypto_primitive_identity_pinned",
+      "report_field": "kernel_model_alignment_validation.runtime_crypto_primitive_identity_pinned",
+      "target": "the `chacha20poly1305` AEAD primitive and the `tiny_keccak::Keccak::v256()` hash primitive (with the workspace `Cargo.toml` versions) in the runtime crypto surface",
+      "work_package": "W5.4"
+    },
+    {
+      "name": "path_oram_deployed_stash_parameters_pinned",
+      "report_field": "kernel_model_alignment_validation.path_oram_deployed_stash_parameters_pinned",
+      "target": "the deployed Path-ORAM `Z = 5` / `stash_bound = max(capacity, 1)` parameters in `crates/uo-core/src/manifest.rs`",
+      "work_package": "W5.3"
+    }
+  ],
   "tcb_size": {
     "lean_theorem_checker_repo_surface": {
       "file_count": 161,
@@ -1023,5 +1073,49 @@
       ],
       "total_nonempty_loc": 11228
     }
-  }
+  },
+  "wp6_closure_audit": [
+    {
+      "checkpoint": "W6.1",
+      "classification": "Lean-proved, semantics-preserving",
+      "lean_anchor": "sgxObserverSurfaceProvenance",
+      "role": "frozen SGX observer surface (page-region names, controller-phase vocabulary, page-event / exit-event vocabularies, shared-resource pattern literal, page-event encoding formula)",
+      "static_drift_check_name": "sgx_observer_surface_pinned"
+    },
+    {
+      "checkpoint": "W6.2 boundary-call",
+      "classification": "Lean-proved, semantics-preserving",
+      "lean_anchor": "sgxBoundaryCallProvenance",
+      "role": "frozen boundary-call model (oram_access API literal, Enter/Exit direction vocabulary, boundary-event budget formula, schedule structural shape)",
+      "static_drift_check_name": "sgx_boundary_call_model_pinned"
+    },
+    {
+      "checkpoint": "W6.2 persistent-I/O",
+      "classification": "Lean-proved, semantics-preserving",
+      "lean_anchor": "sgxPersistentIoProvenance",
+      "role": "frozen persistent-I/O model (PhysicalRead / PhysicalWrite field schemas, WriteClass vocabulary)",
+      "static_drift_check_name": "sgx_persistent_io_model_pinned"
+    },
+    {
+      "checkpoint": "W6.3",
+      "classification": "Lean-proved, semantics-preserving",
+      "lean_anchor": "sgxControllerRefinementProvenance",
+      "role": "controller-refinement integration (canonical Lean controller-shape constructor refines the W6.1 / W6.2 frozen observer in page-region names, workset-region names, boundary-event budget, and shared-resource pattern)",
+      "static_drift_check_name": "sgx_controller_refinement_pinned"
+    },
+    {
+      "checkpoint": "W6.4",
+      "classification": "Lean-proved, semantics-preserving",
+      "lean_anchor": "sgxStorageRefinementProvenance",
+      "role": "sealing / storage-refinement integration (viewTEEStore field projection forwards physicalReads / physicalWrites / gasUsed / entrypointId deterministically from the underlying Trace and Config)",
+      "static_drift_check_name": "sgx_storage_refinement_pinned"
+    },
+    {
+      "checkpoint": "W6.5",
+      "classification": "Cited / externally justified",
+      "lean_anchor": "SgxDeploymentAssumptions + sgxDeploymentAssumptionProvenances",
+      "role": "explicit hostile-host TEE deployment-assumption bundle (attestation authenticity, enclave memory isolation, rollback resistance, freshness guarantee, crash recovery discipline, patch-level trust) paired with Intel SGX provenance citations",
+      "static_drift_check_name": "sgx_deployment_assumption_bundle_pinned"
+    }
+  ]
 }

@@ -304,14 +304,22 @@ be its own commit:
     `CheckProofGradeRuntimeKernelRefinementWitness`,
     `CheckProofGradeRuntimeTrustedKernel`,
     `CheckProofGradeRuntimeWitness`).
-  Remaining (still bare-`main`-only): the larger
-  `CheckProofGradeRuntimeConfidentialCore*` family,
-  `CheckProofGradeRuntimePaperMainFamily*`,
-  `CheckProofGradeRuntimeKernelInterfaceFamily`, and
-  `CheckProofGradeRuntimeWitnessFamily`. These follow the same
-  pattern (forward an existing `UOToolchain.imported<...>_valid_*`
-  theorem) and can be batched in a follow-up when the underlying
-  paper-grade theorems are also stable.
+  - `7b53fe1` — W7.2 final batch: every remaining
+    minimal-form proof-grade checker tightened
+    (`CheckProofGradeRuntimeConfidentialCore` and its `Slot` /
+    `Lowering` / `ShellBoundarySlot` /
+    `ShellBoundaryLowering` / `KernelInterfaceSlot` siblings,
+    `CheckProofGradeRuntimeConfidentialProofBundleFamily`,
+    `CheckProofGradeRuntimeWitnessFamily`,
+    `CheckProofGradeRuntimeKernelInterfaceFamily`,
+    `CheckProofGradeRuntimePaperMainFamily`,
+    `CheckProofGradeRuntimePaperMainFamilyBundle`,
+    `CheckProofGradeRuntimePaperMainSlotFamilyBundle`, and
+    `CheckProofGradeTranslationArtifacts`). After this commit
+    every `CheckProofGrade*.lean` file in `proof/lean/` exposes at
+    least one named paper-grade witness theorem forwarding an
+    existing `UOToolchain.imported<…>_*` theorem; zero
+    bare-`main`-only proof-grade checkers remain.
 - W7.3 — compatibility-shim removal, one commit per shim category.
   Landed:
   - `b1cfd59` — W7.3 paper-narrative compatibility shim removal:

@@ -224,13 +224,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 38773,
-      "sha256": "049183f5b6ac4ee400f5b5bfb0cd29401a1d26877e1dc21478039eeab98a1fcb"
+      "bytes": 45095,
+      "sha256": "b7d5f07e0d9bac17e441f77626da24b0b2c72cc22dca44f4a8a5b624b76e02f8"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 12564,
-      "sha256": "2debd72f0a420fe7e149a2e94f0a25ca70e0a2d9bc2d036b05f54cf8a70e5a87"
+      "bytes": 18250,
+      "sha256": "c30ae245e9e5743b90c7a1d75d3ccba135d50b2bfdd8e1841ae59c4ab88b655d"
     },
     {
       "path": "runtime_boundary_validation.json",
