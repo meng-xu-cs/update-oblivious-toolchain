@@ -655,28 +655,204 @@ def Statement.kernelLowerableSchedule (stmts : List Statement) : Bool :=
 def CompiledFunction.kernelLowerable (fn : CompiledFunction) : Bool :=
   Statement.kernelLowerableSchedule fn.body
 
-/-! ### Lowering succeeds-iff-precondition theorems (deferred)
+/-! ### Lowering succeeds-when-precondition theorems (forward direction)
 
-`branchlessPureExpr e = true` is the lowering precondition for
-`lowerPureExpr`. `Expr.fragmentValid e = true` is the lowering
-precondition for `lowerExpr`. `Statement.kernelLowerable s = true` is
-the lowering precondition for `lowerStatement`, and
-`Statement.kernelLowerableSchedule stmts = true` is the precondition
-for `lowerStatements`. Their iff theorems will land in a follow-up
-W4.4 commit; the proofs are structural mutual recursions analogous
-to W4.3 but with three theorem families instead of two, plus the
-companion list lemmas.
+`branchlessPureExpr e = true → lowerPureExpr e` succeeds; analogously
+for `Expr.fragmentValid` ↔ `lowerExpr`, `Statement.kernelLowerable` ↔
+`lowerStatement`, and `Statement.kernelLowerableSchedule` ↔
+`lowerStatements`. These are the *forward* directions of the iff
+characterization. They are what the W4.4 semantics-preservation
+theorem (Session B-2) needs as preconditions. The reverse directions
+("the lowering succeeds → the precondition predicate is true") are a
+useful corollary for W4.6 (artifact-checker demotion) but are not
+strictly required by W4.4; they are deferred. -/
 
-The W4.4 *semantics-preservation* theorem
-(`evalContract cfg = evalKernelProgram (lowerCompiledFunction fn) cfg`
-when the lowering succeeds) is the W4.4 Session B deliverable; it
-will use these iff theorems.
+mutual
 
-For the W4.4 forward use ("if `fn.kernelLowerable` then the lowering
-succeeds and the kernel program agrees with the IR"), the helper
-`branchlessPureExpr_implies_fragmentValid` below already factors out
-the structural fact that branchless-pure expressions are also
-fragment-valid. -/
+/-- `branchlessPureExpr` implies `lowerPureExpr` succeeds. Forward
+direction of the lowering iff. Mutually recursive with the list
+companion. -/
+theorem branchlessPureExpr_implies_lowerPureExpr_ok :
+    ∀ e : Expr, branchlessPureExpr e = true →
+      ∃ ke, lowerPureExpr e = .ok ke
+  | .literal v, _ => ⟨.literal v, rfl⟩
+  | .var name, _ => ⟨.var name, rfl⟩
+  | .unary op e, h => by
+      simp only [branchlessPureExpr] at h
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok e h with ⟨ke, hke⟩
+      exact ⟨.unary op ke, by unfold lowerPureExpr; rw [hke]; rfl⟩
+  | .binary op lhs rhs, h => by
+      simp only [branchlessPureExpr, Bool.and_eq_true] at h
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok lhs h.1 with ⟨kl, hkl⟩
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok rhs h.2 with ⟨kr, hkr⟩
+      exact ⟨.binary op kl kr, by unfold lowerPureExpr; rw [hkl, hkr]; rfl⟩
+  | .select cond wt wf, h => by
+      simp only [branchlessPureExpr, Bool.and_eq_true] at h
+      rcases h with ⟨⟨hC, hT⟩, hF⟩
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok cond hC with ⟨kc, hkc⟩
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok wt hT with ⟨kt, hkt⟩
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok wf hF with ⟨kf, hkf⟩
+      exact ⟨.select kc kt kf, by unfold lowerPureExpr; rw [hkc, hkt, hkf]; rfl⟩
+  | .cellGet _, h => by simp [branchlessPureExpr] at h
+  | .arrayGet _ _, h => by simp [branchlessPureExpr] at h
+  | .mapGet _ _, h => by simp [branchlessPureExpr] at h
+  | .structField _ _, h => by simp [branchlessPureExpr] at h
+  | .arrayIndex _ _, h => by simp [branchlessPureExpr] at h
+  | .keccak256 parts, h => by
+      simp only [branchlessPureExpr] at h
+      rcases branchlessPureExprList_implies_lowerPureExprList_ok parts h
+        with ⟨kparts, hkparts⟩
+      exact ⟨.keccak256 kparts, by unfold lowerPureExpr; rw [hkparts]; rfl⟩
+
+theorem branchlessPureExprList_implies_lowerPureExprList_ok :
+    ∀ es : List Expr, branchlessPureExprList es = true →
+      ∃ kes, lowerPureExprList es = .ok kes
+  | [], _ => ⟨[], rfl⟩
+  | e :: rest, h => by
+      simp only [branchlessPureExprList, Bool.and_eq_true] at h
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok e h.1 with ⟨ke, hke⟩
+      rcases branchlessPureExprList_implies_lowerPureExprList_ok rest h.2
+        with ⟨krest, hkrest⟩
+      exact ⟨ke :: krest, by unfold lowerPureExprList; rw [hke, hkrest]; rfl⟩
+
+end
+
+mutual
+
+/-- `Expr.fragmentValid` implies `lowerExpr` succeeds. Forward
+direction of the lowering iff. Mutually recursive with the list
+companion. The `Expr.select` case uses
+`branchlessPureExpr_implies_lowerPureExpr_ok` for its arms. -/
+theorem fragmentValid_implies_lowerExpr_ok :
+    ∀ e : Expr, Expr.fragmentValid e = true →
+      ∃ ke, lowerExpr e = .ok ke
+  | .literal v, _ => ⟨.literal v, rfl⟩
+  | .var name, _ => ⟨.var name, rfl⟩
+  | .unary op e, h => by
+      simp only [Expr.fragmentValid] at h
+      rcases fragmentValid_implies_lowerExpr_ok e h with ⟨ke, hke⟩
+      exact ⟨.unary op ke, by unfold lowerExpr; rw [hke]; rfl⟩
+  | .binary op lhs rhs, h => by
+      simp only [Expr.fragmentValid, Bool.and_eq_true] at h
+      rcases fragmentValid_implies_lowerExpr_ok lhs h.1 with ⟨kl, hkl⟩
+      rcases fragmentValid_implies_lowerExpr_ok rhs h.2 with ⟨kr, hkr⟩
+      exact ⟨.binary op kl kr, by unfold lowerExpr; rw [hkl, hkr]; rfl⟩
+  | .select cond wt wf, h => by
+      simp only [Expr.fragmentValid, Bool.and_eq_true] at h
+      rcases h with ⟨⟨⟨⟨hC, _⟩, _⟩, hBPwt⟩, hBPwf⟩
+      rcases fragmentValid_implies_lowerExpr_ok cond hC with ⟨kc, hkc⟩
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok wt hBPwt with ⟨kt, hkt⟩
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok wf hBPwf with ⟨kf, hkf⟩
+      exact ⟨.select kc kt kf, by unfold lowerExpr; rw [hkc, hkt, hkf]; rfl⟩
+  | .cellGet id, _ => ⟨.cellGet id, rfl⟩
+  | .arrayGet id index, h => by
+      simp only [Expr.fragmentValid] at h
+      rcases fragmentValid_implies_lowerExpr_ok index h with ⟨ki, hki⟩
+      exact ⟨.arrayGet id ki, by unfold lowerExpr; rw [hki]; rfl⟩
+  | .mapGet id key, h => by
+      simp only [Expr.fragmentValid] at h
+      rcases fragmentValid_implies_lowerExpr_ok key h with ⟨kk, hkk⟩
+      exact ⟨.mapGet id kk, by unfold lowerExpr; rw [hkk]; rfl⟩
+  | .structField _ _, h => by simp [Expr.fragmentValid] at h
+  | .arrayIndex _ _, h => by simp [Expr.fragmentValid] at h
+  | .keccak256 parts, h => by
+      simp only [Expr.fragmentValid] at h
+      rcases fragmentValidList_implies_lowerExprList_ok parts h
+        with ⟨kparts, hkparts⟩
+      exact ⟨.keccak256 kparts, by unfold lowerExpr; rw [hkparts]; rfl⟩
+
+theorem fragmentValidList_implies_lowerExprList_ok :
+    ∀ es : List Expr, Expr.fragmentValidList es = true →
+      ∃ kes, lowerExprList es = .ok kes
+  | [], _ => ⟨[], rfl⟩
+  | e :: rest, h => by
+      simp only [Expr.fragmentValidList, Bool.and_eq_true] at h
+      rcases fragmentValid_implies_lowerExpr_ok e h.1 with ⟨ke, hke⟩
+      rcases fragmentValidList_implies_lowerExprList_ok rest h.2 with ⟨krest, hkrest⟩
+      exact ⟨ke :: krest, by unfold lowerExprList; rw [hke, hkrest]; rfl⟩
+
+end
+
+/-- `Statement.kernelLowerable` implies `lowerStatement` succeeds.
+Forward direction of the statement-level lowering iff. -/
+theorem kernelLowerable_implies_lowerStatement_ok :
+    ∀ s : Statement, Statement.kernelLowerable s = true →
+      ∃ ks, lowerStatement s = .ok ks
+  | .declare name ty value, h => by
+      simp only [Statement.kernelLowerable] at h
+      rcases fragmentValid_implies_lowerExpr_ok value h with ⟨kv, hkv⟩
+      exact ⟨.declare name ty kv, by unfold lowerStatement; simp [hkv]; rfl⟩
+  | .assign name value, h => by
+      simp only [Statement.kernelLowerable] at h
+      rcases fragmentValid_implies_lowerExpr_ok value h with ⟨kv, hkv⟩
+      exact ⟨.assign name kv, by unfold lowerStatement; simp [hkv]; rfl⟩
+  | .require cond, h => by
+      simp only [Statement.kernelLowerable] at h
+      rcases fragmentValid_implies_lowerExpr_ok cond h with ⟨kc, hkc⟩
+      exact ⟨.require kc, by unfold lowerStatement; simp [hkc]; rfl⟩
+  | .abortIf cond, h => by
+      simp only [Statement.kernelLowerable] at h
+      rcases fragmentValid_implies_lowerExpr_ok cond h with ⟨kc, hkc⟩
+      exact ⟨.abortIf kc, by unfold lowerStatement; simp [hkc]; rfl⟩
+  | .ifStmt _ _ _, h => by simp [Statement.kernelLowerable] at h
+  | .forLoop _ _ _ _ _, h => by simp [Statement.kernelLowerable] at h
+  | .cellSet id value pred, h => by
+      simp only [Statement.kernelLowerable, Bool.and_eq_true] at h
+      rcases fragmentValid_implies_lowerExpr_ok value h.1 with ⟨kv, hkv⟩
+      cases pred with
+      | none =>
+          exact ⟨.cellSet id kv none, by unfold lowerStatement; simp [hkv]; rfl⟩
+      | some p =>
+          have hp : Expr.fragmentValid p = true := by
+            have := h.2
+            simp at this; exact this
+          rcases fragmentValid_implies_lowerExpr_ok p hp with ⟨kp, hkp⟩
+          exact ⟨.cellSet id kv (some kp), by unfold lowerStatement; simp [hkv, hkp]; rfl⟩
+  | .arraySet id index value pred, h => by
+      simp only [Statement.kernelLowerable, Bool.and_eq_true] at h
+      rcases fragmentValid_implies_lowerExpr_ok index h.1.1 with ⟨ki, hki⟩
+      rcases fragmentValid_implies_lowerExpr_ok value h.1.2 with ⟨kv, hkv⟩
+      cases pred with
+      | none =>
+          exact ⟨.arraySet id ki kv none, by unfold lowerStatement; simp [hki, hkv]; rfl⟩
+      | some p =>
+          have hp : Expr.fragmentValid p = true := by
+            have := h.2
+            simp at this; exact this
+          rcases fragmentValid_implies_lowerExpr_ok p hp with ⟨kp, hkp⟩
+          exact ⟨.arraySet id ki kv (some kp),
+            by unfold lowerStatement; simp [hki, hkv, hkp]; rfl⟩
+  | .mapPut id key value pred, h => by
+      simp only [Statement.kernelLowerable, Bool.and_eq_true] at h
+      rcases fragmentValid_implies_lowerExpr_ok key h.1.1 with ⟨kk, hkk⟩
+      rcases fragmentValid_implies_lowerExpr_ok value h.1.2 with ⟨kv, hkv⟩
+      cases pred with
+      | none =>
+          exact ⟨.mapPut id kk kv none, by unfold lowerStatement; simp [hkk, hkv]; rfl⟩
+      | some p =>
+          have hp : Expr.fragmentValid p = true := by
+            have := h.2
+            simp at this; exact this
+          rcases fragmentValid_implies_lowerExpr_ok p hp with ⟨kp, hkp⟩
+          exact ⟨.mapPut id kk kv (some kp),
+            by unfold lowerStatement; simp [hkk, hkv, hkp]; rfl⟩
+  | .retStmt none, _ => ⟨.retStmt none, rfl⟩
+  | .retStmt (some value), h => by
+      simp only [Statement.kernelLowerable] at h
+      rcases fragmentValid_implies_lowerExpr_ok value h with ⟨kv, hkv⟩
+      exact ⟨.retStmt (some kv), by unfold lowerStatement; simp [hkv]; rfl⟩
+
+/-! The schedule-level forward theorem
+(`kernelLowerableScheduleAux_implies_lowerStatementsAux_ok`) and the
+program-level corollary (`kernelLowerable_implies_lowerCompiledFunction_ok`)
+are deferred. The schedule predicate's recursive `let isReturn := match ...`
+binding interacts with `simp` / `rcases` reductions in a way that
+needs a small structural rewrite to close cleanly; landing them is
+trivial mechanically once the lemma `Statement.kernelLowerableScheduleAux_cons_false`
+is split out. The per-statement theorem
+`kernelLowerable_implies_lowerStatement_ok` above already exposes the
+key per-element correctness property the W4.4 preservation theorem
+needs; the schedule-level lift is a thin list induction. -/
 
 mutual
 
