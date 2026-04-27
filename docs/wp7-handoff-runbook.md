@@ -313,11 +313,42 @@ be its own commit:
   theorem) and can be batched in a follow-up when the underlying
   paper-grade theorems are also stable.
 - W7.3 — compatibility-shim removal, one commit per shim category.
+  Landed:
+  - `b1cfd59` — W7.3 paper-narrative compatibility shim removal:
+    update the probe `explicit_assumption_summary()` "TEE deployment
+    assumptions" status to reflect the W6.5 closure; refresh the
+    `paper-theorem-profile.md` "What is still open" entries for WP4
+    (W4.5/W4.6 closed), WP5 (closed at the Cited / externally
+    justified level), and WP6 (closed at the six-checkpoint level
+    with future-strengthening called out separately).
 - W7.4 — new tamper / negative-test scenarios, one commit per
   scenario.
+  Landed:
+  - `95a9f54` — W7.4 tamper-coverage audit: the 379-scenario
+    tamper-validation suite is documented in
+    `paper-theorem-profile.md` by category (JSON-bundle tampers for
+    every paper-grade `loadAndCheckImported<…>` checker family,
+    source-mutation tampers replayed across every downstream theorem
+    route, translation-side / Path-ORAM hidden-state /
+    controller-certificate tampers); the W6 freeze surface is
+    covered by static-drift checks plus the closure-audit theorem
+    `sgxHostileHostClosureAudit_driftCheckNames`.
 - W7.5 — determinism / reproducibility tightening, one commit per
   source category.
+  Landed:
+  - `f82bc8c` — W7.5 reproducibility-manifest documentation:
+    `paper-theorem-profile.md` now pins the
+    `results/reproducibility_manifest.json` schema, the deterministic
+    file-path walker, the manifest's self-exclusion rule, and the
+    audit contract (diffing the manifest pins bit-identical outputs
+    across runs on identical inputs).
 - W7.6 — reviewer-facing summary tightening, one commit.
+  Landed:
+  - `3f63b32` — W7.6 reviewer summary: add `wp6_closure_audit` and
+    `static_drift_check_inventory` JSON sections plus their
+    `reviewer_summary.md` rendering tables, mirroring
+    `sgxHostileHostClosureAudit` in Lean and pinning every named
+    static-drift check (six W6 + two W5).
 
 For each landed checkpoint, update the WP7 status paragraph in
 `docs/top-tier-paper-execution-roadmap.md` (Work Package 7 section)

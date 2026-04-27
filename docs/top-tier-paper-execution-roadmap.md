@@ -2251,6 +2251,44 @@ Current artifact-side realization: the full probe bundle emits
 reviewer-facing table over proof/report cost, artifact sizes, runtime
 overheads, TCB surface, and explicit assumptions.
 
+Status of charter task 6 (reviewer-facing summary): the reviewer
+summary at `results/reviewer_summary.json` /
+`results/reviewer_summary.md` now reports proof-checking cost
+(per-report milliseconds), artifact size (top materialized and
+estimated JSON byte counts), runtime overhead (raw vs. ORAM gas /
+writes / bytes per benchmark), TCB size (trusted Rust runtime
+surface, outer runtime risk surface, Lean theorem/checker repo
+surface in non-empty LOC), the current TCB table (component / status
+/ role), the explicit assumption profile (W5 + W6.5 entries), the
+WP6 closure-audit table (six W6 surface checkpoints with claim
+classification, Lean anchor, and static-drift check name), and the
+named static-drift check inventory (eight checks: six W6 + two W5).
+The W7.6 cleanup landed in commit `3f63b32`.
+
+Status of charter task 5 (artifact reproducibility): the
+`results/reproducibility_manifest.json` walker emits a deterministic
+SHA-256 + byte count per output file. The W7.5 cleanup landed in
+commit `f82bc8c` (documentation pinning the manifest schema and
+audit contract).
+
+Status of charter task 4 (tamper-coverage audit): the 379-scenario
+tamper-validation suite covers every theorem-facing JSON artifact
+emitted by the runtime, every source-backed boundary, and every
+translation-side artifact, with the W6 freeze surface covered by the
+named static-drift checks plus the closure-audit theorem
+`sgxHostileHostClosureAudit_driftCheckNames`. The W7.4 audit landed
+in commit `95a9f54` (documentation pinning the categorical
+distribution).
+
+Status of charter task 3 (paper-narrative compatibility-shim
+removal): three stale paper-narrative shims removed (the probe's
+"TEE deployment assumptions" status text now reflects the W6.5
+closure; the paper-theorem-profile "What is still open" list no
+longer says W4.5 / W4.6 are open or that WP5 needs full Lean
+discharge; the WP6 entry now distinguishes the closed six-checkpoint
+surface from the open future-strengthening step). The W7.3 cleanup
+landed in commit `b1cfd59`.
+
 Status of charter task 2 (proof-grade checker theorem-tightening): each of
 the previously-minimal-form proof-grade checker entrypoints now exposes
 at least one named paper-grade witness theorem at file scope. The W7.2
