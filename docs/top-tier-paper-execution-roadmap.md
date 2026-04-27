@@ -1631,6 +1631,24 @@ Current status update:
   secret based on `StateObject.confidential`) and structured value
   updates clean. `evalContract` discards the final `cfg` and returns
   the outcome unchanged.
+- Subtask W4.4 Session B-1 (forward-direction lowering iff
+  theorems) landed (commits `1be2c58`, `90e9cde`, `1dcd8ef`,
+  [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)):
+  the forward-direction lowering iff theorems are now Lean-proved
+  at all four levels — `branchlessPureExpr_implies_lowerPureExpr_ok`
+  / `…List_…_ok` (mutual), `fragmentValid_implies_lowerExpr_ok` /
+  `…List_…_ok` (mutual), `kernelLowerable_implies_lowerStatement_ok`,
+  `kernelLowerableScheduleAux_implies_lowerStatementsAux_ok`,
+  `kernelLowerableSchedule_implies_lowerStatements_ok`, and the
+  program-level `kernelLowerable_implies_lowerCompiledFunction_ok`.
+  The schedule-level proof case-splits on `stmt.isReturn` (now
+  factored out as a top-level `Statement.isReturn` helper) and on
+  the structure of `rest`. The reverse direction of the iff
+  (lowering succeeds → precondition holds) is deferred — it is
+  useful for W4.6 (artifact-checker demotion) but not strictly
+  required by the W4.4 preservation theorem. Session B-2 (the
+  preservation theorem itself) and Session C (paper-facing facade)
+  remain open.
 - Subtask W4.4 Session A (kernel DSL definitions) landed (commit
   `1bd6180`, new file
   [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)):
@@ -1669,10 +1687,13 @@ Current status update:
   the only `unsupported` constructors are `Expr.{structField,
   arrayIndex}`, which `Expr.fragmentValid` already rejects.
 - Still open: the *real* source-to-IR correctness theorem (W4.2),
-  the W4.4 Session B (lowering iff theorem + semantics-preservation
-  theorem) and Session C (`ProofGrade.lean` projection), the
-  manifest-exactness semantics-preserving lift (W4.5), and the
-  direct artifact checker demotion (W4.6).
+  W4.4 Session B-2 (semantics-preservation theorem) and Session C
+  (`ProofGrade.lean` projection), the manifest-exactness
+  semantics-preserving lift (W4.5), and the direct artifact
+  checker demotion (W4.6). The reverse direction of the W4.4
+  lowering iff (lowering succeeds → precondition holds) is also
+  deferred; it is useful for W4.6 but not strictly required by the
+  preservation theorem.
 
 Exit gate:
 

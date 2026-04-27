@@ -21,15 +21,17 @@ a TEE under a hostile-host adversary (M+ model).
 You are now picking up **Work Package 4: Prove Source-To-Kernel
 Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
 **W4.1**, **W4.1b**, **W4.3** (full theorem + paper facade),
-**W4.1+**, **W4.1++**, **W4.1+++** (store-update threading), and
+**W4.1+**, **W4.1++**, **W4.1+++** (store-update threading),
 **W4.4 Session A** (typed kernel DSL + semantics + lowering
-definitions in `proof/lean/UOToolchain/KernelDsl.lean`) are all
-landed. The W4.1 evaluator is total over the structural admitted
-fragment with masked-store semantics; the kernel-DSL Lean mirror
-shares the same `IR.Outcome` type so the W4.4 preservation theorem
-can be a literal outcome equality. The next subtasks are W4.4
-Session B (lowering iff theorems + semantics-preservation theorem)
-and Session C (paper-facing facade).
+definitions), and **W4.4 Session B-1** (forward-direction lowering
+iff theorems at all four levels: Expr / Statement / schedule /
+program) are all landed. The W4.1 evaluator is total over the
+structural admitted fragment with masked-store semantics; the
+kernel-DSL Lean mirror shares the same `IR.Outcome` type so the
+W4.4 preservation theorem can be a literal outcome equality; and
+every kernel-lowerable IR program is now provably lowerable to a
+kernel program. The next subtask is W4.4 Session B-2 (semantics-
+preservation theorem) followed by Session C (paper-facing facade).
 
 ## First, Read These Files In This Exact Order
 
@@ -123,47 +125,42 @@ land in:
 
 ## Recommended Next Subtask
 
-W4.4 Session A is landed; the next subtask is **W4.4 Session B**:
-the lowering succeeds-iff-precondition iff theorems plus the
-semantics-preservation theorem.
+W4.4 Session B-1 is landed; the next subtask is **W4.4 Session B-2**:
+the semantics-preservation theorem.
 
-**Subtask W4.4 Session B: Lowering iff + semantics-preservation.**
+**Subtask W4.4 Session B-2: Semantics-preservation theorem.**
 
 Concretely:
 
-1. Prove four lowering iff theorem families in `KernelDsl.lean`,
-   each as a mutual `theorem` block with its list companion:
-   - `branchlessPureExpr_iff_lowerPureExpr_ok` /
-     `branchlessPureExprList_iff_lowerPureExprList_ok`
-   - `fragmentValid_iff_lowerExpr_ok` /
-     `fragmentValidList_iff_lowerExprList_ok`
-   - `kernelLowerable_iff_lowerStatement_ok`
-   - `kernelLowerableSchedule_iff_lowerStatements_ok`
-
-   The proofs are structural mutual recursions analogous to W4.3.
-   The Session A corollary
-   `branchlessPureExpr_implies_fragmentValid` is the helper for the
-   `Expr.select` case. Session A had a draft attempt that hit
-   tactic-mechanics issues with `simp` / `rcases` / `cases`
-   patterns; a clean restart with `simp only` everywhere and
-   careful `cases` on the lowering result should work.
-2. Prove the semantics-preservation theorem:
+1. Prove per-Expr / per-Statement preservation lemmas in
+   `KernelDsl.lean`:
+   - `lowerExpr_preserves_semantics`: `lowerExpr e = .ok ke →
+     evalExpr cfg env e = evalKernelExpr cfg env ke`
+   - `lowerPureExpr_preserves_semantics`: analogous for pure exprs
+   - `lowerStatement_preserves_semantics`: lifts to statements
+   - `lowerStatements_preserves_semantics`: lifts to lists
+2. Prove the program-level theorem:
    `lowerCompiledFunction fn = .ok kp →
-     ∀ cfg, evalContract { cfg with contract.functions including fn } =
-       evalKernelProgram kp cfg`
-   (or a suitable form — the IR evaluator looks up the entrypoint
-   via `cfg.entrypoint`, so the equation needs to handle the
-   entrypoint resolution side too). Strategy: prove the per-`Expr`
-   and per-`Statement` preservation lemmas first, then lift to the
-   program level.
+     ∀ cfg env outcome, evalBody cfg env outcome fn.body =
+       evalKernelBody cfg env outcome kp.body`
+   (or the entrypoint-level form via `evalContract` /
+   `evalKernelProgram`).
 3. Session C will project this through `ProofGrade.lean` as
    `proofGrade_ir_to_kernel_correctness` and update the WP4 status
    text.
 
+The structural recursion mirrors Session B-1's forward iff
+proofs but is bigger because the `do`-notation reductions in both
+`lowerExpr` (when `lowering = .ok ke`) and `evalExpr` /
+`evalKernelExpr` need to be threaded together. Expect to reuse the
+same `unfold + simp + rfl` tactic pattern that worked for the
+Session B-1 forward iffs.
+
 If you would prefer to drive **W4.2** (source-to-IR correctness)
 instead, see the runbook's "Recommended Starting Subtask" section
 for the AST-pull-back framing. W4.2 is roughly 2-3× the effort of
-W4.4 because it requires a partial Lean Solidity parser AST mirror.
+W4.4 because it requires a partial Lean Solidity parser AST
+mirror.
 
 After W4.4 lands, the natural sequence is:
 
@@ -266,8 +263,8 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The first technical step is W4.4 Session B
-(lowering iff theorems + semantics-preservation theorem). If you
-prefer strict deliverable order, the runbook's "Recommended
+Begin with the runbook. The first technical step is W4.4 Session
+B-2 (semantics-preservation theorem; B-1 forward iffs are landed).
+If you prefer strict deliverable order, the runbook's "Recommended
 Starting Subtask" section also documents the W4.2 source-to-IR
 AST-pull-back framing.

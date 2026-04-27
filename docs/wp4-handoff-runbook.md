@@ -124,6 +124,27 @@ Subtasks **W4.1**, **W4.1b**, **W4.3 (full theorem)**, and **W4.1+
   recorded unconditionally to mirror the runtime's always-write
   access pattern. `evalContract` discards the final `cfg` and
   returns the outcome unchanged.
+- W4.4 Session B-1 landed (forward-direction lowering iff theorems)
+  in `KernelDsl.lean`:
+  `branchlessPureExpr_implies_lowerPureExpr_ok` /
+  `branchlessPureExprList_implies_lowerPureExprList_ok` (mutual);
+  `fragmentValid_implies_lowerExpr_ok` /
+  `fragmentValidList_implies_lowerExprList_ok` (mutual);
+  `kernelLowerable_implies_lowerStatement_ok`;
+  `kernelLowerableScheduleAux_implies_lowerStatementsAux_ok` /
+  `kernelLowerableSchedule_implies_lowerStatements_ok`; and the
+  program-level corollary
+  `kernelLowerable_implies_lowerCompiledFunction_ok`. A
+  `Statement.isReturn : Statement → Bool` helper was factored out
+  to remove a `let`-binding obstacle in
+  `kernelLowerableScheduleAux` / `lowerStatementsAux` that blocked
+  `simp` reductions. The schedule-level proof case-splits on
+  `stmt.isReturn` and on the structure of `rest`. The reverse
+  iff direction (lowering succeeds → precondition holds) is
+  deferred — useful for W4.6 (artifact-checker demotion), not
+  strictly required by the W4.4 preservation theorem. The W4.4
+  semantics-preservation theorem (Session B-2) and the paper-
+  facing facade (Session C) remain open.
 - W4.4 Session A landed in
   [`proof/lean/UOToolchain/KernelDsl.lean`](../proof/lean/UOToolchain/KernelDsl.lean):
   typed Lean mirror of the kernel DSL (`KernelExpr` /
@@ -518,17 +539,20 @@ should be its own commit:
   operational semantics, lowering definitions, lowering
   precondition predicates, and `branchlessPureExpr_implies_
   fragmentValid` corollary in `KernelDsl.lean` (commit `1bd6180`).
-- *(next)* W4.4 Session B: lowering succeeds-iff-precondition iff
-  theorems (`branchlessPureExpr_iff_lowerPureExpr_ok` and three
-  more theorem families) plus the semantics-preservation theorem
+- *(landed)* W4.4 Session B-1: forward-direction lowering iff
+  theorems at all four levels (Expr / Statement / schedule /
+  program), with `Statement.isReturn` helper refactor (commits
+  `1be2c58`, `90e9cde`, `1dcd8ef`).
+- *(next)* W4.4 Session B-2: semantics-preservation theorem
   (`evalContract cfg = evalKernelProgram (lowerCompiledFunction
-  fn) cfg` when the lowering succeeds). The iff proofs are
-  structural mutual recursions analogous to W4.3; the preservation
-  proof is a longer structural mutual recursion comparing
-  `evalExpr` / `evalKernelExpr` outcomes after lowering.
+  fn) cfg` when the lowering succeeds). Structural mutual recursion
+  comparing `evalExpr` / `evalKernelExpr` outcomes after lowering.
+  Will use the Session B-1 forward iffs as preconditions.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.
+- *(also next)* iff reverse directions for W4.6 artifact-checker
+  demotion (low-priority, not on the W4.4 critical path).
 - Source-to-IR lowering theorem (W4.2, probably split into
   expression-level, statement-level, function-level).
 - IR-to-kernel lowering theorem (W4.4, likely split per kernel-DSL

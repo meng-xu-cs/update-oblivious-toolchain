@@ -285,8 +285,16 @@ What is still open:
   the statement evaluator. W4.4 Session A landed in
   `proof/lean/UOToolchain/KernelDsl.lean` with the typed kernel-DSL
   inductives, operational semantics (sharing `IR.Outcome`), lowering
-  definitions, and lowering preconditions; the iff theorems and the
-  semantics-preservation theorem are deferred to Session B. The only
+  definitions, and lowering preconditions. W4.4 Session B-1 then
+  landed the forward-direction lowering iff theorems
+  (`branchlessPureExpr → lowerPureExpr ok`, `Expr.fragmentValid →
+  lowerExpr ok`, `Statement.kernelLowerable → lowerStatement ok`,
+  `Statement.kernelLowerableSchedule → lowerStatements ok`, and the
+  program-level corollary
+  `CompiledFunction.kernelLowerable → lowerCompiledFunction ok`).
+  The W4.4 semantics-preservation theorem (Session B-2) and the
+  paper-facing facade (Session C) remain open; the iff reverse
+  directions are also still deferred. The only
   `unsupported` evaluator cases are `Expr.{structField,arrayIndex}`,
   which `fragmentValid` rejects, so they cannot appear in an
   accepted IR program.
