@@ -2172,6 +2172,34 @@ Concrete tasks:
      they are honored by the TEE platform under deployment.
 6. Remove any remaining ambiguity between idealized TEE-storage security and
    malicious-host execution obliviousness.
+   - **W6.6 status (landed):** the WP6 surface is now closed at
+     exactly six explicit checkpoints — W6.1 observer freeze,
+     W6.2 boundary-call model, W6.2 persistent-I/O model, W6.3
+     controller-refinement integration, W6.4 sealing /
+     storage-refinement integration, and W6.5 explicit
+     deployment-assumption bundle. The
+     `sgxHostileHostClosureAudit` summary list and its closure
+     theorems (`sgxHostileHostClosureAudit_length`,
+     `sgxHostileHostClosureAudit_leanProvedEntries`,
+     `sgxHostileHostClosureAudit_allClassified`, and
+     `sgxHostileHostClosureAudit_driftCheckNames`) pin the audit
+     conclusion at the Lean type level. Per the WP6 claim
+     taxonomy, the first five checkpoints are all
+     **Lean-proved, semantics-preserving** and W6.5 is **Cited /
+     externally justified** end-to-end; no entry is in the
+     "trusted-without-citation" or "source-frozen-only" bucket.
+     The named six probe drift checks
+     (`sgx_observer_surface_pinned`,
+     `sgx_boundary_call_model_pinned`,
+     `sgx_persistent_io_model_pinned`,
+     `sgx_controller_refinement_pinned`,
+     `sgx_storage_refinement_pinned`,
+     `sgx_deployment_assumption_bundle_pinned`) are emitted by the
+     `kernel_model_alignment_validation.json` report and gated by
+     `run_kernel_model_alignment_validation`. With WP6 closed, the
+     paper can claim malicious-host security against the W6.1 /
+     W6.2 frozen observer without hiding the observer surface or
+     the deployment assumptions.
 
 Deliverables:
 

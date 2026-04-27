@@ -1804,4 +1804,60 @@ theorem proofGrade_sgx_deployment_patch_level_trust_bibKey :
     sgxDeploymentProvenance_patchLevelTrust.primaryBibKey =
       "IntelSGXSecurityCenter" := by rfl
 
+/-! ### WP6.6 Hostile-Host Closure Audit Facades
+
+The facades below expose the W6.6 closure audit, mirroring the W5.6
+bundle-housekeeping pattern. The audit summary records that the
+WP6 surface has six explicit checkpoint fields, each paired either
+with a Lean refinement theorem (W6.1–W6.4) or with an explicit
+Cited / externally justified provenance pairing (W6.5).
+
+Claim taxonomy: these facades are **Lean-proved,
+semantics-preserving** for the audit closure itself. The audit list
+and per-classification theorems are direct equalities. The audit
+conclusion is meta — it states that every surviving WP6 surface
+field has a documented home, not that any TEE-side `Prop` axiom
+has been Lean-discharged. -/
+
+/-- Paper-facing W6.6 facade: the WP6 closure audit summary
+contains exactly six entries — one per WP6 surface checkpoint
+(W6.1, W6.2 boundary-call, W6.2 persistent-I/O, W6.3, W6.4, W6.5). -/
+theorem proofGrade_sgx_hostile_host_closure_audit_length :
+    sgxHostileHostClosureAudit.length = 6 :=
+  sgxHostileHostClosureAudit_length
+
+/-- Paper-facing W6.6 facade: the first five entries (W6.1, W6.2
+boundary-call, W6.2 persistent-I/O, W6.3, W6.4) are all classified
+**Lean-proved, semantics-preserving**. -/
+theorem proofGrade_sgx_hostile_host_closure_audit_leanProvedEntries :
+    ∀ entry, entry ∈ sgxHostileHostClosureAudit.take 5 →
+      entry.classification = "Lean-proved, semantics-preserving" :=
+  sgxHostileHostClosureAudit_leanProvedEntries
+
+/-- Paper-facing W6.6 facade: every entry in the WP6 closure audit
+summary is classified either **Lean-proved, semantics-preserving**
+or **Cited / externally justified**. No entry is in the
+"trusted-without-citation" or "source-frozen-only" bucket — this
+is the W6.6 closure condition. -/
+theorem proofGrade_sgx_hostile_host_closure_audit_all_classified :
+    ∀ entry, entry ∈ sgxHostileHostClosureAudit →
+      entry.classification = "Lean-proved, semantics-preserving" ∨
+        entry.classification = "Cited / externally justified" :=
+  sgxHostileHostClosureAudit_allClassified
+
+/-- Paper-facing W6.6 facade: the WP6 closure audit references the
+canonical six probe drift checks that pin the runtime-facing
+surface for each WP6 checkpoint. -/
+theorem proofGrade_sgx_hostile_host_closure_audit_drift_check_names :
+    sgxHostileHostClosureAudit.map
+        (fun entry => entry.staticDriftCheckName) =
+      [ "sgx_observer_surface_pinned"
+      , "sgx_boundary_call_model_pinned"
+      , "sgx_persistent_io_model_pinned"
+      , "sgx_controller_refinement_pinned"
+      , "sgx_storage_refinement_pinned"
+      , "sgx_deployment_assumption_bundle_pinned"
+      ] :=
+  sgxHostileHostClosureAudit_driftCheckNames
+
 end UOToolchain

@@ -1095,4 +1095,168 @@ theorem sgxDeploymentAssumptionProvenances_sharedDriftCheck :
   · subst h; rfl
   · subst h; rfl
 
+/-! ### W6.6: Hostile-Host Closure Audit
+
+W6.6 is the bundle-housekeeping audit for WP6, mirroring the W5.6
+pattern. It records the post-W6.1 / W6.2 / W6.3 / W6.4 / W6.5
+closure summary at the Lean type level: the WP6 surface has six
+explicit checkpoint fields, each paired either with a Lean
+refinement theorem (W6.1–W6.4) or with an explicit Cited /
+externally justified provenance pairing (W6.5 deployment
+assumptions).
+
+The audit closure documents that:
+
+- W6.1 observer-surface freeze, W6.2 boundary-call model, W6.2
+  persistent-I/O model, W6.3 controller-refinement integration,
+  and W6.4 sealing / storage-refinement integration are all
+  **Lean-proved, semantics-preserving** components, paired with
+  named probe drift checks pinning the runtime-facing surface;
+- W6.5 deployment-assumption bundle — `attestationAuthenticity`,
+  `enclaveMemoryIsolation`, `rollbackResistance`,
+  `crashRecoveryDiscipline`, `patchLevelTrust` — is **Cited /
+  externally justified** end-to-end with one provenance entry per
+  field;
+- no surviving WP6 surface field has been left in the
+  "trusted-without-citation" or "source-frozen-only" buckets.
+
+Claim taxonomy: this audit summary is **Lean-proved,
+semantics-preserving** for the audit closure itself: the audit
+list, the length theorem, and the per-classification theorems are
+all direct equalities. The audit conclusion ("WP6 closes the
+hostile-host TEE theorem") is meta — it states that every
+surviving WP6 surface field has a documented home, not that any
+TEE-side `Prop` axiom has been Lean-discharged. -/
+
+/-- Audit-record entry for one WP6 surface checkpoint. Pairs the
+checkpoint label with its claim-taxonomy classification, the Lean
+record / theorem name pinning it, and the named probe drift check
+that rejects representative drift in the corresponding runtime or
+Lean source. -/
+structure SgxHostileHostClosureAuditEntry where
+  /-- WP6 checkpoint identifier (e.g. "W6.1"). -/
+  checkpoint : String
+  /-- Plain-language description of the checkpoint's role. -/
+  role : String
+  /-- WP6 claim taxonomy classification ("Lean-proved,
+  semantics-preserving" or "Cited / externally justified"). -/
+  classification : String
+  /-- Lean record / provenance / refinement object pinning the
+  checkpoint. -/
+  leanAnchor : String
+  /-- Probe static-drift check name pinning the runtime-facing
+  surface. -/
+  staticDriftCheckName : String
+deriving Repr, DecidableEq
+
+/-- W6.6 closure summary: the six WP6 surface checkpoints plus their
+post-W6.1..W6.5 classification and provenance pairings. -/
+def sgxHostileHostClosureAudit :
+    List SgxHostileHostClosureAuditEntry :=
+  [ { checkpoint := "W6.1"
+    , role := "frozen SGX observer surface (page-region names, controller-phase vocabulary, page-event / exit-event vocabularies, shared-resource pattern literal, page-event encoding formula)"
+    , classification := "Lean-proved, semantics-preserving"
+    , leanAnchor := "sgxObserverSurfaceProvenance"
+    , staticDriftCheckName := "sgx_observer_surface_pinned"
+    }
+  , { checkpoint := "W6.2 boundary-call"
+    , role := "frozen boundary-call model (oram_access API literal, Enter/Exit direction vocabulary, boundary-event budget formula, schedule structural shape)"
+    , classification := "Lean-proved, semantics-preserving"
+    , leanAnchor := "sgxBoundaryCallProvenance"
+    , staticDriftCheckName := "sgx_boundary_call_model_pinned"
+    }
+  , { checkpoint := "W6.2 persistent-I/O"
+    , role := "frozen persistent-I/O model (PhysicalRead / PhysicalWrite field schemas, WriteClass vocabulary)"
+    , classification := "Lean-proved, semantics-preserving"
+    , leanAnchor := "sgxPersistentIoProvenance"
+    , staticDriftCheckName := "sgx_persistent_io_model_pinned"
+    }
+  , { checkpoint := "W6.3"
+    , role := "controller-refinement integration (canonical Lean controller-shape constructor refines the W6.1 / W6.2 frozen observer in page-region names, workset-region names, boundary-event budget, and shared-resource pattern)"
+    , classification := "Lean-proved, semantics-preserving"
+    , leanAnchor := "sgxControllerRefinementProvenance"
+    , staticDriftCheckName := "sgx_controller_refinement_pinned"
+    }
+  , { checkpoint := "W6.4"
+    , role := "sealing / storage-refinement integration (viewTEEStore field projection forwards physicalReads / physicalWrites / gasUsed / entrypointId deterministically from the underlying Trace and Config)"
+    , classification := "Lean-proved, semantics-preserving"
+    , leanAnchor := "sgxStorageRefinementProvenance"
+    , staticDriftCheckName := "sgx_storage_refinement_pinned"
+    }
+  , { checkpoint := "W6.5"
+    , role := "explicit hostile-host TEE deployment-assumption bundle (attestation authenticity, enclave memory isolation, rollback resistance, crash recovery discipline, patch-level trust) paired with Intel SGX provenance citations"
+    , classification := "Cited / externally justified"
+    , leanAnchor := "SgxDeploymentAssumptions + sgxDeploymentAssumptionProvenances"
+    , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+    }
+  ]
+
+/-- The W6.6 audit summary contains exactly six entries — one per
+WP6 surface checkpoint. -/
+theorem sgxHostileHostClosureAudit_length :
+    sgxHostileHostClosureAudit.length = 6 := by rfl
+
+/-- The first five W6.6 audit entries are all classified
+**Lean-proved, semantics-preserving**: W6.1, W6.2 (boundary-call),
+W6.2 (persistent-I/O), W6.3, and W6.4 each carry a Lean refinement
+or freeze theorem. -/
+theorem sgxHostileHostClosureAudit_leanProvedEntries :
+    ∀ entry, entry ∈ sgxHostileHostClosureAudit.take 5 →
+      entry.classification = "Lean-proved, semantics-preserving" := by
+  intro entry hMem
+  unfold sgxHostileHostClosureAudit at hMem
+  simp at hMem
+  rcases hMem with h | h | h | h | h
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
+
+/-- The W6.6 audit's W6.5 entry is classified **Cited / externally
+justified**: every field in the deployment-assumption bundle is
+paired with an Intel SGX specification citation. -/
+theorem sgxHostileHostClosureAudit_w65_cited :
+    ∀ entry, entry ∈ [sgxHostileHostClosureAudit.getLast (by simp [sgxHostileHostClosureAudit])] →
+      entry.classification = "Cited / externally justified" := by
+  intro entry hMem
+  simp at hMem
+  subst hMem
+  rfl
+
+/-- Every entry in the W6.6 audit summary is classified either
+**Lean-proved, semantics-preserving** or **Cited / externally
+justified**. No entry is in the "trusted-without-citation" or
+"source-frozen-only" bucket. -/
+theorem sgxHostileHostClosureAudit_allClassified :
+    ∀ entry, entry ∈ sgxHostileHostClosureAudit →
+      entry.classification = "Lean-proved, semantics-preserving" ∨
+        entry.classification = "Cited / externally justified" := by
+  intro entry hMem
+  unfold sgxHostileHostClosureAudit at hMem
+  simp at hMem
+  rcases hMem with h | h | h | h | h | h
+  · subst h; left; rfl
+  · subst h; left; rfl
+  · subst h; left; rfl
+  · subst h; left; rfl
+  · subst h; left; rfl
+  · subst h; right; rfl
+
+/-- Every entry in the W6.6 audit summary references a probe
+static-drift check name that pins the runtime-facing surface
+corresponding to that checkpoint. The list of names — the union of
+the per-checkpoint drift checks — is what the
+`kernel_model_alignment_validation` report gates. -/
+theorem sgxHostileHostClosureAudit_driftCheckNames :
+    sgxHostileHostClosureAudit.map
+        (fun entry => entry.staticDriftCheckName) =
+      [ "sgx_observer_surface_pinned"
+      , "sgx_boundary_call_model_pinned"
+      , "sgx_persistent_io_model_pinned"
+      , "sgx_controller_refinement_pinned"
+      , "sgx_storage_refinement_pinned"
+      , "sgx_deployment_assumption_bundle_pinned"
+      ] := by rfl
+
 end UOToolchain

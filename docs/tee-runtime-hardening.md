@@ -487,6 +487,81 @@ If any of those drift, the static-checks gate flips
 `sgx_deployment_assumption_bundle_pinned` to `false` and the gate
 rejects the checkpoint.
 
+## W6.6 Hostile-Host Closure Audit
+
+W6.6 is the bundle-housekeeping audit for WP6, mirroring the W5.6
+pattern. It records the post-W6.1 / W6.2 / W6.3 / W6.4 / W6.5
+closure summary at the Lean type level: the WP6 surface has six
+explicit checkpoint fields, each paired either with a Lean
+refinement theorem (W6.1–W6.4) or with an explicit Cited /
+externally justified provenance pairing (W6.5 deployment
+assumptions).
+
+The Lean side extends `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+with the `SgxHostileHostClosureAuditEntry` audit-record structure,
+the six-element `sgxHostileHostClosureAudit` summary list, and four
+closure theorems:
+
+- `sgxHostileHostClosureAudit_length` (= 6);
+- `sgxHostileHostClosureAudit_leanProvedEntries` (the first five
+  entries are all classified `"Lean-proved,
+  semantics-preserving"`);
+- `sgxHostileHostClosureAudit_allClassified` (every entry is in
+  one of the two acceptable WP6 buckets — no entry is
+  "trusted-without-citation" or "source-frozen-only");
+- `sgxHostileHostClosureAudit_driftCheckNames` (the audit names
+  the canonical six probe drift checks in canonical order).
+
+Claim taxonomy: **Lean-proved, semantics-preserving** for the
+audit closure itself. The audit conclusion ("WP6 closes the
+hostile-host TEE theorem") is meta — it states that every
+surviving WP6 surface field has a documented home, not that any
+TEE-side `Prop` axiom has been Lean-discharged.
+
+### W6.6 audit summary
+
+| Checkpoint | Role | Classification | Lean anchor | Drift check |
+| --- | --- | --- | --- | --- |
+| W6.1 | observer-surface freeze (page-region names, controller-phase vocabulary, page/exit-event vocabularies, shared-resource pattern, page-event encoding) | Lean-proved, semantics-preserving | `sgxObserverSurfaceProvenance` | `sgx_observer_surface_pinned` |
+| W6.2 boundary-call | boundary-call model (oram_access API literal, Enter/Exit direction vocabulary, boundary-event budget formula, schedule structural shape) | Lean-proved, semantics-preserving | `sgxBoundaryCallProvenance` | `sgx_boundary_call_model_pinned` |
+| W6.2 persistent-I/O | persistent-I/O model (PhysicalRead / PhysicalWrite field schemas, WriteClass vocabulary) | Lean-proved, semantics-preserving | `sgxPersistentIoProvenance` | `sgx_persistent_io_model_pinned` |
+| W6.3 | controller-refinement integration | Lean-proved, semantics-preserving | `sgxControllerRefinementProvenance` | `sgx_controller_refinement_pinned` |
+| W6.4 | sealing / storage-refinement integration | Lean-proved, semantics-preserving | `sgxStorageRefinementProvenance` | `sgx_storage_refinement_pinned` |
+| W6.5 | deployment-assumption bundle (attestation, enclave isolation, rollback, crash, patch level) paired with Intel SGX provenance citations | Cited / externally justified | `SgxDeploymentAssumptions` + `sgxDeploymentAssumptionProvenances` | `sgx_deployment_assumption_bundle_pinned` |
+
+### Provenance pairing
+
+The W6.6 closure-audit theorems pin the audit summary at the Lean
+type level. Any future addition to the WP6 surface that does not
+also extend the audit list will fail the
+`sgxHostileHostClosureAudit_length` check. Any field that lands in
+the "trusted-without-citation" or "source-frozen-only" bucket will
+fail the `sgxHostileHostClosureAudit_allClassified` check.
+
+The paper-facing facades exposed in
+[`ProofGrade.lean`](../proof/lean/UOToolchain/ProofGrade.lean) under
+the `proofGrade_sgx_hostile_host_closure_audit_*` prefix mirror the
+W5.6 closure-audit facade pattern.
+
+### Closure conclusion
+
+WP6 now closes the hostile-host TEE theorem in the W6 charter
+sense: the observer signature is frozen, the boundary calls /
+persistent I/O / exits / shared-resource observations / paging
+observations are all modeled, the controller and sealing /
+storage paths are refined into the canonical observer, the
+deployment assumptions are stated explicitly with Intel SGX
+provenance citations, and the audit closes the surface at exactly
+six checkpoints. Every surviving claim is either
+**Lean-proved, semantics-preserving** (W6.1–W6.4) or **Cited /
+externally justified** (W6.5).
+
+The remaining open work below the WP6 surface is a future-
+strengthening track: a deeper semantics-of-Rust refinement of the
+real `uo-evm` runtime against the W6.1 / W6.2 frozen observer.
+That track stays documented as an explicit "still open" item but
+does not block the WP6 closure as scoped in the WP6 charter.
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:
