@@ -904,8 +904,10 @@ bundle stays explicit at the Lean type level rather than being
 hidden in prose; each assumption is paired with the Intel SGX
 specification it relies on.
 
-The five canonical fields capture the load-bearing TEE deployment
-assumptions called out by the WP6 charter:
+The six canonical fields capture every load-bearing TEE deployment
+assumption called out by the WP6 charter (attestation, rollback,
+crash, freshness, patch-level) plus the underlying enclave memory
+isolation assumption that every TEE security claim depends on:
 
 - `attestationAuthenticity` — Intel SGX attestation produces a
   quote signed by the platform's attestation key whose
@@ -915,8 +917,10 @@ assumptions called out by the WP6 charter:
   the Memory Encryption Engine (MEE) for confidentiality and
   integrity;
 - `rollbackResistance` — sealed state cannot be silently rolled
-  back to an earlier epoch (sgx_get_trusted_time / monotonic
-  counters / replay protection);
+  back to a prior epoch (monotonic counters / replay protection);
+- `freshnessGuarantee` — read from sealed state returns the most
+  recent committed value (`sgx_get_trusted_time` / freshness
+  enforcement);
 - `crashRecoveryDiscipline` — crash recovery from sealed state does
   not leak partial confidential state;
 - `patchLevelTrust` — the deployed platform's security
@@ -930,7 +934,7 @@ specifications. They are not Lean-discharged; they are part of the
 deployment TCB and must be honored by the TEE platform under
 deployment. -/
 
-/-- Explicit hostile-host TEE deployment-assumption bundle. The five
+/-- Explicit hostile-host TEE deployment-assumption bundle. The six
 fields are the irreducible deployment-side trust assumptions for
 the hostile-host SGX execution-oblivious theorem. Each field is
 paired with an explicit provenance record (defined below). -/
@@ -944,9 +948,11 @@ structure SgxDeploymentAssumptions where
   host. -/
   enclaveMemoryIsolation : Prop
   /-- Sealed state cannot be silently rolled back to a prior epoch
-  (monotonic counters / `sgx_get_trusted_time` / replay
-  protection). -/
+  (monotonic counters / replay protection). -/
   rollbackResistance : Prop
+  /-- Read from sealed state returns the most recent committed
+  value (`sgx_get_trusted_time` / freshness enforcement). -/
+  freshnessGuarantee : Prop
   /-- Crash recovery from sealed state does not leak partial
   confidential state. -/
   crashRecoveryDiscipline : Prop
@@ -1006,15 +1012,31 @@ def sgxDeploymentProvenance_enclaveMemoryIsolation :
   }
 
 /-- Provenance record for `rollbackResistance`. Cites the Intel SGX
-SDK monotonic counter / trusted time interfaces. -/
+SDK monotonic-counter interfaces used to detect rollback of sealed
+state. -/
 def sgxDeploymentProvenance_rollbackResistance :
     SgxDeploymentAssumptionProvenance :=
   { fieldName := "rollbackResistance"
   , role :=
-      "sealed state cannot be silently rolled back to a prior epoch; replay protection comes from monotonic counters and sgx_get_trusted_time"
+      "sealed state cannot be silently rolled back to a prior epoch; replay protection comes from monotonic counters tied to the platform's TCB"
   , classification := "Cited / externally justified"
   , primaryCitation :=
-      "Intel SGX SDK Developer Reference: sgx_create_monotonic_counter / sgx_increment_monotonic_counter and sgx_get_trusted_time interfaces. Sealing & freshness chapter."
+      "Intel SGX SDK Developer Reference: sgx_create_monotonic_counter / sgx_increment_monotonic_counter / sgx_read_monotonic_counter interfaces. Rollback-protection chapter."
+  , primaryBibKey := "IntelSGXSDKDeveloperReference"
+  , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+  }
+
+/-- Provenance record for `freshnessGuarantee`. Cites the Intel SGX
+SDK trusted-time interfaces used to enforce that reads from sealed
+state return the most recent committed value. -/
+def sgxDeploymentProvenance_freshnessGuarantee :
+    SgxDeploymentAssumptionProvenance :=
+  { fieldName := "freshnessGuarantee"
+  , role :=
+      "read from sealed state returns the most recent committed value; freshness is enforced by sgx_get_trusted_time and the trusted-clock substrate"
+  , classification := "Cited / externally justified"
+  , primaryCitation :=
+      "Intel SGX SDK Developer Reference: sgx_get_trusted_time / sgx_create_pse_session interfaces. Trusted Time and freshness-enforcement chapter."
   , primaryBibKey := "IntelSGXSDKDeveloperReference"
   , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
   }
@@ -1047,21 +1069,22 @@ def sgxDeploymentProvenance_patchLevelTrust :
   , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
   }
 
-/-- Five-element provenance list for the deployment-assumption
+/-- Six-element provenance list for the deployment-assumption
 bundle, in canonical declaration order. -/
 def sgxDeploymentAssumptionProvenances :
     List SgxDeploymentAssumptionProvenance :=
   [ sgxDeploymentProvenance_attestationAuthenticity
   , sgxDeploymentProvenance_enclaveMemoryIsolation
   , sgxDeploymentProvenance_rollbackResistance
+  , sgxDeploymentProvenance_freshnessGuarantee
   , sgxDeploymentProvenance_crashRecoveryDiscipline
   , sgxDeploymentProvenance_patchLevelTrust
   ]
 
-/-- The deployment-assumption provenance list has exactly five
+/-- The deployment-assumption provenance list has exactly six
 entries — one per bundle field. -/
 theorem sgxDeploymentAssumptionProvenances_length :
-    sgxDeploymentAssumptionProvenances.length = 5 := by rfl
+    sgxDeploymentAssumptionProvenances.length = 6 := by rfl
 
 /-- Every entry in the deployment-assumption provenance list is
 classified as "Cited / externally justified". -/
@@ -1071,7 +1094,8 @@ theorem sgxDeploymentAssumptionProvenances_allCited :
   intro entry hMem
   unfold sgxDeploymentAssumptionProvenances at hMem
   simp at hMem
-  rcases hMem with h | h | h | h | h
+  rcases hMem with h | h | h | h | h | h
+  · subst h; rfl
   · subst h; rfl
   · subst h; rfl
   · subst h; rfl
@@ -1088,7 +1112,8 @@ theorem sgxDeploymentAssumptionProvenances_sharedDriftCheck :
   intro entry hMem
   unfold sgxDeploymentAssumptionProvenances at hMem
   simp at hMem
-  rcases hMem with h | h | h | h | h
+  rcases hMem with h | h | h | h | h | h
+  · subst h; rfl
   · subst h; rfl
   · subst h; rfl
   · subst h; rfl
@@ -1184,7 +1209,7 @@ def sgxHostileHostClosureAudit :
     , staticDriftCheckName := "sgx_storage_refinement_pinned"
     }
   , { checkpoint := "W6.5"
-    , role := "explicit hostile-host TEE deployment-assumption bundle (attestation authenticity, enclave memory isolation, rollback resistance, crash recovery discipline, patch-level trust) paired with Intel SGX provenance citations"
+    , role := "explicit hostile-host TEE deployment-assumption bundle (attestation authenticity, enclave memory isolation, rollback resistance, freshness guarantee, crash recovery discipline, patch-level trust) paired with Intel SGX provenance citations"
     , classification := "Cited / externally justified"
     , leanAnchor := "SgxDeploymentAssumptions + sgxDeploymentAssumptionProvenances"
     , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"

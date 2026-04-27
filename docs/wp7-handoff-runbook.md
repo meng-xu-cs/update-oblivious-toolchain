@@ -27,8 +27,10 @@ WP6 closed on 2026-04-27 in seven small commits on top of `77a7ef1`:
   (`viewTEEStore` projection forwards trace + config fields
   deterministically);
 - `c95aaac` — W6.5 explicit deployment-assumption bundle
-  (`SgxDeploymentAssumptions` with five `Prop` fields paired with
-  Intel SGX provenance citations);
+  (`SgxDeploymentAssumptions` with six `Prop` fields covering
+  every WP6 charter task 5 enumeration — attestation, rollback,
+  freshness, crash, patch-level — plus enclave memory isolation,
+  paired with Intel SGX provenance citations);
 - `1724852` — W6.6 closure audit (`sgxHostileHostClosureAudit` six-
   entry summary, closure theorems
   `sgxHostileHostClosureAudit_length` /

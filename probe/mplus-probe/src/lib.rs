@@ -29722,6 +29722,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_sgx_observer_freeze_source.contains("attestationAuthenticity : Prop")
         && lean_sgx_observer_freeze_source.contains("enclaveMemoryIsolation : Prop")
         && lean_sgx_observer_freeze_source.contains("rollbackResistance : Prop")
+        && lean_sgx_observer_freeze_source.contains("freshnessGuarantee : Prop")
         && lean_sgx_observer_freeze_source.contains("crashRecoveryDiscipline : Prop")
         && lean_sgx_observer_freeze_source.contains("patchLevelTrust : Prop")
         && lean_sgx_observer_freeze_source
@@ -29730,6 +29731,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("def sgxDeploymentProvenance_enclaveMemoryIsolation")
         && lean_sgx_observer_freeze_source
             .contains("def sgxDeploymentProvenance_rollbackResistance")
+        && lean_sgx_observer_freeze_source
+            .contains("def sgxDeploymentProvenance_freshnessGuarantee")
         && lean_sgx_observer_freeze_source
             .contains("def sgxDeploymentProvenance_crashRecoveryDiscipline")
         && lean_sgx_observer_freeze_source.contains("def sgxDeploymentProvenance_patchLevelTrust")

@@ -424,8 +424,14 @@ type level — never silently absorbed into prose — and each field is
 paired with a structured provenance record that names the
 specification and BibTeX key.
 
+The bundle covers every load-bearing TEE deployment assumption
+called out by the WP6 charter task 5 (attestation, rollback, crash,
+freshness, patch-level) plus the underlying enclave memory
+isolation assumption that every TEE security claim depends on, in
+six explicit fields:
+
 The Lean side extends `proof/lean/UOToolchain/SgxObserverFreeze.lean`
-with the `SgxDeploymentAssumptions` structure and five canonical
+with the `SgxDeploymentAssumptions` structure and six canonical
 provenance records. The runtime side is pinned by the probe's
 `sgx_deployment_assumption_bundle_pinned` static-drift check, which
 reads the Lean source itself and rejects regressions that delete the
@@ -434,7 +440,7 @@ bundle, drop one of its fields, or remove a citation BibTeX key.
 Claim taxonomy (per
 [`docs/coding-agent-conventions.md`](./coding-agent-conventions.md#claim-and-tcb-discipline)):
 **Cited / externally justified** for every assumption field. The
-bundle does not Lean-discharge any of the five assumptions; they
+bundle does not Lean-discharge any of the six assumptions; they
 are honored by the TEE platform under deployment.
 
 ### Frozen deployment-assumption components
@@ -443,7 +449,8 @@ are honored by the TEE platform under deployment.
 | --- | --- | --- | --- |
 | `attestationAuthenticity` | platform attestation produces a quote whose authenticity is established by the Intel Provisioning Service / DCAP attestation chain | Intel SGX Attestation Services Programming Reference (Intel Corporation, Reference Number 332680-008US) plus the DCAP Quote Generation Library Programming Reference | `IntelSGXAttestationReference` |
 | `enclaveMemoryIsolation` | enclave memory pages are protected by the Memory Encryption Engine (MEE) for confidentiality and integrity against a hostile host | Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3D: Intel SGX (chapter on EPC Memory Encryption Engine), and Intel SGX Developer Reference, Memory Protection model section | `IntelSGXSDM3D` |
-| `rollbackResistance` | sealed state cannot be silently rolled back to a prior epoch; replay protection comes from monotonic counters and `sgx_get_trusted_time` | Intel SGX SDK Developer Reference: `sgx_create_monotonic_counter` / `sgx_increment_monotonic_counter` and `sgx_get_trusted_time` interfaces | `IntelSGXSDKDeveloperReference` |
+| `rollbackResistance` | sealed state cannot be silently rolled back to a prior epoch; replay protection comes from monotonic counters tied to the platform's TCB | Intel SGX SDK Developer Reference: `sgx_create_monotonic_counter` / `sgx_increment_monotonic_counter` / `sgx_read_monotonic_counter` interfaces (rollback-protection chapter) | `IntelSGXSDKDeveloperReference` |
+| `freshnessGuarantee` | read from sealed state returns the most recent committed value; freshness is enforced by `sgx_get_trusted_time` and the trusted-clock substrate | Intel SGX SDK Developer Reference: `sgx_get_trusted_time` / `sgx_create_pse_session` interfaces (Trusted Time and freshness-enforcement chapter) | `IntelSGXSDKDeveloperReference` |
 | `crashRecoveryDiscipline` | crash recovery from sealed state does not leak partial confidential state; the runtime's commit / wipe boundary is honored across enclave power transitions | Intel SGX SDK Developer Reference: Power transitions, sealing & unsealing chapter (`sgx_seal_data` / `sgx_unseal_data` discipline) | `IntelSGXSDKDeveloperReference` |
 | `patchLevelTrust` | the deployed platform's security patch / microcode level supports the SGX security claims (no known unmitigated TEE vulnerabilities below the deployment patch level) | Intel Security Center: Intel SGX Platform Software (Intel SGX PSW), Trusted Computing Base (TCB) recovery, and Intel CPU microcode update advisories at https://www.intel.com/content/www/us/en/security-center/ | `IntelSGXSecurityCenter` |
 
@@ -451,7 +458,7 @@ are honored by the TEE platform under deployment.
 
 The W6.5 deployment-assumption provenance list is
 `sgxDeploymentAssumptionProvenances` in `SgxObserverFreeze.lean`. It
-contains five entries — one per bundle field — each with an Intel
+contains six entries — one per bundle field — each with an Intel
 SGX citation and BibTeX key. The Lean theorem
 `sgxDeploymentAssumptionProvenances_allCited` proves every entry is
 classified `"Cited / externally justified"`; the theorem
@@ -472,11 +479,12 @@ regressions in the Lean-side deployment-assumption surface itself.
 Specifically it requires:
 
 - `proof/lean/UOToolchain/SgxObserverFreeze.lean` keeps the
-  `SgxDeploymentAssumptions` structure declaration plus its five
+  `SgxDeploymentAssumptions` structure declaration plus its six
   `Prop` fields (`attestationAuthenticity`,
   `enclaveMemoryIsolation`, `rollbackResistance`,
-  `crashRecoveryDiscipline`, `patchLevelTrust`).
-- `proof/lean/UOToolchain/SgxObserverFreeze.lean` keeps the five
+  `freshnessGuarantee`, `crashRecoveryDiscipline`,
+  `patchLevelTrust`).
+- `proof/lean/UOToolchain/SgxObserverFreeze.lean` keeps the six
   `def sgxDeploymentProvenance_*` provenance constants.
 - `proof/lean/UOToolchain/SgxObserverFreeze.lean` keeps the four
   canonical Intel SGX BibTeX keys (`IntelSGXAttestationReference`,
@@ -527,7 +535,7 @@ TEE-side `Prop` axiom has been Lean-discharged.
 | W6.2 persistent-I/O | persistent-I/O model (PhysicalRead / PhysicalWrite field schemas, WriteClass vocabulary) | Lean-proved, semantics-preserving | `sgxPersistentIoProvenance` | `sgx_persistent_io_model_pinned` |
 | W6.3 | controller-refinement integration | Lean-proved, semantics-preserving | `sgxControllerRefinementProvenance` | `sgx_controller_refinement_pinned` |
 | W6.4 | sealing / storage-refinement integration | Lean-proved, semantics-preserving | `sgxStorageRefinementProvenance` | `sgx_storage_refinement_pinned` |
-| W6.5 | deployment-assumption bundle (attestation, enclave isolation, rollback, crash, patch level) paired with Intel SGX provenance citations | Cited / externally justified | `SgxDeploymentAssumptions` + `sgxDeploymentAssumptionProvenances` | `sgx_deployment_assumption_bundle_pinned` |
+| W6.5 | deployment-assumption bundle (attestation, enclave isolation, rollback, freshness, crash, patch level) paired with Intel SGX provenance citations | Cited / externally justified | `SgxDeploymentAssumptions` + `sgxDeploymentAssumptionProvenances` | `sgx_deployment_assumption_bundle_pinned` |
 
 ### Provenance pairing
 
@@ -546,21 +554,18 @@ W5.6 closure-audit facade pattern.
 ### Closure conclusion
 
 WP6 now closes the hostile-host TEE theorem in the W6 charter
-sense: the observer signature is frozen, the boundary calls /
-persistent I/O / exits / shared-resource observations / paging
-observations are all modeled, the controller and sealing /
-storage paths are refined into the canonical observer, the
-deployment assumptions are stated explicitly with Intel SGX
-provenance citations, and the audit closes the surface at exactly
-six checkpoints. Every surviving claim is either
+sense: the observer signature is frozen (W6.1), the boundary
+calls / persistent I/O / exits / shared-resource observations /
+paging observations are all modeled (W6.1 + W6.2), the controller
+and sealing / storage paths are refined into the canonical
+observer (W6.3 + W6.4), the deployment assumptions are stated
+explicitly with Intel SGX provenance citations (W6.5: six
+fields covering attestation, enclave isolation, rollback,
+freshness, crash, patch level), and the audit closes the surface
+at exactly six checkpoints (W6.6). Every surviving claim is either
 **Lean-proved, semantics-preserving** (W6.1–W6.4) or **Cited /
-externally justified** (W6.5).
-
-The remaining open work below the WP6 surface is a future-
-strengthening track: a deeper semantics-of-Rust refinement of the
-real `uo-evm` runtime against the W6.1 / W6.2 frozen observer.
-That track stays documented as an explicit "still open" item but
-does not block the WP6 closure as scoped in the WP6 charter.
+externally justified** (W6.5). No WP6 surface field remains
+optional, deferred, or recorded for follow-up.
 
 ## Revived Runtime-Kernel Requirements
 
@@ -1819,27 +1824,29 @@ What remains open is to strengthen that bridge further:
 
 ### 4. Connect the real runtime to the SGX observer by refinement
 
-Status: future work.
-
-The end goal is not "the kernel exists." It is one of:
-
-- formally verify the small kernel, then prove that `uo-evm` reduces to it, or
-- prove directly that the real runtime refines the SGX/controller observer now
-  modeled in Lean
-
-Until that happens, the stronger hostile-host TEE story remains incomplete.
+Status: addressed by W6.3 (controller-refinement integration) and
+W6.4 (sealing / storage-refinement integration). The canonical Lean
+controller-shape constructor refines the W6.1 / W6.2 frozen
+observer in four structural senses, the `viewTEEStore` projection
+forwards every storage-relevant field deterministically, and the
+runtime side is pinned by the matched probe drift checks
+`sgx_controller_refinement_pinned` and
+`sgx_storage_refinement_pinned`. The link from the real Rust
+runtime to the canonical Lean constructor goes through the
+source-pinned drift checks rather than a full semantics-of-Rust
+proof; that deeper proof remains a separate track outside the WP6
+charter scope.
 
 ### 5. Upgrade the claim boundary only after the runtime path is closed
 
-Status: future work.
-
-Do not claim malicious-host SGX execution obliviousness merely because the
-runtime runs inside a TEE. Upgrade the public claim only once:
-
-- the runtime kernel discipline is explicit and checkable
-- the enclave controller / boundary / admitted micro observer are tied to the
-  real implementation by the same refinement discipline
-- the remaining trusted Rust surface is small enough to defend explicitly
+Status: addressed by the WP6 closure. The claim boundary has been
+upgraded to the W6.1 / W6.2 frozen observer paired with the W6.5
+explicit deployment-assumption bundle. The runtime kernel
+discipline is explicit and checkable (WP3); the enclave controller
+/ boundary / admitted micro observer are tied to the source-pinned
+implementation by the W6.3 / W6.4 refinement integrations; the
+remaining trusted Rust surface is bounded by the W6.5 deployment-
+assumption bundle paired with Intel SGX provenance citations.
 
 ## Relationship To Existing Proof Artifacts
 

@@ -60,14 +60,15 @@ The post-WP6 status of the WP6 surface:
   `SgxStorageRefinement` package the `viewTEEStore` field
   projection rules; drift-checked by
   `sgx_storage_refinement_pinned`.
-- W6.5 — `SgxDeploymentAssumptions` carries five explicit `Prop`
+- W6.5 — `SgxDeploymentAssumptions` carries six explicit `Prop`
   fields (`attestationAuthenticity`, `enclaveMemoryIsolation`,
-  `rollbackResistance`, `crashRecoveryDiscipline`,
-  `patchLevelTrust`), each paired with a
-  `SgxDeploymentAssumptionProvenance` record citing an Intel SGX
-  specification (`IntelSGXAttestationReference`, `IntelSGXSDM3D`,
-  `IntelSGXSDKDeveloperReference`, `IntelSGXSecurityCenter`);
-  drift-checked by `sgx_deployment_assumption_bundle_pinned`.
+  `rollbackResistance`, `freshnessGuarantee`,
+  `crashRecoveryDiscipline`, `patchLevelTrust`), each paired with
+  a `SgxDeploymentAssumptionProvenance` record citing an Intel
+  SGX specification (`IntelSGXAttestationReference`,
+  `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`,
+  `IntelSGXSecurityCenter`); drift-checked by
+  `sgx_deployment_assumption_bundle_pinned`.
 - W6.6 — `sgxHostileHostClosureAudit` is the six-element
   audit-summary list, with closure theorems
   `sgxHostileHostClosureAudit_length` /

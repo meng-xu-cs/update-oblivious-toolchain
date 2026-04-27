@@ -1746,9 +1746,9 @@ each assumption an explicit Lean-side provenance pairing accessible
 at the Lean type level. -/
 
 /-- Paper-facing W6.5 facade: the deployment-assumption provenance
-list contains exactly five entries — one per bundle field. -/
+list contains exactly six entries — one per bundle field. -/
 theorem proofGrade_sgx_deployment_assumption_provenances_length :
-    sgxDeploymentAssumptionProvenances.length = 5 :=
+    sgxDeploymentAssumptionProvenances.length = 6 :=
   sgxDeploymentAssumptionProvenances_length
 
 /-- Paper-facing W6.5 facade: every entry in the deployment-
@@ -1789,6 +1789,12 @@ theorem proofGrade_sgx_deployment_enclave_memory_isolation_bibKey :
 record's pinned BibTeX key is `IntelSGXSDKDeveloperReference`. -/
 theorem proofGrade_sgx_deployment_rollback_resistance_bibKey :
     sgxDeploymentProvenance_rollbackResistance.primaryBibKey =
+      "IntelSGXSDKDeveloperReference" := by rfl
+
+/-- Paper-facing W6.5 facade: the `freshnessGuarantee` provenance
+record's pinned BibTeX key is `IntelSGXSDKDeveloperReference`. -/
+theorem proofGrade_sgx_deployment_freshness_guarantee_bibKey :
+    sgxDeploymentProvenance_freshnessGuarantee.primaryBibKey =
       "IntelSGXSDKDeveloperReference" := by rfl
 
 /-- Paper-facing W6.5 facade: the `crashRecoveryDiscipline`
