@@ -2862,8 +2862,8 @@ fn explicit_assumption_summary() -> JsonValue {
         },
         {
             "assumption": "TEE deployment assumptions",
-            "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model",
-            "status": "required by the final malicious-host deployment theorem; not yet fully closed in Lean",
+            "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust",
+            "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification (`IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, `IntelSGXSecurityCenter`); the static-drift check `sgx_deployment_assumption_bundle_pinned` pins the bundle's Prop-field shape and the six provenance citations; W6.6 audits these as the six closed checkpoint entries of `sgxHostileHostClosureAudit`",
         }
     ])
 }

@@ -281,13 +281,13 @@ What is still open:
   are now Lean-proved end-to-end at the program level for the full
   admitted post-resolution Sol AST (see below); W4.5 (manifest-
   exactness semantics-preserving lift) and W4.6 (artifact-checker
-  demotion) remain open. `uo-solc` is no longer in the trusted
-  surface for the semantic Sol → IR step; the parser-level
-  syntactic preprocessing (`solang_parser` plus state-name
-  resolution, capacity lookup, `abi.encodePacked` unwrapping,
-  helper-function inlining, `AssignAdd`-style desugaring) remains
-  trusted as the front-end that produces the post-resolution Sol
-  AST consumed by the W4.2 theorem. W4.1 / W4.3 add Lean-side
+  demotion) have also landed end-to-end (see below). `uo-solc` is
+  no longer in the trusted surface for the semantic Sol → IR step;
+  the parser-level syntactic preprocessing (`solang_parser` plus
+  state-name resolution, capacity lookup, `abi.encodePacked`
+  unwrapping, helper-function inlining, `AssignAdd`-style
+  desugaring) remains trusted as the front-end that produces the
+  post-resolution Sol AST consumed by the W4.2 theorem. W4.1 / W4.3 add Lean-side
   operational and structural-classifier surfaces the WP4 lowering
   theorems refine against.
   Rust / Lean classifier agreement is a source-freeze obligation,
@@ -435,12 +435,19 @@ What is still open:
   proved end-to-end on the happy path: source → IR → kernel
   runtime → static kernel-program schedule → manifest
   `kernel_steps` field.
-- WP5 (concrete backend assumptions): full discharge of the concrete
-  `PathOramLocalPosmapV1SecurityAssumptions` bundle
+- WP5 (concrete backend assumptions): closed at the Cited /
+  externally justified level. WP5 charter tasks 3-6 pair each
+  `PathOramLocalPosmapV1SecurityAssumptions` field
   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,
-  `stashOverflowBounded`).
-- WP6 (hostile-host TEE theorem): the final malicious-host SGX / TEE
-  deployment theorem for the real runtime.
+  `stashOverflowBounded`) with a provenance record and a probe
+  static-drift check. A deeper Lean-side discharge would be a
+  future-strengthening step beyond the published charter.
+- WP6 (hostile-host TEE theorem): closed at the six-checkpoint level via
+  the W6.1–W6.4 Lean-proved freeze / refinement layer plus the W6.5
+  Cited / externally justified `SgxDeploymentAssumptions` bundle plus
+  the W6.6 closure audit. The remaining future-strengthening step (not
+  a WP6 blocker) is a deeper semantics-of-Rust refinement of the real
+  `uo-evm` runtime against the W6.1 / W6.2 frozen observer.
 - Future strengthening below WP3 (not a WP3 blocker, retained as the next
   scientific step): a deeper semantics-of-Rust refinement below the now
   source-pinned/public-only handwritten runtime shell cuts, the
