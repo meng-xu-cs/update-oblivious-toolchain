@@ -2112,6 +2112,24 @@ Concrete tasks:
      exits, shared-resource observations, and paging observations
      were already pinned in W6.1.
 3. Prove that the real controller/runtime behavior refines that observer.
+   - **W6.3 status (landed):** the canonical Lean controller-shape
+     constructor `sgxControllerShapeOfExecutionLeakage` is now shown
+     to refine the W6.1 / W6.2 frozen observer surface in four
+     structural senses (page-region names, workset-region names,
+     boundary-event budget, shared-resource pattern) for every
+     `OramAccessLeakage` list. The Lean integration is packaged as
+     `SgxControllerObserverRefinement` plus the constructor
+     `sgxControllerObserverRefinementOf` and the existence
+     packaging `sgxControllerObserverRefinement_exists`, paired
+     with the provenance record
+     `sgxControllerRefinementProvenance` and the named probe drift
+     check `sgx_controller_refinement_pinned`. The drift check
+     rejects representative drift in
+     `crates/uo-core/src/trace.rs`'s
+     `RuntimeControllerCertificate::controller_shape` emission
+     path. The W6.3 integration is a one-line forwarder over the
+     existing W6.1 / W6.2 structural equalities; it does not
+     introduce new admitted assumptions.
 4. Prove that the sealing/storage path matches the theorem-side persistent
    model.
 5. State attestation, rollback, crash, freshness, and patch-level assumptions

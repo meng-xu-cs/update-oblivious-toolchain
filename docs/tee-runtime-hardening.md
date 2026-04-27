@@ -273,6 +273,78 @@ If any of those drift, the static-checks gate flips
 `sgx_persistent_io_model_pinned` to `false` and the gate rejects
 the checkpoint.
 
+## W6.3 Controller-Refinement Integration
+
+W6.3 packages the W6.1 / W6.2 freezes as a single Lean integration
+theorem: every leakage list induces a canonical Lean controller
+shape that refines the W6.1 / W6.2 frozen observer surface in four
+structural senses.
+
+The Lean side extends `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+with the `SgxControllerObserverRefinement` integration record, the
+`sgxControllerObserverRefinementOf` constructor, and the
+`sgxControllerObserverRefinement_exists` packaging theorem. The
+runtime side is pinned by the probe's
+`sgx_controller_refinement_pinned` static-drift check.
+
+Claim taxonomy: **Lean-proved, semantics-preserving** for the W6.3
+controller-refinement integration. The Lean integration is a
+one-line forwarder over the existing W6.1 / W6.2 structural
+equalities (`controllerPageTraceRegionsOfLeakage_pageKinds`,
+`controllerWorksetRegionsOfLeakage_pageKinds`,
+`sgxObserverBoundaryEventBudget_eq_controllerShape`,
+`controllerSharedResourcePatternOfShape_value`); the static-drift
+check rejects representative runtime drift in the Rust controller
+emission path. The integration does not by itself discharge any
+deployment assumption; it composes the W6.1 / W6.2 component
+freezes into one named refinement statement.
+
+### Frozen controller-refinement components
+
+| Component | Refinement claim | Lean anchor | Rust anchor |
+| --- | --- | --- | --- |
+| Page-region names | `(controllerPageTraceRegionsOfLeakage leakage).map pageKind = sgxObserverPageRegionNames` | `SgxControllerObserverRefinement.pageRegionNamesMatch`; constructor uses `controllerPageTraceRegionsOfLeakage_pageKinds` | `RuntimeControllerCertificate::controller_shape` page-region builder in `crates/uo-core/src/trace.rs`, building each region with `page_kind: METADATA_REGION.into()` etc. |
+| Workset-region names | `(controllerWorksetRegionsOfLeakage leakage).map pageKind = sgxObserverPageRegionNames` | `SgxControllerObserverRefinement.worksetRegionNamesMatch`; constructor uses `controllerWorksetRegionsOfLeakage_pageKinds` | `RuntimeControllerCertificate::controller_shape` workset-region builder in `crates/uo-core/src/trace.rs` |
+| Boundary-event budget | `sgxObserverBoundaryEventBudget (totalOramAccesses leakage) = (sgxControllerShapeOfExecutionLeakage leakage).boundaryEventBudget` | `SgxControllerObserverRefinement.boundaryEventBudgetMatch`; constructor uses `sgxObserverBoundaryEventBudget_eq_controllerShape` | `boundary_event_budget: 2 * total_oram_accesses + 2,` field in the Rust `controller_shape()` constructor |
+| Shared-resource pattern | `controllerSharedResourcePatternOfShape shape = List.replicate shape.sharedResourceBudget sgxObserverSharedResourceTick` | `SgxControllerObserverRefinement.sharedResourcePatternMatch`; constructor uses `controllerSharedResourcePatternOfShape_value` | `vec!["shared_resource_tick".into(); self.shared_resource_budget].into_boxed_slice();` line in `SgxControllerShapeTrace::normalized_micro_trace` |
+
+### Provenance pairing
+
+The W6.3 controller-refinement provenance record is
+`sgxControllerRefinementProvenance` in `SgxObserverFreeze.lean`. It
+carries the free-form refinement claim, the documentation anchor
+(this section), the probe static-drift check name, and the Lean /
+Rust file paths anchoring the controller-shape constructor.
+
+The paper-facing facades exposed in
+[`ProofGrade.lean`](../proof/lean/UOToolchain/ProofGrade.lean) under
+the `proofGrade_sgx_controller_observer_refinement_*` and
+`proofGrade_sgx_controller_refinement_provenance_*` prefixes mirror
+the W6.1 / W6.2 facade pattern.
+
+### Static-drift coverage
+
+The probe's `sgx_controller_refinement_pinned` flag, emitted by the
+`kernel_model_alignment_validation.json` report, rejects
+representative drift on the Rust side. Specifically it requires:
+
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `controller_phase_order = vec![ControllerPhase::EnclaveEnter]` /
+  `ControllerPhase::StageRequest` / `DescendPositionMap` /
+  `LoadMetadata` / `FetchPath` / `ScanStash` / `RewritePath` /
+  `AscendPositionMap` / `SealPersistentState` / `EnclaveExit`
+  emission path inside `RuntimeControllerCertificate::controller_shape`.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `page_kind: METADATA_REGION.into()` /
+  `page_kind: POSITION_MAP_REGION.into()` / `PATH_REGION` /
+  `STASH_REGION` page-region builder pattern with the canonical
+  `metadata_budget` / `position_map_budget` / `metadata_workset` /
+  `position_map_workset` derived counters.
+
+If any of those drift, the static-checks gate flips
+`sgx_controller_refinement_pinned` to `false` and the gate rejects
+the checkpoint.
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:

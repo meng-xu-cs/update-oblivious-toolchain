@@ -1610,4 +1610,63 @@ theorem proofGrade_sgx_persistent_io_provenance_write_class_names :
       sgxObserverWriteClassNames :=
   sgxPersistentIoProvenance_writeClassNames
 
+/-! ### WP6.3 Controller-Refinement Integration Facades
+
+The facades below expose the W6.3 controller-refinement
+integration: every leakage list induces a canonical Lean
+controller-shape that refines the W6.1 / W6.2 frozen observer
+surface in four structural senses (page-region names,
+workset-region names, boundary-event budget, and shared-resource
+pattern).
+
+Claim taxonomy: these facades are **Lean-proved,
+semantics-preserving**. The Lean integration is a one-line
+forwarder over the existing W6.1 / W6.2 structural equalities; the
+runtime side is pinned by the probe's
+`sgx_controller_refinement_pinned` static-drift check, which
+rejects representative drift in the Rust controller-shape and
+boundary-schedule construction logic. -/
+
+/-- Paper-facing W6.3 facade: every leakage list admits a controller-
+observer refinement witness. The witness packages the four canonical
+structural equalities pinning the controller's page-region names,
+workset-region names, boundary-event budget, and shared-resource
+pattern against the W6.1 / W6.2 frozen observer surface. -/
+theorem proofGrade_sgx_controller_observer_refinement_exists
+    (leakage : List OramAccessLeakage) :
+    Nonempty SgxControllerObserverRefinement :=
+  sgxControllerObserverRefinement_exists leakage
+
+/-- Paper-facing W6.3 facade: the canonical controller-refinement
+constructor produces a witness whose page-region names match the
+canonical observer page-region list. -/
+theorem proofGrade_sgx_controller_observer_refinement_page_region_names_match
+    (leakage : List OramAccessLeakage) :
+    (sgxControllerObserverRefinementOf leakage).pageRegionNamesMatch =
+      controllerPageTraceRegionsOfLeakage_pageKinds leakage := by rfl
+
+/-- Paper-facing W6.3 facade: the canonical controller-refinement
+constructor produces a witness whose workset-region names match the
+canonical observer page-region list. -/
+theorem proofGrade_sgx_controller_observer_refinement_workset_region_names_match
+    (leakage : List OramAccessLeakage) :
+    (sgxControllerObserverRefinementOf leakage).worksetRegionNamesMatch =
+      controllerWorksetRegionsOfLeakage_pageKinds leakage := by rfl
+
+/-- Paper-facing W6.3 facade: the canonical controller-refinement
+constructor produces a witness whose boundary-event budget matches
+the canonical observer formula. -/
+theorem proofGrade_sgx_controller_observer_refinement_boundary_event_budget_match
+    (leakage : List OramAccessLeakage) :
+    (sgxControllerObserverRefinementOf leakage).boundaryEventBudgetMatch =
+      sgxObserverBoundaryEventBudget_eq_controllerShape leakage := by rfl
+
+/-- Paper-facing W6.3 facade: the controller-refinement provenance
+record references the `sgx_controller_refinement_pinned` probe
+static-drift check. -/
+theorem proofGrade_sgx_controller_refinement_provenance_static_drift_check :
+    sgxControllerRefinementProvenance.staticDriftCheckName =
+      "sgx_controller_refinement_pinned" :=
+  sgxControllerRefinementProvenance_staticDriftCheckName
+
 end UOToolchain

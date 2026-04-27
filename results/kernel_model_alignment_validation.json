@@ -1991,6 +1991,7 @@
   "seeded_runtime_paper_main_family_bundle_field_names_match": true,
   "seeded_runtime_paper_main_slot_family_bundle_field_names_match": true,
   "sgx_boundary_call_model_pinned": true,
+  "sgx_controller_refinement_pinned": true,
   "sgx_observer_surface_pinned": true,
   "sgx_persistent_io_model_pinned": true,
   "shell_boundary_bundle_refinement_guard_present": true,

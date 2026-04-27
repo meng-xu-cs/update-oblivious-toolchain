@@ -660,4 +660,124 @@ theorem sgxPersistentIoProvenance_staticDriftCheckName :
     sgxPersistentIoProvenance.staticDriftCheckName =
       "sgx_persistent_io_model_pinned" := by rfl
 
+/-! ### W6.3: Controller refinement against the frozen observer
+
+W6.3 packages the W6.1 / W6.2 freezes as a single integration
+theorem: the canonical Lean controller-shape constructor
+`sgxControllerShapeOfExecutionLeakage` refines the W6.1 / W6.2
+frozen observer surface for every leakage input. Concretely, for
+any list of `OramAccessLeakage` records:
+
+- the controller's page-region names equal `sgxObserverPageRegionNames`;
+- the controller's workset-region names equal `sgxObserverPageRegionNames`;
+- the controller's boundary-event budget equals
+  `sgxObserverBoundaryEventBudget (totalOramAccesses leakage)`;
+- the controller's shared-resource pattern is the canonical
+  `List.replicate budget sgxObserverSharedResourceTick`.
+
+The runtime side is pinned by the probe's
+`sgx_controller_refinement_pinned` static-drift check, which
+rejects representative drift in the Rust controller-shape and
+boundary-schedule construction logic.
+
+Claim taxonomy: this integration theorem is **Lean-proved,
+semantics-preserving**. Each component refinement is a one-line
+forwarder over an existing W6.1 / W6.2 structural equality; the
+integration theorem shows the W6.1 / W6.2 freezes are coherent and
+together pin the controller refinement at the public observer
+surface. -/
+
+/-- W6.3 controller-refinement integration record. Given a leakage
+list, this record packages the four canonical structural equalities
+that show the Lean controller shape refines the W6.1 / W6.2 frozen
+observer surface. -/
+structure SgxControllerObserverRefinement where
+  /-- The leakage list under refinement. -/
+  leakage : List OramAccessLeakage
+  /-- The page-region names match the canonical observer set. -/
+  pageRegionNamesMatch :
+    (controllerPageTraceRegionsOfLeakage leakage).map
+        (fun region => region.pageKind) = sgxObserverPageRegionNames
+  /-- The workset-region names match the canonical observer set. -/
+  worksetRegionNamesMatch :
+    (controllerWorksetRegionsOfLeakage leakage).map
+        (fun region => region.pageKind) = sgxObserverPageRegionNames
+  /-- The boundary-event budget matches the canonical formula. -/
+  boundaryEventBudgetMatch :
+    sgxObserverBoundaryEventBudget (totalOramAccesses leakage) =
+      (sgxControllerShapeOfExecutionLeakage leakage).boundaryEventBudget
+  /-- The shared-resource pattern matches the canonical literal
+  replicated to the public budget. -/
+  sharedResourcePatternMatch :
+    controllerSharedResourcePatternOfShape
+        (sgxControllerShapeOfExecutionLeakage leakage) =
+      List.replicate
+        (sgxControllerShapeOfExecutionLeakage leakage).sharedResourceBudget
+        sgxObserverSharedResourceTick
+
+/-- W6.3 controller-refinement constructor: every leakage list
+admits a controller-observer refinement witness. The four structural
+equalities are direct consequences of the W6.1 / W6.2 freezes. -/
+def sgxControllerObserverRefinementOf
+    (leakage : List OramAccessLeakage) :
+    SgxControllerObserverRefinement :=
+  { leakage := leakage
+  , pageRegionNamesMatch :=
+      controllerPageTraceRegionsOfLeakage_pageKinds leakage
+  , worksetRegionNamesMatch :=
+      controllerWorksetRegionsOfLeakage_pageKinds leakage
+  , boundaryEventBudgetMatch :=
+      sgxObserverBoundaryEventBudget_eq_controllerShape leakage
+  , sharedResourcePatternMatch :=
+      controllerSharedResourcePatternOfShape_value
+        (sgxControllerShapeOfExecutionLeakage leakage)
+  }
+
+/-- W6.3 theorem packaging: every leakage list refines the W6.1 /
+W6.2 frozen observer in all four structural senses. -/
+theorem sgxControllerObserverRefinement_exists
+    (leakage : List OramAccessLeakage) :
+    Nonempty SgxControllerObserverRefinement :=
+  ⟨sgxControllerObserverRefinementOf leakage⟩
+
+/-! ### W6.3 controller-refinement provenance record -/
+
+/-- W6.3 frozen controller-refinement provenance record. Pairs the
+controller-refinement integration theorem with the structural
+metadata so the paper claim, the Lean formalization, and the Rust
+runtime all reference one canonical refinement statement. -/
+structure SgxControllerRefinementProvenance where
+  /-- Free-form description of the refinement integration. -/
+  refinementClaim : String
+  /-- Documentation anchor for the WP6 hardening track. -/
+  observerDocSection : String
+  /-- Probe static-drift check that pins the Rust runtime's
+  controller refinement. -/
+  staticDriftCheckName : String
+  /-- File path anchoring the Lean controller-shape constructor. -/
+  leanControllerModule : String
+  /-- File path anchoring the Rust public-trace projection. -/
+  rustTraceModule : String
+  /-- File path anchoring the Rust runtime controller recorder. -/
+  rustControllerModule : String
+deriving Repr, DecidableEq
+
+/-- The actual W6.3 controller-refinement provenance record. -/
+def sgxControllerRefinementProvenance : SgxControllerRefinementProvenance :=
+  { refinementClaim :=
+      "for every OramAccessLeakage list, the canonical Lean controller-shape constructor refines the W6.1 / W6.2 frozen observer surface in page-region names, workset-region names, boundary-event budget, and shared-resource pattern"
+  , observerDocSection :=
+      "docs/tee-runtime-hardening.md \"W6.3 Controller-Refinement Integration\""
+  , staticDriftCheckName := "sgx_controller_refinement_pinned"
+  , leanControllerModule := "proof/lean/UOToolchain/SgxController.lean"
+  , rustTraceModule := "crates/uo-core/src/trace.rs"
+  , rustControllerModule := "runtime/uo-evm/src/controller.rs"
+  }
+
+/-- The provenance record references the
+`sgx_controller_refinement_pinned` probe static-drift check. -/
+theorem sgxControllerRefinementProvenance_staticDriftCheckName :
+    sgxControllerRefinementProvenance.staticDriftCheckName =
+      "sgx_controller_refinement_pinned" := by rfl
+
 end UOToolchain

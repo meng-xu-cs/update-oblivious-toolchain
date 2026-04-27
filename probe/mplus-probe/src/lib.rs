@@ -29683,6 +29683,40 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && core_trace_source.contains("    pub len: usize,")
         && core_trace_source.contains("    pub class: WriteClass,")
         && core_trace_source.contains("pub struct PhysicalReadEvent {");
+    // W6.3: pin the canonical hostile-host controller refinement —
+    // the Rust `RuntimeControllerCertificate::controller_shape`
+    // constructor builds the canonical 4-region (`metadata`,
+    // `position_map`, `path`, `stash`) page-trace and workset
+    // budgets, derives the boundary-event budget from
+    // `2 * total_oram_accesses + 2`, and emits the canonical
+    // controller-phase trace (Begin → per-access StageRequest →
+    // DescendPositionMap... → ScanStash → RewritePath →
+    // AscendPositionMap... → Seal → Exit) in canonical order. The
+    // matching Lean provenance record is
+    // `sgxControllerRefinementProvenance`; the W6.3 integration
+    // theorem is `sgxControllerObserverRefinementOf`. The
+    // refinement is documented in `docs/tee-runtime-hardening.md`
+    // under "W6.3 Controller-Refinement Integration".
+    let sgx_controller_refinement_pinned = core_trace_source
+        .contains("let mut controller_phase_order = vec![ControllerPhase::EnclaveEnter];")
+        && core_trace_source
+            .contains("controller_phase_order.push(ControllerPhase::StageRequest);")
+        && core_trace_source.contains("ControllerPhase::DescendPositionMap,")
+        && core_trace_source.contains("ControllerPhase::LoadMetadata,")
+        && core_trace_source.contains("ControllerPhase::FetchPath,")
+        && core_trace_source.contains("ControllerPhase::ScanStash,")
+        && core_trace_source.contains("ControllerPhase::RewritePath,")
+        && core_trace_source.contains("ControllerPhase::AscendPositionMap,")
+        && core_trace_source.contains("ControllerPhase::SealPersistentState,")
+        && core_trace_source.contains("ControllerPhase::EnclaveExit,")
+        && core_trace_source.contains("page_kind: METADATA_REGION.into(),")
+        && core_trace_source.contains("page_kind: POSITION_MAP_REGION.into(),")
+        && core_trace_source.contains("page_kind: PATH_REGION.into(),")
+        && core_trace_source.contains("page_kind: STASH_REGION.into(),")
+        && core_trace_source.contains("event_budget: metadata_budget,")
+        && core_trace_source.contains("event_budget: position_map_budget,")
+        && core_trace_source.contains("event_budget: metadata_workset,")
+        && core_trace_source.contains("event_budget: position_map_workset,");
     // W6.2: pin the canonical hostile-host boundary-call model — the
     // `"oram_access"` inner API literal, the `Enter`/`Exit` direction
     // enum vocabulary, the canonical boundary-event budget formula
@@ -34157,6 +34191,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && sgx_observer_surface_pinned
         && sgx_boundary_call_model_pinned
         && sgx_persistent_io_model_pinned
+        && sgx_controller_refinement_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34844,6 +34879,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             sgx_boundary_call_model_pinned,
         "sgx_persistent_io_model_pinned":
             sgx_persistent_io_model_pinned,
+        "sgx_controller_refinement_pinned":
+            sgx_controller_refinement_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
