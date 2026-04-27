@@ -406,6 +406,8 @@ cargo fmt --all
 cd proof/lean
 lake build UOToolchain.IRSyntax \
   UOToolchain.IRSemantics \
+  UOToolchain.Sol \
+  UOToolchain.KernelDsl \
   UOToolchain.CompilerInvariant \
   UOToolchain.CompilerExactness \
   UOToolchain.ConfidentialFragment \
@@ -575,12 +577,24 @@ should be its own commit:
   preservation theorems plus the corresponding paper-facing
   facades (commit `9f0fd7b`). **WP4 charter task 4 (IR-to-kernel
   correctness) is now closed end-to-end at the program level.**
+- *(landed)* W4.2 — Sol AST mirror, evaluator, AST → IR lowering,
+  and per-Expr / per-Statement / Body / Function preservation
+  theorems plus the corresponding paper-facing facades (commit
+  `1ec7da6`,
+  [proof/lean/UOToolchain/Sol.lean](../proof/lean/UOToolchain/Sol.lean)).
+  **WP4 charter task 2 (source-to-IR correctness) is now closed
+  end-to-end at the program level for the structural fragment of
+  the admitted Solidity subset.** Combined with the W4.4 program-
+  level theorem, this completes the source-to-kernel correctness
+  chain at the structural fragment.
 - *(next)* WP4 charter task 5 (manifest-exactness semantics-
-  preserving lift, W4.5), or charter task 2 (source-to-IR
-  correctness, W4.2), or charter task 6 (artifact-checker
-  demotion, W4.6). The W4.4 reverse iff direction (lowering
-  succeeds → precondition holds) is also a useful but optional
-  W4.6 building block.
+  preserving lift, W4.5), or charter task 6 (artifact-checker
+  demotion, W4.6), or the context-dependent extensions of the
+  W4.2 source surface (state-variable accesses, `MemberAccess
+  ".length"`, `abi.encodePacked` keccak wrapping, helper
+  inlining). The W4.4 reverse iff direction (lowering succeeds →
+  precondition holds) is also a useful but optional W4.6
+  building block.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

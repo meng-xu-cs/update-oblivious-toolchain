@@ -20,11 +20,22 @@ a TEE under a hostile-host adversary (M+ model).
 
 You are now picking up **Work Package 4: Prove Source-To-Kernel
 Compiler Correctness**. Work Packages 0–3 are closed. WP4 charter
-tasks **1, 3, and 4 are now Lean-proved**:
+tasks **1, 2, 3, and 4 are now Lean-proved**:
 
 - W4.1 / W4.1b / W4.1+ / W4.1++ / W4.1+++: real operational
   evaluator over the structured admitted IR, total over the W4.3
   fragment, with masked-store updates.
+- W4.2 (Sol AST mirror + evaluator + AST → IR lowering + per-Expr
+  / per-Statement / Body / Function preservation theorems +
+  paper-facing facade): the `proofGrade_sol_to_ir_program_
+  preservation` theorem certifies that for every Sol function
+  `fn` and IR `OperationalConfig` whose entrypoint resolves to
+  `lowerFunction fn`, the Sol-side `evalFunction` and the IR-side
+  `evalContract` produce identical outcomes. Closed for the
+  structural fragment of the admitted Solidity subset; the
+  context-dependent extensions (state-variable accesses,
+  `MemberAccess ".length"`, `abi.encodePacked` keccak wrapping,
+  helper inlining) are deferred.
 - W4.3 (full theorem + paper facade):
   `(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
   fn.fragmentValid = true`.
@@ -37,11 +48,14 @@ tasks **1, 3, and 4 are now Lean-proved**:
   `evalKernelProgram` (on `lowerCompiledFunction fn`) produce
   identical outcomes.
 
-WP4 charter tasks **2** (source-to-IR correctness), **5**
-(manifest-exactness semantics-preserving lift), and **6** (direct
-artifact-checker demotion) remain open. The W4.4 reverse iff
-direction (lowering succeeds → precondition holds) is also still
-deferred (useful for W4.6 but not required by W4.4).
+Combined, W4.2 + W4.4 yield the source-to-kernel correctness chain
+at the structural fragment.
+
+WP4 charter tasks **5** (manifest-exactness semantics-preserving
+lift) and **6** (direct artifact-checker demotion) remain open;
+the W4.2 context-dependent extensions and the W4.4 reverse iff
+direction (lowering succeeds → precondition holds) are also still
+deferred (the latter useful for W4.6 but not required by W4.4).
 
 ## First, Read These Files In This Exact Order
 
@@ -65,6 +79,9 @@ deferred (useful for W4.6 but not required by W4.4).
 Then read the WP4-relevant Lean and Rust files listed in the runbook.
 Pay special attention to:
 
+- `proof/lean/UOToolchain/Sol.lean` — the typed Sol AST mirror,
+  evaluator, AST → IR lowering, and the W4.2 preservation
+  theorems for the structural fragment.
 - `proof/lean/UOToolchain/IRSyntax.lean` — the structured IR mirror
   of `crates/uo-core/src/{ir,types}.rs` that landed in W4.1.
 - `proof/lean/UOToolchain/IRSemantics.lean` — the new operational
@@ -127,6 +144,8 @@ land in:
 
 - `proof/lean/UOToolchain/IRSyntax.lean`
 - `proof/lean/UOToolchain/IRSemantics.lean`
+- `proof/lean/UOToolchain/Sol.lean`
+- `proof/lean/UOToolchain/KernelDsl.lean`
 - `proof/lean/UOToolchain/CompilerInvariant.lean`
 - `proof/lean/UOToolchain/ConfidentialFragment.lean`
 - `proof/lean/UOToolchain/CompilerExactness.lean`
@@ -146,17 +165,10 @@ layer (`secret_args`, `param_names`, manifest boundary lengths,
 `max_commit_ops`, etc.) to semantics-preserving statements: each
 manifest field is the exact semantic projection of the source
 program under the IR / kernel evaluator. This builds directly on
-the W4.4 preservation theorem and the W4.1 evaluator's
-deterministic outcome.
+the W4.2 source-to-IR theorem, the W4.4 IR-to-kernel preservation
+theorem, and the W4.1 evaluator's deterministic outcome.
 
-**Option (b) — W4.2 source-to-IR correctness.**
-Mirror `solang_parser::pt::Statement` / `pt::Expression` for the
-admitted Solidity subset in Lean; prove that `uo-solc::lower_block`
-faithfully translates from that AST to `IR.Statement`. Larger
-scope than W4.5 because the parser AST surface is wider than the
-IR.
-
-**Option (c) — W4.6 direct artifact-checker demotion.**
+**Option (b) — W4.6 direct artifact-checker demotion.**
 Demote the existing `checkProofGradeTranslationArtifacts` Lean
 checker from "main trust argument" to "executable proof witness for
 the proven compiler story." The checker doesn't need to disappear
@@ -165,24 +177,28 @@ This requires the reverse direction of the W4.4 lowering iff
 (`lowerExpr e = .ok ke → Expr.fragmentValid e = true`) plus a doc
 update to the WP4 trust narrative.
 
-Recommend option (a) — W4.5 — because the W4.4 preservation
-theorem is the natural foundation for it, and W4.5 closes the
-last remaining "compiler-side" charter task. W4.2 is the largest
-remaining piece and benefits from being tackled with fresh
-context. W4.6 is small but is mostly a doc / role-swap task.
+**Option (c) — W4.2 context-dependent extensions.** Extend
+`proof/lean/UOToolchain/Sol.lean` to cover the constructors
+deferred in the structural fragment: `ArraySubscript base index`
+→ `IR.ArrayGet` / `MapGet` / `ArrayIndex` based on the state-
+object table; `MemberAccess base ".length"` → `IR.Literal length`
+when `base` is a state with declared capacity; `Assign lhs rhs`
+where `lhs` is a state variable → `IR.CellSet` / `ArraySet` /
+`MapPut`; `FunctionCall keccak256 (abi.encodePacked args)` →
+`IR.Keccak256 args`; helper-function inlining via
+`ctx.frontend.helpers`. Each constructor needs lowering plus a
+preservation theorem in the same B-2 style.
 
-If you would prefer to drive **W4.2** (source-to-IR correctness)
-instead, see the runbook's "Recommended Starting Subtask" section
-for the AST-pull-back framing. W4.2 is roughly 2-3× the effort of
-W4.4 because it requires a partial Lean Solidity parser AST
-mirror.
+Recommend option (a) — W4.5 — because both W4.2 and W4.4
+preservation theorems are the natural foundation for it, and W4.5
+closes the last remaining "compiler-side" charter task. Option (b)
+is small but mostly a doc / role-swap task. Option (c) extends the
+W4.2 surface and is independent of the rest of WP4.
 
-After W4.4 lands, the natural sequence is:
+After W4.5 lands, the natural sequence is:
 
-- W4.2 — source-to-IR correctness theorem (deliverable 1).
-- W4.5 — manifest-exactness lift (from exactness/export to
-  semantics-preserving, per field).
 - W4.6 — demote the direct artifact checker (charter task 6).
+- W4.2 context-dependent extensions — the deferred Sol surface.
 
 ## Validation Slice (Standard WP4 Variant)
 
@@ -192,6 +208,8 @@ cargo fmt --all
 cd proof/lean
 lake build UOToolchain.IRSyntax \
   UOToolchain.IRSemantics \
+  UOToolchain.Sol \
+  UOToolchain.KernelDsl \
   UOToolchain.CompilerInvariant \
   UOToolchain.CompilerExactness \
   UOToolchain.ConfidentialFragment \
@@ -280,6 +298,7 @@ for the content requirements.
 
 Begin with the runbook. The recommended next subtask is W4.5
 (manifest-exactness semantics-preserving lift). Alternative
-options are W4.2 (source-to-IR correctness, larger scope) and
-W4.6 (artifact-checker demotion, smaller scope but mostly a
-role-swap).
+options are W4.6 (artifact-checker demotion, smaller scope but
+mostly a role-swap) and the W4.2 context-dependent extensions
+(state-variable accesses, `MemberAccess ".length"`,
+`abi.encodePacked` keccak wrapping, helper inlining).

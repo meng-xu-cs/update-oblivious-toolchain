@@ -1728,12 +1728,40 @@ Current status update:
   W4.1 evaluator is now total over the structural admitted fragment;
   the only `unsupported` constructors are `Expr.{structField,
   arrayIndex}`, which `Expr.fragmentValid` already rejects.
-- Still open: the *real* source-to-IR correctness theorem (W4.2),
-  the manifest-exactness semantics-preserving lift (W4.5), and the
-  direct artifact checker demotion (W4.6). The reverse direction
-  of the W4.4 lowering iff (lowering succeeds → precondition
-  holds) is also deferred; it is useful for W4.6 but not strictly
-  required by the preservation theorem.
+- **Charter task 2 (source-to-IR correctness) closed for the
+  structural fragment of the admitted Solidity subset** (commit
+  `1ec7da6`,
+  [proof/lean/UOToolchain/Sol.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/Sol.lean)):
+  a typed Lean mirror of `solang_parser::pt::Statement` /
+  `pt::Expression` covers literals, variables, unary / binary /
+  conditional / `keccak256` expressions, declare / assign-to-local /
+  require / if / for / return statements, and an entrypoint
+  `Function`. An operational semantics
+  (`Sol.evalExpr` / `evalStatement` / `evalBody` / `evalForLoop` /
+  `evalFunction`) defined with `def` + `termination_by` reduces by
+  `rfl` / `unfold + rw`, mirroring the W4.4 evaluator style. The
+  AST → IR lowering (`lowerExpr` / `lowerStatement` /
+  `lowerStatementList` / `lowerFunction`) follows the structural
+  cases of `compiler/uo-solc/src/lib.rs` constructor-for-constructor.
+  The per-Expr / per-Statement / Body / Function preservation
+  theorems are Lean-proved end-to-end in the Session B-2 style;
+  the Function-level theorem is conditional on the IR config's
+  entrypoint resolving to the lowered function (the same
+  precondition shape as the W4.4 program-level theorem). Paper-
+  facing facades `proofGrade_sol_to_ir_{expr,statement,body,
+  program}_preservation` re-export through `ProofGrade.lean`.
+  Combined with `proofGrade_ir_to_kernel_program_preservation`,
+  this completes the source-to-kernel correctness chain at the
+  structural fragment, leaving only the context-dependent lowering
+  cases (state-variable accesses, `MemberAccess ".length"`,
+  `abi.encodePacked` keccak wrapping, helper inlining) as a
+  follow-up extension.
+- Still open: the manifest-exactness semantics-preserving lift
+  (W4.5), the direct artifact checker demotion (W4.6), the
+  context-dependent extensions of the W4.2 source surface, and
+  the reverse direction of the W4.4 lowering iff (lowering
+  succeeds → precondition holds; useful for W4.6 but not strictly
+  required by the preservation theorem).
 
 Exit gate:
 
