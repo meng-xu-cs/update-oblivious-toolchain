@@ -695,4 +695,34 @@ theorem proofGrade_sol_to_ir_program_preservation
     Sol.evalFunction fn cfg = IR.evalContract cfg :=
   Sol.lowerFunction_preserves_semantics fn cfg hEntry
 
+/-! ## W4.5: Source-to-kernel runtime preservation (paper facade)
+
+`proofGrade_sol_to_kernel_outcome_preservation` composes the W4.2
+Sol-to-IR program preservation theorem with the W4.4 IR-to-kernel
+program preservation theorem to produce a single source-to-kernel
+runtime preservation handle: for every Sol function `fn` whose
+lowering to a kernel program `kp` succeeds (`lowerCompiledFunction
+(lowerFunction fn) = .ok kp`) and every IR `OperationalConfig`
+whose entrypoint resolves to the lowered function, the Sol-side
+`evalFunction` and the kernel-side `evalKernelProgram` produce
+identical outcomes.
+
+This is the **W4.5 enabling theorem**: every manifest field that is
+a function of the runtime outcome (`kernelSteps`, `publicResult`,
+`oramAccessCounts`, `status`) can now be talked about *equivalently*
+on the source side, the IR side, and the kernel side. The W4.5
+manifest-exactness lift then proceeds by relating each manifest
+field to the appropriate projection of this shared outcome.
+-/
+
+theorem proofGrade_sol_to_kernel_outcome_preservation
+    (fn : Sol.Function) (kp : IR.KernelProgram)
+    (cfg : IR.OperationalConfig)
+    (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
+    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn)) :
+    Sol.evalFunction fn cfg = IR.evalKernelProgram kp cfg := by
+  rw [Sol.lowerFunction_preserves_semantics fn cfg hEntry]
+  exact IR.lowerCompiledFunction_preserves_semantics cfg
+    (Sol.lowerFunction fn) kp hLow hEntry
+
 end UOToolchain
