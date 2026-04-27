@@ -910,6 +910,39 @@ theorem kernelLowerable_implies_lowerCompiledFunction_ok
   rw [hks]
   rfl
 
+/-! ### W4.4 Session B-2: semantics-preservation (per-Expr, partial)
+
+The W4.4 charter task 4 ultimately requires proving that the kernel
+DSL's evaluator agrees with the IR evaluator on the lowered program:
+`lowerExpr e = .ok ke → evalExpr cfg env e = evalKernelExpr cfg env ke`,
+and similarly for pure expressions, statements, statement lists, and
+compiled functions.
+
+The IR evaluator (`evalExpr` in `IRSemantics.lean`) and the kernel
+DSL evaluator (`evalKernelExpr` here) are constructor-for-constructor
+mirror images on the supported subset, so the preservation theorem is
+true by structural induction. The proof is mechanical mutual recursion
+on the lowering structure. Each case unfolds both the lowering and
+the corresponding evaluator branches, then uses the induction
+hypothesis to align the recursive calls.
+
+Two equivalences worth checking when porting these proofs:
+
+- `evalExpr.cellGet` inlines the public-then-secret store lookup,
+  while `evalKernelExpr.cellGet` calls `OperationalConfig.readObject`
+  which performs the same lookup. They agree definitionally.
+- The `Value.keccak256Mock` placeholder is shared, so both evaluators
+  produce the same hash digest from the same evaluated parts list.
+
+Landing the full preservation proof needs the same tactic-mechanics
+care as the W4.4 Session B-1 forward iffs (`unfold + simp + rfl`,
+careful avoidance of variable shadowing in `do`-bindings, mutual
+blocks for nested-inductive recursion). It is left for a follow-up
+commit; the iff infrastructure landed in B-1 already exposes the
+matching `∃ ke, lowerXxx _ = .ok ke` shape that the preservation
+theorem will build on.
+-/
+
 mutual
 
 /-- Branchless-pure expressions are fragment-valid: the structural
