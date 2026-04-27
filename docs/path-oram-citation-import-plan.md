@@ -238,6 +238,53 @@ the IND-CPA half; integrity is a stronger property that is not
 load-bearing for the paper-main theorem but is also delivered by the
 primitive.
 
+## W5.3 Stash-Overflow Provenance Pairing
+
+The Lean side now also pairs the `stashOverflowBounded` assumption with
+explicit provenance metadata. The structure
+[`PathOramLocalPosmapV1StashOverflowProvenance`](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/PathOramLocalPosmapV1.lean)
+carries:
+
+- `primaryCitationBibKey`: `Stefanov2018PathORAM` (JACM 2018)
+- `primaryTheoremReference`: JACM 2018 Theorem 5.1 (stash overflow tail
+  bound)
+- `fallbackCitationBibKey`: `Stefanov2013PathORAM` (CCS 2013)
+- `deployedBlocksPerBucket`: 5 (matching `pathOramBlocksPerBucket`)
+- `deployedStashBoundFormula`: `stash_bound = max(capacity, 1)` (the
+  Path-ORAM construction in
+  `crates/uo-core/src/manifest.rs`)
+- `workingStashCapacityFormula`: `stash_bound + buckets_per_access *
+  blocks_per_bucket` (the Rust `working_stash_capacity` formula in
+  `runtime/uo-evm/src/generated_oram_codecs.rs`)
+- `deployedJACMTailBoundExpression`:
+  `P[stash size > R] <= 14 * 0.6002^R` (the JACM Theorem 5.1
+  exponential tail bound at `Z = 5`)
+- `deployedParametersFile`: `crates/uo-core/src/manifest.rs`
+- `staticDriftCheckName`:
+  `path_oram_deployed_stash_parameters_pinned`
+
+The bundle method-style projection
+`PathOramLocalPosmapV1SecurityAssumptions.stashOverflowProvenance`
+returns `pathOramLocalPosmapV1_stashOverflowProvenance` for any bundle
+instance: the deployed Path-ORAM parameter regime is fixed at the
+manifest source. The named
+`proofGrade_path_oram_local_posmap_v1_stash_overflow_provenance_*`
+facades in `ProofGrade.lean` expose the bucket-size pinning, the
+repo-equality fact, and the named static-drift check.
+
+The probe-side `path_oram_deployed_stash_parameters_pinned` static-drift
+check (in `run_kernel_model_alignment_validation`) rejects representative
+drift in `crates/uo-core/src/manifest.rs`: it pins both the construction
+sites (`let blocks_per_bucket = 5usize;`,
+`let stash_bound = capacity.max(1);`) and the validation sites
+(`if self.blocks_per_bucket != 5`, `if self.stash_bound != capacity.max(1)`).
+
+After W5.3, the WP5 claim taxonomy classifies `stashOverflowBounded`
+as **Cited / externally justified**: the assumption remains explicit in
+`PathOramLocalPosmapV1SecurityAssumptions`, but it is paired with the
+explicit JACM 2018 Theorem 5.1 + CCS 2013 fallback citations, the
+deployed parameter substitution, and the named probe drift check.
+
 ## W5.4 Crypto Provenance Pairing
 
 The Lean side now pairs the encryption assumptions with explicit

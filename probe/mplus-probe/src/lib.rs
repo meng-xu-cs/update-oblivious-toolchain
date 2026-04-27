@@ -2843,17 +2843,17 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "bucketEncryptionINDCPA",
             "meaning": "hides bucket/path ciphertext contents for the concrete local-posmap backend",
-            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; not yet discharged in-repo",
+            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface",
         },
         {
             "assumption": "metadataEncryptionINDCPA",
             "meaning": "hides encrypted position-map metadata pages",
-            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; not yet discharged in-repo",
+            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface",
         },
         {
             "assumption": "stashOverflowBounded",
             "meaning": "bounds stash-overflow failure for the deployed parameters",
-            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; not yet fully discharged in-repo",
+            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = max(capacity, 1) parameters in crates/uo-core/src/manifest.rs",
         },
         {
             "assumption": "PaperMainRuntimeKernelBoundary / PaperMainRuntimeKernelSlotBoundary",
@@ -24833,6 +24833,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let runtime_evm_cargo_toml_path = repo_root().join("runtime/uo-evm/Cargo.toml");
     let runtime_uo_store_cargo_toml_path = repo_root().join("runtime/uo-store/Cargo.toml");
     let workspace_cargo_toml_path = repo_root().join("Cargo.toml");
+    // W5.3: pin the deployed Path-ORAM stash parameter regime in the
+    // manifest source. The Lean provenance record
+    // `pathOramLocalPosmapV1_stashOverflowProvenance` references this
+    // file as the canonical pin for the JACM Theorem 5.1 parameter
+    // substitution.
+    let manifest_alignment_path = repo_root().join("crates/uo-core/src/manifest.rs");
     let lean_runtime_implementation_interface_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterface.lean");
     let lean_runtime_implementation_interface_json_path =
@@ -25032,6 +25038,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 display_report_path(&runtime_uo_store_cargo_toml_path)
             )
         })?;
+    let manifest_alignment_source = fs::read_to_string(&manifest_alignment_path)
+        .with_context(|| format!("reading {}", display_report_path(&manifest_alignment_path)))?;
     let workspace_cargo_toml_source =
         fs::read_to_string(&workspace_cargo_toml_path).with_context(|| {
             format!(
@@ -29614,6 +29622,22 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && workspace_cargo_toml_source.contains("chacha20poly1305 = \"=0.10.1\"")
         && workspace_cargo_toml_source
             .contains("tiny-keccak = { version = \"=2.0.2\", features = [\"keccak\"] }");
+    // W5.3: pin the deployed Path-ORAM parameter regime in the manifest
+    // source. The JACM Theorem 5.1 stash bound applies at Z = 5 with
+    // stash_bound = max(capacity, 1); the static-drift check below rejects
+    // representative drift in the manifest's Path-ORAM construction or
+    // validation logic. The matching Lean provenance record is
+    // `pathOramLocalPosmapV1_stashOverflowProvenance` and the bundle
+    // method-style projection is
+    // `PathOramLocalPosmapV1SecurityAssumptions.stashOverflowProvenance`.
+    let path_oram_deployed_stash_parameters_pinned = manifest_alignment_source
+        .contains("let blocks_per_bucket = 5usize;")
+        && manifest_alignment_source.contains("let stash_bound = capacity.max(1);")
+        && manifest_alignment_source.contains("if self.blocks_per_bucket != 5 {")
+        && manifest_alignment_source.contains("bail!(\"path ORAM requires 5 blocks per bucket\");")
+        && manifest_alignment_source.contains("if self.stash_bound != capacity.max(1) {")
+        && manifest_alignment_source
+            .contains("bail!(\"path ORAM stash_bound must equal max(capacity, 1)\");");
     let rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names =
         extract_rust_struct_fields(
             &probe_source,
@@ -34007,6 +34031,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_residual_helper_shell_boundary_path_metadata_codec_roundtrip_theorems_present
         && runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present
         && runtime_crypto_primitive_identity_pinned
+        && path_oram_deployed_stash_parameters_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34686,6 +34711,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_residual_helper_shell_boundary_oram_codec_semantics_theorems_present,
         "runtime_crypto_primitive_identity_pinned":
             runtime_crypto_primitive_identity_pinned,
+        "path_oram_deployed_stash_parameters_pinned":
+            path_oram_deployed_stash_parameters_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":

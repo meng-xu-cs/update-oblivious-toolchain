@@ -646,6 +646,7 @@
   "oram_runtime_uses_shared_boxed_filler_helper": true,
   "oram_runtime_uses_shared_boxed_seal_helper": true,
   "oram_runtime_uses_shared_open_decode_helper": true,
+  "path_oram_deployed_stash_parameters_pinned": true,
   "proof_interface_bundle_literal_checks": [
     {
       "expected_files": [

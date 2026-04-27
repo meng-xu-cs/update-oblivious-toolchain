@@ -169,6 +169,139 @@ theorem PathOramLocalPosmapV1SecurityAssumptions.cryptoProvenance_pinned
     assumptions.cryptoProvenance = pathOramLocalPosmapV1_cryptoProvenance := by
   rfl
 
+/-! ### W5.3: Stash-overflow provenance for the deployed parameter regime
+
+The `stashOverflowBounded` assumption captures the Path-ORAM stash-overflow
+tail bound from Stefanov et al. JACM 2018 Theorem 5.1 (with CCS 2013 as the
+fallback citation), specialized to the deployed parameter regime:
+
+- bucket size `Z = 5` (matching `pathOramJACMBlocksPerBucket`,
+  `pathOramBlocksPerBucket`, and the deployed `blocks_per_bucket = 5usize`
+  in `crates/uo-core/src/manifest.rs`)
+- stash bound formula `max(capacity, 1)` (matching the deployed
+  `let stash_bound = capacity.max(1);` line in
+  `crates/uo-core/src/manifest.rs`)
+- working stash capacity `stash_bound + buckets_per_access *
+  blocks_per_bucket` (the Rust `working_stash_capacity` formula in
+  `runtime/uo-evm/src/generated_oram_codecs.rs`)
+
+Under these parameters, JACM Theorem 5.1 gives an exponentially small
+upper bound on stash-overflow probability: at bucket size `Z = 5` and
+stash size `R` the failure probability is bounded by `14 * 0.6002^R`
+after any polynomially-bounded access trace. The repository keeps
+`stashOverflowBounded` as an explicit `Prop` taken on faith from this
+literature theorem; the W5.3 work pairs the assumption with the
+deployed-parameter substitution and the named static-drift check that
+pins the parameter regime in the runtime source. -/
+
+/-- Explicit stash-overflow-provenance metadata for the
+`path_oram_local_posmap_v1` runtime's `stashOverflowBounded`
+confidentiality-assumption. This is the citation marker structure
+paired with the explicit `stashOverflowBounded` assumption: it carries
+the JACM 2018 citation + theorem reference, the fallback CCS 2013
+citation, the deployed parameter values, the deployed stash-bound
+formula, the working-stash capacity formula, the JACM 5.1 tail-bound
+expression at the deployed bucket size, and the static-drift check
+name pinning the deployed parameters in the Rust source. -/
+structure PathOramLocalPosmapV1StashOverflowProvenance where
+  /-- BibTeX key for the primary JACM 2018 source. -/
+  primaryCitationBibKey : String
+  /-- Human-readable primary citation. -/
+  primaryCitation : String
+  /-- Specific theorem reference within the primary source. -/
+  primaryTheoremReference : String
+  /-- BibTeX key for the fallback CCS 2013 source. -/
+  fallbackCitationBibKey : String
+  /-- Human-readable fallback citation. -/
+  fallbackCitation : String
+  /-- Deployed Path-ORAM bucket size (`Z`), pinned by the manifest. -/
+  deployedBlocksPerBucket : Nat
+  /-- Description of the deployed stash-bound formula. -/
+  deployedStashBoundFormula : String
+  /-- Description of the working-stash capacity formula consumed by the
+  Rust runtime. -/
+  workingStashCapacityFormula : String
+  /-- Tail-bound expression for the deployed parameter regime, restated
+  from JACM Theorem 5.1 at `Z = 5`. -/
+  deployedJACMTailBoundExpression : String
+  /-- File path pinning the deployed parameters in the Rust source. -/
+  deployedParametersFile : String
+  /-- Probe static-drift check that pins the deployed parameter regime
+  in the Rust source. -/
+  staticDriftCheckName : String
+deriving Repr, DecidableEq
+
+/-- The actual stash-overflow provenance record for the
+`path_oram_local_posmap_v1` runtime: JACM 2018 Theorem 5.1 (with CCS 2013
+as the fallback), specialized to the deployed bucket size `Z = 5` and
+stash bound `max(capacity, 1)`. The probe's
+`path_oram_deployed_stash_parameters_pinned` static-drift check pins the
+Rust manifest still constructs Path-ORAM objects with these parameters;
+the JACM tail bound `14 * 0.6002^R` then becomes the literature reference
+for stash-overflow negligibility. -/
+def pathOramLocalPosmapV1_stashOverflowProvenance :
+    PathOramLocalPosmapV1StashOverflowProvenance :=
+  { primaryCitationBibKey := "Stefanov2018PathORAM"
+  , primaryCitation :=
+      "Stefanov, van Dijk, Shi, Chan, Fletcher, Ren, Yu, Devadas (JACM 2018). Path ORAM: An Extremely Simple Oblivious RAM Protocol. Journal of the ACM 65(4), Article 18, April 2018."
+  , primaryTheoremReference := "JACM 2018 Theorem 5.1 (stash overflow tail bound)"
+  , fallbackCitationBibKey := "Stefanov2013PathORAM"
+  , fallbackCitation :=
+      "Stefanov, van Dijk, Shi, Fletcher, Ren, Yu, Devadas (CCS 2013). Path ORAM: An Extremely Simple Oblivious RAM Protocol. Proceedings of CCS 2013."
+  , deployedBlocksPerBucket := pathOramBlocksPerBucket
+  , deployedStashBoundFormula := "stash_bound = max(capacity, 1)"
+  , workingStashCapacityFormula :=
+      "working_stash_capacity = stash_bound + buckets_per_access * blocks_per_bucket"
+  , deployedJACMTailBoundExpression :=
+      "P[stash size > R] <= 14 * 0.6002^R for Z = 5 (JACM 2018 Theorem 5.1)"
+  , deployedParametersFile := "crates/uo-core/src/manifest.rs"
+  , staticDriftCheckName := "path_oram_deployed_stash_parameters_pinned"
+  }
+
+/-- Assumption-bundle method-style projection: every concrete instance of
+`PathOramLocalPosmapV1SecurityAssumptions` is paired with the same
+runtime-pinned stash-overflow provenance record. The deployed Path-ORAM
+parameters are fixed at the manifest source; the bundle projection only
+exposes that fact at the type level. -/
+def PathOramLocalPosmapV1SecurityAssumptions.stashOverflowProvenance
+    (_ : PathOramLocalPosmapV1SecurityAssumptions) :
+    PathOramLocalPosmapV1StashOverflowProvenance :=
+  pathOramLocalPosmapV1_stashOverflowProvenance
+
+/-- The provenance record's pinned bucket size matches the
+implementation-side constant `pathOramBlocksPerBucket = 5`. -/
+theorem pathOramLocalPosmapV1_stashOverflowProvenance_deployedBlocksPerBucket :
+    pathOramLocalPosmapV1_stashOverflowProvenance.deployedBlocksPerBucket =
+      pathOramBlocksPerBucket := by
+  rfl
+
+/-- The provenance record's pinned bucket size is exactly 5, matching the
+JACM Theorem 5.1 statement (which is stated for `Z = 5`). -/
+theorem pathOramLocalPosmapV1_stashOverflowProvenance_deployedBlocksPerBucket_value :
+    pathOramLocalPosmapV1_stashOverflowProvenance.deployedBlocksPerBucket = 5 := by
+  rfl
+
+/-- The provenance record references the
+`path_oram_deployed_stash_parameters_pinned` probe static-drift check.
+This is the named hook that rejects representative drift if the Rust
+manifest stops constructing Path-ORAM objects with the deployed
+`Z = 5` / `stash_bound = capacity.max(1)` parameter regime. -/
+theorem pathOramLocalPosmapV1_stashOverflowProvenance_staticDriftCheckName :
+    pathOramLocalPosmapV1_stashOverflowProvenance.staticDriftCheckName =
+      "path_oram_deployed_stash_parameters_pinned" := by
+  rfl
+
+/-- The stash-overflow-provenance projection on the assumption bundle
+returns the runtime-pinned provenance record, regardless of which bundle
+instance is chosen. The deployed Path-ORAM parameter regime is fixed at
+the manifest source; the bundle projection only exposes that fact at
+the type level. -/
+theorem PathOramLocalPosmapV1SecurityAssumptions.stashOverflowProvenance_pinned
+    (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+    assumptions.stashOverflowProvenance =
+      pathOramLocalPosmapV1_stashOverflowProvenance := by
+  rfl
+
 def PathOramLocalPosmapV1SecurityAssumptions.toCanonicalLeafValueSecurityAssumptions
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
   PathOramCanonicalLeafValueSecurityAssumptions :=
