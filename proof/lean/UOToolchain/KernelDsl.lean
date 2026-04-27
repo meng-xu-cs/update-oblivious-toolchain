@@ -564,6 +564,15 @@ def lowerStatement : Statement → Except KernelLoweringError KernelStatement
       let kv ← lowerExpr value
       .ok (.retStmt (some kv))
 
+/-- Decide whether a statement is a `retStmt`. Used by both
+`lowerStatementsAux` and `kernelLowerableScheduleAux` to enforce the
+"no statement after `Return`" public-schedule rule. Pulled out as a
+top-level helper so that subsequent rewrites can reduce it
+syntactically without `let`-binding obstacles. -/
+def Statement.isReturn : Statement → Bool
+  | .retStmt _ => true
+  | _ => false
+
 /-- Lower a list of statements to a list of `KernelStatement`s,
 enforcing the "no statement after `Return`" public-schedule rule from
 the Rust `lower_confidential_kernel_statements`. -/
@@ -575,11 +584,7 @@ def lowerStatementsAux :
         .error (.nonFinalReturn index)
       else do
         let ks ← lowerStatement stmt
-        let isReturn :=
-          match stmt with
-          | .retStmt _ => true
-          | _ => false
-        let krest ← lowerStatementsAux rest (index + 1) isReturn
+        let krest ← lowerStatementsAux rest (index + 1) stmt.isReturn
         .ok (ks :: krest)
 
 def lowerStatements
@@ -641,12 +646,8 @@ def Statement.kernelLowerableScheduleAux : List Statement → Bool → Bool
   | stmt :: rest, sawReturn =>
       if sawReturn then false
       else
-        let isReturn :=
-          match stmt with
-          | .retStmt _ => true
-          | _ => false
         Statement.kernelLowerable stmt
-          && Statement.kernelLowerableScheduleAux rest isReturn
+          && Statement.kernelLowerableScheduleAux rest stmt.isReturn
 
 def Statement.kernelLowerableSchedule (stmts : List Statement) : Bool :=
   Statement.kernelLowerableScheduleAux stmts false
@@ -845,14 +846,17 @@ theorem kernelLowerable_implies_lowerStatement_ok :
 /-! The schedule-level forward theorem
 (`kernelLowerableScheduleAux_implies_lowerStatementsAux_ok`) and the
 program-level corollary (`kernelLowerable_implies_lowerCompiledFunction_ok`)
-are deferred. The schedule predicate's recursive `let isReturn := match ...`
-binding interacts with `simp` / `rcases` reductions in a way that
-needs a small structural rewrite to close cleanly; landing them is
-trivial mechanically once the lemma `Statement.kernelLowerableScheduleAux_cons_false`
-is split out. The per-statement theorem
-`kernelLowerable_implies_lowerStatement_ok` above already exposes the
-key per-element correctness property the W4.4 preservation theorem
-needs; the schedule-level lift is a thin list induction. -/
+are deferred. The proof requires a three-way case split on
+`stmt.isReturn` plus the structure of `rest`:
+the lowering is allowed to succeed when (1) `stmt` is not a return
+and `rest` is schedule-lowerable, or (2) `stmt` is a return and
+`rest` is empty. Threading this through the `do`-notation reductions
+in `lowerStatementsAux` plus the corresponding `if sawReturn then
+false else ...` reductions in `kernelLowerableScheduleAux` is
+mechanical but exceeded the W4.4 Session B-1 scope. The per-element
+forward theorems above already expose the key correctness property
+the W4.4 preservation theorem needs; the schedule-level lift is a
+thin list induction over those. -/
 
 mutual
 
