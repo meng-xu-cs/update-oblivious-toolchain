@@ -1866,4 +1866,118 @@ theorem proofGrade_sgx_hostile_host_closure_audit_drift_check_names :
       ] :=
   sgxHostileHostClosureAudit_driftCheckNames
 
+/-! ### SGX projection-chain paper-main facades (W7.1 canonicalization)
+
+These facades re-export the canonical paper-main theorems of the SGX
+projection chain. Each Lean module in the chain
+(`SgxRelation.lean`, `SgxExactProjection.lean`, `SgxOramProjection.lean`,
+`SgxJointProjection.lean`) exposes one abstraction function and one
+paper-main theorem; the facades below pin those four entry points as the
+canonical paper-grade surface so reviewers see a single, minimal API
+even though the underlying chain has multiple intermediate definitions.
+
+Claim taxonomy: these facades are **Lean-proved,
+semantics-preserving** — each is a one-line forwarding over an existing
+theorem in the SGX projection chain. They do not introduce new
+assumptions; they document the canonical entry points already proved
+end-to-end. -/
+
+/-- Paper-facing W7.1 facade: TEE-storage-oblivious deployments project
+into the exact-equality SGX execution security relation. This is the
+single canonical entry point of the `SgxRelation.lean` layer; the
+abstraction function is `sgxViewOfDeployment`. -/
+theorem proofGrade_sgx_projection_tee_storage_to_exact_sgx
+  {run : DeploymentSemantics}
+  (tags : SGXModelTags)
+  (hTEE : ExactTEEStorageOblivious run) :
+  SGXExecutionSecurity
+    samePublicProjection
+    exactSGXProofRelation
+    (deploymentToSGXSemantics run)
+    emptyStorageLeakage
+    (deploymentMicroLeakage run tags) :=
+  exactTEEStorage_projects_to_exactSGX tags hTEE
+
+/-- Paper-facing W7.1 facade: exact-UO trace runs project into the
+normalized-observer SGX execution security relation. This is the single
+canonical entry point of the `SgxExactProjection.lean` layer; the
+abstraction function is `exactToSGXSemantics`. -/
+theorem proofGrade_sgx_projection_paper_main_exact_uo
+  {run : TraceSemantics}
+  {publicOutcome : Config → SGXPublicOutcome}
+  {boundarySchedule : Config → List BoundaryEvent}
+  {controllerShape : Config → SGXControllerShape}
+  {modelTags : SGXModelTags}
+  (hExact : ExactUO run)
+  (hOutcome : PublicOutcomeSafe publicOutcome)
+  (hBoundary : PublicBoundarySafe boundarySchedule)
+  (hController : PublicControllerShapeSafe controllerShape) :
+  SGXExecutionSecurity
+    samePublicProjection
+    exactNormalizedObservedSGXProofRelation
+    (exactToSGXSemantics
+      run
+      publicOutcome
+      boundarySchedule
+      (fun cfg => controllerMicroTraceOfShape (controllerShape cfg)))
+    emptyStorageLeakage
+    (exactMicroLeakage publicOutcome controllerShape modelTags) :=
+  paperMain_exactUO_projects_to_sgxExecution
+    hExact hOutcome hBoundary hController
+
+/-- Paper-facing W7.1 facade: ORAM-secured runs project into the
+normalized-observer SGX execution security relation. This is the single
+canonical entry point of the `SgxOramProjection.lean` layer; the
+abstraction function is `oramToSGXSemantics`. -/
+theorem proofGrade_sgx_projection_paper_main_computational_uo
+  (security : OramSecurityInterface)
+  {run : OramSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {modelTags : SGXModelTags}
+  (hOram : ComputationalUOWith security run)
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    (oramNormalizedObservedSGXProofRelationWith security)
+    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
+    executionLeakage
+    (oramMicroLeakage publicOutcome modelTags) :=
+  paperMain_computationalUOWith_projects_to_sgxExecution
+    security hOram hOutcome hBoundary
+
+/-- Paper-facing W7.1 facade: joint storage/micro security runs project
+into the normalized-observer SGX execution security relation. This is
+the single canonical entry point of the `SgxJointProjection.lean`
+layer; the abstraction function is `jointToSGXSemantics`. -/
+theorem proofGrade_sgx_projection_paper_main_joint_security
+  (security : OramSecurityInterface)
+  {run : SGXJointSemantics}
+  {publicOutcome : OramConfig → SGXPublicOutcome}
+  {boundarySchedule : OramConfig → List BoundaryEvent}
+  {microLeakage : OramConfig → SGXMicroLeakage}
+  (hStorage :
+    ∀ cfg₁ cfg₂,
+      sameOramPublicProjection cfg₁ cfg₂ →
+      security.localTheorem
+        (jointStorageViews (run cfg₁))
+        (jointStorageViews (run cfg₂))
+        (executionLeakage cfg₁))
+  (hMicro :
+    ∀ cfg,
+      NormalizedByLeakage (jointMicroViews (run cfg)) (microLeakage cfg))
+  (hOutcome : OramPublicOutcomeSafe publicOutcome)
+  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hMicroLeakage : OramPublicMicroLeakageSafe microLeakage) :
+  SGXExecutionSecurity
+    sameOramPublicProjection
+    { storageRel := oramSGXStorageRelationWith security
+      , microRel := normalizedObservedSGXMicroRelation }
+    (jointToSGXSemantics run publicOutcome boundarySchedule)
+    executionLeakage
+    (jointMicroLeakage microLeakage) :=
+  paperMain_jointSecurityWith_projects_to_sgxExecution
+    security hStorage hMicro hOutcome hBoundary hMicroLeakage
+
 end UOToolchain
