@@ -2130,4 +2130,280 @@ theorem evalKernelPureExprList_status_ne_completed
 
 end
 
+/-! ### W4.5: Per-statement runtime-vs-static `kernelSteps` lift
+
+With the `evalKernelExpr_status_ne_completed` invariant in hand, the
+per-statement runtime-vs-static `kernelSteps` lift becomes provable
+under the natural `.completed` + `publicResult preserved` preconditions:
+the resulting outcome's `kernelSteps` is exactly `oc.kernelSteps ++
+stmt.expectedStep`. -/
+
+theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
+    (stmt : KernelStatement)
+    (hStatus : (evalKernelStatement cfg env oc stmt).snd.snd.status = .completed)
+    (hPub : (evalKernelStatement cfg env oc stmt).snd.snd.publicResult =
+      oc.publicResult) :
+    (evalKernelStatement cfg env oc stmt).snd.snd.kernelSteps =
+      oc.kernelSteps ++ stmt.expectedStep := by
+  cases stmt with
+  | declare name ty value =>
+      simp only [evalKernelStatement, KernelStatement.expectedStep,
+        List.append_nil] at *
+      cases hVal : evalKernelExpr cfg env value with
+      | value v => simp [hVal]
+      | status s =>
+          simp [hVal] at hStatus
+          exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
+  | assign name value =>
+      simp only [evalKernelStatement, KernelStatement.expectedStep,
+        List.append_nil] at *
+      cases hVal : evalKernelExpr cfg env value with
+      | value v => simp [hVal]
+      | status s =>
+          simp [hVal] at hStatus
+          exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
+  | require cond =>
+      simp only [evalKernelStatement, KernelStatement.expectedStep,
+        List.append_nil] at *
+      cases hCond : evalKernelExpr cfg env cond with
+      | value v =>
+          cases v with
+          | bool b =>
+              cases b with
+              | true => simp [hCond]
+              | false => simp [hCond] at hStatus
+          | _ => simp [hCond] at hStatus
+      | status s =>
+          simp [hCond] at hStatus
+          exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env cond s hCond)
+  | abortIf cond =>
+      simp only [evalKernelStatement, KernelStatement.expectedStep,
+        List.append_nil] at *
+      cases hCond : evalKernelExpr cfg env cond with
+      | value v =>
+          cases v with
+          | bool b =>
+              cases b with
+              | true => simp [hCond] at hStatus
+              | false => simp [hCond]
+          | _ => simp [hCond] at hStatus
+      | status s =>
+          simp [hCond] at hStatus
+          exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env cond s hCond)
+  | retStmt val =>
+      cases val with
+      | none =>
+          simp only [evalKernelStatement, KernelStatement.expectedStep,
+            List.append_nil] at *
+      | some value =>
+          simp only [evalKernelStatement, KernelStatement.expectedStep,
+            List.append_nil] at *
+          cases hVal : evalKernelExpr cfg env value with
+          | value v => simp [hVal]
+          | status s =>
+              simp [hVal] at hStatus
+              exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
+  | cellSet objectId value predicate =>
+      simp only [evalKernelStatement, KernelStatement.expectedStep] at *
+      cases hVal : evalKernelExpr cfg env value with
+      | status s =>
+          simp [hVal] at hStatus
+          exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
+      | value newVal =>
+          cases predicate with
+          | none => simp [hVal]
+          | some predExpr =>
+              cases hPred : evalKernelExpr cfg env predExpr with
+              | status s =>
+                  simp [hVal, hPred] at hStatus
+                  exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env predExpr s hPred)
+              | value pv =>
+                  cases pv with
+                  | bool b =>
+                      cases b
+                      · simp [hVal, hPred]
+                      · simp [hVal, hPred]
+                  | _ => simp [hVal, hPred] at hStatus
+  | arraySet objectId index value predicate =>
+      simp only [evalKernelStatement, KernelStatement.expectedStep] at *
+      cases hIdx : evalKernelExpr cfg env index with
+      | status s =>
+          simp [hIdx] at hStatus
+          exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env index s hIdx)
+      | value indexVal =>
+          cases hVal : evalKernelExpr cfg env value with
+          | status s =>
+              simp [hIdx, hVal] at hStatus
+              exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
+          | value newVal =>
+              cases predicate with
+              | none =>
+                  cases indexVal with
+                  | uint idx =>
+                      cases hRead : cfg.readObject objectId with
+                      | none => simp [hIdx, hVal, hRead] at hStatus
+                      | some objVal =>
+                          cases objVal with
+                          | array values =>
+                              by_cases hOob : idx ≥ values.length
+                              · simp [hIdx, hVal, hRead, hOob] at hStatus
+                              · simp [hIdx, hVal, hRead, hOob]
+                          | _ => simp [hIdx, hVal, hRead] at hStatus
+                  | _ => simp [hIdx, hVal] at hStatus
+              | some predExpr =>
+                  cases hPred : evalKernelExpr cfg env predExpr with
+                  | status s =>
+                      simp [hIdx, hVal, hPred] at hStatus
+                      exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env predExpr s hPred)
+                  | value pv =>
+                      cases pv with
+                      | bool b =>
+                          cases b
+                          · simp [hIdx, hVal, hPred]
+                          · cases indexVal with
+                            | uint idx =>
+                                cases hRead : cfg.readObject objectId with
+                                | none => simp [hIdx, hVal, hPred, hRead] at hStatus
+                                | some objVal =>
+                                    cases objVal with
+                                    | array values =>
+                                        by_cases hOob : idx ≥ values.length
+                                        · simp [hIdx, hVal, hPred, hRead, hOob] at hStatus
+                                        · simp [hIdx, hVal, hPred, hRead, hOob]
+                                    | _ => simp [hIdx, hVal, hPred, hRead] at hStatus
+                            | _ => simp [hIdx, hVal, hPred] at hStatus
+                      | _ => simp [hIdx, hVal, hPred] at hStatus
+  | mapPut objectId key value predicate =>
+      simp only [evalKernelStatement, KernelStatement.expectedStep] at *
+      cases hKey : evalKernelExpr cfg env key with
+      | status s =>
+          simp [hKey] at hStatus
+          exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env key s hKey)
+      | value keyVal =>
+          cases hVal : evalKernelExpr cfg env value with
+          | status s =>
+              simp [hKey, hVal] at hStatus
+              exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
+          | value newVal =>
+              cases predicate with
+              | none =>
+                  cases hRead : cfg.readObject objectId with
+                  | none => simp [hKey, hVal, hRead]
+                  | some objVal =>
+                      cases objVal with
+                      | map entries => simp [hKey, hVal, hRead]
+                      | _ => simp [hKey, hVal, hRead] at hStatus
+              | some predExpr =>
+                  cases hPred : evalKernelExpr cfg env predExpr with
+                  | status s =>
+                      simp [hKey, hVal, hPred] at hStatus
+                      exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env predExpr s hPred)
+                  | value pv =>
+                      cases pv with
+                      | bool b =>
+                          cases b
+                          · simp [hKey, hVal, hPred]
+                          · cases hRead : cfg.readObject objectId with
+                            | none => simp [hKey, hVal, hPred, hRead]
+                            | some objVal =>
+                                cases objVal with
+                                | map entries => simp [hKey, hVal, hPred, hRead]
+                                | _ => simp [hKey, hVal, hPred, hRead] at hStatus
+                      | _ => simp [hKey, hVal, hPred] at hStatus
+
+/-! ### W4.5: Body-level runtime-vs-static `kernelSteps` lift
+
+`evalKernelBody_kernelSteps_eq_expected_of_completed` lifts the
+per-statement theorem through `evalKernelBody`: under `.completed`
+final status AND `oc.publicResult = none` AND
+`(evalKernelBody _).snd.snd.publicResult = none` (i.e., no early
+`retStmt (some _)` fired during the body), the runtime
+`kernelSteps` is `oc.kernelSteps ++ body.flatMap
+KernelStatement.expectedStep`.
+
+The strong precondition `oc.publicResult = none` rules out the
+pathological case where the input outcome already had a return
+value set; the program-level theorem
+(`evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed`)
+discharges this precondition by starting from `Outcome.empty`. -/
+
+theorem evalKernelBody_kernelSteps_eq_expected_of_completed
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
+    (hOcPub : oc.publicResult = none) :
+    ∀ (body : List KernelStatement),
+      (evalKernelBody cfg env oc body).snd.snd.status = .completed →
+      (evalKernelBody cfg env oc body).snd.snd.publicResult = none →
+      (evalKernelBody cfg env oc body).snd.snd.kernelSteps =
+        oc.kernelSteps ++ body.flatMap KernelStatement.expectedStep
+  | [], _, _ => by simp [evalKernelBody]
+  | stmt :: rest, hStatus, hPub => by
+      simp only [evalKernelBody] at hStatus hPub ⊢
+      generalize hStep : evalKernelStatement cfg env oc stmt = step at *
+      obtain ⟨cfg', env', oc'⟩ := step
+      simp only at hStatus hPub ⊢
+      cases hSt' : oc'.status with
+      | completed =>
+          simp only [hSt'] at hStatus hPub ⊢
+          by_cases hRet : oc'.publicResult.isSome
+          · -- Early return: body returns oc' immediately. We have
+            -- hPub : oc'.publicResult = none, but hRet : oc'.publicResult.isSome.
+            -- Contradiction.
+            simp only [hRet, if_true] at hStatus hPub ⊢
+            rw [hPub] at hRet
+            exact absurd hRet (by simp)
+          · -- oc'.publicResult must be `none` (from hRet : ¬ isSome)
+            have hOcPubNone : oc'.publicResult = none := by
+              cases hOPR : oc'.publicResult with
+              | none => rfl
+              | some v => rw [hOPR] at hRet; exact absurd (by simp) hRet
+            simp only [hOcPubNone, Option.isSome_none, Bool.false_eq_true,
+              if_false] at hStatus hPub ⊢
+            have h1 : (evalKernelStatement cfg env oc stmt).snd.snd.status = .completed := by
+              rw [hStep]; exact hSt'
+            have h2 : (evalKernelStatement cfg env oc stmt).snd.snd.publicResult =
+              oc.publicResult := by
+              rw [hStep, hOcPubNone, hOcPub]
+            have hKsEqStmt := evalKernelStatement_kernelSteps_eq_expected_of_completed
+              cfg env oc stmt h1 h2
+            rw [hStep] at hKsEqStmt
+            simp only at hKsEqStmt
+            have hKsEqRest := evalKernelBody_kernelSteps_eq_expected_of_completed
+              cfg' env' oc' hOcPubNone rest hStatus hPub
+            rw [hKsEqRest, hKsEqStmt]
+            simp [List.flatMap, List.append_assoc]
+      | requireFailed => simp only [hSt'] at hStatus; cases hStatus
+      | abortedByUser => simp only [hSt'] at hStatus; cases hStatus
+      | unsupported _ => simp only [hSt'] at hStatus; cases hStatus
+      | evalError _ => simp only [hSt'] at hStatus; cases hStatus
+
+/-! ### W4.5: Program-level runtime-vs-static `kernelSteps` lift
+
+The program-level theorem
+`evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed`
+discharges the body-level theorem's `oc.publicResult = none`
+precondition by starting from `Outcome.empty` (which has
+`publicResult = none`). The result: when `evalKernelProgram kp cfg`
+produces a fully-completed outcome (no error, no early return), its
+`kernelSteps` equals `kp.expectedKernelSteps`. -/
+
+theorem evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
+    (kp : KernelProgram) (cfg : OperationalConfig)
+    (hStatus : (evalKernelProgram kp cfg).status = .completed)
+    (hPub : (evalKernelProgram kp cfg).publicResult = none) :
+    (evalKernelProgram kp cfg).kernelSteps = kp.expectedKernelSteps := by
+  unfold evalKernelProgram at hStatus hPub ⊢
+  cases hEnv : kp.initialEnv cfg.publicArgs cfg.secretArgs with
+  | none => simp [hEnv] at hStatus
+  | some env =>
+      simp only [hEnv] at hStatus hPub ⊢
+      have hOcPub : (Outcome.empty : Outcome).publicResult = none := rfl
+      have hBodyEq := evalKernelBody_kernelSteps_eq_expected_of_completed
+        cfg env Outcome.empty hOcPub kp.body hStatus hPub
+      simp only [KernelProgram.expectedKernelSteps]
+      have hOcKs : (Outcome.empty : Outcome).kernelSteps = [] := rfl
+      rw [hOcKs] at hBodyEq
+      simp at hBodyEq
+      exact hBodyEq
+
 end UOToolchain.IR
