@@ -11,6 +11,18 @@ def familyEntrypoint
   | some witness => witness.public_outcome.entrypoint_id
   | none => "<empty>"
 
+/-- Paper-grade witness theorem (W7.2): validated proof-grade
+imported seeded path-ORAM runtime witness families satisfy the
+underlying validity bundle (i.e., the proof-grade discharge implies
+the structural validity required by the runtime path-ORAM family
+entrypoints). -/
+theorem importedSeededRuntimePathOramWitnessFamily_validates_proofGrade_implies_valid
+  {family : ImportedSeededRuntimePathOramWitnessFamily}
+  {modelTags : SGXModelTags}
+  (hValid : family.ProofGradeValid modelTags) :
+  family.Valid modelTags :=
+  importedSeededRuntimePathOramWitnessFamily_proofGradeValid_implies_valid hValid
+
 def main (args : List String) : IO UInt32 := do
   match args with
   | [path, pageModel, exitModel, sharedResourceModel] =>
