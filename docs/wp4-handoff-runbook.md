@@ -571,13 +571,16 @@ should be its own commit:
   (commit `849c1ae`): `proofGrade_ir_to_kernel_expr_preservation`
   and `proofGrade_ir_to_kernel_pure_expr_preservation` in
   `ProofGrade.lean`.
-- *(next)* W4.4 Statement / Body / Program-level preservation
-  lifts. Mechanical mutual recursion mirroring the W4.4 Session
-  B-1 forward iffs but lifting the per-Expr preservation through
-  `evalStatement` / `evalBody` / `evalContract`. Then project
-  through `ProofGrade.lean` as
-  `proofGrade_ir_to_kernel_statement_preservation` /
-  `_body_preservation` / `_program_preservation`.
+- *(landed)* W4.4 Session B-2 + C — Statement / Body / Program-level
+  preservation theorems plus the corresponding paper-facing
+  facades (commit `9f0fd7b`). **WP4 charter task 4 (IR-to-kernel
+  correctness) is now closed end-to-end at the program level.**
+- *(next)* WP4 charter task 5 (manifest-exactness semantics-
+  preserving lift, W4.5), or charter task 2 (source-to-IR
+  correctness, W4.2), or charter task 6 (artifact-checker
+  demotion, W4.6). The W4.4 reverse iff direction (lowering
+  succeeds → precondition holds) is also a useful but optional
+  W4.6 building block.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

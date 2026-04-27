@@ -1631,6 +1631,22 @@ Current status update:
   secret based on `StateObject.confidential`) and structured value
   updates clean. `evalContract` discards the final `cfg` and returns
   the outcome unchanged.
+- **Charter task 4 (IR-to-kernel correctness) closed end-to-end**
+  (commit `9f0fd7b`): the per-Statement, list-level (`evalBody`),
+  and program-level (`evalContract`) preservation theorems are now
+  all Lean-proved, with paper-facing facades
+  `proofGrade_ir_to_kernel_statement_preservation`,
+  `_body_preservation`, and `_program_preservation` in
+  `ProofGrade.lean`. The program-level theorem
+  `lowerCompiledFunction_preserves_semantics` certifies that for
+  any `OperationalConfig` whose entrypoint resolves to a function
+  `fn`, if `lowerCompiledFunction fn = .ok kp` then
+  `evalContract cfg = evalKernelProgram kp cfg`. Combined with
+  the W4.4 Session B-1 forward iff
+  (`kernelLowerable_implies_lowerCompiledFunction_ok`), this
+  gives the W4.4 charter deliverable: every kernel-lowerable
+  program admitted by the W4.3 fragment classifier evaluates the
+  same way under the IR semantics and the kernel-DSL semantics.
 - Subtask W4.4 Session B-2 (per-Expr semantics-preservation
   theorem) landed (commits `de979bb` for the partial→def
   evaluator refactor, `326d710` for the proof, `849c1ae` for the
@@ -1713,15 +1729,11 @@ Current status update:
   the only `unsupported` constructors are `Expr.{structField,
   arrayIndex}`, which `Expr.fragmentValid` already rejects.
 - Still open: the *real* source-to-IR correctness theorem (W4.2),
-  the Statement / Body / Program-level lifts of the W4.4
-  preservation theorem (which mechanically lift the per-Expr
-  result through statement evaluation, body evaluation, and
-  entrypoint resolution), the manifest-exactness semantics-
-  preserving lift (W4.5), and the direct artifact checker
-  demotion (W4.6). The reverse direction of the W4.4 lowering iff
-  (lowering succeeds → precondition holds) is also deferred; it is
-  useful for W4.6 but not strictly required by the preservation
-  theorem.
+  the manifest-exactness semantics-preserving lift (W4.5), and the
+  direct artifact checker demotion (W4.6). The reverse direction
+  of the W4.4 lowering iff (lowering succeeds → precondition
+  holds) is also deferred; it is useful for W4.6 but not strictly
+  required by the preservation theorem.
 
 Exit gate:
 

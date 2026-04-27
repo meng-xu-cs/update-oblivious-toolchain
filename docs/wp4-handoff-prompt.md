@@ -19,20 +19,29 @@ Solidity subset compiled to a tiny confidential kernel running inside
 a TEE under a hostile-host adversary (M+ model).
 
 You are now picking up **Work Package 4: Prove Source-To-Kernel
-Compiler Correctness**. Work Packages 0–3 are closed. WP4 subtasks
-**W4.1**, **W4.1b**, **W4.3** (full theorem + paper facade),
-**W4.1+**, **W4.1++**, **W4.1+++** (store-update threading),
-**W4.4 Session A** (typed kernel DSL + semantics + lowering
-definitions), **W4.4 Session B-1** (forward-direction lowering
-iff theorems at all four levels), and the **partial→def evaluator
-refactor + W4.4 Session B-2 per-Expr semantics-preservation +
-ProofGrade projection** are all landed. The W4.4 charter task 4
-is now Lean-proved at the per-expression level: `IR.lowerExpr_
-preserves_semantics` covers all 11 `Expr` constructors, mutually
-with pure-expression and list companions, projected through
-`ProofGrade.lean` as `proofGrade_ir_to_kernel_expr_preservation`.
-The next deliverable is the Statement / Body / Program-level lifts
-(mechanical mutual recursion over the per-Expr base).
+Compiler Correctness**. Work Packages 0–3 are closed. WP4 charter
+tasks **1, 3, and 4 are now Lean-proved**:
+
+- W4.1 / W4.1b / W4.1+ / W4.1++ / W4.1+++: real operational
+  evaluator over the structured admitted IR, total over the W4.3
+  fragment, with masked-store updates.
+- W4.3 (full theorem + paper facade):
+  `(IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
+  fn.fragmentValid = true`.
+- W4.4 (Session A typed kernel DSL + B-1 forward iff at all four
+  levels + B-2 semantics-preservation theorem at all four levels +
+  C paper-facing facade): the `proofGrade_ir_to_kernel_program_
+  preservation` theorem certifies that for every kernel-lowerable
+  function `fn` and IR `OperationalConfig` whose entrypoint
+  resolves to `fn`, the IR-side `evalContract` and the kernel-side
+  `evalKernelProgram` (on `lowerCompiledFunction fn`) produce
+  identical outcomes.
+
+WP4 charter tasks **2** (source-to-IR correctness), **5**
+(manifest-exactness semantics-preserving lift), and **6** (direct
+artifact-checker demotion) remain open. The W4.4 reverse iff
+direction (lowering succeeds → precondition holds) is also still
+deferred (useful for W4.6 but not required by W4.4).
 
 ## First, Read These Files In This Exact Order
 
@@ -129,50 +138,38 @@ land in:
 W4.4 Session B-1 is landed; the next subtask is **W4.4 Session B-2**:
 the semantics-preservation theorem.
 
-**Subtask W4.4 Statement/Body/Program-level preservation lifts.**
+The next subtask is one of:
 
-The per-Expr preservation theorem (`IR.lowerExpr_preserves_semantics`
-plus pure / list companions) is landed and projected through
-`ProofGrade.lean` as `proofGrade_ir_to_kernel_expr_preservation`.
-The remaining work for the full W4.4 IR-to-kernel correctness
-deliverable is the structural lift through statement / body /
-program evaluation.
+**Option (a) — W4.5 manifest-exactness semantics-preserving lift.**
+Promote the existing `ProofGradeCompilerFacts` exactness/export
+layer (`secret_args`, `param_names`, manifest boundary lengths,
+`max_commit_ops`, etc.) to semantics-preserving statements: each
+manifest field is the exact semantic projection of the source
+program under the IR / kernel evaluator. This builds directly on
+the W4.4 preservation theorem and the W4.1 evaluator's
+deterministic outcome.
 
-Concretely:
+**Option (b) — W4.2 source-to-IR correctness.**
+Mirror `solang_parser::pt::Statement` / `pt::Expression` for the
+admitted Solidity subset in Lean; prove that `uo-solc::lower_block`
+faithfully translates from that AST to `IR.Statement`. Larger
+scope than W4.5 because the parser AST surface is wider than the
+IR.
 
-1. Prove `lowerStatement_preserves_semantics`: per-Statement
-   preservation. Each statement constructor case follows the
-   same pattern as the per-Expr proof:
-   - case-split on each sub-lowering's success/error
-   - extract the kernel-side witness via `Except.ok.inj`
-   - substitute, unfold both evaluators
-   - apply per-Expr IH for sub-expressions; then close by `rfl`.
-   The `cellSet` / `arraySet` / `mapPut` cases need additional
-   case-splits on the predicate option and on the evaluated
-   predicate boolean to align both evaluators' masked-store
-   semantics.
+**Option (c) — W4.6 direct artifact-checker demotion.**
+Demote the existing `checkProofGradeTranslationArtifacts` Lean
+checker from "main trust argument" to "executable proof witness for
+the proven compiler story." The checker doesn't need to disappear
+— it just changes role from gating step to corroborating witness.
+This requires the reverse direction of the W4.4 lowering iff
+(`lowerExpr e = .ok ke → Expr.fragmentValid e = true`) plus a doc
+update to the WP4 trust narrative.
 
-2. Prove `lowerStatementsAux_preserves_semantics` /
-   `lowerStatements_preserves_semantics`: list-level lifts using
-   the per-Statement theorem. The `sawReturn` parameter threads
-   through both `evalBody` and `lowerStatementsAux`.
-
-3. Prove `lowerCompiledFunction_preserves_semantics`: program-
-   level theorem. The IR's `evalContract` looks up the entrypoint
-   in `cfg.contract.functions`; the kernel's `evalKernelProgram`
-   takes the program directly. The theorem requires that
-   `cfg.entrypoint` resolves to `fn` for the IR side, and the
-   kernel program is `lowerCompiledFunction fn = .ok kp`. Then
-   `evalContract cfg = evalKernelProgram kp cfg`.
-
-4. Project the program-level theorem through `ProofGrade.lean` as
-   `proofGrade_ir_to_kernel_program_preservation`.
-
-The proofs should mirror the W4.4 Session B-2 per-Expr structure
-(`unfold + Except.ok.inj + subst + rw [ih] + rfl`).
-
-Estimated: 1-2 sessions for the Statement/Body/Program lifts plus
-ProofGrade projection.
+Recommend option (a) — W4.5 — because the W4.4 preservation
+theorem is the natural foundation for it, and W4.5 closes the
+last remaining "compiler-side" charter task. W4.2 is the largest
+remaining piece and benefits from being tackled with fresh
+context. W4.6 is small but is mostly a doc / role-swap task.
 
 If you would prefer to drive **W4.2** (source-to-IR correctness)
 instead, see the runbook's "Recommended Starting Subtask" section
@@ -281,8 +278,8 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The first technical step is the W4.4
-Statement / Body / Program-level preservation lifts (per-Expr is
-landed). If you prefer strict deliverable order, the runbook's
-"Recommended Starting Subtask" section also documents the W4.2
-source-to-IR AST-pull-back framing.
+Begin with the runbook. The recommended next subtask is W4.5
+(manifest-exactness semantics-preserving lift). Alternative
+options are W4.2 (source-to-IR correctness, larger scope) and
+W4.6 (artifact-checker demotion, smaller scope but mostly a
+role-swap).
