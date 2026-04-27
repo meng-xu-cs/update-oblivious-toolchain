@@ -488,125 +488,253 @@ partial def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
 
 end
 
+/-! ## Store-update helpers
+
+`cellSet` / `arraySet` / `mapPut` use these helpers to perform the
+predicate-driven masked-store update. The masked semantics says: the
+runtime always performs a write (so the access pattern is public); the
+data written is `if pred then newValue else currentValue`. For the
+W4.1 evaluator's value-flow tracking, this is equivalent to "write
+when pred is true (or absent), leave unchanged otherwise."
+
+The store choice (public vs secret) is determined by the object's
+`StateObject.confidential` flag, looked up in `cfg.contract.state`. If
+the object has no entry there (a malformed program), the evaluator
+defaults to the public store, which the W4.3 admission would already
+have rejected. -/
+
+/-- True if the object is declared as `confidential` in the contract's
+state list. Defaults to `false` (public) for unknown objects. -/
+def OperationalConfig.objectIsConfidential
+    (cfg : OperationalConfig) (objectId : Nat) : Bool :=
+  match cfg.contract.state.find? (fun so => so.id = objectId) with
+  | some so => so.confidential
+  | none => false
+
+/-- Update the object's value in the appropriate store (public or secret
+based on confidentiality). -/
+def OperationalConfig.writeObject
+    (cfg : OperationalConfig) (objectId : Nat) (value : Value) :
+    OperationalConfig :=
+  if cfg.objectIsConfidential objectId then
+    { cfg with secretState := cfg.secretState.insert objectId value }
+  else
+    { cfg with publicState := cfg.publicState.insert objectId value }
+
+/-- Read the object's value from the appropriate store. Public store
+takes precedence; if not found, fall back to the secret store. -/
+def OperationalConfig.readObject
+    (cfg : OperationalConfig) (objectId : Nat) : Option Value :=
+  match cfg.publicState.lookup objectId with
+  | some v => some v
+  | none => cfg.secretState.lookup objectId
+
+/-- Replace the element at `index` in a `Value.array`'s underlying list.
+Returns the original list if `index` is out of bounds. The W4.1
+evaluator's caller turns out-of-bounds into an explicit
+`EvalStatus.evalError`. -/
+def Value.arraySetAt (values : List Value) (index : Nat) (newVal : Value) :
+    List Value :=
+  values.mapIdx (fun i v => if i = index then newVal else v)
+
+/-- Insert or update a `(key, value)` entry in a map's entry list. If a
+matching key exists (by `Value.beq`), replace its value; otherwise
+prepend a new entry. -/
+def Value.mapInsert (entries : List (Value × Value)) (key value : Value) :
+    List (Value × Value) :=
+  if entries.any (fun entry => Value.beq entry.fst key) then
+    entries.map (fun entry =>
+      if Value.beq entry.fst key then (entry.fst, value) else entry)
+  else
+    (key, value) :: entries
+
 mutual
 
-/-- Big-step statement evaluator step: takes a configuration, environment,
-running outcome, and a single statement; returns the updated environment
-and outcome. The evaluator stops as soon as a `retStmt` lands or any
-non-`completed` status is recorded.
+/-- Big-step statement evaluator step. Threads an updated
+`OperationalConfig` through so `cellSet` / `arraySet` / `mapPut` can
+perform predicate-driven masked-store updates and so subsequent
+statements observe the new store.
 
 `evalStatement` and `evalBody` are mutually recursive so that
 `Statement.ifStmt` and `Statement.forLoop` can recurse into nested
 statement bodies via `evalBody`. -/
 partial def evalStatement
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
-    Statement → LocalEnv × Outcome
+    Statement → OperationalConfig × LocalEnv × Outcome
   | .declare name _ value =>
       match evalExpr cfg env value with
-      | .value v => (env.insert name v, oc)
-      | .status s => (env, { oc with status := s })
+      | .value v => (cfg, env.insert name v, oc)
+      | .status s => (cfg, env, { oc with status := s })
   | .assign name value =>
       match evalExpr cfg env value with
-      | .value v => (env.insert name v, oc)
-      | .status s => (env, { oc with status := s })
+      | .value v => (cfg, env.insert name v, oc)
+      | .status s => (cfg, env, { oc with status := s })
   | .require cond =>
       match evalExpr cfg env cond with
-      | .value (.bool true) => (env, oc)
-      | .value (.bool false) => (env, { oc with status := .requireFailed })
-      | .value _ => (env, { oc with status := .evalError "require not boolean" })
-      | .status s => (env, { oc with status := s })
+      | .value (.bool true) => (cfg, env, oc)
+      | .value (.bool false) => (cfg, env, { oc with status := .requireFailed })
+      | .value _ => (cfg, env, { oc with status := .evalError "require not boolean" })
+      | .status s => (cfg, env, { oc with status := s })
   | .abortIf cond =>
       match evalExpr cfg env cond with
-      | .value (.bool true) => (env, { oc with status := .abortedByUser })
-      | .value (.bool false) => (env, oc)
-      | .value _ => (env, { oc with status := .evalError "abortIf not boolean" })
-      | .status s => (env, { oc with status := s })
-  | .cellSet _objectId value _predicate =>
-      -- The predicate is part of the secret-conditional store update; the
-      -- W4.1 evaluator records the cell update through the kernel-step
-      -- surface and leaves predicate-driven masking and store mutation to
-      -- the follow-up commits that prove the masked-store theorem.
+      | .value (.bool true) => (cfg, env, { oc with status := .abortedByUser })
+      | .value (.bool false) => (cfg, env, oc)
+      | .value _ => (cfg, env, { oc with status := .evalError "abortIf not boolean" })
+      | .status s => (cfg, env, { oc with status := s })
+  | .cellSet objectId value predicate =>
+      -- Masked-store semantics: write the new value when the predicate
+      -- is true (or absent); leave the cell unchanged otherwise. The
+      -- kernel step is recorded unconditionally to mirror the runtime's
+      -- always-write access pattern.
       match evalExpr cfg env value with
-      | .value _ =>
-          (env, { oc with kernelSteps := oc.kernelSteps ++ ["CellSet"] })
-      | .status s => (env, { oc with status := s })
-  | .arraySet _objectId index value _predicate =>
-      -- Mirrors the cellSet handling: evaluate the index and value
-      -- expressions, track the kernel step, leave the masked store
-      -- mutation to a follow-up commit.
+      | .status s => (cfg, env, { oc with status := s })
+      | .value newVal =>
+          let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["CellSet"] }
+          match predicate with
+          | none =>
+              (cfg.writeObject objectId newVal, env, oc')
+          | some predExpr =>
+              match evalExpr cfg env predExpr with
+              | .status s => (cfg, env, { oc with status := s })
+              | .value (.bool true) =>
+                  (cfg.writeObject objectId newVal, env, oc')
+              | .value (.bool false) => (cfg, env, oc')
+              | .value _ =>
+                  (cfg, env, { oc with status := .evalError "cellSet predicate not boolean" })
+  | .arraySet objectId index value predicate =>
       match evalExpr cfg env index with
-      | .status s => (env, { oc with status := s })
-      | .value _ =>
+      | .status s => (cfg, env, { oc with status := s })
+      | .value indexVal =>
           match evalExpr cfg env value with
-          | .status s => (env, { oc with status := s })
-          | .value _ =>
-              (env, { oc with kernelSteps := oc.kernelSteps ++ ["ArraySet"] })
-  | .mapPut _objectId key value _predicate =>
+          | .status s => (cfg, env, { oc with status := s })
+          | .value newVal =>
+              let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["ArraySet"] }
+              -- Resolve "should we write?" based on the predicate, then
+              -- if writing, replace `array[index]` in the stored
+              -- `Value.array`.
+              let shouldWrite : Except EvalStatus Bool :=
+                match predicate with
+                | none => .ok true
+                | some predExpr =>
+                    match evalExpr cfg env predExpr with
+                    | .status s => .error s
+                    | .value (.bool true) => .ok true
+                    | .value (.bool false) => .ok false
+                    | .value _ =>
+                        .error (.evalError "arraySet predicate not boolean")
+              match shouldWrite with
+              | .error s => (cfg, env, { oc with status := s })
+              | .ok false => (cfg, env, oc')
+              | .ok true =>
+                  match indexVal with
+                  | .uint idx =>
+                      match cfg.readObject objectId with
+                      | some (.array values) =>
+                          if idx ≥ values.length then
+                            let msg := s!"arraySet index {idx} out of bounds"
+                            (cfg, env, { oc with status := .evalError msg })
+                          else
+                            let updated := Value.array (Value.arraySetAt values idx newVal)
+                            (cfg.writeObject objectId updated, env, oc')
+                      | some _ =>
+                          let msg := s!"arraySet on non-array object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
+                      | none =>
+                          let msg := s!"arraySet on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
+                  | _ =>
+                      (cfg, env, { oc with status := .evalError "arraySet index not uint" })
+  | .mapPut objectId key value predicate =>
       match evalExpr cfg env key with
-      | .status s => (env, { oc with status := s })
-      | .value _ =>
+      | .status s => (cfg, env, { oc with status := s })
+      | .value keyVal =>
           match evalExpr cfg env value with
-          | .status s => (env, { oc with status := s })
-          | .value _ =>
-              (env, { oc with kernelSteps := oc.kernelSteps ++ ["MapPut"] })
+          | .status s => (cfg, env, { oc with status := s })
+          | .value newVal =>
+              let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["MapPut"] }
+              let shouldWrite : Except EvalStatus Bool :=
+                match predicate with
+                | none => .ok true
+                | some predExpr =>
+                    match evalExpr cfg env predExpr with
+                    | .status s => .error s
+                    | .value (.bool true) => .ok true
+                    | .value (.bool false) => .ok false
+                    | .value _ =>
+                        .error (.evalError "mapPut predicate not boolean")
+              match shouldWrite with
+              | .error s => (cfg, env, { oc with status := s })
+              | .ok false => (cfg, env, oc')
+              | .ok true =>
+                  match cfg.readObject objectId with
+                  | some (.map entries) =>
+                      let updated := Value.map (Value.mapInsert entries keyVal newVal)
+                      (cfg.writeObject objectId updated, env, oc')
+                  | some _ =>
+                      let msg := s!"mapPut on non-map object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
+                  | none =>
+                      -- New map: start a fresh entries list.
+                      let updated := Value.map [(keyVal, newVal)]
+                      (cfg.writeObject objectId updated, env, oc')
   | .ifStmt cond thenBody elseBody =>
       -- Public-conditional control flow: evaluate the condition, then
       -- recurse into the chosen branch via `evalBody`.
       match evalExpr cfg env cond with
-      | .status s => (env, { oc with status := s })
+      | .status s => (cfg, env, { oc with status := s })
       | .value (.bool true) => evalBody cfg env oc thenBody
       | .value (.bool false) => evalBody cfg env oc elseBody
-      | .value _ => (env, { oc with status := .evalError "if condition not boolean" })
+      | .value _ => (cfg, env, { oc with status := .evalError "if condition not boolean" })
   | .forLoop _loopId indexVar startExpr endExpr body =>
       -- Bounded loop: the admitted fragment requires `start` and `end`
       -- to be public, so the iteration count is fixed by the public
       -- projection.
       match evalExpr cfg env startExpr with
-      | .status s => (env, { oc with status := s })
+      | .status s => (cfg, env, { oc with status := s })
       | .value startVal =>
           match evalExpr cfg env endExpr with
-          | .status s => (env, { oc with status := s })
+          | .status s => (cfg, env, { oc with status := s })
           | .value endVal =>
               match startVal, endVal with
               | .uint startN, .uint endN =>
                   evalForLoop cfg env oc indexVar startN endN body
               | _, _ =>
-                  (env, { oc with status := .evalError "for-loop bounds not uint" })
-  | .retStmt none => (env, oc)
+                  (cfg, env, { oc with status := .evalError "for-loop bounds not uint" })
+  | .retStmt none => (cfg, env, oc)
   | .retStmt (some value) =>
       match evalExpr cfg env value with
-      | .value v => (env, { oc with publicResult := some v })
-      | .status s => (env, { oc with status := s })
+      | .value v => (cfg, env, { oc with publicResult := some v })
+      | .status s => (cfg, env, { oc with status := s })
 
 partial def evalBody
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
-    List Statement → LocalEnv × Outcome
-  | [] => (env, oc)
+    List Statement → OperationalConfig × LocalEnv × Outcome
+  | [] => (cfg, env, oc)
   | stmt :: rest =>
-      let (env', oc') := evalStatement cfg env oc stmt
+      let (cfg', env', oc') := evalStatement cfg env oc stmt
       match oc'.status with
       | .completed =>
-          if oc'.publicResult.isSome then (env', oc')
-          else evalBody cfg env' oc' rest
-      | _ => (env', oc')
+          if oc'.publicResult.isSome then (cfg', env', oc')
+          else evalBody cfg' env' oc' rest
+      | _ => (cfg', env', oc')
 
 /-- Bounded for-loop helper. The loop runs from `i` (inclusive) to `endN`
 (exclusive). Each iteration binds `indexVar` to `Value.uint i` and
-walks `body` via `evalBody`. The loop exits early on a `retStmt` or any
-non-`completed` status. -/
+walks `body` via `evalBody`, threading the updated config through. The
+loop exits early on a `retStmt` or any non-`completed` status. -/
 partial def evalForLoop
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
     (indexVar : String) (i endN : Nat) (body : List Statement) :
-    LocalEnv × Outcome :=
-  if i ≥ endN then (env, oc)
+    OperationalConfig × LocalEnv × Outcome :=
+  if i ≥ endN then (cfg, env, oc)
   else
     let env' := env.insert indexVar (.uint i)
-    let (env'', oc') := evalBody cfg env' oc body
+    let (cfg', env'', oc') := evalBody cfg env' oc body
     match oc'.status with
     | .completed =>
-        if oc'.publicResult.isSome then (env'', oc')
-        else evalForLoop cfg env'' oc' indexVar (i + 1) endN body
-    | _ => (env'', oc')
+        if oc'.publicResult.isSome then (cfg', env'', oc')
+        else evalForLoop cfg' env'' oc' indexVar (i + 1) endN body
+    | _ => (cfg', env'', oc')
 
 end
 
@@ -630,7 +758,10 @@ def OperationalConfig.initialEnv (cfg : OperationalConfig)
     none
 
 /-- Big-step contract evaluator. Looks up the entrypoint, binds arguments,
-walks the body, and returns the resulting `Outcome`. -/
+walks the body, and returns the resulting `Outcome`. The final
+`OperationalConfig` (with all store updates applied) and `LocalEnv`
+are discarded; downstream paper-facing theorems care only about the
+outcome's public projection / kernel-step trace / public result. -/
 def evalContract (cfg : OperationalConfig) : Outcome :=
   match cfg.entrypointFn? with
   | none =>
@@ -640,7 +771,7 @@ def evalContract (cfg : OperationalConfig) : Outcome :=
       | none =>
           { Outcome.empty with status := .evalError "argument arity mismatch" }
       | some env =>
-          let (_env', outcome) := evalBody cfg env Outcome.empty fn.body
+          let (_cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
           outcome
 
 end IR
