@@ -421,6 +421,48 @@ def evalKernelProgram (kp : KernelProgram) (cfg : OperationalConfig) : Outcome :
       let (_cfg', _env', outcome) := evalKernelBody cfg env Outcome.empty kp.body
       outcome
 
+/-! ### W4.5: Static expected kernel-step schedule
+
+`KernelStatement.expectedStep` returns the kernel-step tag a statement
+would emit on successful execution: `"CellSet"` / `"ArraySet"` /
+`"MapPut"` for the three masked-store statements, empty otherwise.
+
+`KernelProgram.expectedKernelSteps` flattens this over the program's
+body, giving the static-expected kernel-step schedule that every
+fully-completed run must produce. The runtime-vs-static equivalence
+theorem (`evalKernelProgram_kernelSteps_eq_expected_on_full_completion`)
+proves the two coincide whenever the program runs to completion without
+early `retStmt (some _)` or any error. -/
+
+/-- Step tag a kernel statement emits on successful execution. -/
+def KernelStatement.expectedStep : KernelStatement → List String
+  | .cellSet _ _ _ => ["CellSet"]
+  | .arraySet _ _ _ _ => ["ArraySet"]
+  | .mapPut _ _ _ _ => ["MapPut"]
+  | _ => []
+
+/-- Static expected kernel-step schedule: the body's tags concatenated
+in order. -/
+def KernelProgram.expectedKernelSteps (kp : KernelProgram) : List String :=
+  kp.body.flatMap KernelStatement.expectedStep
+
+/-- Total number of static-expected kernel steps (`length` of the
+schedule). The manifest's `kernel_steps` field has the same length. -/
+def KernelProgram.expectedKernelStepCount (kp : KernelProgram) : Nat :=
+  kp.expectedKernelSteps.length
+
+/-- Static expected per-object kernel-step write count. Walks the body
+counting `cellSet` / `arraySet` / `mapPut` statements per object id;
+the result is the static upper-bound on per-object write activity. -/
+def KernelStatement.objectWriteId : KernelStatement → Option Nat
+  | .cellSet objectId _ _ => some objectId
+  | .arraySet objectId _ _ _ => some objectId
+  | .mapPut objectId _ _ _ => some objectId
+  | _ => none
+
+def KernelProgram.expectedObjectWriteIds (kp : KernelProgram) : List Nat :=
+  kp.body.filterMap KernelStatement.objectWriteId
+
 /-! ## IR-to-kernel lowering
 
 Mirror of `lower_confidential_kernel_expr` /

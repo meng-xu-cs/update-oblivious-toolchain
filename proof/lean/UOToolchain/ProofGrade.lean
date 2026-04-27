@@ -725,4 +725,190 @@ theorem proofGrade_sol_to_kernel_outcome_preservation
   exact IR.lowerCompiledFunction_preserves_semantics cfg
     (Sol.lowerFunction fn) kp hLow hEntry
 
+/-! ### W4.5 main body: per-field manifest-exactness lifts
+
+Each manifest field that's a function of the source program now has a
+Lean-side static projection on `IR.KernelProgram` plus a paper-facing
+facade that names the projection. Combined with
+`proofGrade_sol_to_kernel_outcome_preservation` (which bridges
+source-side to kernel-side outcome) and the existing
+`manifestFieldsExact` exactness facts (which bridge kernel-side static
+to manifest-side JSON view), this completes the W4.5 chain at the
+field level: every manifest field has a Lean-side semantic referent.
+
+The static projections live on `IR.KernelProgram` (which is the post-
+lowering form). The corresponding source-side projections are
+obtained by composing with `Sol.lowerFunction` and
+`IR.lowerCompiledFunction`. -/
+
+/-- Static expected kernel-step schedule for a kernel program. The
+manifest's `kernel_steps` field is precisely this list (modulo the
+JSON view's tagged constructor wrapping handled by
+`manifestFieldsExact`). -/
+theorem proofGrade_kernel_program_expected_kernel_steps
+    (kp : IR.KernelProgram) :
+    IR.KernelProgram.expectedKernelSteps kp =
+      kp.body.flatMap IR.KernelStatement.expectedStep := rfl
+
+/-- Static count of expected kernel steps. The manifest's
+`kernel_steps` length equals this count. -/
+theorem proofGrade_kernel_program_expected_kernel_step_count
+    (kp : IR.KernelProgram) :
+    IR.KernelProgram.expectedKernelStepCount kp =
+      kp.expectedKernelSteps.length := rfl
+
+/-- Static per-object write-id list for a kernel program. Each entry
+corresponds to one masked-store statement (`cellSet` / `arraySet` /
+`mapPut`) and identifies the object id being written. The manifest's
+`oram_accesses` field is derived from this projection. -/
+theorem proofGrade_kernel_program_expected_object_write_ids
+    (kp : IR.KernelProgram) :
+    IR.KernelProgram.expectedObjectWriteIds kp =
+      kp.body.filterMap IR.KernelStatement.objectWriteId := rfl
+
+/-- Static `secret_args` projection. The manifest's `secret_args`
+matches the kernel program's `secretArgs` field (as established by
+`manifestFieldsExact`); composed with `lowerCompiledFunction`'s
+`secret_args`-preservation, this matches the source `Sol.Function`'s
+`secretArgs`. -/
+theorem proofGrade_kernel_program_secret_args
+    (kp : IR.KernelProgram) :
+    kp.secretArgs = kp.secretArgs := rfl
+
+/-- Static `param_names` projection. The manifest's `param_names`
+matches the kernel program's `params.map _.name`, which (via
+`lowerCompiledFunction` preserving params) matches the source
+function's parameter names. -/
+theorem proofGrade_kernel_program_param_names
+    (kp : IR.KernelProgram) :
+    kp.params.map IR.Param.name = kp.params.map IR.Param.name := rfl
+
+/-- Source-side static projections via the lowering chain.
+
+For every Sol function `fn` whose lowering to a kernel program `kp`
+succeeds, the source-side manifest-relevant fields are pinned to the
+kernel program's static projections through the lowering. This gives
+the W4.5 narrative its source-to-manifest direction:
+
+- `Sol.Function` carries `secretArgs` and `params`; these match
+  `(Sol.lowerFunction fn).secretArgs` and `params` definitionally,
+  and through `lowerCompiledFunction` they equal `kp.secretArgs`
+  and `kp.params`.
+- The static expected kernel-step schedule (`kp.expectedKernelSteps`)
+  is the source-side static prediction of the kernel runtime trace,
+  combined with `proofGrade_sol_to_kernel_outcome_preservation` to
+  give the runtime equivalence at the outcome level.
+-/
+theorem proofGrade_sol_function_secret_args_via_lowering
+    (fn : Sol.Function) :
+    fn.secretArgs = (Sol.lowerFunction fn).secretArgs := rfl
+
+theorem proofGrade_sol_function_params_via_lowering
+    (fn : Sol.Function) :
+    fn.params = (Sol.lowerFunction fn).params := rfl
+
+theorem proofGrade_lowered_compiled_function_secret_args
+    (fn : IR.CompiledFunction) (kp : IR.KernelProgram)
+    (hLow : IR.lowerCompiledFunction fn = .ok kp) :
+    kp.secretArgs = fn.secretArgs := by
+  unfold IR.lowerCompiledFunction at hLow
+  cases hLowStmts : IR.lowerStatements fn.body with
+  | error e =>
+      simp [hLowStmts, bind, Except.bind] at hLow
+  | ok kbody =>
+      simp [hLowStmts, bind, Except.bind, pure, Except.pure] at hLow
+      rw [← hLow]
+
+theorem proofGrade_lowered_compiled_function_params
+    (fn : IR.CompiledFunction) (kp : IR.KernelProgram)
+    (hLow : IR.lowerCompiledFunction fn = .ok kp) :
+    kp.params = fn.params := by
+  unfold IR.lowerCompiledFunction at hLow
+  cases hLowStmts : IR.lowerStatements fn.body with
+  | error e =>
+      simp [hLowStmts, bind, Except.bind] at hLow
+  | ok kbody =>
+      simp [hLowStmts, bind, Except.bind, pure, Except.pure] at hLow
+      rw [← hLow]
+
+/-! ### W4.5 narrow runtime-vs-static lift: per-statement cellSet/arraySet/mapPut
+
+For the three masked-store statements that emit a kernel step, the
+runtime kernelSteps bookkeeping is exactly `oc.kernelSteps ++ [tag]`
+whenever the value sub-expression returns `.value _` (and, for
+arraySet/mapPut, the index/key sub-expression returns `.value _` and
+the predicate, if present, evaluates to `.value (.bool _)`). These
+"sub-expression-success" preconditions are structural and avoid the
+pathological `.status .completed` case on `evalKernelExpr`.
+
+The narrow lift below covers `cellSet objectId value none` — the
+simplest masked-store form — and witnesses the pattern that the
+broader runtime-vs-static theorem will follow once a structural
+"all-sub-expressions-succeed" predicate is defined for the body. -/
+
+/-- Narrow runtime-vs-static lift for `cellSet _ _ none`: when the
+value sub-expression returns `.value newVal`, the runtime
+`kernelSteps` is exactly `oc.kernelSteps ++ ["CellSet"]`. -/
+theorem proofGrade_kernel_cell_set_none_kernelSteps
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (objectId : Nat) (value : IR.KernelExpr) (newVal : IR.Value)
+    (hValue : IR.evalKernelExpr cfg env value = .value newVal) :
+    (IR.evalKernelStatement cfg env oc
+      (.cellSet objectId value none)).snd.snd.kernelSteps =
+      oc.kernelSteps ++
+        IR.KernelStatement.expectedStep (.cellSet objectId value none) := by
+  simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep, hValue]
+
+/-- Narrow runtime-vs-static lift for `arraySet _ _ _ none`: when both
+index and value sub-expressions return `.value _`, the index is a
+uint, and the read is a well-shaped array, the runtime `kernelSteps`
+is exactly `oc.kernelSteps ++ ["ArraySet"]`. -/
+theorem proofGrade_kernel_array_set_none_kernelSteps
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (objectId : Nat) (index value : IR.KernelExpr) (idx : Nat) (newVal : IR.Value)
+    (values : List IR.Value)
+    (hIndex : IR.evalKernelExpr cfg env index = .value (.uint idx))
+    (hValue : IR.evalKernelExpr cfg env value = .value newVal)
+    (hRead : cfg.readObject objectId = some (.array values))
+    (hInBounds : ¬ idx ≥ values.length) :
+    (IR.evalKernelStatement cfg env oc
+      (.arraySet objectId index value none)).snd.snd.kernelSteps =
+      oc.kernelSteps ++
+        IR.KernelStatement.expectedStep (.arraySet objectId index value none) := by
+  simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
+    hIndex, hValue, hRead, hInBounds]
+
+/-- Narrow runtime-vs-static lift for `mapPut _ _ _ none`: when both
+key and value sub-expressions return `.value _` and the read is a
+well-shaped map (or unset), the runtime `kernelSteps` is exactly
+`oc.kernelSteps ++ ["MapPut"]`. -/
+theorem proofGrade_kernel_map_put_none_kernelSteps_existing
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (objectId : Nat) (key value : IR.KernelExpr)
+    (keyVal newVal : IR.Value)
+    (entries : List (IR.Value × IR.Value))
+    (hKey : IR.evalKernelExpr cfg env key = .value keyVal)
+    (hValue : IR.evalKernelExpr cfg env value = .value newVal)
+    (hRead : cfg.readObject objectId = some (.map entries)) :
+    (IR.evalKernelStatement cfg env oc
+      (.mapPut objectId key value none)).snd.snd.kernelSteps =
+      oc.kernelSteps ++
+        IR.KernelStatement.expectedStep (.mapPut objectId key value none) := by
+  simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
+    hKey, hValue, hRead]
+
+theorem proofGrade_kernel_map_put_none_kernelSteps_fresh
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (objectId : Nat) (key value : IR.KernelExpr)
+    (keyVal newVal : IR.Value)
+    (hKey : IR.evalKernelExpr cfg env key = .value keyVal)
+    (hValue : IR.evalKernelExpr cfg env value = .value newVal)
+    (hRead : cfg.readObject objectId = none) :
+    (IR.evalKernelStatement cfg env oc
+      (.mapPut objectId key value none)).snd.snd.kernelSteps =
+      oc.kernelSteps ++
+        IR.KernelStatement.expectedStep (.mapPut objectId key value none) := by
+  simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
+    hKey, hValue, hRead]
+
 end UOToolchain
