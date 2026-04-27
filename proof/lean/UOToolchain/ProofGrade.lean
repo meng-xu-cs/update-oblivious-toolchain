@@ -1143,4 +1143,64 @@ theorem proofGrade_runtime_store_codec_uo_slot_aad_prefix
       "uo_store:" ++ object :=
   RuntimeStoreCodecSemantics.uoStoreSlotAad_prefix_publicShape object
 
+/-! ### WP5 Cryptographic-Assumption Provenance Facades
+
+The facades below expose the W5.4 cryptographic-assumption provenance
+metadata: every concrete instance of `PathOramLocalPosmapV1SecurityAssumptions`
+is paired with the runtime-pinned `pathOramLocalPosmapV1_cryptoProvenance`
+record, which carries the explicit citation markers (RFC 8439, Procter
+2014 IACR ePrint) plus the static-drift check name pinning the Rust
+crypto surface (`runtime_crypto_primitive_identity_pinned`).
+
+Claim taxonomy: these facades are **Cited / externally justified** for
+`bucketEncryptionINDCPA` and `metadataEncryptionINDCPA`. The assumptions
+remain explicit in the bundle; the provenance projection makes the
+citation pairing accessible at the Lean type level. The static-drift
+check pins the Rust source's continued use of the cited primitive. The
+Lean codec-semantics constants (`cipherKeyBytes = 32`, `sealedNonceBytes
+= 12`, `sealedTagBytes = 16`) pin the corresponding shape obligations. -/
+
+/-- Paper-facing crypto-provenance pinning facade. Every concrete
+`PathOramLocalPosmapV1SecurityAssumptions` instance projects to the
+runtime-pinned cryptographic provenance record; the Rust crypto
+primitive identity is fixed by the source-pinned
+`runtime_crypto_primitive_identity_pinned` static-drift check. -/
+theorem proofGrade_path_oram_local_posmap_v1_crypto_provenance_pinned
+    (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+    assumptions.cryptoProvenance =
+      pathOramLocalPosmapV1_cryptoProvenance :=
+  PathOramLocalPosmapV1SecurityAssumptions.cryptoProvenance_pinned
+    assumptions
+
+/-- Paper-facing crypto-provenance cipher-key length facade.
+The runtime crypto primitive uses a 32-byte ChaCha20-Poly1305 key,
+matching RFC 8439 section 2.5 and the Rust `key: [u8; 32]` buffer. -/
+theorem proofGrade_path_oram_local_posmap_v1_crypto_provenance_cipher_key_bytes :
+    pathOramLocalPosmapV1_cryptoProvenance.cipherKeyBytes = 32 :=
+  pathOramLocalPosmapV1_cryptoProvenance_cipherKeyBytes_value
+
+/-- Paper-facing crypto-provenance nonce-length facade.
+The runtime crypto primitive uses a 12-byte ChaCha20-Poly1305 nonce,
+matching RFC 8439 section 2.3 and the Rust `Nonce::from_slice` 12-byte
+requirement. -/
+theorem proofGrade_path_oram_local_posmap_v1_crypto_provenance_nonce_bytes :
+    pathOramLocalPosmapV1_cryptoProvenance.nonceBytes = 12 :=
+  pathOramLocalPosmapV1_cryptoProvenance_nonceBytes_value
+
+/-- Paper-facing crypto-provenance tag-length facade.
+The runtime crypto primitive uses a 16-byte ChaCha20-Poly1305 tag,
+matching the RFC 8439 128-bit detached-tag size and the Rust
+`Tag::from_slice(tag_bytes)` requirement. -/
+theorem proofGrade_path_oram_local_posmap_v1_crypto_provenance_tag_bytes :
+    pathOramLocalPosmapV1_cryptoProvenance.tagBytes = 16 :=
+  pathOramLocalPosmapV1_cryptoProvenance_tagBytes_value
+
+/-- Paper-facing crypto-provenance static-drift check name facade.
+The provenance record references the named probe drift check that pins
+the Rust source still uses ChaCha20-Poly1305. -/
+theorem proofGrade_path_oram_local_posmap_v1_crypto_provenance_static_drift_check :
+    pathOramLocalPosmapV1_cryptoProvenance.staticDriftCheckName =
+      "runtime_crypto_primitive_identity_pinned" :=
+  pathOramLocalPosmapV1_cryptoProvenance_staticDriftCheckName
+
 end UOToolchain

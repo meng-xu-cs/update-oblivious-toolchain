@@ -221,6 +221,57 @@ This is not itself the theorem proving the repo’s confidentiality assumptions.
 It is the correct specification reference for the primitive actually used by
 the runtime.
 
+For the AEAD-security analysis pairing the IND-CPA assumptions
+(`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`) with the concrete
+ChaCha20-Poly1305 composition, the cited analysis is:
+
+- Gordon Procter.
+  "A Security Analysis of the Composition of ChaCha20 and Poly1305."
+  IACR Cryptology ePrint Archive, Report 2014/613, 2014.
+- <https://eprint.iacr.org/2014/613>
+
+This is the reference confirming the AEAD-style composition used by the
+runtime primitive provides confidentiality (IND-CPA) and integrity
+(INT-CTXT) under the standard security model. The repo's
+`bucketEncryptionINDCPA` and `metadataEncryptionINDCPA` assumptions are
+the IND-CPA half; integrity is a stronger property that is not
+load-bearing for the paper-main theorem but is also delivered by the
+primitive.
+
+## W5.4 Crypto Provenance Pairing
+
+The Lean side now pairs the encryption assumptions with explicit
+provenance metadata. The structure
+[`PathOramLocalPosmapV1CryptoProvenance`](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/PathOramLocalPosmapV1.lean)
+carries:
+
+- `primitive`: `chacha20poly1305::ChaCha20Poly1305`
+- `rfcCitation`: RFC 8439 (Nir, Langley 2018)
+- `aeadCompositionAnalysisCitation`: Procter 2014 (IACR ePrint
+  2014/613)
+- `staticDriftCheckName`: `runtime_crypto_primitive_identity_pinned`
+- `cipherKeyBytes`: 32 (matching
+  `RuntimeStoreCodecSemantics.cipherKeyBytes`)
+- `nonceBytes`: 12 (matching `sealedNonceBytes`)
+- `tagBytes`: 16 (matching `sealedTagBytes`)
+
+The bundle method-style projection
+`PathOramLocalPosmapV1SecurityAssumptions.cryptoProvenance` returns
+`pathOramLocalPosmapV1_cryptoProvenance` for any bundle instance: the
+Rust crypto primitive identity is fixed at the source level, so the
+provenance pairing is the same regardless of which logical assumption
+bundle is plugged in. The named
+`proofGrade_path_oram_local_posmap_v1_crypto_provenance_*` facades in
+`ProofGrade.lean` expose the constant-value pinning facts (32-byte key,
+12-byte nonce, 16-byte tag, named static-drift check) on the
+paper-facing surface.
+
+After W5.4, the WP5 claim taxonomy classifies the encryption
+assumptions as **Cited / externally justified**: the assumptions remain
+explicit in `PathOramLocalPosmapV1SecurityAssumptions`, but they are
+paired with the explicit RFC 8439 + Procter 2014 citations and the
+named probe drift check.
+
 ## Next Non-Doc Step
 
 The next non-documentation step for the current paper is no longer figuring out

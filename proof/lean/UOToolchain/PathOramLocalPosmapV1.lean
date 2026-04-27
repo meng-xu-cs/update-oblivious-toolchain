@@ -1,5 +1,6 @@
 import UOToolchain.Composition
 import UOToolchain.RuntimeCoins
+import UOToolchain.RuntimeStoreCodecSemantics
 import UOToolchain.SgxExactProjection
 import UOToolchain.SgxJointProjection
 import UOToolchain.TeeDeployment
@@ -15,6 +16,158 @@ structure PathOramLocalPosmapV1SecurityAssumptions where
   bucketEncryptionINDCPA : Prop
   metadataEncryptionINDCPA : Prop
   stashOverflowBounded : Prop
+
+/-! ### W5.4: Cryptographic-assumption provenance
+
+The two encryption assumptions in the bundle
+(`bucketEncryptionINDCPA` and `metadataEncryptionINDCPA`) are the
+load-bearing IND-CPA confidentiality hypotheses for the concrete
+sealed-record AEAD primitive used by the runtime. The runtime uses
+RFC 8439 ChaCha20-Poly1305 over a 32-byte key with fresh 12-byte nonces
+and 16-byte detached tags (see
+`runtime/uo-store/src/generated_surface.rs`). The probe's
+`runtime_crypto_primitive_identity_pinned` static-drift check pins the
+Rust source still uses this primitive; the Lean codec semantics layer
+(`RuntimeStoreCodecSemantics`) pins the corresponding shape obligations.
+
+The provenance structure below pairs the encryption assumptions with
+explicit citation markers for the primitive (RFC 8439) and the
+published AEAD-security analysis used to instantiate them
+(Procter ePrint 2014/613). The structure is metadata-only: it does not
+discharge the assumptions, but it documents the exact provenance route
+the WP5 paper-facing claim takes. The provenance stays paired with the
+explicit `PathOramLocalPosmapV1SecurityAssumptions` bundle as a
+**Cited / externally justified** provenance entry per the WP5 claim
+taxonomy. -/
+
+/-- Explicit cryptographic-provenance metadata for the
+`path_oram_local_posmap_v1` runtime's confidentiality-assumption
+primitives. This is the citation marker structure paired with the
+explicit `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA`
+assumptions: it carries the primitive identifier, the IETF specification
+reference, the published AEAD-security analysis citation, the static-
+drift check name pinning the Rust source, and the constants pinned by
+the codec semantics layer. -/
+structure PathOramLocalPosmapV1CryptoProvenance where
+  /-- Primitive identifier as it appears in the Rust source. -/
+  primitive : String
+  /-- IETF RFC defining the primitive. -/
+  rfcCitation : String
+  /-- BibTeX key for the RFC entry in
+  `docs/path-oram-theorem-sources.bib`. -/
+  rfcBibKey : String
+  /-- Citation for the published AEAD-security analysis used to
+  instantiate the IND-CPA assumption against the concrete primitive. -/
+  aeadCompositionAnalysisCitation : String
+  /-- BibTeX key for the AEAD composition-analysis entry in
+  `docs/path-oram-theorem-sources.bib`. -/
+  aeadCompositionAnalysisBibKey : String
+  /-- Probe static-drift check that pins the Rust source still uses the
+  cited primitive. -/
+  staticDriftCheckName : String
+  /-- Codec-key length in bytes pinned by the Lean
+  `RuntimeStoreCodecSemantics.cipherKeyBytes` constant. -/
+  cipherKeyBytes : Nat
+  /-- AEAD nonce length in bytes pinned by the Lean
+  `RuntimeStoreCodecSemantics.sealedNonceBytes` constant. -/
+  nonceBytes : Nat
+  /-- AEAD authentication-tag length in bytes pinned by the Lean
+  `RuntimeStoreCodecSemantics.sealedTagBytes` constant. -/
+  tagBytes : Nat
+deriving Repr, DecidableEq
+
+/-- The actual cryptographic provenance record for the
+`path_oram_local_posmap_v1` runtime: ChaCha20-Poly1305 AEAD as specified
+in RFC 8439 (Nir, Langley 2018), with composition security analyzed by
+Procter (IACR ePrint 2014/613). The probe's
+`runtime_crypto_primitive_identity_pinned` static-drift check pins the
+Rust crypto surface still uses this primitive; the Lean codec semantic
+constants pin the corresponding 32-byte key, 12-byte nonce, and
+16-byte tag size obligations. -/
+def pathOramLocalPosmapV1_cryptoProvenance :
+    PathOramLocalPosmapV1CryptoProvenance :=
+  { primitive := "chacha20poly1305::ChaCha20Poly1305"
+  , rfcCitation :=
+      "RFC 8439 (Nir, Langley 2018). ChaCha20 and Poly1305 for IETF Protocols."
+  , rfcBibKey := "RFC8439"
+  , aeadCompositionAnalysisCitation :=
+      "Procter 2014. A Security Analysis of the Composition of ChaCha20 and Poly1305. IACR Cryptology ePrint 2014/613."
+  , aeadCompositionAnalysisBibKey := "Procter2014ChaCha20Poly1305Analysis"
+  , staticDriftCheckName := "runtime_crypto_primitive_identity_pinned"
+  , cipherKeyBytes := RuntimeStoreCodecSemantics.cipherKeyBytes
+  , nonceBytes := RuntimeStoreCodecSemantics.sealedNonceBytes
+  , tagBytes := RuntimeStoreCodecSemantics.sealedTagBytes
+  }
+
+/-- Assumption-bundle method-style projection: every concrete instance of
+`PathOramLocalPosmapV1SecurityAssumptions` is paired with the same
+runtime-pinned cryptographic provenance record. The runtime crypto
+primitive identity is fixed by the source; this projection makes the
+provenance pairing accessible via dot notation on any bundle value. -/
+def PathOramLocalPosmapV1SecurityAssumptions.cryptoProvenance
+    (_ : PathOramLocalPosmapV1SecurityAssumptions) :
+    PathOramLocalPosmapV1CryptoProvenance :=
+  pathOramLocalPosmapV1_cryptoProvenance
+
+/-- The provenance record's pinned cipher-key length matches the codec
+semantic constant. -/
+theorem pathOramLocalPosmapV1_cryptoProvenance_cipherKeyBytes :
+    pathOramLocalPosmapV1_cryptoProvenance.cipherKeyBytes =
+      RuntimeStoreCodecSemantics.cipherKeyBytes := by
+  rfl
+
+/-- The provenance record's pinned nonce length matches the codec
+semantic constant. -/
+theorem pathOramLocalPosmapV1_cryptoProvenance_nonceBytes :
+    pathOramLocalPosmapV1_cryptoProvenance.nonceBytes =
+      RuntimeStoreCodecSemantics.sealedNonceBytes := by
+  rfl
+
+/-- The provenance record's pinned tag length matches the codec
+semantic constant. -/
+theorem pathOramLocalPosmapV1_cryptoProvenance_tagBytes :
+    pathOramLocalPosmapV1_cryptoProvenance.tagBytes =
+      RuntimeStoreCodecSemantics.sealedTagBytes := by
+  rfl
+
+/-- The provenance record's pinned cipher-key length is exactly 32 bytes,
+matching RFC 8439 section 2.5 (256-bit ChaCha20-Poly1305 key) and the
+Rust `key: [u8; 32]` buffer. -/
+theorem pathOramLocalPosmapV1_cryptoProvenance_cipherKeyBytes_value :
+    pathOramLocalPosmapV1_cryptoProvenance.cipherKeyBytes = 32 := by
+  rfl
+
+/-- The provenance record's pinned nonce length is exactly 12 bytes,
+matching the RFC 8439 ChaCha20-Poly1305 96-bit nonce and the Rust
+`Nonce::from_slice` 12-byte requirement. -/
+theorem pathOramLocalPosmapV1_cryptoProvenance_nonceBytes_value :
+    pathOramLocalPosmapV1_cryptoProvenance.nonceBytes = 12 := by
+  rfl
+
+/-- The provenance record's pinned tag length is exactly 16 bytes,
+matching the RFC 8439 ChaCha20-Poly1305 128-bit authentication tag and
+the Rust `Tag::from_slice(tag_bytes)` requirement. -/
+theorem pathOramLocalPosmapV1_cryptoProvenance_tagBytes_value :
+    pathOramLocalPosmapV1_cryptoProvenance.tagBytes = 16 := by
+  rfl
+
+/-- The provenance record references the
+`runtime_crypto_primitive_identity_pinned` probe static-drift check.
+This is the named hook that rejects representative drift if the Rust
+crypto surface stops using ChaCha20-Poly1305. -/
+theorem pathOramLocalPosmapV1_cryptoProvenance_staticDriftCheckName :
+    pathOramLocalPosmapV1_cryptoProvenance.staticDriftCheckName =
+      "runtime_crypto_primitive_identity_pinned" := by
+  rfl
+
+/-- The provenance projection on the assumption bundle returns the
+runtime-pinned provenance record, regardless of which bundle instance is
+chosen. The Rust crypto primitive identity is fixed at the source level;
+the bundle projection only exposes that fact at the type level. -/
+theorem PathOramLocalPosmapV1SecurityAssumptions.cryptoProvenance_pinned
+    (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+    assumptions.cryptoProvenance = pathOramLocalPosmapV1_cryptoProvenance := by
+  rfl
 
 def PathOramLocalPosmapV1SecurityAssumptions.toCanonicalLeafValueSecurityAssumptions
   (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
