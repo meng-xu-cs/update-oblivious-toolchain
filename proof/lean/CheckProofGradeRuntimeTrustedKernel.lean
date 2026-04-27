@@ -5,6 +5,16 @@ open UOToolchain
 def usage : String :=
   "usage: checkProofGradeRuntimeTrustedKernel <bundle.json> <page-model> <exit-model> <shared-resource-model>"
 
+/-- Paper-grade witness theorem (W7.2): validated imported runtime
+trusted-kernel slot bundles preserve validity through the
+`toRuntimeTrustedKernelSlotBundle` projection. -/
+theorem importedRuntimeTrustedKernelSlotBundle_validates_toRuntimeValid
+  (bundle : ImportedRuntimeTrustedKernelSlotBundle)
+  (modelTags : SGXModelTags)
+  (hValid : bundle.Valid modelTags) :
+  bundle.toRuntimeTrustedKernelSlotBundle.Valid modelTags :=
+  importedRuntimeTrustedKernelSlotBundle_toRuntimeValid bundle modelTags hValid
+
 def main (args : List String) : IO UInt32 := do
   match args with
   | [path, pageModel, exitModel, sharedResourceModel] =>
