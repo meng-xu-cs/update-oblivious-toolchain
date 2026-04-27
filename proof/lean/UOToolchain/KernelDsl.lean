@@ -910,37 +910,52 @@ theorem kernelLowerable_implies_lowerCompiledFunction_ok
   rw [hks]
   rfl
 
-/-! ### W4.4 Session B-2: semantics-preservation (per-Expr, partial)
+/-! ### W4.4 Session B-2: semantics-preservation (deferred)
 
-The W4.4 charter task 4 ultimately requires proving that the kernel
-DSL's evaluator agrees with the IR evaluator on the lowered program:
+The W4.4 charter task 4 ultimately requires:
 `lowerExpr e = .ok ke → evalExpr cfg env e = evalKernelExpr cfg env ke`,
-and similarly for pure expressions, statements, statement lists, and
-compiled functions.
+and analogously for pure expressions, statements, statement lists,
+and compiled functions.
 
-The IR evaluator (`evalExpr` in `IRSemantics.lean`) and the kernel
-DSL evaluator (`evalKernelExpr` here) are constructor-for-constructor
-mirror images on the supported subset, so the preservation theorem is
-true by structural induction. The proof is mechanical mutual recursion
-on the lowering structure. Each case unfolds both the lowering and
-the corresponding evaluator branches, then uses the induction
-hypothesis to align the recursive calls.
+**Blocker discovered while attempting B-2:** the W4.1 `evalExpr` /
+`evalStatement` / `evalBody` / `evalForLoop` and the W4.4 Session A
+`evalKernelExpr` / `evalKernelPureExpr` / `evalKernelStatement` /
+`evalKernelBody` are all `partial def`, which Lean 4 does *not*
+automatically reduce by `rfl` / `simp`. Proving even
+`evalExpr cfg env (.literal v) = .value v` requires either
+(a) re-defining the evaluators as `def` with explicit termination
+proofs, (b) using the `partial def`'s opaque `Lean.Elab.WF.eqns_*`
+generated lemmas, or (c) defining the preservation theorem directly
+on the structural recursion principle of `Expr` and `Statement`
+without going through the evaluators' reduction behavior.
 
-Two equivalences worth checking when porting these proofs:
+Recommended path forward (for the next coding agent):
+
+1. Change every evaluator from `partial def` to `def` with
+   `termination_by` / `decreasing_by` clauses. This requires a
+   well-founded recursion measure — for `evalExpr` it's the
+   `sizeOf` of the input expression; for `evalForLoop` it's
+   `(endN - i)`; for `evalBody` it's the list length plus the
+   recursive call sizes.
+2. With `def` evaluators, `simp [evalExpr]` will reduce them
+   step-by-step, and `rfl` / `simp` can close the trivial cases.
+3. Then prove the per-Expr preservation by mutual recursion on
+   `lowerExpr` / `lowerPureExpr`, mirroring the Session B-1
+   forward iff proofs.
+
+This refactor is structural but invasive: every callsite that
+relies on the evaluator being `partial` would need to verify
+termination. Estimated 1-2 sessions of work just for the
+evaluator refactor; another 1-2 sessions for the preservation
+proof itself.
+
+Two equivalences worth confirming up front:
 
 - `evalExpr.cellGet` inlines the public-then-secret store lookup,
   while `evalKernelExpr.cellGet` calls `OperationalConfig.readObject`
   which performs the same lookup. They agree definitionally.
 - The `Value.keccak256Mock` placeholder is shared, so both evaluators
   produce the same hash digest from the same evaluated parts list.
-
-Landing the full preservation proof needs the same tactic-mechanics
-care as the W4.4 Session B-1 forward iffs (`unfold + simp + rfl`,
-careful avoidance of variable shadowing in `do`-bindings, mutual
-blocks for nested-inductive recursion). It is left for a follow-up
-commit; the iff infrastructure landed in B-1 already exposes the
-matching `∃ ke, lowerXxx _ = .ok ke` shape that the preservation
-theorem will build on.
 -/
 
 mutual
