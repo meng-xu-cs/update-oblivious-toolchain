@@ -1,6 +1,28 @@
 import UOToolchain.SgxMicroModel
 import UOToolchain.SgxOramProjection
 
+/-! # Joint storage/micro-trace SGX projection layer
+
+This file projects a joint `SGXJointSemantics` (storage view paired with
+micro trace) into the SGX execution view under the paper-facing
+normalized SGX micro observer.
+
+* **Abstraction function:** `jointToSGXSemantics` (lifts a
+  `SGXJointSemantics` to `SGXSemantics OramConfig` via
+  `sgxViewOfJointSample`).
+* **Main theorem:** `paperMain_jointSecurityWith_projects_to_sgxExecution`
+  — joint storage security plus normalized-by-leakage micro traces lift
+  to `SGXExecutionSecurity` under the
+  `oramSGXStorageRelationWith security` / `normalizedObservedSGXMicroRelation`
+  pair.
+
+All other declarations in this file are file-local helpers used by the
+proof body
+`jointSecurityWith_projects_to_sgxExecution_with_normalizedMicro`.
+The paper-facing entry point in `ProofGrade.lean` is
+`proofGrade_sgx_projection_paper_main_joint_security`.
+-/
+
 namespace UOToolchain
 
 structure SGXJointSample where

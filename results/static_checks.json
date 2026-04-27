@@ -26,11 +26,9 @@
   "legacy_theorem_symbol_surface_checks": [
     {
       "expected_files": [
-        "proof/lean/UOToolchain/LegacySgxJointProjection.lean",
         "proof/lean/UOToolchain/SgxMicroGame.lean"
       ],
       "files": [
-        "proof/lean/UOToolchain/LegacySgxJointProjection.lean",
         "proof/lean/UOToolchain/SgxMicroGame.lean"
       ],
       "pattern": "legacySgxMicroLocalTheorem",

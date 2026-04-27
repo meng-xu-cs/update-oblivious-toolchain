@@ -3099,12 +3099,12 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
                 .expect("legacy axiom restriction flag must be boolean")
         });
     let legacy_theorem_symbol_surface_checks = [
+        // After the W7.1 SgxMicroModel canonicalization the joint legacy
+        // mirror no longer references `legacySgxMicroLocalTheorem`; the
+        // axiom now lives only in its `SgxMicroGame.lean` definition.
         (
             "legacySgxMicroLocalTheorem",
-            vec![
-                String::from("proof/lean/UOToolchain/LegacySgxJointProjection.lean"),
-                String::from("proof/lean/UOToolchain/SgxMicroGame.lean"),
-            ],
+            vec![String::from("proof/lean/UOToolchain/SgxMicroGame.lean")],
         ),
         (
             "legacyOramLocalTheorem",
