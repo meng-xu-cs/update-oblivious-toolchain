@@ -29660,6 +29660,37 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // canonical observer-surface freeze is documented in
     // `docs/tee-runtime-hardening.md` under "W6.1 Frozen SGX
     // Observer Surface".
+    // W6.2: pin the canonical hostile-host boundary-call model — the
+    // `"oram_access"` inner API literal, the `Enter`/`Exit` direction
+    // enum vocabulary, the canonical boundary-event budget formula
+    // (`2 * total_oram_accesses + 2`), and the canonical
+    // boundary-schedule structural shape (outer enter, repeated
+    // exit/enter ORAM-access pairs, outer exit). The matching Lean
+    // provenance record is `sgxBoundaryCallProvenance`. The freeze
+    // is documented in `docs/tee-runtime-hardening.md` under
+    // "W6.2 Frozen Boundary-Call Model".
+    let sgx_boundary_call_model_pinned = runtime_controller_source
+        .contains(".push(BoundaryEvent::enter(entrypoint, total_input_len));")
+        && runtime_controller_source.contains(".push(BoundaryEvent::exit(\"oram_access\", 0));")
+        && runtime_controller_source.contains(".push(BoundaryEvent::enter(\"oram_access\", 0));")
+        && runtime_controller_source.contains("self.boundary_schedule.push(BoundaryEvent::exit(")
+        && core_trace_source.contains("pub enum BoundaryDirection {")
+        && core_trace_source.contains("    Enter,")
+        && core_trace_source.contains("    Exit,")
+        && core_trace_source.contains("pub struct BoundaryEvent {")
+        && core_trace_source.contains("    pub direction: BoundaryDirection,")
+        && core_trace_source.contains("    pub api_id: String,")
+        && core_trace_source.contains("    pub input_len: usize,")
+        && core_trace_source.contains("    pub output_len: usize,")
+        && core_trace_source
+            .contains("pub fn enter(api_id: impl Into<String>, input_len: usize) -> Self {")
+        && core_trace_source
+            .contains("pub fn exit(api_id: impl Into<String>, output_len: usize) -> Self {")
+        && core_trace_source.contains(
+            "let mut schedule = Vec::with_capacity(2 * self.observed_oram_accesses.len() + 2);",
+        )
+        && core_trace_source.contains("api_id: \"oram_access\".into(),")
+        && core_trace_source.contains("boundary_event_budget: 2 * total_oram_accesses + 2,");
     let sgx_observer_surface_pinned = runtime_controller_source
         .contains("const METADATA_REGION: &str = \"metadata\";")
         && runtime_controller_source
@@ -34101,6 +34132,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_crypto_primitive_identity_pinned
         && path_oram_deployed_stash_parameters_pinned
         && sgx_observer_surface_pinned
+        && sgx_boundary_call_model_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34784,6 +34816,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             path_oram_deployed_stash_parameters_pinned,
         "sgx_observer_surface_pinned":
             sgx_observer_surface_pinned,
+        "sgx_boundary_call_model_pinned":
+            sgx_boundary_call_model_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":

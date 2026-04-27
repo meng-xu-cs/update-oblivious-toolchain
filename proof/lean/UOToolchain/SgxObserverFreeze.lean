@@ -295,4 +295,256 @@ theorem sgxObserverSurfaceProvenance_staticDriftCheckName :
     sgxObserverSurfaceProvenance.staticDriftCheckName =
       "sgx_observer_surface_pinned" := by rfl
 
+/-! ### W6.2 Boundary-Call Model
+
+W6.2 models the enclave-boundary call schedule explicitly. The Lean
+boundary observer (`SgxBoundary.lean`) carries the abstract
+`BoundaryEvent` shape; W6.2 freezes the canonical structural
+boundary-call model the runtime emits:
+
+- **canonical inner API literal**: `"oram_access"` — the public API
+  used to mark each ORAM-access ECALL/OCALL pair;
+- **canonical boundary directions**: `enter` / `exit`;
+- **canonical event budget formula**: `2 * total_oram_accesses + 2`,
+  matching the
+  `boundary_event_budget = 2 * (totalAccesses + 1)` formula in
+  `controllerShape.boundaryEventBudget` (Lean) and the
+  `boundary_event_budget: 2 * total_oram_accesses + 2` formula in
+  `RuntimeControllerCertificate::controller_shape` (Rust);
+- **canonical schedule shape**: a public-entrypoint enter/exit
+  envelope wrapping `n` symmetric `oram_access` exit/enter pairs,
+  matching the runtime's `RuntimeControllerCertificate::boundary_schedule`
+  builder.
+
+The runtime side is pinned by the probe's
+`sgx_boundary_call_model_pinned` static-drift check. -/
+
+/-- Frozen literal for the inner ORAM-access boundary API name. The
+runtime uses this string for both the exit and the re-enter of every
+ORAM access; the Lean controller-trace constructor and the Rust
+controller recorder both stamp this exact literal. -/
+def sgxObserverOramAccessApi : String := "oram_access"
+
+theorem sgxObserverOramAccessApi_value :
+    sgxObserverOramAccessApi = "oram_access" := by rfl
+
+/-- Frozen list of the two `BoundaryDirection` constructors. -/
+def sgxObserverBoundaryDirections : List BoundaryDirection :=
+  [BoundaryDirection.enter, BoundaryDirection.exit]
+
+@[simp] theorem sgxObserverBoundaryDirections_length :
+    sgxObserverBoundaryDirections.length = 2 := by rfl
+
+/-- Frozen list of public-facing names for the two boundary
+directions. -/
+def sgxObserverBoundaryDirectionNames : List String :=
+  ["enter", "exit"]
+
+@[simp] theorem sgxObserverBoundaryDirectionNames_length :
+    sgxObserverBoundaryDirectionNames.length = 2 := by rfl
+
+/-- Canonical boundary-event budget formula. The runtime emits one
+ORAM-access exit/enter pair per access plus the outer
+entrypoint enter/exit envelope: `budget = 2 * accesses + 2`. -/
+def sgxObserverBoundaryEventBudget (totalAccesses : Nat) : Nat :=
+  2 * totalAccesses + 2
+
+theorem sgxObserverBoundaryEventBudget_eq_controllerShape
+    (leakage : List OramAccessLeakage) :
+    sgxObserverBoundaryEventBudget (totalOramAccesses leakage) =
+      (sgxControllerShapeOfExecutionLeakage leakage).boundaryEventBudget := by
+  unfold sgxObserverBoundaryEventBudget
+  simp [sgxControllerShapeOfExecutionLeakage, Nat.mul_add]
+
+/-- Canonical boundary-schedule builder. Given a public outer
+entrypoint, an entry-input length, an output return length, and a
+list of ORAM accesses, this builds the symmetric Enter/Exit
+schedule the runtime emits. -/
+def sgxObserverBoundarySchedule
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) : List BoundaryEvent :=
+  [{ direction := BoundaryDirection.enter
+   , apiId := entrypointId
+   , inputLen := entryInputLen
+   , outputLen := 0
+   }] ++
+  (List.range totalAccesses).flatMap (fun _ =>
+    [ { direction := BoundaryDirection.exit
+      , apiId := sgxObserverOramAccessApi
+      , inputLen := 0
+      , outputLen := 0
+      }
+    , { direction := BoundaryDirection.enter
+      , apiId := sgxObserverOramAccessApi
+      , inputLen := 0
+      , outputLen := 0
+      }
+    ]) ++
+  [{ direction := BoundaryDirection.exit
+   , apiId := entrypointId
+   , inputLen := 0
+   , outputLen := outputLen
+   }]
+
+/-- The canonical boundary schedule has length exactly the canonical
+`sgxObserverBoundaryEventBudget` for the supplied access count. -/
+theorem sgxObserverBoundarySchedule_length
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) :
+    (sgxObserverBoundarySchedule entrypointId entryInputLen
+        outputLen totalAccesses).length =
+      sgxObserverBoundaryEventBudget totalAccesses := by
+  induction totalAccesses with
+  | zero =>
+      simp [sgxObserverBoundarySchedule, sgxObserverBoundaryEventBudget]
+  | succ n ih =>
+      simp [sgxObserverBoundarySchedule,
+        sgxObserverBoundaryEventBudget,
+        List.range_succ, List.flatMap_append] at ih ⊢
+      omega
+
+/-- The first event of the canonical schedule is the outer entrypoint
+enter event, carrying the public entry-input length. -/
+theorem sgxObserverBoundarySchedule_head
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) :
+    (sgxObserverBoundarySchedule entrypointId entryInputLen
+        outputLen totalAccesses).head?
+      = some
+        { direction := BoundaryDirection.enter
+        , apiId := entrypointId
+        , inputLen := entryInputLen
+        , outputLen := 0
+        } := by
+  cases totalAccesses with
+  | zero => simp [sgxObserverBoundarySchedule]
+  | succ n => simp [sgxObserverBoundarySchedule]
+
+/-- The schedule decomposes structurally as `<head>::<middle> ++
+[<outer_exit>]`, so the last element is exactly the outer-exit
+event. -/
+theorem sgxObserverBoundarySchedule_eq_concat
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) :
+    sgxObserverBoundarySchedule entrypointId entryInputLen
+        outputLen totalAccesses =
+      ({ direction := BoundaryDirection.enter
+       , apiId := entrypointId
+       , inputLen := entryInputLen
+       , outputLen := 0
+       } ::
+        (List.range totalAccesses).flatMap (fun _ =>
+          [ { direction := BoundaryDirection.exit
+            , apiId := sgxObserverOramAccessApi
+            , inputLen := 0
+            , outputLen := 0
+            }
+          , { direction := BoundaryDirection.enter
+            , apiId := sgxObserverOramAccessApi
+            , inputLen := 0
+            , outputLen := 0
+            }
+          ])) ++
+        [{ direction := BoundaryDirection.exit
+         , apiId := entrypointId
+         , inputLen := 0
+         , outputLen := outputLen
+         }] := by
+  rfl
+
+/-- The last event of the canonical schedule is the outer entrypoint
+exit event, carrying the public output return length. The schedule
+is structurally `<prefix> ++ [outer_exit]`, so the last element is
+fixed to the outer-exit event regardless of the access count. -/
+theorem sgxObserverBoundarySchedule_getLast
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) :
+    (sgxObserverBoundarySchedule entrypointId entryInputLen
+        outputLen totalAccesses).getLast?
+      = some
+        { direction := BoundaryDirection.exit
+        , apiId := entrypointId
+        , inputLen := 0
+        , outputLen := outputLen
+        } := by
+  rw [sgxObserverBoundarySchedule_eq_concat]
+  exact List.getLast?_concat
+
+/-! ### W6.2 boundary-call provenance record -/
+
+/-- W6.2 frozen boundary-call provenance record. Pairs each
+boundary-call component with the structural metadata so the paper
+claim, the Lean formalization, and the Rust runtime all reference
+one canonical boundary-call model. -/
+structure SgxBoundaryCallProvenance where
+  /-- The canonical inner ORAM-access API name literal. -/
+  oramAccessApi : String
+  /-- The two canonical boundary directions. -/
+  boundaryDirectionNames : List String
+  /-- Free-form description of the canonical boundary-event budget
+  formula. -/
+  boundaryEventBudgetFormula : String
+  /-- Free-form description of the canonical boundary-schedule
+  shape. -/
+  boundaryScheduleShape : String
+  /-- Documentation anchor for the WP6 hardening track. -/
+  observerDocSection : String
+  /-- Probe static-drift check that pins the Rust boundary-call
+  surface. -/
+  staticDriftCheckName : String
+  /-- File path anchoring the Lean boundary-event model. -/
+  leanBoundaryModule : String
+  /-- File path anchoring the Lean boundary-schedule constructor. -/
+  leanScheduleModule : String
+  /-- File path anchoring the Rust runtime controller recorder. -/
+  rustControllerModule : String
+  /-- File path anchoring the Rust public-trace projection. -/
+  rustTraceModule : String
+deriving Repr, DecidableEq
+
+/-- The actual W6.2 boundary-call provenance record. -/
+def sgxBoundaryCallProvenance : SgxBoundaryCallProvenance :=
+  { oramAccessApi := sgxObserverOramAccessApi
+  , boundaryDirectionNames := sgxObserverBoundaryDirectionNames
+  , boundaryEventBudgetFormula :=
+      "boundary_event_budget = 2 * total_oram_accesses + 2"
+  , boundaryScheduleShape :=
+      "Enter(<entrypoint>, entry_input_len, 0); for each oram access: Exit(\"oram_access\", 0, 0); Enter(\"oram_access\", 0, 0); Exit(<entrypoint>, 0, return_length)"
+  , observerDocSection :=
+      "docs/tee-runtime-hardening.md \"W6.2 Frozen Boundary-Call Model\""
+  , staticDriftCheckName := "sgx_boundary_call_model_pinned"
+  , leanBoundaryModule := "proof/lean/UOToolchain/SgxBoundary.lean"
+  , leanScheduleModule := "proof/lean/UOToolchain/SgxControllerTrace.lean"
+  , rustControllerModule := "runtime/uo-evm/src/controller.rs"
+  , rustTraceModule := "crates/uo-core/src/trace.rs"
+  }
+
+/-- The provenance record's pinned ORAM-access API matches the frozen
+`sgxObserverOramAccessApi` literal. -/
+theorem sgxBoundaryCallProvenance_oramAccessApi :
+    sgxBoundaryCallProvenance.oramAccessApi =
+      sgxObserverOramAccessApi := by rfl
+
+/-- The provenance record's pinned boundary-direction names match the
+frozen `sgxObserverBoundaryDirectionNames` list. -/
+theorem sgxBoundaryCallProvenance_boundaryDirectionNames :
+    sgxBoundaryCallProvenance.boundaryDirectionNames =
+      sgxObserverBoundaryDirectionNames := by rfl
+
+/-- The provenance record references the
+`sgx_boundary_call_model_pinned` probe static-drift check. -/
+theorem sgxBoundaryCallProvenance_staticDriftCheckName :
+    sgxBoundaryCallProvenance.staticDriftCheckName =
+      "sgx_boundary_call_model_pinned" := by rfl
+
 end UOToolchain

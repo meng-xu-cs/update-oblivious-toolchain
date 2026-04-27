@@ -1445,4 +1445,114 @@ theorem proofGrade_sgx_observer_surface_provenance_shared_resource_tick :
       sgxObserverSharedResourceTick :=
   sgxObserverSurfaceProvenance_sharedResourceTick
 
+/-! ### WP6.2 Boundary-Call Model Facades
+
+The facades below expose the W6.2 enclave-boundary-call model: the
+canonical inner ORAM-access API literal, the canonical boundary
+directions, the canonical boundary-event budget formula, the
+canonical boundary-schedule shape, and the W6.2 provenance record.
+
+Claim taxonomy: these facades are **Lean-proved,
+semantics-preserving**. The Lean equalities pin the canonical
+boundary-call shape; the runtime side is pinned by the probe's
+`sgx_boundary_call_model_pinned` static-drift check. -/
+
+/-- Paper-facing W6.2 facade: the canonical inner ORAM-access
+boundary API literal is exactly `"oram_access"`. -/
+theorem proofGrade_sgx_boundary_oram_access_api :
+    sgxObserverOramAccessApi = "oram_access" :=
+  sgxObserverOramAccessApi_value
+
+/-- Paper-facing W6.2 facade: the canonical observer carries exactly
+two boundary-direction names — enter and exit. -/
+theorem proofGrade_sgx_boundary_direction_names_length :
+    sgxObserverBoundaryDirectionNames.length = 2 :=
+  sgxObserverBoundaryDirectionNames_length
+
+/-- Paper-facing W6.2 facade: the canonical boundary-event budget
+formula is `2 * total_oram_accesses + 2`. The Lean controller-shape
+constructor `sgxControllerShapeOfExecutionLeakage` uses exactly this
+formula, and the Rust runtime emits the same budget. -/
+theorem proofGrade_sgx_boundary_event_budget_eq_controller_shape
+    (leakage : List OramAccessLeakage) :
+    sgxObserverBoundaryEventBudget (totalOramAccesses leakage) =
+      (sgxControllerShapeOfExecutionLeakage leakage).boundaryEventBudget :=
+  sgxObserverBoundaryEventBudget_eq_controllerShape leakage
+
+/-- Paper-facing W6.2 facade: the canonical boundary schedule has
+length exactly `2 * total_oram_accesses + 2`, matching the canonical
+event-budget formula. -/
+theorem proofGrade_sgx_boundary_schedule_length
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) :
+    (sgxObserverBoundarySchedule entrypointId entryInputLen
+        outputLen totalAccesses).length =
+      sgxObserverBoundaryEventBudget totalAccesses :=
+  sgxObserverBoundarySchedule_length
+    entrypointId entryInputLen outputLen totalAccesses
+
+/-- Paper-facing W6.2 facade: the first event of the canonical
+boundary schedule is the outer entrypoint enter event, carrying the
+public entry-input length. -/
+theorem proofGrade_sgx_boundary_schedule_head
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) :
+    (sgxObserverBoundarySchedule entrypointId entryInputLen
+        outputLen totalAccesses).head?
+      = some
+        { direction := BoundaryDirection.enter
+        , apiId := entrypointId
+        , inputLen := entryInputLen
+        , outputLen := 0
+        } :=
+  sgxObserverBoundarySchedule_head
+    entrypointId entryInputLen outputLen totalAccesses
+
+/-- Paper-facing W6.2 facade: the last event of the canonical
+boundary schedule is the outer entrypoint exit event, carrying the
+public output return length. -/
+theorem proofGrade_sgx_boundary_schedule_getLast
+    (entrypointId : String)
+    (entryInputLen : Nat)
+    (outputLen : Nat)
+    (totalAccesses : Nat) :
+    (sgxObserverBoundarySchedule entrypointId entryInputLen
+        outputLen totalAccesses).getLast?
+      = some
+        { direction := BoundaryDirection.exit
+        , apiId := entrypointId
+        , inputLen := 0
+        , outputLen := outputLen
+        } :=
+  sgxObserverBoundarySchedule_getLast
+    entrypointId entryInputLen outputLen totalAccesses
+
+/-- Paper-facing W6.2 facade: the boundary-call provenance record
+references the `sgx_boundary_call_model_pinned` probe static-drift
+check. -/
+theorem proofGrade_sgx_boundary_call_provenance_static_drift_check :
+    sgxBoundaryCallProvenance.staticDriftCheckName =
+      "sgx_boundary_call_model_pinned" :=
+  sgxBoundaryCallProvenance_staticDriftCheckName
+
+/-- Paper-facing W6.2 facade: the boundary-call provenance record's
+pinned ORAM-access API matches the canonical
+`sgxObserverOramAccessApi`. -/
+theorem proofGrade_sgx_boundary_call_provenance_oram_access_api :
+    sgxBoundaryCallProvenance.oramAccessApi =
+      sgxObserverOramAccessApi :=
+  sgxBoundaryCallProvenance_oramAccessApi
+
+/-- Paper-facing W6.2 facade: the boundary-call provenance record's
+pinned boundary-direction names match the canonical
+`sgxObserverBoundaryDirectionNames`. -/
+theorem proofGrade_sgx_boundary_call_provenance_direction_names :
+    sgxBoundaryCallProvenance.boundaryDirectionNames =
+      sgxObserverBoundaryDirectionNames :=
+  sgxBoundaryCallProvenance_boundaryDirectionNames
+
 end UOToolchain

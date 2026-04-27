@@ -1990,6 +1990,7 @@
   "scratch_region_serde_snake_case": true,
   "seeded_runtime_paper_main_family_bundle_field_names_match": true,
   "seeded_runtime_paper_main_slot_family_bundle_field_names_match": true,
+  "sgx_boundary_call_model_pinned": true,
   "sgx_observer_surface_pinned": true,
   "shell_boundary_bundle_refinement_guard_present": true,
   "shell_boundary_exact_bridge_checks": [

@@ -2073,6 +2073,29 @@ Concrete tasks:
      `runtime/uo-evm/src/controller.rs` and `crates/uo-core/src/trace.rs`.
 2. Model enclave-boundary calls, persistent I/O, exits, and any admitted
    shared-resource or paging observations.
+   - **W6.2 boundary-call status (landed):** the canonical inner
+     ORAM-access API literal `"oram_access"`, the boundary-direction
+     vocabulary (`enter`, `exit`), the canonical boundary-event
+     budget formula `2 * total_oram_accesses + 2`, and the canonical
+     boundary-schedule structural shape (outer enter, repeated
+     `oram_access` exit/enter pairs, outer exit) are now pinned
+     explicitly in `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+     under `sgxObserverOramAccessApi`,
+     `sgxObserverBoundaryDirectionNames`,
+     `sgxObserverBoundaryEventBudget`, and
+     `sgxObserverBoundarySchedule`. The Lean equalities
+     `sgxObserverBoundaryEventBudget_eq_controllerShape`,
+     `sgxObserverBoundarySchedule_length`,
+     `sgxObserverBoundarySchedule_head`, and
+     `sgxObserverBoundarySchedule_getLast` connect the canonical
+     budget and schedule shape to the existing controller-shape
+     constructor. The provenance record
+     `sgxBoundaryCallProvenance` and the named probe drift check
+     `sgx_boundary_call_model_pinned` reject representative
+     boundary-call drift in `runtime/uo-evm/src/controller.rs` and
+     `crates/uo-core/src/trace.rs`. W6.2 still has an open
+     persistent-I/O sub-task (PhysicalRead/Write field schema and
+     WriteClass vocabulary).
 3. Prove that the real controller/runtime behavior refines that observer.
 4. Prove that the sealing/storage path matches the theorem-side persistent
    model.

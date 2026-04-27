@@ -145,6 +145,74 @@ If any of those drift, the static-checks gate flips
 `sgx_observer_surface_pinned` to `false` and the gate rejects the
 checkpoint.
 
+## W6.2 Frozen Boundary-Call Model
+
+W6.2 closes the boundary-call surface: the canonical inner API
+literal, the canonical boundary directions, the canonical
+boundary-event budget formula, and the canonical boundary-schedule
+shape that the runtime emits.
+
+The Lean side extends `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+with the `sgxBoundaryCallProvenance` record. The runtime side is
+pinned by the probe's `sgx_boundary_call_model_pinned` static-drift
+check.
+
+Claim taxonomy: **Lean-proved, semantics-preserving** for the W6.2
+boundary-call model. The Lean equalities pin the canonical
+boundary-call shape; the static-drift check rejects representative
+runtime drift. The freeze does not by itself discharge any
+deployment assumption.
+
+### Frozen boundary-call components
+
+| Component | Canonical value | Lean anchor | Rust anchor |
+| --- | --- | --- | --- |
+| Inner ORAM-access API literal | `"oram_access"` | `sgxObserverOramAccessApi`; paired with `sgxBoundaryCallProvenance` | `BoundaryEvent::enter("oram_access", 0)` / `BoundaryEvent::exit("oram_access", 0)` calls inside `runtime/uo-evm/src/controller.rs`; `api_id: "oram_access".into()` literal inside `RuntimeControllerCertificate::boundary_schedule` (`crates/uo-core/src/trace.rs`) |
+| Boundary direction vocabulary | `[enter, exit]` | `BoundaryDirection` inductive in `SgxBoundary.lean`; canonical list `sgxObserverBoundaryDirections` and name list `sgxObserverBoundaryDirectionNames` in `SgxObserverFreeze.lean` | `BoundaryDirection` enum in `crates/uo-core/src/trace.rs` (`Enter`, `Exit`); used by the `BoundaryEvent::{enter,exit}` constructors |
+| Boundary-event budget formula | `2 * total_oram_accesses + 2` | `sgxObserverBoundaryEventBudget` in `SgxObserverFreeze.lean`; paired with `sgxObserverBoundaryEventBudget_eq_controllerShape` over the Lean controller-shape constructor | `2 * self.observed_oram_accesses.len() + 2` capacity in `RuntimeControllerCertificate::boundary_schedule`; `boundary_event_budget: 2 * total_oram_accesses + 2` field in `RuntimeControllerCertificate::controller_shape` |
+| Boundary-schedule structural shape | `Enter(<entry>, entry_input_len, 0); for each oram access: Exit("oram_access", 0, 0); Enter("oram_access", 0, 0); Exit(<entry>, 0, return_length)` | `sgxObserverBoundarySchedule` in `SgxObserverFreeze.lean`; paired with `sgxObserverBoundarySchedule_length`, `sgxObserverBoundarySchedule_head`, and `sgxObserverBoundarySchedule_getLast` | `RuntimeControllerCertificate::boundary_schedule` builder in `crates/uo-core/src/trace.rs`; `record_oram_access` site in `runtime/uo-evm/src/controller.rs` |
+
+### Provenance pairing
+
+The W6.2 provenance record is `sgxBoundaryCallProvenance` in
+`SgxObserverFreeze.lean`. It carries the canonical inner API
+literal, the boundary-direction names, free-form descriptions of
+the canonical budget formula and schedule shape, the documentation
+anchor (this section), the probe static-drift check name, and the
+Lean / Rust file paths anchoring each pinned component.
+
+The paper-facing facades exposed in
+[`ProofGrade.lean`](../proof/lean/UOToolchain/ProofGrade.lean) under
+the `proofGrade_sgx_boundary_*` prefix mirror the W6.1 pattern: each
+facade is a one-line forwarder that gives the paper a Lean theorem
+object referencing the canonical constant or projection equality.
+
+### Static-drift coverage
+
+The probe's `sgx_boundary_call_model_pinned` flag, emitted by the
+`kernel_model_alignment_validation.json` report, rejects
+representative drift on the Rust side. Specifically it requires:
+
+- `runtime/uo-evm/src/controller.rs` keeps the
+  `BoundaryEvent::enter(entrypoint, total_input_len)` outer-enter
+  call, the `BoundaryEvent::exit("oram_access", 0)` /
+  `BoundaryEvent::enter("oram_access", 0)` inner pair, and the
+  outer exit call.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `BoundaryDirection` enum (`Enter`, `Exit`), the canonical
+  `BoundaryEvent` field schema (`direction`, `api_id`,
+  `input_len`, `output_len`), and the canonical
+  `BoundaryEvent::{enter, exit}` constructor signatures.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `Vec::with_capacity(2 * self.observed_oram_accesses.len() + 2)`
+  schedule pre-allocation, the `api_id: "oram_access".into()`
+  literal, and the `boundary_event_budget: 2 * total_oram_accesses
+  + 2` field formula.
+
+If any of those drift, the static-checks gate flips
+`sgx_boundary_call_model_pinned` to `false` and the gate rejects
+the checkpoint.
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:
