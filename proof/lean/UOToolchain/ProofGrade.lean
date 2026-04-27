@@ -1002,4 +1002,51 @@ theorem proofGrade_ir_to_kernel_lower_compiled_function_iff_kernel_lowerable
   ⟨fun ⟨kp, h⟩ => IR.lowerCompiledFunction_ok_implies_kernelLowerable fn kp h,
    IR.kernelLowerable_implies_lowerCompiledFunction_ok fn⟩
 
+/-! ### W4.6: Artifact-checker demotion corollary
+
+The W4.6 charter task demotes the direct Lean artifact checker
+(`checkProofGradeTranslationArtifacts`) from "main trust argument"
+to "executable proof witness for the proven compiler story." The
+formal expression of this demotion is the corollary below, which
+bundles the W4.2 + W4.4 + W4.5 chain into a single named statement:
+
+For every Sol function `fn` whose lowering to a kernel program `kp`
+succeeds (equivalently, `kernelLowerable` holds, by the W4.4 iff),
+and every `OperationalConfig` whose entrypoint resolves to the
+lowered function, the source-side `Sol.evalFunction` and the
+kernel-side `IR.evalKernelProgram` produce identical outcomes —
+including identical `kernelSteps` traces matching the static
+`kp.expectedKernelSteps` schedule on the happy path.
+
+This statement is what the artifact checker *would* corroborate if
+asked: it is no longer the trust root, because the W4.2 + W4.4 +
+W4.5 chain establishes the same fact independently. -/
+
+/-- The W4.6 demotion corollary: source-to-kernel runtime
+preservation (W4.2 + W4.4) plus runtime-vs-static `kernelSteps`
+equivalence (W4.5) bundled into one named statement. The artifact
+checker remains as an executable witness but is no longer load-
+bearing for the trust narrative. -/
+theorem proofGrade_compiler_correctness_supersedes_artifact_checker
+    (fn : Sol.Function) (kp : IR.KernelProgram)
+    (cfg : IR.OperationalConfig)
+    (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
+    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn)) :
+    -- (a) Source-side and kernel-side outcomes coincide (W4.2 + W4.4):
+    Sol.evalFunction fn cfg = IR.evalKernelProgram kp cfg ∧
+    -- (b) The lowering precondition is decided by the iff (W4.4 reverse):
+    IR.CompiledFunction.kernelLowerable (Sol.lowerFunction fn) = true ∧
+    -- (c) On the happy path, runtime kernelSteps equals the static
+    --     schedule (W4.5):
+    ((Sol.evalFunction fn cfg).status = .completed →
+      (Sol.evalFunction fn cfg).publicResult = none →
+      (Sol.evalFunction fn cfg).kernelSteps = kp.expectedKernelSteps) := by
+  refine ⟨?_, ?_, ?_⟩
+  · exact proofGrade_sol_to_kernel_outcome_preservation fn kp cfg hLow hEntry
+  · exact IR.lowerCompiledFunction_ok_implies_kernelLowerable
+      (Sol.lowerFunction fn) kp hLow
+  · intro hStatus hPub
+    exact proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected
+      fn kp cfg hLow hEntry hStatus hPub
+
 end UOToolchain
