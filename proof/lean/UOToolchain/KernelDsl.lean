@@ -960,6 +960,7 @@ theorem kernelLowerable_implies_lowerCompiledFunction_ok
   rw [hks]
   rfl
 
+
 /-! ### W4.4 Session B-2: semantics-preservation (per-Expr)
 
 After the `partial def → def` evaluator refactor (commit `de979bb`),
@@ -1779,6 +1780,350 @@ theorem branchlessPureExprList_implies_fragmentValidList :
       · exact branchlessPureExprList_implies_fragmentValidList rest h.2
 
 end
+/-! ### W4.4 reverse iff: lowering succeeds → precondition holds
+
+The reverse direction of the W4.4 lowering iff: if `lowerExpr` /
+`lowerPureExpr` / `lowerStatement` / `lowerStatements` /
+`lowerCompiledFunction` succeed, then the corresponding precondition
+(`Expr.fragmentValid` / `branchlessPureExpr` /
+`Statement.kernelLowerable` / `Statement.kernelLowerableSchedule` /
+`CompiledFunction.kernelLowerable`) holds.
+
+Combined with the forward iff theorems (above), this gives the full
+biconditional: "lowering succeeds iff the program is in the admitted
+fragment." This is the prerequisite for W4.6 (artifact-checker
+demotion): the existing direct artifact checker can verify that
+lowering succeeded, and the reverse iff lifts that to "the program
+is in the admitted fragment, so all the W4.2 + W4.4 + W4.5 theorems
+apply." -/
+
+mutual
+
+theorem lowerPureExpr_ok_implies_branchlessPureExpr :
+    ∀ (e : Expr) (ke : KernelPureExpr),
+      lowerPureExpr e = .ok ke → branchlessPureExpr e = true
+  | .literal _, _, _ => rfl
+  | .var _, _, _ => rfl
+  | .unary op e, _, h => by
+      unfold lowerPureExpr at h
+      cases hRec : lowerPureExpr e with
+      | error _ => simp [hRec, bind, Except.bind] at h
+      | ok ke =>
+          simp [hRec, bind, Except.bind, pure, Except.pure] at h
+          simp [branchlessPureExpr]
+          exact lowerPureExpr_ok_implies_branchlessPureExpr e ke hRec
+  | .binary op lhs rhs, _, h => by
+      unfold lowerPureExpr at h
+      cases hL : lowerPureExpr lhs with
+      | error _ => simp [hL, bind, Except.bind] at h
+      | ok kl =>
+          cases hR : lowerPureExpr rhs with
+          | error _ => simp [hL, hR, bind, Except.bind] at h
+          | ok kr =>
+              simp [hL, hR, bind, Except.bind, pure, Except.pure] at h
+              simp [branchlessPureExpr]
+              exact ⟨lowerPureExpr_ok_implies_branchlessPureExpr lhs kl hL,
+                lowerPureExpr_ok_implies_branchlessPureExpr rhs kr hR⟩
+  | .select cond wt wf, _, h => by
+      unfold lowerPureExpr at h
+      cases hC : lowerPureExpr cond with
+      | error _ => simp [hC, bind, Except.bind] at h
+      | ok kc =>
+          cases hT : lowerPureExpr wt with
+          | error _ => simp [hC, hT, bind, Except.bind] at h
+          | ok kt =>
+              cases hF : lowerPureExpr wf with
+              | error _ => simp [hC, hT, hF, bind, Except.bind] at h
+              | ok kf =>
+                  simp [hC, hT, hF, bind, Except.bind, pure, Except.pure] at h
+                  simp [branchlessPureExpr]
+                  exact ⟨⟨lowerPureExpr_ok_implies_branchlessPureExpr cond kc hC,
+                          lowerPureExpr_ok_implies_branchlessPureExpr wt kt hT⟩,
+                          lowerPureExpr_ok_implies_branchlessPureExpr wf kf hF⟩
+  | .cellGet _, _, h => by simp [lowerPureExpr] at h
+  | .arrayGet _ _, _, h => by simp [lowerPureExpr] at h
+  | .mapGet _ _, _, h => by simp [lowerPureExpr] at h
+  | .structField _ _, _, h => by simp [lowerPureExpr] at h
+  | .arrayIndex _ _, _, h => by simp [lowerPureExpr] at h
+  | .keccak256 parts, _, h => by
+      unfold lowerPureExpr at h
+      cases hParts : lowerPureExprList parts with
+      | error _ => simp [hParts, bind, Except.bind] at h
+      | ok kparts =>
+          simp [hParts, bind, Except.bind, pure, Except.pure] at h
+          simp [branchlessPureExpr]
+          exact lowerPureExprList_ok_implies_branchlessPureExprList parts kparts hParts
+
+theorem lowerPureExprList_ok_implies_branchlessPureExprList :
+    ∀ (es : List Expr) (kes : List KernelPureExpr),
+      lowerPureExprList es = .ok kes → branchlessPureExprList es = true
+  | [], _, _ => rfl
+  | e :: rest, _, h => by
+      unfold lowerPureExprList at h
+      cases hHead : lowerPureExpr e with
+      | error _ => simp [hHead, bind, Except.bind] at h
+      | ok ke =>
+          cases hTail : lowerPureExprList rest with
+          | error _ => simp [hHead, hTail, bind, Except.bind] at h
+          | ok krest =>
+              simp [hHead, hTail, bind, Except.bind, pure, Except.pure] at h
+              simp [branchlessPureExprList]
+              exact ⟨lowerPureExpr_ok_implies_branchlessPureExpr e ke hHead,
+                lowerPureExprList_ok_implies_branchlessPureExprList rest krest hTail⟩
+
+end
+
+mutual
+
+theorem lowerExpr_ok_implies_fragmentValid :
+    ∀ (e : Expr) (ke : KernelExpr),
+      lowerExpr e = .ok ke → Expr.fragmentValid e = true
+  | .literal _, _, _ => rfl
+  | .var _, _, _ => rfl
+  | .unary op e, _, h => by
+      unfold lowerExpr at h
+      cases hRec : lowerExpr e with
+      | error _ => simp [hRec, bind, Except.bind] at h
+      | ok ke =>
+          simp [hRec, bind, Except.bind, pure, Except.pure] at h
+          simp [Expr.fragmentValid]
+          exact lowerExpr_ok_implies_fragmentValid e ke hRec
+  | .binary op lhs rhs, _, h => by
+      unfold lowerExpr at h
+      cases hL : lowerExpr lhs with
+      | error _ => simp [hL, bind, Except.bind] at h
+      | ok kl =>
+          cases hR : lowerExpr rhs with
+          | error _ => simp [hL, hR, bind, Except.bind] at h
+          | ok kr =>
+              simp [hL, hR, bind, Except.bind, pure, Except.pure] at h
+              simp [Expr.fragmentValid]
+              exact ⟨lowerExpr_ok_implies_fragmentValid lhs kl hL,
+                lowerExpr_ok_implies_fragmentValid rhs kr hR⟩
+  | .select cond wt wf, _, h => by
+      unfold lowerExpr at h
+      cases hC : lowerExpr cond with
+      | error _ => simp [hC, bind, Except.bind] at h
+      | ok kc =>
+          cases hT : lowerPureExpr wt with
+          | error _ => simp [hC, hT, bind, Except.bind] at h
+          | ok kt =>
+              cases hF : lowerPureExpr wf with
+              | error _ => simp [hC, hT, hF, bind, Except.bind] at h
+              | ok kf =>
+                  simp [hC, hT, hF, bind, Except.bind, pure, Except.pure] at h
+                  -- Need: fragmentValid for cond + wt + wf, plus branchlessPureExpr wt + wf.
+                  -- The select arms wt/wf were lowered via lowerPureExpr (succeeded by hT, hF),
+                  -- which by lowerPureExpr_ok_implies_branchlessPureExpr gives branchlessness.
+                  -- branchless implies fragment-valid (existing W4.4 fact).
+                  have hBT := lowerPureExpr_ok_implies_branchlessPureExpr wt kt hT
+                  have hBF := lowerPureExpr_ok_implies_branchlessPureExpr wf kf hF
+                  simp [Expr.fragmentValid]
+                  refine ⟨⟨⟨⟨?_, ?_⟩, ?_⟩, hBT⟩, hBF⟩
+                  · exact lowerExpr_ok_implies_fragmentValid cond kc hC
+                  · exact branchlessPureExpr_implies_fragmentValid wt hBT
+                  · exact branchlessPureExpr_implies_fragmentValid wf hBF
+  | .cellGet _, _, _ => rfl
+  | .arrayGet id index, _, h => by
+      unfold lowerExpr at h
+      cases hI : lowerExpr index with
+      | error _ => simp [hI, bind, Except.bind] at h
+      | ok ki =>
+          simp [hI, bind, Except.bind, pure, Except.pure] at h
+          simp [Expr.fragmentValid]
+          exact lowerExpr_ok_implies_fragmentValid index ki hI
+  | .mapGet id key, _, h => by
+      unfold lowerExpr at h
+      cases hK : lowerExpr key with
+      | error _ => simp [hK, bind, Except.bind] at h
+      | ok kk =>
+          simp [hK, bind, Except.bind, pure, Except.pure] at h
+          simp [Expr.fragmentValid]
+          exact lowerExpr_ok_implies_fragmentValid key kk hK
+  | .structField _ _, _, h => by simp [lowerExpr] at h
+  | .arrayIndex _ _, _, h => by simp [lowerExpr] at h
+  | .keccak256 parts, _, h => by
+      unfold lowerExpr at h
+      cases hParts : lowerExprList parts with
+      | error _ => simp [hParts, bind, Except.bind] at h
+      | ok kparts =>
+          simp [hParts, bind, Except.bind, pure, Except.pure] at h
+          simp [Expr.fragmentValid]
+          exact lowerExprList_ok_implies_fragmentValidList parts kparts hParts
+
+theorem lowerExprList_ok_implies_fragmentValidList :
+    ∀ (es : List Expr) (kes : List KernelExpr),
+      lowerExprList es = .ok kes → Expr.fragmentValidList es = true
+  | [], _, _ => rfl
+  | e :: rest, _, h => by
+      unfold lowerExprList at h
+      cases hHead : lowerExpr e with
+      | error _ => simp [hHead, bind, Except.bind] at h
+      | ok ke =>
+          cases hTail : lowerExprList rest with
+          | error _ => simp [hHead, hTail, bind, Except.bind] at h
+          | ok krest =>
+              simp [hHead, hTail, bind, Except.bind, pure, Except.pure] at h
+              simp [Expr.fragmentValidList]
+              exact ⟨lowerExpr_ok_implies_fragmentValid e ke hHead,
+                lowerExprList_ok_implies_fragmentValidList rest krest hTail⟩
+
+end
+
+/-- Statement-level reverse iff: `lowerStatement s` succeeds implies
+`Statement.kernelLowerable s = true`. -/
+theorem lowerStatement_ok_implies_kernelLowerable :
+    ∀ (s : Statement) (ks : KernelStatement),
+      lowerStatement s = .ok ks → Statement.kernelLowerable s = true
+  | .declare name ty value, _, h => by
+      unfold lowerStatement at h
+      cases hV : lowerExpr value with
+      | error _ => simp [hV, bind, Except.bind] at h
+      | ok kv =>
+          simp [hV, bind, Except.bind, pure, Except.pure] at h
+          simp [Statement.kernelLowerable]
+          exact lowerExpr_ok_implies_fragmentValid value kv hV
+  | .assign name value, _, h => by
+      unfold lowerStatement at h
+      cases hV : lowerExpr value with
+      | error _ => simp [hV, bind, Except.bind] at h
+      | ok kv =>
+          simp [hV, bind, Except.bind, pure, Except.pure] at h
+          simp [Statement.kernelLowerable]
+          exact lowerExpr_ok_implies_fragmentValid value kv hV
+  | .require cond, _, h => by
+      unfold lowerStatement at h
+      cases hC : lowerExpr cond with
+      | error _ => simp [hC, bind, Except.bind] at h
+      | ok kc =>
+          simp [hC, bind, Except.bind, pure, Except.pure] at h
+          simp [Statement.kernelLowerable]
+          exact lowerExpr_ok_implies_fragmentValid cond kc hC
+  | .abortIf cond, _, h => by
+      unfold lowerStatement at h
+      cases hC : lowerExpr cond with
+      | error _ => simp [hC, bind, Except.bind] at h
+      | ok kc =>
+          simp [hC, bind, Except.bind, pure, Except.pure] at h
+          simp [Statement.kernelLowerable]
+          exact lowerExpr_ok_implies_fragmentValid cond kc hC
+  | .ifStmt _ _ _, _, h => by simp [lowerStatement] at h
+  | .forLoop _ _ _ _ _, _, h => by simp [lowerStatement] at h
+  | .cellSet id value pred, _, h => by
+      unfold lowerStatement at h
+      cases hV : lowerExpr value with
+      | error _ => simp [hV, bind, Except.bind] at h
+      | ok kv =>
+          cases pred with
+          | none =>
+              simp [hV, bind, Except.bind, pure, Except.pure] at h
+              simp [Statement.kernelLowerable]
+              exact lowerExpr_ok_implies_fragmentValid value kv hV
+          | some p =>
+              cases hP : lowerExpr p with
+              | error _ => simp [hV, hP, bind, Except.bind] at h
+              | ok kp =>
+                  simp [hV, hP, bind, Except.bind, pure, Except.pure] at h
+                  simp [Statement.kernelLowerable]
+                  exact ⟨lowerExpr_ok_implies_fragmentValid value kv hV,
+                    lowerExpr_ok_implies_fragmentValid p kp hP⟩
+  | .arraySet id index value pred, _, h => by
+      unfold lowerStatement at h
+      cases hI : lowerExpr index with
+      | error _ => simp [hI, bind, Except.bind] at h
+      | ok ki =>
+          cases hV : lowerExpr value with
+          | error _ => simp [hI, hV, bind, Except.bind] at h
+          | ok kv =>
+              cases pred with
+              | none =>
+                  simp [hI, hV, bind, Except.bind, pure, Except.pure] at h
+                  simp [Statement.kernelLowerable]
+                  exact ⟨lowerExpr_ok_implies_fragmentValid index ki hI,
+                    lowerExpr_ok_implies_fragmentValid value kv hV⟩
+              | some p =>
+                  cases hP : lowerExpr p with
+                  | error _ => simp [hI, hV, hP, bind, Except.bind] at h
+                  | ok kp =>
+                      simp [hI, hV, hP, bind, Except.bind, pure, Except.pure] at h
+                      simp [Statement.kernelLowerable]
+                      exact ⟨⟨lowerExpr_ok_implies_fragmentValid index ki hI,
+                        lowerExpr_ok_implies_fragmentValid value kv hV⟩,
+                        lowerExpr_ok_implies_fragmentValid p kp hP⟩
+  | .mapPut id key value pred, _, h => by
+      unfold lowerStatement at h
+      cases hK : lowerExpr key with
+      | error _ => simp [hK, bind, Except.bind] at h
+      | ok kk =>
+          cases hV : lowerExpr value with
+          | error _ => simp [hK, hV, bind, Except.bind] at h
+          | ok kv =>
+              cases pred with
+              | none =>
+                  simp [hK, hV, bind, Except.bind, pure, Except.pure] at h
+                  simp [Statement.kernelLowerable]
+                  exact ⟨lowerExpr_ok_implies_fragmentValid key kk hK,
+                    lowerExpr_ok_implies_fragmentValid value kv hV⟩
+              | some p =>
+                  cases hP : lowerExpr p with
+                  | error _ => simp [hK, hV, hP, bind, Except.bind] at h
+                  | ok kp =>
+                      simp [hK, hV, hP, bind, Except.bind, pure, Except.pure] at h
+                      simp [Statement.kernelLowerable]
+                      exact ⟨⟨lowerExpr_ok_implies_fragmentValid key kk hK,
+                        lowerExpr_ok_implies_fragmentValid value kv hV⟩,
+                        lowerExpr_ok_implies_fragmentValid p kp hP⟩
+  | .retStmt none, _, _ => rfl
+  | .retStmt (some value), _, h => by
+      unfold lowerStatement at h
+      cases hV : lowerExpr value with
+      | error _ => simp [hV, bind, Except.bind] at h
+      | ok kv =>
+          simp [hV, bind, Except.bind, pure, Except.pure] at h
+          simp [Statement.kernelLowerable]
+          exact lowerExpr_ok_implies_fragmentValid value kv hV
+
+/-- Schedule-level reverse iff. -/
+theorem lowerStatementsAux_ok_implies_kernelLowerableScheduleAux :
+    ∀ (stmts : List Statement) (index : Nat) (sawReturn : Bool)
+      (ks : List KernelStatement),
+      lowerStatementsAux stmts index sawReturn = .ok ks →
+      Statement.kernelLowerableScheduleAux stmts sawReturn = true
+  | [], _, _, _, _ => rfl
+  | stmt :: rest, index, sawReturn, _, h => by
+      unfold lowerStatementsAux at h
+      cases sawReturn with
+      | true => simp at h
+      | false =>
+          simp at h
+          cases hS : lowerStatement stmt with
+          | error _ => simp [hS, bind, Except.bind] at h
+          | ok ks =>
+              cases hRest : lowerStatementsAux rest (index + 1) stmt.isReturn with
+              | error _ => simp [hS, hRest, bind, Except.bind] at h
+              | ok krest =>
+                  simp [Statement.kernelLowerableScheduleAux]
+                  refine ⟨lowerStatement_ok_implies_kernelLowerable stmt ks hS, ?_⟩
+                  exact lowerStatementsAux_ok_implies_kernelLowerableScheduleAux
+                    rest (index + 1) stmt.isReturn krest hRest
+
+theorem lowerStatements_ok_implies_kernelLowerableSchedule
+    (stmts : List Statement) (ks : List KernelStatement)
+    (h : lowerStatements stmts = .ok ks) :
+    Statement.kernelLowerableSchedule stmts = true :=
+  lowerStatementsAux_ok_implies_kernelLowerableScheduleAux stmts 0 false ks h
+
+/-- Program-level reverse iff. -/
+theorem lowerCompiledFunction_ok_implies_kernelLowerable
+    (fn : CompiledFunction) (kp : KernelProgram)
+    (h : lowerCompiledFunction fn = .ok kp) :
+    CompiledFunction.kernelLowerable fn = true := by
+  unfold lowerCompiledFunction at h
+  cases hLowStmts : lowerStatements fn.body with
+  | error _ => simp [hLowStmts, bind, Except.bind] at h
+  | ok kbody =>
+      simp [CompiledFunction.kernelLowerable]
+      exact lowerStatements_ok_implies_kernelLowerableSchedule fn.body kbody hLowStmts
 
 /-! ### W4.5: Status invariant for kernel expression evaluators
 

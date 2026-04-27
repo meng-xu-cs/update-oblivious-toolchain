@@ -955,4 +955,51 @@ theorem proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected
   exact IR.evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
     kp cfg hStatus hPub
 
+/-! ### W4.4 reverse iff: lowering succeeds → precondition holds (paper facades)
+
+The reverse iff theorems certify that successful lowering implies the
+admitted-fragment precondition. Combined with the existing forward iff
+theorems, this gives the full biconditional: a program is in the
+admitted fragment iff its lowering succeeds. The reverse direction is
+the prerequisite for W4.6 (artifact-checker demotion): the existing
+direct artifact checker can verify "the lowering succeeded," and the
+reverse iff lifts that fact to "the program is in the admitted
+fragment, so all the W4.2 + W4.4 + W4.5 theorems apply." -/
+
+theorem proofGrade_ir_to_kernel_lower_pure_expr_iff_branchless
+    (e : IR.Expr) :
+    (∃ ke, IR.lowerPureExpr e = .ok ke) ↔ IR.branchlessPureExpr e = true :=
+  ⟨fun ⟨ke, h⟩ => IR.lowerPureExpr_ok_implies_branchlessPureExpr e ke h,
+   IR.branchlessPureExpr_implies_lowerPureExpr_ok e⟩
+
+theorem proofGrade_ir_to_kernel_lower_expr_iff_fragment_valid
+    (e : IR.Expr) :
+    (∃ ke, IR.lowerExpr e = .ok ke) ↔ IR.Expr.fragmentValid e = true :=
+  ⟨fun ⟨ke, h⟩ => IR.lowerExpr_ok_implies_fragmentValid e ke h,
+   IR.fragmentValid_implies_lowerExpr_ok e⟩
+
+theorem proofGrade_ir_to_kernel_lower_statement_iff_kernel_lowerable
+    (s : IR.Statement) :
+    (∃ ks, IR.lowerStatement s = .ok ks) ↔ IR.Statement.kernelLowerable s = true :=
+  ⟨fun ⟨ks, h⟩ => IR.lowerStatement_ok_implies_kernelLowerable s ks h,
+   IR.kernelLowerable_implies_lowerStatement_ok s⟩
+
+theorem proofGrade_ir_to_kernel_lower_statements_iff_kernel_lowerable_schedule
+    (stmts : List IR.Statement) :
+    (∃ ks, IR.lowerStatements stmts = .ok ks) ↔
+      IR.Statement.kernelLowerableSchedule stmts = true :=
+  ⟨fun ⟨ks, h⟩ => IR.lowerStatements_ok_implies_kernelLowerableSchedule stmts ks h,
+   IR.kernelLowerableSchedule_implies_lowerStatements_ok stmts⟩
+
+/-- Program-level lowering iff: the W4.4 forward direction
+(`kernelLowerable_implies_lowerCompiledFunction_ok`) and the W4.4
+reverse direction (`lowerCompiledFunction_ok_implies_kernelLowerable`)
+together. -/
+theorem proofGrade_ir_to_kernel_lower_compiled_function_iff_kernel_lowerable
+    (fn : IR.CompiledFunction) :
+    (∃ kp, IR.lowerCompiledFunction fn = .ok kp) ↔
+      IR.CompiledFunction.kernelLowerable fn = true :=
+  ⟨fun ⟨kp, h⟩ => IR.lowerCompiledFunction_ok_implies_kernelLowerable fn kp h,
+   IR.kernelLowerable_implies_lowerCompiledFunction_ok fn⟩
+
 end UOToolchain
