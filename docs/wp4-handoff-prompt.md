@@ -76,15 +76,20 @@ theorems are all Lean-proved end-to-end. Paper-facing facades
 `proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected` expose
 the program-level fact and its source-side composition.
 
-The W4.4 reverse iff direction is now also landed: the per-Expr /
+The W4.4 reverse iff direction is also landed: the per-Expr /
 per-Statement / program-level theorems
 (`lowerExpr_ok_implies_fragmentValid` and friends in
 `KernelDsl.lean`) plus the paper-facing iff facades in
 `ProofGrade.lean` close the W4.4 lowering iff at every level.
 
-WP4 charter task **6** (direct artifact-checker demotion) is the
-only remaining open task — and with W4.4 reverse iff now landed,
-W4.6 reduces to a doc / role-swap task.
+The W4.6 (direct artifact-checker demotion) charter task is now
+also closed: the demotion corollary
+`proofGrade_compiler_correctness_supersedes_artifact_checker` in
+`ProofGrade.lean` bundles the W4.2 + W4.4 + W4.5 chain into a
+single named statement that supersedes the direct artifact
+checker as the trust root.
+
+**All six WP4 charter tasks are now Lean-proved end-to-end.**
 
 ## First, Read These Files In This Exact Order
 
@@ -186,29 +191,14 @@ land in:
 W4.4 Session B-1 is landed; the next subtask is **W4.4 Session B-2**:
 the semantics-preservation theorem.
 
-The next subtask is one of:
+## Next subtask
 
-**Option (a) — W4.6 direct artifact-checker demotion.**
-With W4.2 + W4.4 + W4.5 all closed, the only remaining "compiler-
-side" charter task is W4.6: demote `checkProofGradeTranslationArtifacts`
-from "main trust argument" to "executable proof witness for the
-proven compiler story." This requires the reverse direction of the
-W4.4 lowering iff (`lowerExpr e = .ok ke → Expr.fragmentValid e =
-true`) plus a doc update to the WP4 trust narrative.
-
-**Option (b) — W4.6 direct artifact-checker demotion.**
-Demote the existing `checkProofGradeTranslationArtifacts` Lean
-checker from "main trust argument" to "executable proof witness for
-the proven compiler story." The checker doesn't need to disappear
-— it just changes role from gating step to corroborating witness.
-This requires the reverse direction of the W4.4 lowering iff
-(`lowerExpr e = .ok ke → Expr.fragmentValid e = true`) plus a doc
-update to the WP4 trust narrative.
-
-Recommend option (a) — W4.6 — as the last remaining compiler-side
-charter task; the W4.5 chain is now fully landed.
-
-After W4.6 lands, all six WP4 charter tasks are closed.
+**All six WP4 charter tasks are closed.** No remaining WP4 sub-tasks
+need to be picked up. The next work-package work is on WP5 (concrete
+backend assumption discharge), WP6 (hostile-host TEE theorem), and
+WP7 (proof-architecture canonicalization). See
+`docs/top-tier-paper-execution-roadmap.md` for the WP5 / WP6 / WP7
+narratives.
 
 ## Validation Slice (Standard WP4 Variant)
 
@@ -306,6 +296,6 @@ for the content requirements.
 - Do not add a probe report bit unless it is backed by a Lean
   theorem.
 
-Begin with the runbook. The recommended next subtask is W4.6
-(artifact-checker demotion, the last remaining "compiler-side"
-charter task — smaller scope but mostly a doc / role-swap).
+Begin with the runbook. All six WP4 charter tasks are closed —
+no further WP4 work remains. The next work-package work is on
+WP5 / WP6 / WP7.

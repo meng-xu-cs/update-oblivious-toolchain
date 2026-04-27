@@ -625,11 +625,23 @@ should be its own commit:
   W4.4 lowering iff at every level. Paper-facing iff facades
   `proofGrade_ir_to_kernel_lower_*_iff_*` package the
   bidirectional equivalences.
-- *(next)* WP4 charter task 6 (artifact-checker demotion, W4.6) —
-  the last remaining "compiler-side" task. With the W4.4 reverse
-  iff now landed, W4.6 reduces to a doc / role-swap task: the
-  existing `checkProofGradeTranslationArtifacts` remains as an
-  executable proof witness but is no longer the trust root.
+- *(landed)* W4.6 — direct artifact-checker demotion (commit
+  `7e0483d`). The demotion corollary
+  `proofGrade_compiler_correctness_supersedes_artifact_checker`
+  in
+  [proof/lean/UOToolchain/ProofGrade.lean](../proof/lean/UOToolchain/ProofGrade.lean)
+  bundles the W4.2 + W4.4 + W4.5 chain into a single named
+  statement that supersedes the direct artifact checker as the
+  trust root. The `checkProofGradeTranslationArtifacts` direct
+  artifact checker remains as an executable proof witness but
+  is no longer load-bearing for the trust narrative. The TCB
+  table row for `uo-solc` records the closure; the Frozen
+  Theorem Box now cites the W4.2 + W4.4 + W4.5 chain rather
+  than the artifact checker.
+- **All six WP4 charter tasks are now Lean-proved end-to-end.**
+  The next work-package work is on WP5 (concrete backend
+  assumption discharge), WP6 (hostile-host TEE theorem), and
+  WP7 (proof-architecture canonicalization).
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

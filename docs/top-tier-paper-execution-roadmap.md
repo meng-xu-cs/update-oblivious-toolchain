@@ -1855,16 +1855,34 @@ Current status update:
   can verify "the lowering succeeded," and the iff lifts that
   fact to "the program is in the admitted fragment, so all the
   W4.2 + W4.4 + W4.5 theorems apply."
-- Still open: the direct artifact checker demotion (W4.6) — the
-  last remaining "compiler-side" charter task. With the W4.4
-  reverse iff now landed, W4.6 reduces to a doc / role-swap
-  task: the existing `checkProofGradeTranslationArtifacts`
-  remains as an executable proof witness, but is no longer the
-  trust root.
+- **W4.6 (direct artifact-checker demotion) closed** (commit
+  `7e0483d`,
+  [proof/lean/UOToolchain/ProofGrade.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)):
+  the demotion corollary
+  `proofGrade_compiler_correctness_supersedes_artifact_checker`
+  bundles the W4.2 + W4.4 + W4.5 chain into a single named
+  statement that supersedes the direct artifact checker as the
+  trust root. The corollary asserts (a) source-to-kernel
+  outcome preservation (W4.2 + W4.4), (b) the admission iff
+  (W4.4 reverse iff), and (c) the runtime-vs-static
+  `kernelSteps` equality on the happy path (W4.5). The
+  `checkProofGradeTranslationArtifacts` direct artifact checker
+  remains as an executable proof witness — useful for checking
+  concrete (source, artifact) pairs in CI — but is no longer
+  load-bearing for the trust narrative. The TCB table row for
+  `uo-solc` records the closure; the Frozen Theorem Box now
+  cites the W4.2 + W4.4 + W4.5 chain rather than the artifact
+  checker.
+- WP4 is now Lean-proved end-to-end at all six charter tasks.
+  The full source-to-manifest correctness chain is established
+  on the happy path: source → IR → kernel runtime → static
+  kernel-program schedule → manifest `kernel_steps` field, with
+  the W4.4 forward + reverse iff pinning the admission
+  condition precisely.
 
 ### WP4 completeness summary
 
-WP4 is now Lean-proved end-to-end at all six charter tasks:
+**WP4 is now Lean-proved end-to-end at all six charter tasks:**
 
 | Charter task | Status | Key theorems / facades |
 | --- | --- | --- |
@@ -1873,7 +1891,7 @@ WP4 is now Lean-proved end-to-end at all six charter tasks:
 | 3: confidential-fragment characterization (W4.3) | **closed** | `confidentialFragmentEntrypointWitnessOf_valid_iff`; `proofGrade_confidential_fragment_valid_iff_structurally_valid` |
 | 4: IR-to-kernel correctness (W4.4) | **closed (forward iff + B-2 preservation + reverse iff)** | `IR.lowerCompiledFunction_preserves_semantics`; `proofGrade_ir_to_kernel_program_preservation`; `proofGrade_ir_to_kernel_lower_compiled_function_iff_kernel_lowerable` |
 | 5: manifest-exactness semantics-preserving lift (W4.5) | **closed (enabling theorem + main body + body/program-level runtime-vs-static lift)** | `proofGrade_sol_to_kernel_outcome_preservation`; `KernelProgram.expectedKernelSteps`; `proofGrade_kernel_program_runtime_kernel_steps_eq_expected`; `proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected` |
-| 6: direct artifact-checker demotion (W4.6) | **open** (doc / role-swap; W4.4 reverse iff prerequisite landed) | — |
+| 6: direct artifact-checker demotion (W4.6) | **closed** | `proofGrade_compiler_correctness_supersedes_artifact_checker` bundles W4.2 + W4.4 + W4.5; the artifact checker remains as an executable proof witness but is no longer load-bearing |
 
 The full source-to-manifest chain is Lean-proved on the happy path:
 `Sol.evalFunction fn cfg = IR.evalContract cfg = IR.evalKernelProgram
@@ -1882,11 +1900,14 @@ matching the manifest's `kernel_steps` field. The W4.4 forward + reverse
 iff equivalence pins the admission condition precisely: a program is in
 the admitted fragment iff its lowering succeeds.
 
-The remaining open task (W4.6) is a documentation / trust-narrative
-update — the existing `checkProofGradeTranslationArtifacts` direct
-artifact checker remains as an executable proof witness but is no
-longer the trust root, since the W4.2 + W4.4 + W4.5 theorems supply
-the trust independently.
+The W4.6 demotion corollary
+(`proofGrade_compiler_correctness_supersedes_artifact_checker` in
+`ProofGrade.lean`) bundles the W4.2 + W4.4 + W4.5 chain into a single
+named statement that supersedes the direct artifact checker as the
+trust root. The `checkProofGradeTranslationArtifacts` direct artifact
+checker remains as an executable proof witness — useful for checking
+concrete (source, artifact) pairs in CI — but is no longer
+load-bearing for the trust narrative.
 
 Exit gate:
 
