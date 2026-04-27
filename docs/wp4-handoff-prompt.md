@@ -130,31 +130,45 @@ the semantics-preservation theorem.
 
 **Subtask W4.4 Session B-2: Semantics-preservation theorem.**
 
-Concretely:
+**Important blocker** discovered while attempting B-2 in the
+previous session (commit `831457c`): all of the W4.1 / W4.4 Session
+A evaluators (`evalExpr`, `evalStatement`, `evalBody`, `evalForLoop`,
+`evalKernelExpr`, `evalKernelPureExpr`, `evalKernelStatement`,
+`evalKernelBody`) are declared as `partial def`. Lean 4 does *not*
+automatically reduce `partial def` calls by `rfl` / `simp`, so
+proving even the trivial
+`lowerExpr (.literal v) = .ok ke → evalExpr cfg env (.literal v) =
+evalKernelExpr cfg env ke` requires either:
 
-1. Prove per-Expr / per-Statement preservation lemmas in
-   `KernelDsl.lean`:
-   - `lowerExpr_preserves_semantics`: `lowerExpr e = .ok ke →
-     evalExpr cfg env e = evalKernelExpr cfg env ke`
-   - `lowerPureExpr_preserves_semantics`: analogous for pure exprs
-   - `lowerStatement_preserves_semantics`: lifts to statements
-   - `lowerStatements_preserves_semantics`: lifts to lists
-2. Prove the program-level theorem:
-   `lowerCompiledFunction fn = .ok kp →
-     ∀ cfg env outcome, evalBody cfg env outcome fn.body =
-       evalKernelBody cfg env outcome kp.body`
-   (or the entrypoint-level form via `evalContract` /
-   `evalKernelProgram`).
-3. Session C will project this through `ProofGrade.lean` as
-   `proofGrade_ir_to_kernel_correctness` and update the WP4 status
-   text.
+(a) **Evaluator refactor.** Change every evaluator from `partial
+def` to `def` with explicit `termination_by` / `decreasing_by`
+clauses. The recursion measures are tractable:
+- `evalExpr` / `evalKernelExpr`: `sizeOf` of the input expression.
+- `evalForLoop`: `(endN - i)`.
+- `evalBody` / `evalKernelBody`: list length plus subterm sizes.
+This is invasive — every existing callsite stays the same, but
+each evaluator's termination must be verified. Estimated 1-2
+sessions for the refactor.
 
-The structural recursion mirrors Session B-1's forward iff
-proofs but is bigger because the `do`-notation reductions in both
-`lowerExpr` (when `lowering = .ok ke`) and `evalExpr` /
-`evalKernelExpr` need to be threaded together. Expect to reuse the
-same `unfold + simp + rfl` tactic pattern that worked for the
-Session B-1 forward iffs.
+(b) **Use `partial def` opaque lemmas.** Lean 4 generates
+`evalExpr.eq_*` lemmas under `Lean.Elab.WF.eqns_*` for `partial def`
+unfolding. They can be invoked via `unfold evalExpr` or via direct
+`rw` against `evalExpr.eq_def` (auto-generated). This avoids the
+refactor but the proof structure is more involved.
+
+(c) **Structural recursion via `Expr.rec`.** Define the preservation
+theorem directly via `Expr.rec` / `Statement.rec` motives, providing
+each constructor case explicitly. This sidesteps the evaluator
+reduction issue but requires explicit recursor application for
+nested-inductive types.
+
+Recommended path: option (a) — the evaluator refactor. The clean
+`def`-based reduction makes downstream theorem work much easier
+and is the canonical Lean 4 pattern.
+
+After resolving the blocker, prove per-Expr / per-Statement /
+program-level preservation lemmas mirroring the Session B-1
+forward iff structure.
 
 If you would prefer to drive **W4.2** (source-to-IR correctness)
 instead, see the runbook's "Recommended Starting Subtask" section

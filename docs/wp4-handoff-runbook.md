@@ -543,11 +543,20 @@ should be its own commit:
   theorems at all four levels (Expr / Statement / schedule /
   program), with `Statement.isReturn` helper refactor (commits
   `1be2c58`, `90e9cde`, `1dcd8ef`).
-- *(next)* W4.4 Session B-2: semantics-preservation theorem
-  (`evalContract cfg = evalKernelProgram (lowerCompiledFunction
-  fn) cfg` when the lowering succeeds). Structural mutual recursion
-  comparing `evalExpr` / `evalKernelExpr` outcomes after lowering.
-  Will use the Session B-1 forward iffs as preconditions.
+- *(landed)* WP4 status / handoff status update for B-1 (commit
+  `703f9ac`).
+- *(landed, deferral note)* W4.4 Session B-2 placeholder + concrete
+  blocker (commits `2a05c72`, `831457c`): identified that all of
+  the W4.1 / W4.4 Session A evaluators are `partial def`, which
+  Lean 4 does not auto-reduce by `rfl` / `simp`; the per-Expr
+  preservation theorem cannot be closed without first either
+  refactoring the evaluators to `def` (with `termination_by`),
+  using `Lean.Elab.WF.eqns_*` opaque lemmas, or proving via
+  structural recursion principles directly. This is a *policy
+  decision* about which path to take.
+- *(next, blocked on policy)* W4.4 Session B-2: semantics-
+  preservation theorem proper. Three candidate paths documented in
+  the `KernelDsl.lean` deferral comment.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.
