@@ -1762,11 +1762,30 @@ Current status update:
   `AssignAdd`-style desugaring) are syntactic preprocessing that
   belong to the trusted `solang_parser` step; the entire semantic
   Sol → IR step is now Lean-proved with no remaining surface.
-- Still open: the manifest-exactness semantics-preserving lift
-  (W4.5), the direct artifact checker demotion (W4.6), and the
-  reverse direction of the W4.4 lowering iff (lowering succeeds →
-  precondition holds; useful for W4.6 but not strictly required by
-  the preservation theorem).
+- **W4.5 enabling theorem landed** (commit `fe256f2`,
+  [proof/lean/UOToolchain/ProofGrade.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)):
+  the paper-facing
+  `proofGrade_sol_to_kernel_outcome_preservation` composes the
+  W4.2 source-to-IR program preservation theorem with the W4.4
+  IR-to-kernel program preservation theorem to give a single
+  source-to-kernel runtime handle: for every Sol function `fn`
+  whose lowering to a kernel program `kp` succeeds and every IR
+  `OperationalConfig` whose entrypoint resolves to the lowered
+  function, `Sol.evalFunction fn cfg = IR.evalKernelProgram kp
+  cfg`. Every manifest field that is a function of the runtime
+  outcome (`kernelSteps`, `publicResult`, `oramAccessCounts`,
+  `status`) can now be talked about equivalently on the source,
+  IR, and kernel sides; the per-field W4.5 lifts proceed by
+  relating each manifest field to the appropriate projection of
+  this shared outcome.
+- Still open: the per-field manifest-exactness semantics-
+  preserving lifts (W4.5 main body — kernel_steps,
+  oram_accesses, read/write counts, max_commit_ops,
+  max_hash_part_bytes, etc.), the direct artifact checker
+  demotion (W4.6), and the reverse direction of the W4.4
+  lowering iff (lowering succeeds → precondition holds; useful
+  for W4.6 but not strictly required by the preservation
+  theorem).
 
 Exit gate:
 

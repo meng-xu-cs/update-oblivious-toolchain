@@ -51,13 +51,19 @@ tasks **1, 2, 3, and 4 are now Lean-proved**:
   identical outcomes.
 
 Combined, W4.2 + W4.4 yield the source-to-kernel correctness chain
-end-to-end on the full admitted post-resolution Sol AST.
+end-to-end on the full admitted post-resolution Sol AST. The W4.5
+enabling theorem `proofGrade_sol_to_kernel_outcome_preservation`
+projects this composition through `ProofGrade.lean`: for every Sol
+function `fn` whose lowering to a kernel program `kp` succeeds and
+every IR `OperationalConfig` whose entrypoint resolves to the
+lowered function, `Sol.evalFunction fn cfg = IR.evalKernelProgram
+kp cfg`.
 
-WP4 charter tasks **5** (manifest-exactness semantics-preserving
-lift) and **6** (direct artifact-checker demotion) remain open;
-the W4.4 reverse iff direction (lowering succeeds → precondition
-holds) is also still deferred (useful for W4.6 but not required
-by W4.4).
+WP4 charter task **5 main body** (per-field manifest-exactness
+semantics-preserving lifts) and task **6** (direct artifact-checker
+demotion) remain open; the W4.4 reverse iff direction (lowering
+succeeds → precondition holds) is also still deferred (useful for
+W4.6 but not required by W4.4).
 
 ## First, Read These Files In This Exact Order
 
@@ -161,14 +167,21 @@ the semantics-preservation theorem.
 
 The next subtask is one of:
 
-**Option (a) — W4.5 manifest-exactness semantics-preserving lift.**
-Promote the existing `ProofGradeCompilerFacts` exactness/export
-layer (`secret_args`, `param_names`, manifest boundary lengths,
-`max_commit_ops`, etc.) to semantics-preserving statements: each
-manifest field is the exact semantic projection of the source
-program under the IR / kernel evaluator. This builds directly on
-the W4.2 source-to-IR theorem, the W4.4 IR-to-kernel preservation
-theorem, and the W4.1 evaluator's deterministic outcome.
+**Option (a) — W4.5 main body (per-field manifest-exactness lifts).**
+The W4.5 enabling theorem (`proofGrade_sol_to_kernel_outcome_
+preservation` in `ProofGrade.lean`) is now landed; it composes
+W4.2 + W4.4 into a single source-to-kernel runtime handle. The
+remaining W4.5 work is to upgrade each field of
+`ProofGradeCompilerFacts.manifestFieldsExact` (currently in the
+exactness/export layer: `secret_args`, `param_names`, manifest
+boundary lengths, `kernel_steps`, `oram_accesses`, read/write
+counts, `max_commit_ops`, `max_hash_part_bytes`) to a
+semantics-preserving statement that relates the field to the
+appropriate projection of the shared `Sol`/`IR`/`Kernel` runtime
+outcome. Recommend starting with `kernel_steps` (most directly
+semantic), which needs an additional kernel-DSL theorem
+(`KernelProgram.expectedKernelSteps` matches the runtime
+`oc.kernelSteps` on completion).
 
 **Option (b) — W4.6 direct artifact-checker demotion.**
 Demote the existing `checkProofGradeTranslationArtifacts` Lean

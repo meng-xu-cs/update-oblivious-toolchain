@@ -356,6 +356,18 @@ What is still open:
   inlining, `AssignAdd`-style desugaring) is the trusted
   front-end that produces the post-resolution Sol AST consumed
   here; the entire semantic Sol → IR step is Lean-proved.
+  **W4.5 enabling theorem landed**: the paper-facing
+  `proofGrade_sol_to_kernel_outcome_preservation` in
+  `ProofGrade.lean` composes W4.2 + W4.4 to give a single
+  source-to-kernel runtime handle (`Sol.evalFunction fn cfg =
+  IR.evalKernelProgram kp cfg` whenever the IR-side lowering
+  succeeds and the entrypoint resolves to the lowered function).
+  Every manifest field that is a function of the runtime outcome
+  (`kernelSteps`, `publicResult`, `oramAccessCounts`, `status`)
+  can now be talked about equivalently on the source, IR, and
+  kernel sides; the per-field W4.5 manifest-exactness lifts
+  proceed by relating each manifest field to the appropriate
+  projection of this shared outcome.
 - WP5 (concrete backend assumptions): full discharge of the concrete
   `PathOramLocalPosmapV1SecurityAssumptions` bundle
   (`bucketEncryptionINDCPA`, `metadataEncryptionINDCPA`,

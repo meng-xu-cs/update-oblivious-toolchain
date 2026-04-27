@@ -582,11 +582,20 @@ should be its own commit:
   `AssignAdd`-style desugaring) is treated as the trusted front-end
   that produces the post-resolution Sol AST consumed by the W4.2
   theorem.
-- *(next)* WP4 charter task 5 (manifest-exactness semantics-
-  preserving lift, W4.5), or charter task 6 (artifact-checker
-  demotion, W4.6). The W4.4 reverse iff direction (lowering
-  succeeds → precondition holds) is also a useful but optional
-  W4.6 building block.
+- *(landed)* W4.5 enabling theorem
+  `proofGrade_sol_to_kernel_outcome_preservation` (commit
+  `fe256f2`,
+  [proof/lean/UOToolchain/ProofGrade.lean](../proof/lean/UOToolchain/ProofGrade.lean)):
+  composes W4.2 + W4.4 into a single source-to-kernel runtime
+  handle. The per-field manifest-exactness lifts of W4.5 build
+  on this composition.
+- *(next)* WP4 charter task 5 main body (per-field manifest-
+  exactness semantics-preserving lifts: kernel_steps,
+  oram_accesses, read/write counts, max_commit_ops,
+  max_hash_part_bytes, etc.), or charter task 6 (artifact-
+  checker demotion, W4.6). The W4.4 reverse iff direction
+  (lowering succeeds → precondition holds) is also a useful but
+  optional W4.6 building block.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.
