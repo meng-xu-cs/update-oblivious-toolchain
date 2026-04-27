@@ -8,6 +8,14 @@ def sealedTagBytes : Nat := 16
 def byteRadix : Nat := 16
 def sealedMagic : List Nat := [165, 90]
 
+/-- ChaCha20-Poly1305 cipher key length in bytes, matching RFC 8439 section 2.5
+(32-byte / 256-bit key). The Rust runtime pins this to `key: [u8; 32]` in
+`runtime/uo-store/src/generated_surface.rs`, and the probe's
+`runtime_crypto_primitive_identity_pinned` static-drift check rejects any other
+key shape. The Lean constant lets WP5 codec theorems refer to this length
+without re-deriving it from the Rust source. -/
+def cipherKeyBytes : Nat := 32
+
 def sealedEncodedLen (payloadLen : Nat) : Nat :=
   2 * (sealedMagicLen + sealedNonceBytes + payloadLen + sealedTagBytes)
 
@@ -817,6 +825,161 @@ theorem uoStoreUpdateWriteAccepted_publicShape
   unfold UoStoreUpdateWriteAccepted uoStoreUpdateWriteShape at hAccepted
   cases hAccepted
   simp
+
+/-! ### W5.5: Concrete Rust StoreCipher surface obligations
+
+The theorems below pin obligations of the concrete Rust StoreCipher surface
+(`runtime/uo-store/src/generated_surface.rs`) at the Lean codec semantic
+level. They project the abstract codec model onto the structural facts the
+Rust seal/open implementation actually relies on (cipher-key length, magic
+constant length / byte validity, sealed-record component lengths, AAD shape).
+The probe `runtime_crypto_primitive_identity_pinned` static-drift check pins
+the Rust side; these Lean theorems pin the corresponding mathematical
+obligations referenced by the WP5 paper-facing claims. -/
+
+/-- The Lean cipher-key-length constant matches the Rust `key: [u8; 32]`
+buffer pinned by the probe's crypto-primitive identity check. This makes the
+RFC 8439 32-byte key length a Lean-side fact rather than only a Rust
+source-pin. -/
+theorem cipherKeyBytes_value :
+    cipherKeyBytes = 32 := by
+  rfl
+
+/-- The sealed-record magic constant has length `sealedMagicLen = 2`,
+matching the Rust `SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A]` constant pinned by
+the static-drift suite. -/
+theorem sealedMagic_length :
+    sealedMagic.length = sealedMagicLen := by
+  rfl
+
+/-- Each byte of the public sealed-record magic is a valid byte (`< 256`).
+This is what allows the magic to flow through `encodeNonzero` (which only
+accepts `ValidByte` inputs) without producing zero bytes in the transport
+record. -/
+theorem sealedMagic_validBytes :
+    ∀ byte, byte ∈ sealedMagic → ValidByte byte := by
+  intro byte hMem
+  unfold ValidByte
+  unfold sealedMagic at hMem
+  simp at hMem
+  rcases hMem with h | h
+  · subst h
+    decide
+  · subst h
+    decide
+
+/-- The transport-encoded sealed record is exactly twice the plain sealed
+record. Each plain byte is encoded as two non-zero nibble bytes (high and
+low), so `sealedEncodedLen = 2 * sealedPlainLen` for any payload size. This
+is the mathematical fact behind the Rust `seal_and_wipe_into_slice` cursor
+arithmetic. -/
+theorem sealedEncodedLen_eq_two_times_sealedPlainLen
+    (payloadLen : Nat) :
+    sealedEncodedLen payloadLen = 2 * sealedPlainLen payloadLen := by
+  rfl
+
+/-- A valid-shape sealed record's magic component has the public
+`sealedMagicLen` length. This is the structural projection from
+`SealedRecordParts.ValidShape` for the magic field. -/
+theorem SealedRecordParts.magic_length_of_validShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    parts.magic.length = sealedMagicLen :=
+  hShape.1
+
+/-- A valid-shape sealed record's nonce component has the public
+`sealedNonceBytes` length. This is the structural projection from
+`SealedRecordParts.ValidShape` for the nonce field; matches the Rust
+`Nonce::from_slice(&nonce_bytes)` 12-byte requirement. -/
+theorem SealedRecordParts.nonce_length_of_validShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    parts.nonce.length = sealedNonceBytes :=
+  hShape.2.1
+
+/-- A valid-shape sealed record's ciphertext component has length exactly
+equal to the payload length. Matches the Rust convention that ChaCha20-Poly1305
+in detached mode produces ciphertext of the same length as the plaintext
+input. -/
+theorem SealedRecordParts.ciphertext_length_of_validShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    parts.ciphertext.length = payloadLen :=
+  hShape.2.2.1
+
+/-- A valid-shape sealed record's tag component has the public
+`sealedTagBytes` length. Matches the Rust `Tag::from_slice(tag_bytes)`
+16-byte requirement and the ChaCha20-Poly1305 detached-tag size from
+RFC 8439. -/
+theorem SealedRecordParts.tag_length_of_validShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    parts.tag.length = sealedTagBytes :=
+  hShape.2.2.2
+
+/-- An open-shape sealed record's magic component is exactly the public
+`sealedMagic` constant. This is the magic-constant equality projection from
+`SealedRecordParts.ValidOpenShape`, mirroring the Rust open-path check
+`if magic != SEALED_MAGIC { return None; }`. -/
+theorem SealedRecordParts.magic_eq_of_validOpenShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidOpenShape payloadLen) :
+    parts.magic = sealedMagic :=
+  hShape.2
+
+/-- A successful `decodeSealedRecord?` outcome witnesses the magic-equality
+fact at the open-shape level. This is the named theorem capturing the
+Rust open-path invariant that an accepted sealed record always exhibits the
+public magic constant. -/
+theorem decodeSealedRecord_some_magic
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : SealedRecordParts}
+    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
+    parts.magic = sealedMagic :=
+  (decodeSealedRecord_some_validOpenShape hDecode).2.2
+
+/-- A successful `decodeSealedRecord?` outcome witnesses the
+component-length facts. This is the named theorem capturing the structural
+decomposition fact at the open-shape level. -/
+theorem decodeSealedRecord_some_componentLengths
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : SealedRecordParts}
+    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
+    parts.magic.length = sealedMagicLen ∧
+      parts.nonce.length = sealedNonceBytes ∧
+      parts.ciphertext.length = payloadLen ∧
+      parts.tag.length = sealedTagBytes := by
+  have hShape := (decodeSealedRecord_some_validOpenShape hDecode).2.1
+  exact ⟨hShape.1, hShape.2.1, hShape.2.2.1, hShape.2.2.2⟩
+
+/-- The store-slot AAD constructed by `uoStoreSlotAad` is the deterministic
+public concatenation `"uo_store:" ++ object`. This pins the AAD shape: the
+AAD depends only on the public object identifier and a fixed public prefix,
+so it carries no secret-dependent content. The Rust runtime's
+`UoObjectStore` builds the AAD this way; this Lean theorem makes the
+decomposition explicit at the codec layer. -/
+theorem uoStoreSlotAad_prefix_publicShape
+    (object : String) :
+    uoStoreSlotAad object = "uo_store:" ++ object := by
+  rfl
+
+/-- The store-slot AAD shape is fully determined by the public object
+identifier: two AAD bytes derived from the same object name agree. This
+restates `uoStoreSlotAad_prefix_publicShape` as an extensionality fact that
+is more directly useful when an AAD obligation is phrased as a same-object
+agreement check. -/
+theorem uoStoreSlotAad_publicProjection
+    {objectA objectB : String}
+    (hObject : objectA = objectB) :
+    uoStoreSlotAad objectA = uoStoreSlotAad objectB := by
+  rw [hObject]
 
 end RuntimeStoreCodecSemantics
 

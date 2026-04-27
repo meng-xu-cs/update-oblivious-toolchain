@@ -54,6 +54,7 @@ import UOToolchain.RuntimeCanonicalPathOramPairJson
 import UOToolchain.TranslationValidationJson
 import UOToolchain.CompilerExactness
 import UOToolchain.RuntimePaperInstantiation
+import UOToolchain.RuntimeStoreCodecSemantics
 
 namespace UOToolchain
 
@@ -1048,5 +1049,98 @@ theorem proofGrade_compiler_correctness_supersedes_artifact_checker
   · intro hStatus hPub
     exact proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected
       fn kp cfg hLow hEntry hStatus hPub
+
+/-! ### WP5 Paper-Facing Backend Codec Surface Facades
+
+These facades expose the W5.5 codec-semantic alignment theorems on the
+paper-facing surface. They pin obligations of the concrete Rust
+`StoreCipher` surface (`runtime/uo-store/src/generated_surface.rs`) at the
+Lean codec level: cipher-key length, magic constant length / byte validity,
+sealed-record component lengths, and AAD shape. Each facade strengthens a
+paper-facing claim about the cryptographic-codec layer that
+`bucketEncryptionINDCPA` and `metadataEncryptionINDCPA` ultimately rest on.
+
+The Rust crypto-primitive identity is independently pinned by the probe's
+`runtime_crypto_primitive_identity_pinned` static-drift check; these
+facades give the same facts a Lean-theorem statement so the WP5 backend
+provenance route can rely on them. -/
+
+/-- Paper-facing cipher-key-length facade. The Lean codec-semantic constant
+`cipherKeyBytes` equals 32, matching the Rust `key: [u8; 32]` ChaCha20-
+Poly1305 buffer pinned by the probe's crypto-primitive identity check. -/
+theorem proofGrade_runtime_store_codec_cipher_key_bytes :
+    RuntimeStoreCodecSemantics.cipherKeyBytes = 32 :=
+  RuntimeStoreCodecSemantics.cipherKeyBytes_value
+
+/-- Paper-facing sealed-record-magic length facade. The public sealed-record
+magic constant has length `sealedMagicLen = 2`, matching the Rust
+`SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A]` literal. -/
+theorem proofGrade_runtime_store_codec_sealed_magic_length :
+    RuntimeStoreCodecSemantics.sealedMagic.length =
+      RuntimeStoreCodecSemantics.sealedMagicLen :=
+  RuntimeStoreCodecSemantics.sealedMagic_length
+
+/-- Paper-facing sealed-record-magic byte-validity facade. Each byte of the
+public magic is a valid byte (`< 256`). This is what allows the magic to
+flow through the non-zero transport encoder without producing zero bytes. -/
+theorem proofGrade_runtime_store_codec_sealed_magic_validBytes :
+    ∀ byte,
+      byte ∈ RuntimeStoreCodecSemantics.sealedMagic →
+        RuntimeStoreCodecSemantics.ValidByte byte :=
+  RuntimeStoreCodecSemantics.sealedMagic_validBytes
+
+/-- Paper-facing transport-encoded-length facade. The transport-encoded
+sealed record is exactly twice the plain sealed record. This is the
+mathematical fact behind the Rust `seal_and_wipe_into_slice` cursor
+arithmetic. -/
+theorem proofGrade_runtime_store_codec_sealed_encoded_len_doubles_plain_len
+    (payloadLen : Nat) :
+    RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen =
+      2 * RuntimeStoreCodecSemantics.sealedPlainLen payloadLen :=
+  RuntimeStoreCodecSemantics.sealedEncodedLen_eq_two_times_sealedPlainLen
+    payloadLen
+
+/-- Paper-facing sealed-record component-length facade. A successful
+`decodeSealedRecord?` outcome witnesses the structural decomposition fact:
+the magic, nonce, ciphertext, and tag components have their pinned public
+lengths. This is the named theorem capturing the Rust open-path component
+slicing. -/
+theorem proofGrade_runtime_store_codec_decoded_sealed_record_component_lengths
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+    (hDecode :
+      RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+        some parts) :
+    parts.magic.length = RuntimeStoreCodecSemantics.sealedMagicLen ∧
+      parts.nonce.length = RuntimeStoreCodecSemantics.sealedNonceBytes ∧
+      parts.ciphertext.length = payloadLen ∧
+      parts.tag.length = RuntimeStoreCodecSemantics.sealedTagBytes :=
+  RuntimeStoreCodecSemantics.decodeSealedRecord_some_componentLengths hDecode
+
+/-- Paper-facing sealed-record magic-equality facade. A successful
+`decodeSealedRecord?` outcome implies the decoded magic component is
+exactly the public `sealedMagic` constant, mirroring the Rust open-path
+check `if magic != SEALED_MAGIC { return None; }`. -/
+theorem proofGrade_runtime_store_codec_decoded_sealed_record_magic
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+    (hDecode :
+      RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
+        some parts) :
+    parts.magic = RuntimeStoreCodecSemantics.sealedMagic :=
+  RuntimeStoreCodecSemantics.decodeSealedRecord_some_magic hDecode
+
+/-- Paper-facing AAD shape facade. The store-slot AAD constructed by
+`uoStoreSlotAad` is the deterministic public concatenation
+`"uo_store:" ++ object`. This pins the AAD shape: the AAD depends only on
+the public object identifier and a fixed public prefix, so it carries no
+secret-dependent content. -/
+theorem proofGrade_runtime_store_codec_uo_slot_aad_prefix
+    (object : String) :
+    RuntimeStoreCodecSemantics.uoStoreSlotAad object =
+      "uo_store:" ++ object :=
+  RuntimeStoreCodecSemantics.uoStoreSlotAad_prefix_publicShape object
 
 end UOToolchain
