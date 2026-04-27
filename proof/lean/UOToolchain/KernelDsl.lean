@@ -843,20 +843,72 @@ theorem kernelLowerable_implies_lowerStatement_ok :
       rcases fragmentValid_implies_lowerExpr_ok value h with ⟨kv, hkv⟩
       exact ⟨.retStmt (some kv), by unfold lowerStatement; simp [hkv]; rfl⟩
 
-/-! The schedule-level forward theorem
-(`kernelLowerableScheduleAux_implies_lowerStatementsAux_ok`) and the
-program-level corollary (`kernelLowerable_implies_lowerCompiledFunction_ok`)
-are deferred. The proof requires a three-way case split on
-`stmt.isReturn` plus the structure of `rest`:
-the lowering is allowed to succeed when (1) `stmt` is not a return
-and `rest` is schedule-lowerable, or (2) `stmt` is a return and
-`rest` is empty. Threading this through the `do`-notation reductions
-in `lowerStatementsAux` plus the corresponding `if sawReturn then
-false else ...` reductions in `kernelLowerableScheduleAux` is
-mechanical but exceeded the W4.4 Session B-1 scope. The per-element
-forward theorems above already expose the key correctness property
-the W4.4 preservation theorem needs; the schedule-level lift is a
-thin list induction over those. -/
+/-- Schedule-level forward theorem. Two cases for the cons:
+either `stmt` is not a return (then `rest` is schedule-lowerable
+with `sawReturn=false`), or `stmt` is a return (then `rest` must be
+empty for the schedule predicate to hold). -/
+theorem kernelLowerableScheduleAux_implies_lowerStatementsAux_ok :
+    ∀ (stmts : List Statement) (index : Nat),
+      Statement.kernelLowerableScheduleAux stmts false = true →
+      ∃ ks, lowerStatementsAux stmts index false = .ok ks
+  | [], _, _ => ⟨[], rfl⟩
+  | stmt :: rest, index, h => by
+      have hSplit : Statement.kernelLowerable stmt = true ∧
+          Statement.kernelLowerableScheduleAux rest stmt.isReturn = true := by
+        have := h
+        simp [Statement.kernelLowerableScheduleAux] at this
+        exact this
+      obtain ⟨hStmt, hRest⟩ := hSplit
+      rcases kernelLowerable_implies_lowerStatement_ok stmt hStmt with ⟨ks, hks⟩
+      cases hIR : stmt.isReturn with
+      | false =>
+          rw [hIR] at hRest
+          rcases kernelLowerableScheduleAux_implies_lowerStatementsAux_ok
+              rest (index + 1) hRest with ⟨krest, hkrest⟩
+          refine ⟨ks :: krest, ?_⟩
+          show lowerStatementsAux (stmt :: rest) index false = .ok (ks :: krest)
+          unfold lowerStatementsAux
+          simp only [hks, hIR, hkrest]
+          rfl
+      | true =>
+          rw [hIR] at hRest
+          -- `kernelLowerableScheduleAux rest true` is true only when rest = [].
+          cases rest with
+          | nil =>
+              refine ⟨[ks], ?_⟩
+              show lowerStatementsAux [stmt] index false = .ok [ks]
+              unfold lowerStatementsAux
+              simp only [hks, hIR]
+              rfl
+          | cons s' rest' =>
+              -- Contradiction: cons-with-sawReturn=true reduces to false.
+              simp [Statement.kernelLowerableScheduleAux] at hRest
+
+/-- `Statement.kernelLowerableSchedule` implies `lowerStatements`
+succeeds. -/
+theorem kernelLowerableSchedule_implies_lowerStatements_ok
+    (stmts : List Statement)
+    (h : Statement.kernelLowerableSchedule stmts = true) :
+    ∃ ks, lowerStatements stmts = .ok ks :=
+  kernelLowerableScheduleAux_implies_lowerStatementsAux_ok stmts 0 h
+
+/-- `CompiledFunction.kernelLowerable` implies
+`lowerCompiledFunction` succeeds. -/
+theorem kernelLowerable_implies_lowerCompiledFunction_ok
+    (fn : CompiledFunction)
+    (h : CompiledFunction.kernelLowerable fn = true) :
+    ∃ kp, lowerCompiledFunction fn = .ok kp := by
+  unfold CompiledFunction.kernelLowerable at h
+  rcases kernelLowerableSchedule_implies_lowerStatements_ok fn.body h
+    with ⟨ks, hks⟩
+  refine ⟨{ entrypointId := fn.signature
+          , params := fn.params
+          , returnType := fn.returnType
+          , secretArgs := fn.secretArgs
+          , body := ks }, ?_⟩
+  unfold lowerCompiledFunction
+  rw [hks]
+  rfl
 
 mutual
 
