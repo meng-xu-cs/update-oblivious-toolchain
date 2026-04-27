@@ -1700,6 +1700,79 @@ The runtime-to-Lean witness interface is now fixed in:
   emitted runtime witnesses are accepted by the Lean checker on representative
   supported paths, including a multi-object ORAM `transferFrom` witness
 
+## Tamper Coverage Audit
+
+The probe's `tamper-validation` scenario runs **379 distinct tamper
+scenarios** (each with a unique mutation description), all of which
+must produce `"accepted": false, "rejected": true` on the Lean
+checker side. The acceptance gate in `scripts/run_validation.sh`
+asserts `rejected_count == scenario_count == 379`; the
+reviewer-facing summary surfaces the same number.
+
+The 379-scenario suite is split across the following theorem-facing
+artifacts (numbers approximate, see `results/tamper_validation.json`
+for the exact distribution):
+
+- **JSON-bundle tampers** for every paper-grade
+  `loadAndCheckImported<…>` checker family — kernel DSL, kernel slot
+  DSL, kernel lowering, kernel witness, kernel refinement witness,
+  kernel-interface bundle, kernel finish boundary, runtime witness,
+  runtime refinement witness, shell boundary, shell boundary slot,
+  shell boundary lowering, confidential core (and its slot / lowering
+  / shell-boundary-slot / shell-boundary-lowering / kernel-finish-slot
+  / kernel-interface-slot / kernel-interface-slot-finish-boundary
+  variants), confidential proof-bundle family (assurance / boundary /
+  finish-slot-boundary / kernel-interface / refinement-boundary /
+  slot-assurance / slot-boundary), trusted-kernel slot, runtime
+  machine-finish witness, runtime machine-finish boundary,
+  runtime-implementation interface and its full chain (public-bridge,
+  slot-adapter, residual-helper-shell, small-confidential-kernel,
+  shared-confidential-kernel, confidential-statement-trace bridge,
+  kernel-meeting / kernel-meeting-confinement / kernel-machine-confinement,
+  shared-kernel and shared-kernel-machine refinements, full
+  implementation-confinement), public-bridge observer-refinement,
+  residual-helper-shell machine-refinement, slot-adapter machine-refinement,
+  small-confidential-kernel machine-refinement,
+  confidential-statement-trace bridge refinement.
+- **Source-mutation tampers** that append handwritten markers
+  (e.g., direct `run_confidential_entrypoint(...)`,
+  `Value::confidential_select`, secret-indexed `entries[slot_index]`,
+  growable `Vec<OramWrite>`, `position(...)` early-exit scans, raw
+  `entries[slot_index]` writes) so the source-backed
+  `RuntimeImplementationInterface` rejects representative
+  confidential-bypass drift; each source-side scenario is replayed
+  against every downstream theorem route (standalone small-kernel,
+  standalone shared-kernel, machine-backed routes, kernel-interface
+  combined boundary, full implementation-confinement, dedicated
+  public-observer route) so a single source mutation triggers
+  rejection at every layer the paper claim depends on.
+- **Translation-side tampers** for `checkProofGradeTranslationArtifacts`
+  (mutated manifest entrypoints, mutated kernel-step `object_id`,
+  mutated raw-target objects in the confidential admission path).
+- **Path-ORAM hidden-state tampers** (mutated position-map leaves,
+  mutated absent-leaf shape).
+- **Controller-certificate tampers** (mutated observed ORAM access,
+  mutated recursion depth) for the controller observer family.
+
+The W6 freeze surface — observer / boundary-call / persistent-I/O /
+controller-refinement / storage-refinement / deployment-assumption
+bundle — does not need its own benchmark-backed tamper-validation
+scenario because the targets are static-drift checks (literal-string
+matches against frozen Lean / Rust source). Source drift in any of
+these surfaces flips the corresponding `*_pinned` flag in
+`results/static_checks.json` and the matching field in
+`results/kernel_model_alignment_validation.json`, both of which the
+acceptance gate requires to be `true`. The closure-audit theorem
+`sgxHostileHostClosureAudit_driftCheckNames` in `ProofGrade.lean`
+pins the six W6 drift-check names at the Lean type level so that the
+static-drift surface itself is theorem-stable.
+
+The 379-scenario suite therefore provides negative-test coverage for
+every theorem-facing JSON artifact emitted by the runtime, every
+source-backed boundary, and every translation-side artifact, while
+the static-drift surface provides the equivalent of negative-test
+coverage for every freeze layer.
+
 ## Non-Claim
 
 This profile does not currently claim:
