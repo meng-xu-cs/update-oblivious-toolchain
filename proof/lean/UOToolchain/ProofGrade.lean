@@ -23,6 +23,7 @@ import UOToolchain.RuntimeImplementationInterface
 import UOToolchain.ConfidentialKernelDsl
 import UOToolchain.ConfidentialFragment
 import UOToolchain.KernelDsl
+import UOToolchain.Sol
 import UOToolchain.RuntimeConfidentialCoreAssurance
 import UOToolchain.RuntimeCoins
 import UOToolchain.PathOramLocalPosmapV1
@@ -638,5 +639,60 @@ theorem proofGrade_ir_to_kernel_program_preservation
     (hEntry : cfg.entrypointFn? = some fn) :
     IR.evalContract cfg = IR.evalKernelProgram kp cfg :=
   IR.lowerCompiledFunction_preserves_semantics cfg fn kp hLow hEntry
+
+/-! ## W4.2: Sol-to-IR preservation (paper facade)
+
+`proofGrade_sol_to_ir_program_preservation` re-exports the W4.2
+program-level preservation theorem so the paper-facing facade can
+cite a single named handle: "for every Sol function lowered by
+`uo-solc`, the AST evaluator and the IR evaluator agree on the
+resulting outcome whenever the IR config's entrypoint resolves to
+the lowered function."
+
+The companion per-Expr / per-Statement / body-level theorems
+(`proofGrade_sol_to_ir_expr_preservation`,
+`proofGrade_sol_to_ir_statement_preservation`,
+`proofGrade_sol_to_ir_body_preservation`) lift the Sol-side AST
+semantics through expression evaluation, statement evaluation, and
+list-of-statements evaluation respectively. Together they pin the
+WP4 source-to-IR correctness theorem against a Lean-side Sol AST
+mirror, completing W4.2 of the WP4 charter.
+-/
+
+theorem proofGrade_sol_to_ir_expr_preservation
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv)
+    (e : Sol.Expr) :
+    Sol.evalExpr cfg env e = IR.evalExpr cfg env (Sol.lowerExpr e) :=
+  Sol.lowerExpr_preserves_semantics cfg env e
+
+theorem proofGrade_sol_to_ir_statement_preservation
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (s : Sol.Statement) :
+    Sol.evalStatement cfg env oc s =
+      IR.evalStatement cfg env oc (Sol.lowerStatement s) :=
+  Sol.lowerStatement_preserves_semantics cfg env oc s
+
+theorem proofGrade_sol_to_ir_body_preservation
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (stmts : List Sol.Statement) :
+    Sol.evalBody cfg env oc stmts =
+      IR.evalBody cfg env oc (Sol.lowerStatementList stmts) :=
+  Sol.lowerStatementList_preserves_semantics cfg env oc stmts
+
+/-- Program-level preservation: the Sol-side `evalFunction` agrees
+with the IR-side `evalContract` whenever the IR config's entrypoint
+resolves to the lowered function.
+
+This is the **W4.2 charter task 2 deliverable** at the program
+level: a Lean-proved, semantics-preserving correspondence between
+the Sol AST evaluator and the IR evaluator on every lowering.
+Combined with the W4.4 IR-to-kernel program preservation, this
+closes the source-to-kernel correctness chain for the structural
+fragment of the admitted Solidity subset. -/
+theorem proofGrade_sol_to_ir_program_preservation
+    (fn : Sol.Function) (cfg : IR.OperationalConfig)
+    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn)) :
+    Sol.evalFunction fn cfg = IR.evalContract cfg :=
+  Sol.lowerFunction_preserves_semantics fn cfg hEntry
 
 end UOToolchain
