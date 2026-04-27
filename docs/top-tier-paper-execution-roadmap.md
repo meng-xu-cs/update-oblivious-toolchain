@@ -2093,9 +2093,24 @@ Concrete tasks:
      `sgxBoundaryCallProvenance` and the named probe drift check
      `sgx_boundary_call_model_pinned` reject representative
      boundary-call drift in `runtime/uo-evm/src/controller.rs` and
-     `crates/uo-core/src/trace.rs`. W6.2 still has an open
-     persistent-I/O sub-task (PhysicalRead/Write field schema and
-     WriteClass vocabulary).
+     `crates/uo-core/src/trace.rs`.
+   - **W6.2 persistent-I/O status (landed):** the canonical
+     `PhysicalRead` / `PhysicalWrite` field schemas and the canonical
+     `WriteClass` vocabulary (`Set`, `Clear`, `Same`, `Update`) are
+     now pinned explicitly in `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+     under `sgxObserverWriteClassNames`,
+     `sgxObserverPhysicalReadFieldNames`, and
+     `sgxObserverPhysicalWriteFieldNames`. The provenance record
+     `sgxPersistentIoProvenance` and the named probe drift check
+     `sgx_persistent_io_model_pinned` reject representative
+     persistent-I/O drift in `crates/uo-core/src/trace.rs` (the
+     `WriteClass` enum, the `as_refinement_label` projection, and
+     the `PhysicalReadEvent` / `PhysicalWriteEvent` field schemas).
+     With this checkpoint W6.2 has covered all five boundary types
+     called out in the WP6 charter (boundary calls, persistent I/O,
+     exits, shared-resource observations, paging observations);
+     exits, shared-resource observations, and paging observations
+     were already pinned in W6.1.
 3. Prove that the real controller/runtime behavior refines that observer.
 4. Prove that the sealing/storage path matches the theorem-side persistent
    model.

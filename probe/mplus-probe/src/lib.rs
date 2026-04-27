@@ -29660,6 +29660,29 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // canonical observer-surface freeze is documented in
     // `docs/tee-runtime-hardening.md` under "W6.1 Frozen SGX
     // Observer Surface".
+    // W6.2: pin the canonical hostile-host persistent-I/O model —
+    // the `PhysicalReadEvent` field schema (`object`, `location`,
+    // `len`), the `PhysicalWriteEvent` field schema (`object`,
+    // `location`, `len`, `class`), and the canonical `WriteClass`
+    // vocabulary (`Set`, `Clear`, `Same`, `Update`). The matching
+    // Lean provenance record is `sgxPersistentIoProvenance`. The
+    // freeze is documented in `docs/tee-runtime-hardening.md`
+    // under "W6.2 Frozen Persistent-I/O Model".
+    let sgx_persistent_io_model_pinned = core_trace_source.contains("pub enum WriteClass {")
+        && core_trace_source.contains("    Set,")
+        && core_trace_source.contains("    Clear,")
+        && core_trace_source.contains("    Same,")
+        && core_trace_source.contains("    Update,")
+        && core_trace_source.contains("Self::Set => \"Set\",")
+        && core_trace_source.contains("Self::Clear => \"Clear\",")
+        && core_trace_source.contains("Self::Same => \"Same\",")
+        && core_trace_source.contains("Self::Update => \"Update\",")
+        && core_trace_source.contains("pub struct PhysicalWriteEvent {")
+        && core_trace_source.contains("    pub object: String,")
+        && core_trace_source.contains("    pub location: String,")
+        && core_trace_source.contains("    pub len: usize,")
+        && core_trace_source.contains("    pub class: WriteClass,")
+        && core_trace_source.contains("pub struct PhysicalReadEvent {");
     // W6.2: pin the canonical hostile-host boundary-call model — the
     // `"oram_access"` inner API literal, the `Enter`/`Exit` direction
     // enum vocabulary, the canonical boundary-event budget formula
@@ -34133,6 +34156,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && path_oram_deployed_stash_parameters_pinned
         && sgx_observer_surface_pinned
         && sgx_boundary_call_model_pinned
+        && sgx_persistent_io_model_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -34818,6 +34842,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             sgx_observer_surface_pinned,
         "sgx_boundary_call_model_pinned":
             sgx_boundary_call_model_pinned,
+        "sgx_persistent_io_model_pinned":
+            sgx_persistent_io_model_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":

@@ -547,4 +547,117 @@ theorem sgxBoundaryCallProvenance_staticDriftCheckName :
     sgxBoundaryCallProvenance.staticDriftCheckName =
       "sgx_boundary_call_model_pinned" := by rfl
 
+/-! ### W6.2 Persistent-I/O Model
+
+W6.2 also models the persistent-I/O surface explicitly. The Lean
+trace model (`TraceModel.lean`) already carries the abstract
+`PhysicalRead` / `PhysicalWrite` shapes (via `Trace`); W6.2 freezes
+the canonical persistent-I/O field schema and the canonical
+`WriteClass` vocabulary that the Rust runtime uses to classify
+host-visible writes.
+
+- **canonical `PhysicalRead` field schema**: `{ object, location,
+  len }`, matching the Rust `PhysicalReadEvent` struct in
+  `crates/uo-core/src/trace.rs`;
+- **canonical `PhysicalWrite` field schema**: `{ object, location,
+  writeClass, len }`, matching the Rust `PhysicalWriteEvent` struct
+  (with `class : WriteClass`);
+- **canonical `WriteClass` vocabulary**: `Set`, `Clear`, `Same`,
+  `Update` — the four classifications the runtime emits via
+  `classify_write` on each host-visible write.
+
+The runtime side is pinned by the probe's
+`sgx_persistent_io_model_pinned` static-drift check. -/
+
+/-- Frozen list of the four canonical `WriteClass` labels in their
+declared order. The runtime classifies every host-visible write into
+one of these four classes via `classify_write`. -/
+def sgxObserverWriteClassNames : List String :=
+  ["Set", "Clear", "Same", "Update"]
+
+@[simp] theorem sgxObserverWriteClassNames_length :
+    sgxObserverWriteClassNames.length = 4 := by rfl
+
+theorem sgxObserverWriteClassNames_value :
+    sgxObserverWriteClassNames = ["Set", "Clear", "Same", "Update"] := by
+  rfl
+
+/-- Frozen list of the canonical `PhysicalRead` field names in
+declared order. -/
+def sgxObserverPhysicalReadFieldNames : List String :=
+  ["object", "location", "len"]
+
+@[simp] theorem sgxObserverPhysicalReadFieldNames_length :
+    sgxObserverPhysicalReadFieldNames.length = 3 := by rfl
+
+/-- Frozen list of the canonical `PhysicalWrite` field names in
+declared order. The Lean structure uses `writeClass` as the
+classification field; the Rust struct uses `class : WriteClass`. -/
+def sgxObserverPhysicalWriteFieldNames : List String :=
+  ["object", "location", "writeClass", "len"]
+
+@[simp] theorem sgxObserverPhysicalWriteFieldNames_length :
+    sgxObserverPhysicalWriteFieldNames.length = 4 := by rfl
+
+/-! ### W6.2 persistent-I/O provenance record -/
+
+/-- W6.2 frozen persistent-I/O provenance record. Pairs the canonical
+`PhysicalRead` / `PhysicalWrite` field schemas and the canonical
+`WriteClass` vocabulary with the structural metadata so the paper
+claim, the Lean formalization, and the Rust runtime all reference
+one canonical persistent-I/O model. -/
+structure SgxPersistentIoProvenance where
+  /-- The canonical `PhysicalRead` field-name list. -/
+  physicalReadFieldNames : List String
+  /-- The canonical `PhysicalWrite` field-name list. -/
+  physicalWriteFieldNames : List String
+  /-- The canonical four `WriteClass` labels. -/
+  writeClassNames : List String
+  /-- Documentation anchor for the WP6 hardening track. -/
+  observerDocSection : String
+  /-- Probe static-drift check that pins the Rust persistent-I/O
+  surface. -/
+  staticDriftCheckName : String
+  /-- File path anchoring the Lean trace model. -/
+  leanTraceModule : String
+  /-- File path anchoring the Rust public-trace projection. -/
+  rustTraceModule : String
+deriving Repr, DecidableEq
+
+/-- The actual W6.2 persistent-I/O provenance record. -/
+def sgxPersistentIoProvenance : SgxPersistentIoProvenance :=
+  { physicalReadFieldNames := sgxObserverPhysicalReadFieldNames
+  , physicalWriteFieldNames := sgxObserverPhysicalWriteFieldNames
+  , writeClassNames := sgxObserverWriteClassNames
+  , observerDocSection :=
+      "docs/tee-runtime-hardening.md \"W6.2 Frozen Persistent-I/O Model\""
+  , staticDriftCheckName := "sgx_persistent_io_model_pinned"
+  , leanTraceModule := "proof/lean/UOToolchain/TraceModel.lean"
+  , rustTraceModule := "crates/uo-core/src/trace.rs"
+  }
+
+/-- The provenance record's pinned `WriteClass` names match the
+canonical `sgxObserverWriteClassNames`. -/
+theorem sgxPersistentIoProvenance_writeClassNames :
+    sgxPersistentIoProvenance.writeClassNames =
+      sgxObserverWriteClassNames := by rfl
+
+/-- The provenance record's pinned `PhysicalRead` field names match
+the canonical `sgxObserverPhysicalReadFieldNames`. -/
+theorem sgxPersistentIoProvenance_physicalReadFieldNames :
+    sgxPersistentIoProvenance.physicalReadFieldNames =
+      sgxObserverPhysicalReadFieldNames := by rfl
+
+/-- The provenance record's pinned `PhysicalWrite` field names match
+the canonical `sgxObserverPhysicalWriteFieldNames`. -/
+theorem sgxPersistentIoProvenance_physicalWriteFieldNames :
+    sgxPersistentIoProvenance.physicalWriteFieldNames =
+      sgxObserverPhysicalWriteFieldNames := by rfl
+
+/-- The provenance record references the
+`sgx_persistent_io_model_pinned` probe static-drift check. -/
+theorem sgxPersistentIoProvenance_staticDriftCheckName :
+    sgxPersistentIoProvenance.staticDriftCheckName =
+      "sgx_persistent_io_model_pinned" := by rfl
+
 end UOToolchain

@@ -213,6 +213,66 @@ If any of those drift, the static-checks gate flips
 `sgx_boundary_call_model_pinned` to `false` and the gate rejects
 the checkpoint.
 
+## W6.2 Frozen Persistent-I/O Model
+
+W6.2 also closes the persistent-I/O surface: the canonical
+`PhysicalRead` / `PhysicalWrite` field schemas and the canonical
+`WriteClass` vocabulary that the runtime emits.
+
+The Lean side extends `proof/lean/UOToolchain/SgxObserverFreeze.lean`
+with the `sgxPersistentIoProvenance` record. The runtime side is
+pinned by the probe's `sgx_persistent_io_model_pinned` static-drift
+check.
+
+Claim taxonomy: **Lean-proved, semantics-preserving** for the W6.2
+persistent-I/O model. The Lean canonical lists pin the field
+schemas and the four-element write-class vocabulary; the
+static-drift check rejects representative runtime drift. The
+freeze does not by itself discharge any deployment assumption.
+
+### Frozen persistent-I/O components
+
+| Component | Canonical value | Lean anchor | Rust anchor |
+| --- | --- | --- | --- |
+| `PhysicalRead` field schema | `["object", "location", "len"]` | `PhysicalRead` structure in `TraceModel.lean`; `sgxObserverPhysicalReadFieldNames` in `SgxObserverFreeze.lean` | `PhysicalReadEvent { object, location, len }` struct in `crates/uo-core/src/trace.rs` |
+| `PhysicalWrite` field schema | `["object", "location", "writeClass", "len"]` (Lean) / `["object", "location", "len", "class"]` (Rust) | `PhysicalWrite` structure in `TraceModel.lean`; `sgxObserverPhysicalWriteFieldNames` in `SgxObserverFreeze.lean` | `PhysicalWriteEvent { object, location, len, class }` struct in `crates/uo-core/src/trace.rs`; `class : WriteClass` carries the classification |
+| `WriteClass` vocabulary | `[Set, Clear, Same, Update]` | `sgxObserverWriteClassNames` in `SgxObserverFreeze.lean` | `WriteClass` enum in `crates/uo-core/src/trace.rs` (`Set`, `Clear`, `Same`, `Update`); the `as_refinement_label` projection emits the canonical labels |
+
+### Provenance pairing
+
+The W6.2 persistent-I/O provenance record is
+`sgxPersistentIoProvenance` in `SgxObserverFreeze.lean`. It carries
+the canonical field-name lists and the four-element write-class
+vocabulary, the documentation anchor (this section), the probe
+static-drift check name, and the Lean / Rust file paths anchoring
+each pinned component.
+
+The paper-facing facades exposed in
+[`ProofGrade.lean`](../proof/lean/UOToolchain/ProofGrade.lean) under
+the `proofGrade_sgx_persistent_io_*` prefix mirror the W6.1 / W6.2
+boundary-call pattern.
+
+### Static-drift coverage
+
+The probe's `sgx_persistent_io_model_pinned` flag, emitted by the
+`kernel_model_alignment_validation.json` report, rejects
+representative drift on the Rust side. Specifically it requires:
+
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `WriteClass` enum with exactly the `Set`, `Clear`, `Same`,
+  `Update` variants in declared order.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `as_refinement_label` projection that emits `"Set"`, `"Clear"`,
+  `"Same"`, `"Update"` strings.
+- `crates/uo-core/src/trace.rs` keeps the canonical
+  `PhysicalReadEvent` and `PhysicalWriteEvent` struct field
+  schemas, including the `class : WriteClass` field on the write
+  event.
+
+If any of those drift, the static-checks gate flips
+`sgx_persistent_io_model_pinned` to `false` and the gate rejects
+the checkpoint.
+
 ## Revived Runtime-Kernel Requirements
 
 The archived runbook was directionally right about what the runtime needed:

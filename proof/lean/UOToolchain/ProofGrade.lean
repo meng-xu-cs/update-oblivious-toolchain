@@ -1555,4 +1555,59 @@ theorem proofGrade_sgx_boundary_call_provenance_direction_names :
       sgxObserverBoundaryDirectionNames :=
   sgxBoundaryCallProvenance_boundaryDirectionNames
 
+/-! ### WP6.2 Persistent-I/O Model Facades
+
+The facades below expose the W6.2 persistent-I/O model: the canonical
+`PhysicalRead` / `PhysicalWrite` field schemas and the canonical
+`WriteClass` vocabulary.
+
+Claim taxonomy: these facades are **Lean-proved,
+semantics-preserving**. The Lean equalities pin the canonical
+persistent-I/O field schemas and the canonical write-class
+vocabulary; the runtime side is pinned by the probe's
+`sgx_persistent_io_model_pinned` static-drift check. -/
+
+/-- Paper-facing W6.2 facade: the canonical `WriteClass` vocabulary
+contains exactly four labels — `Set`, `Clear`, `Same`, `Update` — in
+this canonical order. -/
+theorem proofGrade_sgx_persistent_io_write_class_names :
+    sgxObserverWriteClassNames =
+      ["Set", "Clear", "Same", "Update"] :=
+  sgxObserverWriteClassNames_value
+
+/-- Paper-facing W6.2 facade: the canonical `WriteClass` vocabulary
+has length exactly four. -/
+theorem proofGrade_sgx_persistent_io_write_class_names_length :
+    sgxObserverWriteClassNames.length = 4 :=
+  sgxObserverWriteClassNames_length
+
+/-- Paper-facing W6.2 facade: the canonical `PhysicalRead` field
+schema has exactly three fields — `object`, `location`, `len`. -/
+theorem proofGrade_sgx_persistent_io_physical_read_field_names_length :
+    sgxObserverPhysicalReadFieldNames.length = 3 :=
+  sgxObserverPhysicalReadFieldNames_length
+
+/-- Paper-facing W6.2 facade: the canonical `PhysicalWrite` field
+schema has exactly four fields — `object`, `location`, `writeClass`,
+`len`. -/
+theorem proofGrade_sgx_persistent_io_physical_write_field_names_length :
+    sgxObserverPhysicalWriteFieldNames.length = 4 :=
+  sgxObserverPhysicalWriteFieldNames_length
+
+/-- Paper-facing W6.2 facade: the persistent-I/O provenance record
+references the `sgx_persistent_io_model_pinned` probe static-drift
+check. -/
+theorem proofGrade_sgx_persistent_io_provenance_static_drift_check :
+    sgxPersistentIoProvenance.staticDriftCheckName =
+      "sgx_persistent_io_model_pinned" :=
+  sgxPersistentIoProvenance_staticDriftCheckName
+
+/-- Paper-facing W6.2 facade: the persistent-I/O provenance record's
+pinned `WriteClass` names match the canonical
+`sgxObserverWriteClassNames`. -/
+theorem proofGrade_sgx_persistent_io_provenance_write_class_names :
+    sgxPersistentIoProvenance.writeClassNames =
+      sgxObserverWriteClassNames :=
+  sgxPersistentIoProvenance_writeClassNames
+
 end UOToolchain
