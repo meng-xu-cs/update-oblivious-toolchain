@@ -1,5 +1,36 @@
 import UOToolchain.SgxControllerTrace
 
+/-! # SGX micro-observer model layer
+
+This file defines the paper-facing normalized SGX micro-observer
+simulator and the corresponding `normalizedObservedSGXMicroRelation`
+used by the SGX projection chain.
+
+* **Abstraction function:** `simulateNormalizedMicroTraceFromLeakage`
+  (deterministic public projection of `SGXMicroLeakage` into a
+  `NormalizedMicroTrace`).
+* **Main theorem:** `normalizeMicroTrace_controllerMicroTraceOfShape`
+  — every controller-shaped micro trace normalizes exactly to the
+  simulator output. The `normalizedObservedSGXMicroRelation` SGX
+  micro relation (used by `paperMain_*` in the projection layers) is
+  defined here as a thin wrapper.
+
+The legacy `SGXMicroConfig`/`SGXMicroSemantics` data structures and
+helper predicates `sameSGXMicroPublicProjection`, `ExactSGXMicroUO`,
+`sgxMicroLeakage` survive only to support `SgxMicroGame.lean`'s
+`legacyComputationalSGXMicroUO` legacy demonstration.
+
+The earlier alternative-relation infrastructure
+(`budgetConsistentSGXMicroRelation`, `canonicalizedSGXMicroRelation`,
+`canonicalizeMicroTrace`, `canonicalLeakageSimulator`,
+`simulateMicroTraceFromLeakage`, `canonicalPageTrace`/`canonicalExitTrace`/
+`canonicalSharedResourceTrace`, the unused `publicControllerMicroSemantics`
+smoke-test `SGXMicroSemantics` instance, plus the six smoke-test
+theorems showing it satisfies budget/canonicalized/normalized variants)
+has been removed: it had no consumer in the paper-grade narrative
+after the W7.1 SgxOramProjection canonicalization.
+-/
+
 namespace UOToolchain
 
 structure SGXMicroPublicData where
@@ -19,24 +50,11 @@ abbrev SGXMicroSemantics := SGXMicroConfig → Distribution SGXMicroTrace
 def sameSGXMicroPublicProjection (lhs rhs : SGXMicroConfig) : Prop :=
   lhs.pubData = rhs.pubData
 
-def ExactSGXMicroUO (run : SGXMicroSemantics) : Prop :=
-  ∀ cfg₁ cfg₂,
-    sameSGXMicroPublicProjection cfg₁ cfg₂ →
-    run cfg₁ = run cfg₂
-
 def sgxMicroLeakage (cfg : SGXMicroConfig) : SGXMicroLeakage :=
   sgxMicroLeakageOfController
     cfg.pubData.publicOutcome
     cfg.pubData.modelTags
     cfg.pubData.controllerShape
-
-def publicControllerMicroSemantics : SGXMicroSemantics :=
-  fun cfg => [controllerMicroTraceOfShape cfg.pubData.controllerShape]
-
-def budgetConsistentSGXMicroRelation : SGXMicroRelation :=
-  fun micro₁ micro₂ leakage =>
-    MicroDistributionConsistentWithLeakage micro₁ leakage ∧
-      MicroDistributionConsistentWithLeakage micro₂ leakage
 
 structure NormalizedPageEvent where
   pageKind : String
@@ -96,54 +114,6 @@ def normalizedObservedSGXMicroRelation : SGXMicroRelation :=
   fun micro₁ micro₂ leakage =>
     NormalizedByLeakage micro₁ leakage ∧
       NormalizedByLeakage micro₂ leakage
-
-def canonicalPageTrace (budget : Nat) : List PageEvent :=
-  (List.range budget).map (controllerPageEventOfIndex "simulated")
-
-@[simp] theorem canonicalPageTrace_length (budget : Nat) :
-    (canonicalPageTrace budget).length = budget := by
-  simp [canonicalPageTrace]
-
-def canonicalExitTrace (budget : Nat) : List ExitEvent :=
-  (List.range budget).map (controllerExitEventOfIndex budget)
-
-@[simp] theorem canonicalExitTrace_length (budget : Nat) :
-    (canonicalExitTrace budget).length = budget := by
-  simp [canonicalExitTrace]
-
-def canonicalSharedResourceTrace (budget : Nat) : SharedResourceTrace :=
-  List.replicate budget "shared_resource_tick"
-
-@[simp] theorem canonicalSharedResourceTrace_length (budget : Nat) :
-    (canonicalSharedResourceTrace budget).length = budget := by
-  simp [canonicalSharedResourceTrace]
-
-def simulateMicroTraceFromLeakage (leakage : SGXMicroLeakage) : SGXMicroTrace :=
-  { pageTrace := canonicalPageTrace leakage.pageTraceBudget
-  , exitTrace := canonicalExitTrace leakage.exitTraceBudget
-  , sharedResourceTrace := canonicalSharedResourceTrace leakage.sharedResourceBudget
-  }
-
-abbrev SGXMicroSimulator := SGXMicroLeakage → Distribution SGXMicroTrace
-
-def canonicalLeakageSimulator : SGXMicroSimulator :=
-  fun leakage => [simulateMicroTraceFromLeakage leakage]
-
-def canonicalizeMicroTrace (trace : SGXMicroTrace) : SGXMicroTrace :=
-  { pageTrace := canonicalPageTrace trace.pageTrace.length
-  , exitTrace := canonicalExitTrace trace.exitTrace.length
-  , sharedResourceTrace := canonicalSharedResourceTrace trace.sharedResourceTrace.length
-  }
-
-def CanonicalizedByLeakage
-  (traces : Distribution SGXMicroTrace)
-  (leakage : SGXMicroLeakage) : Prop :=
-  ∀ trace, trace ∈ traces → canonicalizeMicroTrace trace = simulateMicroTraceFromLeakage leakage
-
-def canonicalizedSGXMicroRelation : SGXMicroRelation :=
-  fun micro₁ micro₂ leakage =>
-    CanonicalizedByLeakage micro₁ leakage ∧
-      CanonicalizedByLeakage micro₂ leakage
 
 @[simp] theorem normalizePageTrace_controllerPageEventsOfRegion
   (region : SGXControllerPageBudget) :
@@ -208,45 +178,6 @@ theorem sgxMicroLeakage_eq_of_samePublicProjection
   cases hPublic
   rfl
 
-theorem publicControllerMicroSemantics_exact :
-  ExactSGXMicroUO publicControllerMicroSemantics := by
-  intro cfg₁ cfg₂ hPublic
-  cases cfg₁
-  cases cfg₂
-  cases hPublic
-  rfl
-
-theorem publicControllerMicroSemantics_consistent
-  (cfg : SGXMicroConfig) :
-  MicroDistributionConsistentWithLeakage
-    (publicControllerMicroSemantics cfg)
-    (sgxMicroLeakage cfg) := by
-  intro trace hMem
-  simp [publicControllerMicroSemantics] at hMem
-  rcases hMem with rfl
-  exact controllerMicroTraceOfShape_consistentWithLeakage
-    cfg.pubData.publicOutcome
-    cfg.pubData.modelTags
-    cfg.pubData.controllerShape
-
-theorem canonicalizeMicroTrace_eq_simulate_of_consistent
-  {trace : SGXMicroTrace}
-  {leakage : SGXMicroLeakage} :
-  MicroTraceConsistentWithLeakage trace leakage →
-  canonicalizeMicroTrace trace = simulateMicroTraceFromLeakage leakage := by
-  intro hConsistent
-  cases trace
-  rcases hConsistent with ⟨hPage, hExit, hShared⟩
-  simp [canonicalizeMicroTrace, simulateMicroTraceFromLeakage, hPage, hExit, hShared]
-
-theorem canonicalizedByLeakage_of_consistent
-  {traces : Distribution SGXMicroTrace}
-  {leakage : SGXMicroLeakage} :
-  MicroDistributionConsistentWithLeakage traces leakage →
-  CanonicalizedByLeakage traces leakage := by
-  intro hConsistent trace hMem
-  exact canonicalizeMicroTrace_eq_simulate_of_consistent (hConsistent trace hMem)
-
 theorem normalizedByLeakage_of_eq
   {traces : Distribution SGXMicroTrace}
   {leakage₁ leakage₂ : SGXMicroLeakage} :
@@ -257,24 +188,6 @@ theorem normalizedByLeakage_of_eq
   subst hEq
   exact hNormalized
 
-theorem canonicalLeakageSimulator_consistent
-  (leakage : SGXMicroLeakage) :
-  MicroDistributionConsistentWithLeakage
-    (canonicalLeakageSimulator leakage)
-    leakage := by
-  intro trace hMem
-  simp [canonicalLeakageSimulator, simulateMicroTraceFromLeakage, MicroTraceConsistentWithLeakage] at hMem ⊢
-  rcases hMem with rfl
-  simp
-
-theorem canonicalLeakageSimulator_canonicalized
-  (leakage : SGXMicroLeakage) :
-  CanonicalizedByLeakage
-    (canonicalLeakageSimulator leakage)
-    leakage := by
-  exact canonicalizedByLeakage_of_consistent
-    (canonicalLeakageSimulator_consistent leakage)
-
 theorem normalizedLeakageSimulator_exact
   (leakage : SGXMicroLeakage) :
   ∀ trace, trace ∈ normalizedLeakageSimulator leakage →
@@ -283,62 +196,5 @@ theorem normalizedLeakageSimulator_exact
   simp [normalizedLeakageSimulator] at hMem
   rcases hMem with rfl
   rfl
-
-theorem publicControllerMicroSemantics_normalized
-  (cfg : SGXMicroConfig) :
-  NormalizedByLeakage
-    (publicControllerMicroSemantics cfg)
-    (sgxMicroLeakage cfg) := by
-  intro trace hMem
-  simp [publicControllerMicroSemantics] at hMem
-  rcases hMem with rfl
-  exact normalizeMicroTrace_controllerMicroTraceOfShape
-    cfg.pubData.publicOutcome
-    cfg.pubData.modelTags
-    cfg.pubData.controllerShape
-
-theorem publicControllerMicroSemantics_budgetRelation
-  {cfg₁ cfg₂ : SGXMicroConfig} :
-  sameSGXMicroPublicProjection cfg₁ cfg₂ →
-  budgetConsistentSGXMicroRelation
-    (publicControllerMicroSemantics cfg₁)
-    (publicControllerMicroSemantics cfg₂)
-    (sgxMicroLeakage cfg₁) := by
-  intro hPublic
-  constructor
-  · exact publicControllerMicroSemantics_consistent cfg₁
-  · exact microDistributionConsistentWithLeakage_of_eq
-      (sgxMicroLeakage_eq_of_samePublicProjection hPublic).symm
-      (publicControllerMicroSemantics_consistent cfg₂)
-
-theorem publicControllerMicroSemantics_canonicalizedRelation
-  {cfg₁ cfg₂ : SGXMicroConfig} :
-  sameSGXMicroPublicProjection cfg₁ cfg₂ →
-  canonicalizedSGXMicroRelation
-    (publicControllerMicroSemantics cfg₁)
-    (publicControllerMicroSemantics cfg₂)
-    (sgxMicroLeakage cfg₁) := by
-  intro hPublic
-  constructor
-  · exact canonicalizedByLeakage_of_consistent
-      (publicControllerMicroSemantics_consistent cfg₁)
-  · exact canonicalizedByLeakage_of_consistent
-      (microDistributionConsistentWithLeakage_of_eq
-        (sgxMicroLeakage_eq_of_samePublicProjection hPublic).symm
-        (publicControllerMicroSemantics_consistent cfg₂))
-
-theorem publicControllerMicroSemantics_normalizedRelation
-  {cfg₁ cfg₂ : SGXMicroConfig} :
-  sameSGXMicroPublicProjection cfg₁ cfg₂ →
-  normalizedObservedSGXMicroRelation
-    (publicControllerMicroSemantics cfg₁)
-    (publicControllerMicroSemantics cfg₂)
-    (sgxMicroLeakage cfg₁) := by
-  intro hPublic
-  constructor
-  · exact publicControllerMicroSemantics_normalized cfg₁
-  · exact normalizedByLeakage_of_eq
-      (sgxMicroLeakage_eq_of_samePublicProjection hPublic).symm
-      (publicControllerMicroSemantics_normalized cfg₂)
 
 end UOToolchain
