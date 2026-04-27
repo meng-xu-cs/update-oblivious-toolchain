@@ -15,41 +15,39 @@ preservation theorem connecting the AST semantics to the IR semantics
 
 ## Scope
 
-This commit covers the **structural fragment** of the admitted
-Solidity subset — the constructors that lower constructor-for-
-constructor to IR with no context-dependent rewriting:
+This module covers the **full admitted post-resolution Sol AST**: every
+parser-AST node that `uo-solc` accepts has a mirroring `Sol.Expr` /
+`Sol.Statement` constructor here. The constructors split into two
+families:
 
-- Literals (bool, uint, address)
-- Variable reference
-- Unary operators (`!`, `-`)
-- Binary operators (the 16 IR `BinaryOp`s)
-- Conditional expression (`?:` → `IR.Expr.select`)
-- Keccak256 (the structural form, without the
-  `abi.encodePacked` wrapper)
-- Statements: declare, assign-to-local, require, if/else, for,
-  return
+- **Source-syntax constructors** (`literal`, `var`, `unary`, `binary`,
+  `conditional`, `keccak256`, `declare`, `assign`, `require_`,
+  `ifStmt`, `forLoop`, `retStmt`) that mirror Solidity surface syntax.
+  Each maps to its same-named IR counterpart up to renaming
+  (`conditional` lowers to `IR.Expr.select`, `require_` to
+  `IR.Statement.require`).
+- **Resolved-state constructors** (`cellGet`, `arrayGet`, `mapGet`,
+  `arrayIndex`, `structField`, `abortIf`, `cellSet`, `arraySet`,
+  `mapPut`) where `uo-solc`'s parser has already resolved a
+  state-variable name to its object id, looked up a `.length`
+  capacity, dispatched `ArraySubscript` to the correct backend
+  (`ArrayGet` / `MapGet` / `ArrayIndex`), unwrapped a
+  `keccak256(abi.encodePacked(...))` call to its parts, and inlined
+  helper-function calls. The Sol AST mirror represents this
+  post-resolution form so each Sol constructor maps 1-1 to its IR
+  counterpart and the lowering is constructor-for-constructor.
 
-The **context-dependent fragment** (where uo-solc's lowering depends
-on the state-object table or on identifier resolution) is deferred
-to a follow-up commit. It includes:
+The context-dependent transformations performed by the parser/
+frontend (state-name resolution, capacity literal lookup,
+`abi.encodePacked` unwrapping, helper-function inlining,
+`AssignAdd`-style desugaring) belong to the trusted parser step
+and are out of scope for the Lean Sol AST. They are syntactic
+preprocessing that produces the post-resolution Sol AST consumed
+here; the Sol → IR lowering proof covers everything semantic.
 
-- `ArraySubscript base index` → `IR.ArrayGet` / `IR.MapGet` /
-  `IR.ArrayIndex` depending on whether `base` is an array/map state
-  variable.
-- `MemberAccess base ".length"` → `IR.Literal length` when `base`
-  is a state with declared capacity.
-- `Assign lhs rhs` where `lhs` is a state variable → `IR.CellSet` /
-  `IR.ArraySet` / `IR.MapPut`.
-- `FunctionCall keccak256 (abi.encodePacked args)` → `IR.Keccak256
-  args` (the structural `Sol.Expr.keccak256 args` form skips the
-  outer ABI wrapping; the deferred follow-up adds the wrapper).
-- Helper-function inlining via `ctx.frontend.helpers`.
-
-The structural fragment is the cleanest piece of the W4.2 charter
-deliverable: each Sol constructor maps directly to one IR
-constructor with the same name and arity, so the preservation
-theorem is provable by direct structural induction with `rfl` /
-`unfold + rw [ih]` patterns mirroring the W4.4 Session B-2 proofs.
+The preservation theorem is then provable by direct structural
+induction with `rfl` / `unfold + rw [ih]` patterns mirroring the
+W4.4 Session B-2 proofs.
 
 ## Why a separate AST mirror?
 
@@ -65,33 +63,50 @@ namespace UOToolchain.Sol
 
 /-! ## Sol.Expr -/
 
-/-- Mirror of the structural admitted subset of
-`solang_parser::pt::Expression`. Each constructor maps directly to
-one `IR.Expr` constructor with the same name and arity; the
-preservation theorem witnesses this directly. -/
+/-- Mirror of the full admitted post-resolution Sol expression
+surface. Source-syntax constructors (`literal`, `var`, `unary`,
+`binary`, `conditional`, `keccak256`) cover what the parser produces
+without lookup; resolved-state constructors (`cellGet`, `arrayGet`,
+`mapGet`, `arrayIndex`, `structField`) carry the object id /
+sub-expression that the parser's name-resolution pass has already
+filled in. Each constructor maps directly to one `IR.Expr`
+constructor with the same name and arity; the preservation theorem
+witnesses this directly. -/
 inductive Expr where
   | literal (v : IR.Value)
   | var (name : String)
   | unary (op : IR.UnaryOp) (e : Expr)
   | binary (op : IR.BinaryOp) (lhs : Expr) (rhs : Expr)
   | conditional (cond : Expr) (whenTrue : Expr) (whenFalse : Expr)
+  | cellGet (objectId : Nat)
+  | arrayGet (objectId : Nat) (index : Expr)
+  | mapGet (objectId : Nat) (key : Expr)
+  | structField (base : Expr) (field : String)
+  | arrayIndex (base : Expr) (index : Expr)
   | keccak256 (parts : List Expr)
   deriving Inhabited
 
 /-! ## Sol.Statement -/
 
-/-- Mirror of the structural admitted subset of
-`solang_parser::pt::Statement`. The `assign` constructor here only
-handles assignment-to-local; assignment-to-state is deferred to the
-context-dependent follow-up. -/
+/-- Mirror of the full admitted post-resolution Sol statement
+surface. The `assign` constructor handles assignment-to-local; the
+resolved-state constructors `cellSet` / `arraySet` / `mapPut` carry
+the object id that the parser's name-resolution pass has already
+filled in for assignment-to-state. -/
 inductive Statement where
   | declare (name : String) (ty : IR.Ty) (value : Expr)
   | assign (name : String) (value : Expr)
   | require_ (cond : Expr)
+  | abortIf (cond : Expr)
   | ifStmt (cond : Expr) (thenBody : List Statement) (elseBody : List Statement)
   | forLoop
       (loopId : String) (indexVar : String)
       (start_ : Expr) (end_ : Expr) (body : List Statement)
+  | cellSet (objectId : Nat) (value : Expr) (predicate : Option Expr)
+  | arraySet
+      (objectId : Nat) (index : Expr) (value : Expr) (predicate : Option Expr)
+  | mapPut
+      (objectId : Nat) (key : Expr) (value : Expr) (predicate : Option Expr)
   | retStmt (value : Option Expr)
   deriving Inhabited
 
@@ -158,6 +173,57 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value (.bool true) => evalExpr cfg env whenTrue
       | .value (.bool false) => evalExpr cfg env whenFalse
       | .value _ => .status (.evalError "select condition not boolean")
+  | .cellGet objectId =>
+      match cfg.publicState.lookup objectId, cfg.secretState.lookup objectId with
+      | some v, _ => .value v
+      | none, some v => .value v
+      | none, none => .status (.evalError s!"cellGet on unknown object {objectId}")
+  | .arrayGet objectId indexExpr =>
+      match evalExpr cfg env indexExpr with
+      | .status s => .status s
+      | .value indexVal =>
+          match indexVal with
+          | .uint idx =>
+              let arrayVal? : Option IR.Value :=
+                match cfg.publicState.lookup objectId with
+                | some v => some v
+                | none => cfg.secretState.lookup objectId
+              match arrayVal? with
+              | some (.array values) =>
+                  match values[idx]? with
+                  | some v => .value v
+                  | none =>
+                      .status (.evalError s!"arrayGet index {idx} out of bounds")
+              | some _ =>
+                  .status (.evalError s!"arrayGet on non-array object {objectId}")
+              | none =>
+                  .status (.evalError s!"arrayGet on unknown object {objectId}")
+          | _ => .status (.evalError "arrayGet index not uint")
+  | .mapGet objectId keyExpr =>
+      match evalExpr cfg env keyExpr with
+      | .status s => .status s
+      | .value keyVal =>
+          let mapVal? : Option IR.Value :=
+            match cfg.publicState.lookup objectId with
+            | some v => some v
+            | none => cfg.secretState.lookup objectId
+          match mapVal? with
+          | some (.map entries) =>
+              match IR.Value.mapLookup entries keyVal with
+              | some v => .value v
+              | none =>
+                  .status (.evalError s!"mapGet missing key in object {objectId}")
+          | some _ =>
+              .status (.evalError s!"mapGet on non-map object {objectId}")
+          | none =>
+              .status (.evalError s!"mapGet on unknown object {objectId}")
+  | .structField _ _ =>
+      -- `structField` is forbidden by `Expr.fragmentValid`; the IR
+      -- evaluator treats it as `unsupported`, so we mirror that.
+      .status (.unsupported "Expr.structField")
+  | .arrayIndex _ _ =>
+      -- `arrayIndex` is forbidden by `Expr.fragmentValid`.
+      .status (.unsupported "Expr.arrayIndex")
   | .keccak256 parts =>
       match evalExprList cfg env parts with
       | .error s => .status s
@@ -198,6 +264,102 @@ def evalStatement
       | .value (.bool false) => (cfg, env, { oc with status := .requireFailed })
       | .value _ => (cfg, env, { oc with status := .evalError "require not boolean" })
       | .status s => (cfg, env, { oc with status := s })
+  | .abortIf cond =>
+      match evalExpr cfg env cond with
+      | .value (.bool true) => (cfg, env, { oc with status := .abortedByUser })
+      | .value (.bool false) => (cfg, env, oc)
+      | .value _ => (cfg, env, { oc with status := .evalError "abortIf not boolean" })
+      | .status s => (cfg, env, { oc with status := s })
+  | .cellSet objectId value predicate =>
+      match evalExpr cfg env value with
+      | .status s => (cfg, env, { oc with status := s })
+      | .value newVal =>
+          let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["CellSet"] }
+          match predicate with
+          | none =>
+              (cfg.writeObject objectId newVal, env, oc')
+          | some predExpr =>
+              match evalExpr cfg env predExpr with
+              | .status s => (cfg, env, { oc with status := s })
+              | .value (.bool true) =>
+                  (cfg.writeObject objectId newVal, env, oc')
+              | .value (.bool false) => (cfg, env, oc')
+              | .value _ =>
+                  (cfg, env, { oc with status := .evalError "cellSet predicate not boolean" })
+  | .arraySet objectId index value predicate =>
+      match evalExpr cfg env index with
+      | .status s => (cfg, env, { oc with status := s })
+      | .value indexVal =>
+          match evalExpr cfg env value with
+          | .status s => (cfg, env, { oc with status := s })
+          | .value newVal =>
+              let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["ArraySet"] }
+              let shouldWrite : Except EvalStatus Bool :=
+                match predicate with
+                | none => .ok true
+                | some predExpr =>
+                    match evalExpr cfg env predExpr with
+                    | .status s => .error s
+                    | .value (.bool true) => .ok true
+                    | .value (.bool false) => .ok false
+                    | .value _ =>
+                        .error (.evalError "arraySet predicate not boolean")
+              match shouldWrite with
+              | .error s => (cfg, env, { oc with status := s })
+              | .ok false => (cfg, env, oc')
+              | .ok true =>
+                  match indexVal with
+                  | .uint idx =>
+                      match cfg.readObject objectId with
+                      | some (.array values) =>
+                          if idx ≥ values.length then
+                            let msg := s!"arraySet index {idx} out of bounds"
+                            (cfg, env, { oc with status := .evalError msg })
+                          else
+                            let updated :=
+                              IR.Value.array (IR.Value.arraySetAt values idx newVal)
+                            (cfg.writeObject objectId updated, env, oc')
+                      | some _ =>
+                          let msg := s!"arraySet on non-array object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
+                      | none =>
+                          let msg := s!"arraySet on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
+                  | _ =>
+                      (cfg, env, { oc with status := .evalError "arraySet index not uint" })
+  | .mapPut objectId key value predicate =>
+      match evalExpr cfg env key with
+      | .status s => (cfg, env, { oc with status := s })
+      | .value keyVal =>
+          match evalExpr cfg env value with
+          | .status s => (cfg, env, { oc with status := s })
+          | .value newVal =>
+              let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["MapPut"] }
+              let shouldWrite : Except EvalStatus Bool :=
+                match predicate with
+                | none => .ok true
+                | some predExpr =>
+                    match evalExpr cfg env predExpr with
+                    | .status s => .error s
+                    | .value (.bool true) => .ok true
+                    | .value (.bool false) => .ok false
+                    | .value _ =>
+                        .error (.evalError "mapPut predicate not boolean")
+              match shouldWrite with
+              | .error s => (cfg, env, { oc with status := s })
+              | .ok false => (cfg, env, oc')
+              | .ok true =>
+                  match cfg.readObject objectId with
+                  | some (.map entries) =>
+                      let updated :=
+                        IR.Value.map (IR.Value.mapInsert entries keyVal newVal)
+                      (cfg.writeObject objectId updated, env, oc')
+                  | some _ =>
+                      let msg := s!"mapPut on non-map object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
+                  | none =>
+                      let updated := IR.Value.map [(keyVal, newVal)]
+                      (cfg.writeObject objectId updated, env, oc')
   | .ifStmt cond thenBody elseBody =>
       match evalExpr cfg env cond with
       | .status s => (cfg, env, { oc with status := s })
@@ -291,6 +453,11 @@ def lowerExpr : Expr → IR.Expr
   | .binary op lhs rhs => .binary op (lowerExpr lhs) (lowerExpr rhs)
   | .conditional cond wt wf =>
       .select (lowerExpr cond) (lowerExpr wt) (lowerExpr wf)
+  | .cellGet objectId => .cellGet objectId
+  | .arrayGet objectId index => .arrayGet objectId (lowerExpr index)
+  | .mapGet objectId key => .mapGet objectId (lowerExpr key)
+  | .structField base field => .structField (lowerExpr base) field
+  | .arrayIndex base index => .arrayIndex (lowerExpr base) (lowerExpr index)
   | .keccak256 parts => .keccak256 (lowerExprList parts)
 
 /-- List companion for `lowerExpr` (`keccak256` case). -/
@@ -307,11 +474,20 @@ def lowerStatement : Statement → IR.Statement
   | .declare name ty value => .declare name ty (lowerExpr value)
   | .assign name value => .assign name (lowerExpr value)
   | .require_ cond => .require (lowerExpr cond)
+  | .abortIf cond => .abortIf (lowerExpr cond)
   | .ifStmt cond thenBody elseBody =>
       .ifStmt (lowerExpr cond) (lowerStatementList thenBody) (lowerStatementList elseBody)
   | .forLoop loopId indexVar start_ end_ body =>
       .forLoop loopId indexVar (lowerExpr start_) (lowerExpr end_)
         (lowerStatementList body)
+  | .cellSet objectId value predicate =>
+      .cellSet objectId (lowerExpr value) (predicate.map lowerExpr)
+  | .arraySet objectId index value predicate =>
+      .arraySet objectId (lowerExpr index) (lowerExpr value)
+        (predicate.map lowerExpr)
+  | .mapPut objectId key value predicate =>
+      .mapPut objectId (lowerExpr key) (lowerExpr value)
+        (predicate.map lowerExpr)
   | .retStmt none => .retStmt none
   | .retStmt (some value) => .retStmt (some (lowerExpr value))
 
@@ -378,6 +554,20 @@ theorem lowerExpr_preserves_semantics
           | structValue _ => rfl
           | array _ => rfl
           | map _ => rfl
+  | .cellGet _ => by
+      unfold evalExpr lowerExpr IR.evalExpr; rfl
+  | .arrayGet objectId index => by
+      unfold evalExpr lowerExpr IR.evalExpr
+      rw [lowerExpr_preserves_semantics cfg env index]
+      rfl
+  | .mapGet objectId key => by
+      unfold evalExpr lowerExpr IR.evalExpr
+      rw [lowerExpr_preserves_semantics cfg env key]
+      rfl
+  | .structField _ _ => by
+      unfold evalExpr lowerExpr IR.evalExpr; rfl
+  | .arrayIndex _ _ => by
+      unfold evalExpr lowerExpr IR.evalExpr; rfl
   | .keccak256 parts => by
       unfold evalExpr lowerExpr IR.evalExpr
       rw [lowerExprList_preserves_semantics cfg env parts]
@@ -417,6 +607,66 @@ theorem lowerStatement_preserves_semantics
       simp only [evalStatement, lowerStatement, IR.evalStatement]
       rw [lowerExpr_preserves_semantics cfg env cond]
       rfl
+  | .abortIf cond => by
+      simp only [evalStatement, lowerStatement, IR.evalStatement]
+      rw [lowerExpr_preserves_semantics cfg env cond]
+      rfl
+  | .cellSet objectId value predicate => by
+      simp only [evalStatement, lowerStatement, IR.evalStatement]
+      rw [lowerExpr_preserves_semantics cfg env value]
+      cases predicate with
+      | none =>
+          simp only [Option.map]
+          rfl
+      | some predExpr =>
+          simp only [Option.map]
+          cases IR.evalExpr cfg env (lowerExpr value) with
+          | status _ => rfl
+          | value _ =>
+              rw [lowerExpr_preserves_semantics cfg env predExpr]
+              rfl
+  | .arraySet objectId index value predicate => by
+      unfold evalStatement lowerStatement IR.evalStatement
+      rw [lowerExpr_preserves_semantics cfg env index]
+      cases IR.evalExpr cfg env (lowerExpr index) with
+      | status _ =>
+          cases predicate with
+          | none => simp only [Option.map]
+          | some _ => simp only [Option.map]
+      | value _ =>
+          rw [lowerExpr_preserves_semantics cfg env value]
+          cases predicate with
+          | none =>
+              simp only [Option.map]
+              rfl
+          | some predExpr =>
+              simp only [Option.map]
+              cases IR.evalExpr cfg env (lowerExpr value) with
+              | status _ => rfl
+              | value _ =>
+                  rw [lowerExpr_preserves_semantics cfg env predExpr]
+                  rfl
+  | .mapPut objectId key value predicate => by
+      unfold evalStatement lowerStatement IR.evalStatement
+      rw [lowerExpr_preserves_semantics cfg env key]
+      cases IR.evalExpr cfg env (lowerExpr key) with
+      | status _ =>
+          cases predicate with
+          | none => simp only [Option.map]
+          | some _ => simp only [Option.map]
+      | value _ =>
+          rw [lowerExpr_preserves_semantics cfg env value]
+          cases predicate with
+          | none =>
+              simp only [Option.map]
+              rfl
+          | some predExpr =>
+              simp only [Option.map]
+              cases IR.evalExpr cfg env (lowerExpr value) with
+              | status _ => rfl
+              | value _ =>
+                  rw [lowerExpr_preserves_semantics cfg env predExpr]
+                  rfl
   | .ifStmt cond thenBody elseBody => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
       rw [lowerExpr_preserves_semantics cfg env cond]
