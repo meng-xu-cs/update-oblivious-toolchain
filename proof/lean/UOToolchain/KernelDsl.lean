@@ -1332,6 +1332,361 @@ theorem lowerPureExprList_preserves_semantics
 
 end
 
+/-! ### W4.4 Session B-2: per-Statement semantics-preservation
+
+`lowerStatement_preserves_semantics` lifts the per-Expr preservation
+through statement evaluation. Each statement constructor case
+follows the same `unfold + Except.ok.inj + subst + rw [ih*] + rfl`
+pattern, with the per-Expr preservation theorem providing the IH
+for sub-expressions.
+
+The forbidden constructors `ifStmt` / `forLoop` close trivially
+because `lowerStatement` returns `.error` for them, making the
+hypothesis `lowerStatement s = .ok ks` contradictory.
+
+The `cellSet` / `arraySet` / `mapPut` cases additionally case-split
+on the predicate option (`none` vs `some p`) and on the evaluated
+predicate boolean (`true` vs `false`) to align both evaluators'
+masked-store semantics. -/
+
+theorem lowerStatement_preserves_semantics
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
+    ∀ (s : Statement) (ks : KernelStatement),
+      lowerStatement s = .ok ks →
+        evalStatement cfg env oc s = evalKernelStatement cfg env oc ks
+  | .declare name ty value, ks, h => by
+      cases hV : lowerExpr value with
+      | error err =>
+          have : lowerStatement (.declare name ty value) = .error err := by
+            simp only [lowerStatement, hV]; rfl
+          rw [this] at h; cases h
+      | ok kv =>
+          have hOk : lowerStatement (.declare name ty value) = .ok (.declare name ty kv) := by
+            simp only [lowerStatement, hV]; rfl
+          rw [hOk] at h
+          have : ks = .declare name ty kv := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env value kv hV
+          simp only [evalStatement, evalKernelStatement]
+          rw [ih]; rfl
+  | .assign name value, ks, h => by
+      cases hV : lowerExpr value with
+      | error err =>
+          have : lowerStatement (.assign name value) = .error err := by
+            simp only [lowerStatement, hV]; rfl
+          rw [this] at h; cases h
+      | ok kv =>
+          have hOk : lowerStatement (.assign name value) = .ok (.assign name kv) := by
+            simp only [lowerStatement, hV]; rfl
+          rw [hOk] at h
+          have : ks = .assign name kv := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env value kv hV
+          simp only [evalStatement, evalKernelStatement]
+          rw [ih]; rfl
+  | .require cond, ks, h => by
+      cases hC : lowerExpr cond with
+      | error err =>
+          have : lowerStatement (.require cond) = .error err := by
+            simp only [lowerStatement, hC]; rfl
+          rw [this] at h; cases h
+      | ok kc =>
+          have hOk : lowerStatement (.require cond) = .ok (.require kc) := by
+            simp only [lowerStatement, hC]; rfl
+          rw [hOk] at h
+          have : ks = .require kc := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env cond kc hC
+          simp only [evalStatement, evalKernelStatement]
+          rw [ih]; rfl
+  | .abortIf cond, ks, h => by
+      cases hC : lowerExpr cond with
+      | error err =>
+          have : lowerStatement (.abortIf cond) = .error err := by
+            simp only [lowerStatement, hC]; rfl
+          rw [this] at h; cases h
+      | ok kc =>
+          have hOk : lowerStatement (.abortIf cond) = .ok (.abortIf kc) := by
+            simp only [lowerStatement, hC]; rfl
+          rw [hOk] at h
+          have : ks = .abortIf kc := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env cond kc hC
+          simp only [evalStatement, evalKernelStatement]
+          rw [ih]; rfl
+  | .ifStmt _ _ _, _, h => by simp [lowerStatement] at h
+  | .forLoop _ _ _ _ _, _, h => by simp [lowerStatement] at h
+  | .cellSet id value pred, ks, h => by
+      cases hV : lowerExpr value with
+      | error err =>
+          have : lowerStatement (.cellSet id value pred) = .error err := by
+            simp only [lowerStatement, hV]; rfl
+          rw [this] at h; cases h
+      | ok kv =>
+          cases pred with
+          | none =>
+              have hOk : lowerStatement (.cellSet id value none) =
+                  .ok (.cellSet id kv none) := by
+                simp only [lowerStatement, hV]; rfl
+              rw [hOk] at h
+              have : ks = .cellSet id kv none := (Except.ok.inj h).symm
+              subst this
+              have ihV := lowerExpr_preserves_semantics cfg env value kv hV
+              simp only [evalStatement, evalKernelStatement]
+              rw [ihV]; rfl
+          | some p =>
+              cases hP : lowerExpr p with
+              | error err =>
+                  have : lowerStatement (.cellSet id value (some p)) = .error err := by
+                    simp only [lowerStatement, hV, hP]; rfl
+                  rw [this] at h; cases h
+              | ok kp =>
+                  have hOk : lowerStatement (.cellSet id value (some p)) =
+                      .ok (.cellSet id kv (some kp)) := by
+                    simp only [lowerStatement, hV, hP]; rfl
+                  rw [hOk] at h
+                  have : ks = .cellSet id kv (some kp) := (Except.ok.inj h).symm
+                  subst this
+                  have ihV := lowerExpr_preserves_semantics cfg env value kv hV
+                  have ihP := lowerExpr_preserves_semantics cfg env p kp hP
+                  simp only [evalStatement, evalKernelStatement]
+                  rw [ihV, ihP]; rfl
+  | .arraySet id index value pred, ks, h => by
+      cases hI : lowerExpr index with
+      | error err =>
+          have : lowerStatement (.arraySet id index value pred) = .error err := by
+            simp only [lowerStatement, hI]; rfl
+          rw [this] at h; cases h
+      | ok ki =>
+          cases hV : lowerExpr value with
+          | error err =>
+              have : lowerStatement (.arraySet id index value pred) = .error err := by
+                simp only [lowerStatement, hI, hV]; rfl
+              rw [this] at h; cases h
+          | ok kv =>
+              cases pred with
+              | none =>
+                  have hOk : lowerStatement (.arraySet id index value none) =
+                      .ok (.arraySet id ki kv none) := by
+                    simp only [lowerStatement, hI, hV]; rfl
+                  rw [hOk] at h
+                  have : ks = .arraySet id ki kv none := (Except.ok.inj h).symm
+                  subst this
+                  have ihI := lowerExpr_preserves_semantics cfg env index ki hI
+                  have ihV := lowerExpr_preserves_semantics cfg env value kv hV
+                  simp only [evalStatement, evalKernelStatement]
+                  rw [ihI, ihV]; rfl
+              | some p =>
+                  cases hP : lowerExpr p with
+                  | error err =>
+                      have : lowerStatement (.arraySet id index value (some p)) =
+                          .error err := by
+                        simp only [lowerStatement, hI, hV, hP]; rfl
+                      rw [this] at h; cases h
+                  | ok kp =>
+                      have hOk : lowerStatement (.arraySet id index value (some p)) =
+                          .ok (.arraySet id ki kv (some kp)) := by
+                        simp only [lowerStatement, hI, hV, hP]; rfl
+                      rw [hOk] at h
+                      have : ks = .arraySet id ki kv (some kp) :=
+                        (Except.ok.inj h).symm
+                      subst this
+                      have ihI := lowerExpr_preserves_semantics cfg env index ki hI
+                      have ihV := lowerExpr_preserves_semantics cfg env value kv hV
+                      have ihP := lowerExpr_preserves_semantics cfg env p kp hP
+                      simp only [evalStatement, evalKernelStatement]
+                      rw [ihI, ihV, ihP]; rfl
+  | .mapPut id key value pred, ks, h => by
+      cases hK : lowerExpr key with
+      | error err =>
+          have : lowerStatement (.mapPut id key value pred) = .error err := by
+            simp only [lowerStatement, hK]; rfl
+          rw [this] at h; cases h
+      | ok kk =>
+          cases hV : lowerExpr value with
+          | error err =>
+              have : lowerStatement (.mapPut id key value pred) = .error err := by
+                simp only [lowerStatement, hK, hV]; rfl
+              rw [this] at h; cases h
+          | ok kv =>
+              cases pred with
+              | none =>
+                  have hOk : lowerStatement (.mapPut id key value none) =
+                      .ok (.mapPut id kk kv none) := by
+                    simp only [lowerStatement, hK, hV]; rfl
+                  rw [hOk] at h
+                  have : ks = .mapPut id kk kv none := (Except.ok.inj h).symm
+                  subst this
+                  have ihK := lowerExpr_preserves_semantics cfg env key kk hK
+                  have ihV := lowerExpr_preserves_semantics cfg env value kv hV
+                  simp only [evalStatement, evalKernelStatement]
+                  rw [ihK, ihV]; rfl
+              | some p =>
+                  cases hP : lowerExpr p with
+                  | error err =>
+                      have : lowerStatement (.mapPut id key value (some p)) =
+                          .error err := by
+                        simp only [lowerStatement, hK, hV, hP]; rfl
+                      rw [this] at h; cases h
+                  | ok kp =>
+                      have hOk : lowerStatement (.mapPut id key value (some p)) =
+                          .ok (.mapPut id kk kv (some kp)) := by
+                        simp only [lowerStatement, hK, hV, hP]; rfl
+                      rw [hOk] at h
+                      have : ks = .mapPut id kk kv (some kp) :=
+                        (Except.ok.inj h).symm
+                      subst this
+                      have ihK := lowerExpr_preserves_semantics cfg env key kk hK
+                      have ihV := lowerExpr_preserves_semantics cfg env value kv hV
+                      have ihP := lowerExpr_preserves_semantics cfg env p kp hP
+                      simp only [evalStatement, evalKernelStatement]
+                      rw [ihK, ihV, ihP]; rfl
+  | .retStmt none, ks, h => by
+      simp only [lowerStatement] at h
+      cases h
+      simp only [evalStatement, evalKernelStatement]
+  | .retStmt (some value), ks, h => by
+      cases hV : lowerExpr value with
+      | error err =>
+          have : lowerStatement (.retStmt (some value)) = .error err := by
+            simp only [lowerStatement, hV]; rfl
+          rw [this] at h; cases h
+      | ok kv =>
+          have hOk : lowerStatement (.retStmt (some value)) = .ok (.retStmt (some kv)) := by
+            simp only [lowerStatement, hV]; rfl
+          rw [hOk] at h
+          have : ks = .retStmt (some kv) := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env value kv hV
+          simp only [evalStatement, evalKernelStatement]
+          rw [ih]; rfl
+
+/-! ### W4.4 Session B-2: list-level (`evalBody`) preservation -/
+
+/-- The lift is universally quantified over `cfg env oc` so the
+recursive call's state threading works seamlessly. The `sawReturn`
+parameter is also universally quantified so the recursive call (which
+uses `stmt.isReturn` for the next iteration) can apply the IH. The
+`sawReturn = true ∧ rest ≠ []` case is contradictory because
+`lowerStatementsAux` returns `.error NonFinalReturn` then. -/
+theorem lowerStatementsAux_preserves_semantics :
+    ∀ (stmts : List Statement) (kstmts : List KernelStatement)
+      (index : Nat) (sawReturn : Bool)
+      (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome),
+      lowerStatementsAux stmts index sawReturn = .ok kstmts →
+        evalBody cfg env oc stmts = evalKernelBody cfg env oc kstmts
+  | [], _, _, _, _, _, _, h => by
+      simp only [lowerStatementsAux] at h
+      cases h
+      simp only [evalBody, evalKernelBody]
+  | stmt :: rest, kstmts, index, sawReturn, cfg, env, oc, h => by
+      cases sawReturn with
+      | true =>
+          -- Lowering returns .error NonFinalReturn; contradiction.
+          simp only [lowerStatementsAux, if_true] at h
+          cases h
+      | false =>
+          cases hS : lowerStatement stmt with
+          | error err =>
+              have : lowerStatementsAux (stmt :: rest) index false = .error err := by
+                simp only [lowerStatementsAux, hS]; rfl
+              rw [this] at h; cases h
+          | ok ks =>
+              cases hRest : lowerStatementsAux rest (index + 1) stmt.isReturn with
+              | error err =>
+                  have : lowerStatementsAux (stmt :: rest) index false = .error err := by
+                    simp only [lowerStatementsAux, hS, hRest]; rfl
+                  rw [this] at h; cases h
+              | ok krest =>
+                  have hOk : lowerStatementsAux (stmt :: rest) index false =
+                      .ok (ks :: krest) := by
+                    simp only [lowerStatementsAux, hS, hRest]; rfl
+                  rw [hOk] at h
+                  have hkstmts : kstmts = ks :: krest := (Except.ok.inj h).symm
+                  subst hkstmts
+                  have ihStmt :=
+                    lowerStatement_preserves_semantics cfg env oc stmt ks hS
+                  simp only [evalBody, evalKernelBody]
+                  rw [ihStmt]
+                  generalize hStep : evalKernelStatement cfg env oc ks = step
+                  cases step with
+                  | mk cfg' rest' =>
+                      cases rest' with
+                      | mk env' oc' =>
+                          simp only []
+                          cases hStatus : oc'.status with
+                          | completed =>
+                              by_cases hRet : oc'.publicResult.isSome
+                              · simp [hStatus, hRet]
+                              · simp only [hStatus, hRet, if_false]
+                                exact lowerStatementsAux_preserves_semantics
+                                  rest krest (index + 1) stmt.isReturn cfg' env' oc' hRest
+                          | _ => simp [hStatus]
+
+/-- Wrapper: `lowerStatements` (which is `lowerStatementsAux _ 0
+false`) preserves semantics. -/
+theorem lowerStatements_preserves_semantics
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
+    (stmts : List Statement) (kstmts : List KernelStatement)
+    (h : lowerStatements stmts = .ok kstmts) :
+    evalBody cfg env oc stmts = evalKernelBody cfg env oc kstmts :=
+  lowerStatementsAux_preserves_semantics stmts kstmts 0 false cfg env oc h
+
+/-! ### W4.4 Session B-2: program-level (`evalContract`) preservation -/
+
+/-- The kernel-side `KernelProgram.initialEnv` agrees with the IR-side
+`OperationalConfig.initialEnv` whenever the kernel program's
+parameters match the function's parameters. The lowering produces a
+kernel program with `kp.params = fn.params`, so this is the
+agreement lemma the program-level theorem uses. -/
+theorem KernelProgram.initialEnv_eq_of_params_eq
+    (cfg : OperationalConfig) (fn : CompiledFunction) (kp : KernelProgram)
+    (hParams : kp.params = fn.params) :
+    kp.initialEnv cfg.publicArgs cfg.secretArgs = cfg.initialEnv fn := by
+  unfold KernelProgram.initialEnv OperationalConfig.initialEnv
+  rw [hParams]
+
+/-- Program-level preservation: when the lowering succeeds and the IR
+configuration's entrypoint resolves to the function being lowered,
+the IR contract evaluator and the kernel program evaluator agree on
+the outcome. -/
+theorem lowerCompiledFunction_preserves_semantics
+    (cfg : OperationalConfig) (fn : CompiledFunction) (kp : KernelProgram)
+    (hLow : lowerCompiledFunction fn = .ok kp)
+    (hEntry : cfg.entrypointFn? = some fn) :
+    evalContract cfg = evalKernelProgram kp cfg := by
+  -- Extract kp's structure from the lowering hypothesis.
+  cases hBody : lowerStatements fn.body with
+  | error err =>
+      have : lowerCompiledFunction fn = .error err := by
+        unfold lowerCompiledFunction; rw [hBody]; rfl
+      rw [this] at hLow; cases hLow
+  | ok ks =>
+      have hLowOk : lowerCompiledFunction fn = .ok
+        { entrypointId := fn.signature, params := fn.params,
+          returnType := fn.returnType, secretArgs := fn.secretArgs, body := ks } := by
+        unfold lowerCompiledFunction; rw [hBody]; rfl
+      rw [hLowOk] at hLow
+      have hkp : kp = ⟨fn.signature, fn.params, fn.returnType, fn.secretArgs, ks⟩ :=
+        (Except.ok.inj hLow).symm
+      subst hkp
+      -- Both evaluators now have the same parameters and lowered body.
+      have hParams :
+          (KernelProgram.mk fn.signature fn.params fn.returnType fn.secretArgs ks).params
+            = fn.params := rfl
+      have hInitEnv :=
+        KernelProgram.initialEnv_eq_of_params_eq cfg fn _ hParams
+      unfold evalContract evalKernelProgram
+      simp only [hEntry, hInitEnv]
+      cases hEnv : cfg.initialEnv fn with
+      | none => simp [hEnv]
+      | some env =>
+          simp only [hEnv]
+          -- Use the list-level preservation theorem.
+          have ihBody := lowerStatements_preserves_semantics
+            cfg env Outcome.empty fn.body ks hBody
+          rw [ihBody]
+
 mutual
 
 /-- Branchless-pure expressions are fragment-valid: the structural

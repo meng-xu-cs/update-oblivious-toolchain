@@ -598,4 +598,45 @@ theorem proofGrade_ir_to_kernel_pure_expr_preservation
     IR.evalExpr cfg env e = IR.evalKernelPureExpr cfg env ke :=
   IR.lowerPureExpr_preserves_semantics cfg env e ke h
 
+/-- Statement-level preservation: the IR statement evaluator and the
+kernel statement evaluator agree on every kernel-lowerable
+statement. -/
+theorem proofGrade_ir_to_kernel_statement_preservation
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (s : IR.Statement) (ks : IR.KernelStatement)
+    (h : IR.lowerStatement s = Except.ok ks) :
+    IR.evalStatement cfg env oc s = IR.evalKernelStatement cfg env oc ks :=
+  IR.lowerStatement_preserves_semantics cfg env oc s ks h
+
+/-- Body-level preservation: when a list of statements lowers to a
+list of kernel statements, body evaluation agrees outcome-for-
+outcome. -/
+theorem proofGrade_ir_to_kernel_body_preservation
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
+    (stmts : List IR.Statement) (kstmts : List IR.KernelStatement)
+    (h : IR.lowerStatements stmts = Except.ok kstmts) :
+    IR.evalBody cfg env oc stmts = IR.evalKernelBody cfg env oc kstmts :=
+  IR.lowerStatements_preserves_semantics cfg env oc stmts kstmts h
+
+/-- Program-level preservation: the IR `evalContract` agrees with the
+kernel `evalKernelProgram` on the lowered program, when the IR
+configuration's entrypoint resolves to the function being lowered.
+
+This is the **W4.4 charter task 4 deliverable** at the program
+level: a Lean-proved, semantics-preserving correspondence between
+the IR-side and kernel-side evaluators on every kernel-lowerable
+function. The lowering precondition (`fn.kernelLowerable = true`)
+combined with the W4.4 Session B-1 forward iff theorem
+(`kernelLowerable_implies_lowerCompiledFunction_ok`) yields the
+existence of a `kp` with `lowerCompiledFunction fn = .ok kp`; this
+preservation theorem then certifies that the IR and kernel
+evaluators agree on the resulting outcome. -/
+theorem proofGrade_ir_to_kernel_program_preservation
+    (cfg : IR.OperationalConfig) (fn : IR.CompiledFunction)
+    (kp : IR.KernelProgram)
+    (hLow : IR.lowerCompiledFunction fn = Except.ok kp)
+    (hEntry : cfg.entrypointFn? = some fn) :
+    IR.evalContract cfg = IR.evalKernelProgram kp cfg :=
+  IR.lowerCompiledFunction_preserves_semantics cfg fn kp hLow hEntry
+
 end UOToolchain
