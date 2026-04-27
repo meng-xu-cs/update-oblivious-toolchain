@@ -22,6 +22,7 @@ import UOToolchain.RuntimeShellBoundary
 import UOToolchain.RuntimeImplementationInterface
 import UOToolchain.ConfidentialKernelDsl
 import UOToolchain.ConfidentialFragment
+import UOToolchain.KernelDsl
 import UOToolchain.RuntimeConfidentialCoreAssurance
 import UOToolchain.RuntimeCoins
 import UOToolchain.PathOramLocalPosmapV1
@@ -562,5 +563,39 @@ theorem proofGrade_confidential_fragment_valid_iff_structurally_valid
     (IR.confidentialFragmentEntrypointWitnessOf fn).Valid ↔
       fn.fragmentValid = true :=
   IR.confidentialFragmentEntrypointWitnessOf_valid_iff fn
+
+/-! ## W4.4: IR-to-kernel preservation (paper facade)
+
+`proofGrade_ir_to_kernel_expr_preservation` re-exports the W4.4
+Session B-2 per-Expr semantics-preservation theorem so the paper-
+facing facade can cite a single named handle: "if the IR-to-kernel
+lowering succeeds for an expression, the IR evaluator and the
+kernel evaluator agree on the expression's outcome."
+
+The companion `proofGrade_ir_to_kernel_pure_expr_preservation`
+covers the pure-expression surface used by `Expr.select` arms.
+
+The Statement / Body / Program-level preservation theorems (which
+lift the per-Expr facts through statement evaluation, body
+evaluation, and entrypoint resolution) are the next deliverables
+in the W4.4 critical path; they will be projected through this
+facade as `proofGrade_ir_to_kernel_statement_preservation`,
+`proofGrade_ir_to_kernel_body_preservation`, and
+`proofGrade_ir_to_kernel_program_preservation` once landed.
+-/
+
+theorem proofGrade_ir_to_kernel_expr_preservation
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv)
+    (e : IR.Expr) (ke : IR.KernelExpr)
+    (h : IR.lowerExpr e = Except.ok ke) :
+    IR.evalExpr cfg env e = IR.evalKernelExpr cfg env ke :=
+  IR.lowerExpr_preserves_semantics cfg env e ke h
+
+theorem proofGrade_ir_to_kernel_pure_expr_preservation
+    (cfg : IR.OperationalConfig) (env : IR.LocalEnv)
+    (e : IR.Expr) (ke : IR.KernelPureExpr)
+    (h : IR.lowerPureExpr e = Except.ok ke) :
+    IR.evalExpr cfg env e = IR.evalKernelPureExpr cfg env ke :=
+  IR.lowerPureExpr_preserves_semantics cfg env e ke h
 
 end UOToolchain
