@@ -1926,9 +1926,12 @@ Primary files:
 - [proof/lean/UOToolchain/PathOramJACMTheorem.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/PathOramJACMTheorem.lean)
 - [proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean)
 - [proof/lean/UOToolchain/RuntimePaperInstantiation.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/RuntimePaperInstantiation.lean)
+- [proof/lean/UOToolchain/RuntimeStoreCodecSemantics.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/RuntimeStoreCodecSemantics.lean)
 - [runtime/uo-evm/src/oram.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-evm/src/oram.rs)
 - [runtime/uo-store/src/store.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-store/src/store.rs)
 - [runtime/uo-store/src/codec.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-store/src/codec.rs)
+- [runtime/uo-store/src/generated_surface.rs](/home/m285xu/update-oblivious-toolchain/runtime/uo-store/src/generated_surface.rs)
+- [crates/uo-core/src/manifest.rs](/home/m285xu/update-oblivious-toolchain/crates/uo-core/src/manifest.rs)
 - [docs/path-oram-citation-import-plan.md](/home/m285xu/update-oblivious-toolchain/docs/path-oram-citation-import-plan.md)
 - [docs/stronger-import-route-feasibility.md](/home/m285xu/update-oblivious-toolchain/docs/stronger-import-route-feasibility.md)
 
@@ -1952,6 +1955,69 @@ Deliverables:
 Exit gate:
 
 - every remaining backend assumption is concrete, justified, and unavoidable
+
+Status as of 2026-04-27: WP5 closed for charter tasks **3, 4, 5, 6**.
+W5.1 / W5.2 (machine-checked import vs companion mechanization) remain
+open as a research-scope policy fork. Charter-task closure summary:
+
+- **W5.5 (store/codec semantic alignment):** the existing 43-theorem
+  `RuntimeStoreCodecSemantics` layer was extended with the
+  `cipherKeyBytes = 32` constant pin, `sealedMagic` length /
+  `ValidByte` proofs, the encoded-length-doubles-plain-length identity,
+  the four `SealedRecordParts.{magic,nonce,ciphertext,tag}_length_of_validShape`
+  projections, the open-shape magic-equality fact, the
+  `decodeSealedRecord_some_componentLengths` named theorem, and the
+  `uoStoreSlotAad_prefix_publicShape` AAD shape pin. Seven
+  `proofGrade_runtime_store_codec_*` facades expose the new theorems on
+  the paper-facing surface.
+- **W5.4 (crypto-assumption provenance):** new structure
+  `PathOramLocalPosmapV1CryptoProvenance` and runtime-pinned record
+  `pathOramLocalPosmapV1_cryptoProvenance` pair the
+  `bucketEncryptionINDCPA` / `metadataEncryptionINDCPA` assumptions
+  with explicit citations (RFC 8439 ChaCha20-Poly1305, Procter 2014
+  IACR ePrint AEAD-composition analysis), the
+  `runtime_crypto_primitive_identity_pinned` static-drift check, and
+  the codec-semantic constants pinned in W5.5. The bundle method-style
+  projection
+  `PathOramLocalPosmapV1SecurityAssumptions.cryptoProvenance` returns
+  the same record for any bundle instance. Five
+  `proofGrade_path_oram_local_posmap_v1_crypto_provenance_*` facades
+  expose the constants and the named drift check.
+- **W5.3 (deployed-parameter stash-overflow provenance):** new
+  structure `PathOramLocalPosmapV1StashOverflowProvenance` and
+  runtime-pinned record `pathOramLocalPosmapV1_stashOverflowProvenance`
+  pair the `stashOverflowBounded` assumption with the JACM 2018
+  Theorem 5.1 citation (CCS 2013 fallback), the deployed parameter
+  substitution (`Z = 5`, `stash_bound = max(capacity, 1)`), the
+  working-stash capacity formula consumed by the runtime, the JACM
+  tail-bound expression (`P[stash size > R] <= 14 * 0.6002^R`), and the
+  named static-drift check `path_oram_deployed_stash_parameters_pinned`.
+  The probe enforces this drift check by string-matching the deployed
+  Path-ORAM construction and validation sites in
+  `crates/uo-core/src/manifest.rs`. Four
+  `proofGrade_path_oram_local_posmap_v1_stash_overflow_provenance_*`
+  facades expose the constants.
+- **W5.6 (bundle housekeeping):** new structure
+  `PathOramLocalPosmapV1AssumptionAuditEntry` and the 3-element list
+  `pathOramLocalPosmapV1_assumptionAudit` summarize the post-W5.3 /
+  post-W5.4 closure: every surviving bundle field is **Cited /
+  externally justified**, paired with a provenance record and a named
+  probe drift check. The `pathOramLocalPosmapV1_assumptionAudit_length`
+  and `pathOramLocalPosmapV1_assumptionAudit_allCited` theorems pin
+  the audit at the Lean type level. Two
+  `proofGrade_path_oram_local_posmap_v1_assumption_audit_*` facades
+  expose the bundle-closure facts.
+
+The W5.1 / W5.2 import-vs-companion fork remains open. Per
+`docs/stronger-import-route-feasibility.md`, no external machine-checked
+Path-ORAM theorem object cleanly matches `PaperMainPathOramTheoremSourceAt`
+today (the FM 2024 Isabelle/HOL Path-ORAM case study is manual-proof
+material, and the CoqPL 2023 work is a proposal). The next step is a
+research-scope decision: invest in a companion mechanization /
+theorem-adapter project, or keep the paper on the citation route and
+present the stronger import route as future strengthening. WP5 charter
+tasks 3–6 are closed; the remaining policy-fork decision belongs to
+the user.
 
 ## Work Package 6: Close The Hostile-Host TEE Theorem
 
