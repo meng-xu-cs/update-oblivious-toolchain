@@ -76,10 +76,10 @@ Explicit assumption profile:
 
 | Assumption | Role | Current status |
 | --- | --- | --- |
-| `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents for the concrete local-posmap backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
-| `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet discharged in-repo |
-| `stashOverflowBounded` | bounds stash-overflow failure for the deployed parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; not yet fully discharged in-repo |
-| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback/freshness discipline, and the stated crash/patch model | required by the final malicious-host deployment theorem; not yet fully closed in Lean |
+| `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents for the concrete local-posmap backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; W5.4 pairs the assumption with `pathOramLocalPosmapV1_cryptoProvenance` (RFC 8439 ChaCha20-Poly1305 + Procter 2014 IACR ePrint AEAD-composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` |
+| `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; W5.4 pairs the assumption with the same `pathOramLocalPosmapV1_cryptoProvenance` route |
+| `stashOverflowBounded` | bounds stash-overflow failure for the deployed parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; W5.3 pairs the assumption with `pathOramLocalPosmapV1_stashOverflowProvenance` (Stefanov et al. JACM 2018 Theorem 5.1 at `Z = 5`) and the static-drift check `path_oram_deployed_stash_parameters_pinned` |
+| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields, each paired with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification and pinned by the static-drift check `sgx_deployment_assumption_bundle_pinned`; W6.6 audits these as the six closed checkpoint entries of `sgxHostileHostClosureAudit` |
 
 The fresh-leaf remapping bridge is no longer a separate backend assumption.
 The canonical fresh-coin runtime-family and hidden-leaf coverage checkers now
@@ -92,7 +92,7 @@ Current proof-grade TCB:
 | Lean kernel plus the Lean theorem/checker development | trusted proof checker and theorem body |
 | Explicit backend / cryptographic / deployment assumptions | trusted assumptions |
 | Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for implementation honesty |
-| Rust code outside the tiny kernel | still part of the implementation risk until confinement and refinement are proved |
+| Rust code outside the tiny kernel | no longer part of the current confidential-work claim; the source-backed `RuntimeImplementationInterface` checker pins it to the public bridge side and `tamper_validation.json` rejects representative confidential-bypass drift |
 | `uo-check` | not in the proof-grade TCB |
 | `mplus-probe` | not in the proof-grade TCB |
 | `uo-solc` | not trusted for the current artifact-level acceptance claim, but still unverified for the final source-level compiler theorem |
@@ -110,9 +110,6 @@ Paper-main theorem strategy:
   `docs/path-oram-theorem-sources.bib`
 - appendix / artifact route: keep the self-instantiated theorem object at the
   same interface so the current artifacts can be checked end to end today
-- future work: keep the stronger external-theorem import route alive, but only
-  as a future strengthening until an actual external theorem artifact can be
-  aligned to that interface
 - the theorem boundary does not change between those two routes; only the
   provenance of the ORAM core theorem object changes
 
