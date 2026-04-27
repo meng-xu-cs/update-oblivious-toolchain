@@ -2251,6 +2251,22 @@ Current artifact-side realization: the full probe bundle emits
 reviewer-facing table over proof/report cost, artifact sizes, runtime
 overheads, TCB surface, and explicit assumptions.
 
+Status of charter task 2 (proof-grade checker theorem-tightening): each of
+the previously-minimal-form proof-grade checker entrypoints now exposes
+at least one named paper-grade witness theorem at file scope. The W7.2
+cleanup landed in commits `52f8056` (seven core minimal-form checkers:
+`CheckProofGradeRuntimeKernelDsl`, `CheckProofGradeRuntimeKernelInterfaceBundle`,
+`CheckProofGradeRuntimeKernelLowering`,
+`CheckProofGradeRuntimeKernelSlotDsl`, `CheckProofGradeRuntimeKernelWitness`,
+`CheckProofGradeRuntimeShellBoundary`,
+`CheckProofGradeRuntimeShellBoundaryLowering`) and `9ec9d34` (four
+follow-up checkers: `CheckProofGradeRuntimeShellBoundarySlot`,
+`CheckProofGradeRuntimeKernelRefinementWitness`,
+`CheckProofGradeRuntimeTrustedKernel`,
+`CheckProofGradeRuntimeWitness`). Each new witness theorem is a one-line
+forwarding over an existing `UOToolchain.imported<...>_*` theorem so the
+checker file's Lean output is theorem-tight.
+
 Status of charter task 1 (theorem-stack refactor): each SGX projection-chain
 layer now exposes one abstraction function and one paper-main theorem with
 clearly-marked file-local helpers. The W7.1 cleanup landed in commits

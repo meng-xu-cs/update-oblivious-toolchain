@@ -289,6 +289,29 @@ be its own commit:
     SgxController, SgxControllerTrace, plus the rest.
 - W7.2 — proof-grade checker theorem-tightening, one commit per
   checker.
+  Landed:
+  - `52f8056` — W7.2 first batch: seven core minimal-form checkers
+    tightened with named paper-grade witness theorems
+    (`CheckProofGradeRuntimeKernelDsl`,
+    `CheckProofGradeRuntimeKernelInterfaceBundle`,
+    `CheckProofGradeRuntimeKernelLowering`,
+    `CheckProofGradeRuntimeKernelSlotDsl`,
+    `CheckProofGradeRuntimeKernelWitness`,
+    `CheckProofGradeRuntimeShellBoundary`,
+    `CheckProofGradeRuntimeShellBoundaryLowering`).
+  - `9ec9d34` — W7.2 second batch: four more checkers
+    (`CheckProofGradeRuntimeShellBoundarySlot`,
+    `CheckProofGradeRuntimeKernelRefinementWitness`,
+    `CheckProofGradeRuntimeTrustedKernel`,
+    `CheckProofGradeRuntimeWitness`).
+  Remaining (still bare-`main`-only): the larger
+  `CheckProofGradeRuntimeConfidentialCore*` family,
+  `CheckProofGradeRuntimePaperMainFamily*`,
+  `CheckProofGradeRuntimeKernelInterfaceFamily`, and
+  `CheckProofGradeRuntimeWitnessFamily`. These follow the same
+  pattern (forward an existing `UOToolchain.imported<...>_valid_*`
+  theorem) and can be batched in a follow-up when the underlying
+  paper-grade theorems are also stable.
 - W7.3 — compatibility-shim removal, one commit per shim category.
 - W7.4 — new tamper / negative-test scenarios, one commit per
   scenario.
