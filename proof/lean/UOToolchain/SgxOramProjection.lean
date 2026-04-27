@@ -1,6 +1,32 @@
 import UOToolchain.OramModel
 import UOToolchain.SgxMicroModel
 
+/-! # ORAM-secured run → SGX projection layer
+
+This file projects an ORAM-secured `OramSemantics` run into the SGX
+execution view under the paper-facing normalized SGX micro observer.
+
+* **Abstraction function:** `oramToSGXSemantics` (lifts `OramSemantics` to
+  `SGXSemantics OramConfig` via `sgxViewOfOramView`).
+* **Main theorem:** `paperMain_computationalUOWith_projects_to_sgxExecution`
+  — `ComputationalUOWith security run` lifts to `SGXExecutionSecurity`
+  against `oramNormalizedObservedSGXProofRelationWith security`.
+
+All other declarations in this file are file-local helpers used by the
+proof body `computationalUOWith_projects_to_sgxExecution_with_normalizedController`.
+The paper-facing entry point in `ProofGrade.lean` is
+`proofGrade_sgx_projection_paper_main_computational_uo`.
+
+The earlier alternative-relation theorems (bare unparameterized form,
+`_with_controller`, `_with_budgetController`, `_with_canonicalController`)
+and the matching `oramSGXProofRelationWith` / `oramBudgetSGXProofRelationWith`
+/ `oramCanonicalizedSGXProofRelationWith` / `publicSGXMicroRelation`
+helper relations are no longer in the paper-grade narrative and have
+been removed from this file. The legacy `OramGame`-axiom demonstrations
+in `LegacySgxOramProjection.lean` continue to mirror only the
+normalized-controller paper-main theorem.
+-/
+
 namespace UOToolchain
 
 def sgxStorageOfOramView (view : ViewMPlus) : SGXStorageTrace :=
@@ -10,9 +36,6 @@ def sgxStorageOfOramView (view : ViewMPlus) : SGXStorageTrace :=
       , persistentWrites := persistentWrites
       }
 
-def publicSGXMicroRelation : SGXMicroRelation :=
-  fun micro₁ micro₂ _leakage => ExactProjectionRelation id micro₁ micro₂
-
 def oramSGXStorageRelationWith (security : OramSecurityInterface) : SGXStorageRelation :=
   fun storage₁ storage₂ leakage =>
     ∃ cfg₁ cfg₂ view₁ view₂,
@@ -21,21 +44,6 @@ def oramSGXStorageRelationWith (security : OramSecurityInterface) : SGXStorageRe
       security.localTheorem view₁ view₂ leakage ∧
       storage₁ = view₁.map sgxStorageOfOramView ∧
       storage₂ = view₂.map sgxStorageOfOramView
-
-def oramSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
-  { storageRel := oramSGXStorageRelationWith security
-  , microRel := publicSGXMicroRelation
-  }
-
-def oramBudgetSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
-  { storageRel := oramSGXStorageRelationWith security
-  , microRel := budgetConsistentSGXMicroRelation
-  }
-
-def oramCanonicalizedSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
-  { storageRel := oramSGXStorageRelationWith security
-  , microRel := canonicalizedSGXMicroRelation
-  }
 
 def oramNormalizedObservedSGXProofRelationWith (security : OramSecurityInterface) : SGXProofRelation :=
   { storageRel := oramSGXStorageRelationWith security
@@ -160,48 +168,6 @@ theorem oramControllerMicroTrace_public :
   intro cfg₁ cfg₂ hPublic
   exact oramControllerMicroTrace_eq_of_samePublicProjection hPublic
 
-theorem oramControllerMicroDistribution_consistent
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (cfg : OramConfig) :
-  MicroDistributionConsistentWithLeakage
-    (sgxMicroDistribution
-      ((oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace) cfg))
-    (oramMicroLeakage publicOutcome modelTags cfg) := by
-  intro trace hMem
-  have hMapped :
-      trace ∈
-        (run cfg).map
-          (fun sourceView =>
-            sgxMicroTrace
-              (sgxViewOfOramView
-                cfg
-                (publicOutcome cfg)
-                (boundarySchedule cfg)
-                (oramControllerMicroTrace cfg)
-                sourceView)) := by
-    simpa [oramToSGXSemantics, sgxMicroDistribution] using hMem
-  rcases List.mem_map.mp hMapped with ⟨sourceView, _hSource, hEq⟩
-  rw [← hEq]
-  simpa using oramControllerMicroTrace_consistentWithLeakage cfg publicOutcome modelTags
-
-theorem oramControllerMicroDistribution_canonicalized
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (cfg : OramConfig) :
-  CanonicalizedByLeakage
-    (sgxMicroDistribution
-      ((oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace) cfg))
-    (oramMicroLeakage publicOutcome modelTags cfg) := by
-  exact canonicalizedByLeakage_of_consistent
-    (oramControllerMicroDistribution_consistent
-      (run := run)
-      (cfg := cfg))
-
 theorem oramControllerMicroDistribution_normalized
   {run : OramSemantics}
   {publicOutcome : OramConfig → SGXPublicOutcome}
@@ -233,215 +199,7 @@ theorem oramControllerMicroDistribution_normalized
       modelTags
       (sgxControllerShapeOfExecutionLeakage (executionLeakage cfg))
 
-theorem oramStorageLeakage_public :
-  PublicStorageLeakage sameOramPublicProjection executionLeakage := by
-  intro cfg₁ cfg₂ hPublic
-  exact executionLeakage_eq_of_samePublicProjection hPublic
-
-theorem computationalUOWith_projects_to_sgxExecution
-  (security : OramSecurityInterface)
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {microTrace : OramConfig → SGXMicroTrace}
-  {modelTags : SGXModelTags}
-  (hOram : ComputationalUOWith security run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule)
-  (hMicro : OramPublicMicroTraceSafe microTrace) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    (oramSGXProofRelationWith security)
-    (oramToSGXSemantics run publicOutcome boundarySchedule microTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  intro cfg₁ cfg₂ hPublic
-  constructor
-  · apply exactProjectionRelation_of_constant (hOutcome cfg₁ cfg₂ hPublic)
-    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₁) _ (run cfg₁) ?_
-      intro view hMem
-      simp
-    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₂) _ (run cfg₂) ?_
-      intro view hMem
-      simp
-  constructor
-  · apply exactProjectionRelation_of_constant (hBoundary cfg₁ cfg₂ hPublic)
-    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₁) _ (run cfg₁) ?_
-      intro view hMem
-      simp
-    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₂) _ (run cfg₂) ?_
-      intro view hMem
-      simp
-  constructor
-  · simpa [oramToSGXSemantics, sgxStorageDistribution] using
-      (oramSecurity_projects_to_sgxStorage
-        security
-        cfg₁
-        cfg₂
-        (run cfg₁)
-        (run cfg₂)
-        hPublic
-        (hOram cfg₁ cfg₂ hPublic))
-  · apply exactProjectionRelation_of_constant (hMicro cfg₁ cfg₂ hPublic)
-    · refine constantProjection_map_of_const id (microTrace cfg₁) sgxMicroTrace ((oramToSGXSemantics run publicOutcome boundarySchedule microTrace) cfg₁) ?_
-      intro view hMem
-      have hMapped : view ∈ (run cfg₁).map (sgxViewOfOramView cfg₁ (publicOutcome cfg₁) (boundarySchedule cfg₁) (microTrace cfg₁)) := by
-        simpa [oramToSGXSemantics] using hMem
-      rcases List.mem_map.mp hMapped with ⟨sourceView, hSource, hEq⟩
-      rw [← hEq]
-      simp
-    · refine constantProjection_map_of_const id (microTrace cfg₂) sgxMicroTrace ((oramToSGXSemantics run publicOutcome boundarySchedule microTrace) cfg₂) ?_
-      intro view hMem
-      have hMapped : view ∈ (run cfg₂).map (sgxViewOfOramView cfg₂ (publicOutcome cfg₂) (boundarySchedule cfg₂) (microTrace cfg₂)) := by
-        simpa [oramToSGXSemantics] using hMem
-      rcases List.mem_map.mp hMapped with ⟨sourceView, hSource, hEq⟩
-      rw [← hEq]
-      simp
-
-theorem computationalUOWith_projects_to_sgxExecution_with_controller
-  (security : OramSecurityInterface)
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : ComputationalUOWith security run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    (oramSGXProofRelationWith security)
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  apply computationalUOWith_projects_to_sgxExecution security hOram hOutcome hBoundary
-  exact oramControllerMicroTrace_public
-
-theorem computationalUOWith_projects_to_sgxExecution_with_budgetController
-  (security : OramSecurityInterface)
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : ComputationalUOWith security run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    (oramBudgetSGXProofRelationWith security)
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  intro cfg₁ cfg₂ hPublic
-  constructor
-  · apply exactProjectionRelation_of_constant (hOutcome cfg₁ cfg₂ hPublic)
-    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₁) _ (run cfg₁) ?_
-      intro view hMem
-      simp
-    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₂) _ (run cfg₂) ?_
-      intro view hMem
-      simp
-  constructor
-  · apply exactProjectionRelation_of_constant (hBoundary cfg₁ cfg₂ hPublic)
-    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₁) _ (run cfg₁) ?_
-      intro view hMem
-      simp
-    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₂) _ (run cfg₂) ?_
-      intro view hMem
-      simp
-  constructor
-  · simpa [oramToSGXSemantics, sgxStorageDistribution] using
-      (oramSecurity_projects_to_sgxStorage
-        security
-        cfg₁
-        cfg₂
-        (run cfg₁)
-        (run cfg₂)
-        hPublic
-        (hOram cfg₁ cfg₂ hPublic))
-  · change
-      MicroDistributionConsistentWithLeakage
-        (sgxMicroDistribution
-          ((oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace) cfg₁))
-        (oramMicroLeakage publicOutcome modelTags cfg₁) ∧
-      MicroDistributionConsistentWithLeakage
-        (sgxMicroDistribution
-          ((oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace) cfg₂))
-        (oramMicroLeakage publicOutcome modelTags cfg₁)
-    constructor
-    · exact oramControllerMicroDistribution_consistent (run := run) (cfg := cfg₁)
-    · exact microDistributionConsistentWithLeakage_of_eq
-        (oramMicroLeakage_public hOutcome cfg₂ cfg₁ (sameOramPublicProjection_symm hPublic))
-        (oramControllerMicroDistribution_consistent
-          (run := run)
-          (cfg := cfg₂))
-
-theorem computationalUOWith_projects_to_sgxExecution_with_canonicalController
-  (security : OramSecurityInterface)
-  {run : OramSemantics}
-  {publicOutcome : OramConfig → SGXPublicOutcome}
-  {boundarySchedule : OramConfig → List BoundaryEvent}
-  {modelTags : SGXModelTags}
-  (hOram : ComputationalUOWith security run)
-  (hOutcome : OramPublicOutcomeSafe publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule) :
-  SGXExecutionSecurity
-    sameOramPublicProjection
-    (oramCanonicalizedSGXProofRelationWith security)
-    (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
-    executionLeakage
-    (oramMicroLeakage publicOutcome modelTags) := by
-  intro cfg₁ cfg₂ hPublic
-  constructor
-  · apply exactProjectionRelation_of_constant (hOutcome cfg₁ cfg₂ hPublic)
-    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₁) _ (run cfg₁) ?_
-      intro view hMem
-      simp
-    · refine constantProjection_map_of_const sgxPublicOutcome (publicOutcome cfg₂) _ (run cfg₂) ?_
-      intro view hMem
-      simp
-  constructor
-  · apply exactProjectionRelation_of_constant (hBoundary cfg₁ cfg₂ hPublic)
-    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₁) _ (run cfg₁) ?_
-      intro view hMem
-      simp
-    · refine constantProjection_map_of_const (fun view : SGXView => view.boundarySchedule) (boundarySchedule cfg₂) _ (run cfg₂) ?_
-      intro view hMem
-      simp
-  constructor
-  · simpa [oramToSGXSemantics, sgxStorageDistribution] using
-      (oramSecurity_projects_to_sgxStorage
-        security
-        cfg₁
-        cfg₂
-        (run cfg₁)
-        (run cfg₂)
-        hPublic
-        (hOram cfg₁ cfg₂ hPublic))
-  · change
-      CanonicalizedByLeakage
-        (sgxMicroDistribution
-          ((oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace) cfg₁))
-        (oramMicroLeakage publicOutcome modelTags cfg₁) ∧
-      CanonicalizedByLeakage
-        (sgxMicroDistribution
-          ((oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace) cfg₂))
-        (oramMicroLeakage publicOutcome modelTags cfg₁)
-    constructor
-    · exact oramControllerMicroDistribution_canonicalized (run := run) (cfg := cfg₁)
-    · intro trace hMem
-      have hCanon :=
-        oramControllerMicroDistribution_canonicalized
-          (run := run)
-          (modelTags := modelTags)
-          (cfg := cfg₂)
-          trace
-          hMem
-      have hLeakageEq :
-          oramMicroLeakage publicOutcome modelTags cfg₂ =
-            oramMicroLeakage publicOutcome modelTags cfg₁ :=
-        oramMicroLeakage_public hOutcome cfg₂ cfg₁ (sameOramPublicProjection_symm hPublic)
-      simpa [hLeakageEq] using hCanon
-
+/-- Internal proof body of `paperMain_computationalUOWith_projects_to_sgxExecution`. -/
 theorem computationalUOWith_projects_to_sgxExecution_with_normalizedController
   (security : OramSecurityInterface)
   {run : OramSemantics}
