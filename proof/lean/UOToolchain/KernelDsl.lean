@@ -1780,4 +1780,354 @@ theorem branchlessPureExprList_implies_fragmentValidList :
 
 end
 
+/-! ### W4.5: Status invariant for kernel expression evaluators
+
+`evalKernelExpr` (and its companions) never return `.status .completed`:
+every `.status` constructor in the evaluator uses an explicit
+non-`.completed` status (`.evalError` or `.unsupported`), and
+forwarded `.status` values from sub-expressions inherit the invariant
+by induction. -/
+
+private theorem EvalStatus_evalError_ne_completed (msg : String) :
+    EvalStatus.evalError msg ≠ EvalStatus.completed := by
+  intro h; cases h
+
+mutual
+
+theorem evalKernelExpr_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (e : KernelExpr) (s : EvalStatus),
+      evalKernelExpr cfg env e = .status s → s ≠ .completed
+  | .literal _, _, h => by simp [evalKernelExpr] at h
+  | .var name, _, h => by
+      unfold evalKernelExpr at h
+      cases hLook : env.lookup name with
+      | some v => rw [hLook] at h; simp at h
+      | none =>
+          rw [hLook] at h
+          simp at h
+          rw [← h]
+          exact EvalStatus_evalError_ne_completed _
+  | .unary op e', s, h => by
+      unfold evalKernelExpr at h
+      cases hRec : evalKernelExpr cfg env e' with
+      | value v =>
+          simp only [hRec] at h
+          cases hOp : op.eval v with
+          | some v' => simp [hOp] at h
+          | none =>
+              simp [hOp] at h
+              rw [← h]
+              exact EvalStatus_evalError_ne_completed _
+      | status s' =>
+          rw [hRec] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelExpr_status_ne_completed cfg env e' s' hRec
+  | .binary op lhs rhs, s, h => by
+      unfold evalKernelExpr at h
+      cases hL : evalKernelExpr cfg env lhs with
+      | status s' =>
+          simp only [hL] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelExpr_status_ne_completed cfg env lhs s' hL
+      | value lv =>
+          simp only [hL] at h
+          cases hR : evalKernelExpr cfg env rhs with
+          | status s' =>
+              simp only [hR] at h
+              have heq : s' = s := by injection h
+              rw [← heq]
+              exact evalKernelExpr_status_ne_completed cfg env rhs s' hR
+          | value rv =>
+              simp only [hR] at h
+              cases hOp : op.eval lv rv with
+              | some v => simp [hOp] at h
+              | none =>
+                  simp [hOp] at h
+                  rw [← h]
+                  exact EvalStatus_evalError_ne_completed _
+  | .select cond wt wf, s, h => by
+      unfold evalKernelExpr at h
+      cases hC : evalKernelExpr cfg env cond with
+      | status s' =>
+          simp only [hC] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelExpr_status_ne_completed cfg env cond s' hC
+      | value cv =>
+          simp only [hC] at h
+          cases cv with
+          | bool b =>
+              cases b with
+              | true =>
+                  simp at h
+                  exact evalKernelPureExpr_status_ne_completed cfg env wt s h
+              | false =>
+                  simp at h
+                  exact evalKernelPureExpr_status_ne_completed cfg env wf s h
+          | uint _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | bytes32 _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | address _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | structValue _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | array _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | map _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+  | .cellGet objectId, _, h => by
+      unfold evalKernelExpr at h
+      cases hRead : cfg.readObject objectId with
+      | some v => simp only [hRead] at h; cases h
+      | none =>
+          simp only [hRead] at h
+          simp at h
+          rw [← h]
+          exact EvalStatus_evalError_ne_completed _
+  | .arrayGet objectId indexExpr, s, h => by
+      unfold evalKernelExpr at h
+      cases hI : evalKernelExpr cfg env indexExpr with
+      | status s' =>
+          rw [hI] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelExpr_status_ne_completed cfg env indexExpr s' hI
+      | value iv =>
+          rw [hI] at h
+          cases iv with
+          | uint idx =>
+              simp at h
+              cases hRead : cfg.readObject objectId with
+              | some objVal =>
+                  rw [hRead] at h
+                  cases objVal with
+                  | array values =>
+                      simp at h
+                      cases hLookup : values[idx]? with
+                      | some v => rw [hLookup] at h; simp at h
+                      | none =>
+                          rw [hLookup] at h
+                          simp at h
+                          rw [← h]
+                          exact EvalStatus_evalError_ne_completed _
+                  | uint _ =>
+                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                  | bool _ =>
+                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                  | bytes32 _ =>
+                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                  | address _ =>
+                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                  | structValue _ =>
+                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                  | map _ =>
+                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              | none =>
+                  rw [hRead] at h
+                  simp at h
+                  rw [← h]
+                  exact EvalStatus_evalError_ne_completed _
+          | bool _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | bytes32 _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | address _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | structValue _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | array _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | map _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+  | .mapGet objectId keyExpr, s, h => by
+      unfold evalKernelExpr at h
+      cases hK : evalKernelExpr cfg env keyExpr with
+      | status s' =>
+          rw [hK] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelExpr_status_ne_completed cfg env keyExpr s' hK
+      | value kv =>
+          rw [hK] at h
+          cases hRead : cfg.readObject objectId with
+          | some objVal =>
+              rw [hRead] at h
+              cases objVal with
+              | map entries =>
+                  simp at h
+                  cases hLookup : Value.mapLookup entries kv with
+                  | some v => rw [hLookup] at h; simp at h
+                  | none =>
+                      rw [hLookup] at h
+                      simp at h
+                      rw [← h]
+                      exact EvalStatus_evalError_ne_completed _
+              | uint _ =>
+                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              | bool _ =>
+                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              | bytes32 _ =>
+                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              | address _ =>
+                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              | structValue _ =>
+                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              | array _ =>
+                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | none =>
+              rw [hRead] at h
+              simp at h
+              rw [← h]
+              exact EvalStatus_evalError_ne_completed _
+  | .keccak256 parts, s, h => by
+      unfold evalKernelExpr at h
+      cases hList : evalKernelExprList cfg env parts with
+      | error s' =>
+          rw [hList] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelExprList_status_ne_completed cfg env parts s' hList
+      | ok vs => rw [hList] at h; simp at h
+
+theorem evalKernelExprList_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (es : List KernelExpr) (s : EvalStatus),
+      evalKernelExprList cfg env es = .error s → s ≠ .completed
+  | [], _, h => by simp [evalKernelExprList] at h
+  | e :: rest, s, h => by
+      unfold evalKernelExprList at h
+      cases hHead : evalKernelExpr cfg env e with
+      | status s' =>
+          rw [hHead] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelExpr_status_ne_completed cfg env e s' hHead
+      | value v =>
+          rw [hHead] at h
+          cases hTail : evalKernelExprList cfg env rest with
+          | ok vs => rw [hTail] at h; simp at h
+          | error s' =>
+              rw [hTail] at h
+              have heq : s' = s := by injection h
+              rw [← heq]
+              exact evalKernelExprList_status_ne_completed cfg env rest s' hTail
+
+theorem evalKernelPureExpr_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (e : KernelPureExpr) (s : EvalStatus),
+      evalKernelPureExpr cfg env e = .status s → s ≠ .completed
+  | .literal _, _, h => by simp [evalKernelPureExpr] at h
+  | .var name, _, h => by
+      unfold evalKernelPureExpr at h
+      cases hLook : env.lookup name with
+      | some v => rw [hLook] at h; simp at h
+      | none =>
+          rw [hLook] at h
+          simp at h
+          rw [← h]
+          exact EvalStatus_evalError_ne_completed _
+  | .unary op e', s, h => by
+      unfold evalKernelPureExpr at h
+      cases hRec : evalKernelPureExpr cfg env e' with
+      | value v =>
+          simp only [hRec] at h
+          cases hOp : op.eval v with
+          | some v' => simp [hOp] at h
+          | none =>
+              simp [hOp] at h
+              rw [← h]
+              exact EvalStatus_evalError_ne_completed _
+      | status s' =>
+          rw [hRec] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelPureExpr_status_ne_completed cfg env e' s' hRec
+  | .binary op lhs rhs, s, h => by
+      unfold evalKernelPureExpr at h
+      cases hL : evalKernelPureExpr cfg env lhs with
+      | status s' =>
+          rw [hL] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelPureExpr_status_ne_completed cfg env lhs s' hL
+      | value lv =>
+          simp only [hL] at h
+          cases hR : evalKernelPureExpr cfg env rhs with
+          | status s' =>
+              simp only [hR] at h
+              have heq : s' = s := by injection h
+              rw [← heq]
+              exact evalKernelPureExpr_status_ne_completed cfg env rhs s' hR
+          | value rv =>
+              simp only [hR] at h
+              cases hOp : op.eval lv rv with
+              | some v => simp [hOp] at h
+              | none =>
+                  simp [hOp] at h
+                  rw [← h]
+                  exact EvalStatus_evalError_ne_completed _
+  | .select cond wt wf, s, h => by
+      unfold evalKernelPureExpr at h
+      cases hC : evalKernelPureExpr cfg env cond with
+      | status s' =>
+          rw [hC] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelPureExpr_status_ne_completed cfg env cond s' hC
+      | value cv =>
+          rw [hC] at h
+          cases cv with
+          | bool b =>
+              cases b with
+              | true =>
+                  simp at h
+                  exact evalKernelPureExpr_status_ne_completed cfg env wt s h
+              | false =>
+                  simp at h
+                  exact evalKernelPureExpr_status_ne_completed cfg env wf s h
+          | uint _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | bytes32 _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | address _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | structValue _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | array _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          | map _ =>
+              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+  | .keccak256 parts, s, h => by
+      unfold evalKernelPureExpr at h
+      cases hList : evalKernelPureExprList cfg env parts with
+      | error s' =>
+          rw [hList] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelPureExprList_status_ne_completed cfg env parts s' hList
+      | ok vs => rw [hList] at h; simp at h
+
+theorem evalKernelPureExprList_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (es : List KernelPureExpr) (s : EvalStatus),
+      evalKernelPureExprList cfg env es = .error s → s ≠ .completed
+  | [], _, h => by simp [evalKernelPureExprList] at h
+  | e :: rest, s, h => by
+      unfold evalKernelPureExprList at h
+      cases hHead : evalKernelPureExpr cfg env e with
+      | status s' =>
+          rw [hHead] at h
+          have heq : s' = s := by injection h
+          rw [← heq]
+          exact evalKernelPureExpr_status_ne_completed cfg env e s' hHead
+      | value v =>
+          rw [hHead] at h
+          cases hTail : evalKernelPureExprList cfg env rest with
+          | ok vs => rw [hTail] at h; simp at h
+          | error s' =>
+              rw [hTail] at h
+              have heq : s' = s := by injection h
+              rw [← heq]
+              exact evalKernelPureExprList_status_ne_completed cfg env rest s' hTail
+
+end
+
 end UOToolchain.IR
