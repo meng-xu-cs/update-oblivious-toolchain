@@ -614,10 +614,22 @@ should be its own commit:
   proved end-to-end on the happy path: source → IR → kernel
   runtime → static kernel-program schedule → manifest
   `kernel_steps` field.
-- *(next)* WP4 charter task 6 (artifact-checker demotion, W4.6).
-  The W4.4 reverse iff direction (lowering succeeds →
-  precondition holds) is also a useful but optional W4.6
-  building block.
+- *(landed)* W4.4 reverse iff direction (commit `48bdd67`):
+  per-Expr / per-PureExpr / list-companion / per-Statement /
+  list-level / program-level theorems
+  (`lowerPureExpr_ok_implies_branchlessPureExpr`,
+  `lowerExpr_ok_implies_fragmentValid`,
+  `lowerStatement_ok_implies_kernelLowerable`,
+  `lowerStatements_ok_implies_kernelLowerableSchedule`,
+  `lowerCompiledFunction_ok_implies_kernelLowerable`) close the
+  W4.4 lowering iff at every level. Paper-facing iff facades
+  `proofGrade_ir_to_kernel_lower_*_iff_*` package the
+  bidirectional equivalences.
+- *(next)* WP4 charter task 6 (artifact-checker demotion, W4.6) —
+  the last remaining "compiler-side" task. With the W4.4 reverse
+  iff now landed, W4.6 reduces to a doc / role-swap task: the
+  existing `checkProofGradeTranslationArtifacts` remains as an
+  executable proof witness but is no longer the trust root.
 - *(next)* W4.4 Session C: paper-facing `ProofGrade.lean`
   projection of the W4.4 preservation theorem and status / handoff
   doc updates.

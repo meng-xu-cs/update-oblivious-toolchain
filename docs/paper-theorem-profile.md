@@ -356,6 +356,18 @@ What is still open:
   inlining, `AssignAdd`-style desugaring) is the trusted
   front-end that produces the post-resolution Sol AST consumed
   here; the entire semantic Sol → IR step is Lean-proved.
+  **W4.4 reverse iff direction landed**: the per-Expr / per-
+  PureExpr / list-companion / per-Statement / list-level /
+  program-level reverse iff theorems
+  (`lowerExpr_ok_implies_fragmentValid` and friends in
+  `KernelDsl.lean`) plus the paper-facing iff facades in
+  `ProofGrade.lean` close the W4.4 lowering iff at every level.
+  Combined with the existing forward iff theorems, this gives the
+  full biconditional: a program is in the admitted fragment iff
+  its lowering succeeds. This is the prerequisite for W4.6: the
+  existing direct artifact checker can verify "the lowering
+  succeeded," and the iff lifts to "the program is in the
+  admitted fragment, so all W4.2 + W4.4 + W4.5 theorems apply."
   **W4.5 enabling theorem landed**: the paper-facing
   `proofGrade_sol_to_kernel_outcome_preservation` in
   `ProofGrade.lean` composes W4.2 + W4.4 to give a single

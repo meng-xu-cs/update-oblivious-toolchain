@@ -1835,10 +1835,58 @@ Current status update:
   runtime → static kernel-program schedule → manifest
   `kernel_steps` field (the last link via the existing
   `manifestFieldsExact` exactness fact).
-- Still open: the direct artifact checker demotion (W4.6) and
-  the reverse direction of the W4.4 lowering iff (lowering
-  succeeds → precondition holds; useful for W4.6 but not
-  strictly required by the preservation theorem).
+- **W4.4 reverse iff direction landed** (commit `48bdd67`,
+  [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)
+  +
+  [proof/lean/UOToolchain/ProofGrade.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)):
+  the per-Expr / per-PureExpr / list-companion / per-Statement /
+  list-level / program-level theorems
+  (`lowerPureExpr_ok_implies_branchlessPureExpr`,
+  `lowerExpr_ok_implies_fragmentValid`,
+  `lowerStatement_ok_implies_kernelLowerable`,
+  `lowerStatements_ok_implies_kernelLowerableSchedule`,
+  `lowerCompiledFunction_ok_implies_kernelLowerable`, plus
+  the `…List` companions) close the W4.4 lowering iff at every
+  level. Paper-facing iff facades
+  `proofGrade_ir_to_kernel_lower_{pure_expr,expr,statement,
+  statements,compiled_function}_iff_*` package the
+  bidirectional equivalences. The reverse direction is the
+  prerequisite for W4.6: the existing direct artifact checker
+  can verify "the lowering succeeded," and the iff lifts that
+  fact to "the program is in the admitted fragment, so all the
+  W4.2 + W4.4 + W4.5 theorems apply."
+- Still open: the direct artifact checker demotion (W4.6) — the
+  last remaining "compiler-side" charter task. With the W4.4
+  reverse iff now landed, W4.6 reduces to a doc / role-swap
+  task: the existing `checkProofGradeTranslationArtifacts`
+  remains as an executable proof witness, but is no longer the
+  trust root.
+
+### WP4 completeness summary
+
+WP4 is now Lean-proved end-to-end at all six charter tasks:
+
+| Charter task | Status | Key theorems / facades |
+| --- | --- | --- |
+| 1: source semantics + admitted-fragment evaluator (W4.1) | **closed** | `IR.evalContract` total over fragment-valid programs; `evaluatorCompilerSecrecyPreservation` / `evaluatorPublicGasSecretIndependent` |
+| 2: source-to-IR correctness (W4.2) | **closed** | `Sol.lowerFunction_preserves_semantics`; `proofGrade_sol_to_ir_program_preservation`; full admitted post-resolution Sol AST |
+| 3: confidential-fragment characterization (W4.3) | **closed** | `confidentialFragmentEntrypointWitnessOf_valid_iff`; `proofGrade_confidential_fragment_valid_iff_structurally_valid` |
+| 4: IR-to-kernel correctness (W4.4) | **closed (forward iff + B-2 preservation + reverse iff)** | `IR.lowerCompiledFunction_preserves_semantics`; `proofGrade_ir_to_kernel_program_preservation`; `proofGrade_ir_to_kernel_lower_compiled_function_iff_kernel_lowerable` |
+| 5: manifest-exactness semantics-preserving lift (W4.5) | **closed (enabling theorem + main body + body/program-level runtime-vs-static lift)** | `proofGrade_sol_to_kernel_outcome_preservation`; `KernelProgram.expectedKernelSteps`; `proofGrade_kernel_program_runtime_kernel_steps_eq_expected`; `proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected` |
+| 6: direct artifact-checker demotion (W4.6) | **open** (doc / role-swap; W4.4 reverse iff prerequisite landed) | — |
+
+The full source-to-manifest chain is Lean-proved on the happy path:
+`Sol.evalFunction fn cfg = IR.evalContract cfg = IR.evalKernelProgram
+kp cfg`, with runtime `kernelSteps` matching `kp.expectedKernelSteps`
+matching the manifest's `kernel_steps` field. The W4.4 forward + reverse
+iff equivalence pins the admission condition precisely: a program is in
+the admitted fragment iff its lowering succeeds.
+
+The remaining open task (W4.6) is a documentation / trust-narrative
+update — the existing `checkProofGradeTranslationArtifacts` direct
+artifact checker remains as an executable proof witness but is no
+longer the trust root, since the W4.2 + W4.4 + W4.5 theorems supply
+the trust independently.
 
 Exit gate:
 

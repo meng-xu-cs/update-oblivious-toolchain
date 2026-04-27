@@ -76,10 +76,15 @@ theorems are all Lean-proved end-to-end. Paper-facing facades
 `proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected` expose
 the program-level fact and its source-side composition.
 
-WP4 charter task **6** (direct artifact-checker demotion) remains
-open. The W4.4 reverse iff direction (lowering succeeds →
-precondition holds) is also still deferred (useful for W4.6 but
-not required by W4.4).
+The W4.4 reverse iff direction is now also landed: the per-Expr /
+per-Statement / program-level theorems
+(`lowerExpr_ok_implies_fragmentValid` and friends in
+`KernelDsl.lean`) plus the paper-facing iff facades in
+`ProofGrade.lean` close the W4.4 lowering iff at every level.
+
+WP4 charter task **6** (direct artifact-checker demotion) is the
+only remaining open task — and with W4.4 reverse iff now landed,
+W4.6 reduces to a doc / role-swap task.
 
 ## First, Read These Files In This Exact Order
 
