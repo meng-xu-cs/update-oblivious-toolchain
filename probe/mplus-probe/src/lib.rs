@@ -9084,8 +9084,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         runtime_implementation_interface.clone();
     tampered_runtime_implementation_bounded_journal_vec_bounce.trace_source = replace_exactly_once(
         &tampered_runtime_implementation_bounded_journal_vec_bounce.trace_source,
-        "for (slot, entry) in entries.iter_mut().zip(self.as_slice().iter().cloned()) {",
-        "return self.as_slice().to_vec().into_boxed_slice();",
+        "fixed_buffer::clone_initialized_prefix_to_box(&self.entries, self.len)",
+        "self.as_slice().to_vec().into_boxed_slice()",
         "runtime implementation bounded-journal Vec bounce tamper",
     )?;
     scenarios.push(validate_tampered_json_case(
