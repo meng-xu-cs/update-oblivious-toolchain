@@ -335,71 +335,72 @@ def Value.asBool? : Value → Option Bool
   | _ => none
 
 /-- The admitted runtime integer domain. The Rust public shell and generated
-confidential kernel both store `Value::Uint` as `u128`; the Lean evaluator keeps
-the payload as `Nat` but normalizes all uint operations modulo this bound. -/
-def uint128Modulus : Nat := 2 ^ 128
+confidential kernel both store `Value::Uint` as a full-width `uint256`; the Lean
+evaluator keeps the payload as `Nat` but normalizes all uint operations modulo
+this bound. -/
+def uint256Modulus : Nat := 2 ^ 256
 
-/-- Normalize a Lean natural into the runtime `u128` range. -/
-def uint128 (n : Nat) : Nat := n % uint128Modulus
+/-- Normalize a Lean natural into the runtime `uint256` range. -/
+def uint256 (n : Nat) : Nat := n % uint256Modulus
 
-/-- Runtime-compatible unsigned negation: `0u128.wrapping_sub(a)`. -/
-def uint128Neg (a : Nat) : Nat :=
-  uint128 (uint128Modulus - uint128 a)
+/-- Runtime-compatible unsigned negation: `0u256.wrapping_sub(a)`. -/
+def uint256Neg (a : Nat) : Nat :=
+  uint256 (uint256Modulus - uint256 a)
 
 /-- Runtime-compatible subtraction: `a.wrapping_sub(b)`. The addition by the
 modulus avoids Lean's saturating `Nat` subtraction before normalization. -/
-def uint128Sub (a b : Nat) : Nat :=
-  uint128 (uint128 a + uint128Modulus - uint128 b)
+def uint256Sub (a b : Nat) : Nat :=
+  uint256 (uint256 a + uint256Modulus - uint256 b)
 
 def UnaryOp.eval (op : UnaryOp) (v : Value) : Option Value :=
   match op, v with
   | .not, .bool b => some (.bool (! b))
-  | .neg, .uint a => some (.uint (uint128Neg a))
+  | .neg, .uint a => some (.uint (uint256Neg a))
   | _, _ => none
 
 def BinaryOp.eval (op : BinaryOp) (lhs rhs : Value) : Option Value :=
   match op, lhs, rhs with
-  | .add, .uint a, .uint b => some (.uint (uint128 (a + b)))
-  | .sub, .uint a, .uint b => some (.uint (uint128Sub a b))
-  | .mul, .uint a, .uint b => some (.uint (uint128 (a * b)))
+  | .add, .uint a, .uint b => some (.uint (uint256 (a + b)))
+  | .sub, .uint a, .uint b => some (.uint (uint256Sub a b))
+  | .mul, .uint a, .uint b => some (.uint (uint256 (a * b)))
   | .div, .uint a, .uint b =>
-      let divisor := uint128 b
-      if divisor = 0 then some (.uint 0) else some (.uint (uint128 a / divisor))
+      let divisor := uint256 b
+      if divisor = 0 then some (.uint 0) else some (.uint (uint256 a / divisor))
   | .mod, .uint a, .uint b =>
-      let divisor := uint128 b
-      if divisor = 0 then some (.uint 0) else some (.uint (uint128 a % divisor))
-  | .bitAnd, .uint a, .uint b => some (.uint (uint128 (uint128 a &&& uint128 b)))
-  | .bitOr, .uint a, .uint b => some (.uint (uint128 (uint128 a ||| uint128 b)))
-  | .bitXor, .uint a, .uint b => some (.uint (uint128 (uint128 a ^^^ uint128 b)))
-  | .lt, .uint a, .uint b => some (.bool (decide (uint128 a < uint128 b)))
-  | .lte, .uint a, .uint b => some (.bool (decide (uint128 a ≤ uint128 b)))
-  | .gt, .uint a, .uint b => some (.bool (decide (uint128 b < uint128 a)))
-  | .gte, .uint a, .uint b => some (.bool (decide (uint128 b ≤ uint128 a)))
-  | .eq, .uint a, .uint b => some (.bool (decide (uint128 a = uint128 b)))
-  | .neq, .uint a, .uint b => some (.bool (decide (uint128 a ≠ uint128 b)))
+      let divisor := uint256 b
+      if divisor = 0 then some (.uint 0) else some (.uint (uint256 a % divisor))
+  | .bitAnd, .uint a, .uint b => some (.uint (uint256 (uint256 a &&& uint256 b)))
+  | .bitOr, .uint a, .uint b => some (.uint (uint256 (uint256 a ||| uint256 b)))
+  | .bitXor, .uint a, .uint b => some (.uint (uint256 (uint256 a ^^^ uint256 b)))
+  | .lt, .uint a, .uint b => some (.bool (decide (uint256 a < uint256 b)))
+  | .lte, .uint a, .uint b => some (.bool (decide (uint256 a ≤ uint256 b)))
+  | .gt, .uint a, .uint b => some (.bool (decide (uint256 b < uint256 a)))
+  | .gte, .uint a, .uint b => some (.bool (decide (uint256 b ≤ uint256 a)))
+  | .eq, .uint a, .uint b => some (.bool (decide (uint256 a = uint256 b)))
+  | .neq, .uint a, .uint b => some (.bool (decide (uint256 a ≠ uint256 b)))
   | .eq, .bool a, .bool b => some (.bool (decide (a = b)))
   | .neq, .bool a, .bool b => some (.bool (decide (a ≠ b)))
   | .logicAnd, .bool a, .bool b => some (.bool (a && b))
   | .logicOr, .bool a, .bool b => some (.bool (a || b))
   | _, _, _ => none
 
-theorem uint128_wraps_at_modulus : uint128 (2 ^ 128) = 0 := by
+theorem uint256_wraps_at_modulus : uint256 (2 ^ 256) = 0 := by
   native_decide
 
-theorem unaryNeg_matches_u128_wrapping :
-    UnaryOp.eval .neg (.uint 1) = some (.uint ((2 ^ 128) - 1)) := by
+theorem unaryNeg_matches_uint256_wrapping :
+    UnaryOp.eval .neg (.uint 1) = some (.uint ((2 ^ 256) - 1)) := by
   rfl
 
-theorem binaryAdd_matches_u128_wrapping :
-    BinaryOp.eval .add (.uint ((2 ^ 128) - 1)) (.uint 1) = some (.uint 0) := by
+theorem binaryAdd_matches_uint256_wrapping :
+    BinaryOp.eval .add (.uint ((2 ^ 256) - 1)) (.uint 1) = some (.uint 0) := by
   rfl
 
-theorem binarySub_matches_u128_wrapping :
-    BinaryOp.eval .sub (.uint 0) (.uint 1) = some (.uint ((2 ^ 128) - 1)) := by
+theorem binarySub_matches_uint256_wrapping :
+    BinaryOp.eval .sub (.uint 0) (.uint 1) = some (.uint ((2 ^ 256) - 1)) := by
   rfl
 
-theorem binaryMul_matches_u128_wrapping :
-    BinaryOp.eval .mul (.uint (2 ^ 127)) (.uint 2) = some (.uint 0) := by
+theorem binaryMul_matches_uint256_wrapping :
+    BinaryOp.eval .mul (.uint (2 ^ 255)) (.uint 2) = some (.uint 0) := by
   rfl
 
 theorem binaryDivByZero_matches_runtime :

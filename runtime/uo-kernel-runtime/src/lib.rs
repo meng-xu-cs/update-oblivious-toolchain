@@ -585,7 +585,7 @@ mod tests {
                         op: BinaryOp::Add,
                         lhs: Box::new(ConfidentialKernelSlotExpr::Slot { slot: 0 }),
                         rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(2),
+                            value: Value::uint(2),
                         }),
                     },
                 },
@@ -657,7 +657,7 @@ mod tests {
                 &program,
                 &(),
                 32,
-                vec![Value::Uint(5)].into_boxed_slice(),
+                vec![Value::uint(5)].into_boxed_slice(),
                 None,
                 &mut recorder,
                 &mut opcode_trace,
@@ -665,7 +665,7 @@ mod tests {
             .unwrap();
 
         assert!(!aborted);
-        assert_eq!(return_value, Some(Value::Uint(7)));
+        assert_eq!(return_value, Some(Value::uint(7)));
         assert_eq!(
             opcode_trace.into_boxed_trace().as_ref(),
             [String::from("declare"), String::from("return")]
@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn kernel_machine_keccak_uses_real_runtime_hash_not_lean_mock() {
         let mut kernel = RuntimeKernelMachine::begin(kernel_plan(), &[]).unwrap();
-        let value = Value::Uint(7);
+        let value = Value::uint(7);
         let mut expected = [0u8; 32];
         let mut hasher = Keccak::v256();
         value.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));
@@ -718,7 +718,7 @@ mod tests {
                 &program,
                 &(),
                 32,
-                vec![Value::Uint(1), Value::Uint(2)].into_boxed_slice(),
+                vec![Value::uint(1), Value::uint(2)].into_boxed_slice(),
                 None,
                 &mut recorder,
                 &mut opcode_trace,

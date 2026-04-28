@@ -1411,7 +1411,7 @@ mod tests {
                 ("flag".into(), Value::Bool(true)),
                 (
                     "items".into(),
-                    Value::Array(vec![Value::Uint(7), Value::Uint(9)].into_boxed_slice()),
+                    Value::Array(vec![Value::uint(7), Value::uint(9)].into_boxed_slice()),
                 ),
             ]
             .into_boxed_slice(),
@@ -1542,21 +1542,21 @@ mod tests {
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x11; 20])),
-                            ("count".into(), Value::Uint(3)),
+                            ("count".into(), Value::uint(3)),
                         ]
                         .into_boxed_slice(),
                     ),
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x22; 20])),
-                            ("count".into(), Value::Uint(5)),
+                            ("count".into(), Value::uint(5)),
                         ]
                         .into_boxed_slice(),
                     ),
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x33; 20])),
-                            ("count".into(), Value::Uint(7)),
+                            ("count".into(), Value::uint(7)),
                         ]
                         .into_boxed_slice(),
                     ),
@@ -1601,7 +1601,7 @@ mod tests {
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x44; 20])),
-                            ("nonce".into(), Value::Uint(1)),
+                            ("nonce".into(), Value::uint(1)),
                         ]
                         .into_boxed_slice(),
                     ),
@@ -1612,7 +1612,7 @@ mod tests {
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x55; 20])),
-                            ("nonce".into(), Value::Uint(2)),
+                            ("nonce".into(), Value::uint(2)),
                         ]
                         .into_boxed_slice(),
                     ),
@@ -1622,7 +1622,7 @@ mod tests {
                             (
                                 "items".into(),
                                 Value::Array(
-                                    vec![Value::Uint(11), Value::Uint(13)].into_boxed_slice(),
+                                    vec![Value::uint(11), Value::uint(13)].into_boxed_slice(),
                                 ),
                             ),
                         ]
@@ -1679,7 +1679,7 @@ mod tests {
                         ("flag".into(), Value::Bool(true)),
                         (
                             "items".into(),
-                            Value::Array(vec![Value::Uint(21), Value::Uint(34)].into_boxed_slice()),
+                            Value::Array(vec![Value::uint(21), Value::uint(34)].into_boxed_slice()),
                         ),
                     ]
                     .into_boxed_slice(),
@@ -1793,7 +1793,7 @@ mod tests {
                 ("flag".into(), Value::Bool(false)),
                 (
                     "items".into(),
-                    Value::Array(vec![Value::Uint(21), Value::Uint(34)].into_boxed_slice()),
+                    Value::Array(vec![Value::uint(21), Value::uint(34)].into_boxed_slice()),
                 ),
             ]
             .into_boxed_slice(),
@@ -1823,21 +1823,21 @@ mod tests {
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x91; 20])),
-                            ("count".into(), Value::Uint(8)),
+                            ("count".into(), Value::uint(8)),
                         ]
                         .into_boxed_slice(),
                     ),
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x92; 20])),
-                            ("count".into(), Value::Uint(9)),
+                            ("count".into(), Value::uint(9)),
                         ]
                         .into_boxed_slice(),
                     ),
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x93; 20])),
-                            ("count".into(), Value::Uint(10)),
+                            ("count".into(), Value::uint(10)),
                         ]
                         .into_boxed_slice(),
                     ),
@@ -1880,7 +1880,7 @@ mod tests {
         let prior = Value::Struct(
             vec![
                 ("owner".into(), Value::Address([0xB1; 20])),
-                ("count".into(), Value::Uint(19)),
+                ("count".into(), Value::uint(19)),
             ]
             .into_boxed_slice(),
         );
@@ -1895,7 +1895,7 @@ mod tests {
         let replacement = Value::Struct(
             vec![
                 ("owner".into(), Value::Address([0xB2; 20])),
-                ("count".into(), Value::Uint(27)),
+                ("count".into(), Value::uint(27)),
             ]
             .into_boxed_slice(),
         );
@@ -1920,7 +1920,7 @@ mod tests {
         let prior = Value::Struct(
             vec![
                 ("owner".into(), Value::Address([0xC1; 20])),
-                ("count".into(), Value::Uint(31)),
+                ("count".into(), Value::uint(31)),
             ]
             .into_boxed_slice(),
         );
@@ -1934,7 +1934,7 @@ mod tests {
         let replacement = Value::Struct(
             vec![
                 ("owner".into(), Value::Address([0xC2; 20])),
-                ("count".into(), Value::Uint(37)),
+                ("count".into(), Value::uint(37)),
             ]
             .into_boxed_slice(),
         );
@@ -1969,7 +1969,7 @@ mod tests {
         let committed_value = Value::Struct(
             vec![
                 ("owner".into(), Value::Address([0xA1; 20])),
-                ("count".into(), Value::Uint(17)),
+                ("count".into(), Value::uint(17)),
             ]
             .into_boxed_slice(),
         );
@@ -2006,7 +2006,7 @@ mod tests {
         let key = Value::Struct(
             vec![
                 ("owner".into(), Value::Address([0x71; 20])),
-                ("nonce".into(), Value::Uint(4)),
+                ("nonce".into(), Value::uint(4)),
             ]
             .into_boxed_slice(),
         );
@@ -2025,7 +2025,7 @@ mod tests {
                 ("flag".into(), Value::Bool(false)),
                 (
                     "items".into(),
-                    Value::Array(vec![Value::Uint(21), Value::Uint(34)].into_boxed_slice()),
+                    Value::Array(vec![Value::uint(21), Value::uint(34)].into_boxed_slice()),
                 ),
             ]
             .into_boxed_slice(),
@@ -2059,7 +2059,7 @@ mod tests {
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x77; 20])),
-                            ("nonce".into(), Value::Uint(4)),
+                            ("nonce".into(), Value::uint(4)),
                         ]
                         .into_boxed_slice(),
                     ),
@@ -2079,7 +2079,7 @@ mod tests {
                     Value::Struct(
                         vec![
                             ("owner".into(), Value::Address([0x88; 20])),
-                            ("nonce".into(), Value::Uint(5)),
+                            ("nonce".into(), Value::uint(5)),
                         ]
                         .into_boxed_slice(),
                     ),
@@ -2089,7 +2089,7 @@ mod tests {
                             (
                                 "items".into(),
                                 Value::Array(
-                                    vec![Value::Uint(15), Value::Uint(16)].into_boxed_slice(),
+                                    vec![Value::uint(15), Value::uint(16)].into_boxed_slice(),
                                 ),
                             ),
                         ]
@@ -2149,7 +2149,7 @@ mod tests {
             Value::Struct(
                 vec![
                     ("owner".into(), Value::Address([0x99; 20])),
-                    ("nonce".into(), Value::Uint(6)),
+                    ("nonce".into(), Value::uint(6)),
                 ]
                 .into_boxed_slice(),
             ),
@@ -2209,7 +2209,7 @@ mod tests {
             RuntimeObject::UoOramMap(map) => {
                 map.oram.install_slot_for_test(
                     0,
-                    MapEntry::new(true, Value::Address([0x66; 20]), Value::Uint(19)),
+                    MapEntry::new(true, Value::Address([0x66; 20]), Value::uint(19)),
                     Some(0),
                 );
             }
@@ -2318,7 +2318,7 @@ mod tests {
             RuntimeObject::UoOramMap(map) => {
                 map.oram.install_slot_for_test(
                     0,
-                    MapEntry::new(true, Value::Address([0x77; 20]), Value::Uint(23)),
+                    MapEntry::new(true, Value::Address([0x77; 20]), Value::uint(23)),
                     Some(0),
                 );
                 map.oram.corrupt_storage_for_test();

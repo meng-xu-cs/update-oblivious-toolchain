@@ -2081,11 +2081,11 @@ def RuntimeImplementationInterface.sharedConfidentialInterpreterUsesMaskedSelect
       , ".unwrap_or_else(|| (String::new(), Value::Bool(false)))"
       , "let values = FixedBoxBuilder::from_fn(*len, |_| Value::zero_for_type(element));"
       , "pub fn as_bool(&self) -> Option<bool> {"
-      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn as_uint(&self) -> Option<Uint256> {"
       , "pub fn wipe_secrets(&mut self) {"
       , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
       , "masked_select_u8(cond, u8::from(*when_true), u8::from(*when_false)) != 0"
-      , "masked_select_u128(cond, *when_true, *when_false)"
+      , "masked_select_uint256(cond, *when_true, *when_false)"
       , "masked_select_bytes(cond, *when_true, *when_false)"
       , "FixedBoxBuilder::new(when_true_fields.len())"
       , "FixedBoxBuilder::new(when_true_values.len())"
@@ -2102,16 +2102,16 @@ def RuntimeImplementationInterface.sharedConfidentialInterpreterUsesMaskedSelect
       , "fn checked_end(offset: usize, len: usize, context: &str) -> Result<usize>"
       , "fn read_exact_range<'a>("
       , "fn write_exact_range("
-      , "fn write_u128_tail_be(out: &mut [u8; 32], value: u128) {"
+      , "value.to_be_bytes()"
       , "fn read_array_at<const N: usize>(bytes: &[u8], offset: usize, context: &str) -> Result<[u8; N]> {"
       , "fn read_u64_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u64> {"
-      , "fn read_u128_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u128> {"
+      , "fn masked_select_uint256(cond: bool, when_true: Uint256, when_false: Uint256) -> Uint256 {"
       , "write_exact_range("
       , "*slot = byte;"
-      , "write_u128_tail_be(&mut out, *value);"
-      , "write_u128_tail_be(&mut bytes, *value);"
-      , "let high = read_exact_range(bytes, 0, 16, \"canonical uint high word\")?;"
-      , "let out = read_u128_be_at(bytes, 16, \"canonical uint payload\")?;"
+      , "value.to_be_bytes()"
+      , "visitor(&value.to_be_bytes())"
+      , "let out = read_array_at::<32>(bytes, 0, \"canonical uint payload\")?;"
+      , "Ok((Value::Uint(Uint256::from_be_bytes(out)), 32))"
       , "let out = read_array_at::<32>(bytes, 0, \"canonical bytes32 payload\")?;"
       , "let out = read_array_at::<20>(bytes, 0, \"canonical address payload\")?;"
       , "let out = read_u64_be_at(bytes, *offset, \"canonical length word\")?;"
@@ -2165,7 +2165,7 @@ def RuntimeImplementationInterface.sharedConfidentialInterpreterUsesMaskedSelect
       , "pub fn confidential_eq(lhs: &Value, rhs: &Value) -> bool {"
       , "pub fn zero_for_type(ty: &Type) -> Self {"
       , "pub fn as_bool(&self) -> Option<bool> {"
-      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn as_uint(&self) -> Option<Uint256> {"
       , "pub fn wipe_secrets(&mut self) {"
       , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
       , "pub fn is_zero_like(&self) -> bool {"
@@ -2210,11 +2210,11 @@ def RuntimeImplementationInterface.checkSharedConfidentialInterpreterUsesMaskedS
       , ".unwrap_or_else(|| (String::new(), Value::Bool(false)))"
       , "let values = FixedBoxBuilder::from_fn(*len, |_| Value::zero_for_type(element));"
       , "pub fn as_bool(&self) -> Option<bool> {"
-      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn as_uint(&self) -> Option<Uint256> {"
       , "pub fn wipe_secrets(&mut self) {"
       , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
       , "masked_select_u8(cond, u8::from(*when_true), u8::from(*when_false)) != 0"
-      , "masked_select_u128(cond, *when_true, *when_false)"
+      , "masked_select_uint256(cond, *when_true, *when_false)"
       , "masked_select_bytes(cond, *when_true, *when_false)"
       , "FixedBoxBuilder::new(when_true_fields.len())"
       , "FixedBoxBuilder::new(when_true_values.len())"
@@ -2231,16 +2231,16 @@ def RuntimeImplementationInterface.checkSharedConfidentialInterpreterUsesMaskedS
       , "fn checked_end(offset: usize, len: usize, context: &str) -> Result<usize>"
       , "fn read_exact_range<'a>("
       , "fn write_exact_range("
-      , "fn write_u128_tail_be(out: &mut [u8; 32], value: u128) {"
+      , "value.to_be_bytes()"
       , "fn read_array_at<const N: usize>(bytes: &[u8], offset: usize, context: &str) -> Result<[u8; N]> {"
       , "fn read_u64_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u64> {"
-      , "fn read_u128_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u128> {"
+      , "fn masked_select_uint256(cond: bool, when_true: Uint256, when_false: Uint256) -> Uint256 {"
       , "write_exact_range("
       , "*slot = byte;"
-      , "write_u128_tail_be(&mut out, *value);"
-      , "write_u128_tail_be(&mut bytes, *value);"
-      , "let high = read_exact_range(bytes, 0, 16, \"canonical uint high word\")?;"
-      , "let out = read_u128_be_at(bytes, 16, \"canonical uint payload\")?;"
+      , "value.to_be_bytes()"
+      , "visitor(&value.to_be_bytes())"
+      , "let out = read_array_at::<32>(bytes, 0, \"canonical uint payload\")?;"
+      , "Ok((Value::Uint(Uint256::from_be_bytes(out)), 32))"
       , "let out = read_array_at::<32>(bytes, 0, \"canonical bytes32 payload\")?;"
       , "let out = read_array_at::<20>(bytes, 0, \"canonical address payload\")?;"
       , "let out = read_u64_be_at(bytes, *offset, \"canonical length word\")?;"
@@ -2294,7 +2294,7 @@ def RuntimeImplementationInterface.checkSharedConfidentialInterpreterUsesMaskedS
       , "pub fn confidential_eq(lhs: &Value, rhs: &Value) -> bool {"
       , "pub fn zero_for_type(ty: &Type) -> Self {"
       , "pub fn as_bool(&self) -> Option<bool> {"
-      , "pub fn as_uint(&self) -> Option<u128> {"
+      , "pub fn as_uint(&self) -> Option<Uint256> {"
       , "pub fn wipe_secrets(&mut self) {"
       , "pub fn as_bytes32(&self) -> Option<[u8; 32]> {"
       , "pub fn is_zero_like(&self) -> bool {"
@@ -8838,7 +8838,7 @@ def RuntimeImplementationInterface.sharedConfidentialInterpreterKeepsSlotEvaluat
     , "let rhs = eval_confidential_kernel_slot_pure_expr_generated(runtime, rhs)?;"
     , "let cond = eval_confidential_kernel_slot_pure_expr_generated(runtime, cond)?"
     , ".map(|part| eval_confidential_kernel_slot_pure_expr_generated(runtime, part)),"
-    , "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            runtime.array_get(*object_id, index)"
+    , "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = index.to_usize_saturating();\n            runtime.array_get(*object_id, index)"
     ] ∧
   sourceLacksAll iface.confidentialKernelProductionSource
     [ "as usize;"
@@ -8864,7 +8864,7 @@ def RuntimeImplementationInterface.checkSharedConfidentialInterpreterKeepsSlotEv
     , "let rhs = eval_confidential_kernel_slot_pure_expr_generated(runtime, rhs)?;"
     , "let cond = eval_confidential_kernel_slot_pure_expr_generated(runtime, cond)?"
     , ".map(|part| eval_confidential_kernel_slot_pure_expr_generated(runtime, part)),"
-    , "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            runtime.array_get(*object_id, index)"
+    , "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = index.to_usize_saturating();\n            runtime.array_get(*object_id, index)"
     ] &&
   checkSourceLacksAll iface.confidentialKernelProductionSource
     [ "as usize;"
@@ -8885,7 +8885,7 @@ def RuntimeImplementationInterface.sharedConfidentialInterpreterKeepsSlotStateme
     , "ConfidentialKernelSlotStatement::Declare { slot, value }\n        | ConfidentialKernelSlotStatement::Assign { slot, value } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            runtime.store_slot(*slot, value)?;"
     , "ConfidentialKernelSlotStatement::AbortIf { cond } => {\n            let cond = eval_confidential_kernel_slot_expr_generated(runtime, cond, state)?"
     , "ConfidentialKernelSlotStatement::CellSet {\n            object_id,\n            value,\n            predicate,\n        } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"cell\", state,\n            )?;"
-    , "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"array\", state,\n            )?;"
+    , "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = index.to_usize_saturating();\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"array\", state,\n            )?;"
     , "ConfidentialKernelSlotStatement::MapPut {\n            object_id,\n            key,\n            value,\n            predicate,\n        } => {\n            let key = eval_confidential_kernel_slot_expr_generated(runtime, key, state)?;\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"map\", state,\n            )?;"
     , "let return_value = if let Some(expr) = value.as_ref() {\n                Some(eval_confidential_kernel_slot_expr_generated(\n                    runtime, expr, state,\n                )?)"
     ]
@@ -8897,7 +8897,7 @@ def RuntimeImplementationInterface.checkSharedConfidentialInterpreterKeepsSlotSt
     , "ConfidentialKernelSlotStatement::Declare { slot, value }\n        | ConfidentialKernelSlotStatement::Assign { slot, value } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            runtime.store_slot(*slot, value)?;"
     , "ConfidentialKernelSlotStatement::AbortIf { cond } => {\n            let cond = eval_confidential_kernel_slot_expr_generated(runtime, cond, state)?"
     , "ConfidentialKernelSlotStatement::CellSet {\n            object_id,\n            value,\n            predicate,\n        } => {\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"cell\", state,\n            )?;"
-    , "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"array\", state,\n            )?;"
+    , "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = index.to_usize_saturating();\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"array\", state,\n            )?;"
     , "ConfidentialKernelSlotStatement::MapPut {\n            object_id,\n            key,\n            value,\n            predicate,\n        } => {\n            let key = eval_confidential_kernel_slot_expr_generated(runtime, key, state)?;\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;\n            let predicate = eval_optional_confidential_kernel_predicate_generated(\n                runtime, predicate, \"map\", state,\n            )?;"
     , "let return_value = if let Some(expr) = value.as_ref() {\n                Some(eval_confidential_kernel_slot_expr_generated(\n                    runtime, expr, state,\n                )?)"
     ]
@@ -15339,27 +15339,19 @@ theorem RuntimePaperNativeKernelAssumptions.valueOpsScalarCanonicalLengthsPublic
     RuntimeValueOpsSemantics.canonicalLengthPrefixBytes = 8 :=
   RuntimeValueOpsSemantics.scalarCanonicalLengths_public
 
-theorem RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldLength
+theorem RuntimePaperNativeKernelAssumptions.valueOpsUint256CanonicalByteFieldLength
   (_assumptions : RuntimePaperNativeKernelAssumptions)
   (value : Nat) :
-  (RuntimeValueOpsSemantics.u128CanonicalByteField value).length =
+  (RuntimeValueOpsSemantics.uint256CanonicalByteField value).length =
     RuntimeValueOpsSemantics.uintCanonicalBytes :=
-  RuntimeValueOpsSemantics.u128CanonicalByteField_length value
+  RuntimeValueOpsSemantics.uint256CanonicalByteField_length value
 
-theorem RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldHighPrefixZero
-  (_assumptions : RuntimePaperNativeKernelAssumptions)
-  (value : Nat) :
-  (RuntimeValueOpsSemantics.u128CanonicalByteField value).take
-      RuntimeValueOpsSemantics.u128HighZeroBytes =
-    List.replicate RuntimeValueOpsSemantics.u128HighZeroBytes 0 :=
-  RuntimeValueOpsSemantics.u128CanonicalByteField_highPrefixZero value
-
-theorem RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldValidBytes
+theorem RuntimePaperNativeKernelAssumptions.valueOpsUint256CanonicalByteFieldValidBytes
   (_assumptions : RuntimePaperNativeKernelAssumptions)
   (value : Nat) :
   RuntimeValueOpsSemantics.ValidByteField
-    (RuntimeValueOpsSemantics.u128CanonicalByteField value) :=
-  RuntimeValueOpsSemantics.u128CanonicalByteField_validBytes value
+    (RuntimeValueOpsSemantics.uint256CanonicalByteField value) :=
+  RuntimeValueOpsSemantics.uint256CanonicalByteField_validBytes value
 
 theorem RuntimePaperNativeKernelAssumptions.valueOpsMaskedSelectBoolTrue
   (_assumptions : RuntimePaperNativeKernelAssumptions)

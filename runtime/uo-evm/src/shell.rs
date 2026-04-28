@@ -6,7 +6,7 @@ use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
 use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
 use uo_core::manifest::EntrypointManifest;
-use uo_core::{RuntimeCallOutcome, Value};
+use uo_core::{RuntimeCallOutcome, Uint256, Value};
 use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;
 
 #[derive(Clone, Debug)]
@@ -216,6 +216,12 @@ fn exec_statement(
             let end = eval_expr(contract, function, end, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("for loop end must be uint"))?;
+            let start = start
+                .checked_to_usize()
+                .ok_or_else(|| anyhow!("for loop start exceeds host usize range"))?;
+            let end = end
+                .checked_to_usize()
+                .ok_or_else(|| anyhow!("for loop end exceeds host usize range"))?;
             for index in start..end {
                 if state.returned {
                     break;
@@ -260,7 +266,7 @@ fn exec_statement(
             let index = eval_expr(contract, function, index, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
-                as usize;
+                .to_usize_saturating();
             let value = eval_expr(contract, function, value, objects, state, recorder, kernel)?;
             let predicate = predicate
                 .as_ref()
@@ -333,11 +339,10 @@ fn eval_expr(
                         .ok_or_else(|| anyhow!("logical not expects bool"))?,
                 )),
                 UnaryOp::Neg => Ok(Value::Uint(
-                    0u128.wrapping_sub(
-                        value
-                            .as_uint()
-                            .ok_or_else(|| anyhow!("negation expects uint"))?,
-                    ),
+                    value
+                        .as_uint()
+                        .ok_or_else(|| anyhow!("negation expects uint"))?
+                        .wrapping_neg(),
                 )),
             }
         }
@@ -369,7 +374,7 @@ fn eval_expr(
             let index = eval_expr(contract, function, index, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
-                as usize;
+                .to_usize_saturating();
             kernel.array_get(objects, recorder, *object_id, index)
         }
         Expr::MapGet { object_id, key } => {
@@ -399,7 +404,7 @@ fn eval_expr(
             let index = eval_expr(contract, function, index, objects, state, recorder, kernel)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?
-                as usize;
+                .to_usize_saturating();
             match &base {
                 Value::Array(values) => values
                     .get(index)
@@ -430,23 +435,23 @@ fn eval_binary(op: &BinaryOp, lhs: Value, rhs: Value) -> Result<Value> {
         BinaryOp::Mul => Ok(Value::Uint(lhs_uint(&lhs)?.wrapping_mul(lhs_uint(&rhs)?))),
         BinaryOp::Div => {
             let divisor = lhs_uint(&rhs)?;
-            Ok(Value::Uint(if divisor == 0 {
-                0
+            Ok(Value::Uint(if divisor.is_zero() {
+                Uint256::ZERO
             } else {
-                lhs_uint(&lhs)? / divisor
+                lhs_uint(&lhs)?.div_rem(divisor).0
             }))
         }
         BinaryOp::Mod => {
             let divisor = lhs_uint(&rhs)?;
-            Ok(Value::Uint(if divisor == 0 {
-                0
+            Ok(Value::Uint(if divisor.is_zero() {
+                Uint256::ZERO
             } else {
-                lhs_uint(&lhs)? % divisor
+                lhs_uint(&lhs)?.div_rem(divisor).1
             }))
         }
-        BinaryOp::BitAnd => Ok(Value::Uint(lhs_uint(&lhs)? & lhs_uint(&rhs)?)),
-        BinaryOp::BitOr => Ok(Value::Uint(lhs_uint(&lhs)? | lhs_uint(&rhs)?)),
-        BinaryOp::BitXor => Ok(Value::Uint(lhs_uint(&lhs)? ^ lhs_uint(&rhs)?)),
+        BinaryOp::BitAnd => Ok(Value::Uint(lhs_uint(&lhs)?.bitand(lhs_uint(&rhs)?))),
+        BinaryOp::BitOr => Ok(Value::Uint(lhs_uint(&lhs)?.bitor(lhs_uint(&rhs)?))),
+        BinaryOp::BitXor => Ok(Value::Uint(lhs_uint(&lhs)?.bitxor(lhs_uint(&rhs)?))),
         BinaryOp::Eq => Ok(Value::Bool(lhs == rhs)),
         BinaryOp::Neq => Ok(Value::Bool(lhs != rhs)),
         BinaryOp::Lt => Ok(Value::Bool(lhs_uint(&lhs)? < lhs_uint(&rhs)?)),
@@ -458,7 +463,7 @@ fn eval_binary(op: &BinaryOp, lhs: Value, rhs: Value) -> Result<Value> {
     }
 }
 
-fn lhs_uint(value: &Value) -> Result<u128> {
+fn lhs_uint(value: &Value) -> Result<Uint256> {
     value
         .as_uint()
         .ok_or_else(|| anyhow!("expected uint-compatible value"))

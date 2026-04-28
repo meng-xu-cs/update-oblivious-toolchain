@@ -13,7 +13,7 @@ use uo_core::{
     AdmittedPackageIdentity, CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram,
     ConfidentialKernelSlotProgram, ContractMetadata, DeclassificationKind,
     ProofRelevantTranslationBundle, ReturnPolicy, ScalarType, StateMetadata, StatusPolicy,
-    StructField, Type, Value,
+    StructField, Type, Uint256, Value,
 };
 
 use solang_parser::{diagnostics::Diagnostic, parse, pt};
@@ -642,11 +642,11 @@ fn lower_expr(
             if !fraction.is_empty() {
                 bail!("fractional literals are unsupported");
             }
-            Ok(Expr::Literal(Value::Uint(integer.parse::<u128>()?)))
+            Ok(Expr::Literal(Value::Uint(Uint256::from_dec_str(integer)?)))
         }
-        pt::Expression::HexNumberLiteral(_, value, _) => Ok(Expr::Literal(Value::Uint(
-            u128::from_str_radix(value.trim_start_matches("0x"), 16)?,
-        ))),
+        pt::Expression::HexNumberLiteral(_, value, _) => {
+            Ok(Expr::Literal(Value::Uint(Uint256::from_hex_str(value)?)))
+        }
         pt::Expression::AddressLiteral(_, value) => {
             let mut bytes = [0u8; 20];
             hex::decode_to_slice(value.trim_start_matches("0x"), &mut bytes)?;
@@ -717,10 +717,10 @@ fn lower_expr(
                         let len = state
                             .capacity
                             .ok_or_else(|| anyhow!("{} has no static length", identifier.name))?;
-                        return Ok(Expr::Literal(Value::Uint(len as u128)));
+                        return Ok(Expr::Literal(Value::uint(len)));
                     }
                     if let Some(Type::Array(_, len)) = ctx.locals.get(&identifier.name) {
-                        return Ok(Expr::Literal(Value::Uint(*len as u128)));
+                        return Ok(Expr::Literal(Value::uint(*len)));
                     }
                 }
             }
@@ -1327,7 +1327,7 @@ fn count_body(statements: &[Statement]) -> CountSummary {
 
 fn count_body_with_env(
     statements: &[Statement],
-    loop_env: &BTreeMap<String, u128>,
+    loop_env: &BTreeMap<String, usize>,
 ) -> CountSummary {
     let mut counts = CountSummary::default();
     for statement in statements {
@@ -1497,7 +1497,7 @@ fn count_oram_accesses(
 fn collect_oram_statement_accesses(
     statement: &Statement,
     frontend: &Frontend,
-    loop_env: &BTreeMap<String, u128>,
+    loop_env: &BTreeMap<String, usize>,
     counts: &mut BTreeMap<u32, usize>,
 ) -> Result<()> {
     match statement {
@@ -1608,39 +1608,51 @@ fn body_contains_oram_accesses(statements: &[Statement], frontend: &Frontend) ->
     Ok(false)
 }
 
-fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, u128>) -> Option<u128> {
+fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Option<usize> {
+    eval_loop_bound_uint(expr, loop_env)?.checked_to_usize()
+}
+
+fn eval_loop_bound_uint(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Option<Uint256> {
     match expr {
         Expr::Literal(Value::Uint(value)) => Some(*value),
-        Expr::Literal(Value::Bool(value)) => Some(u128::from(*value)),
-        Expr::Var(name) => loop_env.get(name).copied(),
+        Expr::Literal(Value::Bool(value)) => Some(Uint256::from_bool(*value)),
+        Expr::Var(name) => loop_env.get(name).copied().map(Uint256::from),
         Expr::Unary {
             op: UnaryOp::Neg,
             expr,
-        } => eval_loop_bound(expr, loop_env).and_then(|value| 0u128.checked_sub(value)),
+        } => eval_loop_bound_uint(expr, loop_env).map(Uint256::wrapping_neg),
         Expr::Unary {
             op: UnaryOp::Not,
             expr,
-        } => eval_loop_bound(expr, loop_env).map(|value| u128::from(value == 0)),
+        } => eval_loop_bound_uint(expr, loop_env).map(|value| Uint256::from_bool(value.is_zero())),
         Expr::Binary { op, lhs, rhs } => {
-            let lhs = eval_loop_bound(lhs, loop_env)?;
-            let rhs = eval_loop_bound(rhs, loop_env)?;
+            let lhs = eval_loop_bound_uint(lhs, loop_env)?;
+            let rhs = eval_loop_bound_uint(rhs, loop_env)?;
             match op {
-                BinaryOp::Add => lhs.checked_add(rhs),
-                BinaryOp::Sub => lhs.checked_sub(rhs),
-                BinaryOp::Mul => lhs.checked_mul(rhs),
-                BinaryOp::Div => (rhs != 0).then(|| lhs / rhs),
-                BinaryOp::Mod => (rhs != 0).then(|| lhs % rhs),
-                BinaryOp::BitAnd => Some(lhs & rhs),
-                BinaryOp::BitOr => Some(lhs | rhs),
-                BinaryOp::BitXor => Some(lhs ^ rhs),
-                BinaryOp::Eq => Some(u128::from(lhs == rhs)),
-                BinaryOp::Neq => Some(u128::from(lhs != rhs)),
-                BinaryOp::Lt => Some(u128::from(lhs < rhs)),
-                BinaryOp::Lte => Some(u128::from(lhs <= rhs)),
-                BinaryOp::Gt => Some(u128::from(lhs > rhs)),
-                BinaryOp::Gte => Some(u128::from(lhs >= rhs)),
-                BinaryOp::And => Some(u128::from(lhs != 0 && rhs != 0)),
-                BinaryOp::Or => Some(u128::from(lhs != 0 || rhs != 0)),
+                BinaryOp::Add => Some(lhs.wrapping_add(rhs)),
+                BinaryOp::Sub => Some(lhs.wrapping_sub(rhs)),
+                BinaryOp::Mul => Some(lhs.wrapping_mul(rhs)),
+                BinaryOp::Div => Some(if rhs.is_zero() {
+                    Uint256::ZERO
+                } else {
+                    lhs.div_rem(rhs).0
+                }),
+                BinaryOp::Mod => Some(if rhs.is_zero() {
+                    Uint256::ZERO
+                } else {
+                    lhs.div_rem(rhs).1
+                }),
+                BinaryOp::BitAnd => Some(lhs.bitand(rhs)),
+                BinaryOp::BitOr => Some(lhs.bitor(rhs)),
+                BinaryOp::BitXor => Some(lhs.bitxor(rhs)),
+                BinaryOp::Eq => Some(Uint256::from_bool(lhs == rhs)),
+                BinaryOp::Neq => Some(Uint256::from_bool(lhs != rhs)),
+                BinaryOp::Lt => Some(Uint256::from_bool(lhs < rhs)),
+                BinaryOp::Lte => Some(Uint256::from_bool(lhs <= rhs)),
+                BinaryOp::Gt => Some(Uint256::from_bool(lhs > rhs)),
+                BinaryOp::Gte => Some(Uint256::from_bool(lhs >= rhs)),
+                BinaryOp::And => Some(Uint256::from_bool(lhs.as_bool() && rhs.as_bool())),
+                BinaryOp::Or => Some(Uint256::from_bool(lhs.as_bool() || rhs.as_bool())),
             }
         }
         Expr::Select {
@@ -1648,11 +1660,11 @@ fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, u128>) -> Option<u12
             when_true,
             when_false,
         } => {
-            let cond = eval_loop_bound(cond, loop_env)?;
-            if cond != 0 {
-                eval_loop_bound(when_true, loop_env)
+            let cond = eval_loop_bound_uint(cond, loop_env)?;
+            if cond.as_bool() {
+                eval_loop_bound_uint(when_true, loop_env)
             } else {
-                eval_loop_bound(when_false, loop_env)
+                eval_loop_bound_uint(when_false, loop_env)
             }
         }
         Expr::CellGet { .. }
@@ -2149,12 +2161,12 @@ fn linearize_statement(statement: &Statement, predicate: &Expr) -> Result<Vec<St
             index_var,
             ..
         } => {
-            let start = const_expr_uint(start)?;
-            let end = const_expr_uint(end)?;
+            let start = const_expr_usize(start)?;
+            let end = const_expr_usize(end)?;
             let mut out = Vec::new();
             for index in start..end {
                 let substituted =
-                    substitute_block(body, index_var, &Expr::Literal(Value::Uint(index)))?;
+                    substitute_block(body, index_var, &Expr::Literal(Value::uint(index)))?;
                 out.extend(linearize_statements(&substituted, predicate)?);
             }
             Ok(out)
@@ -2392,9 +2404,11 @@ fn not_expr(expr: Expr) -> Expr {
     }
 }
 
-fn const_expr_uint(expr: &Expr) -> Result<u128> {
+fn const_expr_usize(expr: &Expr) -> Result<usize> {
     match expr {
-        Expr::Literal(Value::Uint(value)) => Ok(*value),
+        Expr::Literal(Value::Uint(value)) => value
+            .checked_to_usize()
+            .ok_or_else(|| anyhow!("loop bound exceeds host usize range")),
         _ => bail!("loop bounds must be compile-time constants"),
     }
 }
@@ -2700,7 +2714,7 @@ mod tests {
     use super::{compile, validate_source};
     use std::fs;
     use std::path::PathBuf;
-    use uo_core::{ContractMetadata, ProgramMode};
+    use uo_core::{ContractMetadata, Expr, ProgramMode, Statement, Uint256, Value};
 
     fn write_temp(name: &str, contents: &str) -> PathBuf {
         let path = PathBuf::from(format!(
@@ -2881,6 +2895,101 @@ bounds:
         assert!(err
             .to_string()
             .contains("only uint256 is supported in proof-grade mode"));
+    }
+
+    #[test]
+    fn accepts_full_width_uint256_decimal_and_hex_literals() {
+        let max_decimal =
+            "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+        let source = write_temp(
+            "uint256-max-literals",
+            &format!(
+                r#"
+            contract C {{
+                uint256 private x;
+                function dec() public {{ x = {max_decimal}; }}
+                function hexed() public {{ x = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; }}
+            }}
+            "#
+            ),
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  dec():
+    confidential: false
+    returns: forbidden
+    status: public
+  hexed():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Raw).unwrap();
+        for signature in ["dec()", "hexed()"] {
+            let function = artifact
+                .contract
+                .functions
+                .iter()
+                .find(|function| function.signature == signature)
+                .unwrap();
+            assert!(matches!(
+                function.body.as_slice(),
+                [Statement::CellSet {
+                    value: Expr::Literal(value),
+                    ..
+                }] if value == &Value::uint(Uint256::MAX)
+            ));
+        }
+    }
+
+    #[test]
+    fn rejects_decimal_literals_above_uint256_max() {
+        let overflow =
+            "115792089237316195423570985008687907853269984665640564039457584007913129639936";
+        let source = write_temp(
+            "uint256-overflow-literal",
+            &format!(
+                r#"
+            contract C {{
+                uint256 private x;
+                function f() public {{ x = {overflow}; }}
+            }}
+            "#
+            ),
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Raw).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("uint256 literal exceeds 2^256 - 1"));
     }
 
     #[test]

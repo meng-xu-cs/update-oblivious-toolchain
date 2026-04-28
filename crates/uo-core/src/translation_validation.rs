@@ -442,14 +442,14 @@ mod tests {
             name: "result".into(),
             value: Expr::Select {
                 cond: Box::new(Expr::Var("cond".into())),
-                when_true: Box::new(Expr::Literal(crate::Value::Uint(1))),
-                when_false: Box::new(Expr::Literal(crate::Value::Uint(0))),
+                when_true: Box::new(Expr::Literal(crate::Value::uint(1))),
+                when_false: Box::new(Expr::Literal(crate::Value::uint(0))),
             },
         };
         let rendered = canonical_json_string(&statement).unwrap();
         assert_eq!(
             rendered,
-            "{\"Assign\":{\"name\":\"result\",\"value\":{\"Select\":{\"cond\":{\"Var\":\"cond\"},\"when_false\":{\"Literal\":{\"Uint\":0}},\"when_true\":{\"Literal\":{\"Uint\":1}}}}}}"
+            "{\"Assign\":{\"name\":\"result\",\"value\":{\"Select\":{\"cond\":{\"Var\":\"cond\"},\"when_false\":{\"Literal\":{\"Uint\":\"0\"}},\"when_true\":{\"Literal\":{\"Uint\":\"1\"}}}}}}"
         );
     }
 
@@ -462,7 +462,7 @@ mod tests {
             body: vec![Statement::ArraySet {
                 object_id: 7,
                 index: Expr::Var("x".into()),
-                value: Expr::Literal(crate::Value::Uint(1)),
+                value: Expr::Literal(crate::Value::uint(1)),
                 predicate: None,
             }],
             secret_args: vec![],
@@ -478,7 +478,7 @@ mod tests {
         );
         assert_eq!(
             view.body[0],
-            "{\"ArraySet\":{\"index\":{\"Var\":\"x\"},\"object_id\":7,\"predicate\":null,\"value\":{\"Literal\":{\"Uint\":1}}}}"
+            "{\"ArraySet\":{\"index\":{\"Var\":\"x\"},\"object_id\":7,\"predicate\":null,\"value\":{\"Literal\":{\"Uint\":\"1\"}}}}"
         );
     }
 

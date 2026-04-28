@@ -2252,7 +2252,7 @@ mod tests {
     };
     use crate::{
         ir::StateObject, BackendKind, BinaryOp, CompiledFunction, ContainerKind, Expr, ScalarType,
-        Statement, Type, UnaryOp, Value,
+        Statement, Type, Uint256, UnaryOp, Value,
     };
     use anyhow::{anyhow, Result};
     use uo_precompiles::UoOpcode;
@@ -2470,7 +2470,7 @@ mod tests {
                 ConfidentialKernelSlotExpr::ArrayGet {
                     object_id: 8,
                     index: Box::new(ConfidentialKernelSlotExpr::Literal {
-                        value: Value::Uint(0),
+                        value: Value::uint(0),
                     }),
                 },
                 ConfidentialKernelSlotExpr::MapGet {
@@ -2582,7 +2582,7 @@ mod tests {
     #[test]
     fn confidential_kernel_slot_expr_json_roundtrips_large_uint_literals() {
         let expr = ConfidentialKernelSlotExpr::Literal {
-            value: Value::Uint((1u128 << 100) + 7),
+            value: Value::uint((1u128 << 100) + 7),
         };
         let encoded = serde_json::to_vec(&expr).unwrap();
         let decoded: ConfidentialKernelSlotExpr = serde_json::from_slice(&encoded).unwrap();
@@ -2592,7 +2592,7 @@ mod tests {
     #[test]
     fn shared_slot_interpreter_executes_runtime_normal_form_program() {
         let mut runtime = MockRuntime::with_slot_count(2);
-        runtime.store_slot(0, Value::Uint(5)).unwrap();
+        runtime.store_slot(0, Value::uint(5)).unwrap();
         let program = ConfidentialKernelSlotProgram {
             entrypoint_id: "demo(uint256)".into(),
             param_count: 1,
@@ -2606,7 +2606,7 @@ mod tests {
                         op: BinaryOp::Add,
                         lhs: Box::new(ConfidentialKernelSlotExpr::Slot { slot: 0 }),
                         rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(2),
+                            value: Value::uint(2),
                         }),
                     },
                 },
@@ -2630,17 +2630,21 @@ mod tests {
             outcome,
             ConfidentialKernelExecutionOutcome {
                 aborted: false,
-                return_value: Some(Value::Uint(7)),
+                return_value: Some(Value::uint(7)),
             }
         );
-        assert_eq!(runtime.load_slot(1).unwrap(), Value::Uint(7));
-        assert_eq!(runtime.cell_sets, vec![(7, Value::Uint(7), Some(true))]);
+        assert_eq!(runtime.load_slot(1).unwrap(), Value::uint(7));
+        assert_eq!(runtime.cell_sets, vec![(7, Value::uint(7), Some(true))]);
         assert_eq!(runtime.statements, vec!["declare", "cell_set", "return"]);
     }
 
     #[test]
-    fn shared_slot_interpreter_uses_u128_wrapping_arithmetic() {
+    fn shared_slot_interpreter_uses_uint256_evm_arithmetic() {
         let mut runtime = MockRuntime::with_slot_count(5);
+        let high_bit = Uint256::from_hex_str(
+            "8000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
         let program = ConfidentialKernelSlotProgram {
             entrypoint_id: "arithmetic()".into(),
             param_count: 0,
@@ -2653,7 +2657,7 @@ mod tests {
                     value: ConfidentialKernelSlotExpr::Unary {
                         op: UnaryOp::Neg,
                         expr: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(1),
+                            value: Value::uint(1),
                         }),
                     },
                 },
@@ -2662,10 +2666,10 @@ mod tests {
                     value: ConfidentialKernelSlotExpr::Binary {
                         op: BinaryOp::Add,
                         lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(u128::MAX),
+                            value: Value::uint(Uint256::MAX),
                         }),
                         rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(1),
+                            value: Value::uint(1),
                         }),
                     },
                 },
@@ -2674,10 +2678,10 @@ mod tests {
                     value: ConfidentialKernelSlotExpr::Binary {
                         op: BinaryOp::Sub,
                         lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(0),
+                            value: Value::uint(0),
                         }),
                         rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(1),
+                            value: Value::uint(1),
                         }),
                     },
                 },
@@ -2686,10 +2690,10 @@ mod tests {
                     value: ConfidentialKernelSlotExpr::Binary {
                         op: BinaryOp::Mul,
                         lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(1u128 << 127),
+                            value: Value::uint(high_bit),
                         }),
                         rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(2),
+                            value: Value::uint(2),
                         }),
                     },
                 },
@@ -2698,10 +2702,10 @@ mod tests {
                     value: ConfidentialKernelSlotExpr::Binary {
                         op: BinaryOp::Div,
                         lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(7),
+                            value: Value::uint(7),
                         }),
                         rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(0),
+                            value: Value::uint(0),
                         }),
                     },
                 },
@@ -2709,10 +2713,10 @@ mod tests {
                     value: Some(ConfidentialKernelSlotExpr::Binary {
                         op: BinaryOp::Mod,
                         lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(7),
+                            value: Value::uint(7),
                         }),
                         rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
-                            value: Value::Uint(0),
+                            value: Value::uint(0),
                         }),
                     }),
                 },
@@ -2722,16 +2726,16 @@ mod tests {
 
         let outcome = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap();
 
-        assert_eq!(runtime.load_slot(0).unwrap(), Value::Uint(u128::MAX));
-        assert_eq!(runtime.load_slot(1).unwrap(), Value::Uint(0));
-        assert_eq!(runtime.load_slot(2).unwrap(), Value::Uint(u128::MAX));
-        assert_eq!(runtime.load_slot(3).unwrap(), Value::Uint(0));
-        assert_eq!(runtime.load_slot(4).unwrap(), Value::Uint(0));
+        assert_eq!(runtime.load_slot(0).unwrap(), Value::uint(Uint256::MAX));
+        assert_eq!(runtime.load_slot(1).unwrap(), Value::uint(0));
+        assert_eq!(runtime.load_slot(2).unwrap(), Value::uint(Uint256::MAX));
+        assert_eq!(runtime.load_slot(3).unwrap(), Value::uint(0));
+        assert_eq!(runtime.load_slot(4).unwrap(), Value::uint(0));
         assert_eq!(
             outcome,
             ConfidentialKernelExecutionOutcome {
                 aborted: false,
-                return_value: Some(Value::Uint(0)),
+                return_value: Some(Value::uint(0)),
             }
         );
     }
@@ -2739,7 +2743,7 @@ mod tests {
     #[test]
     fn shared_slot_interpreter_rejects_non_normalized_programs() {
         let mut runtime = MockRuntime::with_slot_count(1);
-        runtime.store_slot(0, Value::Uint(1)).unwrap();
+        runtime.store_slot(0, Value::uint(1)).unwrap();
         let program = ConfidentialKernelSlotProgram {
             entrypoint_id: "guard(uint256)".into(),
             param_count: 1,
@@ -2761,7 +2765,7 @@ mod tests {
     #[test]
     fn shared_slot_interpreter_rejects_non_final_return_schedule() {
         let mut runtime = MockRuntime::with_slot_count(1);
-        runtime.store_slot(0, Value::Uint(1)).unwrap();
+        runtime.store_slot(0, Value::uint(1)).unwrap();
         let program = ConfidentialKernelSlotProgram {
             entrypoint_id: "early_return(uint256)".into(),
             param_count: 1,
@@ -2775,7 +2779,7 @@ mod tests {
                 ConfidentialKernelSlotStatement::Assign {
                     slot: 0,
                     value: ConfidentialKernelSlotExpr::Literal {
-                        value: Value::Uint(2),
+                        value: Value::uint(2),
                     },
                 },
             ]
@@ -2803,7 +2807,7 @@ mod tests {
                 },
                 ConfidentialKernelSlotStatement::Return {
                     value: Some(ConfidentialKernelSlotExpr::Literal {
-                        value: Value::Uint(9),
+                        value: Value::uint(9),
                     }),
                 },
             ]
@@ -2816,7 +2820,7 @@ mod tests {
             outcome,
             ConfidentialKernelExecutionOutcome {
                 aborted: true,
-                return_value: Some(Value::Uint(9)),
+                return_value: Some(Value::uint(9)),
             }
         );
         assert_eq!(runtime.statements, vec!["abort_if", "return"]);

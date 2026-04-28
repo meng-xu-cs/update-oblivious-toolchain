@@ -13,13 +13,13 @@
     },
     {
       "path": "artifact_readme.md",
-      "bytes": 46526,
-      "sha256": "e2766c79f6084b584dded1747f722573a762cc1ae35aa346c48fba487d3866fa"
+      "bytes": 46529,
+      "sha256": "3eeaae6a0482c06aa923dc97039c3a9747784827b20a56f39ee0471d679c2024"
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 25592335,
-      "sha256": "33ce414b891a91e69d6aa4e1453177d8ff7c82f9cde67a1b295a0cf6d562bf0a"
+      "bytes": 25591023,
+      "sha256": "ce9acad3fc1f2d6298882c572c6e9f6c84382891dd8a6df06e1ab5ee0f5cf89e"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -263,8 +263,8 @@
     },
     {
       "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.json",
-      "bytes": 968136,
-      "sha256": "f493c438c1d47b9884cb6c255c880134a60e5fa5145b0d958fab82597bfcf2a7"
+      "bytes": 966856,
+      "sha256": "cc528fcc743bd069077ed645211f7355a471969c13d376c95fb45de46d1655f5"
     },
     {
       "path": "runtime_implementation_kernel_meeting_boundary_validation.json",

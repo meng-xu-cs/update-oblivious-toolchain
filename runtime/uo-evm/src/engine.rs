@@ -305,7 +305,7 @@ mod tests {
         );
         let mut instance = ContractInstance::deploy_with_seed(artifact, 7).unwrap();
         instance
-            .call("classify(uint256)", vec![Value::Uint(1)])
+            .call("classify(uint256)", vec![Value::uint(1)])
             .unwrap();
 
         instance
@@ -316,7 +316,7 @@ mod tests {
         assert_objects_are_cold(&instance);
 
         let peek = instance.call("peek()", vec![]).unwrap();
-        assert_eq!(peek.return_value, Some(Value::Uint(1)));
+        assert_eq!(peek.return_value, Some(Value::uint(1)));
     }
 
     #[test]
@@ -330,7 +330,7 @@ mod tests {
         );
         let mut instance = ContractInstance::deploy_with_seed(artifact, 11).unwrap();
         instance
-            .call("classify(uint256)", vec![Value::Uint(1)])
+            .call("classify(uint256)", vec![Value::uint(1)])
             .unwrap();
 
         let (cell_id, mut hot_cell) = {
@@ -369,7 +369,7 @@ mod tests {
         );
         let mut instance = ContractInstance::deploy_with_seed(artifact, 9).unwrap();
         instance
-            .call("put(bytes32,uint256)", vec![b32(7), Value::Uint(9)])
+            .call("put(bytes32,uint256)", vec![b32(7), Value::uint(9)])
             .unwrap();
 
         let committed_map = instance
@@ -381,7 +381,7 @@ mod tests {
         assert_eq!(committed_map.path_oram_access_counter_for_test(), Some(1));
 
         let read = instance.call("read(bytes32)", vec![b32(7)]).unwrap();
-        assert_eq!(read.return_value, Some(Value::Uint(9)));
+        assert_eq!(read.return_value, Some(Value::uint(9)));
     }
 
     #[test]

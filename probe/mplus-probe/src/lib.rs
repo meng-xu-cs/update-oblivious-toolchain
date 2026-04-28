@@ -3758,25 +3758,25 @@ fn run_controller_observer_validation(
     let auth_setup = vec![
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(0), b32(1)],
+            args: vec![Value::uint(0), b32(1)],
         },
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(1), b32(2)],
+            args: vec![Value::uint(1), b32(2)],
         },
     ];
     let erc20_setup = vec![CallSpec {
         entrypoint: "mint(address,uint256)",
-        args: vec![addr(0x11), Value::Uint(10)],
+        args: vec![addr(0x11), Value::uint(10)],
     }];
     let erc20_transfer_setup = vec![
         CallSpec {
             entrypoint: "mint(address,uint256)",
-            args: vec![addr(0x11), Value::Uint(10)],
+            args: vec![addr(0x11), Value::uint(10)],
         },
         CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
     ];
     let excluded_scenarios = vec![
@@ -3797,7 +3797,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(0)],
+            args: vec![Value::uint(0)],
         },
         &checker,
     )?);
@@ -3807,7 +3807,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(1)],
+            args: vec![Value::uint(1)],
         },
         &checker,
     )?);
@@ -3837,7 +3837,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(0)],
+            args: vec![b32(7), Value::uint(0)],
         },
         &checker,
     )?);
@@ -3847,7 +3847,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(7)],
+            args: vec![b32(7), Value::uint(7)],
         },
         &checker,
     )?);
@@ -3857,7 +3857,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(0)],
+            args: vec![b32(5), Value::uint(0)],
         },
         &checker,
     )?);
@@ -3867,7 +3867,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -3877,7 +3877,7 @@ fn run_controller_observer_validation(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(0)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(0)],
         },
         &checker,
     )?);
@@ -3887,7 +3887,7 @@ fn run_controller_observer_validation(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
         &checker,
     )?);
@@ -3897,7 +3897,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -3907,7 +3907,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -3917,7 +3917,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -3927,7 +3927,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -3937,7 +3937,7 @@ fn run_controller_observer_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -3947,7 +3947,7 @@ fn run_controller_observer_validation(
         &erc20_transfer_setup,
         &CallSpec {
             entrypoint: "transferFrom(address,address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
         },
         &checker,
     )?);
@@ -3991,7 +3991,7 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &checker,
         )?,
@@ -4001,7 +4001,7 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(7)],
+                args: vec![b32(9), Value::uint(7)],
             },
             &checker,
         )?,
@@ -4011,7 +4011,7 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &checker,
         )?,
@@ -4021,7 +4021,7 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(7)],
+                args: vec![b32(9), Value::uint(7)],
             },
             &checker,
         )?,
@@ -4031,7 +4031,7 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "deposit(bytes32,uint256)",
-                args: vec![b32(5), Value::Uint(1)],
+                args: vec![b32(5), Value::uint(1)],
             },
             &checker,
         )?,
@@ -4041,16 +4041,16 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
             &[
                 CallSpec {
                     entrypoint: "mint(address,uint256)",
-                    args: vec![addr(0x11), Value::Uint(10)],
+                    args: vec![addr(0x11), Value::uint(10)],
                 },
                 CallSpec {
                     entrypoint: "approve(address,address,uint256)",
-                    args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                    args: vec![addr(0x11), addr(0x22), Value::uint(4)],
                 },
             ],
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
             },
             &checker,
         )?,
@@ -4075,11 +4075,11 @@ fn run_tamper_validation() -> Result<JsonValue> {
     let artifact = compile_artifact(source_path, metadata_path, ProgramMode::Uo)?;
     let target = CallSpec {
         entrypoint: "put(bytes32,uint256)",
-        args: vec![b32(1), Value::Uint(7)],
+        args: vec![b32(1), Value::uint(7)],
     };
     let pair_target = CallSpec {
         entrypoint: "put(bytes32,uint256)",
-        args: vec![b32(9), Value::Uint(7)],
+        args: vec![b32(9), Value::uint(7)],
     };
     let trace = run_target_call(&artifact, &[], target.entrypoint, target.args.clone())?;
     let controller_certificate = trace.runtime_controller_observer_certificate()?;
@@ -14468,16 +14468,16 @@ fn run_trusted_kernel_validation(
     let auth_setup = vec![
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(0), b32(1)],
+            args: vec![Value::uint(0), b32(1)],
         },
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(1), b32(2)],
+            args: vec![Value::uint(1), b32(2)],
         },
     ];
     let erc20_setup = vec![CallSpec {
         entrypoint: "mint(address,uint256)",
-        args: vec![addr(0x11), Value::Uint(10)],
+        args: vec![addr(0x11), Value::uint(10)],
     }];
     let excluded_scenarios = vec![
         json!({
@@ -14497,7 +14497,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(0)],
+            args: vec![Value::uint(0)],
         },
         &checker,
     )?);
@@ -14507,7 +14507,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(1)],
+            args: vec![Value::uint(1)],
         },
         &checker,
     )?);
@@ -14537,7 +14537,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(0)],
+            args: vec![b32(7), Value::uint(0)],
         },
         &checker,
     )?);
@@ -14547,7 +14547,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(7)],
+            args: vec![b32(7), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14557,7 +14557,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(0)],
+            args: vec![b32(5), Value::uint(0)],
         },
         &checker,
     )?);
@@ -14567,7 +14567,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -14577,7 +14577,7 @@ fn run_trusted_kernel_validation(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(0)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(0)],
         },
         &checker,
     )?);
@@ -14587,7 +14587,7 @@ fn run_trusted_kernel_validation(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
         &checker,
     )?);
@@ -14597,7 +14597,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14607,7 +14607,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14617,7 +14617,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14627,7 +14627,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14637,7 +14637,7 @@ fn run_trusted_kernel_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -14647,16 +14647,16 @@ fn run_trusted_kernel_validation(
         &[
             CallSpec {
                 entrypoint: "mint(address,uint256)",
-                args: vec![addr(0x11), Value::Uint(10)],
+                args: vec![addr(0x11), Value::uint(10)],
             },
             CallSpec {
                 entrypoint: "approve(address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                args: vec![addr(0x11), addr(0x22), Value::uint(4)],
             },
         ],
         &CallSpec {
             entrypoint: "transferFrom(address,address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
         },
         &checker,
     )?);
@@ -14695,16 +14695,16 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
     let auth_setup = vec![
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(0), b32(1)],
+            args: vec![Value::uint(0), b32(1)],
         },
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(1), b32(2)],
+            args: vec![Value::uint(1), b32(2)],
         },
     ];
     let erc20_setup = vec![CallSpec {
         entrypoint: "mint(address,uint256)",
-        args: vec![addr(0x11), Value::Uint(10)],
+        args: vec![addr(0x11), Value::uint(10)],
     }];
     let excluded_scenarios = vec![
         json!({
@@ -14724,7 +14724,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(0)],
+            args: vec![Value::uint(0)],
         },
         &checker,
     )?);
@@ -14734,7 +14734,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(1)],
+            args: vec![Value::uint(1)],
         },
         &checker,
     )?);
@@ -14764,7 +14764,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(0)],
+            args: vec![b32(7), Value::uint(0)],
         },
         &checker,
     )?);
@@ -14774,7 +14774,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(7)],
+            args: vec![b32(7), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14784,7 +14784,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(0)],
+            args: vec![b32(5), Value::uint(0)],
         },
         &checker,
     )?);
@@ -14794,7 +14794,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -14804,7 +14804,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(0)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(0)],
         },
         &checker,
     )?);
@@ -14814,7 +14814,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
         &checker,
     )?);
@@ -14824,7 +14824,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14834,7 +14834,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14844,7 +14844,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14854,7 +14854,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -14864,7 +14864,7 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -14874,16 +14874,16 @@ fn run_kernel_validation(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         &[
             CallSpec {
                 entrypoint: "mint(address,uint256)",
-                args: vec![addr(0x11), Value::Uint(10)],
+                args: vec![addr(0x11), Value::uint(10)],
             },
             CallSpec {
                 entrypoint: "approve(address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                args: vec![addr(0x11), addr(0x22), Value::uint(4)],
             },
         ],
         &CallSpec {
             entrypoint: "transferFrom(address,address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
         },
         &checker,
     )?);
@@ -14919,16 +14919,16 @@ fn run_kernel_refinement_validation(
     let auth_setup = vec![
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(0), b32(1)],
+            args: vec![Value::uint(0), b32(1)],
         },
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(1), b32(2)],
+            args: vec![Value::uint(1), b32(2)],
         },
     ];
     let erc20_setup = vec![CallSpec {
         entrypoint: "mint(address,uint256)",
-        args: vec![addr(0x11), Value::Uint(10)],
+        args: vec![addr(0x11), Value::uint(10)],
     }];
     let excluded_scenarios = vec![
         json!({
@@ -14948,7 +14948,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(0)],
+            args: vec![Value::uint(0)],
         },
         &checker,
     )?);
@@ -14958,7 +14958,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(1)],
+            args: vec![Value::uint(1)],
         },
         &checker,
     )?);
@@ -14988,7 +14988,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(0)],
+            args: vec![b32(7), Value::uint(0)],
         },
         &checker,
     )?);
@@ -14998,7 +14998,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(7)],
+            args: vec![b32(7), Value::uint(7)],
         },
         &checker,
     )?);
@@ -15008,7 +15008,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(0)],
+            args: vec![b32(5), Value::uint(0)],
         },
         &checker,
     )?);
@@ -15018,7 +15018,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -15028,7 +15028,7 @@ fn run_kernel_refinement_validation(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(0)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(0)],
         },
         &checker,
     )?);
@@ -15038,7 +15038,7 @@ fn run_kernel_refinement_validation(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
         &checker,
     )?);
@@ -15048,7 +15048,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -15058,7 +15058,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -15068,7 +15068,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
         &checker,
     )?);
@@ -15078,7 +15078,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
         &checker,
     )?);
@@ -15088,7 +15088,7 @@ fn run_kernel_refinement_validation(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
         &checker,
     )?);
@@ -15098,16 +15098,16 @@ fn run_kernel_refinement_validation(
         &[
             CallSpec {
                 entrypoint: "mint(address,uint256)",
-                args: vec![addr(0x11), Value::Uint(10)],
+                args: vec![addr(0x11), Value::uint(10)],
             },
             CallSpec {
                 entrypoint: "approve(address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                args: vec![addr(0x11), addr(0x22), Value::uint(4)],
             },
         ],
         &CallSpec {
             entrypoint: "transferFrom(address,address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
         },
         &checker,
     )?);
@@ -15770,16 +15770,16 @@ fn collect_proofgrade_runtime_validation_scenarios(
     let auth_setup = vec![
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(0), b32(1)],
+            args: vec![Value::uint(0), b32(1)],
         },
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(1), b32(2)],
+            args: vec![Value::uint(1), b32(2)],
         },
     ];
     let erc20_setup = vec![CallSpec {
         entrypoint: "mint(address,uint256)",
-        args: vec![addr(0x11), Value::Uint(10)],
+        args: vec![addr(0x11), Value::uint(10)],
     }];
     let excluded_scenarios = vec![
         json!({
@@ -15799,7 +15799,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(0)],
+            args: vec![Value::uint(0)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15808,7 +15808,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "classify(uint256)",
-            args: vec![Value::Uint(1)],
+            args: vec![Value::uint(1)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15835,7 +15835,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(0)],
+            args: vec![b32(7), Value::uint(0)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15844,7 +15844,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "upsert(bytes32,uint256)",
-            args: vec![b32(7), Value::Uint(7)],
+            args: vec![b32(7), Value::uint(7)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15853,7 +15853,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(0)],
+            args: vec![b32(5), Value::uint(0)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15862,7 +15862,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15871,7 +15871,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(0)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(0)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15880,7 +15880,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &erc20_setup,
         &CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15889,7 +15889,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15898,7 +15898,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "put(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15907,7 +15907,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(1), Value::Uint(7)],
+            args: vec![b32(1), Value::uint(7)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15916,7 +15916,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "add(bytes32,uint256)",
-            args: vec![b32(9), Value::Uint(7)],
+            args: vec![b32(9), Value::uint(7)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15925,7 +15925,7 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![b32(5), Value::Uint(1)],
+            args: vec![b32(5), Value::uint(1)],
         },
     )?);
     scenarios.push(validate_case(
@@ -15934,16 +15934,16 @@ fn collect_proofgrade_runtime_validation_scenarios(
         &[
             CallSpec {
                 entrypoint: "mint(address,uint256)",
-                args: vec![addr(0x11), Value::Uint(10)],
+                args: vec![addr(0x11), Value::uint(10)],
             },
             CallSpec {
                 entrypoint: "approve(address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                args: vec![addr(0x11), addr(0x22), Value::uint(4)],
             },
         ],
         &CallSpec {
             entrypoint: "transferFrom(address,address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
         },
     )?);
 
@@ -15983,7 +15983,7 @@ fn run_seeded_witness_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             8,
             &checker,
@@ -16000,7 +16000,7 @@ fn run_seeded_witness_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             8,
             &checker,
@@ -16017,7 +16017,7 @@ fn run_seeded_witness_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "deposit(bytes32,uint256)",
-                args: vec![b32(5), Value::Uint(1)],
+                args: vec![b32(5), Value::uint(1)],
             },
             4,
             &checker,
@@ -16034,16 +16034,16 @@ fn run_seeded_witness_validation() -> Result<JsonValue> {
             &[
                 CallSpec {
                     entrypoint: "mint(address,uint256)",
-                    args: vec![addr(0x11), Value::Uint(10)],
+                    args: vec![addr(0x11), Value::uint(10)],
                 },
                 CallSpec {
                     entrypoint: "approve(address,address,uint256)",
-                    args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                    args: vec![addr(0x11), addr(0x22), Value::uint(4)],
                 },
             ],
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
             },
             4,
             &checker,
@@ -16100,11 +16100,11 @@ fn run_fresh_coin_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
     let erc20_transfer_setup = [
         CallSpec {
             entrypoint: "mint(address,uint256)",
-            args: vec![addr(0x11), Value::Uint(10)],
+            args: vec![addr(0x11), Value::uint(10)],
         },
         CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
     ];
 
@@ -16115,7 +16115,7 @@ fn run_fresh_coin_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &family_checker,
             &theorem_input_checker,
@@ -16127,7 +16127,7 @@ fn run_fresh_coin_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &family_checker,
             &theorem_input_checker,
@@ -16139,7 +16139,7 @@ fn run_fresh_coin_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "deposit(bytes32,uint256)",
-                args: vec![b32(5), Value::Uint(1)],
+                args: vec![b32(5), Value::uint(1)],
             },
             &family_checker,
             &theorem_input_checker,
@@ -16151,7 +16151,7 @@ fn run_fresh_coin_validation(options: &ProbeRunOptions) -> Result<JsonValue> {
             &erc20_transfer_setup,
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
             },
             &family_checker,
             &theorem_input_checker,
@@ -16198,11 +16198,11 @@ fn run_pathoram_pair_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(7)],
+                args: vec![b32(9), Value::uint(7)],
             },
             8,
             &checker,
@@ -16213,11 +16213,11 @@ fn run_pathoram_pair_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(7)],
+                args: vec![b32(9), Value::uint(7)],
             },
             8,
             &checker,
@@ -16228,11 +16228,11 @@ fn run_pathoram_pair_validation() -> Result<JsonValue> {
             &[],
             &CallSpec {
                 entrypoint: "deposit(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(1)],
+                args: vec![b32(1), Value::uint(1)],
             },
             &CallSpec {
                 entrypoint: "deposit(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(1)],
+                args: vec![b32(9), Value::uint(1)],
             },
             4,
             &checker,
@@ -16243,20 +16243,20 @@ fn run_pathoram_pair_validation() -> Result<JsonValue> {
             &[
                 CallSpec {
                     entrypoint: "mint(address,uint256)",
-                    args: vec![addr(0x11), Value::Uint(10)],
+                    args: vec![addr(0x11), Value::uint(10)],
                 },
                 CallSpec {
                     entrypoint: "approve(address,address,uint256)",
-                    args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                    args: vec![addr(0x11), addr(0x22), Value::uint(4)],
                 },
             ],
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
             },
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), addr(0x44), Value::Uint(3)],
+                args: vec![addr(0x11), addr(0x22), addr(0x44), Value::uint(3)],
             },
             4,
             &checker,
@@ -16297,11 +16297,11 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
     let erc20_transfer_setup = [
         CallSpec {
             entrypoint: "mint(address,uint256)",
-            args: vec![addr(0x11), Value::Uint(10)],
+            args: vec![addr(0x11), Value::uint(10)],
         },
         CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
         },
     ];
 
@@ -16312,11 +16312,11 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
             &[],
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &CallSpec {
                 entrypoint: "put(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(7)],
+                args: vec![b32(9), Value::uint(7)],
             },
             &checker,
             &paper_instantiation_checker,
@@ -16329,11 +16329,11 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
             &[],
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(7)],
+                args: vec![b32(1), Value::uint(7)],
             },
             &CallSpec {
                 entrypoint: "add(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(7)],
+                args: vec![b32(9), Value::uint(7)],
             },
             &checker,
             &paper_instantiation_checker,
@@ -16346,11 +16346,11 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
             &[],
             &CallSpec {
                 entrypoint: "deposit(bytes32,uint256)",
-                args: vec![b32(1), Value::Uint(1)],
+                args: vec![b32(1), Value::uint(1)],
             },
             &CallSpec {
                 entrypoint: "deposit(bytes32,uint256)",
-                args: vec![b32(9), Value::Uint(1)],
+                args: vec![b32(9), Value::uint(1)],
             },
             &checker,
             &paper_instantiation_checker,
@@ -16363,11 +16363,11 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
             &erc20_transfer_setup,
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
             },
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), addr(0x44), Value::Uint(3)],
+                args: vec![addr(0x11), addr(0x22), addr(0x44), Value::uint(3)],
             },
             &checker,
             &paper_instantiation_checker,
@@ -20382,9 +20382,8 @@ fn validate_runtime_implementation_kernel_machine_confinement_boundary_case(
             "paper_native_store_trace_exact_boxed_backing_theorem_checked": true,
             "paper_native_generated_value_ops_match_lean_generator_theorem_checked": true,
             "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-            "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-            "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-            "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true,
+            "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+            "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true,
             "value_ops_masked_select_bool_true_theorem_checked": true,
             "value_ops_masked_select_bool_false_theorem_checked": true,
             "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
@@ -31208,11 +31207,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         [
             "def FixedByteBufferState.extend?",
             "def FixedByteBufferState.finish?",
-            "def u128CanonicalByteField",
+            "def uint256CanonicalByteField",
             "theorem scalarCanonicalLengths_public",
-            "theorem u128CanonicalByteField_length",
-            "theorem u128CanonicalByteField_highPrefixZero",
-            "theorem u128CanonicalByteField_validBytes",
+            "theorem uint256CanonicalByteField_length",
+            "theorem uint256CanonicalByteField_validBytes",
             "theorem maskedSelectBool_true",
             "theorem maskedSelectBool_false",
             "theorem maskedSelectBytes_length_of_equal",
@@ -31226,9 +31224,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             && [
                 "RuntimePaperNativeKernelAssumptions.generatedValueOpsMatchLeanGenerator",
                 "RuntimePaperNativeKernelAssumptions.valueOpsScalarCanonicalLengthsPublic",
-                "RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldLength",
-                "RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldHighPrefixZero",
-                "RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldValidBytes",
+                "RuntimePaperNativeKernelAssumptions.valueOpsUint256CanonicalByteFieldLength",
+                "RuntimePaperNativeKernelAssumptions.valueOpsUint256CanonicalByteFieldValidBytes",
                 "RuntimePaperNativeKernelAssumptions.valueOpsMaskedSelectBoolTrue",
                 "RuntimePaperNativeKernelAssumptions.valueOpsMaskedSelectBoolFalse",
                 "RuntimePaperNativeKernelAssumptions.valueOpsMaskedSelectBytesLengthOfEqual",
@@ -31242,9 +31239,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             && [
                 "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_generatedValueOpsMatchLeanGenerator",
                 "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsScalarCanonicalLengthsPublic",
-                "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldLength",
-                "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldHighPrefixZero",
-                "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldValidBytes",
+                "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsUint256CanonicalByteFieldLength",
+                "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsUint256CanonicalByteFieldValidBytes",
                 "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsMaskedSelectBoolTrue",
                 "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsMaskedSelectBoolFalse",
                 "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsMaskedSelectBytesLengthOfEqual",
@@ -31258,9 +31254,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             && [
                 "importedBoundaryPaperNativeGeneratedValueOpsMatchLeanGenerator",
                 "importedBoundaryPaperNativeValueOpsScalarCanonicalLengthsPublic",
-                "importedBoundaryPaperNativeValueOpsU128CanonicalByteFieldLength",
-                "importedBoundaryPaperNativeValueOpsU128CanonicalByteFieldHighPrefixZero",
-                "importedBoundaryPaperNativeValueOpsU128CanonicalByteFieldValidBytes",
+                "importedBoundaryPaperNativeValueOpsUint256CanonicalByteFieldLength",
+                "importedBoundaryPaperNativeValueOpsUint256CanonicalByteFieldValidBytes",
                 "importedBoundaryPaperNativeValueOpsMaskedSelectBoolTrue",
                 "importedBoundaryPaperNativeValueOpsMaskedSelectBoolFalse",
                 "importedBoundaryPaperNativeValueOpsMaskedSelectBytesLengthOfEqual",
@@ -31277,9 +31272,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             && [
                 "\"paper_native_generated_value_ops_match_lean_generator_theorem_checked\": true",
                 "\"value_ops_scalar_canonical_lengths_public_theorem_checked\": true",
-                "\"value_ops_u128_canonical_byte_field_length_theorem_checked\": true",
-                "\"value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked\": true",
-                "\"value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked\": true",
+                "\"value_ops_uint256_canonical_byte_field_length_theorem_checked\": true",
+                "\"value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked\": true",
                 "\"value_ops_masked_select_bool_true_theorem_checked\": true",
                 "\"value_ops_masked_select_bool_false_theorem_checked\": true",
                 "\"value_ops_masked_select_bytes_length_of_equal_theorem_checked\": true",
@@ -41200,22 +41194,24 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_value_ops_impl_source.contains("fn read_exact_range<'a>(")
         && generated_value_ops_impl_source.contains("fn write_exact_range(")
         && generated_value_ops_impl_source
-            .contains("fn write_u128_tail_be(out: &mut [u8; 32], value: u128) {")
+            .contains("use super::{FixedBoxBuilder, ScalarType, Type, Uint256, Value, CANONICAL_LENGTH_PREFIX_BYTES};")
         && generated_value_ops_impl_source.contains(
             "fn read_array_at<const N: usize>(bytes: &[u8], offset: usize, context: &str) -> Result<[u8; N]> {",
         )
         && generated_value_ops_impl_source
             .contains("fn read_u64_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u64> {")
         && generated_value_ops_impl_source
-            .contains("fn read_u128_be_at(bytes: &[u8], offset: usize, context: &str) -> Result<u128> {")
+            .contains("fn masked_select_uint256(cond: bool, when_true: Uint256, when_false: Uint256) -> Uint256 {")
+        && generated_value_ops_impl_source
+            .contains("fn masked_eq_uint256(lhs: Uint256, rhs: Uint256) -> bool {")
         && generated_value_ops_impl_source.contains("write_exact_range(")
         && generated_value_ops_impl_source.contains("*slot = byte;")
-        && generated_value_ops_impl_source.contains("write_u128_tail_be(&mut out, *value);")
-        && generated_value_ops_impl_source.contains("write_u128_tail_be(&mut bytes, *value);")
+        && generated_value_ops_impl_source.contains("value.to_be_bytes()")
+        && generated_value_ops_impl_source.contains("visitor(&value.to_be_bytes())")
         && generated_value_ops_impl_source
-            .contains("let high = read_exact_range(bytes, 0, 16, \"canonical uint high word\")?;")
+            .contains("let out = read_array_at::<32>(bytes, 0, \"canonical uint payload\")?;")
         && generated_value_ops_impl_source
-            .contains("let out = read_u128_be_at(bytes, 16, \"canonical uint payload\")?;")
+            .contains("Ok((Value::Uint(Uint256::from_be_bytes(out)), 32))")
         && generated_value_ops_impl_source
             .contains("let out = read_array_at::<32>(bytes, 0, \"canonical bytes32 payload\")?;")
         && generated_value_ops_impl_source
@@ -41266,12 +41262,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("fn masked_slice_is_zero(bytes: &[u8]) -> bool {")
         && generated_value_ops_impl_source.contains("diff |= *byte;")
         && generated_value_ops_impl_source.contains("pub fn as_bool(&self) -> Option<bool> {")
-        && generated_value_ops_impl_source.contains("pub fn as_uint(&self) -> Option<u128> {")
+        && generated_value_ops_impl_source.contains("pub fn as_uint(&self) -> Option<Uint256> {")
         && generated_value_ops_impl_source.contains("pub fn wipe_secrets(&mut self) {")
         && generated_value_ops_impl_source
             .contains("pub fn as_bytes32(&self) -> Option<[u8; 32]> {")
         && !types_impl_source.contains("pub fn as_bool(&self) -> Option<bool>")
-        && !types_impl_source.contains("pub fn as_uint(&self) -> Option<u128>")
+        && !types_impl_source.contains("pub fn as_uint(&self) -> Option<Uint256>")
         && !types_impl_source.contains("pub fn wipe_secrets(&mut self)")
         && !types_impl_source.contains("pub fn as_bytes32(&self) -> Option<[u8; 32]>")
         && !types_impl_source.contains("pub fn is_zero_like(&self) -> bool")
@@ -41772,7 +41768,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "benches/raw/FixedSlotClassifier.uo.yaml",
             ProgramMode::Uo,
         )?;
-        let trace = run_target_call(&artifact, &[], "classify(uint256)", vec![Value::Uint(7)])?;
+        let trace = run_target_call(&artifact, &[], "classify(uint256)", vec![Value::uint(7)])?;
         let encoded = serde_json::to_value(&trace)?;
         let encoded_object = encoded
             .as_object()
@@ -45697,7 +45693,7 @@ where
 fn check_classifier_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     let target = CallSpec {
         entrypoint: "classify(uint256)",
-        args: vec![Value::Uint(1)],
+        args: vec![Value::uint(1)],
     };
     let getters = vec![CallSpec {
         entrypoint: "peek()",
@@ -45705,7 +45701,7 @@ fn check_classifier_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue>
     }];
     let uo = run_scenario(&artifacts.uo, &[], &target, &getters)?;
     let raw = run_optional_raw_scenario(&artifacts.raw, &[], &target, &getters)?;
-    let expected_getters = vec![Some(Value::Uint(1))];
+    let expected_getters = vec![Some(Value::uint(1))];
     Ok(json!({
         "benchmark": "FixedSlotClassifier",
         "raw": optional_scenario_summary(&raw),
@@ -45720,11 +45716,11 @@ fn check_authscan_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     let setup = vec![
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(0), b32(1)],
+            args: vec![Value::uint(0), b32(1)],
         },
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(1), b32(2)],
+            args: vec![Value::uint(1), b32(2)],
         },
     ];
     let target = CallSpec {
@@ -45739,8 +45735,8 @@ fn check_authscan_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
         .context("correctness/AuthScan/uo scenario")?;
     let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)
         .context("correctness/AuthScan/raw scenario")?;
-    let expected_return = Some(Value::Uint(1));
-    let expected_getters = vec![Some(Value::Uint(1))];
+    let expected_return = Some(Value::uint(1));
+    let expected_getters = vec![Some(Value::uint(1))];
     Ok(json!({
         "benchmark": "AuthScan",
         "raw": optional_scenario_summary(&raw),
@@ -45755,11 +45751,11 @@ fn check_mixer_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     let key = b32(9);
     let setup = vec![CallSpec {
         entrypoint: "deposit(bytes32,uint256)",
-        args: vec![key.clone(), Value::Uint(5)],
+        args: vec![key.clone(), Value::uint(5)],
     }];
     let target = CallSpec {
         entrypoint: "withdraw(bytes32,uint256)",
-        args: vec![key.clone(), Value::Uint(2)],
+        args: vec![key.clone(), Value::uint(2)],
     };
     let getters = vec![
         CallSpec {
@@ -45782,8 +45778,8 @@ fn check_mixer_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
         &getters,
     )?;
     let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)?;
-    let expected_return = Some(Value::Uint(2));
-    let expected_getters = vec![Some(Value::Uint(3)), Some(Value::Uint(3))];
+    let expected_return = Some(Value::uint(2));
+    let expected_getters = vec![Some(Value::uint(3)), Some(Value::uint(3))];
     Ok(json!({
         "benchmark": "ConfidentialMixer",
         "raw": optional_scenario_summary(&raw),
@@ -45804,16 +45800,16 @@ fn check_erc20_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     let setup = vec![
         CallSpec {
             entrypoint: "mint(address,uint256)",
-            args: vec![alice.clone(), Value::Uint(10)],
+            args: vec![alice.clone(), Value::uint(10)],
         },
         CallSpec {
             entrypoint: "approve(address,address,uint256)",
-            args: vec![alice.clone(), bob.clone(), Value::Uint(4)],
+            args: vec![alice.clone(), bob.clone(), Value::uint(4)],
         },
     ];
     let target = CallSpec {
         entrypoint: "transferFrom(address,address,address,uint256)",
-        args: vec![alice.clone(), bob.clone(), carol.clone(), Value::Uint(3)],
+        args: vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(3)],
     };
     let getters = vec![
         CallSpec {
@@ -45840,11 +45836,11 @@ fn check_erc20_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
         &getters,
     )?;
     let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)?;
-    let expected_return = Some(Value::Uint(1));
+    let expected_return = Some(Value::uint(1));
     let expected_getters = vec![
-        Some(Value::Uint(7)),
-        Some(Value::Uint(3)),
-        Some(Value::Uint(1)),
+        Some(Value::uint(7)),
+        Some(Value::uint(3)),
+        Some(Value::uint(1)),
     ];
     Ok(json!({
         "benchmark": "ERC20Lite",
@@ -45863,11 +45859,11 @@ fn check_registry_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     let key = b32(4);
     let setup = vec![CallSpec {
         entrypoint: "upsert(bytes32,uint256)",
-        args: vec![key.clone(), Value::Uint(9)],
+        args: vec![key.clone(), Value::uint(9)],
     }];
     let target = CallSpec {
         entrypoint: "clearIfMatch(bytes32,uint256)",
-        args: vec![key.clone(), Value::Uint(9)],
+        args: vec![key.clone(), Value::uint(9)],
     };
     let getters = vec![CallSpec {
         entrypoint: "read(bytes32)",
@@ -45875,8 +45871,8 @@ fn check_registry_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     }];
     let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)?;
     let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)?;
-    let expected_return = Some(Value::Uint(1));
-    let expected_getters = vec![Some(Value::Uint(0))];
+    let expected_return = Some(Value::uint(1));
+    let expected_getters = vec![Some(Value::uint(0))];
     Ok(json!({
         "benchmark": "RegistryCRUD",
         "raw": optional_scenario_summary(&raw),
@@ -46175,7 +46171,7 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![mixer_key.clone(), Value::Uint(3)],
+            args: vec![mixer_key.clone(), Value::uint(3)],
         },
         &[],
     )
@@ -46188,7 +46184,7 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![mixer_key.clone(), Value::Uint(3)],
+            args: vec![mixer_key.clone(), Value::uint(3)],
         },
         &[],
     )
@@ -46201,7 +46197,7 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![mixer_key, Value::Uint(3)],
+            args: vec![mixer_key, Value::uint(3)],
         },
         &[],
     )
@@ -46316,16 +46312,16 @@ fn run_fixed_classifier_experiment(artifact: &CompiledArtifact) -> Result<Experi
         &[],
         "classify(uint256)",
         vec![
-            vec![Value::Uint(0)],
-            vec![Value::Uint(2)],
-            vec![Value::Uint(4)],
-            vec![Value::Uint(6)],
+            vec![Value::uint(0)],
+            vec![Value::uint(2)],
+            vec![Value::uint(4)],
+            vec![Value::uint(6)],
         ],
         vec![
-            vec![Value::Uint(1)],
-            vec![Value::Uint(3)],
-            vec![Value::Uint(5)],
-            vec![Value::Uint(7)],
+            vec![Value::uint(1)],
+            vec![Value::uint(3)],
+            vec![Value::uint(5)],
+            vec![Value::uint(7)],
         ],
     )
 }
@@ -46335,8 +46331,8 @@ fn run_classifier_same_same(artifact: &CompiledArtifact) -> Result<ExperimentOut
         artifact,
         &[],
         "sameSame(uint256)",
-        vec![vec![Value::Uint(1)], vec![Value::Uint(3)]],
-        vec![vec![Value::Uint(5)], vec![Value::Uint(7)]],
+        vec![vec![Value::uint(1)], vec![Value::uint(3)]],
+        vec![vec![Value::uint(5)], vec![Value::uint(7)]],
     )
 }
 
@@ -46344,11 +46340,11 @@ fn run_authscan_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutc
     let setup = vec![
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(0), b32(1)],
+            args: vec![Value::uint(0), b32(1)],
         },
         CallSpec {
             entrypoint: "seed(uint256,bytes32)",
-            args: vec![Value::Uint(1), b32(2)],
+            args: vec![Value::uint(1), b32(2)],
         },
     ];
     run_binary_experiment(
@@ -46366,16 +46362,16 @@ fn run_registry_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutc
         &[],
         "upsert(bytes32,uint256)",
         vec![
-            vec![b32(7), Value::Uint(0)],
-            vec![b32(7), Value::Uint(0)],
-            vec![b32(7), Value::Uint(0)],
-            vec![b32(7), Value::Uint(0)],
+            vec![b32(7), Value::uint(0)],
+            vec![b32(7), Value::uint(0)],
+            vec![b32(7), Value::uint(0)],
+            vec![b32(7), Value::uint(0)],
         ],
         vec![
-            vec![b32(7), Value::Uint(1)],
-            vec![b32(7), Value::Uint(2)],
-            vec![b32(7), Value::Uint(3)],
-            vec![b32(7), Value::Uint(4)],
+            vec![b32(7), Value::uint(1)],
+            vec![b32(7), Value::uint(2)],
+            vec![b32(7), Value::uint(3)],
+            vec![b32(7), Value::uint(4)],
         ],
     )
 }
@@ -46386,16 +46382,16 @@ fn run_mixer_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome
         &[],
         "deposit(bytes32,uint256)",
         vec![
-            vec![b32(5), Value::Uint(0)],
-            vec![b32(5), Value::Uint(0)],
-            vec![b32(5), Value::Uint(0)],
-            vec![b32(5), Value::Uint(0)],
+            vec![b32(5), Value::uint(0)],
+            vec![b32(5), Value::uint(0)],
+            vec![b32(5), Value::uint(0)],
+            vec![b32(5), Value::uint(0)],
         ],
         vec![
-            vec![b32(5), Value::Uint(1)],
-            vec![b32(5), Value::Uint(2)],
-            vec![b32(5), Value::Uint(3)],
-            vec![b32(5), Value::Uint(4)],
+            vec![b32(5), Value::uint(1)],
+            vec![b32(5), Value::uint(2)],
+            vec![b32(5), Value::uint(3)],
+            vec![b32(5), Value::uint(4)],
         ],
     )
 }
@@ -46406,16 +46402,16 @@ fn run_mixer_key_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOut
         &[],
         "deposit(bytes32,uint256)",
         vec![
-            vec![b32(1), Value::Uint(3)],
-            vec![b32(2), Value::Uint(3)],
-            vec![b32(3), Value::Uint(3)],
-            vec![b32(4), Value::Uint(3)],
+            vec![b32(1), Value::uint(3)],
+            vec![b32(2), Value::uint(3)],
+            vec![b32(3), Value::uint(3)],
+            vec![b32(4), Value::uint(3)],
         ],
         vec![
-            vec![b32(9), Value::Uint(3)],
-            vec![b32(10), Value::Uint(3)],
-            vec![b32(11), Value::Uint(3)],
-            vec![b32(12), Value::Uint(3)],
+            vec![b32(9), Value::uint(3)],
+            vec![b32(10), Value::uint(3)],
+            vec![b32(11), Value::uint(3)],
+            vec![b32(12), Value::uint(3)],
         ],
     )
 }
@@ -46426,16 +46422,16 @@ fn run_registry_key_experiment(artifact: &CompiledArtifact) -> Result<Experiment
         &[],
         "upsert(bytes32,uint256)",
         vec![
-            vec![b32(1), Value::Uint(7)],
-            vec![b32(2), Value::Uint(7)],
-            vec![b32(3), Value::Uint(7)],
-            vec![b32(4), Value::Uint(7)],
+            vec![b32(1), Value::uint(7)],
+            vec![b32(2), Value::uint(7)],
+            vec![b32(3), Value::uint(7)],
+            vec![b32(4), Value::uint(7)],
         ],
         vec![
-            vec![b32(9), Value::Uint(7)],
-            vec![b32(10), Value::Uint(7)],
-            vec![b32(11), Value::Uint(7)],
-            vec![b32(12), Value::Uint(7)],
+            vec![b32(9), Value::uint(7)],
+            vec![b32(10), Value::uint(7)],
+            vec![b32(11), Value::uint(7)],
+            vec![b32(12), Value::uint(7)],
         ],
     )
 }
@@ -46448,16 +46444,16 @@ fn run_erc20_allowance_value_experiment(artifact: &CompiledArtifact) -> Result<E
         &[],
         "approve(address,address,uint256)",
         vec![
-            vec![owner.clone(), spender.clone(), Value::Uint(0)],
-            vec![owner.clone(), spender.clone(), Value::Uint(0)],
-            vec![owner.clone(), spender.clone(), Value::Uint(0)],
-            vec![owner.clone(), spender.clone(), Value::Uint(0)],
+            vec![owner.clone(), spender.clone(), Value::uint(0)],
+            vec![owner.clone(), spender.clone(), Value::uint(0)],
+            vec![owner.clone(), spender.clone(), Value::uint(0)],
+            vec![owner.clone(), spender.clone(), Value::uint(0)],
         ],
         vec![
-            vec![owner.clone(), spender.clone(), Value::Uint(1)],
-            vec![owner.clone(), spender.clone(), Value::Uint(2)],
-            vec![owner.clone(), spender.clone(), Value::Uint(3)],
-            vec![owner, spender, Value::Uint(4)],
+            vec![owner.clone(), spender.clone(), Value::uint(1)],
+            vec![owner.clone(), spender.clone(), Value::uint(2)],
+            vec![owner.clone(), spender.clone(), Value::uint(3)],
+            vec![owner, spender, Value::uint(4)],
         ],
     )
 }
@@ -46468,16 +46464,16 @@ fn run_erc20_allowance_key_experiment(artifact: &CompiledArtifact) -> Result<Exp
         &[],
         "approve(address,address,uint256)",
         vec![
-            vec![addr(0x11), addr(0x21), Value::Uint(3)],
-            vec![addr(0x12), addr(0x22), Value::Uint(3)],
-            vec![addr(0x13), addr(0x23), Value::Uint(3)],
-            vec![addr(0x14), addr(0x24), Value::Uint(3)],
+            vec![addr(0x11), addr(0x21), Value::uint(3)],
+            vec![addr(0x12), addr(0x22), Value::uint(3)],
+            vec![addr(0x13), addr(0x23), Value::uint(3)],
+            vec![addr(0x14), addr(0x24), Value::uint(3)],
         ],
         vec![
-            vec![addr(0x31), addr(0x41), Value::Uint(3)],
-            vec![addr(0x32), addr(0x42), Value::Uint(3)],
-            vec![addr(0x33), addr(0x43), Value::Uint(3)],
-            vec![addr(0x34), addr(0x44), Value::Uint(3)],
+            vec![addr(0x31), addr(0x41), Value::uint(3)],
+            vec![addr(0x32), addr(0x42), Value::uint(3)],
+            vec![addr(0x33), addr(0x43), Value::uint(3)],
+            vec![addr(0x34), addr(0x44), Value::uint(3)],
         ],
     )
 }
@@ -47929,7 +47925,7 @@ Unsupported / rejected:
 
 Prototype assumptions:
 
-- `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
+- `uint256` arithmetic is evaluated modulo `2^256`, including division and modulo by zero returning zero to match EVM unsigned integer behavior.
 - The ORAM backend is an instrumented Path-ORAM-style runtime prototype with fixed public controller shape and rerandomized bucket/block rewrites; it is reported as computational-UO only.
 - The guarantees are with respect to the abstract/runtime traces emitted by this artifact, including the normalized physical read/write schedules captured by the runtime, not every downstream machine-code or microarchitectural observer.
 "#,
@@ -48008,8 +48004,8 @@ mod tests {
             .as_str()
             .unwrap_or_default()
             .contains("uses raw backend"));
-        assert_eq!(report["uo"]["return"].as_u64(), Some(1));
-        assert_eq!(report["uo"]["getters"][0].as_u64(), Some(1));
+        assert_eq!(report["uo"]["return"].as_str(), Some("1"));
+        assert_eq!(report["uo"]["getters"][0].as_str(), Some("1"));
     }
 
     #[test]
@@ -48062,16 +48058,16 @@ mod tests {
         let setup = vec![
             CallSpec {
                 entrypoint: "mint(address,uint256)",
-                args: vec![addr(0x11), Value::Uint(10)],
+                args: vec![addr(0x11), Value::uint(10)],
             },
             CallSpec {
                 entrypoint: "approve(address,address,uint256)",
-                args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+                args: vec![addr(0x11), addr(0x22), Value::uint(4)],
             },
         ];
         let target = CallSpec {
             entrypoint: "transferFrom(address,address,address,uint256)",
-            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
         };
 
         let mut baseline = prepare_instance_with_seed(&artifact, &setup, 0).unwrap();

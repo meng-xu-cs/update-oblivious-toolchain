@@ -8,8 +8,7 @@ def boolCanonicalBytes : Nat := 1
 def uintCanonicalBytes : Nat := 32
 def bytes32CanonicalBytes : Nat := 32
 def addressCanonicalBytes : Nat := 20
-def u128HighZeroBytes : Nat := 16
-def u128PayloadBytes : Nat := 16
+def uint256PayloadBytes : Nat := 32
 
 def ValidByte (byte : Nat) : Prop :=
   byte < byteModulus
@@ -21,8 +20,8 @@ def encodeNatField (width value : Nat) : List Nat :=
   (List.range width).map
     (fun index => (value / (byteModulus ^ (width - 1 - index))) % byteModulus)
 
-def u128CanonicalByteField (value : Nat) : List Nat :=
-  List.replicate u128HighZeroBytes 0 ++ encodeNatField u128PayloadBytes value
+def uint256CanonicalByteField (value : Nat) : List Nat :=
+  encodeNatField uint256PayloadBytes value
 
 def addressCanonicalByteField (bytes : List Nat) : Prop :=
   bytes.length = addressCanonicalBytes ∧ ValidByteField bytes
@@ -95,30 +94,18 @@ theorem encodeNatField_validBytes
   unfold ValidByte byteModulus
   exact Nat.mod_lt _ (by decide)
 
-theorem u128CanonicalByteField_length
+theorem uint256CanonicalByteField_length
     (value : Nat) :
-    (u128CanonicalByteField value).length = uintCanonicalBytes := by
-  simp [u128CanonicalByteField, uintCanonicalBytes,
-    u128HighZeroBytes, u128PayloadBytes, encodeNatField_length]
+    (uint256CanonicalByteField value).length = uintCanonicalBytes := by
+  simp [uint256CanonicalByteField, uintCanonicalBytes,
+    uint256PayloadBytes, encodeNatField_length]
 
-theorem u128CanonicalByteField_highPrefixZero
+theorem uint256CanonicalByteField_validBytes
     (value : Nat) :
-    (u128CanonicalByteField value).take u128HighZeroBytes =
-      List.replicate u128HighZeroBytes 0 := by
-  simp [u128CanonicalByteField]
-
-theorem u128CanonicalByteField_validBytes
-    (value : Nat) :
-    ValidByteField (u128CanonicalByteField value) := by
+    ValidByteField (uint256CanonicalByteField value) := by
   intro byte hMem
-  unfold u128CanonicalByteField at hMem
-  simp only [List.mem_append, List.mem_replicate] at hMem
-  rcases hMem with hZero | hEncoded
-  · rcases hZero with ⟨_, hByte⟩
-    rw [hByte]
-    unfold ValidByte byteModulus
-    decide
-  · exact encodeNatField_validBytes u128PayloadBytes value byte hEncoded
+  unfold uint256CanonicalByteField at hMem
+  exact encodeNatField_validBytes uint256PayloadBytes value byte hMem
 
 theorem maskedSelect_true
     (whenTrue whenFalse : α) :

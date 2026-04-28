@@ -894,14 +894,14 @@ mod tests {
                 slot_index: 1,
                 leaf: 3,
                 key: Value::Address([0x11; 20]),
-                value: Value::Uint(5),
+                value: Value::uint(5),
             },
             OramBlock {
                 occupied: true,
                 slot_index: 4,
                 leaf: 6,
                 key: Value::Address([0x22; 20]),
-                value: Value::Uint(9),
+                value: Value::uint(9),
             },
         ];
         let mut state =
@@ -935,14 +935,14 @@ mod tests {
                 slot_index: 1,
                 leaf: 3,
                 key: Value::Address([0x11; 20]),
-                value: Value::Uint(5),
+                value: Value::uint(5),
             },
             OramBlock {
                 occupied: true,
                 slot_index: 4,
                 leaf: 6,
                 key: Value::Address([0x22; 20]),
-                value: Value::Uint(9),
+                value: Value::uint(9),
             },
         ];
         let mut state = path_oram_state_with_stash(&spec, original_stash, 0xC10F);
@@ -967,14 +967,14 @@ mod tests {
                 slot_index: 1,
                 leaf: 3,
                 key: Value::Address([0x11; 20]),
-                value: Value::Uint(5),
+                value: Value::uint(5),
             },
             OramBlock {
                 occupied: true,
                 slot_index: 4,
                 leaf: 6,
                 key: Value::Address([0x22; 20]),
-                value: Value::Uint(9),
+                value: Value::uint(9),
             },
         ];
         let mut state = path_oram_state_with_stash(&spec, original_stash, 0xC1A0);
@@ -999,7 +999,7 @@ mod tests {
             .put(
                 &spec,
                 Value::Address([0x11; 20]),
-                Value::Uint(17),
+                Value::uint(17),
                 true,
                 &mut allocator,
                 &mut leaf_coins,
@@ -1045,7 +1045,7 @@ mod tests {
                     slot_index: index % state.parameters.capacity,
                     leaf: index % leaf_count,
                     key: Value::Address([index as u8; 20]),
-                    value: Value::Uint(index as u128),
+                    value: Value::uint(index as u128),
                 })
                 .unwrap();
         }
@@ -1064,7 +1064,7 @@ mod tests {
             .unwrap();
         allocator.finish().unwrap();
 
-        assert_eq!(value, Value::Uint(0));
+        assert_eq!(value, Value::uint(0));
         assert!(overflowed);
     }
 
@@ -1080,7 +1080,7 @@ mod tests {
         old.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x11; 20]),
-            value: Value::Uint(7),
+            value: Value::uint(7),
         };
 
         let mut shadow_allocator = allocator_for_path_oram(&old.parameters);
@@ -1103,7 +1103,7 @@ mod tests {
         new.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x22; 20]),
-            value: Value::Uint(9),
+            value: Value::uint(9),
         };
 
         let mut commit_allocator = allocator_for_path_oram(&new.parameters);
@@ -1158,7 +1158,7 @@ mod tests {
         state.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x11; 20]),
-            value: Value::Uint(7),
+            value: Value::uint(7),
         };
         let mut allocator = allocator_for_path_oram(&state.parameters);
         let mut leaf_coins = PathOramLeafCoinSource::random();
@@ -1173,7 +1173,7 @@ mod tests {
             .unwrap()
             .0;
         allocator.finish().unwrap();
-        assert_eq!(value, Value::Uint(0));
+        assert_eq!(value, Value::uint(0));
     }
 
     #[test]
@@ -1184,7 +1184,7 @@ mod tests {
         state.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x11; 20]),
-            value: Value::Uint(7),
+            value: Value::uint(7),
         };
         let snapshot = map_entries_snapshot(&state.entries);
         let mut allocator = allocator_for_path_oram(&state.parameters);
@@ -1193,7 +1193,7 @@ mod tests {
             .put(
                 &spec,
                 Value::Address([0x11; 20]),
-                Value::Uint(99),
+                Value::uint(99),
                 false,
                 &mut allocator,
                 &mut leaf_coins,
@@ -1218,14 +1218,14 @@ mod tests {
                     slot_index: 0,
                     leaf: 0,
                     key: Value::Address([0x11; 20]),
-                    value: Value::Uint(5),
+                    value: Value::uint(5),
                 },
                 super::OramBlock {
                     occupied: true,
                     slot_index: 0,
                     leaf: 0,
                     key: Value::Address([0x22; 20]),
-                    value: Value::Uint(7),
+                    value: Value::uint(7),
                 },
             ],
         )
@@ -1251,7 +1251,7 @@ mod tests {
                 slot_index: 0,
                 leaf: 0,
                 key: Value::Address([0x11; 20]),
-                value: Value::Uint(5),
+                value: Value::uint(5),
             }],
         )
         .unwrap();
@@ -1275,7 +1275,7 @@ mod tests {
                 slot_index: 0,
                 leaf: 0,
                 key: Value::Address([0x22; 20]),
-                value: Value::Uint(7),
+                value: Value::uint(7),
             }],
         )
         .unwrap();
@@ -1295,17 +1295,17 @@ mod tests {
                 MapEntry {
                     occupied: true,
                     key: Value::Address([0x11; 20]),
-                    value: Value::Uint(1),
+                    value: Value::uint(1),
                 },
                 MapEntry {
                     occupied: true,
                     key: Value::Address([0x22; 20]),
-                    value: Value::Uint(2),
+                    value: Value::uint(2),
                 },
                 MapEntry {
                     occupied: true,
                     key: Value::Address([0x33; 20]),
-                    value: Value::Uint(3),
+                    value: Value::uint(3),
                 },
             ],
             4,
@@ -1321,12 +1321,12 @@ mod tests {
         let mut entry = MapEntry {
             occupied: true,
             key: Value::Address([0x11; 20]),
-            value: Value::Uint(9),
+            value: Value::uint(9),
         };
         entry.wipe_secrets();
         assert!(!entry.occupied);
         assert_eq!(entry.key, Value::Address([0u8; 20]));
-        assert_eq!(entry.value, Value::Uint(0));
+        assert_eq!(entry.value, Value::uint(0));
     }
 
     #[test]
@@ -1336,14 +1336,14 @@ mod tests {
             slot_index: 5,
             leaf: 7,
             key: Value::Address([0x22; 20]),
-            value: Value::Uint(11),
+            value: Value::uint(11),
         };
         block.wipe_secrets();
         assert!(!block.occupied);
         assert_eq!(block.slot_index, 0);
         assert_eq!(block.leaf, 0);
         assert_eq!(block.key, Value::Address([0u8; 20]));
-        assert_eq!(block.value, Value::Uint(0));
+        assert_eq!(block.value, Value::uint(0));
     }
 
     #[test]
@@ -1366,7 +1366,7 @@ mod tests {
                 slot_index: index % parameters.capacity.max(1),
                 leaf: index % parameters.leaf_count().max(1),
                 key: Value::Address([index as u8; 20]),
-                value: Value::Uint(index as u128),
+                value: Value::uint(index as u128),
             })
             .collect::<Vec<_>>();
         let pages = encode_path_metadata_pages(
@@ -1464,21 +1464,21 @@ mod tests {
                 slot_index: 0,
                 leaf: 0,
                 key: Value::Address([0x10; 20]),
-                value: Value::Uint(1),
+                value: Value::uint(1),
             },
             OramBlock {
                 occupied: true,
                 slot_index: 1,
                 leaf: 1,
                 key: Value::Address([0x20; 20]),
-                value: Value::Uint(2),
+                value: Value::uint(2),
             },
             OramBlock {
                 occupied: true,
                 slot_index: 2,
                 leaf: 2,
                 key: Value::Address([0x30; 20]),
-                value: Value::Uint(3),
+                value: Value::uint(3),
             },
         ];
         let mut permuted_stash = test_clone_oram_blocks(&base_stash);
@@ -1487,7 +1487,7 @@ mod tests {
         let mut first = path_oram_state_with_stash(&spec, base_stash, 0xA11CE);
         let mut second = path_oram_state_with_stash(&spec, permuted_stash, 0xA11CE);
         let delete_key = Value::Address([0x10; 20]);
-        let delete_value = Value::Uint(0);
+        let delete_value = Value::uint(0);
 
         let mut first_allocator = allocator_for_path_oram(&first.parameters);
         let mut second_allocator = allocator_for_path_oram(&second.parameters);
@@ -1556,7 +1556,7 @@ mod tests {
             slot_index: 0,
             leaf: 0,
             key: Value::Address([0x44; 20]),
-            value: Value::Uint(9),
+            value: Value::uint(9),
         };
         let position_map = vec![Some(0)]
             .into_iter()
@@ -1597,7 +1597,7 @@ mod tests {
             slot_index: 0,
             leaf: 0,
             key: Value::Address([0x55; 20]),
-            value: Value::Uint(7),
+            value: Value::uint(7),
         };
         let position_map = vec![Some(1)]
             .into_iter()
@@ -1632,7 +1632,7 @@ mod tests {
             slot_index: 0,
             leaf,
             key: Value::Address([0x66; 20]),
-            value: Value::Uint(13),
+            value: Value::uint(13),
         };
         let position_map = vec![Some(leaf)]
             .into_iter()

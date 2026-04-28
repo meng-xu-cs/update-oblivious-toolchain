@@ -262,8 +262,8 @@ mod tests {
             body: vec![Statement::Return {
                 value: Some(Expr::Select {
                     cond: Box::new(Expr::CellGet { object_id: 1 }),
-                    when_true: Box::new(Expr::Literal(Value::Uint(1))),
-                    when_false: Box::new(Expr::Literal(Value::Uint(0))),
+                    when_true: Box::new(Expr::Literal(Value::uint(1))),
+                    when_false: Box::new(Expr::Literal(Value::uint(0))),
                 }),
             }],
             secret_args: vec![0],
@@ -305,9 +305,9 @@ mod tests {
                 Statement::Return {
                     value: Some(Expr::ArrayIndex {
                         base: Box::new(Expr::Literal(Value::Array(
-                            vec![Value::Uint(1)].into_boxed_slice(),
+                            vec![Value::uint(1)].into_boxed_slice(),
                         ))),
-                        index: Box::new(Expr::Literal(Value::Uint(0))),
+                        index: Box::new(Expr::Literal(Value::uint(0))),
                     }),
                 },
             ],
@@ -335,9 +335,9 @@ mod tests {
                     cond: Box::new(Expr::Literal(Value::Bool(true))),
                     when_true: Box::new(Expr::MapGet {
                         object_id: 7,
-                        key: Box::new(Expr::Literal(Value::Uint(1))),
+                        key: Box::new(Expr::Literal(Value::uint(1))),
                     }),
-                    when_false: Box::new(Expr::Literal(Value::Uint(0))),
+                    when_false: Box::new(Expr::Literal(Value::uint(0))),
                 }),
             }],
             secret_args: vec![0],
@@ -359,7 +359,7 @@ mod tests {
             params: vec![],
             return_type: Some(Type::Scalar(crate::ScalarType::Uint(256))),
             body: vec![Statement::Return {
-                value: Some(Expr::Literal(Value::Uint((1u128 << 100) + 7))),
+                value: Some(Expr::Literal(Value::uint((1u128 << 100) + 7))),
             }],
             secret_args: vec![],
             confidential: false,

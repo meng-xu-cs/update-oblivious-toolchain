@@ -68,7 +68,7 @@ mod tests {
         artifact.contract.state[0].confidential = false;
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         let err = instance
-            .call("classify(uint256)", vec![Value::Uint(1)])
+            .call("classify(uint256)", vec![Value::uint(1)])
             .unwrap_err();
         assert!(
             err.to_string().contains("targets raw backend object last"),
@@ -87,11 +87,11 @@ mod tests {
         );
         let mut zero_instance = ContractInstance::deploy(artifact.clone()).unwrap();
         let zero = zero_instance
-            .call("classify(uint256)", vec![Value::Uint(0)])
+            .call("classify(uint256)", vec![Value::uint(0)])
             .unwrap();
         let mut one_instance = ContractInstance::deploy(artifact).unwrap();
         let one = one_instance
-            .call("classify(uint256)", vec![Value::Uint(1)])
+            .call("classify(uint256)", vec![Value::uint(1)])
             .unwrap();
         assert!(zero
             .trace
@@ -126,13 +126,13 @@ mod tests {
         inst0
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(0), token0.clone()],
+                vec![Value::uint(0), token0.clone()],
             )
             .unwrap();
         inst0
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(1), token1.clone()],
+                vec![Value::uint(1), token1.clone()],
             )
             .unwrap();
         let hit = inst0.call("auth(bytes32)", vec![token0]).unwrap();
@@ -141,13 +141,13 @@ mod tests {
         inst1
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+                vec![Value::uint(0), Value::Bytes32([1u8; 32])],
             )
             .unwrap();
         inst1
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+                vec![Value::uint(1), Value::Bytes32([2u8; 32])],
             )
             .unwrap();
         let miss = inst1.call("auth(bytes32)", vec![token_absent]).unwrap();
@@ -179,7 +179,7 @@ mod tests {
         );
         let mut inst = ContractInstance::deploy(artifact).unwrap();
         let result = inst
-            .call("sameSame(uint256)", vec![Value::Uint(5)])
+            .call("sameSame(uint256)", vec![Value::uint(5)])
             .unwrap();
         let peek = inst.call("peek()", vec![]).unwrap();
 
@@ -189,7 +189,7 @@ mod tests {
             .physical_writes
             .iter()
             .all(|event| event.class == WriteClass::Update));
-        assert_eq!(peek.return_value, Some(Value::Uint(1)));
+        assert_eq!(peek.return_value, Some(Value::uint(1)));
     }
 
     #[test]
@@ -207,13 +207,13 @@ mod tests {
         ok_inst
             .call(
                 "deposit(bytes32,uint256)",
-                vec![key.clone(), Value::Uint(5)],
+                vec![key.clone(), Value::uint(5)],
             )
             .unwrap();
         let ok = ok_inst
             .call(
                 "withdraw(bytes32,uint256)",
-                vec![key.clone(), Value::Uint(2)],
+                vec![key.clone(), Value::uint(2)],
             )
             .unwrap();
         let ok_balance = ok_inst
@@ -224,13 +224,13 @@ mod tests {
         abort_inst
             .call(
                 "deposit(bytes32,uint256)",
-                vec![key.clone(), Value::Uint(5)],
+                vec![key.clone(), Value::uint(5)],
             )
             .unwrap();
         let abort = abort_inst
             .call(
                 "withdraw(bytes32,uint256)",
-                vec![key.clone(), Value::Uint(9)],
+                vec![key.clone(), Value::uint(9)],
             )
             .unwrap();
         let abort_balance = abort_inst.call("balanceOf(bytes32)", vec![key]).unwrap();
@@ -241,7 +241,7 @@ mod tests {
             ok.trace.hashes().unwrap().physical_access_trace_hash,
             abort.trace.hashes().unwrap().physical_access_trace_hash
         );
-        assert_eq!(ok.return_value, Some(Value::Uint(2)));
+        assert_eq!(ok.return_value, Some(Value::uint(2)));
         assert_eq!(abort.return_value, None);
         let ok_outcome = ok.trace.theorem_trace.public_outcome.as_ref().unwrap();
         let abort_outcome = abort.trace.theorem_trace.public_outcome.as_ref().unwrap();
@@ -263,8 +263,8 @@ mod tests {
             uo_core::StatusPolicy::Declassified
         );
         assert_eq!(abort_outcome.return_payload, None);
-        assert_eq!(ok_balance.return_value, Some(Value::Uint(3)));
-        assert_eq!(abort_balance.return_value, Some(Value::Uint(5)));
+        assert_eq!(ok_balance.return_value, Some(Value::uint(3)));
+        assert_eq!(abort_balance.return_value, Some(Value::uint(5)));
     }
 
     #[test]
@@ -279,19 +279,19 @@ mod tests {
         let key = Value::Bytes32([4u8; 32]);
 
         let mut inst = ContractInstance::deploy(artifact).unwrap();
-        inst.call("upsert(bytes32,uint256)", vec![key.clone(), Value::Uint(9)])
+        inst.call("upsert(bytes32,uint256)", vec![key.clone(), Value::uint(9)])
             .unwrap();
         let clear = inst
             .call(
                 "clearIfMatch(bytes32,uint256)",
-                vec![key.clone(), Value::Uint(9)],
+                vec![key.clone(), Value::uint(9)],
             )
             .unwrap();
         let read = inst.call("read(bytes32)", vec![key]).unwrap();
 
         assert_eq!(clear.trace.gas_used, 12288);
-        assert_eq!(clear.return_value, Some(Value::Uint(1)));
-        assert_eq!(read.return_value, Some(Value::Uint(0)));
+        assert_eq!(clear.return_value, Some(Value::uint(1)));
+        assert_eq!(read.return_value, Some(Value::uint(0)));
     }
 
     #[test]
@@ -308,17 +308,17 @@ mod tests {
         let mut inst = ContractInstance::deploy(artifact).unwrap();
         inst.call(
             "mint(address,uint256)",
-            vec![alice.clone(), Value::Uint(10)],
+            vec![alice.clone(), Value::uint(10)],
         )
         .unwrap();
         inst.call(
             "approve(address,address,uint256)",
-            vec![alice.clone(), bob.clone(), Value::Uint(4)],
+            vec![alice.clone(), bob.clone(), Value::uint(4)],
         )
         .unwrap();
         inst.call(
             "transferFrom(address,address,address,uint256)",
-            vec![alice.clone(), bob.clone(), carol.clone(), Value::Uint(3)],
+            vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(3)],
         )
         .unwrap();
 
@@ -330,9 +330,9 @@ mod tests {
                 vec![Value::Address([0x11; 20]), bob],
             )
             .unwrap();
-        assert_eq!(alice_balance.return_value, Some(Value::Uint(7)));
-        assert_eq!(carol_balance.return_value, Some(Value::Uint(3)));
-        assert_eq!(allowance.return_value, Some(Value::Uint(1)));
+        assert_eq!(alice_balance.return_value, Some(Value::uint(7)));
+        assert_eq!(carol_balance.return_value, Some(Value::uint(3)));
+        assert_eq!(allowance.return_value, Some(Value::uint(1)));
     }
 
     #[test]
@@ -348,14 +348,14 @@ mod tests {
         let first_trace = first
             .call(
                 "deposit(bytes32,uint256)",
-                vec![Value::Bytes32([1u8; 32]), Value::Uint(3)],
+                vec![Value::Bytes32([1u8; 32]), Value::uint(3)],
             )
             .unwrap();
         let mut second = ContractInstance::deploy(artifact).unwrap();
         let second_trace = second
             .call(
                 "deposit(bytes32,uint256)",
-                vec![Value::Bytes32([9u8; 32]), Value::Uint(3)],
+                vec![Value::Bytes32([9u8; 32]), Value::uint(3)],
             )
             .unwrap();
         assert_eq!(
@@ -389,7 +389,7 @@ mod tests {
         let call = instance
             .call(
                 "deposit(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(3)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(3)],
             )
             .unwrap();
 
@@ -434,7 +434,7 @@ mod tests {
                 vec![
                     Value::Address([0x11; 20]),
                     Value::Address([0x21; 20]),
-                    Value::Uint(3),
+                    Value::uint(3),
                 ],
             )
             .unwrap();
@@ -445,7 +445,7 @@ mod tests {
                 vec![
                     Value::Address([0x31; 20]),
                     Value::Address([0x41; 20]),
-                    Value::Uint(3),
+                    Value::uint(3),
                 ],
             )
             .unwrap();
@@ -470,14 +470,14 @@ mod tests {
         let first_trace = first
             .call(
                 "deposit(bytes32,uint256)",
-                vec![Value::Bytes32([1u8; 32]), Value::Uint(3)],
+                vec![Value::Bytes32([1u8; 32]), Value::uint(3)],
             )
             .unwrap();
         let mut second = ContractInstance::deploy(artifact).unwrap();
         let second_trace = second
             .call(
                 "deposit(bytes32,uint256)",
-                vec![Value::Bytes32([9u8; 32]), Value::Uint(3)],
+                vec![Value::Bytes32([9u8; 32]), Value::uint(3)],
             )
             .unwrap();
         assert_eq!(
@@ -524,14 +524,14 @@ mod tests {
         let first_trace = first
             .call(
                 "put(bytes32,uint256)",
-                vec![Value::Bytes32([1u8; 32]), Value::Uint(7)],
+                vec![Value::Bytes32([1u8; 32]), Value::uint(7)],
             )
             .unwrap();
         let mut second = ContractInstance::deploy(artifact).unwrap();
         let second_trace = second
             .call(
                 "put(bytes32,uint256)",
-                vec![Value::Bytes32([9u8; 32]), Value::Uint(7)],
+                vec![Value::Bytes32([9u8; 32]), Value::uint(7)],
             )
             .unwrap();
         let first_witness = first_trace.trace.runtime_refinement_witness().unwrap();
@@ -578,14 +578,14 @@ mod tests {
         let first_trace = first
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([1u8; 32]), Value::Uint(7)],
+                vec![Value::Bytes32([1u8; 32]), Value::uint(7)],
             )
             .unwrap();
         let mut second = ContractInstance::deploy(artifact).unwrap();
         let second_trace = second
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([9u8; 32]), Value::Uint(7)],
+                vec![Value::Bytes32([9u8; 32]), Value::uint(7)],
             )
             .unwrap();
         let first_witness = first_trace.trace.runtime_refinement_witness().unwrap();
@@ -647,7 +647,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let witness = result.trace.runtime_refinement_witness().unwrap();
@@ -676,13 +676,13 @@ mod tests {
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+                vec![Value::uint(0), Value::Bytes32([1u8; 32])],
             )
             .unwrap();
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+                vec![Value::uint(1), Value::Bytes32([2u8; 32])],
             )
             .unwrap();
         let result = instance
@@ -753,13 +753,13 @@ mod tests {
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+                vec![Value::uint(0), Value::Bytes32([1u8; 32])],
             )
             .unwrap();
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+                vec![Value::uint(1), Value::Bytes32([2u8; 32])],
             )
             .unwrap();
         let result = instance
@@ -806,13 +806,13 @@ mod tests {
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+                vec![Value::uint(0), Value::Bytes32([1u8; 32])],
             )
             .unwrap();
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+                vec![Value::uint(1), Value::Bytes32([2u8; 32])],
             )
             .unwrap();
         let result = instance
@@ -855,13 +855,13 @@ mod tests {
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+                vec![Value::uint(0), Value::Bytes32([1u8; 32])],
             )
             .unwrap();
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+                vec![Value::uint(1), Value::Bytes32([2u8; 32])],
             )
             .unwrap();
         let result = instance
@@ -903,13 +903,13 @@ mod tests {
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(0), Value::Bytes32([1u8; 32])],
+                vec![Value::uint(0), Value::Bytes32([1u8; 32])],
             )
             .unwrap();
         instance
             .call(
                 "seed(uint256,bytes32)",
-                vec![Value::Uint(1), Value::Bytes32([2u8; 32])],
+                vec![Value::uint(1), Value::Bytes32([2u8; 32])],
             )
             .unwrap();
         let result = instance
@@ -950,7 +950,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let kernel_witness = result.trace.exact_runtime_kernel_witness().unwrap();
@@ -995,7 +995,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let bundle = result
@@ -1027,7 +1027,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let bundle = result
@@ -1070,7 +1070,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let bundle_family = result
@@ -1120,7 +1120,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
 
@@ -1193,7 +1193,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
 
@@ -1255,7 +1255,7 @@ mod tests {
         let err = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap_err();
         let err = err.to_string();
@@ -1280,7 +1280,7 @@ mod tests {
         let result = instance
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let bundle = result.trace.runtime_trusted_kernel_bundle().unwrap();
@@ -1372,14 +1372,14 @@ mod tests {
         let first_result = first
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let mut second = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
         let second_result = second
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
 
@@ -1409,7 +1409,7 @@ mod tests {
         let baseline_result = baseline
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let baseline_witness = baseline_result.trace.runtime_refinement_witness().unwrap();
@@ -1428,7 +1428,7 @@ mod tests {
         let injected_result = injected
             .call_with_path_oram_fresh_coins(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
                 fresh_coin_plan,
             )
             .unwrap();
@@ -1458,7 +1458,7 @@ mod tests {
         let baseline_result = baseline
             .call(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
             )
             .unwrap();
         let baseline_witness = baseline_result.trace.runtime_refinement_witness().unwrap();
@@ -1475,7 +1475,7 @@ mod tests {
         let err = injected
             .call_with_path_oram_fresh_coins(
                 "add(bytes32,uint256)",
-                vec![Value::Bytes32([7u8; 32]), Value::Uint(5)],
+                vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
                 short_plan,
             )
             .unwrap_err();
@@ -1515,19 +1515,19 @@ mod tests {
         instance
             .call(
                 "mint(address,uint256)",
-                vec![owner.clone(), Value::Uint(10)],
+                vec![owner.clone(), Value::uint(10)],
             )
             .unwrap();
         instance
             .call(
                 "approve(address,address,uint256)",
-                vec![owner.clone(), spender.clone(), Value::Uint(6)],
+                vec![owner.clone(), spender.clone(), Value::uint(6)],
             )
             .unwrap();
         let result = instance
             .call(
                 "transferFrom(address,address,address,uint256)",
-                vec![owner.clone(), spender.clone(), recipient, Value::Uint(3)],
+                vec![owner.clone(), spender.clone(), recipient, Value::uint(3)],
             )
             .unwrap();
         let witness = result.trace.runtime_refinement_witness().unwrap();
@@ -1595,7 +1595,7 @@ mod tests {
         let err = instance
             .call(
                 "put(bytes32,uint256)",
-                vec![Value::Bytes32([1u8; 32]), Value::Uint(7)],
+                vec![Value::Bytes32([1u8; 32]), Value::uint(7)],
             )
             .unwrap_err();
         assert!(err
@@ -1626,7 +1626,7 @@ mod tests {
 
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         let err = instance
-            .call("classify(uint256)", vec![Value::Uint(1)])
+            .call("classify(uint256)", vec![Value::uint(1)])
             .unwrap_err();
         assert!(err
             .to_string()
@@ -1653,7 +1653,7 @@ mod tests {
 
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         let err = instance
-            .call("classify(uint256)", vec![Value::Uint(1)])
+            .call("classify(uint256)", vec![Value::uint(1)])
             .unwrap_err();
         assert!(err
             .to_string()
@@ -1680,7 +1680,7 @@ mod tests {
 
         let mut instance = ContractInstance::deploy(artifact).unwrap();
         let err = instance
-            .call("classify(uint256)", vec![Value::Uint(1)])
+            .call("classify(uint256)", vec![Value::uint(1)])
             .unwrap_err();
         assert!(err
             .to_string()

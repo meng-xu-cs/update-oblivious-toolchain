@@ -28,8 +28,6 @@ The Path ORAM theorem/provenance route is summarized in
 
 ## Remaining Caveats
 
-- Accepted `uint256` syntax is executed in the prototype's bounded `u128`
-  domain.
 - Parser-level preprocessing remains trusted until a raw-source witness
   relation is added.
 - Runtime Keccak uses `tiny_keccak::Keccak::v256()` over canonical bytes; Lean

@@ -237,12 +237,32 @@ private def taggedPayload? (json : Json) (tag : String) : Option Json :=
       | _ => none
   | _ => none
 
+private def uint256Modulus : Nat := 2 ^ 256
+
+private def uint256 (value : Nat) : Nat :=
+  value % uint256Modulus
+
+private def uint256Sub (lhs rhs : Nat) : Nat :=
+  uint256 (uint256 lhs + uint256Modulus - uint256 rhs)
+
+private def uint256Literal? (value : Nat) : Option Nat :=
+  if value < uint256Modulus then
+    some value
+  else
+    none
+
 private def asUintLiteral? (json : Json) : Option Nat :=
   match taggedPayload? json "Uint" with
   | some payload =>
-      match fromJson? payload with
-      | .ok value => some value
-      | .error _ => none
+      match (fromJson? payload : Except String Nat) with
+      | .ok value => uint256Literal? value
+      | .error _ =>
+          match (fromJson? payload : Except String String) with
+          | .ok value =>
+              match value.toNat? with
+              | some parsed => uint256Literal? parsed
+              | none => none
+          | .error _ => none
   | none => none
 
 private def asBoolLiteral? (json : Json) : Option Nat :=
@@ -524,26 +544,6 @@ private def parseImportedContractViewAndRawContractStringFromArtifactJson
   let contractView ← parseImportedContractViewFromRawContractJson contractJson
   pure (contractJson.compress, contractView)
 
-private def checkedAddU128? (lhs rhs : Nat) : Option Nat :=
-  let sum := lhs + rhs
-  if sum < 2^128 then
-    some sum
-  else
-    none
-
-private def checkedSubU128? (lhs rhs : Nat) : Option Nat :=
-  if rhs ≤ lhs then
-    some (lhs - rhs)
-  else
-    none
-
-private def checkedMulU128? (lhs rhs : Nat) : Option Nat :=
-  let product := lhs * rhs
-  if product < 2^128 then
-    some product
-  else
-    none
-
 private def lookupLoopVar
   (name : String)
   (loopEnv : List (String × Nat)) : Option Nat :=
@@ -575,11 +575,11 @@ private partial def evalLoopBoundJson
                       match (fromJson? opJson : Except String String) with
                       | .ok "Neg" =>
                           match evalLoopBoundJson innerExpr loopEnv with
-                          | some value => checkedSubU128? 0 value
+                          | some value => some (uint256Sub 0 value)
                           | none => none
                       | .ok "Not" =>
                           match evalLoopBoundJson innerExpr loopEnv with
-                          | some value => some (if value == 0 then 1 else 0)
+                          | some value => some (if uint256 value == 0 then 1 else 0)
                           | none => none
                       | _ => none
                   | .error _ => none
@@ -596,69 +596,73 @@ private partial def evalLoopBoundJson
                               match (fromJson? opJson : Except String String) with
                               | .ok "Add" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => checkedAddU128? lhs rhs
+                                  | some lhs, some rhs => some (uint256 (lhs + rhs))
                                   | _, _ => none
                               | .ok "Sub" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => checkedSubU128? lhs rhs
+                                  | some lhs, some rhs => some (uint256Sub lhs rhs)
                                   | _, _ => none
                               | .ok "Mul" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => checkedMulU128? lhs rhs
+                                  | some lhs, some rhs => some (uint256 (lhs * rhs))
                                   | _, _ => none
                               | .ok "Div" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => if rhs == 0 then none else some (lhs / rhs)
+                                  | some lhs, some rhs =>
+                                      let divisor := uint256 rhs
+                                      if divisor == 0 then some 0 else some (uint256 lhs / divisor)
                                   | _, _ => none
                               | .ok "Mod" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => if rhs == 0 then none else some (lhs % rhs)
+                                  | some lhs, some rhs =>
+                                      let divisor := uint256 rhs
+                                      if divisor == 0 then some 0 else some (uint256 lhs % divisor)
                                   | _, _ => none
                               | .ok "BitAnd" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (Nat.land lhs rhs)
+                                  | some lhs, some rhs => some (uint256 (Nat.land (uint256 lhs) (uint256 rhs)))
                                   | _, _ => none
                               | .ok "BitOr" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (Nat.lor lhs rhs)
+                                  | some lhs, some rhs => some (uint256 (Nat.lor (uint256 lhs) (uint256 rhs)))
                                   | _, _ => none
                               | .ok "BitXor" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (Nat.xor lhs rhs)
+                                  | some lhs, some rhs => some (uint256 (Nat.xor (uint256 lhs) (uint256 rhs)))
                                   | _, _ => none
                               | .ok "Eq" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (if lhs == rhs then 1 else 0)
+                                  | some lhs, some rhs => some (if uint256 lhs == uint256 rhs then 1 else 0)
                                   | _, _ => none
                               | .ok "Neq" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (if lhs != rhs then 1 else 0)
+                                  | some lhs, some rhs => some (if uint256 lhs != uint256 rhs then 1 else 0)
                                   | _, _ => none
                               | .ok "Lt" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (if lhs < rhs then 1 else 0)
+                                  | some lhs, some rhs => some (if uint256 lhs < uint256 rhs then 1 else 0)
                                   | _, _ => none
                               | .ok "Lte" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (if lhs ≤ rhs then 1 else 0)
+                                  | some lhs, some rhs => some (if uint256 lhs ≤ uint256 rhs then 1 else 0)
                                   | _, _ => none
                               | .ok "Gt" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (if lhs > rhs then 1 else 0)
+                                  | some lhs, some rhs => some (if uint256 lhs > uint256 rhs then 1 else 0)
                                   | _, _ => none
                               | .ok "Gte" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
-                                  | some lhs, some rhs => some (if lhs ≥ rhs then 1 else 0)
+                                  | some lhs, some rhs => some (if uint256 lhs ≥ uint256 rhs then 1 else 0)
                                   | _, _ => none
                               | .ok "And" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
                                   | some lhs, some rhs =>
-                                      some (if lhs != 0 && rhs != 0 then 1 else 0)
+                                      some (if uint256 lhs != 0 && uint256 rhs != 0 then 1 else 0)
                                   | _, _ => none
                               | .ok "Or" =>
                                   match evalLoopBoundJson lhsExpr loopEnv, evalLoopBoundJson rhsExpr loopEnv with
                                   | some lhs, some rhs =>
-                                      some (if lhs != 0 || rhs != 0 then 1 else 0)
+                                      some (if uint256 lhs != 0 || uint256 rhs != 0 then 1 else 0)
                                   | _, _ => none
                               | _ => none
                           | .error _ => none
@@ -675,7 +679,7 @@ private partial def evalLoopBoundJson
                               | .ok whenFalseExpr =>
                                   match evalLoopBoundJson condExpr loopEnv with
                                   | some cond =>
-                                      if cond != 0 then
+                                      if uint256 cond != 0 then
                                         evalLoopBoundJson whenTrueExpr loopEnv
                                       else
                                         evalLoopBoundJson whenFalseExpr loopEnv

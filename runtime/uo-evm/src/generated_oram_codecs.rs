@@ -56,8 +56,8 @@ impl FixedStash {
             occupied: false,
             slot_index: 0,
             leaf: 0,
-            key: Value::Uint(0),
-            value: Value::Uint(0),
+            key: Value::uint(0),
+            value: Value::uint(0),
         };
         Self {
             empty_block,
@@ -503,7 +503,7 @@ impl OramState {
                 directory_page_entries: 0,
                 directory_page_bytes: 0,
             },
-            empty_entry: MapEntry::new(false, Value::Uint(0), Value::Uint(0)),
+            empty_entry: MapEntry::new(false, Value::uint(0), Value::uint(0)),
             entries: Box::<[MapEntry]>::default(),
             position_map: Box::<[MaskedUsizeOption]>::default(),
             stash: FixedStash::placeholder(),

@@ -2343,39 +2343,26 @@ theorem
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
 
 theorem
-  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldLength
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsUint256CanonicalByteFieldLength
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
   (value : Nat) :
-  (RuntimeValueOpsSemantics.u128CanonicalByteField value).length =
+  (RuntimeValueOpsSemantics.uint256CanonicalByteField value).length =
     RuntimeValueOpsSemantics.uintCanonicalBytes := by
   exact
-    RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldLength
+    RuntimePaperNativeKernelAssumptions.valueOpsUint256CanonicalByteFieldLength
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
       value
 
 theorem
-  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldHighPrefixZero
-  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
-  (hValid : boundary.Valid)
-  (value : Nat) :
-  (RuntimeValueOpsSemantics.u128CanonicalByteField value).take
-      RuntimeValueOpsSemantics.u128HighZeroBytes =
-    List.replicate RuntimeValueOpsSemantics.u128HighZeroBytes 0 := by
-  exact
-    RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldHighPrefixZero
-      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      value
-
-theorem
-  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldValidBytes
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsUint256CanonicalByteFieldValidBytes
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
   (value : Nat) :
   RuntimeValueOpsSemantics.ValidByteField
-    (RuntimeValueOpsSemantics.u128CanonicalByteField value) := by
+    (RuntimeValueOpsSemantics.uint256CanonicalByteField value) := by
   exact
-    RuntimePaperNativeKernelAssumptions.valueOpsU128CanonicalByteFieldValidBytes
+    RuntimePaperNativeKernelAssumptions.valueOpsUint256CanonicalByteFieldValidBytes
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
       value
 

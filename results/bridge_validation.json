@@ -575956,9 +575956,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 2036,
         "opcode_trace_json_bytes": 22,
@@ -576566,9 +576565,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 2036,
         "opcode_trace_json_bytes": 22,
@@ -577366,9 +577364,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 4734,
         "opcode_trace_json_bytes": 67,
@@ -578184,9 +578181,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 4734,
         "opcode_trace_json_bytes": 67,
@@ -578974,9 +578970,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 4010,
         "opcode_trace_json_bytes": 11,
@@ -579746,9 +579741,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 4010,
         "opcode_trace_json_bytes": 11,
@@ -580590,9 +580584,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 5219,
         "opcode_trace_json_bytes": 32,
@@ -581450,9 +581443,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 5219,
         "opcode_trace_json_bytes": 32,
@@ -582464,9 +582456,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 6768,
         "opcode_trace_json_bytes": 21,
@@ -583467,9 +583458,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 6768,
         "opcode_trace_json_bytes": 21,
@@ -584664,9 +584654,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 9130,
         "opcode_trace_json_bytes": 11,
@@ -585856,9 +585845,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 9130,
         "opcode_trace_json_bytes": 11,
@@ -587250,9 +587238,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 11653,
         "opcode_trace_json_bytes": 21,
@@ -588646,9 +588633,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 11653,
         "opcode_trace_json_bytes": 21,
@@ -591772,9 +591758,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 32971,
         "opcode_trace_json_bytes": 32,
@@ -600344,9 +600329,8 @@
           "value_ops_masked_select_bool_true_theorem_checked": true,
           "value_ops_masked_select_bytes_length_of_equal_theorem_checked": true,
           "value_ops_scalar_canonical_lengths_public_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_high_prefix_zero_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_length_theorem_checked": true,
-          "value_ops_u128_canonical_byte_field_valid_bytes_theorem_checked": true
+          "value_ops_uint256_canonical_byte_field_length_theorem_checked": true,
+          "value_ops_uint256_canonical_byte_field_valid_bytes_theorem_checked": true
         },
         "machine_finish_witness_json_bytes": 99212,
         "opcode_trace_json_bytes": 92,

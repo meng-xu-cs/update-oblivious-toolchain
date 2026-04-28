@@ -668,7 +668,7 @@ Unsupported / rejected:
 
 Prototype assumptions:
 
-- `uint256` syntax is accepted, but the current executable prototype evaluates arithmetic in a bounded `u128` domain for the benchmark suite.
+- `uint256` arithmetic is evaluated modulo `2^256`, including division and modulo by zero returning zero to match EVM unsigned integer behavior.
 - The ORAM backend is an instrumented Path-ORAM-style runtime prototype with fixed public controller shape and rerandomized bucket/block rewrites; it is reported as computational-UO only.
 - The guarantees are with respect to the abstract/runtime traces emitted by this artifact, including the normalized physical read/write schedules captured by the runtime, not every downstream machine-code or microarchitectural observer.
 

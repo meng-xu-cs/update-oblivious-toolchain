@@ -58,10 +58,10 @@ Sidecar metadata requirements:
 
 Execution-model note:
 
-- accepted `uint256` syntax is executed by the current prototype in a bounded
-  `u128` domain; the Lean IR evaluator normalizes unsigned arithmetic,
-  comparisons, negation, and div/mod-by-zero to match the Rust runtime's
-  `u128` behavior rather than Solidity's full `uint256` arithmetic
+- accepted `uint256` syntax is executed in the EVM unsigned 256-bit domain;
+  Rust runtime values, canonical fixed-size encodings, compiler literals, and
+  the Lean IR evaluator all normalize arithmetic modulo `2^256`, with division
+  or modulo by zero returning zero
 - `keccak256(abi.encodePacked(...))` is supported by the runtime with real
   Keccak over canonical fixed-size bytes, but the current Lean source/IR/kernel
   preservation proofs use a deterministic mock hash. They prove preservation

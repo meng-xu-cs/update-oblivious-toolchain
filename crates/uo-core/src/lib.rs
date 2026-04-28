@@ -114,4 +114,4 @@ pub use translation_validation::{
     ProofRelevantStateObjectView, ProofRelevantTranslationBundle,
 };
 pub use trusted_kernel::{RuntimeTrustedKernelSlotBundle, RuntimeTrustedKernelSlotBundleError};
-pub use types::{FixedBoxBuilder, ScalarType, StructField, Type, Value};
+pub use types::{FixedBoxBuilder, ScalarType, StructField, Type, Uint256, Value};

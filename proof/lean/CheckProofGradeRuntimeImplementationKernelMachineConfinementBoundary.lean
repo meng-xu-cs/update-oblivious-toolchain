@@ -196,35 +196,24 @@ theorem importedBoundaryPaperNativeValueOpsScalarCanonicalLengthsPublic
     importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsScalarCanonicalLengthsPublic
       hValid
 
-theorem importedBoundaryPaperNativeValueOpsU128CanonicalByteFieldLength
+theorem importedBoundaryPaperNativeValueOpsUint256CanonicalByteFieldLength
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
   (value : Nat) :
-  (RuntimeValueOpsSemantics.u128CanonicalByteField value).length =
+  (RuntimeValueOpsSemantics.uint256CanonicalByteField value).length =
     RuntimeValueOpsSemantics.uintCanonicalBytes := by
   exact
-    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldLength
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsUint256CanonicalByteFieldLength
       hValid value
 
-theorem importedBoundaryPaperNativeValueOpsU128CanonicalByteFieldHighPrefixZero
-  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
-  (hValid : boundary.Valid)
-  (value : Nat) :
-  (RuntimeValueOpsSemantics.u128CanonicalByteField value).take
-      RuntimeValueOpsSemantics.u128HighZeroBytes =
-    List.replicate RuntimeValueOpsSemantics.u128HighZeroBytes 0 := by
-  exact
-    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldHighPrefixZero
-      hValid value
-
-theorem importedBoundaryPaperNativeValueOpsU128CanonicalByteFieldValidBytes
+theorem importedBoundaryPaperNativeValueOpsUint256CanonicalByteFieldValidBytes
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
   (value : Nat) :
   RuntimeValueOpsSemantics.ValidByteField
-    (RuntimeValueOpsSemantics.u128CanonicalByteField value) := by
+    (RuntimeValueOpsSemantics.uint256CanonicalByteField value) := by
   exact
-    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsU128CanonicalByteFieldValidBytes
+    importedRuntimeImplementationKernelMachineConfinementBoundary_valid_valueOpsUint256CanonicalByteFieldValidBytes
       hValid value
 
 theorem importedBoundaryPaperNativeValueOpsMaskedSelectBoolTrue

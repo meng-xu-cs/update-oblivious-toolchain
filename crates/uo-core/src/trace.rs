@@ -8460,11 +8460,11 @@ mod tests {
             cond: Box::new(Expr::Var("cond".into())),
             when_true: Box::new(Expr::ArrayIndex {
                 base: Box::new(Expr::Literal(Value::Array(
-                    vec![Value::Uint(1)].into_boxed_slice(),
+                    vec![Value::uint(1)].into_boxed_slice(),
                 ))),
-                index: Box::new(Expr::Literal(Value::Uint(0))),
+                index: Box::new(Expr::Literal(Value::uint(0))),
             }),
-            when_false: Box::new(Expr::Literal(Value::Uint(0))),
+            when_false: Box::new(Expr::Literal(Value::uint(0))),
         };
         let err =
             collect_kernel_steps_from_expr(&expr, "auth(bytes32)", &mut Vec::new()).unwrap_err();
@@ -8480,9 +8480,9 @@ mod tests {
     fn kernel_witness_validation_rejects_confidential_array_index() {
         let expr = Expr::ArrayIndex {
             base: Box::new(Expr::Literal(Value::Array(
-                vec![Value::Uint(1)].into_boxed_slice(),
+                vec![Value::uint(1)].into_boxed_slice(),
             ))),
-            index: Box::new(Expr::Literal(Value::Uint(0))),
+            index: Box::new(Expr::Literal(Value::uint(0))),
         };
         let err =
             collect_kernel_steps_from_expr(&expr, "auth(bytes32)", &mut Vec::new()).unwrap_err();

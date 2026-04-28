@@ -4,7 +4,7 @@ use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, St
 use uo_core::manifest::PATH_ORAM_SCHEME;
 use uo_core::{
     lower_confidential_kernel_statements, CompiledArtifact, ContractMetadata, OramManifest,
-    ProofRelevantTranslationBundle, StateObjectManifest, Type,
+    ProofRelevantTranslationBundle, StateObjectManifest, Type, Uint256,
 };
 
 #[cfg(test)]
@@ -421,7 +421,7 @@ fn count_body(statements: &[Statement]) -> CountSummary {
 
 fn count_body_with_env(
     statements: &[Statement],
-    loop_env: &BTreeMap<String, u128>,
+    loop_env: &BTreeMap<String, usize>,
 ) -> CountSummary {
     let mut counts = CountSummary::default();
     for statement in statements {
@@ -746,7 +746,7 @@ fn count_oram_accesses(
 fn collect_oram_statement_accesses(
     statement: &Statement,
     state: &[StateObject],
-    loop_env: &BTreeMap<String, u128>,
+    loop_env: &BTreeMap<String, usize>,
     counts: &mut BTreeMap<u32, usize>,
 ) -> Result<()> {
     match statement {
@@ -857,39 +857,51 @@ fn body_contains_oram_accesses(statements: &[Statement], state: &[StateObject]) 
     Ok(false)
 }
 
-fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, u128>) -> Option<u128> {
+fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Option<usize> {
+    eval_loop_bound_uint(expr, loop_env)?.checked_to_usize()
+}
+
+fn eval_loop_bound_uint(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Option<Uint256> {
     match expr {
         Expr::Literal(uo_core::Value::Uint(value)) => Some(*value),
-        Expr::Literal(uo_core::Value::Bool(value)) => Some(u128::from(*value)),
-        Expr::Var(name) => loop_env.get(name).copied(),
+        Expr::Literal(uo_core::Value::Bool(value)) => Some(Uint256::from_bool(*value)),
+        Expr::Var(name) => loop_env.get(name).copied().map(Uint256::from),
         Expr::Unary {
             op: uo_core::UnaryOp::Neg,
             expr,
-        } => eval_loop_bound(expr, loop_env).and_then(|value| 0u128.checked_sub(value)),
+        } => eval_loop_bound_uint(expr, loop_env).map(Uint256::wrapping_neg),
         Expr::Unary {
             op: uo_core::UnaryOp::Not,
             expr,
-        } => eval_loop_bound(expr, loop_env).map(|value| u128::from(value == 0)),
+        } => eval_loop_bound_uint(expr, loop_env).map(|value| Uint256::from_bool(value.is_zero())),
         Expr::Binary { op, lhs, rhs } => {
-            let lhs = eval_loop_bound(lhs, loop_env)?;
-            let rhs = eval_loop_bound(rhs, loop_env)?;
+            let lhs = eval_loop_bound_uint(lhs, loop_env)?;
+            let rhs = eval_loop_bound_uint(rhs, loop_env)?;
             match op {
-                uo_core::BinaryOp::Add => lhs.checked_add(rhs),
-                uo_core::BinaryOp::Sub => lhs.checked_sub(rhs),
-                uo_core::BinaryOp::Mul => lhs.checked_mul(rhs),
-                uo_core::BinaryOp::Div => (rhs != 0).then(|| lhs / rhs),
-                uo_core::BinaryOp::Mod => (rhs != 0).then(|| lhs % rhs),
-                uo_core::BinaryOp::BitAnd => Some(lhs & rhs),
-                uo_core::BinaryOp::BitOr => Some(lhs | rhs),
-                uo_core::BinaryOp::BitXor => Some(lhs ^ rhs),
-                uo_core::BinaryOp::Eq => Some(u128::from(lhs == rhs)),
-                uo_core::BinaryOp::Neq => Some(u128::from(lhs != rhs)),
-                uo_core::BinaryOp::Lt => Some(u128::from(lhs < rhs)),
-                uo_core::BinaryOp::Lte => Some(u128::from(lhs <= rhs)),
-                uo_core::BinaryOp::Gt => Some(u128::from(lhs > rhs)),
-                uo_core::BinaryOp::Gte => Some(u128::from(lhs >= rhs)),
-                uo_core::BinaryOp::And => Some(u128::from(lhs != 0 && rhs != 0)),
-                uo_core::BinaryOp::Or => Some(u128::from(lhs != 0 || rhs != 0)),
+                uo_core::BinaryOp::Add => Some(lhs.wrapping_add(rhs)),
+                uo_core::BinaryOp::Sub => Some(lhs.wrapping_sub(rhs)),
+                uo_core::BinaryOp::Mul => Some(lhs.wrapping_mul(rhs)),
+                uo_core::BinaryOp::Div => Some(if rhs.is_zero() {
+                    Uint256::ZERO
+                } else {
+                    lhs.div_rem(rhs).0
+                }),
+                uo_core::BinaryOp::Mod => Some(if rhs.is_zero() {
+                    Uint256::ZERO
+                } else {
+                    lhs.div_rem(rhs).1
+                }),
+                uo_core::BinaryOp::BitAnd => Some(lhs.bitand(rhs)),
+                uo_core::BinaryOp::BitOr => Some(lhs.bitor(rhs)),
+                uo_core::BinaryOp::BitXor => Some(lhs.bitxor(rhs)),
+                uo_core::BinaryOp::Eq => Some(Uint256::from_bool(lhs == rhs)),
+                uo_core::BinaryOp::Neq => Some(Uint256::from_bool(lhs != rhs)),
+                uo_core::BinaryOp::Lt => Some(Uint256::from_bool(lhs < rhs)),
+                uo_core::BinaryOp::Lte => Some(Uint256::from_bool(lhs <= rhs)),
+                uo_core::BinaryOp::Gt => Some(Uint256::from_bool(lhs > rhs)),
+                uo_core::BinaryOp::Gte => Some(Uint256::from_bool(lhs >= rhs)),
+                uo_core::BinaryOp::And => Some(Uint256::from_bool(lhs.as_bool() && rhs.as_bool())),
+                uo_core::BinaryOp::Or => Some(Uint256::from_bool(lhs.as_bool() || rhs.as_bool())),
             }
         }
         Expr::Select {
@@ -897,11 +909,11 @@ fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, u128>) -> Option<u12
             when_true,
             when_false,
         } => {
-            let cond = eval_loop_bound(cond, loop_env)?;
-            if cond != 0 {
-                eval_loop_bound(when_true, loop_env)
+            let cond = eval_loop_bound_uint(cond, loop_env)?;
+            if cond.as_bool() {
+                eval_loop_bound_uint(when_true, loop_env)
             } else {
-                eval_loop_bound(when_false, loop_env)
+                eval_loop_bound_uint(when_false, loop_env)
             }
         }
         Expr::CellGet { .. }
@@ -1099,11 +1111,11 @@ bounds:
             cond: Box::new(Expr::Var("cond".into())),
             when_true: Box::new(Expr::ArrayIndex {
                 base: Box::new(Expr::Literal(Value::Array(
-                    vec![Value::Uint(1)].into_boxed_slice(),
+                    vec![Value::uint(1)].into_boxed_slice(),
                 ))),
-                index: Box::new(Expr::Literal(Value::Uint(0))),
+                index: Box::new(Expr::Literal(Value::uint(0))),
             }),
-            when_false: Box::new(Expr::Literal(Value::Uint(0))),
+            when_false: Box::new(Expr::Literal(Value::uint(0))),
         };
         let err = forbid_raw_expr(&expr, "confidentialSelect(uint256)").unwrap_err();
         assert!(err
@@ -1115,9 +1127,9 @@ bounds:
     fn checker_rejects_confidential_array_index() {
         let expr = Expr::ArrayIndex {
             base: Box::new(Expr::Literal(Value::Array(
-                vec![Value::Uint(1)].into_boxed_slice(),
+                vec![Value::uint(1)].into_boxed_slice(),
             ))),
-            index: Box::new(Expr::Literal(Value::Uint(0))),
+            index: Box::new(Expr::Literal(Value::uint(0))),
         };
         let err = forbid_raw_expr(&expr, "confidentialArrayIndex()").unwrap_err();
         assert!(err

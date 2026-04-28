@@ -43,8 +43,8 @@ inductive Ty where
   deriving Inhabited
 
 /-- Mirror of `crates/uo-core/src/types.rs`'s `Value`. The `uint` payload is
-modeled as `Nat` instead of Rust's `u128`; the operational evaluator normalizes
-uint operations into the runtime `u128` domain.
+modeled as `Nat` instead of Rust's full-width `Uint256`; the operational
+evaluator normalizes uint operations into the runtime `uint256` domain.
 
 The `map` variant is the Lean-side representation of a confidential
 `UOMap` instance: a list of `(key, value)` entries the evaluator can

@@ -13,7 +13,7 @@ use super::{
     ConfidentialKernelStatementProfile,
 };
 use crate::ir::{BinaryOp, UnaryOp};
-use crate::types::{masked_select_bool, Value};
+use crate::types::{masked_select_bool, Uint256, Value};
 use anyhow::{anyhow, bail, Result};
 use uo_precompiles::UoOpcode;
 
@@ -312,7 +312,7 @@ pub(super) fn execute_confidential_kernel_slot_statement_generated<
             let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?;
-            let index = usize::try_from(index).unwrap_or(usize::MAX);
+            let index = index.to_usize_saturating();
             let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;
             let predicate = eval_optional_confidential_kernel_predicate_generated(
                 runtime, predicate, "array", state,
@@ -347,7 +347,7 @@ pub(super) fn execute_confidential_kernel_slot_statement_generated<
     Ok(())
 }
 
-fn lhs_uint_generated(value: &Value) -> Result<u128> {
+fn lhs_uint_generated(value: &Value) -> Result<Uint256> {
     value
         .as_uint()
         .ok_or_else(|| anyhow!("expected uint-compatible value"))
@@ -367,11 +367,10 @@ fn eval_confidential_kernel_unary_generated(op: &UnaryOp, value: Value) -> Resul
                 .ok_or_else(|| anyhow!("logical not expects bool"))?,
         )),
         UnaryOp::Neg => Ok(Value::Uint(
-            0u128.wrapping_sub(
-                value
-                    .as_uint()
-                    .ok_or_else(|| anyhow!("negation expects uint"))?,
-            ),
+            value
+                .as_uint()
+                .ok_or_else(|| anyhow!("negation expects uint"))?
+                .wrapping_neg(),
         )),
     }
 }
@@ -393,28 +392,28 @@ fn eval_confidential_kernel_binary_generated(
         )),
         BinaryOp::Div => {
             let divisor = lhs_uint_generated(&rhs)?;
-            Ok(Value::Uint(if divisor == 0 {
-                0
+            Ok(Value::Uint(if divisor.is_zero() {
+                Uint256::ZERO
             } else {
-                lhs_uint_generated(&lhs)? / divisor
+                lhs_uint_generated(&lhs)?.div_rem(divisor).0
             }))
         }
         BinaryOp::Mod => {
             let divisor = lhs_uint_generated(&rhs)?;
-            Ok(Value::Uint(if divisor == 0 {
-                0
+            Ok(Value::Uint(if divisor.is_zero() {
+                Uint256::ZERO
             } else {
-                lhs_uint_generated(&lhs)? % divisor
+                lhs_uint_generated(&lhs)?.div_rem(divisor).1
             }))
         }
         BinaryOp::BitAnd => Ok(Value::Uint(
-            lhs_uint_generated(&lhs)? & lhs_uint_generated(&rhs)?,
+            lhs_uint_generated(&lhs)?.bitand(lhs_uint_generated(&rhs)?),
         )),
         BinaryOp::BitOr => Ok(Value::Uint(
-            lhs_uint_generated(&lhs)? | lhs_uint_generated(&rhs)?,
+            lhs_uint_generated(&lhs)?.bitor(lhs_uint_generated(&rhs)?),
         )),
         BinaryOp::BitXor => Ok(Value::Uint(
-            lhs_uint_generated(&lhs)? ^ lhs_uint_generated(&rhs)?,
+            lhs_uint_generated(&lhs)?.bitxor(lhs_uint_generated(&rhs)?),
         )),
         BinaryOp::Eq => Ok(Value::Bool(lhs == rhs)),
         BinaryOp::Neq => Ok(Value::Bool(lhs != rhs)),
@@ -494,7 +493,7 @@ pub(super) fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernel
             let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?
                 .as_uint()
                 .ok_or_else(|| anyhow!("array index must be uint"))?;
-            let index = usize::try_from(index).unwrap_or(usize::MAX);
+            let index = index.to_usize_saturating();
             runtime.array_get(*object_id, index)
         }
         ConfidentialKernelSlotExpr::MapGet { object_id, key } => {
