@@ -91,7 +91,8 @@ themselves. The Lean equalities are exact and rejected by the build
 if they ever drift; the static-drift check rejects representative
 runtime drift. The freeze does not by itself discharge any
 deployment assumption — it locks the observer signature so the
-remaining hostile-host theorem work targets one fixed surface.
+W6.2 / W6.3 / W6.4 / W6.5 / W6.6 closure layers compose against one
+fixed surface.
 
 ### Frozen components
 
@@ -1793,15 +1794,19 @@ assumption bundle paired with Intel SGX provenance citations.
 
 ## Relationship To Existing Proof Artifacts
 
-This track is additive. It does not replace the existing controller /
-trusted-kernel / refinement-witness path.
+This track has been integrated additively into the existing controller
+/ trusted-kernel / refinement-witness path. The repository now:
 
-Instead, it aims to move more of `uo-evm` itself into the same assurance
-pipeline:
-
-1. keep the current Lean-checked theorem boundary
-2. shrink the trusted runtime interior by routing more behavior through the
-   small kernel
-3. export evidence for that kernel discipline
-4. then prove or validate the refinement from the real runtime to the same
-   modeled observer
+1. keeps the Lean-checked theorem boundary at the W6.1 / W6.2
+   frozen observer surface
+2. has a tiny trusted runtime interior; behavior is routed through
+   the small kernel and the source-backed
+   `RuntimeImplementationInterface` chain (WP3)
+3. exports evidence for that kernel discipline as the
+   `RuntimeKernelMachineFinishWitness` and the full
+   `RuntimeImplementation*Boundary` family
+4. ties the real runtime to the modeled observer via the W6.3
+   controller-refinement and W6.4 storage-refinement integrations
+   under the static-drift checks
+   `sgx_controller_refinement_pinned` and
+   `sgx_storage_refinement_pinned`
