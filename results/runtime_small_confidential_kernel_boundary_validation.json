@@ -1,18 +1,18 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1157067,
+  "artifact_json_bytes": 1160309,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSmallConfidentialKernelBoundary",
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime small confidential-kernel boundary",
   "lean_checker_kind": "runtime small confidential-kernel boundary",
-  "lean_stdout": "validated runtime small confidential-kernel boundary for source-backed uo-evm/shared-kernel runtime (23349 shared-kernel bytes)",
+  "lean_stdout": "validated runtime small confidential-kernel boundary for source-backed uo-evm/shared-kernel runtime (23343 shared-kernel bytes)",
   "residual_helper_shell_boundary_theorem_checked": true,
   "runtime_host_visible_error_taxonomy_theorem_checked": true,
   "slot_adapter_boundary_theorem_checked": true,
   "small_confidential_kernel_boundary_theorem_checked": true,
   "source_bytes": {
     "allocator": 15508,
-    "confidential_kernel": 98063,
+    "confidential_kernel": 102039,
     "engine": 14738,
     "fresh_coins": 5031,
     "generated_confidential_kernel": 21686,
@@ -22,7 +22,7 @@
     "generated_store_codec": 1683,
     "generated_store_helpers": 11516,
     "generated_store_surface": 6914,
-    "kernel_runtime": 23349,
+    "kernel_runtime": 23343,
     "kernel_slot_support": 3263,
     "objects": 87075,
     "oram": 55073,
@@ -31,7 +31,7 @@
     "store_codec": 5892,
     "store_lib": 93,
     "store_store": 2898,
-    "types": 16954
+    "types": 16860
   },
   "source_files": [
     "runtime/uo-evm/src/engine.rs",

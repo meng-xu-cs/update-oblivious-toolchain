@@ -94,19 +94,25 @@
         "report": "tamper_validation"
       },
       {
-        "bytes": 2642927,
-        "estimated": false,
-        "metric": "confidential_proof_family_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
-        "report": "confidential_proof_family_boundary_validation"
-      },
-      {
-        "bytes": 2642880,
+        "bytes": 2642936,
         "estimated": false,
         "metric": "confidential_proof_family_slot_assurance_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_slot_assurance_validation"
       },
       {
-        "bytes": 2642808,
+        "bytes": 2642853,
+        "estimated": false,
+        "metric": "confidential_proof_family_refinement_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_refinement_boundary_validation"
+      },
+      {
+        "bytes": 2642844,
+        "estimated": false,
+        "metric": "confidential_proof_family_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_validation"
+      },
+      {
+        "bytes": 2642837,
         "estimated": false,
         "metric": "confidential_proof_family_slot_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_slot_boundary_validation"
@@ -114,32 +120,26 @@
       {
         "bytes": 2642792,
         "estimated": false,
-        "metric": "confidential_proof_family_refinement_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
-        "report": "confidential_proof_family_refinement_boundary_validation"
+        "metric": "confidential_proof_family_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_boundary_validation"
       },
       {
-        "bytes": 2642792,
-        "estimated": false,
-        "metric": "confidential_proof_family_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
-        "report": "confidential_proof_family_validation"
-      },
-      {
-        "bytes": 2642790,
-        "estimated": false,
-        "metric": "confidential_proof_family_assurance_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
-        "report": "confidential_proof_family_assurance_validation"
-      },
-      {
-        "bytes": 2642736,
+        "bytes": 2642756,
         "estimated": false,
         "metric": "confidential_proof_family_finish_slot_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_finish_slot_boundary_validation"
       },
       {
-        "bytes": 2642630,
+        "bytes": 2642756,
         "estimated": false,
         "metric": "confidential_proof_family_kernel_interface_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_kernel_interface_validation"
+      },
+      {
+        "bytes": 2642722,
+        "estimated": false,
+        "metric": "confidential_proof_family_assurance_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
+        "report": "confidential_proof_family_assurance_validation"
       },
       {
         "bytes": 1694143,
@@ -148,25 +148,25 @@
         "report": "pathoram_pair_validation"
       },
       {
-        "bytes": 1357213,
+        "bytes": 1360455,
         "estimated": false,
         "metric": "runtime_implementation_kernel_meeting_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_meeting_boundary_validation"
       },
       {
-        "bytes": 1357213,
+        "bytes": 1360455,
         "estimated": false,
         "metric": "runtime_implementation_kernel_meeting_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_meeting_confinement_boundary_validation"
       },
       {
-        "bytes": 1259616,
+        "bytes": 1262858,
         "estimated": false,
         "metric": "runtime_implementation_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_confinement_boundary_validation"
       },
       {
-        "bytes": 1257998,
+        "bytes": 1261240,
         "estimated": false,
         "metric": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_machine_confinement_boundary_validation"
@@ -234,82 +234,82 @@
     {
       "assumption": "TEE deployment assumptions",
       "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust",
-      "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification (`IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, `IntelSGXSecurityCenter`); the static-drift check `sgx_deployment_assumption_bundle_pinned` pins the bundle's Prop-field shape and the six provenance citations; W6.6 audits these as the six closed checkpoint entries of `sgxHostileHostClosureAudit`"
+      "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is gated by the runtime rejection of `encrypted_to_client` returns; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_gate_pinned` pin the surface"
     }
   ],
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 145911,
-    "confidential_core_kernel_finish_slot_validation": 5742,
-    "confidential_core_kernel_interface_slot_finish_boundary_validation": 5815,
-    "confidential_core_kernel_interface_slot_validation": 5660,
-    "confidential_core_lowering_validation": 5946,
-    "confidential_core_shell_boundary_lowering_validation": 5849,
-    "confidential_core_shell_boundary_slot_validation": 5851,
-    "confidential_core_slot_validation": 5769,
-    "confidential_core_validation": 5934,
+    "canonical_pathoram_pair_validation": 145280,
+    "confidential_core_kernel_finish_slot_validation": 5584,
+    "confidential_core_kernel_interface_slot_finish_boundary_validation": 5607,
+    "confidential_core_kernel_interface_slot_validation": 5636,
+    "confidential_core_lowering_validation": 5560,
+    "confidential_core_shell_boundary_lowering_validation": 5638,
+    "confidential_core_shell_boundary_slot_validation": 5658,
+    "confidential_core_slot_validation": 5586,
+    "confidential_core_validation": 5595,
     "confidential_fragment_validation": 0,
-    "confidential_proof_family_assurance_validation": 6321,
-    "confidential_proof_family_boundary_validation": 6454,
-    "confidential_proof_family_finish_slot_boundary_validation": 6458,
-    "confidential_proof_family_kernel_interface_validation": 6492,
-    "confidential_proof_family_refinement_boundary_validation": 6383,
-    "confidential_proof_family_slot_assurance_validation": 6292,
-    "confidential_proof_family_slot_boundary_validation": 6470,
-    "confidential_proof_family_validation": 6511,
-    "controller_observer_validation": 5852,
-    "correctness": 6882,
-    "fresh_coin_validation": 58316,
-    "kernel_confinement_boundary_validation": 4990,
-    "kernel_dsl_validation": 5790,
-    "kernel_finish_boundary_validation": 5013,
-    "kernel_interface_confinement_boundary_validation": 5055,
-    "kernel_interface_singleton_boundary_validation": 5046,
-    "kernel_interface_validation": 4998,
-    "kernel_lowering_validation": 5482,
-    "kernel_model_alignment_validation": 9352,
-    "kernel_refinement_boundary_validation": 5046,
-    "kernel_refinement_validation": 5889,
-    "kernel_slot_boundary_validation": 5875,
-    "kernel_slot_dsl_validation": 5686,
-    "kernel_validation": 5797,
-    "leakage_auc": 10434,
-    "mutual_information": 10433,
-    "overheads": 374,
+    "confidential_proof_family_assurance_validation": 6134,
+    "confidential_proof_family_boundary_validation": 6115,
+    "confidential_proof_family_finish_slot_boundary_validation": 6001,
+    "confidential_proof_family_kernel_interface_validation": 6156,
+    "confidential_proof_family_refinement_boundary_validation": 6139,
+    "confidential_proof_family_slot_assurance_validation": 6162,
+    "confidential_proof_family_slot_boundary_validation": 6136,
+    "confidential_proof_family_validation": 6148,
+    "controller_observer_validation": 5335,
+    "correctness": 6835,
+    "fresh_coin_validation": 57735,
+    "kernel_confinement_boundary_validation": 5001,
+    "kernel_dsl_validation": 5523,
+    "kernel_finish_boundary_validation": 4970,
+    "kernel_interface_confinement_boundary_validation": 5027,
+    "kernel_interface_singleton_boundary_validation": 5031,
+    "kernel_interface_validation": 5010,
+    "kernel_lowering_validation": 5615,
+    "kernel_model_alignment_validation": 7925,
+    "kernel_refinement_boundary_validation": 5001,
+    "kernel_refinement_validation": 5633,
+    "kernel_slot_boundary_validation": 5600,
+    "kernel_slot_dsl_validation": 5536,
+    "kernel_validation": 5561,
+    "leakage_auc": 10407,
+    "mutual_information": 10411,
+    "overheads": 373,
     "paper_main_family_boundary_validation": 1,
     "paper_main_slot_boundary_validation": 1,
-    "pathoram_hidden_validation": 4924,
-    "pathoram_pair_validation": 29131,
-    "runtime_boundary_validation": 1323,
-    "runtime_confidential_statement_trace_bridge_boundary_validation": 1016,
-    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 7790,
-    "runtime_implementation_confinement_boundary_validation": 51798,
-    "runtime_implementation_interface_validation": 3739,
-    "runtime_implementation_kernel_machine_confinement_boundary_validation": 52431,
-    "runtime_implementation_kernel_meeting_boundary_validation": 52973,
-    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 100021,
-    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 35704,
-    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 33016,
-    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 51442,
-    "runtime_implementation_shared_kernel_refinement_boundary_validation": 52897,
-    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 7136,
-    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 49789,
-    "runtime_kernel_machine_finish_boundary_validation": 5804,
-    "runtime_kernel_machine_finish_witness_validation": 5916,
-    "runtime_public_bridge_boundary_validation": 1001,
-    "runtime_residual_helper_shell_boundary_validation": 2731,
-    "runtime_shared_confidential_kernel_boundary_validation": 3641,
-    "runtime_slot_adapter_boundary_validation": 994,
-    "runtime_small_confidential_kernel_boundary_validation": 3653,
-    "seeded_witness_validation": 18630,
-    "shell_boundary_lowering_validation": 5928,
-    "shell_boundary_slot_validation": 5755,
-    "shell_boundary_validation": 5806,
-    "static_checks": 1835,
-    "tamper_validation": 871436,
-    "total_probe_ms": 1900382,
-    "trace_equivalence": 10609,
-    "trusted_kernel_validation": 5914,
-    "witness_validation": 4817
+    "pathoram_hidden_validation": 4455,
+    "pathoram_pair_validation": 29026,
+    "runtime_boundary_validation": 1308,
+    "runtime_confidential_statement_trace_bridge_boundary_validation": 703,
+    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 7645,
+    "runtime_implementation_confinement_boundary_validation": 50324,
+    "runtime_implementation_interface_validation": 3379,
+    "runtime_implementation_kernel_machine_confinement_boundary_validation": 50217,
+    "runtime_implementation_kernel_meeting_boundary_validation": 54297,
+    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 102947,
+    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 34639,
+    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 31976,
+    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 50891,
+    "runtime_implementation_shared_kernel_refinement_boundary_validation": 54491,
+    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 6883,
+    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 49428,
+    "runtime_kernel_machine_finish_boundary_validation": 5591,
+    "runtime_kernel_machine_finish_witness_validation": 5574,
+    "runtime_public_bridge_boundary_validation": 672,
+    "runtime_residual_helper_shell_boundary_validation": 2212,
+    "runtime_shared_confidential_kernel_boundary_validation": 3388,
+    "runtime_slot_adapter_boundary_validation": 690,
+    "runtime_small_confidential_kernel_boundary_validation": 3292,
+    "seeded_witness_validation": 17979,
+    "shell_boundary_lowering_validation": 5575,
+    "shell_boundary_slot_validation": 5527,
+    "shell_boundary_validation": 5537,
+    "static_checks": 1553,
+    "tamper_validation": 865362,
+    "total_probe_ms": 1878925,
+    "trace_equivalence": 10465,
+    "trusted_kernel_validation": 5637,
+    "witness_validation": 4981
   },
   "runtime_overheads": {
     "cases": [
@@ -376,6 +376,48 @@
       "work_package": "W6.5"
     },
     {
+      "name": "runtime_host_visible_outcome_taxonomy_pinned",
+      "report_field": "kernel_model_alignment_validation.host_visible_outcome_taxonomy_audit_present",
+      "target": "the `runtimeHostVisibleOutcomeTaxonomy` audit model covering success, abort, runtime public errors, proof-checker failures, commit/rollback, and cryptographic integrity failures",
+      "work_package": "F03"
+    },
+    {
+      "name": "runtime_freshness_discipline_pinned",
+      "report_field": "kernel_model_alignment_validation.runtime_freshness_discipline_audit_present",
+      "target": "the `runtimeFreshnessDiscipline` audit model covering store encryption nonces, metadata encryption nonces, Path-ORAM fresh remap coins, canonical fresh-coin proof families, and diagnostics-only fresh-coin injection",
+      "work_package": "F16"
+    },
+    {
+      "name": "theorem_adjacent_unsafe_isolated_to_fixed_buffer",
+      "report_field": "kernel_model_alignment_validation.theorem_adjacent_unsafe_isolated_to_fixed_buffer",
+      "target": "the only production Rust `unsafe` in theorem-adjacent crates/runtime code lives in `crates/uo-core/src/fixed_buffer.rs`, whose helpers document the fixed-prefix initialization invariants and are covered by focused tests",
+      "work_package": "F15"
+    },
+    {
+      "name": "lean_toolchain_exact_release_pinned",
+      "report_field": "kernel_model_alignment_validation.lean_toolchain_exact_release_pinned",
+      "target": "`proof/lean/lean-toolchain` is pinned to an exact Lean release instead of `stable`, and the observed Lean/Lake versions match that release",
+      "work_package": "F18"
+    },
+    {
+      "name": "lean_lake_versions_recorded_in_manifest",
+      "report_field": "kernel_model_alignment_validation.lean_lake_versions_recorded_in_manifest",
+      "target": "`reproducibility_manifest.json` records the exact Lean toolchain pin plus `lean --version` and `lake --version`, and manifest generation fails closed on non-exact pins",
+      "work_package": "F18"
+    },
+    {
+      "name": "sgx_deployment_assumption_mechanism_matrix_pinned",
+      "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_mechanism_matrix_pinned",
+      "target": "the SGX deployment assumption-to-mechanism matrix and first milestone checklist for attestation transcript, sealed storage/freshness, rollback counter, and return-channel gate",
+      "work_package": "F17"
+    },
+    {
+      "name": "return_channel_crypto_gate_pinned",
+      "report_field": "kernel_model_alignment_validation.return_channel_crypto_gate_pinned",
+      "target": "the current implemented claim rejects `encrypted_to_client` returns until an encrypted return channel with nonce/session-key evidence exists",
+      "work_package": "F17"
+    },
+    {
       "name": "runtime_crypto_primitive_identity_pinned",
       "report_field": "kernel_model_alignment_validation.runtime_crypto_primitive_identity_pinned",
       "target": "the `chacha20poly1305` AEAD primitive and the `tiny_keccak::Keccak::v256()` hash primitive (with the workspace `Cargo.toml` versions) in the runtime crypto surface",
@@ -390,7 +432,7 @@
   ],
   "tcb_size": {
     "lean_theorem_checker_repo_surface": {
-      "file_count": 170,
+      "file_count": 175,
       "files": [
         {
           "file": "proof/lean/CheckCanonicalPathOramPairCertificate.lean",
@@ -407,6 +449,10 @@
         {
           "file": "proof/lean/CheckPathOramPairCertificate.lean",
           "nonempty_loc": 20
+        },
+        {
+          "file": "proof/lean/CheckProofGradeAxiomReport.lean",
+          "nonempty_loc": 27
         },
         {
           "file": "proof/lean/CheckProofGradeRuntimeConfidentialCore.lean",
@@ -753,12 +799,16 @@
           "nonempty_loc": 38
         },
         {
+          "file": "proof/lean/UOToolchain/HistorySemantics.lean",
+          "nonempty_loc": 182
+        },
+        {
           "file": "proof/lean/UOToolchain/IRSemantics.lean",
-          "nonempty_loc": 689
+          "nonempty_loc": 720
         },
         {
           "file": "proof/lean/UOToolchain/IRSyntax.lean",
-          "nonempty_loc": 224
+          "nonempty_loc": 223
         },
         {
           "file": "proof/lean/UOToolchain/KernelDsl.lean",
@@ -767,6 +817,10 @@
         {
           "file": "proof/lean/UOToolchain/LegacyComposition.lean",
           "nonempty_loc": 14
+        },
+        {
+          "file": "proof/lean/UOToolchain/LegacyRoot.lean",
+          "nonempty_loc": 12
         },
         {
           "file": "proof/lean/UOToolchain/LegacySgxJointProjection.lean",
@@ -817,12 +871,20 @@
           "nonempty_loc": 1785
         },
         {
+          "file": "proof/lean/UOToolchain/ProofGradeRoot.lean",
+          "nonempty_loc": 72
+        },
+        {
           "file": "proof/lean/UOToolchain/RuntimeAllocatorDiscipline.lean",
           "nonempty_loc": 171
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeArrayAccessDiscipline.lean",
           "nonempty_loc": 91
+        },
+        {
+          "file": "proof/lean/UOToolchain/RuntimeAuditSurfaces.lean",
+          "nonempty_loc": 428
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeCanonicalPathOramPairJson.lean",
@@ -866,7 +928,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeImplementationInterface.lean",
-          "nonempty_loc": 19160
+          "nonempty_loc": 19164
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeImplementationInterfaceJson.lean",
@@ -1066,15 +1128,15 @@
         },
         {
           "file": "proof/lean/UOToolchain.lean",
-          "nonempty_loc": 68
+          "nonempty_loc": 6
         },
         {
           "file": "proof/lean/lakefile.lean",
-          "nonempty_loc": 244
+          "nonempty_loc": 247
         }
       ],
       "root": "proof/lean",
-      "total_nonempty_loc": 102373
+      "total_nonempty_loc": 103069
     },
     "measurement": "non-empty source lines",
     "outer_runtime_risk_surface": {
@@ -1096,7 +1158,7 @@
       "files": [
         {
           "file": "runtime/uo-kernel-runtime/src/lib.rs",
-          "nonempty_loc": 647
+          "nonempty_loc": 641
         },
         {
           "file": "runtime/uo-evm/src/state.rs",
@@ -1108,10 +1170,10 @@
         },
         {
           "file": "crates/uo-core/src/trace.rs",
-          "nonempty_loc": 9811
+          "nonempty_loc": 9790
         }
       ],
-      "total_nonempty_loc": 11425
+      "total_nonempty_loc": 11398
     }
   },
   "wp6_closure_audit": [
@@ -1156,6 +1218,13 @@
       "lean_anchor": "SgxDeploymentAssumptions + sgxDeploymentAssumptionProvenances",
       "role": "explicit hostile-host TEE deployment-assumption bundle (attestation authenticity, enclave memory isolation, rollback resistance, freshness guarantee, crash recovery discipline, patch-level trust) paired with Intel SGX provenance citations",
       "static_drift_check_name": "sgx_deployment_assumption_bundle_pinned"
+    },
+    {
+      "checkpoint": "F17 mechanism matrix",
+      "classification": "mapped implementation evidence / external deployment-only / removed from implemented claim",
+      "lean_anchor": "sgxDeploymentAssumptionMechanismMatrix + sgxDeploymentFirstMilestoneChecklist",
+      "role": "assumption-to-mechanism matrix plus first deployment milestone checklist (enclave boundary, attestation transcript, sealed storage, freshness evidence, rollback counter, encrypted return-channel gate)",
+      "static_drift_check_name": "sgx_deployment_assumption_mechanism_matrix_pinned"
     }
   ]
 }

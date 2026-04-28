@@ -2395,7 +2395,7 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
     }
     out.push('\n');
 
-    out.push_str("## WP6 Closure Audit\n\n");
+    out.push_str("## TEE Observer Closure Audit\n\n");
     out.push_str(
         "Mirrors the `sgxHostileHostClosureAudit` Lean record in \
         `proof/lean/UOToolchain/SgxObserverFreeze.lean`. The Lean \
@@ -2429,7 +2429,7 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
         validation slice. The acceptance gate requires every listed \
         check to be `true` in the corresponding report field.\n\n",
     );
-    out.push_str("| Static-Drift Check | Work Package | Target | Report Field |\n");
+    out.push_str("| Static-Drift Check | Surface | Target | Report Field |\n");
     out.push_str("| --- | --- | --- | --- |\n");
     if let Some(entries) = summary["static_drift_check_inventory"].as_array() {
         for entry in entries {
@@ -2787,11 +2787,11 @@ fn build_reviewer_summary(
     }))
 }
 
-/// W7.6 reviewer-summary surface: the W6.6 closure audit summary.
+/// Reviewer-summary surface: the TEE observer closure audit summary.
 ///
 /// Mirrors `sgxHostileHostClosureAudit` in
 /// `proof/lean/UOToolchain/SgxObserverFreeze.lean` so reviewers can
-/// see the six WP6 surface checkpoints without reading the Lean
+/// see the six TEE-observer surface checkpoints without reading the Lean
 /// source. The Lean closure-audit theorems
 /// `sgxHostileHostClosureAudit_length`,
 /// `sgxHostileHostClosureAudit_leanProvedEntries`,
@@ -2852,10 +2852,10 @@ fn wp6_closure_audit_summary() -> JsonValue {
     ])
 }
 
-/// W7.6 reviewer-summary surface: the static-drift check inventory.
+/// Reviewer-summary surface: the static-drift check inventory.
 ///
 /// Pins every named static-drift check the probe runs, with its
-/// target surface and the work package it serves. The acceptance
+/// target surface and the historical label it serves. The acceptance
 /// gate requires all listed checks to be `true`.
 fn static_drift_check_inventory() -> JsonValue {
     json!([
@@ -30338,16 +30338,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // facades are exposed under the `proofGrade_sgx_observer_*`
     // prefix in `proof/lean/UOToolchain/ProofGrade.lean`. The
     // canonical observer-surface freeze is documented in
-    // `docs/tee-runtime-hardening.md` under "W6.1 Frozen SGX
-    // Observer Surface".
+    // `docs/runtime/tee-observer.md` under "Observer Surface".
     // W6.2: pin the canonical hostile-host persistent-I/O model —
     // the `PhysicalReadEvent` field schema (`object`, `location`,
     // `len`), the `PhysicalWriteEvent` field schema (`object`,
     // `location`, `len`, `class`), and the canonical `WriteClass`
     // vocabulary (`Set`, `Clear`, `Same`, `Update`). The matching
     // Lean provenance record is `sgxPersistentIoProvenance`. The
-    // freeze is documented in `docs/tee-runtime-hardening.md`
-    // under "W6.2 Frozen Persistent-I/O Model".
+    // freeze is documented in `docs/runtime/tee-observer.md`
+    // under "Persistent-I/O Model".
     let sgx_persistent_io_model_pinned = core_trace_source.contains("pub enum WriteClass {")
         && core_trace_source.contains("    Set,")
         && core_trace_source.contains("    Clear,")
@@ -30375,8 +30374,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // matching Lean provenance record is
     // `sgxControllerRefinementProvenance`; the W6.3 integration
     // theorem is `sgxControllerObserverRefinementOf`. The
-    // refinement is documented in `docs/tee-runtime-hardening.md`
-    // under "W6.3 Controller-Refinement Integration".
+    // refinement is documented in `docs/runtime/tee-observer.md`
+    // under "Controller Refinement".
     // W6.5: pin the hostile-host TEE deployment-assumption bundle
     // surface in the Lean source. The six canonical fields
     // (`attestationAuthenticity`, `enclaveMemoryIsolation`,
@@ -30385,9 +30384,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // referencing Intel SGX specifications must remain present in
     // `proof/lean/UOToolchain/SgxObserverFreeze.lean`. The matching
     // Lean provenance list is `sgxDeploymentAssumptionProvenances`;
-    // the W6.5 deployment-assumption bundle is documented in
-    // `docs/tee-runtime-hardening.md` under
-    // "W6.5 Hostile-Host TEE Deployment-Assumption Bundle".
+    // the deployment-assumption bundle is documented in
+    // `docs/runtime/tee-observer.md` under
+    // "Deployment-Assumption Bundle".
     let lean_sgx_observer_freeze_path =
         repo_root().join("proof/lean/UOToolchain/SgxObserverFreeze.lean");
     let lean_sgx_observer_freeze_source = fs::read_to_string(&lean_sgx_observer_freeze_path)
@@ -30456,8 +30455,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // provenance record is `sgxStorageRefinementProvenance`; the
     // W6.4 integration is `sgxStorageRefinementOf`. The
     // refinement is documented in
-    // `docs/tee-runtime-hardening.md` under
-    // "W6.4 Sealing / Storage Refinement Integration".
+    // `docs/runtime/tee-observer.md` under "Storage Refinement".
     let sgx_storage_refinement_pinned = core_trace_source.contains("pub struct RefinementTrace {")
         && core_trace_source.contains("    pub opcode_trace: Box<[String]>,")
         && core_trace_source.contains("    pub logical_accesses: Box<[LogicalEvent]>,")
@@ -30499,8 +30497,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // boundary-schedule structural shape (outer enter, repeated
     // exit/enter ORAM-access pairs, outer exit). The matching Lean
     // provenance record is `sgxBoundaryCallProvenance`. The freeze
-    // is documented in `docs/tee-runtime-hardening.md` under
-    // "W6.2 Frozen Boundary-Call Model".
+    // is documented in `docs/runtime/tee-observer.md` under
+    // "Boundary-Call Model".
     let sgx_boundary_call_model_pinned = runtime_controller_source
         .contains(".push(BoundaryEvent::enter(entrypoint, total_input_len));")
         && runtime_controller_source.contains(".push(BoundaryEvent::exit(\"oram_access\", 0));")

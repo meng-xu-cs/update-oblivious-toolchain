@@ -15,16 +15,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1159588,
+      "boundary_json_bytes": 1162830,
       "confidential_slot_program_json_bytes": 377,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -35,7 +35,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -48,9 +48,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -262,16 +262,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1159588,
+      "boundary_json_bytes": 1162830,
       "confidential_slot_program_json_bytes": 377,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -282,7 +282,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -295,9 +295,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -509,16 +509,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1163504,
+      "boundary_json_bytes": 1166746,
       "confidential_slot_program_json_bytes": 1550,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -529,7 +529,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -542,9 +542,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -959,16 +959,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1163504,
+      "boundary_json_bytes": 1166746,
       "confidential_slot_program_json_bytes": 1550,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -979,7 +979,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -992,9 +992,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1409,16 +1409,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1161446,
+      "boundary_json_bytes": 1164688,
       "confidential_slot_program_json_bytes": 272,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -1429,7 +1429,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -1442,9 +1442,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1818,16 +1818,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1161446,
+      "boundary_json_bytes": 1164688,
       "confidential_slot_program_json_bytes": 272,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -1838,7 +1838,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -1851,9 +1851,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2227,16 +2227,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1163038,
+      "boundary_json_bytes": 1166280,
       "confidential_slot_program_json_bytes": 634,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -2247,7 +2247,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -2260,9 +2260,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2720,16 +2720,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1163038,
+      "boundary_json_bytes": 1166280,
       "confidential_slot_program_json_bytes": 634,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -2740,7 +2740,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -2753,9 +2753,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3213,16 +3213,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1164342,
+      "boundary_json_bytes": 1167584,
       "confidential_slot_program_json_bytes": 400,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -3233,7 +3233,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -3246,9 +3246,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3852,16 +3852,16 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1164342,
+      "boundary_json_bytes": 1167584,
       "confidential_slot_program_json_bytes": 400,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -3872,7 +3872,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -3885,9 +3885,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -4491,16 +4491,16 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1166563,
+      "boundary_json_bytes": 1169805,
       "confidential_slot_program_json_bytes": 269,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -4511,7 +4511,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -4524,9 +4524,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -5320,16 +5320,16 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1166563,
+      "boundary_json_bytes": 1169805,
       "confidential_slot_program_json_bytes": 269,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -5340,7 +5340,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -5353,9 +5353,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -6149,16 +6149,16 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1169262,
+      "boundary_json_bytes": 1172504,
       "confidential_slot_program_json_bytes": 435,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -6169,7 +6169,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -6182,9 +6182,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -7181,16 +7181,16 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1169262,
+      "boundary_json_bytes": 1172504,
       "confidential_slot_program_json_bytes": 435,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -7201,7 +7201,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -7214,9 +7214,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -8213,16 +8213,16 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1190790,
+      "boundary_json_bytes": 1194032,
       "confidential_slot_program_json_bytes": 634,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 12288,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -8233,7 +8233,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -8246,9 +8246,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -10986,16 +10986,16 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1257998,
+      "boundary_json_bytes": 1261240,
       "confidential_slot_program_json_bytes": 1541,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 16384,
       "implementation_interface_source_bytes": {
         "allocator": 15508,
         "confidential_core": 46577,
-        "confidential_kernel": 98063,
+        "confidential_kernel": 102039,
         "controller": 19525,
-        "core_lib": 7074,
+        "core_lib": 7096,
         "engine": 14738,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 21686,
@@ -11006,7 +11006,7 @@
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 21570,
-        "kernel_runtime": 23349,
+        "kernel_runtime": 23343,
         "kernel_slot_support": 3263,
         "objects": 87075,
         "oram": 55073,
@@ -11019,9 +11019,9 @@
         "store_lib": 93,
         "store_store": 2898,
         "theorem": 3936,
-        "trace": 394810,
+        "trace": 394087,
         "trusted_kernel": 4518,
-        "types": 16954
+        "types": 16860
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [

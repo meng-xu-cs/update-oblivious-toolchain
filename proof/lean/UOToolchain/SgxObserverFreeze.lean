@@ -227,7 +227,7 @@ structure SgxObserverSurfaceProvenance where
   exitEventKindNames : List String
   /-- The public shared-resource-pattern literal. -/
   sharedResourceTick : String
-  /-- Documentation anchor for the WP6 hardening track. -/
+  /-- Documentation anchor for the TEE observer reference. -/
   observerDocSection : String
   /-- Probe static-drift check that pins the Rust observer surface. -/
   staticDriftCheckName : String
@@ -249,7 +249,7 @@ def sgxObserverSurfaceProvenance : SgxObserverSurfaceProvenance :=
   , exitEventKindNames := sgxObserverExitEventNames
   , sharedResourceTick := sgxObserverSharedResourceTick
   , observerDocSection :=
-      "docs/tee-runtime-hardening.md \"W6.1 Frozen SGX Observer Surface\""
+      "docs/runtime/tee-observer.md \"Observer Surface\""
   , staticDriftCheckName := "sgx_observer_surface_pinned"
   , leanRelationModule := "proof/lean/UOToolchain/SgxRelation.lean"
   , leanControllerTraceModule := "proof/lean/UOToolchain/SgxControllerTrace.lean"
@@ -497,7 +497,7 @@ structure SgxBoundaryCallProvenance where
   /-- Free-form description of the canonical boundary-schedule
   shape. -/
   boundaryScheduleShape : String
-  /-- Documentation anchor for the WP6 hardening track. -/
+  /-- Documentation anchor for the TEE observer reference. -/
   observerDocSection : String
   /-- Probe static-drift check that pins the Rust boundary-call
   surface. -/
@@ -521,7 +521,7 @@ def sgxBoundaryCallProvenance : SgxBoundaryCallProvenance :=
   , boundaryScheduleShape :=
       "Enter(<entrypoint>, entry_input_len, 0); for each oram access: Exit(\"oram_access\", 0, 0); Enter(\"oram_access\", 0, 0); Exit(<entrypoint>, 0, return_length)"
   , observerDocSection :=
-      "docs/tee-runtime-hardening.md \"W6.2 Frozen Boundary-Call Model\""
+      "docs/runtime/tee-observer.md \"Boundary-Call Model\""
   , staticDriftCheckName := "sgx_boundary_call_model_pinned"
   , leanBoundaryModule := "proof/lean/UOToolchain/SgxBoundary.lean"
   , leanScheduleModule := "proof/lean/UOToolchain/SgxControllerTrace.lean"
@@ -630,7 +630,7 @@ def sgxPersistentIoProvenance : SgxPersistentIoProvenance :=
   , physicalWriteFieldNames := sgxObserverPhysicalWriteFieldNames
   , writeClassNames := sgxObserverWriteClassNames
   , observerDocSection :=
-      "docs/tee-runtime-hardening.md \"W6.2 Frozen Persistent-I/O Model\""
+      "docs/runtime/tee-observer.md \"Persistent-I/O Model\""
   , staticDriftCheckName := "sgx_persistent_io_model_pinned"
   , leanTraceModule := "proof/lean/UOToolchain/TraceModel.lean"
   , rustTraceModule := "crates/uo-core/src/trace.rs"
@@ -767,7 +767,7 @@ def sgxControllerRefinementProvenance : SgxControllerRefinementProvenance :=
   { refinementClaim :=
       "for every OramAccessLeakage list, the canonical Lean controller-shape constructor refines the W6.1 / W6.2 frozen observer surface in page-region names, workset-region names, boundary-event budget, and shared-resource pattern"
   , observerDocSection :=
-      "docs/tee-runtime-hardening.md \"W6.3 Controller-Refinement Integration\""
+      "docs/runtime/tee-observer.md \"Controller Refinement\""
   , staticDriftCheckName := "sgx_controller_refinement_pinned"
   , leanControllerModule := "proof/lean/UOToolchain/SgxController.lean"
   , rustTraceModule := "crates/uo-core/src/trace.rs"
@@ -865,7 +865,7 @@ all reference one canonical sealing / storage projection. -/
 structure SgxStorageRefinementProvenance where
   /-- Free-form description of the refinement integration. -/
   refinementClaim : String
-  /-- Documentation anchor for the WP6 hardening track. -/
+  /-- Documentation anchor for the TEE observer reference. -/
   observerDocSection : String
   /-- Probe static-drift check that pins the Rust runtime's
   storage-refinement emission. -/
@@ -883,7 +883,7 @@ def sgxStorageRefinementProvenance : SgxStorageRefinementProvenance :=
   { refinementClaim :=
       "viewTEEStore projects every TEEView field deterministically from the underlying Config and DeploymentResult; the physicalReads / physicalWrites lists are forwarded unchanged at the W6.2-frozen PhysicalRead / PhysicalWrite schema"
   , observerDocSection :=
-      "docs/tee-runtime-hardening.md \"W6.4 Sealing / Storage Refinement Integration\""
+      "docs/runtime/tee-observer.md \"Storage Refinement\""
   , staticDriftCheckName := "sgx_storage_refinement_pinned"
   , leanTeeDeploymentModule := "proof/lean/UOToolchain/TeeDeployment.lean"
   , leanTraceModule := "proof/lean/UOToolchain/TraceModel.lean"
@@ -927,7 +927,7 @@ isolation assumption that every TEE security claim depends on:
   patch / microcode level supports the SGX security claims.
 
 Claim taxonomy (per
-[`docs/coding-agent-conventions.md`](./coding-agent-conventions.md#claim-and-tcb-discipline)):
+[`docs/coding-agent-conventions.md`](../../docs/coding-agent-conventions.md#claim-discipline)):
 **Cited / externally justified** — the assumptions remain explicit
 in the bundle, paired with provenance citations to the Intel SGX
 specifications. They are not Lean-discharged; they are part of the

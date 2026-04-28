@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1157067,
+  "artifact_json_bytes": 1160309,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimePublicBridgeBoundary",
   "lean_checker_input": "source-backed runtime public bridge boundary",
   "lean_checker_kind": "runtime public bridge boundary",
@@ -8,7 +8,7 @@
   "public_bridge_boundary_theorem_checked": true,
   "source_bytes": {
     "controller": 19525,
-    "core_lib": 7074,
+    "core_lib": 7096,
     "engine": 14738,
     "runtime_evm_lib": 62066,
     "runtime_module": 2096,
