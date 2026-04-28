@@ -34,6 +34,9 @@ Rejected:
 Sidecar metadata requirements:
 
 - every state object must declare `kind`, `backend`, and confidentiality
+- every externally callable entrypoint must have an explicit sidecar stanza;
+  public entrypoints must say `confidential: false`, and confidential
+  entrypoints must say `confidential: true`
 - every map must declare a public `capacity`
 - confidential entrypoints must declare `secret_args`
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is

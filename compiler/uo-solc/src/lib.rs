@@ -55,21 +55,18 @@ pub fn validate_source(source_path: &str, metadata: &ContractMetadata) -> Result
     for function in &frontend.functions {
         let signature = function_signature(function)
             .ok_or_else(|| anyhow!("function without name is unsupported"))?;
-        let entry_meta = frontend
-            .entrypoint_metadata
-            .get(&signature)
-            .cloned()
-            .unwrap_or(uo_core::EntrypointMetadata {
-                secret_args: Vec::new(),
-                public_gas_budget: None,
-                confidential: false,
-            });
+        let entry_meta = frontend.entrypoint_metadata.get(&signature).ok_or_else(|| {
+            anyhow!(
+                "entrypoint {} is missing explicit metadata; declare it public or confidential in the sidecar",
+                signature
+            )
+        })?;
         let mut ctx = LowerCtx {
             frontend: &frontend,
             locals: BTreeMap::new(),
             loop_counter: 0,
         };
-        let _ = lower_function(function, &entry_meta, ProgramMode::Raw, &mut ctx)?;
+        let _ = lower_function(function, entry_meta, ProgramMode::Raw, &mut ctx)?;
     }
     Ok(ValidationOutput {
         contract_name: frontend.contract_name,
@@ -95,24 +92,21 @@ pub fn compile(
     for function in &frontend.functions {
         let signature = function_signature(function)
             .ok_or_else(|| anyhow!("function without name is unsupported"))?;
-        let entry_meta = frontend
-            .entrypoint_metadata
-            .get(&signature)
-            .cloned()
-            .unwrap_or(uo_core::EntrypointMetadata {
-                secret_args: Vec::new(),
-                public_gas_budget: None,
-                confidential: false,
-            });
+        let entry_meta = frontend.entrypoint_metadata.get(&signature).ok_or_else(|| {
+            anyhow!(
+                "entrypoint {} is missing explicit metadata; declare it public or confidential in the sidecar",
+                signature
+            )
+        })?;
         let mut ctx = LowerCtx {
             frontend: &frontend,
             locals: BTreeMap::new(),
             loop_counter: 0,
         };
-        let compiled = lower_function(function, &entry_meta, mode.clone(), &mut ctx)?;
+        let compiled = lower_function(function, entry_meta, mode.clone(), &mut ctx)?;
         manifest_entrypoints.insert(
             signature.clone(),
-            build_manifest_entry(&compiled, &frontend, &entry_meta)?,
+            build_manifest_entry(&compiled, &frontend, entry_meta)?,
         );
         functions.push(compiled);
     }
@@ -207,7 +201,7 @@ fn parse_frontend(
     let mut state_by_name = BTreeMap::new();
     let mut functions = Vec::new();
     let mut helpers = BTreeMap::new();
-    let mut diagnostics = Vec::new();
+    let diagnostics = Vec::new();
     for part in &contract.parts {
         match part {
             pt::ContractPart::StructDefinition(def) => {
@@ -279,6 +273,18 @@ fn parse_frontend(
             bail!("metadata references unknown state object {}", key);
         }
     }
+    let function_signatures = functions
+        .iter()
+        .map(|function| {
+            function_signature(function)
+                .ok_or_else(|| anyhow!("function without name is unsupported"))
+        })
+        .collect::<Result<BTreeSet<_>>>()?;
+    for signature in metadata.entrypoints.keys() {
+        if !function_signatures.contains(signature) {
+            bail!("metadata references unknown entrypoint {}", signature);
+        }
+    }
     let mut entrypoint_metadata = BTreeMap::new();
     for function in &functions {
         let signature = function_signature(function)
@@ -287,10 +293,10 @@ fn parse_frontend(
             entrypoint_metadata.insert(signature.clone(), entry_meta.clone());
             ensure_secret_args_exist(function, entry_meta)?;
         } else {
-            diagnostics.push(format!(
-                "no explicit metadata for {}, treating it as public entrypoint",
+            bail!(
+                "entrypoint {} is missing explicit metadata; declare it public or confidential in the sidecar",
                 signature
-            ));
+            );
         }
     }
     Ok(Frontend {
@@ -2369,7 +2375,9 @@ mod tests {
         let meta = parse_metadata(
             r#"
 contract: C
-entrypoints: {}
+entrypoints:
+  f(uint256):
+    confidential: false
 state:
   x:
     kind: cell
@@ -2381,6 +2389,70 @@ bounds:
 "#,
         );
         assert!(validate_source(source.to_str().unwrap(), &meta).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_entrypoint_metadata() {
+        let source = write_temp(
+            "missing-entrypoint-metadata",
+            r#"
+            contract C {
+                uint256 private x;
+                function f(uint256 a) public { x = a; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints: {}
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f(uint256) is missing explicit metadata"));
+    }
+
+    #[test]
+    fn rejects_unknown_entrypoint_metadata() {
+        let source = write_temp(
+            "unknown-entrypoint-metadata",
+            r#"
+            contract C {
+                uint256 private x;
+                function f(uint256 a) public { x = a; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  g(uint256):
+    confidential: false
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("metadata references unknown entrypoint g(uint256)"));
     }
 
     #[test]
