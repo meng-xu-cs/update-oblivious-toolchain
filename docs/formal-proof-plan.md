@@ -761,6 +761,12 @@ not claim value-level equality with the runtime's real
 `tiny_keccak::Keccak::v256()` output until a hash refinement bridge is
 added.
 
+The default Lean umbrella `UOToolchain` imports only
+`UOToolchain.ProofGradeRoot`. The historical axiom-backed ORAM/SGX
+demonstrations remain available through `UOToolchain.LegacyRoot`, and
+`CheckProofGradeAxiomReport` pins the axiom dependency reports for the named
+paper-facing compiler/runtime theorems to Lean's standard logical axioms.
+
 ### 6.4 Surrogate-backend isolation (closed by WP3 / WP7 static-drift discipline)
 
 The legacy surrogate backend remains in the repository for benchmarking

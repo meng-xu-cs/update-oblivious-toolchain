@@ -1,68 +1,8 @@
-import UOToolchain.TraceModel
-import UOToolchain.FiniteDistribution
-import UOToolchain.IRSyntax
-import UOToolchain.IRSemantics
-import UOToolchain.KernelDsl
-import UOToolchain.Sol
-import UOToolchain.ExactObjects
-import UOToolchain.CompilerInvariant
-import UOToolchain.OramModel
-import UOToolchain.Composition
-import UOToolchain.OramGame
-import UOToolchain.LegacyComposition
-import UOToolchain.StandardOramReduction
-import UOToolchain.PathOramSecurity
-import UOToolchain.TeeDeployment
-import UOToolchain.LegacyTeeDeployment
-import UOToolchain.SgxBoundary
-import UOToolchain.SgxRelation
-import UOToolchain.SgxController
-import UOToolchain.SgxControllerTrace
-import UOToolchain.SgxMicroModel
-import UOToolchain.SgxMicroGame
-import UOToolchain.SgxObserverFreeze
-import UOToolchain.RuntimeRefinement
-import UOToolchain.RuntimeTrustedKernel
-import UOToolchain.RuntimeShellBoundary
-import UOToolchain.ConfidentialKernelDsl
-import UOToolchain.RuntimeAllocatorDiscipline
-import UOToolchain.RuntimeArrayAccessDiscipline
-import UOToolchain.RuntimeOramCodecSemantics
-import UOToolchain.RuntimeOramHelperSemantics
-import UOToolchain.RuntimeOramWriteLogDiscipline
-import UOToolchain.RuntimeReturnScheduleDiscipline
-import UOToolchain.RuntimeSmallMapLookupDiscipline
-import UOToolchain.RuntimeStatementTraceDiscipline
-import UOToolchain.RuntimeStoreCodecSemantics
-import UOToolchain.RuntimeStoreHelperSemantics
-import UOToolchain.RuntimeValueOpsSemantics
-import UOToolchain.ConfidentialFragment
-import UOToolchain.RuntimeConfidentialCoreAssurance
-import UOToolchain.RuntimeCoins
-import UOToolchain.PathOramLocalPosmapV1
-import UOToolchain.PathOramLocalPosmapV1Refinement
-import UOToolchain.PathOramLocalPosmapV1StandardTheorem
-import UOToolchain.PathOramJACMTheorem
-import UOToolchain.PaperPathOramTheoremRoute
-import UOToolchain.RuntimeRefinementJson
-import UOToolchain.RuntimeTrustedKernelJson
-import UOToolchain.RuntimeShellBoundaryJson
-import UOToolchain.RuntimeShellBoundarySlotJson
-import UOToolchain.RuntimeShellBoundaryLoweringJson
-import UOToolchain.ConfidentialFragmentJson
-import UOToolchain.RuntimeKernelDslJson
-import UOToolchain.RuntimeConfidentialCoreAssuranceJson
-import UOToolchain.RuntimeConfidentialCoreKernelInterfaceSlotJson
-import UOToolchain.RuntimeConfidentialCoreShellBoundarySlotJson
-import UOToolchain.RuntimeConfidentialCoreShellBoundaryLoweringJson
-import UOToolchain.RuntimeCoinsJson
-import UOToolchain.RuntimePathOramPairJson
-import UOToolchain.RuntimeCanonicalPathOramPairJson
-import UOToolchain.TranslationValidationJson
-import UOToolchain.CompilerExactness
-import UOToolchain.RuntimePaperInstantiation
-import UOToolchain.SgxOramProjection
-import UOToolchain.LegacySgxOramProjection
-import UOToolchain.SgxExactProjection
-import UOToolchain.SgxJointProjection
-import UOToolchain.LegacySgxJointProjection
+import UOToolchain.ProofGradeRoot
+
+/-!
+# UO toolchain proof-grade umbrella
+
+The default umbrella imports the proof-grade root only. Legacy axiom-backed
+demonstrations remain available through `UOToolchain.LegacyRoot`.
+-/

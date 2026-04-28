@@ -52,6 +52,22 @@
     }
   ],
   "legacy_theorem_symbol_surface_restricted": true,
+  "proofgrade_axiom_report_legacy_symbols_absent": true,
+  "proofgrade_axiom_report_theorem_checks": [
+    {
+      "print_axioms_present": true,
+      "theorem": "UOToolchain.proofGrade_compiler_correctness_supersedes_artifact_checker"
+    },
+    {
+      "print_axioms_present": true,
+      "theorem": "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell"
+    },
+    {
+      "print_axioms_present": true,
+      "theorem": "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell"
+    }
+  ],
+  "proofgrade_axiom_report_theorem_checks_present": true,
   "proofgrade_checker_import_surface_checks": [
     {
       "file": "proof/lean/CheckCanonicalPathOramPairCertificate.lean",
@@ -73,6 +89,12 @@
     },
     {
       "file": "proof/lean/CheckPathOramPairCertificate.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckProofGradeAxiomReport.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true
@@ -496,6 +518,16 @@
   "proofgrade_checker_legacy_symbol_mentions_absent": true,
   "proofgrade_core_module_import_surface_checks": [
     {
+      "file": "proof/lean/UOToolchain.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/ProofGradeRoot.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
       "file": "proof/lean/UOToolchain/ProofGrade.lean",
       "forbidden_import_hits": [],
       "restricted": true
@@ -507,6 +539,11 @@
     },
     {
       "file": "proof/lean/UOToolchain/TeeDeployment.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/SgxController.lean",
       "forbidden_import_hits": [],
       "restricted": true
     },

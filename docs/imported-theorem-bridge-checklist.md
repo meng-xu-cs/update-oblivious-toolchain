@@ -62,14 +62,20 @@ Status labels:
   `probe/mplus-probe/src/lib.rs`,
   `docs/formal-proof-plan.md`.
   The only remaining Lean `axiom`s are marked legacy, and the proof-grade
-  `path_oram_local_posmap_v1` development does not depend on them.
+  `path_oram_local_posmap_v1` development does not depend on them. The default
+  `UOToolchain` umbrella now imports `UOToolchain.ProofGradeRoot`, while the
+  old axiom-backed demonstrations are isolated behind
+  `UOToolchain.LegacyRoot`.
   The `static-checks` probe also pins the legacy axiom definitions to the
   legacy game modules, restricts legacy theorem-symbol mentions to the
   `Legacy*` bridge/projection companions, and checks that every top-level
-  `Check*.lean` entrypoint imports `UOToolchain.ProofGrade` instead of the
-  legacy umbrella, that the `ProofGrade` umbrella plus the generic theorem
-  modules do not import the legacy surface, and that those checker entrypoints
-  do not mention the legacy shims directly.
+  `Check*.lean` entrypoint imports `UOToolchain.ProofGrade` or
+  `UOToolchain.ProofGradeRoot` instead of the legacy umbrella, that the
+  proof-grade root / `ProofGrade` umbrella plus the generic theorem modules do
+  not import the legacy surface, and that those checker entrypoints do not
+  mention the legacy shims directly. `CheckProofGradeAxiomReport.lean` pins
+  `#print axioms` output for the named paper-facing compiler/runtime theorems
+  and allows only Lean's standard logical axioms.
 
 - `cleared` Translation-validate proof-relevant compiler output against source
   and metadata.

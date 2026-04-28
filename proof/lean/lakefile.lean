@@ -11,6 +11,10 @@ lean_exe checkProofGradeRuntimeWitness where
   root := `CheckProofGradeRuntimeWitness
 
 @[default_target]
+lean_exe checkProofGradeAxiomReport where
+  root := `CheckProofGradeAxiomReport
+
+@[default_target]
 lean_exe checkRuntimeWitness where
   root := `CheckRuntimeWitness
 

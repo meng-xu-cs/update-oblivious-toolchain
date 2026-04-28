@@ -359,8 +359,8 @@
     },
     {
       "path": "static_checks.json",
-      "bytes": 28455,
-      "sha256": "01d6ba30f4b94f6116ed45ea9b6cc9b1c0f8de871b7ec378b1c4f8ea0bf1929a"
+      "bytes": 29678,
+      "sha256": "2bc1b20d4d01f9f62a4baeff4df88360019aad301a863dbd7b6bdf0b55311f32"
     },
     {
       "path": "tamper_validation.json",

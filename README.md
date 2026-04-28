@@ -104,6 +104,10 @@ Current proof-grade TCB:
 
 Current theorem boundary notes:
 
+- The default Lean umbrella `UOToolchain` imports `UOToolchain.ProofGradeRoot`.
+  Legacy axiom-backed demonstrations are isolated behind
+  `UOToolchain.LegacyRoot`, and `CheckProofGradeAxiomReport` pins axiom
+  dependencies for the named paper-facing theorems.
 - Source-to-kernel correctness starts at the post-resolution Sol AST / UO IR
   consumed by the Lean model. Parser-level preprocessing remains trusted until
   a raw-source-to-post-resolution witness relation is mechanized.

@@ -48,6 +48,10 @@ The repository has already closed several important proof-grade gaps.
   confidential entrypoints, and that online check plus emitted kernel-step
   tracking now route through shared `uo-core` execution/schedule trackers
   rather than runtime-local cursors or bounded journals
+- the default Lean umbrella is proof-grade only: `UOToolchain` imports
+  `UOToolchain.ProofGradeRoot`, legacy axiom-backed demonstrations are isolated
+  under `UOToolchain.LegacyRoot`, and `CheckProofGradeAxiomReport` pins the
+  axiom reports for the named paper-facing theorems
 
 The repository has closed the outer runtime-side proof/interface gap for the
 chosen paper route. In addition to the exact checked

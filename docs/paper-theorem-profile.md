@@ -1247,6 +1247,7 @@ before lowering instead of truncating execution through a runtime
 | --- | --- | --- |
 | Lean kernel plus Lean theorem/checker development | trusted | trusted |
 | Explicit backend / cryptographic / deployment assumptions | trusted assumptions | keep explicit and minimize |
+| Legacy axiom demonstrations | isolated outside the proof-grade root: the default `UOToolchain` umbrella imports `UOToolchain.ProofGradeRoot`, legacy axiom-backed ORAM/SGX demonstrations live behind `UOToolchain.LegacyRoot`, and `CheckProofGradeAxiomReport` pins `#print axioms` output for the named paper-facing compiler/runtime theorems to Lean's standard logical axioms only | keep out of the proof-grade root; remove once the historical demonstrations are no longer useful |
 | `uo-check` | not in the proof-grade TCB | not in the TCB |
 | `checkProofGradeTranslationArtifacts` (direct Lean artifact checker) | demoted from the trust root by W4.6 (commit `7e0483d`); the W4.2 + W4.4 + W4.5 chain (`proofGrade_compiler_correctness_supersedes_artifact_checker` in `ProofGrade.lean`) supplies the same content directly. The artifact checker remains as an executable proof witness — useful for checking concrete (source, artifact) pairs in CI — but is no longer load-bearing for the trust narrative | keep as an executable proof witness; trust flows via the W4.2 + W4.4 + W4.5 theorems |
 | `mplus-probe` | not in the proof-grade TCB | not in the TCB |

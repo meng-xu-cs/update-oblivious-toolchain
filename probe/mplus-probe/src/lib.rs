@@ -3358,9 +3358,12 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             }
             let source =
                 fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-            let uses_proofgrade_umbrella = source
-                .lines()
-                .any(|line| line.trim() == "import UOToolchain.ProofGrade");
+            let uses_proofgrade_umbrella = source.lines().any(|line| {
+                matches!(
+                    line.trim(),
+                    "import UOToolchain.ProofGrade" | "import UOToolchain.ProofGradeRoot"
+                )
+            });
             let uses_legacy_umbrella = source
                 .lines()
                 .any(|line| line.trim() == "import UOToolchain");
@@ -3400,9 +3403,12 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "import UOToolchain.LegacySgxJointProjection",
     ];
     let proofgrade_core_module_import_surface_checks = [
+        "proof/lean/UOToolchain.lean",
+        "proof/lean/UOToolchain/ProofGradeRoot.lean",
         "proof/lean/UOToolchain/ProofGrade.lean",
         "proof/lean/UOToolchain/Composition.lean",
         "proof/lean/UOToolchain/TeeDeployment.lean",
+        "proof/lean/UOToolchain/SgxController.lean",
         "proof/lean/UOToolchain/SgxOramProjection.lean",
         "proof/lean/UOToolchain/SgxJointProjection.lean",
         "proof/lean/UOToolchain/StandardOramReduction.lean",
@@ -3435,6 +3441,32 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
                     .as_bool()
                     .expect("core module import-surface restriction flag must be boolean")
             });
+    let proofgrade_axiom_report_source =
+        fs::read_to_string(workspace_path("proof/lean/CheckProofGradeAxiomReport.lean"))
+            .context("reading proof-grade axiom report checker")?;
+    let proofgrade_axiom_report_theorem_checks = [
+        "UOToolchain.proofGrade_compiler_correctness_supersedes_artifact_checker",
+        "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
+        "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
+    ]
+    .into_iter()
+    .map(|theorem| {
+        let print_axioms = format!("#print axioms {theorem}");
+        json!({
+            "theorem": theorem,
+            "print_axioms_present": proofgrade_axiom_report_source.contains(&print_axioms),
+        })
+    })
+    .collect::<Vec<_>>();
+    let proofgrade_axiom_report_theorem_checks_present =
+        proofgrade_axiom_report_theorem_checks.iter().all(|entry| {
+            entry["print_axioms_present"]
+                .as_bool()
+                .expect("proof-grade axiom report theorem-check flag must be boolean")
+        });
+    let proofgrade_axiom_report_legacy_symbols_absent = !proofgrade_axiom_report_source
+        .contains("legacyOramLocalTheorem")
+        && !proofgrade_axiom_report_source.contains("legacySgxMicroLocalTheorem");
     let mut reports = Vec::new();
     for (name, artifacts) in suite {
         let source = format!("benches/raw/{name}.sol");
@@ -3522,6 +3554,12 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             proofgrade_core_module_import_surface_checks,
         "proofgrade_core_module_import_surface_restricted":
             proofgrade_core_module_import_surface_restricted,
+        "proofgrade_axiom_report_theorem_checks":
+            proofgrade_axiom_report_theorem_checks,
+        "proofgrade_axiom_report_theorem_checks_present":
+            proofgrade_axiom_report_theorem_checks_present,
+        "proofgrade_axiom_report_legacy_symbols_absent":
+            proofgrade_axiom_report_legacy_symbols_absent,
         "reports": reports,
     }))
 }
