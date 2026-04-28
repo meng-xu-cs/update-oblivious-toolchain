@@ -472,6 +472,19 @@ The paper-facing facades exposed in
 the `proofGrade_sgx_deployment_*` prefix mirror the W5.4 / W5.3
 provenance facade pattern.
 
+`proof/lean/UOToolchain/RuntimeAuditSurfaces.lean` now adds the
+deployment mechanism layer requested by the review. The
+`sgxDeploymentAssumptionMechanismMatrix` maps all six bundle fields
+to a concrete mechanism and classifies each one as implementation
+evidence, external/deployment-only, or removed from the implemented
+claim. The companion `sgxDeploymentFirstMilestoneChecklist` names the
+first deployment artifacts: enclave boundary, attestation transcript,
+sealed storage, sealed-state freshness evidence, rollback counter, and
+encrypted return channel. The encrypted return-channel entry is
+classified as removed from the implemented claim because the current
+runtime rejects `encrypted_to_client` returns until channel crypto is
+implemented.
+
 ### Static-drift coverage
 
 The probe's `sgx_deployment_assumption_bundle_pinned` flag, emitted
@@ -495,6 +508,13 @@ Specifically it requires:
 If any of those drift, the static-checks gate flips
 `sgx_deployment_assumption_bundle_pinned` to `false` and the gate
 rejects the checkpoint.
+
+The same report now emits
+`sgx_deployment_assumption_mechanism_matrix_pinned` and
+`return_channel_crypto_gate_pinned`. Those checks require the
+assumption-to-mechanism matrix, the first deployment milestone
+checklist, and the runtime gate that rejects `ReturnPolicy::EncryptedToClient`
+until an encrypted return-channel transcript exists.
 
 ## W6.6 Hostile-Host Closure Audit
 
@@ -566,7 +586,10 @@ freshness, crash, patch level), and the audit closes the surface
 at exactly six checkpoints (W6.6). Every surviving claim is either
 **Lean-proved, semantics-preserving** (W6.1–W6.4) or **Cited /
 externally justified** (W6.5). No WP6 surface field remains
-optional, deferred, or recorded for follow-up.
+optional, deferred, or recorded for follow-up; the separate F17
+mechanism matrix records deployment artifacts that must be supplied by
+an SGX deployment or are removed from the implemented claim until the
+runtime supports them.
 
 ## Revived Runtime-Kernel Requirements
 

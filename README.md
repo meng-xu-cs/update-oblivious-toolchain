@@ -84,11 +84,16 @@ Explicit assumption profile:
 | `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents for the concrete local-posmap backend | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; W5.4 pairs the assumption with `pathOramLocalPosmapV1_cryptoProvenance` (RFC 8439 ChaCha20-Poly1305 + Procter 2014 IACR ePrint AEAD-composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` |
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; W5.4 pairs the assumption with the same `pathOramLocalPosmapV1_cryptoProvenance` route |
 | `stashOverflowBounded` | bounds stash-overflow failure for the deployed parameters | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; W5.3 pairs the assumption with `pathOramLocalPosmapV1_stashOverflowProvenance` (Stefanov et al. JACM 2018 Theorem 5.1 at `Z = 5`) and the static-drift check `path_oram_deployed_stash_parameters_pinned` |
-| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields, each paired with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification and pinned by the static-drift check `sgx_deployment_assumption_bundle_pinned`; W6.6 audits these as the six closed checkpoint entries of `sgxHostileHostClosureAudit` |
+| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields, each paired with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification and pinned by `sgx_deployment_assumption_bundle_pinned`; `RuntimeAuditSurfaces.lean` now adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist`, pinned by `sgx_deployment_assumption_mechanism_matrix_pinned`, so each assumption is classified as implementation evidence, external/deployment-only, or removed from the implemented claim; the encrypted return-channel milestone is explicitly gated because the current runtime rejects `encrypted_to_client` returns |
 
 The fresh-leaf remapping bridge is no longer a separate backend assumption.
 The canonical fresh-coin runtime-family and hidden-leaf coverage checkers now
 discharge that exact leaf-seed-space interface directly.
+`RuntimeAuditSurfaces.lean` also pins the residual host-visible outcome
+taxonomy (`runtimeHostVisibleOutcomeTaxonomy`) and the runtime nonce /
+fresh-coin discipline (`runtimeFreshnessDiscipline`), and
+`kernel_model_alignment_validation.json` rejects deletion of those audit
+surfaces.
 
 Current proof-grade TCB:
 

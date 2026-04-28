@@ -39,7 +39,9 @@ Sidecar metadata requirements:
   entrypoints must say `confidential: true`
 - every entrypoint must declare `returns` as `forbidden`, `public`,
   `declassified`, or `encrypted_to_client`; the current runtime rejects
-  `encrypted_to_client` until an encrypted return channel is implemented
+  `encrypted_to_client` until an encrypted return channel is implemented, and
+  the `return_channel_crypto_gate_pinned` probe check keeps that unsupported
+  policy out of the implemented claim
 - every entrypoint must declare `status` as `public` or `declassified`
 - `returns: declassified` requires `declassifies: [return]`, and
   `status: declassified` requires `declassifies: [success]`

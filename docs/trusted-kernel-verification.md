@@ -89,7 +89,10 @@ taxonomy for the generated object/ORAM/store helper stack: public shape,
 authenticated-decode/integrity, cold-restore, fresh-coin tape, write-log, and
 public capacity errors may still surface as `Result` failures, while
 deterministic hidden-state map/ORAM misses must flow through the modeled abort
-bit.
+bit. F03 now lifts that into a named proof-grade audit surface,
+`runtimeHostVisibleOutcomeTaxonomy`, so success, abort, runtime public errors,
+proof-checker failures, commit/rollback, and cryptographic integrity failures
+are all classified rather than left as prose.
 The checked stack now also isolates the handwritten `uo-kernel-runtime`
 forwarding shell as its own standalone `RuntimeImplementationSlotAdapterBoundary`
 before the wider small-kernel boundary, so the remaining handwritten adapter
@@ -119,7 +122,12 @@ The final paper target is now built on that runtime boundary:
   post-resolution source language
 - WP5 supplies the minimized backend-assumption audit and citation/provenance
   route
-- WP6 supplies the hostile-host observer/deployment closure
+- WP6 supplies the hostile-host observer/deployment closure, and F17's
+  `sgxDeploymentAssumptionMechanismMatrix` maps every surviving TEE assumption
+  to implementation evidence, external/deployment-only evidence, or removal
+  from the implemented claim
+- F16's `runtimeFreshnessDiscipline` names the runtime nonce, fresh-coin, and
+  diagnostics-only coin surfaces that feed the formal freshness assumptions
 - `uo-check`, `mplus-probe`, and Rust-side translation convenience wrappers
   remain outside the TCB
 - a deeper semantics-of-Rust refinement below the checked boundary remains an

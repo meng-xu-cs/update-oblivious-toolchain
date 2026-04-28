@@ -208,7 +208,12 @@ backend-assumption provenance/audit route, and WP6 supplies the hostile-host
 observer and deployment-assumption closure. The remaining non-claim is below
 this interface: the repository does not prove downstream machine code or a full
 semantics-of-Rust refinement for every residual implementation detail beneath
-the checked source-backed runtime boundary.
+the checked source-backed runtime boundary. F16/F17 are now tracked by named
+audit surfaces rather than prose: `runtimeFreshnessDiscipline` connects the
+runtime nonce/fresh-coin/diagnostic surfaces to formal freshness obligations,
+and `sgxDeploymentAssumptionMechanismMatrix` maps each TEE assumption to
+implementation evidence, external/deployment-only evidence, or removal from
+the current implemented claim.
 
 ### M7. Paper-main standard-theorem route
 
@@ -1384,7 +1389,12 @@ boundary now pins a residual host-visible error taxonomy for generated
 object/ORAM/store helpers: public shape/capacity, authenticated
 decode/integrity, cold-restore, fresh-coin tape, and write-log discipline
 failures may still return `Result` errors, while deterministic hidden-state
-map/ORAM capacity or update misses must remain in-band abort effects. Lean now
+map/ORAM capacity or update misses must remain in-band abort effects. The
+F03 audit surface `runtimeHostVisibleOutcomeTaxonomy` now records the complete
+host-visible model for success, abort, runtime public errors, proof-checker
+failures, commit/rollback, and cryptographic integrity failures, and proves
+each class is closed by public determination, a stated negligible assumption,
+explicit declassification, or internal normalization. Lean now
 also states the generated ORAM codec byte layout directly, including ORAM block
 encode/decode roundtrip, exact-length ORAM block decode/roundtrip facts, ORAM
 decoded-block valid-shape facts, aggregate decoded bucket/stash block

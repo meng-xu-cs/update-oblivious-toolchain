@@ -2181,6 +2181,20 @@ Concrete tasks:
      taxonomy, every entry is **Cited / externally justified** —
      the bundle does not Lean-discharge any of the six assumptions;
      they are honored by the TEE platform under deployment.
+   - **F17 mechanism-matrix status (landed):**
+     `RuntimeAuditSurfaces.lean` now carries
+     `sgxDeploymentAssumptionMechanismMatrix`, mapping each of the six
+     deployment assumptions to implementation evidence,
+     external/deployment-only evidence, or removal from the implemented
+     claim. The companion `sgxDeploymentFirstMilestoneChecklist` records the
+     first deployment artifacts: enclave boundary, attestation transcript,
+     sealed storage, sealed-state freshness evidence, rollback counter, and
+     encrypted return channel. The encrypted return-channel entry is
+     explicitly removed from the current implemented claim because the
+     runtime rejects `ReturnPolicy::EncryptedToClient` until channel crypto is
+     implemented. The probe pins both the mechanism matrix and this gate with
+     `sgx_deployment_assumption_mechanism_matrix_pinned` and
+     `return_channel_crypto_gate_pinned`.
 6. Remove any remaining ambiguity between idealized TEE-storage security and
    malicious-host execution obliviousness.
    - **W6.6 status (landed):** the WP6 surface is now closed at
@@ -2498,7 +2512,14 @@ only as a closure log for the historical execution order:
    public-shape/public-capacity, authenticated decode/integrity,
    cold-restore, fresh-coin tape, or write-log discipline errors, and the old
    deterministic hidden-state capacity/update misses are rejected even if the
-   Lean generators and generated Rust drift together. The Path-ORAM side is
+   Lean generators and generated Rust drift together. F03 now records the
+   closed host-visible outcome model in
+   `RuntimeAuditSurfaces.runtimeHostVisibleOutcomeTaxonomy`: success, abort,
+   runtime public errors, proof-checker failures, commit/rollback, and
+   cryptographic integrity failures are each classified as
+   public-determined, negligible under a stated assumption, explicitly
+   declassified, or normalized internally, and the probe pins the audit as
+   `host_visible_outcome_taxonomy_audit_present`. The Path-ORAM side is
    now pinned
    both at the restore-vs-exact-write-batch split and at the generated
    `with_opened_oram_payload` / `seal_boxed_oram_payload` /
@@ -3169,6 +3190,12 @@ only as a closure log for the historical execution order:
    and schedule grouping paths to use checked entry/schedule lookups rather
    than `old_entries[index]`, `coin_schedule[index]`, or schedule sub-slices;
    tamper validation rejects reintroducing the direct-index replacement form.
+   F16 now adds the proof-grade `runtimeFreshnessDiscipline` audit, covering
+   store encryption nonces, metadata encryption nonces, Path-ORAM fresh remap
+   coins, canonical fresh-coin proof families, and diagnostics-only
+   fresh-coin injection; the audit proves every entry is domain-separated,
+   fresh per call/seed, and production-theorem safe, and the probe pins it as
+   `runtime_freshness_discipline_audit_present`.
    The committed-state duplicate-object guard likewise uses a slice-pattern
    window match rather than `pair[0]` / `pair[1]`, and the implementation
    interface rejects that stale direct-index shell shape too.

@@ -15,6 +15,10 @@ cannot honestly target a universal theorem over all downstream Rust machine
 code, host runtime effects, or microarchitectural observers; the remaining
 work is source-to-kernel compiler correctness, backend-assumption discharge,
 and the final malicious-host deployment theorem.
+`RuntimeAuditSurfaces.lean` now pins the residual host-visible outcome
+taxonomy, nonce/fresh-coin discipline, and SGX deployment mechanism matrix so
+those remaining non-semantic assumptions are explicit proof-grade inputs rather
+than prose-only obligations.
 
 ## 0. Frozen Final Theorem Target
 
@@ -801,8 +805,14 @@ Lean type level (W6.6). The named static-drift checks
 (`sgx_observer_surface_pinned`, `sgx_boundary_call_model_pinned`,
 `sgx_persistent_io_model_pinned`, `sgx_controller_refinement_pinned`,
 `sgx_storage_refinement_pinned`,
-`sgx_deployment_assumption_bundle_pinned`) reject regression of any
-of those surfaces.
+`sgx_deployment_assumption_bundle_pinned`,
+`sgx_deployment_assumption_mechanism_matrix_pinned`, and
+`return_channel_crypto_gate_pinned`) reject regression of any of those
+surfaces. The mechanism matrix records which deployment artifacts are
+implementation-backed, which remain external/deployment-only, and which are
+removed from the implemented claim; currently `encrypted_to_client` returns
+stay removed because the runtime rejects them until return-channel crypto
+exists.
 
 ## 7. Proof-Oriented Refactor Plan (frozen architecture)
 
@@ -850,7 +860,8 @@ under the explicit `PathOramLocalPosmapV1SecurityAssumptions` bundle:
 - the malicious-host SGX deployment surface is closed at the WP6
   six-checkpoint level under the W6.1 / W6.2 frozen observer plus the
   W6.5 explicit `SgxDeploymentAssumptions` Cited / externally
-  justified bundle
+  justified bundle, with F17's mechanism matrix pinning the concrete
+  deployment artifacts and the encrypted-return gate
 - the results bundle is regenerated against the transcript model and
   pinned by `results/reproducibility_manifest.json`
 

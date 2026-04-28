@@ -2780,6 +2780,13 @@ fn wp6_closure_audit_summary() -> JsonValue {
             "lean_anchor": "SgxDeploymentAssumptions + sgxDeploymentAssumptionProvenances",
             "static_drift_check_name": "sgx_deployment_assumption_bundle_pinned",
         },
+        {
+            "checkpoint": "F17 mechanism matrix",
+            "role": "assumption-to-mechanism matrix plus first deployment milestone checklist (enclave boundary, attestation transcript, sealed storage, freshness evidence, rollback counter, encrypted return-channel gate)",
+            "classification": "mapped implementation evidence / external deployment-only / removed from implemented claim",
+            "lean_anchor": "sgxDeploymentAssumptionMechanismMatrix + sgxDeploymentFirstMilestoneChecklist",
+            "static_drift_check_name": "sgx_deployment_assumption_mechanism_matrix_pinned",
+        },
     ])
 }
 
@@ -2825,6 +2832,30 @@ fn static_drift_check_inventory() -> JsonValue {
             "work_package": "W6.5",
             "target": "the `SgxDeploymentAssumptions` Lean record's six `Prop` fields and the matching six `SgxDeploymentAssumptionProvenance` records carrying `IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, and `IntelSGXSecurityCenter` citations",
             "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_bundle_pinned",
+        },
+        {
+            "name": "runtime_host_visible_outcome_taxonomy_pinned",
+            "work_package": "F03",
+            "target": "the `runtimeHostVisibleOutcomeTaxonomy` audit model covering success, abort, runtime public errors, proof-checker failures, commit/rollback, and cryptographic integrity failures",
+            "report_field": "kernel_model_alignment_validation.host_visible_outcome_taxonomy_audit_present",
+        },
+        {
+            "name": "runtime_freshness_discipline_pinned",
+            "work_package": "F16",
+            "target": "the `runtimeFreshnessDiscipline` audit model covering store encryption nonces, metadata encryption nonces, Path-ORAM fresh remap coins, canonical fresh-coin proof families, and diagnostics-only fresh-coin injection",
+            "report_field": "kernel_model_alignment_validation.runtime_freshness_discipline_audit_present",
+        },
+        {
+            "name": "sgx_deployment_assumption_mechanism_matrix_pinned",
+            "work_package": "F17",
+            "target": "the SGX deployment assumption-to-mechanism matrix and first milestone checklist for attestation transcript, sealed storage/freshness, rollback counter, and return-channel gate",
+            "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_mechanism_matrix_pinned",
+        },
+        {
+            "name": "return_channel_crypto_gate_pinned",
+            "work_package": "F17",
+            "target": "the current implemented claim rejects `encrypted_to_client` returns until an encrypted return channel with nonce/session-key evidence exists",
+            "report_field": "kernel_model_alignment_validation.return_channel_crypto_gate_pinned",
         },
         {
             "name": "runtime_crypto_primitive_identity_pinned",
@@ -3033,7 +3064,7 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "TEE deployment assumptions",
             "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust",
-            "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification (`IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, `IntelSGXSecurityCenter`); the static-drift check `sgx_deployment_assumption_bundle_pinned` pins the bundle's Prop-field shape and the six provenance citations; W6.6 audits these as the six closed checkpoint entries of `sgxHostileHostClosureAudit`",
+            "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is gated by the runtime rejection of `encrypted_to_client` returns; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_gate_pinned` pin the surface",
         }
     ])
 }
@@ -25274,6 +25305,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterfaceJson.lean");
     let lean_history_semantics_path =
         repo_root().join("proof/lean/UOToolchain/HistorySemantics.lean");
+    let lean_runtime_audit_surfaces_path =
+        repo_root().join("proof/lean/UOToolchain/RuntimeAuditSurfaces.lean");
     let lean_proofgrade_root_path = repo_root().join("proof/lean/UOToolchain/ProofGradeRoot.lean");
     let lean_runtime_implementation_interface_checker_path =
         repo_root().join("proof/lean/CheckProofGradeRuntimeImplementationInterface.lean");
@@ -25530,6 +25563,13 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_history_semantics_path)
+            )
+        })?;
+    let lean_runtime_audit_surfaces_source = fs::read_to_string(&lean_runtime_audit_surfaces_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_runtime_audit_surfaces_path)
             )
         })?;
     let lean_proofgrade_root_source =
@@ -28546,6 +28586,35 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("theorem orderedMixedBackendSchedule_eq_of_publicObjectSchedule_eq")
         && lean_history_semantics_source
             .contains("theorem runtimeKernelSchedule_orderedObjectSchedule_finalState_public");
+    let host_visible_outcome_taxonomy_audit_present = lean_proofgrade_root_source
+        .contains("import UOToolchain.RuntimeAuditSurfaces")
+        && lean_runtime_audit_surfaces_source.contains("inductive HostVisibleOutcomeKind")
+        && lean_runtime_audit_surfaces_source.contains("def runtimeHostVisibleOutcomeTaxonomy")
+        && lean_runtime_audit_surfaces_source
+            .contains("HostVisibleOutcomeKind.proofCheckerFailure")
+        && lean_runtime_audit_surfaces_source.contains("HostVisibleOutcomeKind.commitRollback")
+        && lean_runtime_audit_surfaces_source
+            .contains("HostVisibleOutcomeKind.cryptographicIntegrityFailure")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem runtimeHostVisibleOutcomeTaxonomy_coversRequiredKinds")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem runtimeHostVisibleOutcomeTaxonomy_allClosed");
+    let runtime_freshness_discipline_audit_present = lean_proofgrade_root_source
+        .contains("import UOToolchain.RuntimeAuditSurfaces")
+        && lean_runtime_audit_surfaces_source.contains("inductive RuntimeFreshnessSurface")
+        && lean_runtime_audit_surfaces_source.contains("def runtimeFreshnessDiscipline")
+        && lean_runtime_audit_surfaces_source
+            .contains("RuntimeFreshnessSurface.storeEncryptionNonce")
+        && lean_runtime_audit_surfaces_source
+            .contains("RuntimeFreshnessSurface.pathOramLeafRemapCoin")
+        && lean_runtime_audit_surfaces_source
+            .contains("RuntimeFreshnessSurface.diagnosticFreshCoinInjection")
+        && lean_runtime_audit_surfaces_source
+            .contains("CanonicalFreshCoinRuntimePathOramWitnessFamily.freshCoinValueDistribution_eq_canonical")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem runtimeFreshnessDiscipline_allAccepted")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem runtimeFreshnessDiscipline_noDiagnosticsInProductionTheoremMode");
     let rust_runtime_small_confidential_kernel_boundary_field_names = extract_rust_struct_fields(
         &probe_source,
         "ImportedRuntimeImplementationSmallConfidentialKernelBoundary",
@@ -30168,9 +30237,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // refinement is documented in `docs/tee-runtime-hardening.md`
     // under "W6.3 Controller-Refinement Integration".
     // W6.5: pin the hostile-host TEE deployment-assumption bundle
-    // surface in the Lean source. The five canonical fields
+    // surface in the Lean source. The six canonical fields
     // (`attestationAuthenticity`, `enclaveMemoryIsolation`,
-    // `rollbackResistance`, `crashRecoveryDiscipline`,
+    // `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`,
     // `patchLevelTrust`) plus their explicit provenance records
     // referencing Intel SGX specifications must remain present in
     // `proof/lean/UOToolchain/SgxObserverFreeze.lean`. The matching
@@ -30210,6 +30279,31 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_sgx_observer_freeze_source.contains("\"IntelSGXSDM3D\"")
         && lean_sgx_observer_freeze_source.contains("\"IntelSGXSDKDeveloperReference\"")
         && lean_sgx_observer_freeze_source.contains("\"IntelSGXSecurityCenter\"");
+    let sgx_deployment_assumption_mechanism_matrix_pinned = lean_proofgrade_root_source
+        .contains("import UOToolchain.RuntimeAuditSurfaces")
+        && lean_runtime_audit_surfaces_source.contains("inductive SgxDeploymentMechanismStatus")
+        && lean_runtime_audit_surfaces_source
+            .contains("def sgxDeploymentAssumptionMechanismMatrix")
+        && lean_runtime_audit_surfaces_source.contains("\"attestation transcript\"")
+        && lean_runtime_audit_surfaces_source.contains("\"rollback counter transcript\"")
+        && lean_runtime_audit_surfaces_source.contains("\"sealed-state freshness evidence\"")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem sgxDeploymentAssumptionMechanismMatrix_coversBundleFields")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem sgxDeploymentAssumptionMechanismMatrix_allMapped")
+        && lean_runtime_audit_surfaces_source.contains("def sgxDeploymentFirstMilestoneChecklist")
+        && lean_runtime_audit_surfaces_source
+            .contains("SgxDeploymentMilestoneArtifact.encryptedReturnChannel")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem sgxDeploymentFirstMilestoneChecklist_coversRequiredArtifacts")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem sgxDeploymentFirstMilestoneChecklist_allMapped");
+    let return_channel_crypto_gate_pinned = lean_runtime_audit_surfaces_source
+        .contains("removedFromImplementedClaim")
+        && lean_runtime_audit_surfaces_source.contains("ReturnPolicy.encrypted_to_client")
+        && runtime_controller_source.contains("ReturnPolicy::EncryptedToClient")
+        && runtime_controller_source
+            .contains("bail!(\"encrypted_to_client returns are not implemented\")");
     // W6.4: pin the canonical hostile-host sealing / storage
     // refinement — the runtime's `RefinementTrace` keeps
     // `physical_reads: Box<[PhysicalReadEvent]>` and
@@ -34727,6 +34821,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_implementation_interface_source_drift_boundary_classified
         && adaptive_history_semantics_theorems_present
         && mixed_backend_ordered_schedule_theorems_present
+        && host_visible_outcome_taxonomy_audit_present
+        && runtime_freshness_discipline_audit_present
         && runtime_small_confidential_kernel_boundary_field_names_match
         && runtime_small_confidential_kernel_boundary_small_kernel_theorem_present
         && runtime_small_confidential_kernel_boundary_slot_adapter_theorem_present
@@ -34754,6 +34850,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && sgx_controller_refinement_pinned
         && sgx_storage_refinement_pinned
         && sgx_deployment_assumption_bundle_pinned
+        && sgx_deployment_assumption_mechanism_matrix_pinned
+        && return_channel_crypto_gate_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -35384,6 +35482,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             adaptive_history_semantics_theorems_present,
         "mixed_backend_ordered_schedule_theorems_present":
             mixed_backend_ordered_schedule_theorems_present,
+        "host_visible_outcome_taxonomy_audit_present":
+            host_visible_outcome_taxonomy_audit_present,
+        "runtime_freshness_discipline_audit_present":
+            runtime_freshness_discipline_audit_present,
         "rust_runtime_small_confidential_kernel_boundary_field_names":
             rust_runtime_small_confidential_kernel_boundary_field_names,
         "lean_runtime_small_confidential_kernel_boundary_field_names":
@@ -35454,6 +35556,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             sgx_storage_refinement_pinned,
         "sgx_deployment_assumption_bundle_pinned":
             sgx_deployment_assumption_bundle_pinned,
+        "sgx_deployment_assumption_mechanism_matrix_pinned":
+            sgx_deployment_assumption_mechanism_matrix_pinned,
+        "return_channel_crypto_gate_pinned":
+            return_channel_crypto_gate_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
