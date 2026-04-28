@@ -471,6 +471,7 @@ mod tests {
         RuntimeKernelStatementTrace,
     };
     use anyhow::Result;
+    use tiny_keccak::{Hasher, Keccak};
     use uo_allocator::{AllocatorPlan, AllocatorSession};
     use uo_core::{
         max_runtime_kernel_refinement_event_count, BinaryOp, ConfidentialKernelSlotExpr,
@@ -691,6 +692,23 @@ mod tests {
             opcode_trace.into_boxed_trace().as_ref(),
             [String::from("declare"), String::from("return")]
         );
+    }
+
+    #[test]
+    fn kernel_machine_keccak_uses_real_runtime_hash_not_lean_mock() {
+        let mut kernel = RuntimeKernelMachine::begin(kernel_plan(), &[]).unwrap();
+        let value = Value::Uint(7);
+        let mut expected = [0u8; 32];
+        let mut hasher = Keccak::v256();
+        value.visit_canonical_chunks(&mut |chunk| hasher.update(chunk));
+        hasher.finalize(&mut expected);
+
+        let digest = kernel
+            .keccak256_values(vec![value].into_boxed_slice())
+            .unwrap();
+
+        assert_ne!(expected, [0u8; 32]);
+        assert_eq!(digest, Value::Bytes32(expected));
     }
 
     #[test]

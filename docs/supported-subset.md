@@ -55,6 +55,14 @@ Execution-model note:
   `u128` domain; the Lean IR evaluator normalizes unsigned arithmetic,
   comparisons, negation, and div/mod-by-zero to match the Rust runtime's
   `u128` behavior rather than Solidity's full `uint256` arithmetic
+- `keccak256(abi.encodePacked(...))` is supported by the runtime with real
+  Keccak over canonical fixed-size bytes, but the current Lean source/IR/kernel
+  preservation proofs use a deterministic mock hash. They prove preservation
+  through the shared abstraction, not value-level equality with the real
+  Keccak output.
+- source-to-kernel correctness is stated for the post-resolution Sol AST / UO
+  IR consumed by the Lean model. Parser-level preprocessing remains trusted
+  until a raw-source-to-post-resolution witness relation is mechanized.
 - confidential entrypoints may not target raw-backend objects at all; the
   direct Lean proof-grade checker, compiler lowering, and runtime admission
   all enforce this, and the proof path is exact backends plus

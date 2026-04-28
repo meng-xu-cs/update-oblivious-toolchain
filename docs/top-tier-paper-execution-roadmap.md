@@ -1713,7 +1713,10 @@ Current status update:
   `Value.keccak256Mock` placeholder. `evalExpr` now handles
   `Expr.mapGet` (search `Value.map` entries by key) and
   `Expr.keccak256` (evaluate parts in order, apply the mock). The
-  W4.1 evaluator is now total over the structural admitted fragment;
+  source/IR/kernel preservation theorem is therefore over the shared
+  Lean hash abstraction; it is not a value-level proof of the
+  runtime's real `tiny_keccak::Keccak::v256()` output. The W4.1
+  evaluator is now total over the structural admitted fragment;
   the only `unsupported` constructors are `Expr.{structField,
   arrayIndex}`, which `Expr.fragmentValid` already rejects.
 - **Charter task 2 (source-to-IR correctness) closed end-to-end at
@@ -1744,12 +1747,14 @@ Current status update:
   program}_preservation` re-export through `ProofGrade.lean`.
   Combined with `proofGrade_ir_to_kernel_program_preservation`,
   this completes the source-to-kernel correctness chain at the
-  full admitted Sol AST. The parser-level transformations that
+  post-resolution admitted Sol AST, not raw Solidity source before
+  preprocessing. The parser-level transformations that
   precede the Sol AST (state-name resolution, capacity literal
   lookup, `abi.encodePacked` unwrapping, helper-function inlining,
   `AssignAdd`-style desugaring) are syntactic preprocessing that
   belong to the trusted `solang_parser` step; the entire semantic
-  Sol → IR step is now Lean-proved with no remaining surface.
+  Sol → IR step after that preprocessing is Lean-proved with no
+  remaining surface.
 - **W4.5 enabling theorem landed** (commit `fe256f2`,
   [proof/lean/UOToolchain/ProofGrade.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/ProofGrade.lean)):
   the paper-facing

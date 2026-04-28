@@ -102,6 +102,16 @@ Current proof-grade TCB:
 | `mplus-probe` | not in the proof-grade TCB |
 | `uo-solc` | not trusted as a proof oracle; WP4's W4.2 + W4.4 + W4.5 + W4.6 Lean chain supersedes the direct artifact checker for the admitted post-resolution source-to-kernel story, with parser/preprocessing still treated as the front-end trust point |
 
+Current theorem boundary notes:
+
+- Source-to-kernel correctness starts at the post-resolution Sol AST / UO IR
+  consumed by the Lean model. Parser-level preprocessing remains trusted until
+  a raw-source-to-post-resolution witness relation is mechanized.
+- Runtime `keccak256` uses real `tiny_keccak::Keccak::v256()` over canonical
+  bytes. The current Lean source/IR/kernel preservation proofs use a
+  deterministic mock hash, so they do not prove value-level equality with real
+  Keccak-derived results.
+
 Paper-main theorem strategy:
 
 - theorem-boundary fact: the paper route and the appendix / artifact route use

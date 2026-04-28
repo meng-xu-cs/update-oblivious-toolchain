@@ -513,10 +513,9 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       .status (.unsupported "Expr.arrayIndex")
   | .keccak256 parts =>
       -- Each sub-expression is evaluated in order via the mutual companion
-      -- `evalExprList`; the W4.1 evaluator only uses the resulting list
-      -- shape (every element evaluated to a value), not the actual hash
-      -- bits. The W4.4 preservation theorem holds because both IR and
-      -- kernel evaluators use the same `Value.keccak256Mock`.
+      -- `evalExprList`; the Lean source/IR/kernel preservation chain uses the
+      -- shared `Value.keccak256Mock` abstraction, not the runtime's real
+      -- Keccak bits.
       match evalExprList cfg env parts with
       | .error s => .status s
       | .ok vs => .value (Value.keccak256Mock vs)

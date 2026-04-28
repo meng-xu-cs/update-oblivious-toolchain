@@ -18,6 +18,15 @@ Stronger ORAM candidate in this artifact:
 Remaining assumptions:
 
 - arithmetic is executed in a bounded `u128` domain even when the accepted Solidity syntax spells `uint256`
+- source-to-kernel correctness starts at the post-resolution Sol AST / UO IR;
+  parser-level preprocessing (`solang_parser`, state resolution, capacity
+  lookup, helper inlining, `abi.encodePacked` unwrapping, and assignment
+  desugaring) remains a trusted front-end step until a proof-relevant
+  preprocessing witness is added
+- the runtime uses real `tiny_keccak::Keccak::v256()` over canonical bytes, but
+  the current Lean source/IR/kernel preservation proofs use a deterministic
+  mock hash and therefore do not claim value-level functional correctness for
+  real Keccak-derived results
 - guarantees are over the instrumented abstract/runtime traces emitted by this workspace, including the normalized physical read/write schedules captured by the current runtime
 - the prototype does not claim a proof for every downstream machine-code or microarchitectural observer
 - in a TEE deployment, persistent state now satisfies a concrete sealed-storage assumption rather than the previous marker-hiding placeholder encoding

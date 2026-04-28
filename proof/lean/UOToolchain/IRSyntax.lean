@@ -200,13 +200,12 @@ because `Value` is a nested-inductive over `List` and `String × Value`
 pairs, and Lean 4.30's `deriving` for nested inductives sometimes
 fails on this shape.
 
-`Value.keccak256Mock` is a deterministic placeholder for the Rust
-runtime's `tiny_keccak::Keccak::v256()` hash. The W4.1 evaluator only
-uses this for the value flow; the runtime's actual hash bits are
-material at a lower abstraction layer (Path-ORAM physical lookup).
-The mock is *not* cryptographically sound; it suffices for the
-evaluator and for the W4.4 preservation theorem (both IR-side and
-kernel-side evaluators use the same mock so they agree). -/
+`Value.keccak256Mock` is a deterministic hash abstraction used only by
+the Lean source/IR/kernel evaluators. It is deliberately not a model of
+the Rust runtime's `tiny_keccak::Keccak::v256()` output. The W4.4
+preservation theorem is therefore a preservation theorem for the shared
+Lean abstraction; value-level agreement with the real runtime hash is a
+separate refinement obligation. -/
 
 mutual
 
@@ -253,12 +252,13 @@ def Value.mapLookup (entries : List (Value × Value)) (key : Value) : Option Val
   | some (_, value) => some value
   | none => none
 
-/-- A deterministic placeholder for the Rust runtime's `Keccak::v256`
-hash. The mock returns a 32-byte zero vector regardless of input.
-This is *not* a cryptographic hash; the evaluator only relies on
-determinism. The W4.4 IR-to-kernel preservation theorem holds because
-both evaluators use the same mock. -/
+/-- A deterministic Lean-side hash abstraction. The mock returns a 32-byte
+zero vector regardless of input. This is *not* a cryptographic hash and is
+not a value-level refinement of the runtime's real Keccak implementation. -/
 def Value.keccak256Mock (_parts : List Value) : Value :=
   Value.bytes32 (List.replicate 32 0)
+
+theorem Value.keccak256Mock_returns_zero_bytes (parts : List Value) :
+    Value.keccak256Mock parts = Value.bytes32 (List.replicate 32 0) := rfl
 
 end UOToolchain.IR

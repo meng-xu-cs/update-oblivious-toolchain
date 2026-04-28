@@ -755,7 +755,12 @@ the Lean compiler-correctness theorems rather than the
 direct-artifact checker. The `uo-check` debug bundle is no longer on
 the proof-grade CLI path; the only trusted source-side surface is
 the parser-level preprocessing that produces the post-resolution Sol
-AST consumed by W4.2.
+AST consumed by W4.2. The current source/IR/kernel preservation chain
+also uses the shared Lean `Value.keccak256Mock` abstraction; it does
+not claim value-level equality with the runtime's real
+`tiny_keccak::Keccak::v256()` output until a hash refinement bridge is
+added.
+
 ### 6.4 Surrogate-backend isolation (closed by WP3 / WP7 static-drift discipline)
 
 The legacy surrogate backend remains in the repository for benchmarking
