@@ -376,7 +376,8 @@ The first implementation step is now present in the codebase:
   the finish boundary; Lean models this allocator transition discipline in
   `RuntimeAllocatorDiscipline`
 - the shared runtime-kernel statement recorder now also uses exact-capacity
-  boxed `MaybeUninit<String>` storage rather than `vec![None; capacity]` plus
+  storage through the safe owned `fixed_buffer::FixedPrefixBuffer<String>`
+  wrapper rather than `vec![None; capacity]`, local raw unsafe moves/drops, or
   a `Vec`-based repacking step at finish
 - that allocator-side kernel-op accounting is now count-only rather than a
   redundant opcode log, so the runtime boundary keeps the authoritative
@@ -1080,8 +1081,10 @@ The first implementation step is now present in the codebase:
   kernel-op/scratch/stack budgets, guard-drop wipe, finish-time wipe
   validation, public-capacity resource-event logging, boxed finish-boundary
   resource events, and absence of unsafe/forget-style escape hatches, with
-  `RuntimeAllocatorDiscipline` backing the allocator transition shape and
-  allocator scratch-budget / resource-event-log tamper cases through the
+  `RuntimeAllocatorDiscipline` backing the allocator transition shape; F15
+  pins all remaining theorem-adjacent fixed-buffer `unsafe` to
+  `crates/uo-core/src/fixed_buffer.rs`; allocator scratch-budget /
+  resource-event-log tamper cases are still exercised through the
   direct machine-confinement checker; the statement-trace recorder is now
   exact-capacity and modeled by `RuntimeStatementTraceDiscipline`; the generated
   confidential-kernel return schedule is now modeled by

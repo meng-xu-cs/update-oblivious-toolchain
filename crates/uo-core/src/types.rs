@@ -1,3 +1,4 @@
+use crate::fixed_buffer;
 use anyhow::{bail, Result};
 use serde::de::{self, DeserializeSeed, Deserializer, EnumAccess, VariantAccess, Visitor};
 use serde::{Deserialize, Serialize};
@@ -66,8 +67,7 @@ impl<T> FixedBoxBuilder<T> {
         }
         let entries = std::mem::take(&mut builder.entries);
         builder.initialized = 0;
-        let raw = Box::into_raw(entries) as *mut [T];
-        unsafe { Box::from_raw(raw) }
+        fixed_buffer::assume_init_boxed_slice(entries)
     }
 
     pub fn push(&mut self, value: T) -> Result<()> {
@@ -97,16 +97,13 @@ impl<T> FixedBoxBuilder<T> {
         }
         let entries = std::mem::take(&mut self.entries);
         self.initialized = 0;
-        let raw = Box::into_raw(entries) as *mut [T];
-        Ok(unsafe { Box::from_raw(raw) })
+        Ok(fixed_buffer::assume_init_boxed_slice(entries))
     }
 }
 
 impl<T> Drop for FixedBoxBuilder<T> {
     fn drop(&mut self) {
-        for entry in self.entries.iter_mut().take(self.initialized) {
-            unsafe { entry.assume_init_drop() };
-        }
+        fixed_buffer::drop_initialized_prefix(&mut self.entries, self.initialized);
     }
 }
 

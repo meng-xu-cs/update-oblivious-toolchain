@@ -812,8 +812,9 @@ The current runtime has a first hardening layer:
   those stack/scratch facts: stack checks, scratch reservations, and scratch
   wipes are recorded explicitly on the runtime kernel witness rather than only
   summarized as final counters
-- the shared runtime-kernel statement recorder now uses exact-capacity boxed
-  `MaybeUninit<String>` storage rather than `vec![None; capacity]` plus a
+- the shared runtime-kernel statement recorder now uses exact-capacity storage
+  through the safe owned `fixed_buffer::FixedPrefixBuffer<String>` wrapper
+  rather than `vec![None; capacity]`, local raw unsafe moves/drops, or a
   `Vec`-repacking finish step, so the opcode-trace bridge stays on the same
   fixed-shape discipline as the rest of the tiny kernel
 - the call-scoped kernel now begins before transaction shadow-state cloning, so
@@ -915,9 +916,11 @@ The current runtime has a first hardening layer:
   allocator-session kernel-op, scratch, stack, guard-drop wipe, finish-wipe,
   bounded public resource-event logging, boxed finish-boundary resource
   events, and unsafe/forget-escape discipline, backed by
-  `RuntimeAllocatorDiscipline`. The live confidential statement recorder is
-  now exact-capacity and backed by `RuntimeStatementTraceDiscipline` rather
-  than a growable `Vec<String>`. Confidential
+  `RuntimeAllocatorDiscipline`. F15 pins the remaining theorem-adjacent
+  fixed-buffer `unsafe` to `crates/uo-core/src/fixed_buffer.rs`. The live
+  confidential statement recorder is now exact-capacity and backed by
+  `RuntimeStatementTraceDiscipline` rather than a growable `Vec<String>`.
+  Confidential
   `keccak256` evaluation in the
   shared `uo-core` interpreter now also stages hash parts through an
   exact-size boxed buffer

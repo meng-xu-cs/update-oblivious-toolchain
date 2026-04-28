@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod confidential_core;
 pub mod confidential_kernel;
+pub mod fixed_buffer;
 pub mod fragment;
 pub mod ir;
 pub mod kernel_dsl;

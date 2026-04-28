@@ -1,6 +1,10 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "file_count": 77,
+  "lean_toolchain": "leanprover/lean4:v4.30.0-rc2",
+  "lean_toolchain_exact_release": true,
+  "lean_version": "Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)",
+  "lake_version": "Lake version 5.0.0-src+3dc1a08 (Lean version 4.30.0-rc2)",
   "files": [
     {
       "path": "artifact_configuration.json",
@@ -159,8 +163,8 @@
     },
     {
       "path": "kernel_model_alignment_validation.json",
-      "bytes": 73662,
-      "sha256": "9c2ccc5f53148227450946cfbddf812ea8e8af4d2d4f447af932ecce58232c21"
+      "bytes": 74547,
+      "sha256": "15a31d706673952f003da8444c53cb583c73ecbdf3197f5b7280b4a0e097d76d"
     },
     {
       "path": "kernel_refinement_boundary_validation.json",
@@ -234,8 +238,8 @@
     },
     {
       "path": "runtime_boundary_validation.json",
-      "bytes": 83945,
-      "sha256": "b190a3f89f84ab4929ddf8182cfae0180d5afa39bb8039fbbfe9724944190e1c"
+      "bytes": 84037,
+      "sha256": "a85f6f2993b2c782cb42d1f4c27117581655895587d6397fcb886bf034f1a0b9"
     },
     {
       "path": "runtime_confidential_statement_trace_bridge_boundary_validation.json",
@@ -255,12 +259,12 @@
     {
       "path": "runtime_implementation_interface_validation.json",
       "bytes": 3294,
-      "sha256": "32c6cffc3bee5d1a1a4015ba42afc202cec6bb36c481693734664a1562a2580f"
+      "sha256": "49173389a70d41aeed2c66bbbc27f8485a98a5ebfecbb124edc309acbffb0aa8"
     },
     {
       "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.json",
       "bytes": 968136,
-      "sha256": "ad5e2094a00fa3fa712ade481b0c4d584c6ceb53816346a3a9e8a248bb465eb4"
+      "sha256": "f493c438c1d47b9884cb6c255c880134a60e5fa5145b0d958fab82597bfcf2a7"
     },
     {
       "path": "runtime_implementation_kernel_meeting_boundary_validation.json",
@@ -320,7 +324,7 @@
     {
       "path": "runtime_residual_helper_shell_boundary_validation.json",
       "bytes": 23389,
-      "sha256": "e2eaa2ac9d2c1d5fdbdf0379e18af96174e3edbb7ff3f563b82b469adfe1e1d6"
+      "sha256": "8ea3574f895a82857f2c40e3629d4fc5de9425bad567acb0f2d8b329d45aef3d"
     },
     {
       "path": "runtime_shared_confidential_kernel_boundary_validation.json",

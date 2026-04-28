@@ -863,7 +863,8 @@ under the explicit `PathOramLocalPosmapV1SecurityAssumptions` bundle:
   justified bundle, with F17's mechanism matrix pinning the concrete
   deployment artifacts and the encrypted-return gate
 - the results bundle is regenerated against the transcript model and
-  pinned by `results/reproducibility_manifest.json`
+  pinned by `results/reproducibility_manifest.json`, which now records the
+  exact Lean toolchain pin and observed Lean/Lake version strings
 
 The correct current description of the repository is:
 

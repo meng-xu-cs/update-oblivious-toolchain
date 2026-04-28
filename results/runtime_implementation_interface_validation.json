@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1162045,
+  "artifact_json_bytes": 1160280,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeImplementationInterface",
   "deeper_semantics_of_rust_refinement_required": true,
   "evidence_classification": "source-frozen/static-drift checked",
@@ -17,9 +17,9 @@
   "source_bytes": {
     "allocator": 15508,
     "confidential_core": 46577,
-    "confidential_kernel": 102303,
+    "confidential_kernel": 102039,
     "controller": 19525,
-    "core_lib": 7074,
+    "core_lib": 7096,
     "engine": 14738,
     "fresh_coins": 5031,
     "generated_confidential_kernel": 21686,
@@ -30,7 +30,7 @@
     "generated_store_helpers": 11516,
     "generated_store_surface": 6914,
     "generated_value_ops": 21570,
-    "kernel_runtime": 23998,
+    "kernel_runtime": 23343,
     "kernel_slot_support": 3263,
     "objects": 87075,
     "oram": 55073,
@@ -43,9 +43,9 @@
     "store_lib": 93,
     "store_store": 2898,
     "theorem": 3936,
-    "trace": 394810,
+    "trace": 394087,
     "trusted_kernel": 4518,
-    "types": 16954
+    "types": 16860
   },
   "source_files": [
     "runtime/uo-evm/src/lib.rs",

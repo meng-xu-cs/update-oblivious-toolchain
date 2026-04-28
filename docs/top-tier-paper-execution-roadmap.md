@@ -570,11 +570,13 @@ confidential statement recorder has likewise moved from a growable
 `RuntimeStatementTraceDiscipline`; Lean now models the recorded name list,
 proves each accepted record appends exactly the public `traceName`, rejects
 records at public capacity, and proves the boxed trace of an accepted recorder
-is exactly `program.statementTraceNames`. That recorder now uses boxed
-`MaybeUninit<String>` storage with checked `get_mut(...)` record slots,
-iterator/zipped finish moves, and iterator-limited drop cleanup rather than
-`vec![None; capacity]`, direct `trace[index]` / `self.statements[index]`
-moves, initialized-prefix slicing, or a `Vec`-repacking finish path. The live
+is exactly `program.statementTraceNames`. That recorder now uses the safe
+owned `fixed_buffer::FixedPrefixBuffer<String>` wrapper for exact-capacity
+storage, and no theorem-adjacent runtime module contains local raw `unsafe`
+for these fixed buffers; the probe pins the remaining `unsafe` surface to
+`crates/uo-core/src/fixed_buffer.rs`. This replaces `vec![None; capacity]`,
+direct `trace[index]` / `self.statements[index]` moves,
+initialized-prefix slicing, and `Vec`-repacking finish paths. The live
 Path-ORAM commit path now emits
 fixed-public-capacity `OramWriteBatch` / `OramWriteLog` evidence backed by
 `RuntimeOramWriteLogDiscipline`, which now also models exact public-capacity
@@ -2283,12 +2285,15 @@ surface in non-empty LOC), the current TCB table (component / status
 / role), the explicit assumption profile (W5 + W6.5 entries), the
 WP6 closure-audit table (six W6 surface checkpoints with claim
 classification, Lean anchor, and static-drift check name), and the
-named static-drift check inventory (eight checks: six W6 + two W5).
+named static-drift check inventory (fifteen checks spanning W5/W6 plus
+F03/F15/F16/F17/F18 audit surfaces).
 The W7.6 cleanup landed in commit `3f63b32`.
 
 Status of charter task 5 (artifact reproducibility): the
 `results/reproducibility_manifest.json` walker emits a deterministic
-SHA-256 + byte count per output file. The W7.5 cleanup landed in
+SHA-256 + byte count per output file and, as of F18, records the exact
+Lean toolchain pin plus observed Lean/Lake version strings while rejecting
+`stable` or otherwise non-exact Lean pins. The W7.5 cleanup landed in
 commit `f82bc8c` (documentation pinning the manifest schema and
 audit contract).
 
@@ -2441,14 +2446,17 @@ only as a closure log for the historical execution order:
    shell, and the runtime machine effect schedule is source-checked for public
    opcode recording, bounded scratch reservation, object-store delegation,
    commit-schedule append, and finish-time wiping, with a Lean
-   `RuntimeKernelMachineSchedule` model for the public-opcode prefix,
-   bounded-scratch, object-store-call, commit-append, and finish-wipe shape.
+  `RuntimeKernelMachineSchedule` model for the public-opcode prefix,
+  bounded-scratch, object-store-call, commit-append, and finish-wipe shape.
    The boundary now also imports `runtime/uo-allocator/src/lib.rs` and checks
    the allocator session's kernel-op/scratch/stack budgets, guard-drop wipe,
    finish-time wipe validation, bounded public-capacity resource-event log,
    boxed finish-boundary resource events, and lack of unsafe/forget-style
    escape hatches, with `RuntimeAllocatorDiscipline` proving the accepted
-   allocator transition shape. The resource-event log now also validates its
+   allocator transition shape. F15 additionally centralizes all remaining
+   theorem-adjacent fixed-buffer `unsafe` in the audited `fixed_buffer` helper
+   and adds static drift coverage for that isolation. The resource-event log
+   now also validates its
    public length/capacity and populated public-prefix entries explicitly
    instead of relying on a prefix-populated `expect`. The live confidential
    statement recorder is now an exact-capacity kernel-owned buffer checked

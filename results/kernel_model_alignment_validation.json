@@ -108,10 +108,15 @@
   "execution_trace_runtime_api_is_explicit": true,
   "execution_trace_runtime_fields_private": true,
   "execution_trace_shell_boundary_bundle_prefers_stored_finish_bundle": true,
+  "expected_lean_toolchain": "leanprover/lean4:v4.30.0-rc2",
   "expected_runtime_trusted_kernel_bundle_field_assignment_files": [
     "crates/uo-core/src/trace.rs"
   ],
   "expected_runtime_trusted_kernel_bundle_storage_surface_files": [],
+  "expected_theorem_adjacent_unsafe_surface_files": [
+    "crates/uo-core/src/fixed_buffer.rs"
+  ],
+  "fixed_buffer_has_audited_unsafe_helpers": true,
   "generated_confidential_kernel_source_matches_lean": true,
   "generated_kernel_machine_source_matches_lean": true,
   "generated_object_helpers_source_matches_lean": true,
@@ -123,6 +128,7 @@
   "host_visible_outcome_taxonomy_audit_present": true,
   "kernel_dsl_manifest_entry_constructors_private": true,
   "kernel_runtime_consumes_generated_machine_schedule": true,
+  "lake_version": "Lake version 5.0.0-src+3dc1a08 (Lean version 4.30.0-rc2)",
   "lean_confidential_core_kernel_interface_slot_exactness_present": true,
   "lean_confidential_core_proof_grade_assurance_present": true,
   "lean_confidential_core_reuses_kernel_boundary_facts": true,
@@ -373,6 +379,7 @@
   ],
   "lean_imported_runtime_kernel_interface_subsumes_boundary_facts_present": true,
   "lean_imported_shell_boundary_kernel_boundary_facts_present": true,
+  "lean_lake_versions_recorded_in_manifest": true,
   "lean_opcode_names": [
     "Begin",
     "CellGet",
@@ -638,7 +645,10 @@
   "lean_shell_boundary_bundle_checks_exact_runtime_views": true,
   "lean_shell_boundary_lowering_bundle_exactness_present": true,
   "lean_shell_boundary_slot_bundle_exactness_present": true,
+  "lean_toolchain": "leanprover/lean4:v4.30.0-rc2",
+  "lean_toolchain_exact_release_pinned": true,
   "lean_trusted_kernel_slot_bundle_proof_grade_exactness_present": true,
+  "lean_version": "Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)",
   "mixed_backend_ordered_schedule_theorems_present": true,
   "objects_runtime_consumes_generated_object_helpers": true,
   "objects_runtime_uses_shared_boxed_seal_helper": true,
@@ -2134,9 +2144,11 @@
     "lean_runtime_store_surface_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeStoreSurfaceRust",
     "lean_runtime_trusted_kernel": "proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean",
     "lean_runtime_value_ops_semantics": "proof/lean/UOToolchain/RuntimeValueOpsSemantics.lean",
+    "lean_toolchain": "proof/lean/lean-toolchain",
     "rust_confidential_core": "crates/uo-core/src/confidential_core.rs",
     "rust_confidential_kernel": "crates/uo-core/src/confidential_kernel.rs",
     "rust_core_trace": "crates/uo-core/src/trace.rs",
+    "rust_fixed_buffer": "crates/uo-core/src/fixed_buffer.rs",
     "rust_generated_confidential_kernel": "crates/uo-core/src/generated_confidential_kernel.rs",
     "rust_generated_kernel_machine": "runtime/uo-kernel-runtime/src/generated_machine.rs",
     "rust_generated_object_helpers": "runtime/uo-evm/src/generated_object_helpers.rs",
@@ -2150,11 +2162,16 @@
     "rust_precompiles": "runtime/uo-precompiles/src/lib.rs",
     "rust_shell_boundary": "crates/uo-core/src/shell_boundary.rs",
     "rust_store_store": "runtime/uo-store/src/store.rs",
-    "rust_trusted_kernel": "crates/uo-core/src/trusted_kernel.rs"
+    "rust_trusted_kernel": "crates/uo-core/src/trusted_kernel.rs",
+    "rust_types": "crates/uo-core/src/types.rs"
   },
   "store_codec_consumes_generated_surface": true,
   "store_codec_consumes_generated_transport": true,
   "store_runtime_consumes_generated_store_helpers": true,
+  "theorem_adjacent_unsafe_isolated_to_fixed_buffer": true,
+  "theorem_adjacent_unsafe_surface_files": [
+    "crates/uo-core/src/fixed_buffer.rs"
+  ],
   "trusted_kernel_slot_bundle_bridge_checks": [
     {
       "expected_files": [

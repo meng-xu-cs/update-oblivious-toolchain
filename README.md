@@ -351,9 +351,11 @@ seeded/canonical witness-family, theorem-input, and pair-certificate artifacts
 and checks that the shipped Lean validators reject those drifted but still
 parseable artifacts.
 Every results directory now also carries `reproducibility_manifest.json`,
-which records bundle-relative output paths, byte sizes, and SHA-256 digests so
-two runs can be compared byte-for-byte even when they were written to
-different output directories.
+which records the exact Lean toolchain pin, `lean --version`, `lake --version`,
+bundle-relative output paths, byte sizes, and SHA-256 digests so two runs can
+be compared byte-for-byte even when they were written to different output
+directories. Manifest generation fails closed if `proof/lean/lean-toolchain`
+is not pinned to an exact Lean release.
 The full bundle also emits `reviewer_summary.json` plus the paper-ready
 `reviewer_summary.md`, which condense proof/report costs, the largest
 materialized and estimated artifact sizes, runtime overheads, current TCB

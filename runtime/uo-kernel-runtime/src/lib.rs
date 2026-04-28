@@ -1,10 +1,9 @@
 use anyhow::Result;
-use std::mem::MaybeUninit;
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
 #[cfg(test)]
 use uo_core::RuntimeKernelStepWitness;
 use uo_core::{
-    execute_confidential_kernel_slot_program, ConfidentialKernelEffectRuntime,
+    execute_confidential_kernel_slot_program, fixed_buffer, ConfidentialKernelEffectRuntime,
     ConfidentialKernelSlotProgram, ConfidentialKernelSlotRuntime, RuntimeKernelBoundaryTracker,
     RuntimeKernelFinishBundle, RuntimeKernelMachineFinishWitness, Value,
 };
@@ -20,46 +19,25 @@ use generated_slot_support::{
 };
 
 pub struct RuntimeKernelStatementTrace {
-    statements: Box<[MaybeUninit<String>]>,
-    len: usize,
+    statements: fixed_buffer::FixedPrefixBuffer<String>,
 }
 
 impl RuntimeKernelStatementTrace {
     pub fn new(capacity: usize) -> Self {
         Self {
-            statements: Box::<[String]>::new_uninit_slice(capacity),
-            len: 0,
+            statements: fixed_buffer::FixedPrefixBuffer::with_capacity(capacity),
         }
     }
 
     fn record(&mut self, statement: &uo_core::ConfidentialKernelSlotStatement) -> Result<()> {
-        let Some(slot) = self.statements.get_mut(self.len) else {
+        if self.statements.push(statement.trace_name().into()).is_err() {
             anyhow::bail!("runtime kernel statement-trace capacity exceeded");
-        };
-        slot.write(statement.trace_name().into());
-        self.len += 1;
+        }
         Ok(())
     }
 
-    pub fn into_boxed_trace(mut self) -> Box<[String]> {
-        let mut trace = Box::<[String]>::new_uninit_slice(self.len);
-        for (slot, statement) in trace
-            .iter_mut()
-            .zip(self.statements.iter_mut().take(self.len))
-        {
-            slot.write(unsafe { statement.assume_init_read() });
-        }
-        self.len = 0;
-        let raw = Box::into_raw(trace) as *mut [String];
-        unsafe { Box::from_raw(raw) }
-    }
-}
-
-impl Drop for RuntimeKernelStatementTrace {
-    fn drop(&mut self) {
-        for statement in self.statements.iter_mut().take(self.len) {
-            unsafe { statement.assume_init_drop() };
-        }
+    pub fn into_boxed_trace(self) -> Box<[String]> {
+        self.statements.into_boxed_slice()
     }
 }
 

@@ -3,6 +3,7 @@ use crate::confidential_core::RuntimeConfidentialProofBundleFamilyError;
 use crate::confidential_kernel::{
     ConfidentialKernelLoweringError, ConfidentialKernelSlotProgram, ConfidentialKernelStep,
 };
+use crate::fixed_buffer;
 use crate::ir::StateObject;
 use crate::manifest::{
     EntrypointManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
@@ -633,7 +634,7 @@ impl<T> BoundedJournal<T> {
     }
 
     fn as_slice(&self) -> &[T] {
-        unsafe { std::slice::from_raw_parts(self.entries.as_ptr() as *const T, self.len) }
+        fixed_buffer::initialized_prefix(&self.entries, self.len)
     }
 
     fn push(&mut self, value: T) -> Result<(), T> {
@@ -652,25 +653,13 @@ impl<T> BoundedJournal<T> {
     where
         T: Clone,
     {
-        let mut entries = Box::<[T]>::new_uninit_slice(self.len);
-        for (slot, entry) in entries.iter_mut().zip(self.as_slice().iter().cloned()) {
-            slot.write(entry);
-        }
-        let raw = Box::into_raw(entries) as *mut [T];
-        unsafe { Box::from_raw(raw) }
+        fixed_buffer::clone_initialized_prefix_to_box(&self.entries, self.len)
     }
 
     fn into_boxed_slice(mut self) -> Box<[T]> {
-        let mut entries = Box::<[T]>::new_uninit_slice(self.len);
-        for (slot, entry) in entries
-            .iter_mut()
-            .zip(self.entries.iter_mut().take(self.len))
-        {
-            slot.write(unsafe { entry.assume_init_read() });
-        }
+        let entries = fixed_buffer::move_initialized_prefix_to_box(&mut self.entries, self.len);
         self.len = 0;
-        let raw = Box::into_raw(entries) as *mut [T];
-        unsafe { Box::from_raw(raw) }
+        entries
     }
 }
 
@@ -708,9 +697,7 @@ impl<T: Eq> Eq for BoundedJournal<T> {}
 
 impl<T> Drop for BoundedJournal<T> {
     fn drop(&mut self) {
-        for entry in self.entries.iter_mut().take(self.len) {
-            unsafe { entry.assume_init_drop() };
-        }
+        fixed_buffer::drop_initialized_prefix(&mut self.entries, self.len);
     }
 }
 
@@ -6623,10 +6610,12 @@ impl CommittedRuntimeWitnessSnapshotBuilder {
                 capacity,
             });
         }
-        let runtime_oram_access_counters =
-            assume_init_boxed_slice(std::mem::take(&mut self.runtime_oram_access_counters));
-        let runtime_oram_position_maps =
-            assume_init_boxed_slice(std::mem::take(&mut self.runtime_oram_position_maps));
+        let runtime_oram_access_counters = fixed_buffer::assume_init_boxed_slice(std::mem::take(
+            &mut self.runtime_oram_access_counters,
+        ));
+        let runtime_oram_position_maps = fixed_buffer::assume_init_boxed_slice(std::mem::take(
+            &mut self.runtime_oram_position_maps,
+        ));
         self.initialized = 0;
         Ok(CommittedRuntimeWitnessSnapshot::new(
             runtime_oram_access_counters,
@@ -6637,26 +6626,15 @@ impl CommittedRuntimeWitnessSnapshotBuilder {
 
 impl Drop for CommittedRuntimeWitnessSnapshotBuilder {
     fn drop(&mut self) {
-        for entry in self
-            .runtime_oram_access_counters
-            .iter_mut()
-            .take(self.initialized)
-        {
-            unsafe { entry.assume_init_drop() };
-        }
-        for entry in self
-            .runtime_oram_position_maps
-            .iter_mut()
-            .take(self.initialized)
-        {
-            unsafe { entry.assume_init_drop() };
-        }
+        fixed_buffer::drop_initialized_prefix(
+            &mut self.runtime_oram_access_counters,
+            self.initialized,
+        );
+        fixed_buffer::drop_initialized_prefix(
+            &mut self.runtime_oram_position_maps,
+            self.initialized,
+        );
     }
-}
-
-fn assume_init_boxed_slice<T>(entries: Box<[MaybeUninit<T>]>) -> Box<[T]> {
-    let raw = Box::into_raw(entries) as *mut [T];
-    unsafe { Box::from_raw(raw) }
 }
 
 #[derive(Debug)]

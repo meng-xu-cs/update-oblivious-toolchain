@@ -385,7 +385,9 @@ commit-schedule append, and finish-time wiping, backed by the explicit Lean
 source and checks allocator-session kernel-op, scratch, stack, guard-drop
 wipe, finish-wipe, bounded public resource-event logging, boxed
 finish-boundary resource events, and unsafe/forget-escape discipline, backed
-by `RuntimeAllocatorDiscipline`. The live statement recorder itself is now
+by `RuntimeAllocatorDiscipline`. F15 centralizes the remaining theorem-adjacent
+fixed-buffer `unsafe` in `crates/uo-core/src/fixed_buffer.rs` and pins that
+isolation in the probe. The live statement recorder itself is now
 the exact-capacity `RuntimeKernelStatementTrace`, backed by
 `RuntimeStatementTraceDiscipline`, rather than a growable `Vec<String>`.
 The same source-backed interface now also pins named/slot confidential-kernel

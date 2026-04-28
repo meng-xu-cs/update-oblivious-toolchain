@@ -1,3 +1,4 @@
+use crate::fixed_buffer;
 use crate::ir::{BinaryOp, CompiledFunction, Expr, StateObject, Statement, UnaryOp};
 use crate::types::{FixedBoxBuilder, Type, Value};
 use anyhow::Result;
@@ -554,21 +555,15 @@ impl FixedKernelStepBuffer {
     }
 
     fn finish(mut self) -> Box<[ConfidentialKernelStep]> {
-        let mut out = Box::<[ConfidentialKernelStep]>::new_uninit_slice(self.len);
-        for (slot, step) in out.iter_mut().zip(self.steps.iter_mut().take(self.len)) {
-            slot.write(unsafe { step.assume_init_read() });
-        }
+        let out = fixed_buffer::move_initialized_prefix_to_box(&mut self.steps, self.len);
         self.len = 0;
-        let raw = Box::into_raw(out) as *mut [ConfidentialKernelStep];
-        unsafe { Box::from_raw(raw) }
+        out
     }
 }
 
 impl Drop for FixedKernelStepBuffer {
     fn drop(&mut self) {
-        for step in self.steps.iter_mut().take(self.len) {
-            unsafe { step.assume_init_drop() };
-        }
+        fixed_buffer::drop_initialized_prefix(&mut self.steps, self.len);
     }
 }
 

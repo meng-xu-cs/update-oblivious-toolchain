@@ -651,10 +651,12 @@
     },
     {
       "expected_files": [
+        "crates/uo-core/src/fixed_buffer.rs",
         "crates/uo-core/src/trace.rs",
         "crates/uo-core/src/types.rs"
       ],
       "files": [
+        "crates/uo-core/src/fixed_buffer.rs",
         "crates/uo-core/src/trace.rs",
         "crates/uo-core/src/types.rs"
       ],
