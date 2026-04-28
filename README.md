@@ -96,7 +96,7 @@ Current proof-grade TCB:
 | --- | --- |
 | Lean kernel plus the Lean theorem/checker development | trusted proof checker and theorem body |
 | Explicit backend / cryptographic / deployment assumptions | trusted assumptions |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | trusted implementation-side extraction surface, pinned by the source-backed runtime implementation boundaries and tamper suite |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | trusted implementation-side extraction surface; the source-backed runtime implementation boundaries are source-frozen/static-drift evidence, not a semantics-of-Rust refinement, and the emitted witness/certificate producer remains trusted although replay/reconstruction checks reduce its authority |
 | Rust code outside the tiny kernel | no longer part of the confidential-work TCB; the source-backed implementation/public-bridge/residual-helper boundaries pin it to public-only or generated-helper routes and `tamper_validation.json` rejects representative drift |
 | `uo-check` | not in the proof-grade TCB |
 | `mplus-probe` | not in the proof-grade TCB |
@@ -115,6 +115,12 @@ Current theorem boundary notes:
   bytes. The current Lean source/IR/kernel preservation proofs use a
   deterministic mock hash, so they do not prove value-level equality with real
   Keccak-derived results.
+- `runtime_implementation_interface_validation.json` classifies the
+  source-backed runtime interface as `source-frozen/static-drift checked` and
+  sets `rust_semantic_refinement_claimed: false`. The direct
+  kernel-machine-confinement report likewise records that witness extraction
+  is still a trusted producer, reduced by replay checks but not eliminated by a
+  primitive-event transcript hash.
 
 Paper-main theorem strategy:
 

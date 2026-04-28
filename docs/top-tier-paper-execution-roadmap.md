@@ -278,7 +278,12 @@ machine-confinement) exposing the matching theorem family. The full
 deeper "semantics-of-Rust refinement" theorem for the residual real
 kernel implementation surface remains open as a future scientific
 strengthening track and is tracked separately below this WP3 closure;
-it is not a WP3 blocker.
+it is not a WP3 blocker. The probe now records this classification directly:
+the implementation-interface report marks the checked source boundary as
+source-frozen/static-drift evidence with no Rust semantic refinement claim, and
+the direct machine-confinement report marks runtime witness extraction as a
+trusted producer whose authority is reduced by replay/reconstruction checks
+rather than eliminated by transcript-hash or verified-extraction machinery.
 
 The outer proof/interface route was completed on April 21, 2026, and
 the stronger shared-kernel strengthening track is now active below that outer

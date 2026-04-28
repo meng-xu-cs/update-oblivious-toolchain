@@ -159,8 +159,8 @@
     },
     {
       "path": "kernel_model_alignment_validation.json",
-      "bytes": 73166,
-      "sha256": "e9c81be124ceb2a3ee0ac09aa24afc961a29aa4457d4dd04df2e451de93ad070"
+      "bytes": 73333,
+      "sha256": "1e577d0fd99f6822b0993703d4eca329dc85745677004a01e693bd14e44e88bc"
     },
     {
       "path": "kernel_refinement_boundary_validation.json",
@@ -254,13 +254,13 @@
     },
     {
       "path": "runtime_implementation_interface_validation.json",
-      "bytes": 3083,
-      "sha256": "abdf6fb4da992a6749b2a760e7217537876f16d3a4200f19448008b2df5c48dd"
+      "bytes": 3294,
+      "sha256": "32c6cffc3bee5d1a1a4015ba42afc202cec6bb36c481693734664a1562a2580f"
     },
     {
       "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.json",
-      "bytes": 961048,
-      "sha256": "d9ff6125230a02bcdfb1a88b5ab8e9fb2677288ce3a7d94d7b8b770b30830d67"
+      "bytes": 968136,
+      "sha256": "ad5e2094a00fa3fa712ade481b0c4d584c6ceb53816346a3a9e8a248bb465eb4"
     },
     {
       "path": "runtime_implementation_kernel_meeting_boundary_validation.json",

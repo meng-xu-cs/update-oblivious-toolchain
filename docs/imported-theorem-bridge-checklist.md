@@ -10,6 +10,12 @@ claim the current artifact can honestly make:
    consequences from that composition
 
 This is deliberately not a claim that every line of Rust is formally verified.
+The source-backed runtime checks are source-frozen/static-drift evidence, not
+a semantics-of-Rust refinement. Runtime witness and certificate extraction also
+remains an implementation-side trusted producer: the current bridge reduces
+that authority by reconstructing from trusted-kernel bundles and replaying
+trace/certificate views, but it does not yet replace the producer with a
+primitive-event transcript hash or verified extraction proof.
 The repo path here is:
 
 - imported standard theorem for the cryptographic / ORAM core

@@ -738,7 +738,14 @@ program/opcode trace, and the paper-facing
 end-to-end conclusion. The full deeper "semantics-of-Rust refinement"
 of the residual real kernel implementation surface remains as an
 out-of-scope future-strengthening track; it is not a WP3 charter
-requirement.
+requirement. The emitted
+`runtime_implementation_interface_validation.json` report therefore classifies
+that boundary as source-frozen/static-drift checked and records
+`rust_semantic_refinement_claimed: false`; the direct
+kernel-machine-confinement report additionally records that the runtime
+witness/certificate producer remains trusted, with authority reduced by replay
+and reconstruction checks rather than eliminated by a primitive-event
+transcript-hash proof.
 
 ### 6.3 Compiler / output conformance (closed by WP4)
 

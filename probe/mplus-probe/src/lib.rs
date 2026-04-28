@@ -16918,6 +16918,10 @@ fn run_runtime_implementation_interface_validation() -> Result<JsonValue> {
         "artifact_json_bytes": interface_json_bytes,
         "lean_checker_kind": "runtime implementation interface",
         "lean_checker_input": "source-backed runtime implementation interface",
+        "evidence_classification": "source-frozen/static-drift checked",
+        "rust_semantic_refinement_claimed": false,
+        "source_text_predicate_boundary": true,
+        "deeper_semantics_of_rust_refinement_required": true,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
     }))
@@ -20238,6 +20242,14 @@ fn validate_runtime_implementation_kernel_machine_confinement_boundary_case(
             "statement_trace_count": confidential_slot_program_statement_trace_count,
             "machine_finish_bundle_matches_trace_finish_bundle": true,
             "separate_finish_slot_meeting_artifact_required": false,
+            "source_backed_boundary_evidence_classification":
+                "source-frozen/static-drift checked",
+            "rust_semantic_refinement_claimed": false,
+            "runtime_witness_extraction_trusted_producer": true,
+            "runtime_witness_authority_reduced_by_replay_checks": true,
+            "runtime_witness_authority_eliminated": false,
+            "primitive_event_transcript_hash_bound": false,
+            "deeper_extraction_refinement_required": true,
             "shared_confidential_kernel_boundary_theorem_checked": true,
             "small_confidential_kernel_boundary_theorem_checked": true,
             "residual_helper_shell_boundary_theorem_checked": true,
@@ -28485,6 +28497,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .contains("importedInterfaceHostVisibleErrorTaxonomy")
             && runtime_implementation_interface_validation_fn_source
                 .contains("\"runtime_host_visible_error_taxonomy_theorem_checked\": true");
+    let runtime_implementation_interface_source_drift_boundary_classified =
+        runtime_implementation_interface_validation_fn_source
+            .contains("\"evidence_classification\": \"source-frozen/static-drift checked\"")
+            && runtime_implementation_interface_validation_fn_source
+                .contains("\"rust_semantic_refinement_claimed\": false")
+            && runtime_implementation_interface_validation_fn_source
+                .contains("\"source_text_predicate_boundary\": true")
+            && runtime_implementation_interface_validation_fn_source
+                .contains("\"deeper_semantics_of_rust_refinement_required\": true");
     let rust_runtime_small_confidential_kernel_boundary_field_names = extract_rust_struct_fields(
         &probe_source,
         "ImportedRuntimeImplementationSmallConfidentialKernelBoundary",
@@ -30861,6 +30882,23 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("importedBoundaryPinsNativeMachineSemantics")
             && kernel_machine_confinement_validation_fn_source
                 .contains("\"native_machine_semantics_theorem_checked\": true");
+    let runtime_implementation_kernel_machine_confinement_witness_authority_classified =
+        kernel_machine_confinement_validation_fn_source
+            .contains("\"source_backed_boundary_evidence_classification\":")
+            && kernel_machine_confinement_validation_fn_source
+                .contains("\"source-frozen/static-drift checked\"")
+            && kernel_machine_confinement_validation_fn_source
+                .contains("\"rust_semantic_refinement_claimed\": false")
+            && kernel_machine_confinement_validation_fn_source
+                .contains("\"runtime_witness_extraction_trusted_producer\": true")
+            && kernel_machine_confinement_validation_fn_source
+                .contains("\"runtime_witness_authority_reduced_by_replay_checks\": true")
+            && kernel_machine_confinement_validation_fn_source
+                .contains("\"runtime_witness_authority_eliminated\": false")
+            && kernel_machine_confinement_validation_fn_source
+                .contains("\"primitive_event_transcript_hash_bound\": false")
+            && kernel_machine_confinement_validation_fn_source
+                .contains("\"deeper_extraction_refinement_required\": true");
     let runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumptions_theorem_present =
         lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions",
@@ -34646,6 +34684,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_implementation_interface_handwritten_runtime_lacks_direct_secret_ops_theorem_present
         && runtime_implementation_interface_handwritten_host_coordination_lacks_secret_serialization_theorem_present
         && runtime_implementation_interface_host_visible_error_taxonomy_theorem_present
+        && runtime_implementation_interface_source_drift_boundary_classified
         && runtime_small_confidential_kernel_boundary_field_names_match
         && runtime_small_confidential_kernel_boundary_small_kernel_theorem_present
         && runtime_small_confidential_kernel_boundary_slot_adapter_theorem_present
@@ -34733,6 +34772,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_implementation_kernel_machine_confinement_public_shell_canonical_hashing_guarded_theorem_present
         && runtime_implementation_kernel_machine_confinement_handwritten_runtime_public_only_theorem_present
         && runtime_implementation_kernel_machine_confinement_native_machine_semantics_theorem_present
+        && runtime_implementation_kernel_machine_confinement_witness_authority_classified
         && runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumptions_theorem_present
         && runtime_implementation_kernel_machine_confinement_value_ops_semantics_theorems_present
         && runtime_implementation_kernel_machine_confinement_slot_support_stage_args_theorems_present
@@ -35296,6 +35336,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_implementation_interface_handwritten_host_coordination_lacks_secret_serialization_theorem_present,
         "runtime_implementation_interface_host_visible_error_taxonomy_theorem_present":
             runtime_implementation_interface_host_visible_error_taxonomy_theorem_present,
+        "runtime_implementation_interface_source_drift_boundary_classified":
+            runtime_implementation_interface_source_drift_boundary_classified,
         "rust_runtime_small_confidential_kernel_boundary_field_names":
             rust_runtime_small_confidential_kernel_boundary_field_names,
         "lean_runtime_small_confidential_kernel_boundary_field_names":
@@ -35522,6 +35564,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_implementation_kernel_machine_confinement_handwritten_runtime_public_only_theorem_present,
         "runtime_implementation_kernel_machine_confinement_native_machine_semantics_theorem_present":
             runtime_implementation_kernel_machine_confinement_native_machine_semantics_theorem_present,
+        "runtime_implementation_kernel_machine_confinement_witness_authority_classified":
+            runtime_implementation_kernel_machine_confinement_witness_authority_classified,
         "runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumptions_theorem_present":
             runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumptions_theorem_present,
         "runtime_implementation_kernel_machine_confinement_value_ops_semantics_theorems_present":

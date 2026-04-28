@@ -28,6 +28,12 @@ is no longer the primitive trusted object.
 ## Current TCB Statement
 
 The current runtime-side TCB should be read explicitly rather than inferred.
+The source-backed implementation checks in this route are
+source-frozen/static-drift evidence, not Rust semantic refinement. Runtime
+witness/certificate extraction also remains a trusted producer: replay and
+certificate reconstruction reduce its authority, but the current route does
+not yet bind a minimal primitive-event transcript hash or mechanically verify
+the extractor.
 
 | Component | In current runtime-side TCB? | Reason |
 | --- | --- | --- |

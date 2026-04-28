@@ -27,6 +27,11 @@ Remaining assumptions:
   the current Lean source/IR/kernel preservation proofs use a deterministic
   mock hash and therefore do not claim value-level functional correctness for
   real Keccak-derived results
+- source-backed runtime implementation checks are classified as
+  source-frozen/static-drift evidence, not Rust semantic refinement; the
+  runtime witness/certificate extractor remains in the implementation-side TCB
+  even though trace replay and certificate reconstruction reduce what an
+  unchecked producer can assert
 - guarantees are over the instrumented abstract/runtime traces emitted by this workspace, including the normalized physical read/write schedules captured by the current runtime
 - the prototype does not claim a proof for every downstream machine-code or microarchitectural observer
 - in a TEE deployment, persistent state now satisfies a concrete sealed-storage assumption rather than the previous marker-hiding placeholder encoding

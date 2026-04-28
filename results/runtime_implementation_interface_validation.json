@@ -1,7 +1,9 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1157038,
+  "artifact_json_bytes": 1162045,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeImplementationInterface",
+  "deeper_semantics_of_rust_refinement_required": true,
+  "evidence_classification": "source-frozen/static-drift checked",
   "handwritten_host_coordination_lacks_secret_serialization_theorem_checked": true,
   "handwritten_runtime_lacks_direct_secret_ops_theorem_checked": true,
   "handwritten_runtime_public_only_theorem_checked": true,
@@ -11,10 +13,11 @@
   "public_shell_canonical_hashing_guarded_by_public_entry_theorem_checked": true,
   "public_shell_rejects_confidential_expression_evaluation_theorem_checked": true,
   "runtime_host_visible_error_taxonomy_theorem_checked": true,
+  "rust_semantic_refinement_claimed": false,
   "source_bytes": {
     "allocator": 15508,
     "confidential_core": 46577,
-    "confidential_kernel": 98063,
+    "confidential_kernel": 102303,
     "controller": 19525,
     "core_lib": 7074,
     "engine": 14738,
@@ -27,7 +30,7 @@
     "generated_store_helpers": 11516,
     "generated_store_surface": 6914,
     "generated_value_ops": 21570,
-    "kernel_runtime": 23349,
+    "kernel_runtime": 23998,
     "kernel_slot_support": 3263,
     "objects": 87075,
     "oram": 55073,
@@ -76,5 +79,6 @@
     "runtime/uo-store/src/store.rs",
     "crates/uo-core/src/generated_value_ops.rs",
     "crates/uo-core/src/types.rs"
-  ]
+  ],
+  "source_text_predicate_boundary": true
 }
