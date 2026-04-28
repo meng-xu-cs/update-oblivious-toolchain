@@ -31,6 +31,8 @@ What it still does not claim is:
 - that every line of the Rust runtime is formally verified
 - that the entire enclave implementation already satisfies a malicious-host SGX
   execution-oblivious theorem
+- that constant modeled public gas proves CPU-time, cache-behavior,
+  page-fault, allocator, scheduler, or wall-clock obliviousness
 
 That gap matters if the deployment story is "run `uo-evm` inside a TEE and
 claim the runtime itself is aligned with the admitted observer."
@@ -598,7 +600,8 @@ The archived runbook was directionally right about what the runtime needed:
 - a small auditable UO kernel ABI for confidential persistent-state operations
 - bounded per-entrypoint working state instead of ad hoc growth
 - explicit wipe / scrub discipline for confidential scratch regions
-- constant public gas per confidential entrypoint
+- constant modeled public gas per confidential entrypoint, without treating
+  that metric as a real-cost or wall-clock-obliviousness theorem
 - no secret-dependent host-visible logging or exceptions
 - eventual proof of the kernel itself, or a proof that the real runtime
   refines the same observer

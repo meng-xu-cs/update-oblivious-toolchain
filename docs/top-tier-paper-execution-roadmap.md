@@ -2278,8 +2278,9 @@ Status of charter task 6 (reviewer-facing summary): the reviewer
 summary at `results/reviewer_summary.json` /
 `results/reviewer_summary.md` now reports proof-checking cost
 (per-report milliseconds), artifact size (top materialized and
-estimated JSON byte counts), runtime overhead (raw vs. ORAM gas /
-writes / bytes per benchmark), TCB size (trusted Rust runtime
+estimated JSON byte counts), measured runtime overhead (raw vs. ORAM gas /
+writes / bytes per benchmark, reported as evaluation data rather than a
+real-cost or wall-clock-obliviousness theorem), TCB size (trusted Rust runtime
 surface, outer runtime risk surface, Lean theorem/checker repo
 surface in non-empty LOC), the current TCB table (component / status
 / role), the explicit assumption profile (W5 + W6.5 entries), the

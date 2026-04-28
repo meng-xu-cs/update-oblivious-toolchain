@@ -122,6 +122,8 @@ The proof should not claim:
   by the compiler/runtime admission path rather than modeled as confidential
   storage
 - security against observers below the modeled abstract/runtime interface
+- real-cost, CPU-time, cache-behavior, page-fault, allocator, scheduler, or
+  wall-clock obliviousness from the public-gas theorem alone
 - security of the current ad hoc nonzero codec as a cryptographic primitive;
   only exact-size transport length, nonzero-byte shape, and valid-byte
   encode/decode roundtrip facts are proved
@@ -246,7 +248,9 @@ Where:
 - `public_output_shape` is the public result shape, such as return presence and
   return length
 - raw wall-clock timing is intentionally not a component of `View_SGX`; the
-  only timing-like public quantity currently modeled is `gas_used`
+  only timing-like public quantity currently modeled is `gas_used`. This
+  modeled public gas metric is not a proxy theorem for real CPU time, cache
+  behavior, page faults, allocator behavior, OS scheduling, or wall-clock time.
 
 This document now fixes `View_SGX` concretely enough for mechanization. What
 remains open is not the observer shape, but the theorem and simulator that
@@ -576,6 +580,11 @@ The current Lean scaffold now contains an explicit reduction layer for this:
 
 For accepted confidential entrypoints, `gas_used` equals the manifest-declared
 public gas budget and is therefore independent of secrets.
+
+Scope: this theorem is solely about the modeled public gas metric in the
+artifact/runtime trace. It does not imply real-cost, CPU-time, cache-behavior,
+page-fault, allocator, scheduler, or wall-clock obliviousness unless a separate
+platform cost model and proof are added.
 
 ### Theorem F: Composition theorem
 

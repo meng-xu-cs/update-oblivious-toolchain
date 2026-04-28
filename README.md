@@ -126,6 +126,11 @@ Current theorem boundary notes:
   kernel-machine-confinement report likewise records that witness extraction
   is still a trusted producer, reduced by replay checks but not eliminated by a
   primitive-event transcript hash.
+- The public-gas theorem is only a statement about the modeled `gas_used`
+  field and the manifest-declared public gas budget. It does not claim CPU
+  time, cache behavior, page faults, allocator effects, OS scheduling, or
+  wall-clock obliviousness; those require a separate platform cost model and
+  proof.
 - `HistorySemantics.lean` now names the adaptive public transcript surface:
   host choices are functions of prior public observations, and each
   observation includes the ordered object schedule. The same module makes the

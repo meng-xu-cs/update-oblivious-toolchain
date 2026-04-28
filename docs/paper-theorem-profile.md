@@ -1304,7 +1304,9 @@ where:
 - `public_outcome` contains entrypoint id, public args, termination status,
   declared status policy, public output shape, declared return policy, any
   plaintext public/declassified return payload, declassification labels, and
-  public gas
+  public gas. Public gas here means the modeled `gas_used` metric and manifest
+  public budget only; it is not a claim about real CPU time, cache behavior,
+  page faults, allocator behavior, scheduler behavior, or wall-clock time.
 - `boundary_schedule` is the exact host-visible enclave boundary sequence
 - `storage_trace` is the normalized persistent read/write trace
 - `micro_trace` is the SGX-specific tuple
@@ -1856,9 +1858,13 @@ This profile does not claim:
 
 - raw equality of SGX page identities
 - raw equality of full micro-event sequences
+- real-cost, CPU-time, cache-behavior, page-fault, allocator, scheduler, or
+  wall-clock obliviousness from the public-gas theorem
 - downstream machine-code equivalence below the checked runtime boundary
 - a complete semantics-of-Rust refinement for every residual implementation
   detail beneath the source-backed runtime interface
 
 Those would require a different observer choice and possibly a wider leakage
-model.
+model. In particular, claiming real-cost or wall-clock obliviousness would
+require a platform cost model plus a proof relating the runtime path to that
+model, not only equality of modeled `gas_used`.
