@@ -1,5 +1,6 @@
 {
   "accepted": true,
+  "adaptive_history_semantics_theorems_present": true,
   "confidential_core_bundle_bridge_checks": [
     {
       "expected_files": [
@@ -637,6 +638,7 @@
   "lean_shell_boundary_lowering_bundle_exactness_present": true,
   "lean_shell_boundary_slot_bundle_exactness_present": true,
   "lean_trusted_kernel_slot_bundle_proof_grade_exactness_present": true,
+  "mixed_backend_ordered_schedule_theorems_present": true,
   "objects_runtime_consumes_generated_object_helpers": true,
   "objects_runtime_uses_shared_boxed_seal_helper": true,
   "objects_runtime_uses_shared_open_decode_helper": true,

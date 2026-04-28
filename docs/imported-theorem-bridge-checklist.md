@@ -16,6 +16,9 @@ remains an implementation-side trusted producer: the current bridge reduces
 that authority by reconstructing from trusted-kernel bundles and replaying
 trace/certificate views, but it does not yet replace the producer with a
 primitive-event transcript hash or verified extraction proof.
+Adaptive histories are modeled as host strategies over accumulated public
+transcripts, and mixed exact/ORAM object access is exposed as an ordered public
+schedule, in `HistorySemantics.lean`.
 The repo path here is:
 
 - imported standard theorem for the cryptographic / ORAM core

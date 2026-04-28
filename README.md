@@ -121,6 +121,12 @@ Current theorem boundary notes:
   kernel-machine-confinement report likewise records that witness extraction
   is still a trusted producer, reduced by replay checks but not eliminated by a
   primitive-event transcript hash.
+- `HistorySemantics.lean` now names the adaptive public transcript surface:
+  host choices are functions of prior public observations, and each
+  observation includes the ordered object schedule. The same module makes the
+  mixed exact/ORAM backend schedule an ordered list, not a count-only leakage
+  component, and `kernel_model_alignment_validation.json` pins those theorem
+  names.
 
 Paper-main theorem strategy:
 

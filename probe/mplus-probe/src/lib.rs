@@ -25272,6 +25272,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterface.lean");
     let lean_runtime_implementation_interface_json_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterfaceJson.lean");
+    let lean_history_semantics_path =
+        repo_root().join("proof/lean/UOToolchain/HistorySemantics.lean");
+    let lean_proofgrade_root_path = repo_root().join("proof/lean/UOToolchain/ProofGradeRoot.lean");
     let lean_runtime_implementation_interface_checker_path =
         repo_root().join("proof/lean/CheckProofGradeRuntimeImplementationInterface.lean");
     let lean_runtime_small_confidential_kernel_boundary_checker_path =
@@ -25522,6 +25525,20 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             display_report_path(&lean_runtime_implementation_interface_json_path)
         )
     })?;
+    let lean_history_semantics_source = fs::read_to_string(&lean_history_semantics_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_history_semantics_path)
+            )
+        })?;
+    let lean_proofgrade_root_source =
+        fs::read_to_string(&lean_proofgrade_root_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_proofgrade_root_path)
+            )
+        })?;
     let runtime_implementation_interface_checker_source = fs::read_to_string(
         &lean_runtime_implementation_interface_checker_path,
     )
@@ -28506,6 +28523,29 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .contains("\"source_text_predicate_boundary\": true")
             && runtime_implementation_interface_validation_fn_source
                 .contains("\"deeper_semantics_of_rust_refinement_required\": true");
+    let adaptive_history_semantics_theorems_present = lean_proofgrade_root_source
+        .contains("import UOToolchain.HistorySemantics")
+        && lean_history_semantics_source.contains("structure HostCallObservation")
+        && lean_history_semantics_source.contains("abbrev AdaptiveHostStrategy")
+        && lean_history_semantics_source.contains("def HistoryFollowsStrategyFrom")
+        && lean_history_semantics_source
+            .contains("theorem runtimeHistory_publicTranscript_eq_of_stepwise_publicEq")
+        && lean_history_semantics_source
+            .contains("theorem runtimeHistory_orderedObjectSchedule_eq_of_stepwise_publicEq")
+        && lean_history_semantics_source
+            .contains("theorem adaptiveHistory_nextRequest_eq_of_same_public_prefix");
+    let mixed_backend_ordered_schedule_theorems_present = lean_proofgrade_root_source
+        .contains("import UOToolchain.HistorySemantics")
+        && lean_history_semantics_source.contains("inductive RuntimeObjectBackend")
+        && lean_history_semantics_source.contains("structure MixedBackendObjectAccess")
+        && lean_history_semantics_source
+            .contains("def RuntimeKernelSchedule.orderedMixedBackendSchedule")
+        && lean_history_semantics_source
+            .contains("theorem orderedMixedBackendSchedule_objectIds_eq_publicObjectSchedule")
+        && lean_history_semantics_source
+            .contains("theorem orderedMixedBackendSchedule_eq_of_publicObjectSchedule_eq")
+        && lean_history_semantics_source
+            .contains("theorem runtimeKernelSchedule_orderedObjectSchedule_finalState_public");
     let rust_runtime_small_confidential_kernel_boundary_field_names = extract_rust_struct_fields(
         &probe_source,
         "ImportedRuntimeImplementationSmallConfidentialKernelBoundary",
@@ -34685,6 +34725,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_implementation_interface_handwritten_host_coordination_lacks_secret_serialization_theorem_present
         && runtime_implementation_interface_host_visible_error_taxonomy_theorem_present
         && runtime_implementation_interface_source_drift_boundary_classified
+        && adaptive_history_semantics_theorems_present
+        && mixed_backend_ordered_schedule_theorems_present
         && runtime_small_confidential_kernel_boundary_field_names_match
         && runtime_small_confidential_kernel_boundary_small_kernel_theorem_present
         && runtime_small_confidential_kernel_boundary_slot_adapter_theorem_present
@@ -35338,6 +35380,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_implementation_interface_host_visible_error_taxonomy_theorem_present,
         "runtime_implementation_interface_source_drift_boundary_classified":
             runtime_implementation_interface_source_drift_boundary_classified,
+        "adaptive_history_semantics_theorems_present":
+            adaptive_history_semantics_theorems_present,
+        "mixed_backend_ordered_schedule_theorems_present":
+            mixed_backend_ordered_schedule_theorems_present,
         "rust_runtime_small_confidential_kernel_boundary_field_names":
             rust_runtime_small_confidential_kernel_boundary_field_names,
         "lean_runtime_small_confidential_kernel_boundary_field_names":

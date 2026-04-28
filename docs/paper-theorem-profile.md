@@ -461,6 +461,12 @@ Closed work-package status:
   certificate producer remains in the implementation-side TCB; current replay
   and reconstruction checks reduce what it can assert, but do not eliminate it
   with a primitive-event transcript hash or verified extraction proof.
+- Adaptive-history / mixed-backend theorem shape: `HistorySemantics.lean`
+  introduces a host strategy over accumulated public transcripts and gives
+  each call observation an ordered object schedule. The ordered mixed-backend
+  schedule is an explicit public leakage object, so exact and ORAM object
+  accesses compose over their ordered interleaving rather than over counts
+  alone.
 - Future strengthening below WP3 (not a WP3 blocker, retained as the next
   scientific step): a deeper semantics-of-Rust refinement below the now
   source-pinned/public-only handwritten runtime shell cuts, the

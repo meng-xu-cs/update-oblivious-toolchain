@@ -746,6 +746,12 @@ kernel-machine-confinement report additionally records that the runtime
 witness/certificate producer remains trusted, with authority reduced by replay
 and reconstruction checks rather than eliminated by a primitive-event
 transcript-hash proof.
+The adaptive-history lift is represented explicitly in
+`HistorySemantics.lean`: the host strategy consumes the accumulated public
+transcript before selecting the next call, and each public observation carries
+the ordered object schedule. The mixed-backend theorem surface therefore treats
+the exact/ORAM object interleaving as an ordered public leakage component
+rather than a count-only summary.
 
 ### 6.3 Compiler / output conformance (closed by WP4)
 

@@ -24,6 +24,10 @@ That bundle contains exactly:
 
 The full theorem-facing runtime witness is reconstructed from that bundle; it
 is no longer the primitive trusted object.
+For history-level statements, `HistorySemantics.lean` treats the per-call
+public observation as a public outcome plus an ordered object schedule, and the
+adaptive host strategy reads the accumulated observation transcript before
+choosing the next public call.
 
 ## Current TCB Statement
 

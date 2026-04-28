@@ -284,6 +284,11 @@ source-frozen/static-drift evidence with no Rust semantic refinement claim, and
 the direct machine-confinement report marks runtime witness extraction as a
 trusted producer whose authority is reduced by replay/reconstruction checks
 rather than eliminated by transcript-hash or verified-extraction machinery.
+The history/composition surface is now explicit as well:
+`HistorySemantics.lean` models adaptive hosts as strategies over the
+accumulated public transcript, includes the ordered object schedule in each
+call observation, and names the ordered mixed-backend exact/ORAM schedule
+theorems pinned by `kernel_model_alignment_validation.json`.
 
 The outer proof/interface route was completed on April 21, 2026, and
 the stronger shared-kernel strengthening track is now active below that outer

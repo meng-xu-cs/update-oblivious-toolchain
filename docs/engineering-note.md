@@ -32,6 +32,10 @@ Remaining assumptions:
   runtime witness/certificate extractor remains in the implementation-side TCB
   even though trace replay and certificate reconstruction reduce what an
   unchecked producer can assert
+- adaptive-history statements now use `HistorySemantics.lean`: host choices
+  are functions of the accumulated public transcript, and the ordered object
+  schedule is part of each call observation, including for mixed exact/ORAM
+  object-store compositions
 - guarantees are over the instrumented abstract/runtime traces emitted by this workspace, including the normalized physical read/write schedules captured by the current runtime
 - the prototype does not claim a proof for every downstream machine-code or microarchitectural observer
 - in a TEE deployment, persistent state now satisfies a concrete sealed-storage assumption rather than the previous marker-hiding placeholder encoding
