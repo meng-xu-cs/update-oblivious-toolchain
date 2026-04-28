@@ -20,12 +20,12 @@ use uo_core::{
     ProgramMode, PublicOutcomeTrace, RuntimeConfidentialCoreKernelFinishSlotBundle,
     RuntimeKernelInterfaceBundle, RuntimeKernelMachineFinishWitness,
     RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramLeafScaffoldWitness,
-    RuntimeOramObjectWitness, RuntimeRefinementWitness, RuntimeShellContract, RuntimeShellTrace,
-    SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainSlotFamilyBundle,
-    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value, WriteClass,
-    CONFIDENTIAL_KERNEL_EXPR_PROFILES, CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES,
-    CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES,
-    CONFIDENTIAL_KERNEL_STATEMENT_PROFILES,
+    RuntimeOramObjectWitness, RuntimePathOramTransitionKind, RuntimeRefinementWitness,
+    RuntimeShellContract, RuntimeShellTrace, SeededRuntimePaperMainFamilyBundle,
+    SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePathOramWitnessFamily,
+    SgxControllerShapeTrace, Value, WriteClass, CONFIDENTIAL_KERNEL_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES, CONFIDENTIAL_KERNEL_STATEMENT_PROFILES,
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
 
@@ -23283,6 +23283,207 @@ fn validate_fresh_coin_theorem_input_case(
     }))
 }
 
+fn path_oram_leaf_choice_count(bucket_count: usize) -> usize {
+    ((bucket_count + 1) / 2).max(1)
+}
+
+fn push_semantic_fresh_coin(
+    scenario: &'static str,
+    scaffold: &[RuntimeOramLeafScaffoldWitness],
+    values: &[usize],
+    cursor: &mut usize,
+    expected: &RuntimeOramLeafScaffoldWitness,
+    coins_by_object: &mut BTreeMap<u32, Vec<usize>>,
+) -> Result<()> {
+    let Some(step) = scaffold.get(*cursor) else {
+        bail!(
+            "canonical fresh-coin scaffold for {} ended before runtime transition schedule",
+            scenario
+        );
+    };
+    if step != expected {
+        bail!(
+            "canonical fresh-coin scaffold for {} drifted at index {}",
+            scenario,
+            *cursor
+        );
+    }
+    let Some(value) = values.get(*cursor).copied() else {
+        bail!(
+            "canonical fresh-coin value list for {} ended before scaffold index {}",
+            scenario,
+            *cursor
+        );
+    };
+    let leaf_count = path_oram_leaf_choice_count(expected.bucket_count);
+    if value >= leaf_count {
+        bail!(
+            "canonical fresh-coin value {} for {} object {} exceeds leaf count {}",
+            value,
+            scenario,
+            expected.object_name,
+            leaf_count
+        );
+    }
+    coins_by_object
+        .entry(expected.object_id)
+        .or_default()
+        .push(value);
+    *cursor += 1;
+    Ok(())
+}
+
+fn push_dummy_write_coin(
+    expected: &RuntimeOramLeafScaffoldWitness,
+    coins_by_object: &mut BTreeMap<u32, Vec<usize>>,
+) {
+    coins_by_object
+        .entry(expected.object_id)
+        .or_default()
+        .push(0);
+}
+
+fn path_oram_fresh_coin_plan_for_runtime_tape(
+    scenario: &'static str,
+    witness: &RuntimeRefinementWitness,
+    values: &[usize],
+) -> Result<PathOramFreshCoinPlan> {
+    let scaffold = witness
+        .path_oram_fresh_coin_scaffold()
+        .ok_or_else(|| anyhow!("fresh-coin scaffold extraction failed for {}", scenario))?;
+    if scaffold.len() != values.len() {
+        bail!(
+            "canonical fresh-coin scaffold length {} for {} does not match value length {}",
+            scaffold.len(),
+            scenario,
+            values.len()
+        );
+    }
+    if witness.oram_leaf_schedule().len() != witness.oram_leaf_state_transitions().len() {
+        bail!(
+            "runtime ORAM leaf schedule length does not match transition length for {}",
+            scenario
+        );
+    }
+
+    let mut cursor = 0usize;
+    let mut coins_by_object = BTreeMap::<u32, Vec<usize>>::new();
+    for (leaf, transition) in witness
+        .oram_leaf_schedule()
+        .iter()
+        .zip(witness.oram_leaf_state_transitions().iter())
+    {
+        if transition.object_id != leaf.object_id
+            || transition.object_name != leaf.object_name
+            || transition.bucket_count != leaf.bucket_count
+        {
+            bail!(
+                "runtime ORAM leaf/transition object mismatch for {}",
+                scenario
+            );
+        }
+        let expected = RuntimeOramLeafScaffoldWitness {
+            object_id: leaf.object_id,
+            object_name: leaf.object_name.clone(),
+            bucket_count: leaf.bucket_count,
+        };
+        match transition.kind {
+            RuntimePathOramTransitionKind::ReadMiss => {
+                push_semantic_fresh_coin(
+                    scenario,
+                    &scaffold,
+                    values,
+                    &mut cursor,
+                    &expected,
+                    &mut coins_by_object,
+                )?;
+            }
+            RuntimePathOramTransitionKind::ReadHit => {
+                if transition.next_leaf.is_none() {
+                    bail!("read-hit transition without next leaf for {}", scenario);
+                }
+                push_semantic_fresh_coin(
+                    scenario,
+                    &scaffold,
+                    values,
+                    &mut cursor,
+                    &expected,
+                    &mut coins_by_object,
+                )?;
+            }
+            RuntimePathOramTransitionKind::WriteNoop => {
+                if transition.slot_index.is_none() {
+                    push_semantic_fresh_coin(
+                        scenario,
+                        &scaffold,
+                        values,
+                        &mut cursor,
+                        &expected,
+                        &mut coins_by_object,
+                    )?;
+                } else if transition.prior_leaf.is_none() {
+                    bail!(
+                        "write-noop slot transition without prior leaf for {}",
+                        scenario
+                    );
+                } else {
+                    push_dummy_write_coin(&expected, &mut coins_by_object);
+                }
+                push_dummy_write_coin(&expected, &mut coins_by_object);
+            }
+            RuntimePathOramTransitionKind::WriteInsert => {
+                push_semantic_fresh_coin(
+                    scenario,
+                    &scaffold,
+                    values,
+                    &mut cursor,
+                    &expected,
+                    &mut coins_by_object,
+                )?;
+                push_semantic_fresh_coin(
+                    scenario,
+                    &scaffold,
+                    values,
+                    &mut cursor,
+                    &expected,
+                    &mut coins_by_object,
+                )?;
+            }
+            RuntimePathOramTransitionKind::WriteUpdate => {
+                if transition.next_leaf.is_none() {
+                    bail!("write-update transition without next leaf for {}", scenario);
+                }
+                push_dummy_write_coin(&expected, &mut coins_by_object);
+                push_semantic_fresh_coin(
+                    scenario,
+                    &scaffold,
+                    values,
+                    &mut cursor,
+                    &expected,
+                    &mut coins_by_object,
+                )?;
+            }
+            RuntimePathOramTransitionKind::WriteDelete => {
+                push_dummy_write_coin(&expected, &mut coins_by_object);
+                push_dummy_write_coin(&expected, &mut coins_by_object);
+            }
+        }
+    }
+    if cursor != scaffold.len() {
+        bail!(
+            "canonical fresh-coin scaffold for {} had {} unused semantic entries",
+            scenario,
+            scaffold.len() - cursor
+        );
+    }
+
+    let mut plan = PathOramFreshCoinPlan::new();
+    for (object_id, coins) in coins_by_object {
+        plan.insert_object_coins(object_id, coins.into_boxed_slice())?;
+    }
+    Ok(plan)
+}
+
 fn collect_canonical_fresh_coin_family_case(
     name: &'static str,
     artifact: &CompiledArtifact,
@@ -23314,8 +23515,9 @@ fn collect_canonical_fresh_coin_family_case(
                         )
                     },
                 )?;
-            let fresh_coin_plan = PathOramFreshCoinPlan::from_scaffold_and_values(
-                &fresh_coin_scaffold,
+            let fresh_coin_plan = path_oram_fresh_coin_plan_for_runtime_tape(
+                name,
+                &first_witness,
                 &fresh_coin_values,
             )?;
             let mut instance = prepare_instance_with_seed(artifact, setup, deploy_seed)?;
@@ -23384,7 +23586,7 @@ fn collect_canonical_fresh_coin_theorem_input_case(
                 )
             })?;
     let fresh_coin_plan =
-        PathOramFreshCoinPlan::from_scaffold_and_values(&fresh_coin_scaffold, &fresh_coin_values)?;
+        path_oram_fresh_coin_plan_for_runtime_tape(name, &first_witness, &fresh_coin_values)?;
     let mut representative_instance = prepare_instance_with_seed(artifact, setup, deploy_seed)?;
     let representative_trace = representative_instance
         .call_with_path_oram_fresh_coins(target.entrypoint, target.args.clone(), fresh_coin_plan)?
@@ -23463,10 +23665,8 @@ fn estimate_canonical_fresh_coin_family_size(
                     seed
                 )
             })?;
-        let fresh_coin_plan = PathOramFreshCoinPlan::from_scaffold_and_values(
-            &fresh_coin_scaffold,
-            &fresh_coin_values,
-        )?;
+        let fresh_coin_plan =
+            path_oram_fresh_coin_plan_for_runtime_tape(name, &first_witness, &fresh_coin_values)?;
         let mut instance = prepare_instance_with_seed(artifact, setup, deploy_seed)?;
         let trace = instance
             .call_with_path_oram_fresh_coins(
@@ -23604,8 +23804,9 @@ fn materialize_canonical_fresh_coin_family_object<W: Write>(
                         seed
                     )
                 })?;
-        let fresh_coin_plan = PathOramFreshCoinPlan::from_scaffold_and_values(
-            &context.public_fresh_coin_scaffold,
+        let fresh_coin_plan = path_oram_fresh_coin_plan_for_runtime_tape(
+            name,
+            &context.first_witness,
             &fresh_coin_values,
         )?;
         let mut instance =
@@ -47351,11 +47552,14 @@ Prototype assumptions:
 #[cfg(test)]
 mod tests {
     use super::{
-        check_authscan_correctness, compile_artifact, compile_suite, production_source_slice,
-        run_auc_reports, run_mutual_information_reports, run_overheads, run_trace_equivalence,
-        BenchArtifacts,
+        addr, check_authscan_correctness, compile_artifact, compile_suite,
+        path_oram_fresh_coin_plan_for_runtime_tape, prepare_instance_with_seed,
+        production_source_slice, run_auc_reports, run_mutual_information_reports, run_overheads,
+        run_trace_equivalence, BenchArtifacts, CallSpec,
     };
-    use uo_core::ProgramMode;
+    use uo_core::{
+        canonical_path_oram_leaf_values_of_seed, ProgramMode, RuntimePathOramTransitionKind, Value,
+    };
 
     #[test]
     fn authscan_correctness_reports_raw_rejection_and_uo_result() {
@@ -47423,6 +47627,67 @@ mod tests {
         assert_eq!(
             overhead_report["cases"][0]["raw"]["rejected"].as_bool(),
             Some(true)
+        );
+    }
+
+    #[test]
+    fn fresh_coin_runtime_tape_pads_transfer_from_write_update_dummy_coins() {
+        let artifact = compile_artifact(
+            "benches/raw/ERC20Lite.sol",
+            "benches/raw/ERC20Lite.pathoram.yaml",
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let setup = vec![
+            CallSpec {
+                entrypoint: "mint(address,uint256)",
+                args: vec![addr(0x11), Value::Uint(10)],
+            },
+            CallSpec {
+                entrypoint: "approve(address,address,uint256)",
+                args: vec![addr(0x11), addr(0x22), Value::Uint(4)],
+            },
+        ];
+        let target = CallSpec {
+            entrypoint: "transferFrom(address,address,address,uint256)",
+            args: vec![addr(0x11), addr(0x22), addr(0x33), Value::Uint(3)],
+        };
+
+        let mut baseline = prepare_instance_with_seed(&artifact, &setup, 0).unwrap();
+        let baseline_trace = baseline
+            .call(target.entrypoint, target.args.clone())
+            .unwrap()
+            .trace;
+        let baseline_witness = baseline_trace.runtime_refinement_witness().unwrap();
+        assert!(baseline_witness
+            .oram_leaf_state_transitions()
+            .iter()
+            .any(|transition| {
+                transition.object_name == "allowances"
+                    && transition.kind == RuntimePathOramTransitionKind::WriteUpdate
+            }));
+        let scaffold = baseline_witness.path_oram_fresh_coin_scaffold().unwrap();
+        let values = canonical_path_oram_leaf_values_of_seed(&scaffold, 0).unwrap();
+        let plan = path_oram_fresh_coin_plan_for_runtime_tape(
+            "ERC20Lite/pathoram/transferFrom-fresh-coins",
+            &baseline_witness,
+            &values,
+        )
+        .unwrap();
+
+        let mut injected = prepare_instance_with_seed(&artifact, &setup, 0).unwrap();
+        let injected_trace = injected
+            .call_with_path_oram_fresh_coins(target.entrypoint, target.args, plan)
+            .unwrap()
+            .trace;
+        let injected_witness = injected_trace.runtime_refinement_witness().unwrap();
+        assert_eq!(
+            injected_witness.path_oram_fresh_coin_scaffold().unwrap(),
+            scaffold
+        );
+        assert_eq!(
+            injected_witness.path_oram_fresh_coin_values().unwrap(),
+            values
         );
     }
 
