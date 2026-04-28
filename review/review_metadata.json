@@ -1,0 +1,107 @@
+{
+  "review_created_utc": "2026-04-28T02:26:30.660698Z",
+  "source_root": "/mnt/data/uot_review/update-oblivious-toolchain-main",
+  "theorem_like_declarations": 2371,
+  "theorem_counter": {
+    "theorem": 2369,
+    "axiom": 2
+  },
+  "files_with_theorems": 75,
+  "top_theorem_files": [
+    [
+      "proof/lean/UOToolchain/RuntimeImplementationInterface.lean",
+      813
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeOramHelperSemantics.lean",
+      222
+    ],
+    [
+      "proof/lean/UOToolchain/ProofGrade.lean",
+      130
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeOramCodecSemantics.lean",
+      96
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeRefinement.lean",
+      89
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeKernelDslJson.lean",
+      74
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeStoreCodecSemantics.lean",
+      56
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeImplementationInterfaceJson.lean",
+      54
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeShellBoundary.lean",
+      41
+    ],
+    [
+      "proof/lean/UOToolchain/SgxObserverFreeze.lean",
+      40
+    ],
+    [
+      "proof/lean/UOToolchain/KernelDsl.lean",
+      38
+    ],
+    [
+      "proof/lean/UOToolchain/PaperPathOramTheoremRoute.lean",
+      35
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeOramWriteLogDiscipline.lean",
+      34
+    ],
+    [
+      "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+      33
+    ],
+    [
+      "proof/lean/UOToolchain/RuntimeRefinementJson.lean",
+      30
+    ]
+  ],
+  "tamper_scenario_count": 379,
+  "tamper_all_rejected": true,
+  "overheads_cases": [
+    {
+      "benchmark": "ConfidentialMixer/deposit",
+      "full_scan_64": {
+        "bytes_written": 12284.0,
+        "gas_used": 32768,
+        "physical_writes": 65
+      },
+      "oram_64": {
+        "bytes_written": 56520.0,
+        "gas_used": 12288,
+        "physical_writes": 49
+      },
+      "oram_improves_physical_writes": true,
+      "raw": {
+        "bytes_written": 64.0,
+        "gas_used": 50,
+        "physical_writes": 2
+      }
+    }
+  ],
+  "trace_equivalence_keys": [
+    "computational_uo",
+    "exact_uo",
+    "positive_control"
+  ],
+  "static_checks_summary": {
+    "legacy_axiom_definition_surface_restricted": true,
+    "legacy_theorem_symbol_surface_restricted": true,
+    "proofgrade_checker_import_surface_restricted": true,
+    "proofgrade_checker_legacy_symbol_mentions_absent": true,
+    "proofgrade_core_module_import_surface_restricted": true
+  }
+}
