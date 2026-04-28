@@ -810,7 +810,7 @@ theorem runtimeRefinementWitness_kernelInterfaceBundle_exact
                       } = bundle := by
                     exact Option.some.inj hBundleSome
                   cases hBundleEq
-                  simp [hShell, hExpectedSteps, hExpectedPublic, hExpectedSchedule]
+                  simp [hExpectedSteps, hExpectedPublic, hExpectedSchedule]
 
 theorem runtimeShellBoundaryBundle_contract_exact
   {bundle : RuntimeShellBoundaryBundle}
@@ -1579,7 +1579,7 @@ theorem runtimeWitness_proofGradeKernelInterfaceBundle_valid
     , expectedKernelSchedule := expectedKernelSchedule
     }
   refine ⟨bundle, ?_, ?_⟩
-  · simpa [RuntimeRefinementWitness.kernelInterfaceBundle?, hBundle,
+  · simp [RuntimeRefinementWitness.kernelInterfaceBundle?, hBundle,
       hExpectedKernelSteps, hExpectedPublicObjectIds, hExpectedKernelSchedule, bundle]
   · exact
       ⟨hBundleValid, hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,

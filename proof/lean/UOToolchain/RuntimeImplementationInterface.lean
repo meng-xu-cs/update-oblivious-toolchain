@@ -433,7 +433,7 @@ def RuntimeImplementationInterface.checkRuntimeOwnsBridgeModules
   iface.checkRuntimeOwnsBridgeModules = true ↔ iface.runtimeOwnsBridgeModules := by
   unfold RuntimeImplementationInterface.checkRuntimeOwnsBridgeModules
     RuntimeImplementationInterface.runtimeOwnsBridgeModules
-  simpa [and_assoc]
+  simp [and_assoc]
 
 def RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
   (iface : RuntimeImplementationInterface) : Prop :=
@@ -1325,7 +1325,7 @@ def RuntimeImplementationInterface.checkAllocatorSessionEnforcesScratchAndWipeDi
     iface.allocatorSessionEnforcesScratchAndWipeDiscipline := by
   unfold RuntimeImplementationInterface.checkAllocatorSessionEnforcesScratchAndWipeDiscipline
     RuntimeImplementationInterface.allocatorSessionEnforcesScratchAndWipeDiscipline
-  simp [and_assoc]
+  simp
 
 theorem RuntimeImplementationInterface.allocatorModel_recordKernelOp_acceptsOnlyBelowBudget
   {state next : RuntimeAllocatorDiscipline.State}
@@ -2053,7 +2053,7 @@ def RuntimeImplementationInterface.checkRuntimeKernelAdapterOnlyForwardsGenerate
     iface.runtimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects := by
   unfold RuntimeImplementationInterface.checkRuntimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
     RuntimeImplementationInterface.runtimeKernelAdapterOnlyForwardsGeneratedSlotsAndEffects
-  simp [and_assoc]
+  simp
 
 def RuntimeImplementationInterface.sharedConfidentialInterpreterUsesMaskedSelectionAndAbort
   (iface : RuntimeImplementationInterface) : Prop :=
@@ -3837,7 +3837,7 @@ def RuntimeImplementationInterface.checkStoreLibrarySurfaceKeepsGeneratedHelpers
     iface.runtimeStoreUoWritesEmitPublicUpdateShape := by
   unfold RuntimeImplementationInterface.checkRuntimeStoreUoWritesEmitPublicUpdateShape
     RuntimeImplementationInterface.runtimeStoreUoWritesEmitPublicUpdateShape
-  simp [and_assoc]
+  simp
 
 @[simp] theorem
   runtimeImplementationInterface_checkStoreLibrarySurfaceKeepsGeneratedHelpersPrivate_eq_true_iff
@@ -3914,7 +3914,7 @@ def RuntimeImplementationInterface.checkRuntimeShadowStateUsesFixedSortedCommitT
     iface.runtimeShadowStateUsesFixedSortedCommitTable := by
   unfold RuntimeImplementationInterface.checkRuntimeShadowStateUsesFixedSortedCommitTable
     RuntimeImplementationInterface.runtimeShadowStateUsesFixedSortedCommitTable
-  simp [and_assoc]
+  simp
 
 def RuntimeImplementationInterface.generatedObjectHelpersMatchLeanGenerator
   (iface : RuntimeImplementationInterface) : Prop :=
@@ -8414,7 +8414,7 @@ def RuntimeImplementationInterface.checkCoreLibraryExportsBoundaryCarriersAndKee
     iface.coreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate := by
   unfold RuntimeImplementationInterface.checkCoreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
     RuntimeImplementationInterface.coreLibraryExportsBoundaryCarriersAndKeepsGeneratedKernelPrivate
-  simp [and_assoc]
+  simp
 
 def RuntimeImplementationInterface.sharedConfidentialKernelConsumesLeanGeneratedProfiles
   (iface : RuntimeImplementationInterface) : Prop :=

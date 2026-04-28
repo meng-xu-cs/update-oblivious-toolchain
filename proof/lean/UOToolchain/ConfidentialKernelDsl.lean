@@ -639,9 +639,7 @@ theorem confidentialKernelStatementToSlotStatement_runtimeNormalForm
                         confidentialKernelExprToSlotExpr value env1 =
                         Except.ok (slotStmt, env') := by
                     simpa using hTmp
-                  have hEq : Except.error err = Except.ok (slotStmt, env') := by
-                    simpa [Functor.map, Except.map, hValue] using hTmp'
-                  cases hEq
+                  simp [Functor.map, Except.map, hValue] at hTmp'
               | ok value' =>
                   have hTmp := h
                   simp [confidentialKernelStatementToSlotStatement, hDecl] at hTmp
@@ -854,20 +852,18 @@ theorem confidentialKernelStatementsToSlotStatements_runtimeNormalForm
                   confidentialKernelStatementsToSlotStatements entrypoint rest env1 with
               | error err =>
                   have hTmp := h
-                  simp [confidentialKernelStatementsToSlotStatements, hStmt] at hTmp
+                  simp [hStmt] at hTmp
                   have hTmp' :
                       (fun a => (slotStmt :: a.fst, a.snd)) <$>
                         confidentialKernelStatementsToSlotStatements entrypoint rest env1 =
                         Except.ok (slotBody, env') := by
                     simpa using hTmp
-                  have hEq : Except.error err = Except.ok (slotBody, env') := by
-                    simpa [Functor.map, Except.map, hRest] using hTmp'
-                  cases hEq
+                  simp [Functor.map, Except.map, hRest] at hTmp'
               | ok restResult =>
                   cases restResult with
                   | mk restBody env2 =>
                       have hTmp := h
-                      simp [confidentialKernelStatementsToSlotStatements, hStmt] at hTmp
+                      simp [hStmt] at hTmp
                       have hTmp' :
                           (fun a => (slotStmt :: a.fst, a.snd)) <$>
                             confidentialKernelStatementsToSlotStatements entrypoint rest env1 =
@@ -929,7 +925,7 @@ theorem confidentialKernelProgram_toConfidentialKernelSlotProgram_runtimeNormalF
           confidentialKernelStatementsToSlotStatements program.entrypointId program.body env with
       | error err =>
           have hTmp := h
-          simp [ConfidentialKernelProgram.toConfidentialKernelSlotProgram?, hEnv] at hTmp
+          simp [hEnv] at hTmp
           have hTmp' :
               (fun a =>
                     { entrypointId := program.entrypointId
@@ -942,14 +938,12 @@ theorem confidentialKernelProgram_toConfidentialKernelSlotProgram_runtimeNormalF
                 confidentialKernelStatementsToSlotStatements program.entrypointId program.body env =
                 Except.ok slotProgram := by
             simpa using hTmp
-          have hEq : Except.error err = Except.ok slotProgram := by
-            simpa [Functor.map, Except.map, hBody] using hTmp'
-          cases hEq
+          simp [Functor.map, Except.map, hBody] at hTmp'
       | ok bodyResult =>
           cases bodyResult with
           | mk body env' =>
               have hTmp := h
-              simp [ConfidentialKernelProgram.toConfidentialKernelSlotProgram?, hEnv] at hTmp
+              simp [hEnv] at hTmp
               have hTmp' :
                   (fun a =>
                         { entrypointId := program.entrypointId

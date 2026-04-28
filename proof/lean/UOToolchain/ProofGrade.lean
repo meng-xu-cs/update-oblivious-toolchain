@@ -818,7 +818,7 @@ theorem proofGrade_lowered_compiled_function_secret_args
   | error e =>
       simp [hLowStmts, bind, Except.bind] at hLow
   | ok kbody =>
-      simp [hLowStmts, bind, Except.bind, pure, Except.pure] at hLow
+      simp [hLowStmts, bind, Except.bind] at hLow
       rw [← hLow]
 
 theorem proofGrade_lowered_compiled_function_params
@@ -830,7 +830,7 @@ theorem proofGrade_lowered_compiled_function_params
   | error e =>
       simp [hLowStmts, bind, Except.bind] at hLow
   | ok kbody =>
-      simp [hLowStmts, bind, Except.bind, pure, Except.pure] at hLow
+      simp [hLowStmts, bind, Except.bind] at hLow
       rw [← hLow]
 
 /-! ### W4.5 narrow runtime-vs-static lift: per-statement cellSet/arraySet/mapPut

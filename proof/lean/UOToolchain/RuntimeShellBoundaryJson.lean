@@ -348,7 +348,7 @@ theorem importedRuntimeRefinementWitness_kernelInterfaceBundle_exact
                       } = bundle := by
                     exact Option.some.inj hBundleSome
                   cases hBundleEq
-                  simp [hShell, hExpectedSteps, hExpectedPublic, hExpectedSchedule]
+                  simp [hExpectedSteps, hExpectedPublic, hExpectedSchedule]
 
 def ImportedRuntimeShellBoundaryBundle.checkValid
   (bundle : ImportedRuntimeShellBoundaryBundle) : Bool :=
@@ -453,7 +453,7 @@ def ImportedRuntimeKernelInterfaceBundle.checkValid
     simp [ImportedRuntimeKernelInterfaceBundle.checkValid, hShellCheck,
       hExpectedKernelSteps, hKernelSteps, hExpectedPublicObjectIds, hPublicObjectIds,
       hResourceState, hExpectedKernelSchedule, hEmittedKernelSchedule,
-      hFinalKernelScheduleState, and_assoc]
+      hFinalKernelScheduleState]
 
 theorem importedRuntimeShellBoundaryBundle_contract_exact
   {bundle : ImportedRuntimeShellBoundaryBundle}
@@ -532,11 +532,23 @@ theorem importedRuntimeShellBoundaryBundle_toRuntimeValid
           bundle.kernel_witness bundle.kernel_witness.entrypoint_id hKernelProofGrade)
   · simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
       ImportedRuntimeKernelRefinementWitness.Valid] using hRefinementValid
-  · simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle, hContractExact] using
-      importedRuntimeKernelWitness_importedShellContract_toRuntime bundle.kernel_witness
-  · simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle, hTraceExact] using
-      importedRuntimeKernelRefinementWitness_importedShellTrace_toRuntime
-        bundle.runtime_kernel_refinement_witness
+  · calc
+      bundle.toRuntimeShellBoundaryBundle.shellContract =
+          bundle.shell_contract.toRuntimeShellContract := rfl
+      _ = bundle.kernel_witness.importedShellContract.toRuntimeShellContract := by
+        rw [hContractExact]
+      _ = bundle.toRuntimeShellBoundaryBundle.kernelWitness.shellContract := by
+        exact importedRuntimeKernelWitness_importedShellContract_toRuntime bundle.kernel_witness
+  · calc
+      bundle.toRuntimeShellBoundaryBundle.shellTrace =
+          bundle.shell_trace.toRuntimeShellTrace := rfl
+      _ =
+          bundle.runtime_kernel_refinement_witness.importedShellTrace.toRuntimeShellTrace := by
+        rw [hTraceExact]
+      _ = bundle.toRuntimeShellBoundaryBundle.runtimeKernelRefinementWitness.shellTrace := by
+        exact
+          importedRuntimeKernelRefinementWitness_importedShellTrace_toRuntime
+            bundle.runtime_kernel_refinement_witness
   · unfold ImportedRuntimeShellTrace.Refines at hRefines
     simpa [ImportedRuntimeShellBoundaryBundle.toRuntimeShellBoundaryBundle,
       ImportedRuntimeKernelWitness.shellContract,
@@ -1024,7 +1036,7 @@ theorem importedWitness_proofGradeKernelInterfaceBundle_valid
       ImportedRuntimeKernelRefinementWitness.shellTrace, hContractExact, hTraceExact] using
       hShellRefines
   refine ⟨bundle, ?_, ?_⟩
-  · simpa [ImportedRuntimeRefinementWitness.kernelInterfaceBundle?, hBundle,
+  · simp [ImportedRuntimeRefinementWitness.kernelInterfaceBundle?, hBundle,
       hExpectedKernelSteps, hExpectedPublicObjectIds, hExpectedKernelSchedule, bundle]
   · exact
       ⟨hShellBoundaryValid, hKernelStateRefinement, hExpectedKernelSteps, hKernelSteps,
@@ -1141,7 +1153,7 @@ theorem importedRuntimeKernelInterfaceBundle_projects_toRuntime
         have hTraceExact :
             shellTrace = runtimeKernelRefinementWitness.shellTrace := by
           simpa [hShellEq] using runtimeShellBoundaryBundle_trace_exact hShellValid
-        simp [hShellEq, hContractExact, hTraceExact]
+        simp [hContractExact, hTraceExact]
   have hRuntimeShellBoundaryExact :
       witness.toRuntimeWitness.shellBoundaryBundle? =
         some runtimeShellBoundaryBundle := by

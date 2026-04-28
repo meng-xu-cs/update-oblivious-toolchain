@@ -140,7 +140,7 @@ theorem importedRuntimeKernelFinishBundle_kernelInterfaceBundle_exact
                   } = kernelInterfaceBundle := by
                 exact Option.some.inj hBundleSome
               cases hBundleEq
-              simp [kernelWitness, hExpectedSteps, hExpectedPublic, hExpectedSchedule]
+              simp
 
 def ImportedRuntimeKernelFinishBundle.Valid
   (bundle : ImportedRuntimeKernelFinishBundle) : Prop :=
@@ -242,8 +242,7 @@ theorem importedRuntimeKernelFinishBundle_toRuntimeKernelInterfaceBundle_expecte
     by
       rcases hBundleExact with
         ⟨_hShellBoundary, hExpectedSteps, _hExpectedPublic, _hExpectedSchedule⟩
-      simp [ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle,
-        ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle]
+      simp [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle]
       simpa [ImportedRuntimeKernelFinishBundle.kernelWitness] using
         congrArg
           (Option.map (List.map ImportedRuntimeKernelStep.toRuntimeKernelStep))
@@ -265,8 +264,7 @@ theorem importedRuntimeKernelFinishBundle_toRuntimeKernelInterfaceBundle_expecte
     by
       rcases hBundleExact with
         ⟨_hShellBoundary, _hExpectedSteps, hExpectedPublic, _hExpectedSchedule⟩
-      simp [ImportedRuntimeKernelFinishBundle.toRuntimeKernelInterfaceBundle,
-        ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle]
+      simp [ImportedRuntimeKernelInterfaceBundle.toRuntimeKernelInterfaceBundle]
       simpa [ImportedRuntimeKernelFinishBundle.kernelWitness] using hExpectedPublic.symm
 
 noncomputable def ImportedRuntimeKernelFinishBundle.toRuntimeKernelRefinementBoundary

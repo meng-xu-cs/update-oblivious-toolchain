@@ -631,8 +631,8 @@ theorem lowerStatement_preserves_semantics
       cases IR.evalExpr cfg env (lowerExpr index) with
       | status _ =>
           cases predicate with
-          | none => simp only [Option.map]
-          | some _ => simp only [Option.map]
+          | none => rfl
+          | some _ => rfl
       | value _ =>
           rw [lowerExpr_preserves_semantics cfg env value]
           cases predicate with
@@ -652,8 +652,8 @@ theorem lowerStatement_preserves_semantics
       cases IR.evalExpr cfg env (lowerExpr key) with
       | status _ =>
           cases predicate with
-          | none => simp only [Option.map]
-          | some _ => simp only [Option.map]
+          | none => rfl
+          | some _ => rfl
       | value _ =>
           rw [lowerExpr_preserves_semantics cfg env value]
           cases predicate with

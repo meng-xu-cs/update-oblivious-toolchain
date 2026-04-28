@@ -113,7 +113,7 @@ theorem importedRuntimeConfidentialCoreKernelInterfaceSlotBundle_toRuntimeValid
         have hTraceExact :
             shellTrace = runtimeKernelRefinementWitness.shellTrace := by
           simpa [hShellEq] using runtimeShellBoundaryBundle_trace_exact hShellValid
-        simp [hShellEq, hContractExact, hTraceExact]
+        simp [hContractExact, hTraceExact]
   have hShellBoundaryBundleExact :
       bundle.runtime_witness.toRuntimeWitness.shellBoundaryBundle? =
         some runtimeShellBoundaryBundle := by

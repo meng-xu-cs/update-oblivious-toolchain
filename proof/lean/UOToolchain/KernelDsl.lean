@@ -1660,11 +1660,11 @@ theorem lowerStatementsAux_preserves_semantics :
                           cases hStatus : oc'.status with
                           | completed =>
                               by_cases hRet : oc'.publicResult.isSome
-                              · simp [hStatus, hRet]
-                              · simp only [hStatus, hRet, if_false]
+                              · simp [hRet]
+                              · simp [hRet]
                                 exact lowerStatementsAux_preserves_semantics
                                   rest krest (index + 1) stmt.isReturn cfg' env' oc' hRest
-                          | _ => simp [hStatus]
+                          | _ => simp
 
 /-- Wrapper: `lowerStatements` (which is `lowerStatementsAux _ 0
 false`) preserves semantics. -/
@@ -1722,9 +1722,9 @@ theorem lowerCompiledFunction_preserves_semantics
       unfold evalContract evalKernelProgram
       simp only [hEntry, hInitEnv]
       cases hEnv : cfg.initialEnv fn with
-      | none => simp [hEnv]
+      | none => simp
       | some env =>
-          simp only [hEnv]
+          simp
           -- Use the list-level preservation theorem.
           have ihBody := lowerStatements_preserves_semantics
             cfg env Outcome.empty fn.body ks hBody
@@ -1809,7 +1809,7 @@ theorem lowerPureExpr_ok_implies_branchlessPureExpr :
       cases hRec : lowerPureExpr e with
       | error _ => simp [hRec, bind, Except.bind] at h
       | ok ke =>
-          simp [hRec, bind, Except.bind, pure, Except.pure] at h
+          simp [hRec, bind, Except.bind] at h
           simp [branchlessPureExpr]
           exact lowerPureExpr_ok_implies_branchlessPureExpr e ke hRec
   | .binary op lhs rhs, _, h => by
@@ -1820,7 +1820,7 @@ theorem lowerPureExpr_ok_implies_branchlessPureExpr :
           cases hR : lowerPureExpr rhs with
           | error _ => simp [hL, hR, bind, Except.bind] at h
           | ok kr =>
-              simp [hL, hR, bind, Except.bind, pure, Except.pure] at h
+              simp [hL, hR, bind, Except.bind] at h
               simp [branchlessPureExpr]
               exact ⟨lowerPureExpr_ok_implies_branchlessPureExpr lhs kl hL,
                 lowerPureExpr_ok_implies_branchlessPureExpr rhs kr hR⟩
@@ -1835,7 +1835,7 @@ theorem lowerPureExpr_ok_implies_branchlessPureExpr :
               cases hF : lowerPureExpr wf with
               | error _ => simp [hC, hT, hF, bind, Except.bind] at h
               | ok kf =>
-                  simp [hC, hT, hF, bind, Except.bind, pure, Except.pure] at h
+                  simp [hC, hT, hF, bind, Except.bind] at h
                   simp [branchlessPureExpr]
                   exact ⟨⟨lowerPureExpr_ok_implies_branchlessPureExpr cond kc hC,
                           lowerPureExpr_ok_implies_branchlessPureExpr wt kt hT⟩,
@@ -1850,7 +1850,7 @@ theorem lowerPureExpr_ok_implies_branchlessPureExpr :
       cases hParts : lowerPureExprList parts with
       | error _ => simp [hParts, bind, Except.bind] at h
       | ok kparts =>
-          simp [hParts, bind, Except.bind, pure, Except.pure] at h
+          simp [hParts, bind, Except.bind] at h
           simp [branchlessPureExpr]
           exact lowerPureExprList_ok_implies_branchlessPureExprList parts kparts hParts
 
@@ -1866,7 +1866,7 @@ theorem lowerPureExprList_ok_implies_branchlessPureExprList :
           cases hTail : lowerPureExprList rest with
           | error _ => simp [hHead, hTail, bind, Except.bind] at h
           | ok krest =>
-              simp [hHead, hTail, bind, Except.bind, pure, Except.pure] at h
+              simp [hHead, hTail, bind, Except.bind] at h
               simp [branchlessPureExprList]
               exact ⟨lowerPureExpr_ok_implies_branchlessPureExpr e ke hHead,
                 lowerPureExprList_ok_implies_branchlessPureExprList rest krest hTail⟩
@@ -1885,7 +1885,7 @@ theorem lowerExpr_ok_implies_fragmentValid :
       cases hRec : lowerExpr e with
       | error _ => simp [hRec, bind, Except.bind] at h
       | ok ke =>
-          simp [hRec, bind, Except.bind, pure, Except.pure] at h
+          simp [hRec, bind, Except.bind] at h
           simp [Expr.fragmentValid]
           exact lowerExpr_ok_implies_fragmentValid e ke hRec
   | .binary op lhs rhs, _, h => by
@@ -1896,7 +1896,7 @@ theorem lowerExpr_ok_implies_fragmentValid :
           cases hR : lowerExpr rhs with
           | error _ => simp [hL, hR, bind, Except.bind] at h
           | ok kr =>
-              simp [hL, hR, bind, Except.bind, pure, Except.pure] at h
+              simp [hL, hR, bind, Except.bind] at h
               simp [Expr.fragmentValid]
               exact ⟨lowerExpr_ok_implies_fragmentValid lhs kl hL,
                 lowerExpr_ok_implies_fragmentValid rhs kr hR⟩
@@ -1911,7 +1911,7 @@ theorem lowerExpr_ok_implies_fragmentValid :
               cases hF : lowerPureExpr wf with
               | error _ => simp [hC, hT, hF, bind, Except.bind] at h
               | ok kf =>
-                  simp [hC, hT, hF, bind, Except.bind, pure, Except.pure] at h
+                  simp [hC, hT, hF, bind, Except.bind] at h
                   -- Need: fragmentValid for cond + wt + wf, plus branchlessPureExpr wt + wf.
                   -- The select arms wt/wf were lowered via lowerPureExpr (succeeded by hT, hF),
                   -- which by lowerPureExpr_ok_implies_branchlessPureExpr gives branchlessness.
@@ -1929,7 +1929,7 @@ theorem lowerExpr_ok_implies_fragmentValid :
       cases hI : lowerExpr index with
       | error _ => simp [hI, bind, Except.bind] at h
       | ok ki =>
-          simp [hI, bind, Except.bind, pure, Except.pure] at h
+          simp [hI, bind, Except.bind] at h
           simp [Expr.fragmentValid]
           exact lowerExpr_ok_implies_fragmentValid index ki hI
   | .mapGet id key, _, h => by
@@ -1937,7 +1937,7 @@ theorem lowerExpr_ok_implies_fragmentValid :
       cases hK : lowerExpr key with
       | error _ => simp [hK, bind, Except.bind] at h
       | ok kk =>
-          simp [hK, bind, Except.bind, pure, Except.pure] at h
+          simp [hK, bind, Except.bind] at h
           simp [Expr.fragmentValid]
           exact lowerExpr_ok_implies_fragmentValid key kk hK
   | .structField _ _, _, h => by simp [lowerExpr] at h
@@ -1947,7 +1947,7 @@ theorem lowerExpr_ok_implies_fragmentValid :
       cases hParts : lowerExprList parts with
       | error _ => simp [hParts, bind, Except.bind] at h
       | ok kparts =>
-          simp [hParts, bind, Except.bind, pure, Except.pure] at h
+          simp [hParts, bind, Except.bind] at h
           simp [Expr.fragmentValid]
           exact lowerExprList_ok_implies_fragmentValidList parts kparts hParts
 
@@ -1963,7 +1963,7 @@ theorem lowerExprList_ok_implies_fragmentValidList :
           cases hTail : lowerExprList rest with
           | error _ => simp [hHead, hTail, bind, Except.bind] at h
           | ok krest =>
-              simp [hHead, hTail, bind, Except.bind, pure, Except.pure] at h
+              simp [hHead, hTail, bind, Except.bind] at h
               simp [Expr.fragmentValidList]
               exact ⟨lowerExpr_ok_implies_fragmentValid e ke hHead,
                 lowerExprList_ok_implies_fragmentValidList rest krest hTail⟩
@@ -1980,7 +1980,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
       cases hV : lowerExpr value with
       | error _ => simp [hV, bind, Except.bind] at h
       | ok kv =>
-          simp [hV, bind, Except.bind, pure, Except.pure] at h
+          simp [hV, bind, Except.bind] at h
           simp [Statement.kernelLowerable]
           exact lowerExpr_ok_implies_fragmentValid value kv hV
   | .assign name value, _, h => by
@@ -1988,7 +1988,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
       cases hV : lowerExpr value with
       | error _ => simp [hV, bind, Except.bind] at h
       | ok kv =>
-          simp [hV, bind, Except.bind, pure, Except.pure] at h
+          simp [hV, bind, Except.bind] at h
           simp [Statement.kernelLowerable]
           exact lowerExpr_ok_implies_fragmentValid value kv hV
   | .require cond, _, h => by
@@ -1996,7 +1996,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
       cases hC : lowerExpr cond with
       | error _ => simp [hC, bind, Except.bind] at h
       | ok kc =>
-          simp [hC, bind, Except.bind, pure, Except.pure] at h
+          simp [hC, bind, Except.bind] at h
           simp [Statement.kernelLowerable]
           exact lowerExpr_ok_implies_fragmentValid cond kc hC
   | .abortIf cond, _, h => by
@@ -2004,7 +2004,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
       cases hC : lowerExpr cond with
       | error _ => simp [hC, bind, Except.bind] at h
       | ok kc =>
-          simp [hC, bind, Except.bind, pure, Except.pure] at h
+          simp [hC, bind, Except.bind] at h
           simp [Statement.kernelLowerable]
           exact lowerExpr_ok_implies_fragmentValid cond kc hC
   | .ifStmt _ _ _, _, h => by simp [lowerStatement] at h
@@ -2016,14 +2016,14 @@ theorem lowerStatement_ok_implies_kernelLowerable :
       | ok kv =>
           cases pred with
           | none =>
-              simp [hV, bind, Except.bind, pure, Except.pure] at h
+              simp [hV, bind, Except.bind] at h
               simp [Statement.kernelLowerable]
               exact lowerExpr_ok_implies_fragmentValid value kv hV
           | some p =>
               cases hP : lowerExpr p with
               | error _ => simp [hV, hP, bind, Except.bind] at h
               | ok kp =>
-                  simp [hV, hP, bind, Except.bind, pure, Except.pure] at h
+                  simp [hV, hP, bind, Except.bind] at h
                   simp [Statement.kernelLowerable]
                   exact ⟨lowerExpr_ok_implies_fragmentValid value kv hV,
                     lowerExpr_ok_implies_fragmentValid p kp hP⟩
@@ -2037,7 +2037,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
           | ok kv =>
               cases pred with
               | none =>
-                  simp [hI, hV, bind, Except.bind, pure, Except.pure] at h
+                  simp [hI, hV, bind, Except.bind] at h
                   simp [Statement.kernelLowerable]
                   exact ⟨lowerExpr_ok_implies_fragmentValid index ki hI,
                     lowerExpr_ok_implies_fragmentValid value kv hV⟩
@@ -2045,7 +2045,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
                   cases hP : lowerExpr p with
                   | error _ => simp [hI, hV, hP, bind, Except.bind] at h
                   | ok kp =>
-                      simp [hI, hV, hP, bind, Except.bind, pure, Except.pure] at h
+                      simp [hI, hV, hP, bind, Except.bind] at h
                       simp [Statement.kernelLowerable]
                       exact ⟨⟨lowerExpr_ok_implies_fragmentValid index ki hI,
                         lowerExpr_ok_implies_fragmentValid value kv hV⟩,
@@ -2060,7 +2060,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
           | ok kv =>
               cases pred with
               | none =>
-                  simp [hK, hV, bind, Except.bind, pure, Except.pure] at h
+                  simp [hK, hV, bind, Except.bind] at h
                   simp [Statement.kernelLowerable]
                   exact ⟨lowerExpr_ok_implies_fragmentValid key kk hK,
                     lowerExpr_ok_implies_fragmentValid value kv hV⟩
@@ -2068,7 +2068,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
                   cases hP : lowerExpr p with
                   | error _ => simp [hK, hV, hP, bind, Except.bind] at h
                   | ok kp =>
-                      simp [hK, hV, hP, bind, Except.bind, pure, Except.pure] at h
+                      simp [hK, hV, hP, bind, Except.bind] at h
                       simp [Statement.kernelLowerable]
                       exact ⟨⟨lowerExpr_ok_implies_fragmentValid key kk hK,
                         lowerExpr_ok_implies_fragmentValid value kv hV⟩,
@@ -2079,7 +2079,7 @@ theorem lowerStatement_ok_implies_kernelLowerable :
       cases hV : lowerExpr value with
       | error _ => simp [hV, bind, Except.bind] at h
       | ok kv =>
-          simp [hV, bind, Except.bind, pure, Except.pure] at h
+          simp [hV, bind, Except.bind] at h
           simp [Statement.kernelLowerable]
           exact lowerExpr_ok_implies_fragmentValid value kv hV
 
@@ -2496,7 +2496,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
       simp only [evalKernelStatement, KernelStatement.expectedStep,
         List.append_nil] at *
       cases hVal : evalKernelExpr cfg env value with
-      | value v => simp [hVal]
+      | value v => simp
       | status s =>
           simp [hVal] at hStatus
           exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
@@ -2504,7 +2504,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
       simp only [evalKernelStatement, KernelStatement.expectedStep,
         List.append_nil] at *
       cases hVal : evalKernelExpr cfg env value with
-      | value v => simp [hVal]
+      | value v => simp
       | status s =>
           simp [hVal] at hStatus
           exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
@@ -2516,7 +2516,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
           cases v with
           | bool b =>
               cases b with
-              | true => simp [hCond]
+              | true => simp
               | false => simp [hCond] at hStatus
           | _ => simp [hCond] at hStatus
       | status s =>
@@ -2531,7 +2531,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
           | bool b =>
               cases b with
               | true => simp [hCond] at hStatus
-              | false => simp [hCond]
+              | false => simp
           | _ => simp [hCond] at hStatus
       | status s =>
           simp [hCond] at hStatus
@@ -2545,7 +2545,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
           simp only [evalKernelStatement, KernelStatement.expectedStep,
             List.append_nil] at *
           cases hVal : evalKernelExpr cfg env value with
-          | value v => simp [hVal]
+          | value v => simp
           | status s =>
               simp [hVal] at hStatus
               exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
@@ -2557,7 +2557,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
           exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
       | value newVal =>
           cases predicate with
-          | none => simp [hVal]
+          | none => simp
           | some predExpr =>
               cases hPred : evalKernelExpr cfg env predExpr with
               | status s =>
@@ -2567,8 +2567,8 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                   cases pv with
                   | bool b =>
                       cases b
-                      · simp [hVal, hPred]
-                      · simp [hVal, hPred]
+                      · simp [hPred]
+                      · simp [hPred]
                   | _ => simp [hVal, hPred] at hStatus
   | arraySet objectId index value predicate =>
       simp only [evalKernelStatement, KernelStatement.expectedStep] at *
@@ -2593,7 +2593,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                           | array values =>
                               by_cases hOob : idx ≥ values.length
                               · simp [hIdx, hVal, hRead, hOob] at hStatus
-                              · simp [hIdx, hVal, hRead, hOob]
+                              · simp [hOob]
                           | _ => simp [hIdx, hVal, hRead] at hStatus
                   | _ => simp [hIdx, hVal] at hStatus
               | some predExpr =>
@@ -2605,7 +2605,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                       cases pv with
                       | bool b =>
                           cases b
-                          · simp [hIdx, hVal, hPred]
+                          · simp [hPred]
                           · cases indexVal with
                             | uint idx =>
                                 cases hRead : cfg.readObject objectId with
@@ -2615,7 +2615,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                                     | array values =>
                                         by_cases hOob : idx ≥ values.length
                                         · simp [hIdx, hVal, hPred, hRead, hOob] at hStatus
-                                        · simp [hIdx, hVal, hPred, hRead, hOob]
+                                        · simp [hPred, hOob]
                                     | _ => simp [hIdx, hVal, hPred, hRead] at hStatus
                             | _ => simp [hIdx, hVal, hPred] at hStatus
                       | _ => simp [hIdx, hVal, hPred] at hStatus
@@ -2634,10 +2634,10 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
               cases predicate with
               | none =>
                   cases hRead : cfg.readObject objectId with
-                  | none => simp [hKey, hVal, hRead]
+                  | none => simp
                   | some objVal =>
                       cases objVal with
-                      | map entries => simp [hKey, hVal, hRead]
+                      | map entries => simp
                       | _ => simp [hKey, hVal, hRead] at hStatus
               | some predExpr =>
                   cases hPred : evalKernelExpr cfg env predExpr with
@@ -2648,12 +2648,12 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                       cases pv with
                       | bool b =>
                           cases b
-                          · simp [hKey, hVal, hPred]
+                          · simp [hPred]
                           · cases hRead : cfg.readObject objectId with
-                            | none => simp [hKey, hVal, hPred, hRead]
+                            | none => simp [hPred]
                             | some objVal =>
                                 cases objVal with
-                                | map entries => simp [hKey, hVal, hPred, hRead]
+                                | map entries => simp [hPred]
                                 | _ => simp [hKey, hVal, hPred, hRead] at hStatus
                       | _ => simp [hKey, hVal, hPred] at hStatus
 

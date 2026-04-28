@@ -442,7 +442,7 @@ theorem
   have hBoundaryEventsLength :
       (bundle.toRuntimeKernelFinishSlotBoundary hValid).runtimeKernelBoundary.runtimeKernelRefinementWitness.events.length =
         (bundle.toRuntimeKernelRefinementWitness hValid).events.length := by
-    simpa [importedRuntimeConfidentialCoreKernelFinishSlotBundle_toRuntimeKernelFinishSlotBoundary_runtimeKernelRefinementWitness_exact
+    simp [importedRuntimeConfidentialCoreKernelFinishSlotBundle_toRuntimeKernelFinishSlotBoundary_runtimeKernelRefinementWitness_exact
       hValid]
   have hRuntimeRefinementFinishBundleEq :=
     importedRuntimeConfidentialCoreKernelFinishSlotBundle_toRuntimeKernelRefinementWitness_eq_finishBundleWitness

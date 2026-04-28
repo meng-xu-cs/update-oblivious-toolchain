@@ -2636,8 +2636,8 @@ private theorem checkImportedConfidentialKernelSlotStatementListEq_toRuntime_run
   | nil =>
       cases rhs with
       | nil =>
-          intro hNorm
-          simpa using hNorm
+          intro _
+          simp
       | cons rhsHead rhsTail =>
           have : False := by
             change false = true at h

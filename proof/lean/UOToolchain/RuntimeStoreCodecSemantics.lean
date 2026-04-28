@@ -638,7 +638,7 @@ theorem openBoxedPayloadShape?_some_payloadLen
   have hOpenShape := (decodeSealedRecord_some_validOpenShape hDecode).2
   have hValidShape : parts.ValidShape payloadLen := hOpenShape.1
   unfold SealedRecordParts.ValidShape at hValidShape
-  simpa [hValidShape.2.2.1]
+  simp [hValidShape.2.2.1]
 
 theorem decodeSealedRecord_none_of_encoded_length_ne
     {payloadLen : Nat}
