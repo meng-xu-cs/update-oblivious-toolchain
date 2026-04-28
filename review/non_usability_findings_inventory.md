@@ -370,7 +370,7 @@ Initial tests: reproducibility preflight should fail if the Lean toolchain is
 2. F06, F07, F08: align semantics or narrow the theorem claim while adding
    differential witnesses.
 3. F11, F12, F13: clean proof audit and runtime witness trust boundaries.
-4. F09, F10, F14: lift from single-call/object-local statements to history and
+4. F09, F10: lift from single-call/object-local statements to history and
    ordered mixed-backend composition.
 5. F03, F16, F17: close remaining host-visible failure and assumption-mapping
    gaps.
