@@ -1676,13 +1676,13 @@ semantics-of-Rust refinement of the residual real kernel
 implementation surface, a global runtime buffer-scrub theorem, an
 operational semantics for every live plaintext buffer inside
 in-call object state, or a Lean proof of the kernel implementation
-itself. Those tracks remain open as future-strengthening work
-beyond the closed WP3 / WP6 charters; they are not recorded as
-in-scope tasks in this document.
+itself. Those tracks are outside the closed WP3 / WP6 charters and are
+not recorded as in-scope tasks in this document.
 
-## Active Instructions
+## Guardrails
 
-These are the revived and still-valid instructions for the stronger story.
+These guardrails define the closed WP6 surface and should remain true for
+future maintenance.
 
 ### 1. Keep the kernel ABI small and auditable
 

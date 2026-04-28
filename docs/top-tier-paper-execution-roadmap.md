@@ -3,6 +3,10 @@
 This roadmap treats every theorem-strengthening, assumption-reducing, and
 trusted-surface-shrinking task as mandatory work for the final paper.
 
+The completed WP1-WP7 review pass is summarized in
+[`wp1-wp7-closure-audit.md`](./wp1-wp7-closure-audit.md); this roadmap is kept
+as the detailed historical record and validation checklist.
+
 The target is not merely "Lean checks some emitted artifacts." The target is
 one end-to-end theorem over the admitted Solidity subset, the concrete
 `path_oram_local_posmap_v1` backend, the real confidential runtime kernel, and
@@ -709,8 +713,9 @@ Concrete tasks:
    paper-facing shell-boundary / expected-step / expected-public-object /
    expected-schedule facts as an explicit `RuntimeKernelInterfaceBundle`, so
    the runtime/kernel interface is now first-class on both the Lean and Rust
-   sides even though the final implementation-refinement theorem is still
-   open. The frozen paper route now phrases
+   sides, and the later source-backed implementation-confinement and
+   machine-confinement routes discharge the implementation-refinement boundary
+   used by the current paper theorem. The frozen paper route now phrases
    `PaperMainRuntimeKernelBoundary` over that explicit kernel-interface bundle
    object, and the stronger shared-slot route now phrases
    `PaperMainRuntimeKernelSlotBoundary` as "one fixed confidential slot
@@ -1332,8 +1337,8 @@ Concrete tasks:
    route remains as the smaller flattened finish-slot artifact path and now
    also marks `residual_helper_shell_boundary_theorem_checked` plus
    `handwritten_runtime_public_only_theorem_checked`. The
-   final below-interface semantics-of-Rust refinement theorem for that real
-   kernel implementation is still open.
+   deeper below-interface semantics-of-Rust refinement theorem for that real
+   kernel implementation remains out-of-charter future strengthening.
 
 Deliverables:
 
@@ -1592,14 +1597,8 @@ Current status update:
   `IR.confidentialFragmentEntrypointWitnessOf` builds the count-based
   witness from a structured function; and
   `FragmentStats.add_zero_forbidden_iff` is a primitive split lemma.
-  The W4.3 characterization theorem
-  `(confidentialFragmentEntrypointWitnessOf fn).Valid ↔
-  fn.fragmentValid` is deferred to a follow-up commit because the
-  natural proof strategy uses structural induction on `Expr` /
-  `Statement`, which Lean 4.30.0-rc2's default `induction` tactic
-  does not support for nested-inductive types; the follow-up commit
-  will use `Expr.recOn` / `Statement.recOn` directly or restructure
-  the IR data types as explicitly mutual inductives.
+  The deferred theorem recorded by this earlier definitions-only cut
+  was closed by the W4.3 full-theorem landing above.
 - Subtask W4.1+ (evaluator coverage extension) landed (commit
   `9f0e45e`,
   [proof/lean/UOToolchain/IRSemantics.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/IRSemantics.lean)):
@@ -1677,12 +1676,9 @@ Current status update:
   program-level `kernelLowerable_implies_lowerCompiledFunction_ok`.
   The schedule-level proof case-splits on `stmt.isReturn` (now
   factored out as a top-level `Statement.isReturn` helper) and on
-  the structure of `rest`. The reverse direction of the iff
-  (lowering succeeds → precondition holds) is deferred — it is
-  useful for W4.6 (artifact-checker demotion) but not strictly
-  required by the W4.4 preservation theorem. Session B-2 (the
-  preservation theorem itself) and Session C (paper-facing facade)
-  remain open.
+  the structure of `rest`. The reverse direction of the iff,
+  the preservation theorem, and the paper-facing facade were closed
+  by the later W4.4/W4.6 landings summarized above.
 - Subtask W4.4 Session A (kernel DSL definitions) landed (commit
   `1bd6180`, new file
   [proof/lean/UOToolchain/KernelDsl.lean](/home/m285xu/update-oblivious-toolchain/proof/lean/UOToolchain/KernelDsl.lean)):
@@ -2275,10 +2271,10 @@ distribution).
 Status of charter task 3 (paper-narrative compatibility-shim
 removal): three stale paper-narrative shims removed (the probe's
 "TEE deployment assumptions" status text now reflects the W6.5
-closure; the paper-theorem-profile "What is still open" list no
+closure; the paper-theorem-profile closed work-package status no
 longer says W4.5 / W4.6 are open or that WP5 needs full Lean
 discharge; the WP6 entry now distinguishes the closed six-checkpoint
-surface from the open future-strengthening step). The W7.3 cleanup
+surface from the out-of-charter strengthening step). The W7.3 cleanup
 landed in commit `b1cfd59`.
 
 Status of charter task 2 (proof-grade checker theorem-tightening):
@@ -2344,9 +2340,9 @@ Exit gate:
 
 - the paper and artifact tell the same minimal story with no hidden branches
 
-## Critical Path
+## Closure Order
 
-The shortest path to the strongest result is:
+The WP0-WP7 closure order was:
 
 1. Work Package 0: freeze the exact theorem, observer, assumptions, and TCB.
 2. Work Package 1: finish shrinking all secret-dependent behavior into the
@@ -2362,14 +2358,15 @@ The shortest path to the strongest result is:
 8. Work Package 7: canonicalize the proof architecture and finalize the
    artifact story.
 
-Work Packages 5 and 7 can progress in parallel once the interfaces from Work
-Packages 0 through 4 are stable. Work Package 6 should not outrun Work Package
-3, because the malicious-host theorem depends on a stable runtime/kernel
-refinement story.
+The original dependency constraint was that WP6 could not outrun WP3 because
+the hostile-host theorem depends on the runtime/kernel refinement story. That
+constraint is now satisfied by the checked WP3 runtime boundary and the WP6
+closure audit.
 
-## Immediate Execution Queue
+## Retired Execution Queue
 
-If implementation resumes immediately, the next concrete sequence should be:
+There is no active WP1-WP7 implementation queue. The entries below are retained
+only as a closure log for the historical execution order:
 
 1. Completed: freeze the flagship theorem, observer, assumption table, and TCB
    table in the paper-facing docs.
@@ -2402,8 +2399,8 @@ If implementation resumes immediately, the next concrete sequence should be:
 7. Completed: prove that the non-kernel shell is public-only and package that
    shell contract together with the exact proof-grade boundary facts needed by
    the confidential-core argument.
-8. Active next item after the strengthened 6-7 route: continue the below-
-   interface shared-kernel story after the Lean-first generated-kernel landing.
+8. Completed below-interface shared-kernel closure for the current theorem
+   surface after the Lean-first generated-kernel landing.
    The live slot-program/block/statement evaluator, operator semantics,
    profile tables, and the private confidential argument / slot-file support
    are now generated from Lean and exact-source checked. The residual
@@ -3301,14 +3298,9 @@ If implementation resumes immediately, the next concrete sequence should be:
    `runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumption_bundle_minimized`
    and is accepted again with the current public-only handwritten shell /
    generated-helper split.
-9. Remaining after 8: prove source-to-kernel compiler correctness.
-10. Remaining after 9: minimize `PathOramLocalPosmapV1SecurityAssumptions`.
-11. Remaining after 10: close the hostile-host TEE theorem over the frozen
-    observer.
-
 ## Validation Gates
 
-Each milestone should keep the proof-grade path live. The minimum recurring
+The closed roadmap should keep the proof-grade path live. The recurring
 validation set is:
 
 ```bash

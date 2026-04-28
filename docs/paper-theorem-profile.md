@@ -246,7 +246,7 @@ What is already established at the frozen interface:
   refinement / shared-kernel machine-refinement / shared-kernel refinement
   routes, and combined implementation-confinement route
 
-What is still open:
+Closed work-package status:
 
 - WP4 (source-to-kernel compiler correctness): a machine-checked
   source-to-kernel compiler correctness theorem beyond the now-landed
@@ -327,8 +327,8 @@ What is still open:
   every kernel-lowerable program admitted by the W4.3 fragment
   classifier evaluates the same way under the IR semantics and
   the kernel-DSL semantics. The iff reverse direction (lowering
-  succeeds → precondition holds) is still deferred (useful for
-  W4.6 but not strictly needed by W4.4). The only `unsupported`
+  succeeds → precondition holds) is now closed by the later W4.4
+  reverse-iff landing. The only `unsupported`
   evaluator cases are `Expr.{structField,arrayIndex}`, which
   `fragmentValid` rejects, so they cannot appear in an accepted
   IR program.
@@ -482,7 +482,7 @@ The main theorem keeps the enclave boundary exact and public:
   `L_sgx_micro`
 
 This is the intended headline claim for the repository. A boundary-normalized
-variant is future work, not the main theorem profile.
+variant is outside the main theorem profile.
 
 ## Explicit Assumption Profile
 
@@ -1809,11 +1809,13 @@ coverage for every freeze layer.
 
 ## Non-Claim
 
-This profile does not currently claim:
+This profile does not claim:
 
 - raw equality of SGX page identities
 - raw equality of full micro-event sequences
-- a normalized boundary theorem
+- downstream machine-code equivalence below the checked runtime boundary
+- a complete semantics-of-Rust refinement for every residual implementation
+  detail beneath the source-backed runtime interface
 
 Those would require a different observer choice and possibly a wider leakage
 model.

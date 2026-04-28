@@ -2245,31 +2245,34 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
     out.push_str(
         "| Benchmark | Raw Gas | Raw Writes | Raw Bytes | Full-Scan Gas | Full-Scan Writes | Full-Scan Bytes | ORAM Gas | ORAM Writes | ORAM Bytes |\n",
     );
-    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
     if let Some(cases) = summary["runtime_overheads"]["cases"].as_array() {
         for case in cases {
+            let overhead_cell = |section: &str, field: &str| -> String {
+                let value = &case[section];
+                if value["rejected"].as_bool() == Some(true) {
+                    return "rejected".to_string();
+                }
+                if let Some(number) = value[field].as_u64() {
+                    return number.to_string();
+                }
+                if let Some(number) = value[field].as_f64() {
+                    return number.to_string();
+                }
+                "n/a".to_string()
+            };
             out.push_str(&format!(
                 "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
                 case["benchmark"].as_str().unwrap_or("unknown"),
-                case["raw"]["gas_used"].as_u64().unwrap_or_default(),
-                case["raw"]["physical_writes"].as_u64().unwrap_or_default(),
-                case["raw"]["bytes_written"].as_f64().unwrap_or_default(),
-                case["full_scan_64"]["gas_used"]
-                    .as_u64()
-                    .unwrap_or_default(),
-                case["full_scan_64"]["physical_writes"]
-                    .as_u64()
-                    .unwrap_or_default(),
-                case["full_scan_64"]["bytes_written"]
-                    .as_f64()
-                    .unwrap_or_default(),
-                case["oram_64"]["gas_used"].as_u64().unwrap_or_default(),
-                case["oram_64"]["physical_writes"]
-                    .as_u64()
-                    .unwrap_or_default(),
-                case["oram_64"]["bytes_written"]
-                    .as_f64()
-                    .unwrap_or_default(),
+                overhead_cell("raw", "gas_used"),
+                overhead_cell("raw", "physical_writes"),
+                overhead_cell("raw", "bytes_written"),
+                overhead_cell("full_scan_64", "gas_used"),
+                overhead_cell("full_scan_64", "physical_writes"),
+                overhead_cell("full_scan_64", "bytes_written"),
+                overhead_cell("oram_64", "gas_used"),
+                overhead_cell("oram_64", "physical_writes"),
+                overhead_cell("oram_64", "bytes_written"),
             ));
         }
     }
@@ -2340,9 +2343,7 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
         Lean-proved), `sgxHostileHostClosureAudit_allClassified`, \
         and `sgxHostileHostClosureAudit_driftCheckNames`.\n\n",
     );
-    out.push_str(
-        "| Checkpoint | Role | Classification | Lean Anchor | Static-Drift Check |\n",
-    );
+    out.push_str("| Checkpoint | Role | Classification | Lean Anchor | Static-Drift Check |\n");
     out.push_str("| --- | --- | --- | --- | --- |\n");
     if let Some(entries) = summary["wp6_closure_audit"].as_array() {
         for entry in entries {
@@ -2366,9 +2367,7 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
         validation slice. The acceptance gate requires every listed \
         check to be `true` in the corresponding report field.\n\n",
     );
-    out.push_str(
-        "| Static-Drift Check | Work Package | Target | Report Field |\n",
-    );
+    out.push_str("| Static-Drift Check | Work Package | Target | Report Field |\n");
     out.push_str("| --- | --- | --- | --- |\n");
     if let Some(entries) = summary["static_drift_check_inventory"].as_array() {
         for entry in entries {
@@ -3003,7 +3002,7 @@ fn current_tcb_summary() -> JsonValue {
         },
         {
             "component": "uo-solc",
-            "role": "not trusted for the current artifact-level acceptance claim; still unverified for the final source-level compiler theorem",
+            "role": "not trusted as a proof oracle; WP4's W4.2 + W4.4 + W4.5 + W4.6 Lean chain supersedes the direct artifact checker for admitted post-resolution source-to-kernel correctness, while parser/preprocessing remains the front-end trust point",
             "in_current_proofgrade_tcb": false,
         }
     ])
@@ -3029,7 +3028,7 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "PaperMainRuntimeKernelBoundary / PaperMainRuntimeKernelSlotBoundary",
             "meaning": "records the exact runtime-side paper boundary: one valid explicit runtime kernel-interface bundle per witness, and in the stronger slot route one fixed confidential slot program whose expected kernel steps match that bundle exactly",
-            "status": "explicit Lean boundaries in PaperPathOramTheoremRoute.lean; they now project mechanically to the native RuntimeProofGradeKernelInterface theorem, the explicit RuntimeKernelConfinementBoundary, and valid native shell-boundary bundles, the top-level paper assumption bundles now carry these boundary facts directly, proof-grade seeded paper-main bundles can discharge them mechanically, but they are not yet discharged for the real runtime by a machine-checked refinement plus confinement theorem",
+            "status": "explicit Lean boundaries in PaperPathOramTheoremRoute.lean; they project mechanically to the native RuntimeProofGradeKernelInterface theorem, RuntimeKernelConfinementBoundary, and valid native shell-boundary bundles, while the WP3/WP6 source-backed runtime implementation and hostile-host closure routes discharge the real-runtime proof/interface boundary for the chosen paper surface",
         },
         {
             "assumption": "TEE deployment assumptions",
@@ -45082,13 +45081,16 @@ fn check_classifier_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue>
         entrypoint: "peek()",
         args: vec![],
     }];
-    let raw = run_scenario(&artifacts.raw, &[], &target, &getters)?;
     let uo = run_scenario(&artifacts.uo, &[], &target, &getters)?;
+    let raw = run_optional_raw_scenario(&artifacts.raw, &[], &target, &getters)?;
+    let expected_getters = vec![Some(Value::Uint(1))];
     Ok(json!({
         "benchmark": "FixedSlotClassifier",
-        "raw": scenario_summary(&raw),
+        "raw": optional_scenario_summary(&raw),
         "uo": scenario_summary(&uo),
-        "equivalent": raw.getters == uo.getters && raw.target.return_value == uo.target.return_value,
+        "uo_matches_expected": scenario_matches(&uo, None, &expected_getters),
+        "raw_equivalent_to_uo": optional_scenario_equivalent_to(&raw, &uo),
+        "equivalent": scenario_matches(&uo, None, &expected_getters),
     }))
 }
 
@@ -45111,15 +45113,19 @@ fn check_authscan_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
         entrypoint: "readLast()",
         args: vec![],
     }];
-    let raw = run_scenario(&artifacts.raw, &setup, &target, &getters)
-        .context("correctness/AuthScan/raw scenario")?;
     let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)
         .context("correctness/AuthScan/uo scenario")?;
+    let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)
+        .context("correctness/AuthScan/raw scenario")?;
+    let expected_return = Some(Value::Uint(1));
+    let expected_getters = vec![Some(Value::Uint(1))];
     Ok(json!({
         "benchmark": "AuthScan",
-        "raw": scenario_summary(&raw),
+        "raw": optional_scenario_summary(&raw),
         "uo": scenario_summary(&uo),
-        "equivalent": raw.getters == uo.getters && raw.target.return_value == uo.target.return_value,
+        "uo_matches_expected": scenario_matches(&uo, expected_return.as_ref(), &expected_getters),
+        "raw_equivalent_to_uo": optional_scenario_equivalent_to(&raw, &uo),
+        "equivalent": scenario_matches(&uo, expected_return.as_ref(), &expected_getters),
     }))
 }
 
@@ -45143,7 +45149,6 @@ fn check_mixer_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
             args: vec![],
         },
     ];
-    let raw = run_scenario(&artifacts.raw, &setup, &target, &getters)?;
     let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)?;
     let oram = run_scenario(
         artifacts
@@ -45154,12 +45159,19 @@ fn check_mixer_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
         &target,
         &getters,
     )?;
+    let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)?;
+    let expected_return = Some(Value::Uint(2));
+    let expected_getters = vec![Some(Value::Uint(3)), Some(Value::Uint(3))];
     Ok(json!({
         "benchmark": "ConfidentialMixer",
-        "raw": scenario_summary(&raw),
+        "raw": optional_scenario_summary(&raw),
         "uo": scenario_summary(&uo),
         "oram": scenario_summary(&oram),
-        "equivalent": raw.getters == uo.getters && raw.getters == oram.getters,
+        "uo_matches_expected": scenario_matches(&uo, expected_return.as_ref(), &expected_getters),
+        "oram_matches_expected": scenario_matches(&oram, expected_return.as_ref(), &expected_getters),
+        "raw_equivalent_to_uo": optional_scenario_equivalent_to(&raw, &uo),
+        "equivalent": scenario_matches(&uo, expected_return.as_ref(), &expected_getters)
+            && scenario_matches(&oram, expected_return.as_ref(), &expected_getters),
     }))
 }
 
@@ -45195,7 +45207,6 @@ fn check_erc20_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
             args: vec![alice.clone(), bob.clone()],
         },
     ];
-    let raw = run_scenario(&artifacts.raw, &setup, &target, &getters)?;
     let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)?;
     let oram = run_scenario(
         artifacts
@@ -45206,12 +45217,23 @@ fn check_erc20_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
         &target,
         &getters,
     )?;
+    let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)?;
+    let expected_return = Some(Value::Uint(1));
+    let expected_getters = vec![
+        Some(Value::Uint(7)),
+        Some(Value::Uint(3)),
+        Some(Value::Uint(1)),
+    ];
     Ok(json!({
         "benchmark": "ERC20Lite",
-        "raw": scenario_summary(&raw),
+        "raw": optional_scenario_summary(&raw),
         "uo": scenario_summary(&uo),
         "oram": scenario_summary(&oram),
-        "equivalent": raw.getters == uo.getters && raw.getters == oram.getters,
+        "uo_matches_expected": scenario_matches(&uo, expected_return.as_ref(), &expected_getters),
+        "oram_matches_expected": scenario_matches(&oram, expected_return.as_ref(), &expected_getters),
+        "raw_equivalent_to_uo": optional_scenario_equivalent_to(&raw, &uo),
+        "equivalent": scenario_matches(&uo, expected_return.as_ref(), &expected_getters)
+            && scenario_matches(&oram, expected_return.as_ref(), &expected_getters),
     }))
 }
 
@@ -45229,23 +45251,31 @@ fn check_registry_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
         entrypoint: "read(bytes32)",
         args: vec![key.clone()],
     }];
-    let raw = run_scenario(&artifacts.raw, &setup, &target, &getters)?;
     let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)?;
+    let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)?;
+    let expected_return = Some(Value::Uint(1));
+    let expected_getters = vec![Some(Value::Uint(0))];
     Ok(json!({
         "benchmark": "RegistryCRUD",
-        "raw": scenario_summary(&raw),
+        "raw": optional_scenario_summary(&raw),
         "uo": scenario_summary(&uo),
-        "equivalent": raw.getters == uo.getters && raw.target.return_value == uo.target.return_value,
+        "uo_matches_expected": scenario_matches(&uo, expected_return.as_ref(), &expected_getters),
+        "raw_equivalent_to_uo": optional_scenario_equivalent_to(&raw, &uo),
+        "equivalent": scenario_matches(&uo, expected_return.as_ref(), &expected_getters),
     }))
 }
 
 fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
-    let classifier_raw = run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)
-        .context("trace_equivalence/FixedSlotClassifier/raw")?;
     let classifier_uo = run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)
         .context("trace_equivalence/FixedSlotClassifier/uo")?;
-    let classifier_same_same = run_classifier_same_same(&suite["FixedSlotClassifier"].raw)
-        .context("trace_equivalence/FixedSlotClassifier/raw-sameSame")?;
+    let classifier_raw = optional_raw_experiment(
+        run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)
+            .context("trace_equivalence/FixedSlotClassifier/raw"),
+    )?;
+    let classifier_same_same = optional_raw_experiment(
+        run_classifier_same_same(&suite["FixedSlotClassifier"].raw)
+            .context("trace_equivalence/FixedSlotClassifier/raw-sameSame"),
+    )?;
     let auth_uo =
         run_authscan_experiment(&suite["AuthScan"].uo).context("trace_equivalence/AuthScan/uo")?;
     let mixer_uo = run_mixer_key_experiment(&suite["ConfidentialMixer"].uo)
@@ -45271,12 +45301,8 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
     Ok(json!({
         "positive_control": {
             "benchmark": "FixedSlotClassifier",
-            "raw_opcode_equal": classifier_raw.opcode_equal,
-            "raw_logical_access_equal": classifier_raw.logical_equal,
-            "raw_logical_write_equal": classifier_raw.logical_write_equal,
-            "raw_physical_read_equal": classifier_raw.physical_read_equal,
-            "raw_physical_equal": classifier_raw.physical_equal,
-            "same_same_control_equal": classifier_same_same.physical_equal,
+            "raw": optional_trace_control_summary(&classifier_raw),
+            "same_same": optional_trace_control_summary(&classifier_same_same),
         },
         "exact_uo": [
             trace_summary("FixedSlotClassifier", "uo", &classifier_uo),
@@ -45293,204 +45319,236 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
 }
 
 fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
-    let experiments = vec![
-        (
+    let reports = vec![
+        experiment_metric_summary(
             "FixedSlotClassifier",
             "raw",
+            "metric_auc",
             run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)
-                .context("leakage_auc/FixedSlotClassifier/raw")?,
+                .context("leakage_auc/FixedSlotClassifier/raw"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "FixedSlotClassifier",
             "uo",
+            "metric_auc",
             run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)
-                .context("leakage_auc/FixedSlotClassifier/uo")?,
+                .context("leakage_auc/FixedSlotClassifier/uo"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "AuthScan",
             "raw",
-            run_authscan_experiment(&suite["AuthScan"].raw).context("leakage_auc/AuthScan/raw")?,
+            "metric_auc",
+            run_authscan_experiment(&suite["AuthScan"].raw).context("leakage_auc/AuthScan/raw"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "AuthScan",
             "uo",
-            run_authscan_experiment(&suite["AuthScan"].uo).context("leakage_auc/AuthScan/uo")?,
+            "metric_auc",
+            run_authscan_experiment(&suite["AuthScan"].uo).context("leakage_auc/AuthScan/uo"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "RegistryCRUD",
             "raw",
+            "metric_auc",
             run_registry_experiment(&suite["RegistryCRUD"].raw)
-                .context("leakage_auc/RegistryCRUD/raw")?,
+                .context("leakage_auc/RegistryCRUD/raw"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "RegistryCRUD",
             "uo",
+            "metric_auc",
             run_registry_experiment(&suite["RegistryCRUD"].uo)
-                .context("leakage_auc/RegistryCRUD/uo")?,
+                .context("leakage_auc/RegistryCRUD/uo"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "ConfidentialMixer",
             "raw",
+            "metric_auc",
             run_mixer_experiment(&suite["ConfidentialMixer"].raw)
-                .context("leakage_auc/ConfidentialMixer/raw")?,
+                .context("leakage_auc/ConfidentialMixer/raw"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "ConfidentialMixer",
             "uo",
+            "metric_auc",
             run_mixer_experiment(&suite["ConfidentialMixer"].uo)
-                .context("leakage_auc/ConfidentialMixer/uo")?,
+                .context("leakage_auc/ConfidentialMixer/uo"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "ConfidentialMixer",
             "oram",
+            "metric_auc",
             run_mixer_experiment(
                 suite["ConfidentialMixer"]
                     .oram
                     .as_ref()
                     .ok_or_else(|| anyhow!("missing mixer oram"))?,
             )
-            .context("leakage_auc/ConfidentialMixer/oram")?,
+            .context("leakage_auc/ConfidentialMixer/oram"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "ERC20Lite",
             "raw",
+            "metric_auc",
             run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)
-                .context("leakage_auc/ERC20Lite/raw")?,
+                .context("leakage_auc/ERC20Lite/raw"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "ERC20Lite",
             "uo",
+            "metric_auc",
             run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)
-                .context("leakage_auc/ERC20Lite/uo")?,
+                .context("leakage_auc/ERC20Lite/uo"),
+            auc_report,
         ),
-        (
+        experiment_metric_summary(
             "ERC20Lite",
             "oram",
+            "metric_auc",
             run_erc20_allowance_value_experiment(
                 suite["ERC20Lite"]
                     .oram
                     .as_ref()
                     .ok_or_else(|| anyhow!("missing erc20 oram"))?,
             )
-            .context("leakage_auc/ERC20Lite/oram")?,
+            .context("leakage_auc/ERC20Lite/oram"),
+            auc_report,
         ),
-    ];
-    let reports = experiments
-        .into_iter()
-        .map(|(benchmark, mode, experiment)| {
-            json!({
-                "benchmark": benchmark,
-                "mode": mode,
-                "metric_auc": auc_report(&experiment.class0_metrics, &experiment.class1_metrics),
-            })
-        })
-        .collect::<Vec<_>>();
+    ]
+    .into_iter()
+    .collect::<Result<Vec<_>>>()?;
     Ok(json!({ "reports": reports }))
 }
 
 fn run_mutual_information_reports(
     suite: &BTreeMap<&'static str, BenchArtifacts>,
 ) -> Result<JsonValue> {
-    let experiments = vec![
-        (
+    let reports = vec![
+        experiment_metric_summary(
             "FixedSlotClassifier",
             "raw",
+            "metric_mi_bits",
             run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)
-                .context("mutual_information/FixedSlotClassifier/raw")?,
+                .context("mutual_information/FixedSlotClassifier/raw"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "FixedSlotClassifier",
             "uo",
+            "metric_mi_bits",
             run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)
-                .context("mutual_information/FixedSlotClassifier/uo")?,
+                .context("mutual_information/FixedSlotClassifier/uo"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "AuthScan",
             "raw",
+            "metric_mi_bits",
             run_authscan_experiment(&suite["AuthScan"].raw)
-                .context("mutual_information/AuthScan/raw")?,
+                .context("mutual_information/AuthScan/raw"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "AuthScan",
             "uo",
+            "metric_mi_bits",
             run_authscan_experiment(&suite["AuthScan"].uo)
-                .context("mutual_information/AuthScan/uo")?,
+                .context("mutual_information/AuthScan/uo"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "RegistryCRUD",
             "raw",
+            "metric_mi_bits",
             run_registry_experiment(&suite["RegistryCRUD"].raw)
-                .context("mutual_information/RegistryCRUD/raw")?,
+                .context("mutual_information/RegistryCRUD/raw"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "RegistryCRUD",
             "uo",
+            "metric_mi_bits",
             run_registry_experiment(&suite["RegistryCRUD"].uo)
-                .context("mutual_information/RegistryCRUD/uo")?,
+                .context("mutual_information/RegistryCRUD/uo"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "ConfidentialMixer",
             "raw",
+            "metric_mi_bits",
             run_mixer_experiment(&suite["ConfidentialMixer"].raw)
-                .context("mutual_information/ConfidentialMixer/raw")?,
+                .context("mutual_information/ConfidentialMixer/raw"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "ConfidentialMixer",
             "uo",
+            "metric_mi_bits",
             run_mixer_experiment(&suite["ConfidentialMixer"].uo)
-                .context("mutual_information/ConfidentialMixer/uo")?,
+                .context("mutual_information/ConfidentialMixer/uo"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "ConfidentialMixer",
             "oram",
+            "metric_mi_bits",
             run_mixer_experiment(
                 suite["ConfidentialMixer"]
                     .oram
                     .as_ref()
                     .ok_or_else(|| anyhow!("missing mixer oram"))?,
             )
-            .context("mutual_information/ConfidentialMixer/oram")?,
+            .context("mutual_information/ConfidentialMixer/oram"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "ERC20Lite",
             "raw",
+            "metric_mi_bits",
             run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)
-                .context("mutual_information/ERC20Lite/raw")?,
+                .context("mutual_information/ERC20Lite/raw"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "ERC20Lite",
             "uo",
+            "metric_mi_bits",
             run_erc20_allowance_value_experiment(&suite["ERC20Lite"].uo)
-                .context("mutual_information/ERC20Lite/uo")?,
+                .context("mutual_information/ERC20Lite/uo"),
+            mi_report,
         ),
-        (
+        experiment_metric_summary(
             "ERC20Lite",
             "oram",
+            "metric_mi_bits",
             run_erc20_allowance_value_experiment(
                 suite["ERC20Lite"]
                     .oram
                     .as_ref()
                     .ok_or_else(|| anyhow!("missing erc20 oram"))?,
             )
-            .context("mutual_information/ERC20Lite/oram")?,
+            .context("mutual_information/ERC20Lite/oram"),
+            mi_report,
         ),
-    ];
-    let reports = experiments
-        .into_iter()
-        .map(|(benchmark, mode, experiment)| {
-            json!({
-                "benchmark": benchmark,
-                "mode": mode,
-                "metric_mi_bits": mi_report(&experiment.class0_metrics, &experiment.class1_metrics),
-            })
-        })
-        .collect::<Vec<_>>();
+    ]
+    .into_iter()
+    .collect::<Result<Vec<_>>>()?;
     Ok(json!({ "reports": reports }))
 }
 
 fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let mixer_key = b32(7);
-    let raw = run_scenario(
+    let raw = run_optional_raw_scenario(
         &suite["ConfidentialMixer"].raw,
         &[],
         &CallSpec {
@@ -45530,7 +45588,7 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
         "cases": [
             {
                 "benchmark": "ConfidentialMixer/deposit",
-                "raw": scenario_overhead(&raw),
+                "raw": optional_scenario_overhead(&raw),
                 "full_scan_64": scenario_overhead(&fullscan64),
                 "oram_64": scenario_overhead(&oram),
                 "oram_improves_physical_writes": oram.target.trace.physical_writes.len() < fullscan64.target.trace.physical_writes.len(),
@@ -45542,6 +45600,11 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
 struct ScenarioResult {
     target: CallResult,
     getters: Vec<Option<Value>>,
+}
+
+enum OptionalScenarioResult {
+    Executed(ScenarioResult),
+    Rejected { error: String },
 }
 
 fn run_scenario(
@@ -45566,6 +45629,49 @@ fn run_scenario(
     Ok(ScenarioResult { target, getters })
 }
 
+fn run_optional_raw_scenario(
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    getters: &[CallSpec],
+) -> Result<OptionalScenarioResult> {
+    match run_scenario(artifact, setup, target, getters) {
+        Ok(result) => Ok(OptionalScenarioResult::Executed(result)),
+        Err(err) if is_expected_confidential_raw_backend_rejection(&err) => {
+            Ok(OptionalScenarioResult::Rejected {
+                error: err.to_string(),
+            })
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn is_expected_confidential_raw_backend_rejection(err: &anyhow::Error) -> bool {
+    err.chain()
+        .any(|cause| cause.to_string().contains("uses raw backend"))
+}
+
+fn optional_scenario_equivalent_to(
+    optional: &OptionalScenarioResult,
+    expected: &ScenarioResult,
+) -> JsonValue {
+    match optional {
+        OptionalScenarioResult::Executed(result) => json!(
+            result.getters == expected.getters
+                && result.target.return_value == expected.target.return_value
+        ),
+        OptionalScenarioResult::Rejected { .. } => JsonValue::Null,
+    }
+}
+
+fn scenario_matches(
+    result: &ScenarioResult,
+    expected_return: Option<&Value>,
+    expected_getters: &[Option<Value>],
+) -> bool {
+    result.target.return_value.as_ref() == expected_return && result.getters == expected_getters
+}
+
 #[derive(Clone)]
 struct ExperimentOutcome {
     class0_metrics: Vec<BTreeMap<String, f64>>,
@@ -45575,6 +45681,11 @@ struct ExperimentOutcome {
     logical_write_equal: bool,
     physical_read_equal: bool,
     physical_equal: bool,
+}
+
+enum OptionalExperimentOutcome {
+    Executed(ExperimentOutcome),
+    Rejected { error: String },
 }
 
 fn run_fixed_classifier_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome> {
@@ -45802,6 +45913,73 @@ fn run_target_call_with_diagnostics(
         instance.call(call.entrypoint, call.args.clone())?;
     }
     instance.call_with_diagnostics(entrypoint, args)
+}
+
+fn experiment_metric_summary<F>(
+    benchmark: &str,
+    mode: &str,
+    metric_field: &str,
+    result: Result<ExperimentOutcome>,
+    metric_report: F,
+) -> Result<JsonValue>
+where
+    F: FnOnce(&[BTreeMap<String, f64>], &[BTreeMap<String, f64>]) -> JsonValue,
+{
+    match result {
+        Ok(experiment) => {
+            let mut entry = serde_json::Map::new();
+            entry.insert("benchmark".into(), json!(benchmark));
+            entry.insert("mode".into(), json!(mode));
+            entry.insert("executable".into(), json!(true));
+            entry.insert("rejected".into(), json!(false));
+            entry.insert(
+                metric_field.into(),
+                metric_report(&experiment.class0_metrics, &experiment.class1_metrics),
+            );
+            Ok(JsonValue::Object(entry))
+        }
+        Err(err) if mode == "raw" && is_expected_confidential_raw_backend_rejection(&err) => {
+            Ok(json!({
+                "benchmark": benchmark,
+                "mode": mode,
+                "executable": false,
+                "rejected": true,
+                "error": err.to_string(),
+            }))
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn optional_raw_experiment(result: Result<ExperimentOutcome>) -> Result<OptionalExperimentOutcome> {
+    match result {
+        Ok(experiment) => Ok(OptionalExperimentOutcome::Executed(experiment)),
+        Err(err) if is_expected_confidential_raw_backend_rejection(&err) => {
+            Ok(OptionalExperimentOutcome::Rejected {
+                error: err.to_string(),
+            })
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn optional_trace_control_summary(result: &OptionalExperimentOutcome) -> JsonValue {
+    match result {
+        OptionalExperimentOutcome::Executed(experiment) => json!({
+            "executable": true,
+            "rejected": false,
+            "opcode_equal": experiment.opcode_equal,
+            "logical_access_equal": experiment.logical_equal,
+            "logical_write_equal": experiment.logical_write_equal,
+            "physical_read_equal": experiment.physical_read_equal,
+            "physical_equal": experiment.physical_equal,
+        }),
+        OptionalExperimentOutcome::Rejected { error } => json!({
+            "executable": false,
+            "rejected": true,
+            "error": error,
+        }),
+    }
 }
 
 fn run_target_call(
@@ -46396,6 +46574,8 @@ fn mutual_information_bits(negatives: &[f64], positives: &[f64]) -> f64 {
 
 fn scenario_summary(result: &ScenarioResult) -> JsonValue {
     json!({
+        "executable": true,
+        "rejected": false,
         "aborted": result.target.aborted,
         "return": format_value(result.target.return_value.as_ref()),
         "getters": result.getters.iter().map(|value| format_value(value.as_ref())).collect::<Vec<_>>(),
@@ -46404,12 +46584,36 @@ fn scenario_summary(result: &ScenarioResult) -> JsonValue {
     })
 }
 
+fn optional_scenario_summary(result: &OptionalScenarioResult) -> JsonValue {
+    match result {
+        OptionalScenarioResult::Executed(result) => scenario_summary(result),
+        OptionalScenarioResult::Rejected { error } => json!({
+            "executable": false,
+            "rejected": true,
+            "error": error,
+        }),
+    }
+}
+
 fn scenario_overhead(result: &ScenarioResult) -> JsonValue {
     json!({
+        "executable": true,
+        "rejected": false,
         "gas_used": result.target.trace.gas_used,
         "physical_writes": result.target.trace.physical_writes.len(),
         "bytes_written": result.target.trace.physical_writes.iter().map(|event| event.len).sum::<usize>() as f64,
     })
+}
+
+fn optional_scenario_overhead(result: &OptionalScenarioResult) -> JsonValue {
+    match result {
+        OptionalScenarioResult::Executed(result) => scenario_overhead(result),
+        OptionalScenarioResult::Rejected { error } => json!({
+            "executable": false,
+            "rejected": true,
+            "error": error,
+        }),
+    }
 }
 
 fn format_value(value: Option<&Value>) -> JsonValue {
@@ -47147,12 +47351,14 @@ Prototype assumptions:
 #[cfg(test)]
 mod tests {
     use super::{
-        check_authscan_correctness, compile_artifact, production_source_slice, BenchArtifacts,
+        check_authscan_correctness, compile_artifact, compile_suite, production_source_slice,
+        run_auc_reports, run_mutual_information_reports, run_overheads, run_trace_equivalence,
+        BenchArtifacts,
     };
     use uo_core::ProgramMode;
 
     #[test]
-    fn authscan_correctness_covers_raw_bounded_loop_budget() {
+    fn authscan_correctness_reports_raw_rejection_and_uo_result() {
         let artifacts = BenchArtifacts {
             raw: compile_artifact(
                 "benches/raw/AuthScan.sol",
@@ -47171,8 +47377,53 @@ mod tests {
         };
         let report = check_authscan_correctness(&artifacts).unwrap();
         assert_eq!(report["equivalent"].as_bool(), Some(true));
-        assert_eq!(report["raw"]["return"].as_u64(), Some(1));
-        assert_eq!(report["raw"]["getters"][0].as_u64(), Some(1));
+        assert_eq!(report["raw"]["executable"].as_bool(), Some(false));
+        assert_eq!(report["raw"]["rejected"].as_bool(), Some(true));
+        assert!(report["raw"]["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("uses raw backend"));
+        assert_eq!(report["uo"]["return"].as_u64(), Some(1));
+        assert_eq!(report["uo"]["getters"][0].as_u64(), Some(1));
+    }
+
+    #[test]
+    fn report_paths_mark_raw_confidential_artifacts_as_rejected() {
+        let suite = compile_suite().unwrap();
+
+        let trace_report = run_trace_equivalence(&suite).unwrap();
+        assert_eq!(
+            trace_report["positive_control"]["raw"]["executable"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            trace_report["positive_control"]["same_same"]["rejected"].as_bool(),
+            Some(true)
+        );
+
+        let auc_report = run_auc_reports(&suite).unwrap();
+        assert!(auc_report["reports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| {
+                entry["mode"].as_str() == Some("raw") && entry["rejected"].as_bool() == Some(true)
+            }));
+
+        let mi_report = run_mutual_information_reports(&suite).unwrap();
+        assert!(mi_report["reports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| {
+                entry["mode"].as_str() == Some("raw") && entry["rejected"].as_bool() == Some(true)
+            }));
+
+        let overhead_report = run_overheads(&suite).unwrap();
+        assert_eq!(
+            overhead_report["cases"][0]["raw"]["rejected"].as_bool(),
+            Some(true)
+        );
     }
 
     #[test]

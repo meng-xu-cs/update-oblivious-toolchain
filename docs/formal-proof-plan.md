@@ -528,10 +528,9 @@ The current Lean scaffold now contains an explicit reduction layer for this:
   theorem target into one named object,
   `PathOramLocalPosmapV1StandardTheoremTarget`, exposes the exact abstract
   theorem proposition `StandardPathOramStorageTheoremAt` that an imported Path
-  ORAM proof must discharge, and packages the remaining concrete-implementation
-  bridge as
-  `PathOramLocalPosmapV1StandardTheoremRealization`, so the remaining work is
-  phrased as one explicit discharge object rather than a loose set of
+  ORAM proof must discharge, and packages the concrete-implementation bridge as
+  `PathOramLocalPosmapV1StandardTheoremRealization`, so the W5 citation route
+  is phrased as one explicit discharge object rather than a loose set of
   cross-file obligations
 - that same module now splits the imported-theorem path into a theorem-side
   `StandardPathOramCoreTheorem` and a runtime-side `PathOramStorageEnvelope`,

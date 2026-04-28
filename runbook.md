@@ -73,8 +73,10 @@ and early confidential returns.
 - the current paper route uses the citation-based JACM theorem source at the
   frozen interface, while the repository keeps the self-instantiated closure as
   appendix / executable-artifact support at exactly the same interface
-- the repository does not currently claim a blanket theorem for all Rust code,
-  all downstream machine code, or malicious-host SGX execution obliviousness
+- the WP6 hostile-host theorem is closed for the frozen observer and explicit
+  deployment-assumption bundle; the repository still does not claim raw
+  downstream machine-code or microarchitectural-event equality, nor a complete
+  semantics-of-Rust refinement below the checked runtime boundary
 
 ## Main Commands
 
@@ -104,22 +106,19 @@ cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' -
 cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format refinement-witness
 ```
 
-## Remaining Work
+## Closure Status
 
-The main remaining work is no longer "build the toolchain." It is theorem and
-provenance strengthening:
+The WP1-WP7 roadmap is closed for the current paper theorem surface:
 
 - keep the claim surface explicit that `path_oram_local_posmap_v1` is the only
   proof-grade backend path and the legacy surrogate ORAM stays benchmark-only
-- keep the small trusted boundary at the emitted certificate / bundle /
-  witness-producing kernel rather than claiming the whole runtime is verified
-- justify or import the explicit
-  `PathOramLocalPosmapV1SecurityAssumptions` bundle cleanly
-- if desired, replace the current citation route with a genuinely external
-  machine-checked theorem import at the same frozen interface
-- do not upgrade the repository into a malicious-host SGX execution theorem
-  until the enclave controller and SGX observer are connected to the real
-  implementation by the same refinement discipline
+- keep the small trusted boundary at the checked runtime extraction surface
+  rather than claiming all downstream Rust or machine code is verified
+- use the W5 citation/provenance route for
+  `PathOramLocalPosmapV1SecurityAssumptions`
+- treat a separately imported machine-checked JACM Path-ORAM proof and a deeper
+  semantics-of-Rust refinement as out-of-charter future strengthening, not as
+  open WP tasks
 
 ## Stronger TEE Runtime Track
 
@@ -335,10 +334,9 @@ That track is now grounded in current code rather than a bootstrap plan:
   path, which now requires the artifact-side expected sequence plus expected
   `{ opcode, object_id? }` step trace to be embedded in the witness
 
-This is still only the first hardening step. The repository still does not
-claim that the whole runtime is already proved against a malicious-host SGX
-observer, but there is now an active implementation track aimed at that
-stronger story.
+This hardening track is closed for the frozen WP6 hostile-host observer. The
+remaining non-claim is below that boundary: the repository does not prove every
+residual Rust implementation detail or downstream machine-code behavior.
 
 ## Historical Note
 

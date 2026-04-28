@@ -103,17 +103,17 @@ and shared-kernel-machine reports now also mark
 `native_machine_refinement_theorem_checked` for their lower-level machine
 theorems directly.
 
-The final paper target is now downstream of that runtime boundary:
+The final paper target is now built on that runtime boundary:
 
-- keep shrinking the non-kernel Rust surface where that still reduces the
-  implementation TCB
-- keep the proved non-kernel shell public-only interface aligned with the
-  admitted observer while lifting the result into the source theorem
-- prove source-to-kernel compiler correctness
-- discharge or minimize the remaining backend / cryptographic assumptions
-- close the final hostile-host deployment theorem
-- keep `uo-check`, `mplus-probe`, and any Rust-side translation convenience
-  wrappers outside the TCB
+- WP4 supplies the source-to-kernel compiler-correctness chain for the admitted
+  post-resolution source language
+- WP5 supplies the minimized backend-assumption audit and citation/provenance
+  route
+- WP6 supplies the hostile-host observer/deployment closure
+- `uo-check`, `mplus-probe`, and Rust-side translation convenience wrappers
+  remain outside the TCB
+- a deeper semantics-of-Rust refinement below the checked boundary remains an
+  out-of-charter strengthening track, not an open trusted-kernel task
 
 ## What Lean Proves
 

@@ -41,8 +41,11 @@ Current claim boundary:
   traces carrying the direct trusted-kernel bundle and the proof-grade path
   validating the slot-wrapped trusted-kernel artifact built from that bundle
   plus the admitted confidential slot program
-- no current blanket claim that the full Rust compiler/runtime stack or a
-  malicious-host SGX deployment already satisfies the final paper theorem
+- the WP4 compiler-correctness chain, the WP5 backend-assumption audit, and
+  the WP6 hostile-host observer/deployment closure are all represented in
+  Lean and checked by the probe reports; the non-claim is now narrower:
+  downstream machine code and a full semantics-of-Rust refinement below the
+  checked runtime boundary are not part of this repository's theorem
 
 Frozen paper claim surface:
 
@@ -91,11 +94,11 @@ Current proof-grade TCB:
 | --- | --- |
 | Lean kernel plus the Lean theorem/checker development | trusted proof checker and theorem body |
 | Explicit backend / cryptographic / deployment assumptions | trusted assumptions |
-| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | currently trusted for implementation honesty |
-| Rust code outside the tiny kernel | no longer part of the current confidential-work claim; the source-backed `RuntimeImplementationInterface` checker pins it to the public bridge side and `tamper_validation.json` rejects representative confidential-bypass drift |
+| Rust runtime kernel plus witness / certificate / bundle extraction and serialization | trusted implementation-side extraction surface, pinned by the source-backed runtime implementation boundaries and tamper suite |
+| Rust code outside the tiny kernel | no longer part of the confidential-work TCB; the source-backed implementation/public-bridge/residual-helper boundaries pin it to public-only or generated-helper routes and `tamper_validation.json` rejects representative drift |
 | `uo-check` | not in the proof-grade TCB |
 | `mplus-probe` | not in the proof-grade TCB |
-| `uo-solc` | not trusted for the current artifact-level acceptance claim, but still unverified for the final source-level compiler theorem |
+| `uo-solc` | not trusted as a proof oracle; WP4's W4.2 + W4.4 + W4.5 + W4.6 Lean chain supersedes the direct artifact checker for the admitted post-resolution source-to-kernel story, with parser/preprocessing still treated as the front-end trust point |
 
 Paper-main theorem strategy:
 
@@ -114,6 +117,9 @@ Paper-main theorem strategy:
   provenance of the ORAM core theorem object changes
 
 Current closure status:
+
+The sequential WP1-WP7 review pass is recorded in
+[`docs/wp1-wp7-closure-audit.md`](docs/wp1-wp7-closure-audit.md).
 
 1. keep `path_oram_local_posmap_v1` as the only proof-grade backend target
 2. source-to-artifact conformance for proof-relevant fields now goes through

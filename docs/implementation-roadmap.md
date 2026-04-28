@@ -201,20 +201,21 @@ The runtime/proof bridge now includes:
   route to discharge the boundary mechanically from proof-grade witness
   acceptance
 
-This milestone is now closed on the repository's runtime proof/interface route.
-What remains above this layer is:
-
-- lift the now-checked runtime boundary upward into a source-to-kernel
-  compiler-correctness theorem
-- justify or import the explicit backend/cryptographic assumptions cleanly
-- close the final malicious-host SGX/TEE theorem over the frozen observer
-- avoid overclaiming lower-level verified semantics beneath the checked
-  source-backed runtime interface
+This milestone is now closed on the repository's runtime proof/interface route,
+and the layers above it are closed for the current paper theorem surface: WP4
+supplies the source-to-kernel compiler-correctness chain, WP5 supplies the
+backend-assumption provenance/audit route, and WP6 supplies the hostile-host
+observer and deployment-assumption closure. The remaining non-claim is below
+this interface: the repository does not prove downstream machine code or a full
+semantics-of-Rust refinement for every residual implementation detail beneath
+the checked source-backed runtime boundary.
 
 ### M7. Paper-main standard-theorem route
 
-Status: implemented at the frozen interface; stronger external import remains
-future work.
+Status: implemented at the frozen interface. The paper route uses the cited
+JACM Path-ORAM source at that interface; a separately imported
+machine-checked external theorem would be out-of-charter future strengthening,
+not an open roadmap task.
 
 The repository now has:
 
@@ -225,42 +226,19 @@ The repository now has:
 - a separate paper-main provenance route documented for the citation-based
   presentation
 
-That means the theorem boundary is fixed and the engineering bridge is closed.
-What remains open is only the provenance choice:
+That means the theorem boundary is fixed, the engineering bridge is closed, and
+the provenance choice is no longer pending for this submission.
 
-- citation route now
-- stronger external machine-checked theorem import later, if available
+## Runtime-Hardening Closure Track
 
-## Immediate Next Steps
-
-The remaining work should be treated as theorem-strengthening:
-
-1. keep `path_oram_local_posmap_v1` as the only proof-grade backend path in
-   docs and claim language
-2. keep the trusted boundary at emitted certificates, the trusted-kernel
-   bundle, witnesses reconstructed from that bundle, and the checked
-   source-backed runtime implementation interface over the real `uo-evm`
-   bridge modules
-3. keep the compiler bridge on the explicit direct-artifact-plus-Lean-check
-   path, and keep any remaining Rust-side bundle emission isolated as
-   convenience/debug tooling rather than part of proof-grade acceptance
-4. present the current paper route as the JACM citation route at the frozen
-   interface
-5. separately justify or import the explicit
-   `PathOramLocalPosmapV1SecurityAssumptions` bundle if a stronger provenance
-   story is needed
-6. do not upgrade the repo into a malicious-host SGX execution theorem until
-   the SGX observer and enclave controller are connected to the real runtime by
-   the same refinement discipline
-
-## Active Runtime-Hardening Track
-
-There is now a separate active strengthening track for the case where `uo-evm`
-itself, even inside a TEE, must be pushed toward the hostile-host adversary
-model rather than treated as an opaque enclave interior.
+The former active strengthening track for pushing `uo-evm` itself toward the
+hostile-host adversary model is closed for the current paper surface. This
+section records the closure evidence and the narrower out-of-charter
+below-interface strengthening target.
 
 Status: the outer proof/interface route is completed, and the stronger
-shared-kernel strengthening track is now active below that outer closure. The
+shared-kernel strengthening track has been carried to the checked boundary
+needed by the current theorem. The
 checked implementation boundary now reaches the shared `uo-core`
 confidential-kernel interpreter / masked-selection layer used by the live
 runtime, and it now also reaches the Path ORAM masked full-scan
@@ -372,9 +350,9 @@ two outer paper theorems explicitly and its emitted validation report marks
 and `paper_public_bridge_observer_refinement_theorem_checked`.
 These direct routes meet on the native
 `RuntimeKernelFinishSlotBoundary` before projecting to the larger
-`RuntimeKernelConfinementBoundary`. The remaining open strengthening step is
-the full below-interface semantics-of-Rust refinement theorem for that real
-shared-kernel / Path ORAM implementation surface.
+`RuntimeKernelConfinementBoundary`. A full below-interface semantics-of-Rust
+refinement theorem for that real shared-kernel / Path ORAM implementation
+surface is outside the closed roadmap.
 
 The first implementation step is now present in the codebase:
 
@@ -1466,18 +1444,14 @@ aggregate stash decode for public stash/slot/leaf bounds, stash position-map
 agreement, stash duplicate live-slot rejection, and Path-ORAM
 position-map/stash page lengths are all marked as checked theorem hooks rather
 than left as implicit Rust-side codec claims.
-The remaining steps are documented in `docs/tee-runtime-hardening.md`:
-
-1. move the remaining secret-bearing helpers and larger decrypted runtime data
-   structures outside those hash/commit/ORAM payload paths under the same
-   bounded discipline
-2. prove the small kernel or prove that the real runtime refines the modeled
-   observer
-3. only then upgrade the malicious-host TEE claim boundary
+The corresponding WP6 hostile-host closure is documented in
+`docs/tee-runtime-hardening.md`; it is no longer an active step list.
 
 ## Practical Readout
 
 The implementation roadmap is no longer blocked on missing runtime/controller
-plumbing, missing witness extraction, or missing theorem-interface alignment.
-The remaining work is about provenance, backend assumption discharge, and
-careful claim discipline.
+plumbing, missing witness extraction, theorem-interface alignment, backend
+assumption provenance, or hostile-host observer closure. The remaining caution
+is claim discipline: do not extend the theorem below the checked runtime
+boundary or beyond the cited backend/deployment assumptions without adding a new
+proof route.
