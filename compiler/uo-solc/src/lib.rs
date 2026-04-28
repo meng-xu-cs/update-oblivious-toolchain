@@ -10,8 +10,9 @@ use uo_core::manifest::{
 };
 use uo_core::{
     CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram,
-    ConfidentialKernelSlotProgram, ContractMetadata, ProofRelevantTranslationBundle, ScalarType,
-    StateMetadata, StructField, Type, Value,
+    ConfidentialKernelSlotProgram, ContractMetadata, DeclassificationKind,
+    ProofRelevantTranslationBundle, ReturnPolicy, ScalarType, StateMetadata, StatusPolicy,
+    StructField, Type, Value,
 };
 
 use solang_parser::{diagnostics::Diagnostic, parse, pt};
@@ -329,6 +330,7 @@ fn lower_function(
         .as_ref()
         .ok_or_else(|| anyhow!("function {} has no body", signature))?;
     let mut lowered = lower_block(body, ctx)?;
+    validate_entrypoint_policy(&signature, &return_type, &lowered, entry_meta, ctx.frontend)?;
     let confidential = matches!(mode, ProgramMode::Uo)
         && (entry_meta.confidential || !entry_meta.secret_args.is_empty());
     if confidential {
@@ -1165,6 +1167,9 @@ fn build_manifest_entry(
         max_stack_words: 64 + counts.local_count,
         max_hash_part_bytes,
         return_canonical_len: function.return_type.as_ref().map(Type::canonical_len),
+        returns: required_return_policy(&function.signature, entry_meta)?,
+        status: required_status_policy(&function.signature, entry_meta)?,
+        declassifies: entry_meta.declassifies.clone(),
         confidential_program,
         confidential_slot_program,
         kernel_steps,
@@ -1720,6 +1725,241 @@ fn collect_expr_objects(expr: &Expr, ids: &mut BTreeSet<u32>) {
             }
         }
         Expr::Literal(_) | Expr::Var(_) => {}
+    }
+}
+
+#[derive(Default)]
+struct PolicySensitivity {
+    return_sensitive: bool,
+    status_sensitive: bool,
+}
+
+fn validate_entrypoint_policy(
+    signature: &str,
+    return_type: &Option<Type>,
+    body: &[Statement],
+    entry_meta: &uo_core::EntrypointMetadata,
+    frontend: &Frontend,
+) -> Result<()> {
+    let returns = required_return_policy(signature, entry_meta)?;
+    let status = required_status_policy(signature, entry_meta)?;
+    let sensitivity = policy_sensitivity(body, entry_meta, frontend);
+    if returns == ReturnPolicy::EncryptedToClient {
+        bail!(
+            "entrypoint {} declares encrypted_to_client returns, but encrypted return channels are not implemented yet",
+            signature
+        );
+    }
+    match (return_type.is_some(), returns) {
+        (true, ReturnPolicy::Forbidden) => bail!(
+            "entrypoint {} returns a value but declares returns: forbidden",
+            signature
+        ),
+        (false, ReturnPolicy::Forbidden) => {}
+        (false, _) => bail!(
+            "entrypoint {} declares a return policy but has no return value; use returns: forbidden",
+            signature
+        ),
+        (true, ReturnPolicy::Public) if entry_meta.confidential => bail!(
+            "confidential entrypoint {} returns a plaintext value; declare returns: declassified or remove the return",
+            signature
+        ),
+        (true, ReturnPolicy::Public) if sensitivity.return_sensitive => bail!(
+            "entrypoint {} returns data derived from confidential state or secret arguments; declare returns: declassified",
+            signature
+        ),
+        (true, ReturnPolicy::Declassified) => require_declassifies(
+            signature,
+            entry_meta,
+            DeclassificationKind::Return,
+            "returns: declassified",
+        )?,
+        (true, ReturnPolicy::Public) => {}
+        (true, ReturnPolicy::EncryptedToClient) => unreachable!("handled above"),
+    }
+    if status == StatusPolicy::Declassified {
+        require_declassifies(
+            signature,
+            entry_meta,
+            DeclassificationKind::Success,
+            "status: declassified",
+        )?;
+    } else if sensitivity.status_sensitive {
+        bail!(
+            "entrypoint {} has secret-dependent success/abort status; declare status: declassified",
+            signature
+        );
+    }
+    Ok(())
+}
+
+fn required_return_policy(
+    signature: &str,
+    entry_meta: &uo_core::EntrypointMetadata,
+) -> Result<ReturnPolicy> {
+    entry_meta.returns.ok_or_else(|| {
+        anyhow!(
+            "entrypoint {} is missing explicit returns policy",
+            signature
+        )
+    })
+}
+
+fn required_status_policy(
+    signature: &str,
+    entry_meta: &uo_core::EntrypointMetadata,
+) -> Result<StatusPolicy> {
+    entry_meta
+        .status
+        .ok_or_else(|| anyhow!("entrypoint {} is missing explicit status policy", signature))
+}
+
+fn require_declassifies(
+    signature: &str,
+    entry_meta: &uo_core::EntrypointMetadata,
+    kind: DeclassificationKind,
+    field: &str,
+) -> Result<()> {
+    if entry_meta.declassifies.contains(&kind) {
+        Ok(())
+    } else {
+        bail!(
+            "entrypoint {} declares {} but omits declassifies: [{:?}]",
+            signature,
+            field,
+            kind
+        )
+    }
+}
+
+fn policy_sensitivity(
+    statements: &[Statement],
+    entry_meta: &uo_core::EntrypointMetadata,
+    frontend: &Frontend,
+) -> PolicySensitivity {
+    let mut tainted = entry_meta
+        .secret_args
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut sensitivity = PolicySensitivity::default();
+    collect_policy_sensitivity(statements, frontend, &mut tainted, &mut sensitivity);
+    sensitivity
+}
+
+fn collect_policy_sensitivity(
+    statements: &[Statement],
+    frontend: &Frontend,
+    tainted: &mut BTreeSet<String>,
+    sensitivity: &mut PolicySensitivity,
+) {
+    for statement in statements {
+        match statement {
+            Statement::Declare { name, value, .. } | Statement::Assign { name, value } => {
+                set_taint(
+                    name,
+                    expr_is_policy_sensitive(value, frontend, tainted),
+                    tainted,
+                );
+            }
+            Statement::Require { cond } | Statement::AbortIf { cond } => {
+                sensitivity.status_sensitive |= expr_is_policy_sensitive(cond, frontend, tainted);
+            }
+            Statement::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                let cond_sensitive = expr_is_policy_sensitive(cond, frontend, tainted);
+                let mut then_tainted = tainted.clone();
+                let mut else_tainted = tainted.clone();
+                if cond_sensitive {
+                    mark_assigned_locals(then_body, &mut then_tainted);
+                    mark_assigned_locals(else_body, &mut else_tainted);
+                }
+                collect_policy_sensitivity(then_body, frontend, &mut then_tainted, sensitivity);
+                collect_policy_sensitivity(else_body, frontend, &mut else_tainted, sensitivity);
+                tainted.extend(then_tainted);
+                tainted.extend(else_tainted);
+            }
+            Statement::For { body, .. } => {
+                collect_policy_sensitivity(body, frontend, tainted, sensitivity);
+            }
+            Statement::CellSet { .. } | Statement::ArraySet { .. } | Statement::MapPut { .. } => {}
+            Statement::Return { value } => {
+                if let Some(value) = value {
+                    sensitivity.return_sensitive |=
+                        expr_is_policy_sensitive(value, frontend, tainted);
+                }
+            }
+        }
+    }
+}
+
+fn set_taint(name: &str, is_tainted: bool, tainted: &mut BTreeSet<String>) {
+    if is_tainted {
+        tainted.insert(name.to_string());
+    } else {
+        tainted.remove(name);
+    }
+}
+
+fn mark_assigned_locals(statements: &[Statement], tainted: &mut BTreeSet<String>) {
+    for statement in statements {
+        match statement {
+            Statement::Declare { name, .. } | Statement::Assign { name, .. } => {
+                tainted.insert(name.clone());
+            }
+            Statement::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                mark_assigned_locals(then_body, tainted);
+                mark_assigned_locals(else_body, tainted);
+            }
+            Statement::For { body, .. } => mark_assigned_locals(body, tainted),
+            Statement::Require { .. }
+            | Statement::AbortIf { .. }
+            | Statement::CellSet { .. }
+            | Statement::ArraySet { .. }
+            | Statement::MapPut { .. }
+            | Statement::Return { .. } => {}
+        }
+    }
+}
+
+fn expr_is_policy_sensitive(expr: &Expr, frontend: &Frontend, tainted: &BTreeSet<String>) -> bool {
+    match expr {
+        Expr::Var(name) => tainted.contains(name),
+        Expr::Unary { expr, .. } => expr_is_policy_sensitive(expr, frontend, tainted),
+        Expr::Binary { lhs, rhs, .. } => {
+            expr_is_policy_sensitive(lhs, frontend, tainted)
+                || expr_is_policy_sensitive(rhs, frontend, tainted)
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            expr_is_policy_sensitive(cond, frontend, tainted)
+                || expr_is_policy_sensitive(when_true, frontend, tainted)
+                || expr_is_policy_sensitive(when_false, frontend, tainted)
+        }
+        Expr::CellGet { object_id }
+        | Expr::ArrayGet { object_id, .. }
+        | Expr::MapGet { object_id, .. } => state_object_by_id(frontend, *object_id)
+            .map(|object| object.confidential)
+            .unwrap_or(true),
+        Expr::StructField { base, .. } => expr_is_policy_sensitive(base, frontend, tainted),
+        Expr::ArrayIndex { base, index } => {
+            expr_is_policy_sensitive(base, frontend, tainted)
+                || expr_is_policy_sensitive(index, frontend, tainted)
+        }
+        Expr::Keccak256 { parts } => parts
+            .iter()
+            .any(|part| expr_is_policy_sensitive(part, frontend, tainted)),
+        Expr::Literal(_) => false,
     }
 }
 
@@ -2378,6 +2618,8 @@ contract: C
 entrypoints:
   f(uint256):
     confidential: false
+    returns: forbidden
+    status: public
 state:
   x:
     kind: cell
@@ -2456,6 +2698,141 @@ bounds:
     }
 
     #[test]
+    fn rejects_missing_return_policy() {
+        let source = write_temp(
+            "missing-return-policy",
+            r#"
+            contract C {
+                uint256 private x;
+                function f(uint256 a) public { x = a; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f(uint256) is missing explicit returns policy"));
+    }
+
+    #[test]
+    fn rejects_confidential_plaintext_return_without_declassification() {
+        let source = write_temp(
+            "confidential-public-return",
+            r#"
+            contract C {
+                function f(uint256 secret) public returns (uint256) { return secret; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: public
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("confidential entrypoint f(uint256) returns a plaintext value"));
+    }
+
+    #[test]
+    fn rejects_secret_dependent_status_without_declassification() {
+        let source = write_temp(
+            "secret-status",
+            r#"
+            contract C {
+                uint256 private balance;
+                function f(uint256 amount) public { require(balance >= amount); }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [amount]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  balance:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("secret-dependent success/abort status"));
+    }
+
+    #[test]
+    fn rejects_public_getter_over_confidential_state_without_declassification() {
+        let source = write_temp(
+            "public-confidential-getter",
+            r#"
+            contract C {
+                uint256 private x;
+                function f() public returns (uint256) { return x; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("returns data derived from confidential state or secret arguments"));
+    }
+
+    #[test]
     fn compiles_branchless_classifier() {
         let source = write_temp(
             "classifier",
@@ -2475,6 +2852,8 @@ entrypoints:
   classify(uint256):
     secret_args: [secret]
     confidential: true
+    returns: forbidden
+    status: public
 state:
   last:
     kind: cell
@@ -2510,6 +2889,8 @@ entrypoints:
   classify(uint256):
     secret_args: [secret]
     confidential: true
+    returns: forbidden
+    status: public
 state:
   last:
     kind: cell
@@ -2547,6 +2928,8 @@ entrypoints:
   fill(uint256,uint256):
     confidential: true
     secret_args: [value]
+    returns: forbidden
+    status: public
 state:
   balances:
     kind: map
@@ -2587,6 +2970,8 @@ entrypoints:
   deposit(bytes32,uint256):
     confidential: true
     secret_args: [key, value]
+    returns: forbidden
+    status: public
 state:
   balances:
     kind: map
@@ -2645,6 +3030,8 @@ entrypoints:
   deposit(bytes32,uint256):
     confidential: true
     secret_args: [key, value]
+    returns: forbidden
+    status: public
 state:
   balances:
     kind: map

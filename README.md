@@ -54,7 +54,8 @@ Frozen paper claim surface:
 > the real runtime executes `A` and emits runtime proof objects accepted by
 > Lean, and the explicit concrete backend / cryptographic / TEE assumptions
 > hold, then the real host-visible execution satisfies the paper's
-> update-obliviousness theorem against the stated hostile-host observer.
+> update-obliviousness theorem against the stated hostile-host observer and
+> the explicit return/status declassification policy embedded in the artifact.
 
 The exact frozen observer is:
 
@@ -68,7 +69,8 @@ View_SGX(c) =
 
 where:
 
-- `public_outcome` is exact
+- `public_outcome` is exact, including the declared return/status
+  declassification policy and any plaintext public/declassified return payload
 - `boundary_schedule` is exact
 - `storage_trace` is exact for exact backends and ORAM-related for
   `path_oram_local_posmap_v1`

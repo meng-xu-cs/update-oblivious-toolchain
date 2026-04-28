@@ -37,6 +37,12 @@ Sidecar metadata requirements:
 - every externally callable entrypoint must have an explicit sidecar stanza;
   public entrypoints must say `confidential: false`, and confidential
   entrypoints must say `confidential: true`
+- every entrypoint must declare `returns` as `forbidden`, `public`,
+  `declassified`, or `encrypted_to_client`; the current runtime rejects
+  `encrypted_to_client` until an encrypted return channel is implemented
+- every entrypoint must declare `status` as `public` or `declassified`
+- `returns: declassified` requires `declassifies: [return]`, and
+  `status: declassified` requires `declassifies: [success]`
 - every map must declare a public `capacity`
 - confidential entrypoints must declare `secret_args`
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is

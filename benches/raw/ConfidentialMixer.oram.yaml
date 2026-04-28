@@ -4,14 +4,25 @@ entrypoints:
     secret_args: [commitment, amount]
     confidential: true
     public_gas_budget: 12288
+    returns: forbidden
+    status: public
   withdraw(bytes32,uint256):
     secret_args: [commitment, amount]
     confidential: true
     public_gas_budget: 12288
+    returns: declassified
+    status: declassified
+    declassifies: [return, success]
   balanceOf(bytes32):
     confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
   totalValue():
     confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
 state:
   balances:
     kind: map

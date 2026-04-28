@@ -1,5 +1,6 @@
 use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSlotProgram};
 use crate::ir::{BackendKind, ContainerKind, StateObject};
+use crate::metadata::{DeclassificationKind, ReturnPolicy, StatusPolicy};
 use crate::types::{ScalarType, Type};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
@@ -55,6 +56,12 @@ pub struct EntrypointManifest {
     pub max_hash_part_bytes: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub return_canonical_len: Option<usize>,
+    #[serde(default)]
+    pub returns: ReturnPolicy,
+    #[serde(default)]
+    pub status: StatusPolicy,
+    #[serde(default)]
+    pub declassifies: Vec<DeclassificationKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidential_program: Option<ConfidentialKernelProgram>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -466,6 +473,9 @@ mod tests {
             max_stack_words: 64,
             max_hash_part_bytes: 0,
             return_canonical_len: None,
+            returns: Default::default(),
+            status: Default::default(),
+            declassifies: Vec::new(),
             confidential_program: None,
             confidential_slot_program: Some(slot_program.clone()),
             kernel_steps: vec![RuntimeKernelStepManifest {

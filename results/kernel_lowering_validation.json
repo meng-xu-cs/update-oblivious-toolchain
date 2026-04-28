@@ -30,7 +30,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_lowering_bundle_json_bytes": 2465,
+      "kernel_lowering_bundle_json_bytes": 2405,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -73,7 +73,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -86,12 +86,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -178,7 +172,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_lowering_bundle_json_bytes": 2465,
+      "kernel_lowering_bundle_json_bytes": 2405,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -221,7 +215,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -234,12 +228,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -326,7 +314,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_lowering_bundle_json_bytes": 7178,
+      "kernel_lowering_bundle_json_bytes": 7118,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -380,7 +368,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -441,12 +429,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -659,7 +641,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_lowering_bundle_json_bytes": 7178,
+      "kernel_lowering_bundle_json_bytes": 7118,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -713,7 +695,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -774,12 +756,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -992,7 +968,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 4296,
+      "kernel_lowering_bundle_json_bytes": 4176,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1008,7 +984,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1030,12 +1006,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1132,18 +1108,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1308,7 +1272,7 @@
         "statement_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 4296,
+      "kernel_lowering_bundle_json_bytes": 4176,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1324,7 +1288,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1346,12 +1310,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1448,18 +1412,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1624,7 +1576,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 5967,
+      "kernel_lowering_bundle_json_bytes": 5847,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1676,7 +1628,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -1785,18 +1737,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2008,7 +1948,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 5967,
+      "kernel_lowering_bundle_json_bytes": 5847,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2060,7 +2000,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2169,18 +2109,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2392,7 +2320,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_lowering_bundle_json_bytes": 7395,
+      "kernel_lowering_bundle_json_bytes": 7215,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -2437,7 +2365,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -2630,24 +2558,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -2939,7 +2849,7 @@
         "statement_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "kernel_lowering_bundle_json_bytes": 7395,
+      "kernel_lowering_bundle_json_bytes": 7215,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -2984,7 +2894,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3177,24 +3087,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -3486,7 +3378,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 9410,
+      "kernel_lowering_bundle_json_bytes": 9290,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -3502,7 +3394,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -3524,12 +3416,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -3962,18 +3854,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -4222,7 +4102,7 @@
         "statement_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 9410,
+      "kernel_lowering_bundle_json_bytes": 9290,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4238,7 +4118,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -4260,12 +4140,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -4698,18 +4578,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -4958,7 +4826,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 12256,
+      "kernel_lowering_bundle_json_bytes": 12136,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5003,7 +4871,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -5436,18 +5304,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -5895,7 +5751,7 @@
         "statement_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 12256,
+      "kernel_lowering_bundle_json_bytes": 12136,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5940,7 +5796,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -6373,18 +6229,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -6832,7 +6676,7 @@
         "statement_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "kernel_lowering_bundle_json_bytes": 33719,
+      "kernel_lowering_bundle_json_bytes": 33599,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -6884,7 +6728,7 @@
           1,
           2
         ],
-        "resource_event_count": 428,
+        "resource_event_count": 426,
         "resource_events": [
           {
             "bytes": 8,
@@ -8625,18 +8469,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -9496,7 +9328,7 @@
         "statement_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "kernel_lowering_bundle_json_bytes": 101996,
+      "kernel_lowering_bundle_json_bytes": 101756,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -9552,7 +9384,7 @@
           1,
           2
         ],
-        "resource_event_count": 1334,
+        "resource_event_count": 1330,
         "resource_events": [
           {
             "bytes": 8,
@@ -14737,30 +14569,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 4
           },
           {
             "bytes": 20,

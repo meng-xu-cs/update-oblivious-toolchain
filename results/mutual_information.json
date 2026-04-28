@@ -2,26 +2,14 @@
   "reports": [
     {
       "benchmark": "FixedSlotClassifier",
-      "metric_mi_bits": {
-        "backend_reads": 0.0,
-        "backend_writes": 0.0,
-        "boundary_events": 0.0,
-        "bytes_read": 0.0,
-        "bytes_written": 0.0,
-        "clear_writes": 0.0,
-        "controller_phase_count": 0.0,
-        "gas_used": 0.0,
-        "normalized_page_events": 0.0,
-        "same_writes": 1.0,
-        "set_writes": 1.0,
-        "update_only_fraction": 0.0,
-        "update_writes": 0.0,
-        "zero_writes": 1.0
-      },
-      "mode": "raw"
+      "error": "mutual_information/FixedSlotClassifier/raw",
+      "executable": false,
+      "mode": "raw",
+      "rejected": true
     },
     {
       "benchmark": "FixedSlotClassifier",
+      "executable": true,
       "metric_mi_bits": {
         "backend_reads": 0.0,
         "backend_writes": 0.0,
@@ -38,30 +26,19 @@
         "update_writes": 0.0,
         "zero_writes": 0.0
       },
-      "mode": "uo"
+      "mode": "uo",
+      "rejected": false
     },
     {
       "benchmark": "AuthScan",
-      "metric_mi_bits": {
-        "backend_reads": 0.0,
-        "backend_writes": 0.0,
-        "boundary_events": 0.0,
-        "bytes_read": 0.0,
-        "bytes_written": 0.0,
-        "clear_writes": 0.0,
-        "controller_phase_count": 0.0,
-        "gas_used": 0.0,
-        "normalized_page_events": 0.0,
-        "same_writes": 1.0,
-        "set_writes": 1.0,
-        "update_only_fraction": 0.0,
-        "update_writes": 0.0,
-        "zero_writes": 1.0
-      },
-      "mode": "raw"
+      "error": "mutual_information/AuthScan/raw",
+      "executable": false,
+      "mode": "raw",
+      "rejected": true
     },
     {
       "benchmark": "AuthScan",
+      "executable": true,
       "metric_mi_bits": {
         "backend_reads": 0.0,
         "backend_writes": 0.0,
@@ -78,30 +55,19 @@
         "update_writes": 0.0,
         "zero_writes": 0.0
       },
-      "mode": "uo"
+      "mode": "uo",
+      "rejected": false
     },
     {
       "benchmark": "RegistryCRUD",
-      "metric_mi_bits": {
-        "backend_reads": 0.0,
-        "backend_writes": 0.0,
-        "boundary_events": 0.0,
-        "bytes_read": 0.0,
-        "bytes_written": 0.0,
-        "clear_writes": 0.0,
-        "controller_phase_count": 0.0,
-        "gas_used": 0.0,
-        "normalized_page_events": 0.0,
-        "same_writes": 1.0,
-        "set_writes": 1.0,
-        "update_only_fraction": 0.0,
-        "update_writes": 0.0,
-        "zero_writes": 1.0
-      },
-      "mode": "raw"
+      "error": "mutual_information/RegistryCRUD/raw",
+      "executable": false,
+      "mode": "raw",
+      "rejected": true
     },
     {
       "benchmark": "RegistryCRUD",
+      "executable": true,
       "metric_mi_bits": {
         "backend_reads": 0.0,
         "backend_writes": 0.0,
@@ -118,30 +84,19 @@
         "update_writes": 0.0,
         "zero_writes": 0.0
       },
-      "mode": "uo"
+      "mode": "uo",
+      "rejected": false
     },
     {
       "benchmark": "ConfidentialMixer",
-      "metric_mi_bits": {
-        "backend_reads": 0.0,
-        "backend_writes": 0.0,
-        "boundary_events": 0.0,
-        "bytes_read": 0.0,
-        "bytes_written": 0.0,
-        "clear_writes": 0.0,
-        "controller_phase_count": 0.0,
-        "gas_used": 0.0,
-        "normalized_page_events": 0.0,
-        "same_writes": 1.0,
-        "set_writes": 1.0,
-        "update_only_fraction": 0.0,
-        "update_writes": 0.0,
-        "zero_writes": 1.0
-      },
-      "mode": "raw"
+      "error": "mutual_information/ConfidentialMixer/raw",
+      "executable": false,
+      "mode": "raw",
+      "rejected": true
     },
     {
       "benchmark": "ConfidentialMixer",
+      "executable": true,
       "metric_mi_bits": {
         "backend_reads": 0.0,
         "backend_writes": 0.0,
@@ -158,10 +113,12 @@
         "update_writes": 0.0,
         "zero_writes": 0.0
       },
-      "mode": "uo"
+      "mode": "uo",
+      "rejected": false
     },
     {
       "benchmark": "ConfidentialMixer",
+      "executable": true,
       "metric_mi_bits": {
         "backend_reads": 0.0,
         "backend_writes": 0.0,
@@ -178,30 +135,19 @@
         "update_writes": 0.0,
         "zero_writes": 0.0
       },
-      "mode": "oram"
+      "mode": "oram",
+      "rejected": false
     },
     {
       "benchmark": "ERC20Lite",
-      "metric_mi_bits": {
-        "backend_reads": 0.0,
-        "backend_writes": 0.0,
-        "boundary_events": 0.0,
-        "bytes_read": 0.0,
-        "bytes_written": 0.0,
-        "clear_writes": 0.0,
-        "controller_phase_count": 0.0,
-        "gas_used": 0.0,
-        "normalized_page_events": 0.0,
-        "same_writes": 1.0,
-        "set_writes": 1.0,
-        "update_only_fraction": 0.0,
-        "update_writes": 0.0,
-        "zero_writes": 1.0
-      },
-      "mode": "raw"
+      "error": "mutual_information/ERC20Lite/raw",
+      "executable": false,
+      "mode": "raw",
+      "rejected": true
     },
     {
       "benchmark": "ERC20Lite",
+      "executable": true,
       "metric_mi_bits": {
         "backend_reads": 0.0,
         "backend_writes": 0.0,
@@ -218,10 +164,12 @@
         "update_writes": 0.0,
         "zero_writes": 0.0
       },
-      "mode": "uo"
+      "mode": "uo",
+      "rejected": false
     },
     {
       "benchmark": "ERC20Lite",
+      "executable": true,
       "metric_mi_bits": {
         "backend_reads": 0.0,
         "backend_writes": 0.0,
@@ -238,7 +186,8 @@
         "update_writes": 0.0,
         "zero_writes": 0.0
       },
-      "mode": "oram"
+      "mode": "oram",
+      "rejected": false
     }
   ]
 }

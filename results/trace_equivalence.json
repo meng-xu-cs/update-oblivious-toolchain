@@ -68,11 +68,15 @@
   ],
   "positive_control": {
     "benchmark": "FixedSlotClassifier",
-    "raw_logical_access_equal": true,
-    "raw_logical_write_equal": true,
-    "raw_opcode_equal": true,
-    "raw_physical_equal": false,
-    "raw_physical_read_equal": true,
-    "same_same_control_equal": true
+    "raw": {
+      "error": "trace_equivalence/FixedSlotClassifier/raw",
+      "executable": false,
+      "rejected": true
+    },
+    "same_same": {
+      "error": "trace_equivalence/FixedSlotClassifier/raw-sameSame",
+      "executable": false,
+      "rejected": true
+    }
   }
 }

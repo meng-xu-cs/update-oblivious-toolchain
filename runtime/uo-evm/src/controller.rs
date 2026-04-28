@@ -5,9 +5,9 @@ use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteC
 pub(crate) use uo_core::PublicCallSummary;
 use uo_core::{
     BoundaryEvent, ControllerPageBudget, ControllerPhase, FixedBoxBuilder, OutputShape,
-    PublicOutcomeTrace, RuntimeControllerObserverCertificate, RuntimeObservedOramAccessWitness,
-    RuntimeOramAccessWitness, RuntimeOramLeafWitness, RuntimePathOramTransitionWitness,
-    RuntimePublicCallTraceBundle, Value,
+    PublicOutcomeTrace, ReturnPolicy, RuntimeControllerObserverCertificate,
+    RuntimeObservedOramAccessWitness, RuntimeOramAccessWitness, RuntimeOramLeafWitness,
+    RuntimePathOramTransitionWitness, RuntimePublicCallTraceBundle, Value,
 };
 use uo_store::StoreExecutionMetrics;
 
@@ -276,6 +276,7 @@ impl CallRecorder {
         manifest_objects: &[StateObjectManifest],
         public_call: PublicCallSummary,
         output_shape: OutputShape,
+        return_payload: Option<String>,
         aborted: bool,
         gas_used: u64,
     ) -> Result<(usize, RuntimePublicCallTraceBundle)> {
@@ -296,7 +297,8 @@ impl CallRecorder {
             !aborted,
             output_shape,
             gas_used,
-        );
+        )
+        .with_host_visibility(manifest_entry, return_payload);
         let controller_observer =
             RuntimeControllerObserverCertificate::from_runtime_observer_with_oram_accesses(
                 public_outcome,
@@ -517,6 +519,24 @@ pub(crate) fn output_shape_of(
     }
 }
 
+pub(crate) fn return_payload_of(
+    manifest_entry: &EntrypointManifest,
+    return_value: &Option<Value>,
+) -> Result<Option<String>> {
+    match (return_value, manifest_entry.returns) {
+        (Some(_), ReturnPolicy::Forbidden) => {
+            bail!("entrypoint returned a value despite returns: forbidden")
+        }
+        (Some(_), ReturnPolicy::EncryptedToClient) => {
+            bail!("encrypted_to_client returns are not implemented")
+        }
+        (Some(value), ReturnPolicy::Public | ReturnPolicy::Declassified) => {
+            Ok(Some(value.to_string()))
+        }
+        (None, _) => Ok(None),
+    }
+}
+
 pub(crate) fn finalize_public_call_trace(
     recorder: CallRecorder,
     manifest_entry: &EntrypointManifest,
@@ -528,11 +548,13 @@ pub(crate) fn finalize_public_call_trace(
 ) -> Result<(u64, usize, RuntimePublicCallTraceBundle)> {
     let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
     let output_shape = output_shape_of(manifest_entry, return_value)?;
+    let return_payload = return_payload_of(manifest_entry, return_value)?;
     let (zero_writes, trace_bundle) = recorder.finish(
         manifest_entry,
         manifest_objects,
         public_call,
         output_shape,
+        return_payload,
         aborted,
         gas_used,
     )?;

@@ -4,85 +4,88 @@
       "benchmark": "FixedSlotClassifier",
       "equivalent": true,
       "raw": {
-        "aborted": false,
-        "gas_used": 22,
-        "getters": [
-          1
-        ],
-        "physical_writes": 1,
-        "return": null
+        "error": "confidential object last uses raw backend",
+        "executable": false,
+        "rejected": true
       },
+      "raw_equivalent_to_uo": null,
       "uo": {
         "aborted": false,
+        "executable": true,
         "gas_used": 4096,
         "getters": [
           1
         ],
         "physical_writes": 1,
+        "rejected": false,
         "return": null
-      }
+      },
+      "uo_matches_expected": true
     },
     {
       "benchmark": "AuthScan",
       "equivalent": true,
       "raw": {
-        "aborted": false,
-        "gas_used": 34,
-        "getters": [
-          1
-        ],
-        "physical_writes": 1,
-        "return": 1
+        "error": "confidential object TOKENS uses raw backend",
+        "executable": false,
+        "rejected": true
       },
+      "raw_equivalent_to_uo": null,
       "uo": {
         "aborted": false,
+        "executable": true,
         "gas_used": 8192,
         "getters": [
           1
         ],
         "physical_writes": 5,
+        "rejected": false,
         "return": 1
-      }
+      },
+      "uo_matches_expected": true
     },
     {
       "benchmark": "ConfidentialMixer",
       "equivalent": true,
       "oram": {
         "aborted": false,
+        "executable": true,
         "gas_used": 12288,
         "getters": [
           3,
           3
         ],
         "physical_writes": 49,
+        "rejected": false,
         "return": 2
       },
+      "oram_matches_expected": true,
       "raw": {
-        "aborted": false,
-        "gas_used": 50,
-        "getters": [
-          3,
-          3
-        ],
-        "physical_writes": 2,
-        "return": 2
+        "error": "confidential object balances uses raw backend",
+        "executable": false,
+        "rejected": true
       },
+      "raw_equivalent_to_uo": null,
       "uo": {
         "aborted": false,
+        "executable": true,
         "gas_used": 16384,
         "getters": [
           3,
           3
         ],
         "physical_writes": 9,
+        "rejected": false,
         "return": 2
-      }
+      },
+      "uo_matches_expected": true
     },
     {
       "benchmark": "ERC20Lite",
       "equivalent": true,
       "oram": {
         "aborted": false,
+        "executable": true,
         "gas_used": 16384,
         "getters": [
           7,
@@ -90,21 +93,19 @@
           1
         ],
         "physical_writes": 178,
+        "rejected": false,
         "return": 1
       },
+      "oram_matches_expected": true,
       "raw": {
-        "aborted": false,
-        "gas_used": 75,
-        "getters": [
-          7,
-          3,
-          1
-        ],
-        "physical_writes": 3,
-        "return": 1
+        "error": "confidential object allowances uses raw backend",
+        "executable": false,
+        "rejected": true
       },
+      "raw_equivalent_to_uo": null,
       "uo": {
         "aborted": false,
+        "executable": true,
         "gas_used": 24576,
         "getters": [
           7,
@@ -112,30 +113,32 @@
           1
         ],
         "physical_writes": 24,
+        "rejected": false,
         "return": 1
-      }
+      },
+      "uo_matches_expected": true
     },
     {
       "benchmark": "RegistryCRUD",
       "equivalent": true,
       "raw": {
-        "aborted": false,
-        "gas_used": 25,
-        "getters": [
-          0
-        ],
-        "physical_writes": 1,
-        "return": 1
+        "error": "confidential object records uses raw backend",
+        "executable": false,
+        "rejected": true
       },
+      "raw_equivalent_to_uo": null,
       "uo": {
         "aborted": false,
+        "executable": true,
         "gas_used": 12288,
         "getters": [
           0
         ],
         "physical_writes": 8,
+        "rejected": false,
         "return": 1
-      }
+      },
+      "uo_matches_expected": true
     }
   ]
 }

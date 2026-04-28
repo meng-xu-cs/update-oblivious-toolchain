@@ -713,6 +713,11 @@
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
           "confidential_program": {
             "entrypoint_id": "auth(bytes32)",
             "params": [
@@ -1148,6 +1153,11 @@
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
           "kernel_steps": [],
           "uocell_reads": 1,
           "uocell_writes": 0,
@@ -1169,6 +1179,9 @@
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
+          "returns": "forbidden",
+          "status": "public",
+          "declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,

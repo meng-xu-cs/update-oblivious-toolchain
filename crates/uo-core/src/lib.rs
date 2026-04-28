@@ -60,7 +60,10 @@ pub use manifest::{
     validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeKernelStepManifest,
     RuntimeManifest, StateObjectManifest,
 };
-pub use metadata::{BoundsMetadata, ContractMetadata, EntrypointMetadata, StateMetadata};
+pub use metadata::{
+    BoundsMetadata, ContractMetadata, DeclassificationKind, EntrypointMetadata, ReturnPolicy,
+    StateMetadata, StatusPolicy,
+};
 pub use shell_boundary::{
     RuntimeKernelInterfaceBundle, RuntimeKernelInterfaceBundleError, RuntimeShellBoundaryBundle,
     RuntimeShellBoundaryBundleError, RuntimeShellContract, RuntimeShellTrace,

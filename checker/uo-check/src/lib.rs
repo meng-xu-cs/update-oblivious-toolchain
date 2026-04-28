@@ -1046,6 +1046,8 @@ entrypoints:
     secret_args: [secret]
     confidential: true
     public_gas_budget: 7777
+    returns: forbidden
+    status: public
 state:
   last:
     kind: cell

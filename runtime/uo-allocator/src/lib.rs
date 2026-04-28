@@ -291,6 +291,9 @@ mod tests {
             max_stack_words: 65,
             max_hash_part_bytes: 0,
             return_canonical_len: None,
+            returns: Default::default(),
+            status: Default::default(),
+            declassifies: Vec::new(),
             confidential_program: None,
             confidential_slot_program: None,
             kernel_steps: vec![

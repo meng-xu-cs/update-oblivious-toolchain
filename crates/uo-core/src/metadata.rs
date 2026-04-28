@@ -20,6 +20,37 @@ pub struct EntrypointMetadata {
     pub public_gas_budget: Option<u64>,
     #[serde(default)]
     pub confidential: bool,
+    #[serde(default)]
+    pub returns: Option<ReturnPolicy>,
+    #[serde(default)]
+    pub status: Option<StatusPolicy>,
+    #[serde(default)]
+    pub declassifies: Vec<DeclassificationKind>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ReturnPolicy {
+    #[default]
+    Forbidden,
+    Public,
+    Declassified,
+    EncryptedToClient,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum StatusPolicy {
+    #[default]
+    Public,
+    Declassified,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum DeclassificationKind {
+    Return,
+    Success,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

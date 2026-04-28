@@ -3,11 +3,18 @@ entrypoints:
   classify(uint256):
     secret_args: [secret]
     confidential: true
+    returns: forbidden
+    status: public
   sameSame(uint256):
     secret_args: [secret]
     confidential: true
+    returns: forbidden
+    status: public
   peek():
     confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
 state:
   last:
     kind: cell

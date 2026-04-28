@@ -3,14 +3,24 @@ entrypoints:
   upsert(bytes32,uint256):
     secret_args: [key, value]
     confidential: true
+    returns: forbidden
+    status: public
   clear(bytes32):
     secret_args: [key]
     confidential: true
+    returns: forbidden
+    status: public
   clearIfMatch(bytes32,uint256):
     secret_args: [key, value]
     confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
   read(bytes32):
     confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
 state:
   records:
     kind: map

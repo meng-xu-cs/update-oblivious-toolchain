@@ -1,16 +1,16 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1058537,
+  "artifact_json_bytes": 1157067,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSlotAdapterBoundary",
   "lean_checker_input": "source-backed runtime slot-adapter boundary",
   "lean_checker_kind": "runtime slot-adapter boundary",
-  "lean_stdout": "validated runtime slot-adapter boundary for source-backed uo-kernel adapter (143415 slot-adapter bytes)",
+  "lean_stdout": "validated runtime slot-adapter boundary for source-backed uo-kernel adapter (146361 slot-adapter bytes)",
   "slot_adapter_boundary_theorem_checked": true,
   "source_bytes": {
-    "confidential_kernel": 95686,
-    "generated_confidential_kernel": 20843,
-    "kernel_runtime": 23758,
-    "kernel_slot_support": 3128
+    "confidential_kernel": 98063,
+    "generated_confidential_kernel": 21686,
+    "kernel_runtime": 23349,
+    "kernel_slot_support": 3263
   },
   "source_files": [
     "runtime/uo-kernel-runtime/src/lib.rs",

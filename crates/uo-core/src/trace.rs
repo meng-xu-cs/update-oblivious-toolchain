@@ -7,6 +7,7 @@ use crate::ir::StateObject;
 use crate::manifest::{
     EntrypointManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
 };
+use crate::metadata::{DeclassificationKind, ReturnPolicy, StatusPolicy};
 use crate::types::{FixedBoxBuilder, Value};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
@@ -148,7 +149,15 @@ pub struct PublicOutcomeTrace {
     pub entrypoint_id: String,
     pub public_args: Box<[String]>,
     pub termination_status: bool,
+    #[serde(default)]
+    pub status_policy: StatusPolicy,
     pub output_shape: OutputShape,
+    #[serde(default)]
+    pub return_policy: ReturnPolicy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub return_payload: Option<String>,
+    #[serde(default)]
+    pub declassifies: Box<[DeclassificationKind]>,
     pub gas_used: u64,
 }
 
@@ -164,9 +173,25 @@ impl PublicOutcomeTrace {
             entrypoint_id: entrypoint_id.into(),
             public_args,
             termination_status,
+            status_policy: StatusPolicy::Public,
             output_shape,
+            return_policy: ReturnPolicy::Forbidden,
+            return_payload: None,
+            declassifies: Box::default(),
             gas_used,
         }
+    }
+
+    pub fn with_host_visibility(
+        mut self,
+        manifest_entry: &EntrypointManifest,
+        return_payload: Option<String>,
+    ) -> Self {
+        self.status_policy = manifest_entry.status;
+        self.return_policy = manifest_entry.returns;
+        self.return_payload = return_payload;
+        self.declassifies = manifest_entry.declassifies.clone().into_boxed_slice();
+        self
     }
 }
 
@@ -8514,7 +8539,11 @@ mod tests {
             entrypoint_id: "put(bytes32,uint256)".into(),
             public_args: Box::default(),
             termination_status: true,
+            status_policy: Default::default(),
             output_shape: OutputShape::default(),
+            return_policy: Default::default(),
+            return_payload: None,
+            declassifies: Box::default(),
             gas_used,
         }
     }
@@ -8806,6 +8835,9 @@ mod tests {
             max_stack_words: 0,
             max_hash_part_bytes: 0,
             return_canonical_len: None,
+            returns: Default::default(),
+            status: Default::default(),
+            declassifies: Vec::new(),
             confidential_program: None,
             kernel_steps: confidential_slot_program
                 .expected_runtime_step_manifest()
@@ -8837,6 +8869,9 @@ mod tests {
                 max_stack_words: 0,
                 max_hash_part_bytes: 0,
                 return_canonical_len: None,
+                returns: Default::default(),
+                status: Default::default(),
+                declassifies: Vec::new(),
                 confidential_program: None,
                 confidential_slot_program: Some(confidential_slot_program.clone()),
                 kernel_steps: vec![],
@@ -9823,7 +9858,11 @@ mod tests {
             entrypoint_id: "f()".into(),
             public_args: Box::default(),
             termination_status: true,
+            status_policy: Default::default(),
             output_shape: OutputShape::default(),
+            return_policy: Default::default(),
+            return_payload: None,
+            declassifies: Box::default(),
             gas_used: 1,
         };
         let controller_shape = controller_certificate.controller_shape();

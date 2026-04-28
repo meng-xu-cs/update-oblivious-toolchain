@@ -1465,6 +1465,11 @@
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -1493,6 +1498,9 @@
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 20,
+          "returns": "forbidden",
+          "status": "public",
+          "declassifies": [],
           "confidential_program": {
             "entrypoint_id": "approve(address,address,uint256)",
             "params": [
@@ -1652,6 +1660,11 @@
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -1675,6 +1688,9 @@
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
+          "returns": "forbidden",
+          "status": "public",
+          "declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -1704,6 +1720,12 @@
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "declassified",
+          "declassifies": [
+            "return",
+            "success"
+          ],
           "confidential_program": {
             "entrypoint_id": "transfer(address,address,uint256)",
             "params": [
@@ -2015,6 +2037,12 @@
           "max_stack_words": 67,
           "max_hash_part_bytes": 20,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "declassified",
+          "declassifies": [
+            "return",
+            "success"
+          ],
           "confidential_program": {
             "entrypoint_id": "transferFrom(address,address,address,uint256)",
             "params": [

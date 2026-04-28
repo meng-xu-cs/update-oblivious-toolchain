@@ -2,22 +2,38 @@ contract: ERC20Lite
 entrypoints:
   mint(address,uint256):
     confidential: false
+    returns: forbidden
+    status: public
   approve(address,address,uint256):
     secret_args: [owner, spender, amount]
     confidential: true
     public_gas_budget: 14336
+    returns: forbidden
+    status: public
   transfer(address,address,uint256):
     secret_args: [from, to, amount]
     confidential: true
     public_gas_budget: 14336
+    returns: declassified
+    status: declassified
+    declassifies: [return, success]
   transferFrom(address,address,address,uint256):
     secret_args: [owner, spender, to, amount]
     confidential: true
     public_gas_budget: 16384
+    returns: declassified
+    status: declassified
+    declassifies: [return, success]
   balanceOf(address):
     confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
   allowanceOf(address,address):
     confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
 state:
   balances:
     kind: map

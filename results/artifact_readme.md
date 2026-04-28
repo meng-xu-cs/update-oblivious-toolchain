@@ -166,23 +166,12 @@ manifest's `return_canonical_len`. `engine.rs` also no longer clones the full
 call argument vector just to recover public theorem-trace fields; instead the
 controller path must derive a `PublicCallSummary` from the checked manifest's
 `param_names`, `secret_args`, and manifest-stored `entry_input_len`, and
-the runtime/state confidential branch must pass the remaining raw confidential
-argument vector directly into `uo-kernel-runtime`, where the Lean-generated
-private `ConfidentialCallInputs` wrapper is created before the generated
-confidential-kernel interpreter runs; the generated slot-support module is
-exact-source checked against `GenerateRuntimeKernelSlotSupportRust`, enforces
-the confidential argument count while staging fixed slots, and wipes buffered
-`Value` payloads on drop; the source-backed runtime boundary now also checks
-the residual `uo-kernel-runtime` slot/effect adapter as a forwarding-only
-shell and rejects raw confidential-argument observation or machine effect
-schedule drift beneath the generated interpreter, with the effect shape
-modeled in Lean as `RuntimeKernelMachineSchedule`; the same imported source
-boundary now includes `uo-allocator`, checks the modeled
-`RuntimeAllocatorDiscipline` shape with bounded public-capacity resource-event
-logging and boxed finish-boundary resource events, and rejects allocator
-scratch-budget / resource-event-log drift beneath the machine schedule; the
-live statement recorder is exact-capacity and modeled by
-`RuntimeStatementTraceDiscipline`; the
+the runtime/state confidential branch must box the remaining raw
+confidential argument vector into the shared `uo-core::ConfidentialCallInputs`
+wrapper before the kernel path begins, with only
+the shared confidential-kernel interpreter path in
+`crates/uo-core/src/confidential_kernel.rs` allowed to unwrap that buffer for
+the slot interpreter and whose buffered `Value` payload now wipes on drop; the
 theorem-finalization path must avoid depending on
 `CompiledFunction` entirely while the public trace path sees only the
 exported `OutputShape` rather than the full return payload, and the committed
@@ -267,9 +256,7 @@ pre-boundary, kernel-step, and commit-object appends through explicit helper
 methods instead of raw witness-vector mutation, and that the remaining public
 shell-side commit /
 witness lists now also start from explicit `Vec::with_capacity(...)` bounds,
-and ORAM placeholder states use direct empty boxed slices rather than
-`Vec::new().into_boxed_slice()` bootstrap carriers, and that live Path-ORAM
-stash state now lives in a fixed-capacity buffer
+and that live Path-ORAM stash state now lives in a fixed-capacity buffer
 derived from the public `working_stash_capacity(...)` bound, preserved across
 cold commits with `.clear()`, and no longer grows mid-call through a late
 `reserve(...)`, that path-bucket rebuilds now stage live blocks in fixed-shape
@@ -296,11 +283,6 @@ slot now itself stored in a boxed fixed-size buffer and resealed through the
 same slice-based wipe helper, and with the raw-backend `RawMapEntry`
 ciphertext slot now boxed as well so the runtime object graph no longer keeps
 secret-bearing ciphertext in growable `Vec<u8>` buffers,
-and that fixed-public-batch Path-ORAM write evidence, masked full-scan UO
-small-map lookup, and masked full-scan UO array read/write access are now
-checked as explicit source-backed/model-backed cuts, including UO-path
-out-of-range array indices selecting/updating no slot rather than taking a
-public error branch,
 and that the remaining shadow-load, shadow-commit, and injected Path-ORAM
 fresh-coin routing steps now live in `state.rs` rather than being assembled by
 any runtime-local kernel wrapper, and that confidential
@@ -344,8 +326,7 @@ back to ciphertext-snapshot write witnesses by requiring both
 `PhysicalWriteEvent` and the internal ORAM write trace to retain only public
 write shape (`location`, `len`, `class`) rather than `old`/`new` byte
 vectors, with zero-write counts carried only as aggregate metrics instead of
-per-write witness fields, and it now rejects regressions from fixed-public
-ORAM write batches back to a growable write log. `ExecutionTrace` now omits runtime telemetry
+per-write witness fields. `ExecutionTrace` now omits runtime telemetry
 entirely, and ordinary `ContractInstance::call` results do too; the runtime
 exposes the irreducible aggregate `zero_writes` count only through an
 explicit feature-gated diagnostic result channel that is absent from the
@@ -496,17 +477,34 @@ that same shared family through
 the exact `RuntimeKernelRefinementBoundary` route for the full shared
 proof-family artifact is benchmark-backed separately from general family
 acceptance alone.
+`runtime_implementation_public_bridge_observer_refinement_boundary_validation.json`
+checks the dedicated machine-backed public-observer route: it pairs the same
+source-backed `RuntimeImplementationInterface` with the live
+`RuntimeKernelMachineFinishWitness`, fixed confidential slot program, and
+opcode trace, and Lean exposes the accepted object through
+`RuntimeImplementationPublicBridgeObserverRefinementBoundary.paperPublicBridgeObserverRefinement`.
+That theorem isolates the checked public bridge plus public-only handwritten
+shell claim from the larger end-to-end confinement package, with exact
+schedule, capacity, slot-program, and opcode alignment already checked on the
+same live machine witness. The tamper suite now also rejects representative
+slot-program drift, opcode-trace drift, and source-side object/ORAM drift on
+that dedicated route.
 `runtime_implementation_kernel_machine_confinement_boundary_validation.json`
 then checks the current strongest WP3 direct route: it pairs the
 source-backed `RuntimeImplementationInterface` with the live
 `RuntimeKernelMachineFinishWitness`, fixed confidential slot program, and
 opcode trace, and Lean exposes the accepted object through
-`RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinement`.
-That theorem states source-side confinement, Lean-kernel refinement,
+`RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell`.
+That theorem states source-side confinement, that handwritten runtime
+confidential work lives only in generated helpers, Lean-kernel refinement,
 shell-trace refinement, admitted schedule consumption, kernel-op and
 runtime-phase capacity bounds, and slot-program/kernel-step exactness together
 without requiring a separate emitted finish-slot meeting artifact for the
-outer confinement step.
+outer confinement step. The same direct boundary now also exposes the narrower
+observer-side theorem
+`RuntimeImplementationKernelMachineConfinementBoundary.paperPublicBridgeObserverRefinement`,
+which projects that same checked public-bridge/public-only-shell half through
+the larger end-to-end confinement package.
 `kernel_model_alignment_validation.json` adds a source-level Rust/Lean
 anti-drift check for the small-kernel ABI itself: it reads the Rust opcode
 enum, the Rust confidential-kernel DSL enums, the Rust slot-DSL enums, and
@@ -620,13 +618,10 @@ theorem-facing runtime kernel-interface bundle, seeded paper-main bundle,
 seeded/canonical witness-family, theorem-input, and pair-certificate
 artifacts, including the source-backed runtime implementation interface, the
 standalone shared confidential-kernel boundary route beneath it, the combined
-runtime implementation confinement boundary, the direct machine-confinement
-route, allocator resource-event-log drift, fixed-capacity statement-trace
-recorder drift, fixed-public-batch ORAM write-log drift, UO small-map
-early-exit lookup drift, UO array direct-index / out-of-range-branch drift, and
-generated-interpreter post-return-break drift including on the direct
-machine-confinement route, then checks that the shipped Lean executables reject
-those semantically drifted but still parseable artifacts.
+runtime implementation confinement boundary, and the witness-fed
+`checkProofGradeRuntimeKernelInterfaceConfinementBoundary` route, then checks
+that the shipped Lean executables reject those semantically drifted but still
+parseable artifacts.
 `pathoram_pair_validation.json` now also checks proof-grade paired seeded
 path-ORAM certificates beyond `SingleAccessMap`, including
 `ConfidentialMixer/pathoram/deposit-pair` and

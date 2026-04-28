@@ -549,7 +549,7 @@
       "oram_artifact": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 3769,
+        "artifact_json_bytes": 3965,
         "contract": "AuthScan",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend",
@@ -558,7 +558,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "raw",
-        "source_artifact_json_bytes": 3769,
+        "source_artifact_json_bytes": 3965,
         "state_object_count": 2
       },
       "source_raw": [
@@ -573,7 +573,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 11650,
+        "artifact_json_bytes": 11846,
         "contract": "AuthScan",
         "function_count": 3,
         "lean_stderr": "",
@@ -582,7 +582,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "uo",
-        "source_artifact_json_bytes": 11650,
+        "source_artifact_json_bytes": 11846,
         "state_object_count": 2
       }
     },
@@ -590,7 +590,7 @@
       "benchmark": "ConfidentialMixer",
       "fullscan64_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 13015,
+        "artifact_json_bytes": 13296,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "",
@@ -599,12 +599,12 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 13015,
+        "source_artifact_json_bytes": 13296,
         "state_object_count": 2
       },
       "oram_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 13276,
+        "artifact_json_bytes": 13557,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "",
@@ -613,12 +613,12 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 13276,
+        "source_artifact_json_bytes": 13557,
         "state_object_count": 2
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 5442,
+        "artifact_json_bytes": 5723,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend",
@@ -627,7 +627,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "raw",
-        "source_artifact_json_bytes": 5442,
+        "source_artifact_json_bytes": 5723,
         "state_object_count": 2
       },
       "source_raw": [
@@ -642,7 +642,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 13010,
+        "artifact_json_bytes": 13291,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "",
@@ -651,7 +651,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 13010,
+        "source_artifact_json_bytes": 13291,
         "state_object_count": 2
       }
     },
@@ -660,7 +660,7 @@
       "fullscan64_artifact": null,
       "oram_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 24179,
+        "artifact_json_bytes": 24603,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -669,12 +669,12 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 24179,
+        "source_artifact_json_bytes": 24603,
         "state_object_count": 2
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 9237,
+        "artifact_json_bytes": 9661,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend",
@@ -683,7 +683,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "raw",
-        "source_artifact_json_bytes": 9237,
+        "source_artifact_json_bytes": 9661,
         "state_object_count": 2
       },
       "source_raw": [
@@ -698,7 +698,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 23642,
+        "artifact_json_bytes": 24066,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -707,7 +707,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 23642,
+        "source_artifact_json_bytes": 24066,
         "state_object_count": 2
       }
     },
@@ -717,7 +717,7 @@
       "oram_artifact": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 3082,
+        "artifact_json_bytes": 3267,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object last uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object last uses raw backend",
@@ -726,7 +726,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "raw",
-        "source_artifact_json_bytes": 3082,
+        "source_artifact_json_bytes": 3267,
         "state_object_count": 1
       },
       "source_raw": [
@@ -741,7 +741,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 7013,
+        "artifact_json_bytes": 7198,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
         "lean_stderr": "",
@@ -750,7 +750,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "uo",
-        "source_artifact_json_bytes": 7013,
+        "source_artifact_json_bytes": 7198,
         "state_object_count": 1
       }
     },
@@ -760,7 +760,7 @@
       "oram_artifact": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 4375,
+        "artifact_json_bytes": 4629,
         "contract": "RegistryCRUD",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object records uses raw backend; artifact_view: confidential state objects use raw backends: confidential state object records uses raw backend",
@@ -769,7 +769,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "raw",
-        "source_artifact_json_bytes": 4375,
+        "source_artifact_json_bytes": 4629,
         "state_object_count": 1
       },
       "source_raw": [
@@ -784,7 +784,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 11428,
+        "artifact_json_bytes": 11682,
         "contract": "RegistryCRUD",
         "function_count": 4,
         "lean_stderr": "",
@@ -793,7 +793,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "uo",
-        "source_artifact_json_bytes": 11428,
+        "source_artifact_json_bytes": 11682,
         "state_object_count": 1
       }
     }

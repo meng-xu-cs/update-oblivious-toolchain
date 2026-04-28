@@ -2,11 +2,19 @@ contract: AuthScan
 entrypoints:
   seed(uint256,bytes32):
     confidential: false
+    returns: forbidden
+    status: public
   auth(bytes32):
     secret_args: [token]
     confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
   readLast():
     confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
 state:
   TOKENS:
     kind: array

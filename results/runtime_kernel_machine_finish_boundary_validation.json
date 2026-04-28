@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 2582,
+      "boundary_json_bytes": 2522,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -69,7 +69,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -82,12 +82,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -155,7 +149,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for classify(uint256)",
-      "machine_finish_witness_json_bytes": 2096,
+      "machine_finish_witness_json_bytes": 2036,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "classify(uint256)",
@@ -166,7 +160,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "runtime_phase_prefix_event_count": 7
       },
       "runtime_kernel_refinement_witness": {
@@ -224,7 +218,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 2582,
+      "boundary_json_bytes": 2522,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -278,7 +272,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "resource_events": [
           {
             "bytes": 32,
@@ -291,12 +285,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -364,7 +352,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for classify(uint256)",
-      "machine_finish_witness_json_bytes": 2096,
+      "machine_finish_witness_json_bytes": 2036,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "classify(uint256)",
@@ -375,7 +363,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 11,
+        "resource_event_count": 10,
         "runtime_phase_prefix_event_count": 7
       },
       "runtime_kernel_refinement_witness": {
@@ -433,7 +421,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 6498,
+      "boundary_json_bytes": 6438,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -498,7 +486,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -559,12 +547,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -758,7 +740,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for auth(bytes32)",
-      "machine_finish_witness_json_bytes": 4794,
+      "machine_finish_witness_json_bytes": 4734,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -770,7 +752,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "runtime_phase_prefix_event_count": 14
       },
       "runtime_kernel_refinement_witness": {
@@ -845,7 +827,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 6498,
+      "boundary_json_bytes": 6438,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -910,7 +892,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "resource_events": [
           {
             "bytes": 32,
@@ -971,12 +953,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
           },
           {
             "bytes": null,
@@ -1170,7 +1146,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for auth(bytes32)",
-      "machine_finish_witness_json_bytes": 4794,
+      "machine_finish_witness_json_bytes": 4734,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -1182,7 +1158,7 @@
           1,
           2
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 38,
         "runtime_phase_prefix_event_count": 14
       },
       "runtime_kernel_refinement_witness": {
@@ -1257,7 +1233,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 4500,
+      "boundary_json_bytes": 4380,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1284,7 +1260,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1306,12 +1282,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1408,18 +1384,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1565,7 +1529,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for upsert(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 4130,
+      "machine_finish_witness_json_bytes": 4010,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -1576,7 +1540,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "runtime_phase_prefix_event_count": 7
       },
       "runtime_kernel_refinement_witness": {
@@ -1634,7 +1598,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 4500,
+      "boundary_json_bytes": 4380,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1661,7 +1625,7 @@
             "peak_bytes": 65,
             "wipe_count": 17
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -1683,12 +1647,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "resource_events": [
           {
             "bytes": 65,
@@ -1785,18 +1749,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -1942,7 +1894,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for upsert(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 4130,
+      "machine_finish_witness_json_bytes": 4010,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -1953,7 +1905,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 39,
+        "resource_event_count": 37,
         "runtime_phase_prefix_event_count": 7
       },
       "runtime_kernel_refinement_witness": {
@@ -2011,7 +1963,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 6092,
+      "boundary_json_bytes": 5972,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2074,7 +2026,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2183,18 +2135,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2387,7 +2327,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for deposit(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 5339,
+      "machine_finish_witness_json_bytes": 5219,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 7,
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2399,7 +2339,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "runtime_phase_prefix_event_count": 13
       },
       "runtime_kernel_refinement_witness": {
@@ -2472,7 +2412,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 6092,
+      "boundary_json_bytes": 5972,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2535,7 +2475,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "resource_events": [
           {
             "bytes": 65,
@@ -2644,18 +2584,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -2848,7 +2776,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for deposit(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 5339,
+      "machine_finish_witness_json_bytes": 5219,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 7,
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2860,7 +2788,7 @@
           1,
           2
         ],
-        "resource_event_count": 48,
+        "resource_event_count": 46,
         "runtime_phase_prefix_event_count": 13
       },
       "runtime_kernel_refinement_witness": {
@@ -2933,7 +2861,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 7456,
+      "boundary_json_bytes": 7276,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -2989,7 +2917,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3182,24 +3110,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -3472,7 +3382,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for approve(address,address,uint256)",
-      "machine_finish_witness_json_bytes": 6948,
+      "machine_finish_witness_json_bytes": 6768,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "approve(address,address,uint256)",
@@ -3484,7 +3394,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "runtime_phase_prefix_event_count": 8
       },
       "runtime_kernel_refinement_witness": {
@@ -3546,7 +3456,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 7456,
+      "boundary_json_bytes": 7276,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3602,7 +3512,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "resource_events": [
           {
             "bytes": 65,
@@ -3795,24 +3705,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
           },
           {
             "bytes": 20,
@@ -4085,7 +3977,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for approve(address,address,uint256)",
-      "machine_finish_witness_json_bytes": 6948,
+      "machine_finish_witness_json_bytes": 6768,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "approve(address,address,uint256)",
@@ -4097,7 +3989,7 @@
           1,
           2
         ],
-        "resource_event_count": 77,
+        "resource_event_count": 74,
         "runtime_phase_prefix_event_count": 8
       },
       "runtime_kernel_refinement_witness": {
@@ -4159,7 +4051,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 9617,
+      "boundary_json_bytes": 9497,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4186,7 +4078,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -4208,12 +4100,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -4648,18 +4540,6 @@
             "words": null
           },
           {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
             "bytes": 32,
             "kind": "reserve_scratch",
             "region": "value_scratch",
@@ -4887,7 +4767,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for put(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 9250,
+      "machine_finish_witness_json_bytes": 9130,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "put(bytes32,uint256)",
@@ -4898,7 +4778,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "runtime_phase_prefix_event_count": 7
       },
       "runtime_kernel_refinement_witness": {
@@ -4956,7 +4836,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 9617,
+      "boundary_json_bytes": 9497,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4983,7 +4863,7 @@
             "peak_bytes": 648,
             "wipe_count": 52
           },
-          "peak_stack_words": 2,
+          "peak_stack_words": 0,
           "value_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
@@ -5005,12 +4885,12 @@
         "kernel_step_public_object_schedule": [
           1
         ],
-        "peak_stack_words": 2,
+        "peak_stack_words": 0,
         "present": true,
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "resource_events": [
           {
             "bytes": 8,
@@ -5443,18 +5323,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -5684,7 +5552,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for put(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 9250,
+      "machine_finish_witness_json_bytes": 9130,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "put(bytes32,uint256)",
@@ -5695,7 +5563,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 109,
+        "resource_event_count": 107,
         "runtime_phase_prefix_event_count": 7
       },
       "runtime_kernel_refinement_witness": {
@@ -5753,7 +5621,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 12316,
+      "boundary_json_bytes": 12196,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -5809,7 +5677,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -6242,18 +6110,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -6682,7 +6538,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for add(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 11773,
+      "machine_finish_witness_json_bytes": 11653,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 5,
         "entrypoint_id": "add(bytes32,uint256)",
@@ -6693,7 +6549,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "runtime_phase_prefix_event_count": 8
       },
       "runtime_kernel_refinement_witness": {
@@ -6753,7 +6609,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 12316,
+      "boundary_json_bytes": 12196,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6809,7 +6665,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "resource_events": [
           {
             "bytes": 8,
@@ -7244,18 +7100,6 @@
             "words": null
           },
           {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
             "bytes": 32,
             "kind": "reserve_scratch",
             "region": "value_scratch",
@@ -7682,7 +7526,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for add(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 11773,
+      "machine_finish_witness_json_bytes": 11653,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 5,
         "entrypoint_id": "add(bytes32,uint256)",
@@ -7693,7 +7537,7 @@
         "public_object_universe": [
           1
         ],
-        "resource_event_count": 142,
+        "resource_event_count": 140,
         "runtime_phase_prefix_event_count": 8
       },
       "runtime_kernel_refinement_witness": {
@@ -7753,7 +7597,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 33844,
+      "boundary_json_bytes": 33724,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -7816,7 +7660,7 @@
           1,
           2
         ],
-        "resource_event_count": 428,
+        "resource_event_count": 426,
         "resource_events": [
           {
             "bytes": 8,
@@ -9557,18 +9401,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
           },
           {
             "bytes": 32,
@@ -10409,7 +10241,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for deposit(bytes32,uint256)",
-      "machine_finish_witness_json_bytes": 33091,
+      "machine_finish_witness_json_bytes": 32971,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 7,
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -10421,7 +10253,7 @@
           1,
           2
         ],
-        "resource_event_count": 428,
+        "resource_event_count": 426,
         "runtime_phase_prefix_event_count": 13
       },
       "runtime_kernel_refinement_witness": {
@@ -10494,7 +10326,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 101172,
+      "boundary_json_bytes": 100932,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -10561,7 +10393,7 @@
           1,
           2
         ],
-        "resource_event_count": 1334,
+        "resource_event_count": 1330,
         "resource_events": [
           {
             "bytes": 8,
@@ -15746,30 +15578,6 @@
             "kind": "wipe_scratch",
             "region": "io_scratch",
             "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 1
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 2
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 3
-          },
-          {
-            "bytes": null,
-            "kind": "stack_check",
-            "region": null,
-            "words": 4
           },
           {
             "bytes": 20,
@@ -18592,7 +18400,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for transferFrom(address,address,address,uint256)",
-      "machine_finish_witness_json_bytes": 99452,
+      "machine_finish_witness_json_bytes": 99212,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 9,
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
@@ -18604,7 +18412,7 @@
           1,
           2
         ],
-        "resource_event_count": 1334,
+        "resource_event_count": 1330,
         "runtime_phase_prefix_event_count": 15
       },
       "runtime_kernel_refinement_witness": {

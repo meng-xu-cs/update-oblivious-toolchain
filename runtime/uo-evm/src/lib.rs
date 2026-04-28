@@ -243,6 +243,26 @@ mod tests {
         );
         assert_eq!(ok.return_value, Some(Value::Uint(2)));
         assert_eq!(abort.return_value, None);
+        let ok_outcome = ok.trace.theorem_trace.public_outcome.as_ref().unwrap();
+        let abort_outcome = abort.trace.theorem_trace.public_outcome.as_ref().unwrap();
+        assert_eq!(
+            ok_outcome.return_policy,
+            uo_core::ReturnPolicy::Declassified
+        );
+        assert_eq!(
+            ok_outcome.status_policy,
+            uo_core::StatusPolicy::Declassified
+        );
+        assert_eq!(ok_outcome.return_payload.as_deref(), Some("2"));
+        assert_eq!(
+            abort_outcome.return_policy,
+            uo_core::ReturnPolicy::Declassified
+        );
+        assert_eq!(
+            abort_outcome.status_policy,
+            uo_core::StatusPolicy::Declassified
+        );
+        assert_eq!(abort_outcome.return_payload, None);
         assert_eq!(ok_balance.return_value, Some(Value::Uint(3)));
         assert_eq!(abort_balance.return_value, Some(Value::Uint(5)));
     }

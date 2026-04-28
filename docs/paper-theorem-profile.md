@@ -21,7 +21,8 @@ The final paper should aim at exactly one theorem:
 > side `IR.evalKernelProgram` produce identical outcomes on the
 > compiled artifact `A`. If the real runtime executes `A` and emits
 > runtime proof objects accepted by Lean, and the explicit concrete
-> backend / cryptographic / TEE assumptions hold, then the real
+> backend / cryptographic / TEE assumptions hold, and every host-visible
+> return/status release is declared by the artifact policy, then the real
 > host-visible execution satisfies the paper's update-obliviousness
 > theorem against the stated hostile-host observer.
 
@@ -1268,7 +1269,9 @@ View_SGX(c) =
 where:
 
 - `public_outcome` contains entrypoint id, public args, termination status,
-  public output shape, and public gas
+  declared status policy, public output shape, declared return policy, any
+  plaintext public/declassified return payload, declassification labels, and
+  public gas
 - `boundary_schedule` is the exact host-visible enclave boundary sequence
 - `storage_trace` is the normalized persistent read/write trace
 - `micro_trace` is the SGX-specific tuple

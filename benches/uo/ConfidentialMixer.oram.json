@@ -745,6 +745,11 @@
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -771,6 +776,9 @@
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
+          "returns": "forbidden",
+          "status": "public",
+          "declassifies": [],
           "confidential_program": {
             "entrypoint_id": "deposit(bytes32,uint256)",
             "params": [
@@ -984,6 +992,11 @@
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
           "kernel_steps": [],
           "uocell_reads": 1,
           "uocell_writes": 0,
@@ -1009,6 +1022,12 @@
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "declassified",
+          "declassifies": [
+            "return",
+            "success"
+          ],
           "confidential_program": {
             "entrypoint_id": "withdraw(bytes32,uint256)",
             "params": [
