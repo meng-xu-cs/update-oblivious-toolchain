@@ -2257,7 +2257,7 @@ mod tests {
     };
     use crate::{
         ir::StateObject, BackendKind, BinaryOp, CompiledFunction, ContainerKind, Expr, ScalarType,
-        Statement, Type, Value,
+        Statement, Type, UnaryOp, Value,
     };
     use anyhow::{anyhow, Result};
     use uo_precompiles::UoOpcode;
@@ -2641,6 +2641,104 @@ mod tests {
         assert_eq!(runtime.load_slot(1).unwrap(), Value::Uint(7));
         assert_eq!(runtime.cell_sets, vec![(7, Value::Uint(7), Some(true))]);
         assert_eq!(runtime.statements, vec!["declare", "cell_set", "return"]);
+    }
+
+    #[test]
+    fn shared_slot_interpreter_uses_u128_wrapping_arithmetic() {
+        let mut runtime = MockRuntime::with_slot_count(5);
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "arithmetic()".into(),
+            param_count: 0,
+            return_type: Some(uint_type()),
+            secret_args: vec![],
+            slot_count: 5,
+            body: vec![
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 0,
+                    value: ConfidentialKernelSlotExpr::Unary {
+                        op: UnaryOp::Neg,
+                        expr: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(1),
+                        }),
+                    },
+                },
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 1,
+                    value: ConfidentialKernelSlotExpr::Binary {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(u128::MAX),
+                        }),
+                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(1),
+                        }),
+                    },
+                },
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 2,
+                    value: ConfidentialKernelSlotExpr::Binary {
+                        op: BinaryOp::Sub,
+                        lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(0),
+                        }),
+                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(1),
+                        }),
+                    },
+                },
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 3,
+                    value: ConfidentialKernelSlotExpr::Binary {
+                        op: BinaryOp::Mul,
+                        lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(1u128 << 127),
+                        }),
+                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(2),
+                        }),
+                    },
+                },
+                ConfidentialKernelSlotStatement::Declare {
+                    slot: 4,
+                    value: ConfidentialKernelSlotExpr::Binary {
+                        op: BinaryOp::Div,
+                        lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(7),
+                        }),
+                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(0),
+                        }),
+                    },
+                },
+                ConfidentialKernelSlotStatement::Return {
+                    value: Some(ConfidentialKernelSlotExpr::Binary {
+                        op: BinaryOp::Mod,
+                        lhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(7),
+                        }),
+                        rhs: Box::new(ConfidentialKernelSlotExpr::Literal {
+                            value: Value::Uint(0),
+                        }),
+                    }),
+                },
+            ]
+            .into_boxed_slice(),
+        };
+
+        let outcome = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap();
+
+        assert_eq!(runtime.load_slot(0).unwrap(), Value::Uint(u128::MAX));
+        assert_eq!(runtime.load_slot(1).unwrap(), Value::Uint(0));
+        assert_eq!(runtime.load_slot(2).unwrap(), Value::Uint(u128::MAX));
+        assert_eq!(runtime.load_slot(3).unwrap(), Value::Uint(0));
+        assert_eq!(runtime.load_slot(4).unwrap(), Value::Uint(0));
+        assert_eq!(
+            outcome,
+            ConfidentialKernelExecutionOutcome {
+                aborted: false,
+                return_value: Some(Value::Uint(0)),
+            }
+        );
     }
 
     #[test]

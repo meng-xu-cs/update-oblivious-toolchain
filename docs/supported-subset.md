@@ -52,7 +52,9 @@ Sidecar metadata requirements:
 Execution-model note:
 
 - accepted `uint256` syntax is executed by the current prototype in a bounded
-  `u128` domain
+  `u128` domain; the Lean IR evaluator normalizes unsigned arithmetic,
+  comparisons, negation, and div/mod-by-zero to match the Rust runtime's
+  `u128` behavior rather than Solidity's full `uint256` arithmetic
 - confidential entrypoints may not target raw-backend objects at all; the
   direct Lean proof-grade checker, compiler lowering, and runtime admission
   all enforce this, and the proof path is exact backends plus
