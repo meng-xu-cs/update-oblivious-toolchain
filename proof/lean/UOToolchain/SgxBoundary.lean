@@ -62,7 +62,11 @@ structure SGXView where
   exitTrace : List ExitEvent
   sharedResourceTrace : SharedResourceTrace
   terminationStatus : Bool
+  statusPolicy : String
   outputShape : OutputShape
+  returnPolicy : String
+  returnPayload : Option String
+  declassifies : List String
   gasUsed : Nat
 deriving Repr, DecidableEq
 

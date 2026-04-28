@@ -225,7 +225,11 @@ structure ImportedPublicOutcomeTrace where
   entrypoint_id : String
   public_args : List String
   termination_status : Bool
+  status_policy : String
   output_shape : ImportedOutputShape
+  return_policy : String
+  return_payload : Option String
+  declassifies : List String
   gas_used : Nat
 deriving Repr, DecidableEq, FromJson, ToJson
 
@@ -234,7 +238,11 @@ def ImportedPublicOutcomeTrace.toPublicOutcome
   { entrypointId := outcome.entrypoint_id
   , publicArgs := outcome.public_args
   , terminationStatus := outcome.termination_status
+  , statusPolicy := outcome.status_policy
   , outputShape := outcome.output_shape.toOutputShape
+  , returnPolicy := outcome.return_policy
+  , returnPayload := outcome.return_payload
+  , declassifies := outcome.declassifies
   , gasUsed := outcome.gas_used
   }
 
@@ -2284,7 +2292,11 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
       { entrypoint_id := "put(bytes32,uint256)"
       , public_args := []
       , termination_status := true
+      , status_policy := "public"
       , output_shape := { return_present := false, return_length := 0 }
+      , return_policy := "forbidden"
+      , return_payload := none
+      , declassifies := []
       , gas_used := 7
       }
   , kernel_witness := none

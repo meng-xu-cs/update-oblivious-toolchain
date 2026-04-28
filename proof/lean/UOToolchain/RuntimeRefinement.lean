@@ -4224,7 +4224,11 @@ def RuntimeRefinementWitness.sgxView
   , exitTrace := microTrace.exitTrace
   , sharedResourceTrace := microTrace.sharedResourceTrace
   , terminationStatus := witness.publicOutcome.terminationStatus
+  , statusPolicy := witness.publicOutcome.statusPolicy
   , outputShape := witness.publicOutcome.outputShape
+  , returnPolicy := witness.publicOutcome.returnPolicy
+  , returnPayload := witness.publicOutcome.returnPayload
+  , declassifies := witness.publicOutcome.declassifies
   , gasUsed := witness.publicOutcome.gasUsed
   }
 

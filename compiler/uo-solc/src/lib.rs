@@ -7,9 +7,10 @@ use uo_core::ir::{
 };
 use uo_core::manifest::{
     EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
+    SURROGATE_ORAM_SCHEME,
 };
 use uo_core::{
-    CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram,
+    AdmittedPackageIdentity, CompiledArtifact, ConfidentialKernelParam, ConfidentialKernelProgram,
     ConfidentialKernelSlotProgram, ContractMetadata, DeclassificationKind,
     ProofRelevantTranslationBundle, ReturnPolicy, ScalarType, StateMetadata, StatusPolicy,
     StructField, Type, Value,
@@ -111,12 +112,14 @@ pub fn compile(
         );
         functions.push(compiled);
     }
+    let compilation_mode = match mode {
+        ProgramMode::Raw => "raw".to_string(),
+        ProgramMode::Uo => "uo".to_string(),
+    };
+    let compiler_version = env!("CARGO_PKG_VERSION").to_string();
     let manifest = RuntimeManifest {
         contract: frontend.contract_name.clone(),
-        compilation_mode: match mode {
-            ProgramMode::Raw => "raw".into(),
-            ProgramMode::Uo => "uo".into(),
-        },
+        compilation_mode: compilation_mode.clone(),
         objects: frontend
             .state_by_name
             .values()
@@ -157,7 +160,13 @@ pub fn compile(
     };
     let disassembly = disassemble_contract(&contract);
     Ok(CompiledArtifact {
-        compiler_version: env!("CARGO_PKG_VERSION").into(),
+        compiler_version: compiler_version.clone(),
+        admitted_package: Some(AdmittedPackageIdentity::new(
+            &source,
+            metadata,
+            &compilation_mode,
+            &compiler_version,
+        )?),
         contract,
         diagnostics: frontend.diagnostics,
         transformed_source: Some(render_contract(&functions)),
@@ -180,21 +189,55 @@ fn parse_frontend(
     metadata: &ContractMetadata,
 ) -> Result<Frontend> {
     let (unit, _) = parse(source, 0).map_err(render_parse_errors)?;
-    let contract = unit
-        .0
-        .iter()
-        .find_map(|part| match part {
+    let mut selected_contract = None;
+    for part in &unit.0 {
+        match part {
+            pt::SourceUnitPart::PragmaDirective(_, _, _)
+            | pt::SourceUnitPart::StraySemicolon(_) => {}
             pt::SourceUnitPart::ContractDefinition(contract) => {
-                let name = contract.name.as_ref()?.name.clone();
+                let name = contract
+                    .name
+                    .as_ref()
+                    .map(|name| name.name.as_str())
+                    .unwrap_or("<anonymous>");
                 if name == metadata.contract {
-                    Some(contract.as_ref().clone())
+                    if selected_contract.is_some() {
+                        bail!(
+                            "duplicate selected contract {} is unsupported",
+                            metadata.contract
+                        );
+                    }
+                    selected_contract = Some(contract.as_ref().clone());
                 } else {
-                    None
+                    bail!(
+                        "unsupported top-level contract {}; proof-grade sources must contain only the selected contract {}",
+                        name,
+                        metadata.contract
+                    );
                 }
             }
-            _ => None,
-        })
-        .ok_or_else(|| anyhow!("contract {} not found", metadata.contract))?;
+            pt::SourceUnitPart::ImportDirective(_) => bail!("top-level imports are unsupported"),
+            pt::SourceUnitPart::EnumDefinition(_) => bail!("top-level enums are unsupported"),
+            pt::SourceUnitPart::StructDefinition(_) => bail!("top-level structs are unsupported"),
+            pt::SourceUnitPart::EventDefinition(_) => bail!("top-level events are unsupported"),
+            pt::SourceUnitPart::ErrorDefinition(_) => {
+                bail!("top-level custom errors are unsupported")
+            }
+            pt::SourceUnitPart::FunctionDefinition(_) => {
+                bail!("top-level functions are unsupported")
+            }
+            pt::SourceUnitPart::VariableDefinition(_) => {
+                bail!("top-level variables are unsupported")
+            }
+            pt::SourceUnitPart::TypeDefinition(_) => {
+                bail!("top-level type aliases are unsupported")
+            }
+            pt::SourceUnitPart::Annotation(_) => bail!("top-level annotations are unsupported"),
+            pt::SourceUnitPart::Using(_) => bail!("top-level using directives are unsupported"),
+        }
+    }
+    let contract =
+        selected_contract.ok_or_else(|| anyhow!("contract {} not found", metadata.contract))?;
     if !contract.base.is_empty() {
         bail!("inheritance is unsupported");
     }
@@ -404,6 +447,14 @@ fn ensure_confidential_slot_program_uses_uo_backends(
         if object.backend == BackendKind::Raw {
             bail!(
                 "confidential entrypoint {} targets raw backend object {} ({})",
+                program.entrypoint_id,
+                object.name,
+                object_id
+            );
+        }
+        if !object.confidential {
+            bail!(
+                "confidential entrypoint {} targets non-confidential state object {} ({})",
                 program.entrypoint_id,
                 object.name,
                 object_id
@@ -929,7 +980,10 @@ fn lower_type_expr(expression: &pt::Expression, structs: &BTreeMap<String, Type>
     match expression {
         pt::Expression::Type(_, ty) => match ty {
             pt::Type::Bool => Ok(Type::Scalar(ScalarType::Bool)),
-            pt::Type::Uint(bits) => Ok(Type::Scalar(ScalarType::Uint(*bits))),
+            pt::Type::Uint(bits) if *bits == 256 => Ok(Type::Scalar(ScalarType::Uint(*bits))),
+            pt::Type::Uint(bits) => {
+                bail!("only uint256 is supported in proof-grade mode; found uint{bits}")
+            }
             pt::Type::Bytes(32) => Ok(Type::Scalar(ScalarType::Bytes32)),
             pt::Type::Address | pt::Type::AddressPayable => Ok(Type::Scalar(ScalarType::Address)),
             pt::Type::Bytes(_) => bail!("only bytes32 is supported"),
@@ -971,18 +1025,36 @@ fn lower_state_object(
         "oram" => BackendKind::Oram,
         other => bail!("unsupported backend {}", other),
     };
+    let oram_scheme = match (backend.clone(), state_meta.oram_scheme.as_ref()) {
+        (BackendKind::Oram, Some(scheme)) => scheme.clone(),
+        (BackendKind::Oram, None) => {
+            bail!("ORAM state {} is missing explicit oram_scheme", name)
+        }
+        (_, Some(scheme)) => scheme.clone(),
+        (_, None) => SURROGATE_ORAM_SCHEME.into(),
+    };
     match kind {
-        ContainerKind::Cell => Ok(StateObject {
-            id,
-            name: name.into(),
-            kind,
-            backend,
-            oram_scheme: state_meta.oram_scheme.clone(),
-            value_type: lower_type_expr(&def.ty, structs)?,
-            key_type: None,
-            capacity: None,
-            confidential: state_meta.confidential,
-        }),
+        ContainerKind::Cell => {
+            let value_type = lower_type_expr(&def.ty, structs)?;
+            validate_metadata_type(name, "value", &state_meta.value, &value_type)?;
+            if state_meta.key.is_some() {
+                bail!("cell state {} must not declare metadata key type", name);
+            }
+            if state_meta.capacity.is_some() {
+                bail!("cell state {} must not declare metadata capacity", name);
+            }
+            Ok(StateObject {
+                id,
+                name: name.into(),
+                kind,
+                backend,
+                oram_scheme,
+                value_type,
+                key_type: None,
+                capacity: None,
+                confidential: state_meta.confidential,
+            })
+        }
         ContainerKind::Array => {
             let (element_ty, capacity) = match &def.ty {
                 pt::Expression::ArraySubscript(_, base, Some(size)) => {
@@ -990,15 +1062,29 @@ fn lower_state_object(
                 }
                 _ => bail!("array state {} must have a fixed compile-time size", name),
             };
+            if let Some(metadata_capacity) = state_meta.capacity {
+                if metadata_capacity != capacity {
+                    bail!(
+                        "array state {} metadata capacity {} does not match source length {}",
+                        name,
+                        metadata_capacity,
+                        capacity
+                    );
+                }
+            }
+            validate_metadata_type(name, "value", &state_meta.value, &element_ty)?;
+            if state_meta.key.is_some() {
+                bail!("array state {} must not declare metadata key type", name);
+            }
             Ok(StateObject {
                 id,
                 name: name.into(),
                 kind,
                 backend,
-                oram_scheme: state_meta.oram_scheme.clone(),
+                oram_scheme,
                 value_type: element_ty,
                 key_type: None,
-                capacity: Some(state_meta.capacity.unwrap_or(capacity)),
+                capacity: Some(capacity),
                 confidential: state_meta.confidential,
             })
         }
@@ -1007,20 +1093,49 @@ fn lower_state_object(
                 diagnostics_error("raw map still requires a public capacity in metadata")?;
             }
             match &def.ty {
-                pt::Expression::Type(_, pt::Type::Mapping { key, value, .. }) => Ok(StateObject {
-                    id,
-                    name: name.into(),
-                    kind,
-                    backend,
-                    oram_scheme: state_meta.oram_scheme.clone(),
-                    value_type: lower_type_expr(value, structs)?,
-                    key_type: Some(lower_type_expr(key, structs)?),
-                    capacity: state_meta.capacity,
-                    confidential: state_meta.confidential,
-                }),
+                pt::Expression::Type(_, pt::Type::Mapping { key, value, .. }) => {
+                    let key_type = lower_type_expr(key, structs)?;
+                    let value_type = lower_type_expr(value, structs)?;
+                    let metadata_key = state_meta.key.as_ref().ok_or_else(|| {
+                        anyhow!("map state {} is missing metadata key type", name)
+                    })?;
+                    validate_metadata_type(name, "key", metadata_key, &key_type)?;
+                    validate_metadata_type(name, "value", &state_meta.value, &value_type)?;
+                    Ok(StateObject {
+                        id,
+                        name: name.into(),
+                        kind,
+                        backend,
+                        oram_scheme,
+                        value_type,
+                        key_type: Some(key_type),
+                        capacity: state_meta.capacity,
+                        confidential: state_meta.confidential,
+                    })
+                }
                 _ => bail!("map state {} must use mapping syntax", name),
             }
         }
+    }
+}
+
+fn validate_metadata_type(
+    object_name: &str,
+    field_name: &str,
+    metadata_type: &str,
+    source_type: &Type,
+) -> Result<()> {
+    let source_type = source_type.short_name();
+    if metadata_type == source_type {
+        Ok(())
+    } else {
+        bail!(
+            "state {} metadata {} type {} does not match source type {}",
+            object_name,
+            field_name,
+            metadata_type,
+            source_type
+        )
     }
 }
 
@@ -2698,6 +2813,150 @@ bounds:
     }
 
     #[test]
+    fn rejects_unsupported_top_level_source_parts() {
+        let source = write_temp(
+            "top-level-import",
+            r#"
+            import "./Other.sol";
+            contract C {
+                uint256 private x;
+                function f(uint256 a) public { x = a; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("top-level imports are unsupported"));
+    }
+
+    #[test]
+    fn rejects_integer_widths_other_than_uint256() {
+        let source = write_temp(
+            "uint64",
+            r#"
+            contract C {
+                uint64 private x;
+                function f(uint64 a) public { x = a; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint64):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint64
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("only uint256 is supported in proof-grade mode"));
+    }
+
+    #[test]
+    fn rejects_array_capacity_that_differs_from_source_length() {
+        let source = write_temp(
+            "array-capacity-mismatch",
+            r#"
+            contract C {
+                bytes32[4] private items;
+                function f() public { }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  items:
+    kind: array
+    value: bytes32
+    capacity: 8
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("metadata capacity 8 does not match source length 4"));
+    }
+
+    #[test]
+    fn rejects_metadata_type_mismatch() {
+        let source = write_temp(
+            "metadata-type-mismatch",
+            r#"
+            contract C {
+                mapping(bytes32 => uint256) private balances;
+                function f(bytes32 key, uint256 value) public { balances[key] = value; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(bytes32,uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  balances:
+    kind: map
+    key: address
+    value: uint256
+    capacity: 8
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("metadata key type address does not match source type bytes32"));
+    }
+
+    #[test]
     fn rejects_missing_return_policy() {
         let source = write_temp(
             "missing-return-policy",
@@ -2906,6 +3165,44 @@ bounds:
     }
 
     #[test]
+    fn rejects_confidential_entrypoint_targeting_non_confidential_uo_state() {
+        let source = write_temp(
+            "confidential-public-uo-target",
+            r#"
+            contract PublicUoTarget {
+                uint256 private last;
+                function classify(uint256 secret) public {
+                    last = secret & 1;
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: PublicUoTarget
+entrypoints:
+  classify(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("targets non-confidential state object last"));
+    }
+
+    #[test]
     fn rejects_dynamic_loop_oram_access_counts() {
         let source = write_temp(
             "oram-loop",
@@ -2937,6 +3234,7 @@ state:
     value: uint256
     capacity: 8
     backend: oram
+    oram_scheme: path_oram_local_posmap_v1
     confidential: true
 bounds:
   loops: {}
@@ -3039,6 +3337,7 @@ state:
     value: uint256
     capacity: 16
     backend: oram
+    oram_scheme: surrogate_public_schedule_v1
     confidential: true
 bounds:
   loops: {}

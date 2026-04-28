@@ -6,17 +6,26 @@ wording elsewhere.
 
 ## Paper Theorem
 
-For every admitted Solidity source program `P`, if `uo-solc` compiles `P` to
-artifact `A`, the Lean source/artifact checker accepts the pair, the real
-runtime executes `A` and emits proof objects accepted by Lean, and the explicit
-backend, cryptographic, and TEE deployment assumptions hold, then the real
-host-visible execution satisfies the paper update-obliviousness theorem against
-the stated hostile-host observer and the artifact-declared return/status
-declassification policy.
+For every admitted program package `(P, M, V)`, where `P` is the restricted
+Solidity source, `M` is the strict sidecar metadata, and `V` records the
+compiler/proof/runtime model versions, if `uo-solc` compiles the package to
+artifact `A`, the artifact records the matching admitted-package hash, the Lean
+source/artifact checker accepts the pair, the real runtime executes `A` and
+emits proof objects accepted by Lean, and the explicit backend, cryptographic,
+and TEE deployment assumptions hold, then the real host-visible execution
+satisfies the paper update-obliviousness theorem against the stated
+hostile-host observer and the artifact-declared return/status declassification
+policy.
 
 The compiler-side trust story starts at the post-resolution Sol AST / UO IR
 consumed by Lean. Parser-level preprocessing remains trusted until a
 raw-source-to-post-resolution witness relation is mechanized.
+
+The artifact-level admitted-package hash is a canonical SHA-256 binding over
+the source bytes, canonical sidecar metadata JSON, compilation mode, compiler
+version, and package schema tag. It is checked for equality by the proof-grade
+translation bundle. It is not yet a deployment attestation hash for the runtime
+binary or SGX quote.
 
 ## Backend Scope
 

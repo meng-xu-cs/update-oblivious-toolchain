@@ -30,6 +30,7 @@ Rejected:
 - external calls and unsupported function-call shapes
 - multi-expression internal functions beyond single-expression pure/view helpers
 - multiple return values
+- integer widths other than `uint256`
 
 Sidecar metadata requirements:
 
@@ -50,6 +51,10 @@ Sidecar metadata requirements:
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is
   intended; the theorem-facing route is `path_oram_local_posmap_v1`
 - gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
+- generated artifacts carry an admitted-package hash over the source bytes,
+  canonical sidecar metadata JSON, compilation mode, compiler version, and
+  package schema tag; the proof-grade translation bundle requires the source
+  and artifact package identities to match
 
 Execution-model note:
 
@@ -65,7 +70,8 @@ Execution-model note:
 - source-to-kernel correctness is stated for the post-resolution Sol AST / UO
   IR consumed by the Lean model. Parser-level preprocessing remains trusted
   until a raw-source-to-post-resolution witness relation is mechanized.
-- confidential entrypoints may not target raw-backend objects at all; the
-  direct Lean proof-grade checker, compiler lowering, and runtime admission
-  all enforce this, and the proof path is exact backends plus
-  `path_oram_local_posmap_v1`
+- confidential entrypoints may target only state objects marked
+  `confidential: true`, and those objects may not use raw backends. The direct
+  Lean proof-grade checker, compiler lowering, and runtime admission enforce
+  the raw-backend restriction; compiler lowering and the proof-grade
+  translation checker also enforce the confidential-object restriction.

@@ -13,7 +13,7 @@ pub mod translation_validation;
 pub mod trusted_kernel;
 pub mod types;
 
-pub use artifact::{ArtifactFormat, CompiledArtifact};
+pub use artifact::{AdmittedPackageIdentity, ArtifactFormat, CompiledArtifact};
 pub use confidential_core::{
     RuntimeConfidentialCoreBundle, RuntimeConfidentialCoreBundleError,
     RuntimeConfidentialCoreKernelFinishSlotBundle,

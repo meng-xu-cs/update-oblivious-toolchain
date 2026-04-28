@@ -4,7 +4,8 @@ use crate::ir::{BackendKind, ContainerKind, ProgramMode};
 use crate::manifest::{
     EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest,
 };
-use crate::metadata::ContractMetadata;
+use crate::metadata::{ContractMetadata, DeclassificationKind, ReturnPolicy, StatusPolicy};
+use crate::AdmittedPackageIdentity;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -36,6 +37,10 @@ fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
 pub struct ProofRelevantTranslationBundle {
     pub source_path: String,
     pub metadata_contract: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_admitted_package: Option<AdmittedPackageIdentity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_admitted_package: Option<AdmittedPackageIdentity>,
     pub source_contract_json: String,
     pub artifact_contract_json: String,
     pub source_view: ProofRelevantContractView,
@@ -52,6 +57,8 @@ impl ProofRelevantTranslationBundle {
         Ok(Self {
             source_path: source_path.into(),
             metadata_contract: metadata.contract.clone(),
+            source_admitted_package: source_artifact.admitted_package.clone(),
+            artifact_admitted_package: artifact.admitted_package.clone(),
             source_contract_json: serde_json::to_string(&source_artifact.contract)?,
             artifact_contract_json: serde_json::to_string(&artifact.contract)?,
             source_view: ProofRelevantContractView::from_artifact(source_artifact)?,
@@ -61,6 +68,8 @@ impl ProofRelevantTranslationBundle {
 
     pub fn views_match(&self) -> bool {
         self.source_view == self.artifact_view
+            && self.source_admitted_package == self.artifact_admitted_package
+            && self.source_admitted_package.is_some()
     }
 }
 
@@ -299,6 +308,9 @@ pub struct ProofRelevantEntrypointView {
     pub max_hash_part_bytes: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub return_canonical_len: Option<usize>,
+    pub returns: ReturnPolicy,
+    pub status: StatusPolicy,
+    pub declassifies: Vec<DeclassificationKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidential_program: Option<ConfidentialKernelProgram>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -326,6 +338,9 @@ impl ProofRelevantEntrypointView {
             max_stack_words: entrypoint.max_stack_words,
             max_hash_part_bytes: entrypoint.max_hash_part_bytes,
             return_canonical_len: entrypoint.return_canonical_len,
+            returns: entrypoint.returns,
+            status: entrypoint.status,
+            declassifies: entrypoint.declassifies.clone(),
             confidential_program: entrypoint.confidential_program.clone(),
             confidential_slot_program: entrypoint.confidential_slot_program.clone(),
             kernel_steps: entrypoint
@@ -412,9 +427,14 @@ fn opcode_tag(opcode: &uo_precompiles::UoOpcode) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{canonical_json_string, ProofRelevantFunctionView, ProofRelevantStateObjectView};
+    use super::{
+        canonical_json_string, ProofRelevantEntrypointView, ProofRelevantFunctionView,
+        ProofRelevantStateObjectView,
+    };
     use crate::ir::{BackendKind, CompiledFunction, ContainerKind, Expr, StateObject, Statement};
-    use crate::{ScalarType, Type};
+    use crate::{
+        DeclassificationKind, EntrypointManifest, ReturnPolicy, ScalarType, StatusPolicy, Type,
+    };
 
     #[test]
     fn canonical_json_string_sorts_nested_statement_object_keys() {
@@ -483,5 +503,41 @@ mod tests {
         assert_eq!(view.value_type_short_name, "uint256[4]");
         assert_eq!(view.key_type.as_deref(), Some("{\"Scalar\":\"Bytes32\"}"));
         assert_eq!(view.key_type_short_name.as_deref(), Some("bytes32"));
+    }
+
+    #[test]
+    fn proof_relevant_entrypoint_view_carries_host_visibility_policy() {
+        let entrypoint = EntrypointManifest {
+            secret_args: vec![0],
+            param_names: vec!["secret".into()],
+            entry_input_len: 32,
+            public_gas_budget: 2000,
+            arena_bytes: 4096,
+            max_stack_words: 64,
+            max_hash_part_bytes: 0,
+            return_canonical_len: Some(32),
+            returns: ReturnPolicy::Declassified,
+            status: StatusPolicy::Declassified,
+            declassifies: vec![DeclassificationKind::Return, DeclassificationKind::Success],
+            confidential_program: None,
+            confidential_slot_program: None,
+            kernel_steps: vec![],
+            uocell_reads: 0,
+            uocell_writes: 0,
+            uoarray_reads: 0,
+            uoarray_writes: 0,
+            uomap_reads: 0,
+            uomap_writes: 0,
+            max_commit_ops: 0,
+            oram_accesses: Default::default(),
+        };
+        let view = ProofRelevantEntrypointView::from_manifest_entrypoint("f(uint256)", &entrypoint)
+            .unwrap();
+        assert_eq!(view.returns, ReturnPolicy::Declassified);
+        assert_eq!(view.status, StatusPolicy::Declassified);
+        assert_eq!(
+            view.declassifies,
+            vec![DeclassificationKind::Return, DeclassificationKind::Success]
+        );
     }
 }

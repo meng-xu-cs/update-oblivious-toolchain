@@ -43,7 +43,11 @@ def sgxViewOfTrace
   , exitTrace := microTrace.exitTrace
   , sharedResourceTrace := microTrace.sharedResourceTrace
   , terminationStatus := publicOutcome.terminationStatus
+  , statusPolicy := publicOutcome.statusPolicy
   , outputShape := publicOutcome.outputShape
+  , returnPolicy := publicOutcome.returnPolicy
+  , returnPayload := publicOutcome.returnPayload
+  , declassifies := publicOutcome.declassifies
   , gasUsed := publicOutcome.gasUsed
   }
 

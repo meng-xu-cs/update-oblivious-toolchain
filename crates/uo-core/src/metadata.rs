@@ -61,20 +61,10 @@ pub struct StateMetadata {
     pub value: String,
     #[serde(default)]
     pub capacity: Option<usize>,
-    #[serde(default = "default_backend")]
     pub backend: String,
-    #[serde(default = "default_oram_scheme")]
-    pub oram_scheme: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oram_scheme: Option<String>,
     pub confidential: bool,
-}
-
-fn default_backend() -> String {
-    "full_scan".to_string()
-}
-
-fn default_oram_scheme() -> String {
-    "surrogate_public_schedule_v1".to_string()
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

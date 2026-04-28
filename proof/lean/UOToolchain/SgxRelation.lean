@@ -26,7 +26,11 @@ structure SGXPublicOutcome where
   entrypointId : String
   publicArgs : List String
   terminationStatus : Bool
+  statusPolicy : String
   outputShape : OutputShape
+  returnPolicy : String
+  returnPayload : Option String
+  declassifies : List String
   gasUsed : Nat
 deriving Repr, DecidableEq
 
@@ -87,7 +91,11 @@ def sgxPublicOutcome (view : SGXView) : SGXPublicOutcome :=
   { entrypointId := view.entrypointId
   , publicArgs := view.publicArgs
   , terminationStatus := view.terminationStatus
+  , statusPolicy := view.statusPolicy
   , outputShape := view.outputShape
+  , returnPolicy := view.returnPolicy
+  , returnPayload := view.returnPayload
+  , declassifies := view.declassifies
   , gasUsed := view.gasUsed
   }
 
@@ -273,7 +281,11 @@ def sgxViewOfDeployment (cfg : Config) (result : DeploymentResult) : SGXView :=
   , exitTrace := []
   , sharedResourceTrace := []
   , terminationStatus := result.terminationStatus
+  , statusPolicy := "public"
   , outputShape := result.outputShape
+  , returnPolicy := "forbidden"
+  , returnPayload := none
+  , declassifies := []
   , gasUsed := result.trace.gasUsed
   }
 

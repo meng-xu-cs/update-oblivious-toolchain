@@ -235,6 +235,7 @@ mod tests {
     fn sample_artifact(functions: Vec<CompiledFunction>) -> CompiledArtifact {
         CompiledArtifact {
             compiler_version: "test".into(),
+            admitted_package: None,
             contract: CompiledContract {
                 contract: "Sample".into(),
                 mode: ProgramMode::Uo,

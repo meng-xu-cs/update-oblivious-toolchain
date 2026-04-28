@@ -81,6 +81,9 @@ structure ImportedProofRelevantEntrypointView where
   max_stack_words : Nat
   max_hash_part_bytes : Nat
   return_canonical_len : Option Nat
+  returns : String
+  status : String
+  declassifies : List String
   confidential_program : Option String
   confidential_slot_program : Option String
   kernel_steps : List ImportedProofRelevantKernelStepView
@@ -109,9 +112,20 @@ structure ImportedProofRelevantContractView where
   manifest : ImportedProofRelevantManifestView
 deriving Repr, DecidableEq, FromJson, ToJson
 
+structure ImportedAdmittedPackageIdentity where
+  schema : String
+  source_sha256 : String
+  metadata_sha256 : String
+  compilation_mode : String
+  compiler_version : String
+  package_sha256 : String
+deriving Repr, DecidableEq, FromJson, ToJson
+
 structure ImportedProofRelevantTranslationBundle where
   source_path : String
   metadata_contract : String
+  source_admitted_package : Option ImportedAdmittedPackageIdentity
+  artifact_admitted_package : Option ImportedAdmittedPackageIdentity
   source_contract_json : String
   artifact_contract_json : String
   source_view : ImportedProofRelevantContractView
@@ -414,6 +428,9 @@ private def parseImportedManifestEntrypointViewFromRawJson
     , max_stack_words := ← lookupFieldAs json "max_stack_words"
     , max_hash_part_bytes := (← lookupOptionalFieldAs json "max_hash_part_bytes").getD 0
     , return_canonical_len := ← lookupOptionalFieldAs json "return_canonical_len"
+    , returns := ← lookupFieldAs json "returns"
+    , status := ← lookupFieldAs json "status"
+    , declassifies := ← lookupFieldAs json "declassifies"
     , confidential_program := (← lookupOptionalFieldJson json "confidential_program").map Json.compress
     , confidential_slot_program :=
         (← lookupOptionalFieldJson json "confidential_slot_program").map Json.compress
@@ -1444,7 +1461,7 @@ private def kernelStepTargetsNonRawStateObject
   | none => true
   | some objectId =>
       match stateObjectById? state objectId with
-      | some stateObject => stateObject.backend != "raw"
+      | some stateObject => stateObject.backend != "raw" && stateObject.confidential
       | none => false
 
 private def kernelStepsTargetNonRawStateObjects
@@ -1487,6 +1504,9 @@ private def kernelStepRawTargetMessages
           | some stateObject =>
               if stateObject.backend == "raw" then
                 s!"{signature}: kernel step {step.opcode}@{objectId} targets raw backend object {stateObject.name}" ::
+                  tail
+              else if !stateObject.confidential then
+                s!"{signature}: kernel step {step.opcode}@{objectId} targets non-confidential state object {stateObject.name}" ::
                   tail
               else
                 tail
@@ -2615,7 +2635,7 @@ def ImportedProofRelevantContractView.validationErrors
     else
       []) ++
     (if !(confidentialEntrypointsAvoidRawKernelTargets view view.functions view.manifest.entrypoints) then
-      ["confidential kernel schedules target raw or unknown state objects: " ++
+      ["confidential kernel schedules target raw, non-confidential, or unknown state objects: " ++
         String.intercalate ", "
           (confidentialRawKernelTargetMessages view view.functions view.manifest.entrypoints)]
     else
@@ -2687,7 +2707,9 @@ def ImportedProofRelevantTranslationBundle.Valid
     bundle.source_view.checkStructuralValid = true ∧
     bundle.artifact_view.checkStructuralValid = true ∧
     bundle.metadata_contract = bundle.source_view.contract ∧
-    bundle.metadata_contract = bundle.artifact_view.contract
+    bundle.metadata_contract = bundle.artifact_view.contract ∧
+    bundle.source_admitted_package = bundle.artifact_admitted_package ∧
+    bundle.source_admitted_package.isSome = true
 
 instance (bundle : ImportedProofRelevantTranslationBundle) :
     Decidable bundle.Valid := by
@@ -2702,7 +2724,9 @@ def ImportedProofRelevantTranslationBundle.checkValid
     bundle.source_view.checkStructuralValid &&
     bundle.artifact_view.checkStructuralValid &&
     (bundle.metadata_contract == bundle.source_view.contract) &&
-    (bundle.metadata_contract == bundle.artifact_view.contract)
+    (bundle.metadata_contract == bundle.artifact_view.contract) &&
+    decide (bundle.source_admitted_package = bundle.artifact_admitted_package) &&
+    bundle.source_admitted_package.isSome
 
 def ImportedProofRelevantTranslationBundle.ProofGradeValid
   (bundle : ImportedProofRelevantTranslationBundle) : Prop :=
@@ -2749,6 +2773,14 @@ def ImportedProofRelevantTranslationBundle.validationErrors
     (if bundle.metadata_contract != bundle.artifact_view.contract then
       ["metadata_contract does not match artifact_view.contract"]
     else
+      []) ++
+    (if bundle.source_admitted_package != bundle.artifact_admitted_package then
+      ["source and artifact admitted package identities do not match"]
+    else
+      []) ++
+    (if bundle.source_admitted_package.isSome != true then
+      ["source admitted package identity is missing"]
+    else
       [])
 
 def parseImportedProofRelevantTranslationBundle
@@ -2768,6 +2800,8 @@ def parseImportedProofGradeTranslationArtifacts
   pure
     { source_path := ""
     , metadata_contract := metadataContract
+    , source_admitted_package := ← lookupOptionalFieldAs sourceArtifactJson "admitted_package"
+    , artifact_admitted_package := ← lookupOptionalFieldAs artifactJson "admitted_package"
     , source_contract_json := sourceContractJson
     , artifact_contract_json := artifactContractJson
     , source_view := sourceView
@@ -3202,7 +3236,7 @@ theorem ImportedProofRelevantContractView.confidential_kernel_step_targets_non_r
       simp [hStateObject] at hStepTarget
   | some stateObject =>
       simp [hStateObject] at hStepTarget
-      exact ⟨stateObject, rfl, hStepTarget⟩
+      exact ⟨stateObject, rfl, hStepTarget.1⟩
 
 theorem ImportedProofRelevantContractView.manifest_boundary_lengths_exact_of_lookup
   (view : ImportedProofRelevantContractView)

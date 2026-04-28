@@ -8865,6 +8865,7 @@ mod tests {
         );
         CompiledArtifact {
             compiler_version: "test".into(),
+            admitted_package: None,
             contract: CompiledContract {
                 contract: "PaperMainTest".into(),
                 mode: ProgramMode::Uo,
