@@ -479,7 +479,7 @@ route. Tests/checks must cover at least a two-call adaptive strategy where the
 second public request depends on the first public observation.
 
 Status:
-Open - required.
+Landed.
 
 ## P2 Language And Environment Completeness
 
@@ -648,7 +648,7 @@ The remediation work must add or update tests for:
 - [x] F-09 landed and tested.
 - [x] F-10 landed and tested.
 - [x] F-11 landed and checked by Lean.
-- [ ] F-12 landed and checked by Lean.
+- [x] F-12 landed and checked by Lean.
 - [ ] F-13 landed and checked against claim wording/semantics tests.
 - [ ] F-14 landed and checked by compiler/runtime/Lean tests.
 - [ ] F-15 landed with scalable proof evidence.

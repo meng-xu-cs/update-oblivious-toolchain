@@ -240,4 +240,390 @@ theorem runtimeKernelSchedule_orderedObjectSchedule_finalState_public
   finalState.publicObjectSchedule = schedule.publicObjectSchedule := by
   exact runtimeKernelSchedule_finalState_publicObjectSchedule hFinal
 
+/-! ## Inductive adaptive-history theorem
+
+The definitions below model the missing theorem boundary directly.  A host
+strategy is public because it receives only the accumulated host transcript.
+Each generated call also carries the public release frame for that call.  The
+single-call theorem is used modulo that release frame and the current public
+state; the induction then derives equality of the whole public history rather
+than assuming stepwise equality up front.
+-/
+
+abbrev HostReleaseFrame := List String
+abbrev HostReleaseHistory := List HostReleaseFrame
+
+abbrev AdaptiveSingleCallObservation :=
+  List String → HostTranscript → HostReleaseFrame → HostCallRequest →
+    HostCallObservation
+
+abbrev AdaptiveCallAdmission :=
+  List String → HostTranscript → HostReleaseFrame → HostCallRequest → Prop
+
+def SingleCallUOTheoremModuloReleases
+  (admitted : AdaptiveCallAdmission)
+  (observe₁ observe₂ : AdaptiveSingleCallObservation) : Prop :=
+  ∀ publicState transcript releaseFrame request,
+    admitted publicState transcript releaseFrame request →
+      observe₁ publicState transcript releaseFrame request =
+        observe₂ publicState transcript releaseFrame request
+
+def HistoryGeneratedByPublicStrategyFrom
+  (strategy : AdaptiveHostStrategy)
+  (admitted : AdaptiveCallAdmission)
+  (observe : AdaptiveSingleCallObservation) :
+  List String → HostTranscript → HostReleaseHistory →
+    List HistoryStepWitness → Prop
+  | _publicState, transcript, _releaseHistory, [] =>
+      strategy transcript = none
+  | _publicState, _transcript, [], _step :: _rest =>
+      False
+  | publicState, transcript, releaseFrame :: releaseHistory, step :: rest =>
+      strategy transcript = some step.request ∧
+        admitted publicState transcript releaseFrame step.request ∧
+        step.observation =
+          observe publicState transcript releaseFrame step.request ∧
+        HistoryGeneratedByPublicStrategyFrom
+          strategy
+          admitted
+          observe
+          step.observation.finalPublicState
+          (transcript ++ [step.observation])
+          releaseHistory
+          rest
+
+def RuntimeHistory.GeneratedByPublicStrategy
+  (history : RuntimeHistory)
+  (strategy : AdaptiveHostStrategy)
+  (admitted : AdaptiveCallAdmission)
+  (observe : AdaptiveSingleCallObservation)
+  (initialPublicState : List String)
+  (releaseHistory : HostReleaseHistory) : Prop :=
+  HistoryGeneratedByPublicStrategyFrom
+    strategy
+    admitted
+    observe
+    initialPublicState
+    []
+    releaseHistory
+    history.steps
+
+structure AdaptiveHistoryNoninterferenceConclusion
+  (lhs rhs : RuntimeHistory) : Prop where
+  stepwisePublicEq : HistoryStepsPublicEq lhs.steps rhs.steps
+  publicTranscript : lhs.publicTranscript = rhs.publicTranscript
+  orderedObjectSchedule :
+    lhs.orderedObjectSchedule = rhs.orderedObjectSchedule
+  finalPublicStates : lhs.finalPublicStates = rhs.finalPublicStates
+
+theorem adaptiveHistory_stepsPublicEq_from_singleCall_aux
+  {strategy : AdaptiveHostStrategy}
+  {admitted : AdaptiveCallAdmission}
+  {observe₁ observe₂ : AdaptiveSingleCallObservation}
+  (hSingle :
+    SingleCallUOTheoremModuloReleases admitted observe₁ observe₂) :
+  ∀ {publicState₁ publicState₂ : List String}
+    {transcript₁ transcript₂ : HostTranscript}
+    {releaseHistory : HostReleaseHistory}
+    {steps₁ steps₂ : List HistoryStepWitness},
+    publicState₁ = publicState₂ →
+    transcript₁ = transcript₂ →
+    HistoryGeneratedByPublicStrategyFrom
+      strategy
+      admitted
+      observe₁
+      publicState₁
+      transcript₁
+      releaseHistory
+      steps₁ →
+    HistoryGeneratedByPublicStrategyFrom
+      strategy
+      admitted
+      observe₂
+      publicState₂
+      transcript₂
+      releaseHistory
+      steps₂ →
+    HistoryStepsPublicEq steps₁ steps₂ := by
+  intro publicState₁ publicState₂ transcript₁ transcript₂ releaseHistory steps₁
+  induction steps₁ generalizing publicState₁ publicState₂ transcript₁ transcript₂ releaseHistory with
+  | nil =>
+      intro steps₂ hState hTranscript hRun₁ hRun₂
+      cases steps₂ with
+      | nil =>
+          simp [HistoryStepsPublicEq]
+      | cons step₂ rest₂ =>
+          cases releaseHistory with
+          | nil =>
+              simp [HistoryGeneratedByPublicStrategyFrom] at hRun₂
+          | cons releaseFrame releaseTail =>
+              simp [HistoryGeneratedByPublicStrategyFrom] at hRun₁ hRun₂
+              rw [← hTranscript, hRun₁] at hRun₂
+              cases hRun₂.1
+  | cons step₁ rest₁ ih =>
+      intro steps₂ hState hTranscript hRun₁ hRun₂
+      cases steps₂ with
+      | nil =>
+          cases releaseHistory with
+          | nil =>
+              simp [HistoryGeneratedByPublicStrategyFrom] at hRun₁
+          | cons releaseFrame releaseTail =>
+              simp [HistoryGeneratedByPublicStrategyFrom] at hRun₁ hRun₂
+              rw [hTranscript, hRun₂] at hRun₁
+              cases hRun₁.1
+      | cons step₂ rest₂ =>
+          cases releaseHistory with
+          | nil =>
+              simp [HistoryGeneratedByPublicStrategyFrom] at hRun₁
+          | cons releaseFrame releaseTail =>
+              simp [HistoryGeneratedByPublicStrategyFrom] at hRun₁ hRun₂
+              rcases hRun₁ with ⟨hStrategy₁, hAdmitted₁, hObserve₁, hRest₁⟩
+              rcases hRun₂ with ⟨hStrategy₂, _hAdmitted₂, hObserve₂, hRest₂⟩
+              subst hState
+              subst hTranscript
+              have hRequest : step₁.request = step₂.request := by
+                rw [hStrategy₁] at hStrategy₂
+                exact Option.some.inj hStrategy₂
+              have hObservation : step₁.observation = step₂.observation := by
+                calc
+                  step₁.observation =
+                      observe₁ publicState₁ transcript₁ releaseFrame step₁.request := hObserve₁
+                  _ =
+                      observe₂ publicState₁ transcript₁ releaseFrame step₁.request :=
+                        hSingle
+                          publicState₁
+                          transcript₁
+                          releaseFrame
+                          step₁.request
+                          hAdmitted₁
+                  _ =
+                      observe₂ publicState₁ transcript₁ releaseFrame step₂.request := by
+                        rw [hRequest]
+                  _ = step₂.observation := hObserve₂.symm
+              constructor
+              · exact ⟨hRequest, hObservation⟩
+              · have hNextState :
+                    step₁.observation.finalPublicState =
+                      step₂.observation.finalPublicState :=
+                  congrArg HostCallObservation.finalPublicState hObservation
+                have hNextTranscript :
+                    transcript₁ ++ [step₁.observation] =
+                      transcript₁ ++ [step₂.observation] := by
+                  rw [hObservation]
+                exact ih hNextState hNextTranscript hRest₁ hRest₂
+
+/-- Inductive adaptive-history noninterference.  A public strategy that chooses
+the next request from the host transcript, admitted calls at every step, equal
+initial public state, equal release history, and the single-call UO theorem
+modulo releases imply equal public transcripts, ordered object schedules, and
+final public states. -/
+theorem adaptiveHistory_noninterference_from_singleCall
+  {strategy : AdaptiveHostStrategy}
+  {admitted : AdaptiveCallAdmission}
+  {observe₁ observe₂ : AdaptiveSingleCallObservation}
+  {initialPublicState₁ initialPublicState₂ : List String}
+  {releaseHistory₁ releaseHistory₂ : HostReleaseHistory}
+  {history₁ history₂ : RuntimeHistory}
+  (hInitialPublicState :
+    initialPublicState₁ = initialPublicState₂)
+  (hReleaseHistory : releaseHistory₁ = releaseHistory₂)
+  (hSingle :
+    SingleCallUOTheoremModuloReleases admitted observe₁ observe₂)
+  (hHistory₁ :
+    history₁.GeneratedByPublicStrategy
+      strategy
+      admitted
+      observe₁
+      initialPublicState₁
+      releaseHistory₁)
+  (hHistory₂ :
+    history₂.GeneratedByPublicStrategy
+      strategy
+      admitted
+      observe₂
+      initialPublicState₂
+      releaseHistory₂) :
+  AdaptiveHistoryNoninterferenceConclusion history₁ history₂ := by
+  subst hReleaseHistory
+  have hSteps :
+      HistoryStepsPublicEq history₁.steps history₂.steps := by
+    exact
+      adaptiveHistory_stepsPublicEq_from_singleCall_aux
+        hSingle
+        hInitialPublicState
+        rfl
+        hHistory₁
+        hHistory₂
+  exact
+    { stepwisePublicEq := hSteps
+    , publicTranscript :=
+        runtimeHistory_publicTranscript_eq_of_stepwise_publicEq hSteps
+    , orderedObjectSchedule :=
+        runtimeHistory_orderedObjectSchedule_eq_of_stepwise_publicEq hSteps
+    , finalPublicStates :=
+        runtimeHistory_finalPublicStates_eq_of_stepwise_publicEq hSteps
+    }
+
+def adaptiveHistorySampleOutcome
+  (entrypointId : String)
+  (publicArgs declassifies : List String)
+  (terminationStatus : Bool) : SGXPublicOutcome :=
+  { entrypointId := entrypointId
+  , publicArgs := publicArgs
+  , terminationStatus := terminationStatus
+  , statusPolicy := "public"
+  , outputShape := { returnPresent := false, returnLength := 0 }
+  , returnPolicy := "forbidden"
+  , returnPayload := none
+  , encryptedReturnPayload := none
+  , declassifies := declassifies
+  , gasUsed := 0
+  }
+
+def adaptiveHistorySampleRequest₁ : HostCallRequest :=
+  { entrypointId := "first", publicArgs := ["0"] }
+
+def adaptiveHistorySampleRequest₂Ok : HostCallRequest :=
+  { entrypointId := "second_ok", publicArgs := ["1"] }
+
+def adaptiveHistorySampleRequest₂Abort : HostCallRequest :=
+  { entrypointId := "second_abort", publicArgs := ["0"] }
+
+def adaptiveHistorySampleObservation
+  (terminationStatus : Bool)
+  (request : HostCallRequest)
+  (releaseFrame : HostReleaseFrame) : HostCallObservation :=
+  { publicOutcome :=
+      adaptiveHistorySampleOutcome
+        request.entrypointId
+        request.publicArgs
+        releaseFrame
+        terminationStatus
+  , orderedObjectSchedule :=
+      if request.entrypointId = "first" then [1] else [2]
+  , finalPublicState := [request.entrypointId]
+  }
+
+def adaptiveHistorySampleFirstObservation : HostCallObservation :=
+  adaptiveHistorySampleObservation true adaptiveHistorySampleRequest₁ ["r0"]
+
+def adaptiveHistorySampleStrategy : AdaptiveHostStrategy
+  | [] => some adaptiveHistorySampleRequest₁
+  | first :: [] =>
+      if first.publicOutcome.terminationStatus then
+        some adaptiveHistorySampleRequest₂Ok
+      else
+        some adaptiveHistorySampleRequest₂Abort
+  | _ => none
+
+theorem adaptiveHistorySampleStrategy_second_request_depends_on_first_observation :
+  adaptiveHistorySampleStrategy [adaptiveHistorySampleFirstObservation] =
+      some adaptiveHistorySampleRequest₂Ok ∧
+    adaptiveHistorySampleStrategy
+      [adaptiveHistorySampleObservation
+        false
+        adaptiveHistorySampleRequest₁
+        ["r0"]] =
+      some adaptiveHistorySampleRequest₂Abort := by
+  simp
+    [ adaptiveHistorySampleStrategy
+    , adaptiveHistorySampleFirstObservation
+    , adaptiveHistorySampleObservation
+    , adaptiveHistorySampleOutcome
+    ]
+
+def adaptiveHistorySampleAdmitted : AdaptiveCallAdmission :=
+  fun _publicState _transcript _releaseFrame _request => True
+
+def adaptiveHistorySampleObserve : AdaptiveSingleCallObservation :=
+  fun _publicState transcript releaseFrame request =>
+    match transcript with
+    | [] => adaptiveHistorySampleObservation true request releaseFrame
+    | _ :: [] => adaptiveHistorySampleObservation true request releaseFrame
+    | _ => adaptiveHistorySampleObservation true request releaseFrame
+
+def adaptiveHistorySampleReleaseHistory : HostReleaseHistory :=
+  [["r0"], ["r1"]]
+
+def adaptiveHistorySampleHistory : RuntimeHistory :=
+  { steps :=
+      [ { request := adaptiveHistorySampleRequest₁
+        , observation :=
+            adaptiveHistorySampleObservation
+              true
+              adaptiveHistorySampleRequest₁
+              ["r0"]
+        }
+      , { request := adaptiveHistorySampleRequest₂Ok
+        , observation :=
+            adaptiveHistorySampleObservation
+              true
+              adaptiveHistorySampleRequest₂Ok
+              ["r1"]
+        }
+      ]
+  }
+
+example :
+  adaptiveHistorySampleHistory.GeneratedByPublicStrategy
+    adaptiveHistorySampleStrategy
+    adaptiveHistorySampleAdmitted
+    adaptiveHistorySampleObserve
+    []
+    adaptiveHistorySampleReleaseHistory := by
+  simp
+    [ RuntimeHistory.GeneratedByPublicStrategy
+    , HistoryGeneratedByPublicStrategyFrom
+    , adaptiveHistorySampleHistory
+    , adaptiveHistorySampleStrategy
+    , adaptiveHistorySampleReleaseHistory
+    , adaptiveHistorySampleAdmitted
+    , adaptiveHistorySampleObserve
+    , adaptiveHistorySampleObservation
+    , adaptiveHistorySampleOutcome
+    ]
+
+theorem adaptiveHistorySampleHistory_generated :
+  adaptiveHistorySampleHistory.GeneratedByPublicStrategy
+    adaptiveHistorySampleStrategy
+    adaptiveHistorySampleAdmitted
+    adaptiveHistorySampleObserve
+    []
+    adaptiveHistorySampleReleaseHistory := by
+  simp
+    [ RuntimeHistory.GeneratedByPublicStrategy
+    , HistoryGeneratedByPublicStrategyFrom
+    , adaptiveHistorySampleHistory
+    , adaptiveHistorySampleStrategy
+    , adaptiveHistorySampleReleaseHistory
+    , adaptiveHistorySampleAdmitted
+    , adaptiveHistorySampleObserve
+    , adaptiveHistorySampleObservation
+    , adaptiveHistorySampleOutcome
+    ]
+
+example :
+  AdaptiveHistoryNoninterferenceConclusion
+    adaptiveHistorySampleHistory
+    adaptiveHistorySampleHistory := by
+  exact
+    adaptiveHistory_noninterference_from_singleCall
+      (strategy := adaptiveHistorySampleStrategy)
+      (admitted := adaptiveHistorySampleAdmitted)
+      (observe₁ := adaptiveHistorySampleObserve)
+      (observe₂ := adaptiveHistorySampleObserve)
+      (initialPublicState₁ := [])
+      (initialPublicState₂ := [])
+      (releaseHistory₁ := adaptiveHistorySampleReleaseHistory)
+      (releaseHistory₂ := adaptiveHistorySampleReleaseHistory)
+      (history₁ := adaptiveHistorySampleHistory)
+      (history₂ := adaptiveHistorySampleHistory)
+      rfl
+      rfl
+      (by
+        intro publicState transcript releaseFrame request hAdmitted
+        rfl)
+      adaptiveHistorySampleHistory_generated
+      adaptiveHistorySampleHistory_generated
+
 end UOToolchain

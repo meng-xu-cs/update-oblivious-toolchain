@@ -1,5 +1,6 @@
 import UOToolchain.SgxExactProjection
 import UOToolchain.PathOramLocalPosmapV1
+import UOToolchain.HistorySemantics
 
 /-!
 # Direct paper-main noninterference theorem
@@ -418,5 +419,44 @@ theorem SeededRuntimePaperMainBundle.pathOramLocalPosmapV1_paperMain_noninterfer
       hFinal
       hRelease
       hPublic
+
+/-- Paper-main route for adaptive histories.  This is the citation-facing
+bridge from the single-call paper-main theorem to public adaptive strategies:
+equal initial public state and equal release history lift the single-call UO
+claim to equality of transcripts, ordered object schedules, and final public
+states. -/
+theorem paperMain_adaptiveHistory_noninterference_from_singleCall
+  {strategy : AdaptiveHostStrategy}
+  {admitted : AdaptiveCallAdmission}
+  {observe₁ observe₂ : AdaptiveSingleCallObservation}
+  {initialPublicState₁ initialPublicState₂ : List String}
+  {releaseHistory₁ releaseHistory₂ : HostReleaseHistory}
+  {history₁ history₂ : RuntimeHistory}
+  (hInitialPublicState :
+    initialPublicState₁ = initialPublicState₂)
+  (hReleaseHistory : releaseHistory₁ = releaseHistory₂)
+  (hSingle :
+    SingleCallUOTheoremModuloReleases admitted observe₁ observe₂)
+  (hHistory₁ :
+    history₁.GeneratedByPublicStrategy
+      strategy
+      admitted
+      observe₁
+      initialPublicState₁
+      releaseHistory₁)
+  (hHistory₂ :
+    history₂.GeneratedByPublicStrategy
+      strategy
+      admitted
+      observe₂
+      initialPublicState₂
+      releaseHistory₂) :
+  AdaptiveHistoryNoninterferenceConclusion history₁ history₂ :=
+  adaptiveHistory_noninterference_from_singleCall
+    hInitialPublicState
+    hReleaseHistory
+    hSingle
+    hHistory₁
+    hHistory₂
 
 end UOToolchain
