@@ -824,6 +824,8 @@ def countBodyStrings (body : List String) : Except String CountSummary :=
 
 def translationPathOramScheme : String := "path_oram_local_posmap_v1"
 
+def translationPathOramLocalPosmapMaxCapacity : Nat := 128
+
 def translationSurrogateOramScheme : String := "surrogate_public_schedule_v1"
 
 def translationOramBucketHeaderBytes : Nat := 24
@@ -1727,6 +1729,7 @@ def validateImportedOramShape
         else if oram.scheme == translationPathOramScheme then
           let leafCount := (oram.bucket_count + 1) / 2
           oram.bucket_count > 0 &&
+            stateObject.capacity.getD 1 <= translationPathOramLocalPosmapMaxCapacity &&
             oram.bucket_count % 2 == 1 &&
             isPowerOfTwo leafCount &&
             oram.blocks_per_bucket == 5 &&
@@ -1741,6 +1744,51 @@ def validateImportedOramShape
             oram.accesses_per_call == 1
         else
           false)
+
+private def overCapacityPathOramStateForCheck : ImportedProofRelevantStateObjectView :=
+  { id := 1
+  , name := "oversized"
+  , kind := "map"
+  , backend := "oram"
+  , oram_scheme := translationPathOramScheme
+  , value_type := "\"uint256\""
+  , value_type_short_name := "uint256"
+  , key_type := some "\"bytes32\""
+  , key_type_short_name := some "bytes32"
+  , capacity := some (translationPathOramLocalPosmapMaxCapacity + 1)
+  , confidential := true
+  }
+
+private def overCapacityPathOramManifestForCheck : ImportedProofRelevantManifestObjectView :=
+  { id := 1
+  , name := "oversized"
+  , kind := "map"
+  , backend := "oram"
+  , capacity := some (translationPathOramLocalPosmapMaxCapacity + 1)
+  , value_type := some "uint256"
+  , key_type := some "bytes32"
+  , oram := some
+      { scheme := translationPathOramScheme
+      , block_size := 64
+      , bucket_size := translationOramBucketHeaderBytes + 5 * 64
+      , bucket_count := 511
+      , blocks_per_bucket := 5
+      , tree_height := 8
+      , stash_bound := translationPathOramLocalPosmapMaxCapacity + 1
+      , recursion_depth := 0
+      , metadata_pages := 1
+      , metadata_pages_per_access := 2
+      , buckets_per_access := 9
+      , accesses_per_call := 1
+      }
+  }
+
+theorem validateImportedOramShape_rejects_path_oram_capacity_above_local_posmap_cap :
+  validateImportedOramShape
+      overCapacityPathOramStateForCheck
+      overCapacityPathOramManifestForCheck
+      1 = false := by
+  native_decide
 
 def expectedCommitOpsForFunction
   (view : ImportedProofRelevantContractView)

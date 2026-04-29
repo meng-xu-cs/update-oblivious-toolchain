@@ -45,7 +45,7 @@ not as independent findings.
 | F-06 | Proof-relevant observer coverage | TB-06, TH-06 | Agree | P0 | Open - required |
 | F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Open - required |
 | F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Open - required |
-| F-09 | Path ORAM capacity cap mirrored in Lean | TB-09, TH-09 | Agree | P1 | Open - required |
+| F-09 | Path ORAM capacity cap mirrored in Lean | TB-09, TH-09 | Agree | P1 | Landed |
 | F-10 | Smaller metadata canonicality gaps | TB-10, negative tests 5-6 | Agree | P1 | Landed |
 | F-11 | Direct paper-main noninterference theorem | TH-02 | Agree | P1 | Open - required |
 | F-12 | Adaptive history theorem | TH-03 | Agree | P1 | Open - required |
@@ -152,7 +152,7 @@ or runtime model tag must fail validation. Deployment must bind the digest into
 the SGX quote/session transcript.
 
 Status:
-Open - required.
+Landed.
 
 ### F-04 - Abort/Rollback Theorem
 
@@ -582,7 +582,7 @@ The remediation work must add or update tests for:
 - [ ] F-06 landed and tested.
 - [ ] F-07 landed and tested.
 - [ ] F-08 landed and tested.
-- [ ] F-09 landed and tested.
+- [x] F-09 landed and tested.
 - [x] F-10 landed and tested.
 - [ ] F-11 landed and checked by Lean.
 - [ ] F-12 landed and checked by Lean.
