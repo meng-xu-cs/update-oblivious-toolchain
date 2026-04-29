@@ -4,17 +4,17 @@
     "schema": "uo-admitted-package-v4",
     "source_language": "uo-solidity-like-dsl-v1",
     "source_sha256": "fa6bceebfe68a1f2d6ff0e7a59ec7523f3441907bd7191999974dca405589548",
-    "metadata_sha256": "03501058e942900ada5d0aefce7cdaa48e716ce00539ef8fa188acf95189a544",
+    "metadata_sha256": "63a0d025439c8be843275eb9d8134b17795bb96635496df213cbafcc9dfcd7e3",
     "raw_metadata_sha256": "2e2649c5dc37f9f60e14eaa7736a8e73b9ed7b2bfbc24359d7d3f12800af48ed",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "c45d9198caccd6ae12ed0cfde8f16787cb01d922c270b7837582d9c935a0f6b3",
-    "package_sha256": "196dbd458b6e95a24a1baef452e28f8fea491ce37edbcf74d1b426c52e499b66"
+    "toolchain_manifest_sha256": "b3209e8aeee474b946020c31b7ffd7a0d9d6f1d8784d87993c0b78e2fdc0e99a",
+    "package_sha256": "80475d8f4dc6545a3eab251ac1da8d6f6371f533906c628757669df87490bd3a"
   },
   "contract": {
     "contract": "AuthScan",
     "mode": "Uo",
-    "source_file": "benches/raw/AuthScan.sol",
+    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
     "state": [
       {
         "id": 1,

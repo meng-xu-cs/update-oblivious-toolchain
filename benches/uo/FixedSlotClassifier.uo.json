@@ -4,17 +4,17 @@
     "schema": "uo-admitted-package-v4",
     "source_language": "uo-solidity-like-dsl-v1",
     "source_sha256": "8680887ee074a5dcbf38f6d1c24cabe4ce8b9bae2ee5dbe0f4f7bb4994bb660a",
-    "metadata_sha256": "a25f837626a2ce8460f701c19ed33f254dee49c6dddec64bce9d9250168dd849",
+    "metadata_sha256": "13e0014f59d6e1b39ce815ec7d5c62ba62cdc2d44c563a1afaf64b4dbcdb85aa",
     "raw_metadata_sha256": "9c808ef91300a273ad03abbf4eef4dfd3f792c8bc025ea6babf04a92c6c361d5",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "c45d9198caccd6ae12ed0cfde8f16787cb01d922c270b7837582d9c935a0f6b3",
-    "package_sha256": "3175fa8b2ee63b9d384d394ea17414a078aefa5d3a4c6b539d6467ed6c1afb22"
+    "toolchain_manifest_sha256": "b3209e8aeee474b946020c31b7ffd7a0d9d6f1d8784d87993c0b78e2fdc0e99a",
+    "package_sha256": "35ea96434dc2933db36eb563e167abc640abde70fb614430a6b05b41b07ab94c"
   },
   "contract": {
     "contract": "FixedSlotClassifier",
     "mode": "Uo",
-    "source_file": "benches/raw/FixedSlotClassifier.sol",
+    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
     "state": [
       {
         "id": 1,

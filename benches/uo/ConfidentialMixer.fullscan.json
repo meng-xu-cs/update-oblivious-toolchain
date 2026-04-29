@@ -4,17 +4,17 @@
     "schema": "uo-admitted-package-v4",
     "source_language": "uo-solidity-like-dsl-v1",
     "source_sha256": "234fe8ee8ec1332afc02b3f7446ef82d93ed2c0d62180b88012be70e98a57262",
-    "metadata_sha256": "e1e3389bd58c7b8fa306dc2dcda4b368933e5c4c59f7a34092f8f9188efa1078",
+    "metadata_sha256": "df74a1a05ae8b011ccf38f3b94c63729288abe645f2f641a0ed03b374010dedb",
     "raw_metadata_sha256": "3663f2d25a5b3943f5b9fbd8884f6fc869ac86b3f5b8fb7db26e0abf8565b5c3",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "c45d9198caccd6ae12ed0cfde8f16787cb01d922c270b7837582d9c935a0f6b3",
-    "package_sha256": "ad393c887760f09c8637aa794695f9c92c879b9b5c101d0f1a889e4316c69724"
+    "toolchain_manifest_sha256": "b3209e8aeee474b946020c31b7ffd7a0d9d6f1d8784d87993c0b78e2fdc0e99a",
+    "package_sha256": "8adddbbca991f1a567eb064b42007b9df6cb81fd89a6868a04b2e8f9231d8c58"
   },
   "contract": {
     "contract": "ConfidentialMixer",
     "mode": "Uo",
-    "source_file": "benches/raw/ConfidentialMixer.sol",
+    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
     "state": [
       {
         "id": 1,

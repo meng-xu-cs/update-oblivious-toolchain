@@ -4,17 +4,17 @@
     "schema": "uo-admitted-package-v4",
     "source_language": "uo-solidity-like-dsl-v1",
     "source_sha256": "c4bce1c020f6ec45575cdd30211d39a50374b557d0afa607415e7c0288466e70",
-    "metadata_sha256": "3412b49e87cb0a0af3a6d1506d256df9b21a14bfc8e11ff6cbad767f82c3469f",
+    "metadata_sha256": "37434ff39fc174f4bb394e5556b6667f3173476a8708dd303ba9b2d89286098d",
     "raw_metadata_sha256": "24fa7b498fca6d446c85616431edf61fbe4942ec4a3df620dd7b7fbc8f331533",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "c45d9198caccd6ae12ed0cfde8f16787cb01d922c270b7837582d9c935a0f6b3",
-    "package_sha256": "a0ab8519d5015571c9e47f30c1dd4b4ba96f836019c3604260293246a0452301"
+    "toolchain_manifest_sha256": "b3209e8aeee474b946020c31b7ffd7a0d9d6f1d8784d87993c0b78e2fdc0e99a",
+    "package_sha256": "51e9452254b7e81a047ee7dd8ea65f780a04a03658062753b1defb121ac3258c"
   },
   "contract": {
     "contract": "RegistryCRUD",
     "mode": "Uo",
-    "source_file": "benches/raw/RegistryCRUD.sol",
+    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.sol",
     "state": [
       {
         "id": 1,
