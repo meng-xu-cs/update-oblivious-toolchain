@@ -200,6 +200,7 @@ def observerCoverageKeys : List String :=
   , "TraceHashBundle.physical_read_trace_hash"
   , "TraceHashBundle.physical_write_trace_hash"
   , "TraceHashBundle.physical_access_trace_hash"
+  , "TraceHashBundle.public_environment_projection_hash"
   , "TraceHashBundle.primitive_event_transcript_hash"
   , "TraceHashBundle.runtime_proof_object_hash"
   , "RuntimePrimitiveEvent.index"

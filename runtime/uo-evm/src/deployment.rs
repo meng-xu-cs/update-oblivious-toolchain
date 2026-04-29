@@ -3,7 +3,7 @@ use crate::return_channel::ReturnChannelSession;
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use uo_core::{CompiledArtifact, ExecutionTrace};
+use uo_core::{CompiledArtifact, ExecutionTrace, PublicEnvironment};
 
 #[cfg(feature = "diagnostics")]
 pub const RUNTIME_BUILD_PROFILE_DESCRIPTOR: &str =
@@ -28,6 +28,8 @@ pub struct ProductionCallEvidence {
     pub proof_root_sha256: String,
     pub sgx_quote_sha256: String,
     pub build_profile_sha256: String,
+    pub public_environment: Box<[String]>,
+    pub public_environment_sha256: String,
     pub session_id: String,
     pub attestation_transcript_hash: String,
     pub freshness_epoch: u64,
@@ -46,6 +48,16 @@ pub fn production_proof_bundle_sha256(
 
 pub fn production_build_profile_sha256() -> String {
     sha256_hex(RUNTIME_BUILD_PROFILE_DESCRIPTOR.as_bytes())
+}
+
+pub fn production_public_environment_transcript(environment: &PublicEnvironment) -> Box<[String]> {
+    environment.full_public_bindings().into_boxed_slice()
+}
+
+pub fn production_public_environment_sha256(environment: &PublicEnvironment) -> Result<String> {
+    Ok(sha256_hex(&serde_json::to_vec(
+        &production_public_environment_transcript(environment),
+    )?))
 }
 
 pub(crate) fn validate_production_artifact(artifact: &CompiledArtifact) -> Result<()> {
@@ -69,11 +81,13 @@ pub(crate) fn validate_production_call_preflight(
     policy: &ProductionRuntimePolicy,
     evidence: &ProductionCallEvidence,
     session: &ReturnChannelSession,
+    environment: &PublicEnvironment,
     freshness: RuntimeFreshnessSnapshot,
 ) -> Result<()> {
     validate_production_artifact(artifact)?;
     validate_policy(policy)?;
     validate_evidence_hashes(evidence)?;
+    validate_public_environment_evidence(evidence, environment)?;
     let identity = artifact
         .admitted_package
         .as_ref()
@@ -142,6 +156,21 @@ pub(crate) fn validate_production_call_preflight(
     Ok(())
 }
 
+pub(crate) fn validate_production_public_environment_trace(
+    trace: &ExecutionTrace,
+    expected_projection: &[String],
+) -> Result<()> {
+    let public_outcome = trace
+        .theorem_trace
+        .public_outcome
+        .as_ref()
+        .ok_or_else(|| anyhow!("production runtime theorem trace missing public_outcome"))?;
+    if public_outcome.public_env.as_ref() != expected_projection {
+        bail!("production runtime public_environment projection mismatch");
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_production_policy(policy: &ProductionRuntimePolicy) -> Result<()> {
     validate_policy(policy)
 }
@@ -188,12 +217,32 @@ fn validate_evidence_hashes(evidence: &ProductionCallEvidence) -> Result<()> {
     validate_sha256_hex("proof_root_sha256", &evidence.proof_root_sha256)?;
     validate_sha256_hex("sgx_quote_sha256", &evidence.sgx_quote_sha256)?;
     validate_sha256_hex("build_profile_sha256", &evidence.build_profile_sha256)?;
+    validate_sha256_hex(
+        "public_environment_sha256",
+        &evidence.public_environment_sha256,
+    )?;
     validate_sha256_hex("session_id", &evidence.session_id)?;
     validate_sha256_hex(
         "attestation_transcript_hash",
         &evidence.attestation_transcript_hash,
     )?;
     validate_sha256_hex("proof_bundle_sha256", &evidence.proof_bundle_sha256)
+}
+
+fn validate_public_environment_evidence(
+    evidence: &ProductionCallEvidence,
+    environment: &PublicEnvironment,
+) -> Result<()> {
+    let expected_transcript = production_public_environment_transcript(environment);
+    if evidence.public_environment.as_ref() != expected_transcript.as_ref() {
+        bail!("production runtime public_environment transcript mismatch");
+    }
+    let expected_hash = production_public_environment_sha256(environment)?;
+    require_equal(
+        "public_environment_sha256",
+        &evidence.public_environment_sha256,
+        &expected_hash,
+    )
 }
 
 fn validate_sha256_hex(label: &str, value: &str) -> Result<()> {

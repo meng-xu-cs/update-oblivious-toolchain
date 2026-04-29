@@ -265,6 +265,20 @@ the same transcript is included in the public projection used by the paper
 theorem. Local/in-process APIs can remain as execution conveniences, but
 proof-grade acceptance should require the same environment-binding evidence.
 
+Status: Fixed. Production call evidence now carries the full canonical public
+environment transcript and its SHA-256 hash; production preflight validates that
+evidence against the exact `PublicEnvironment` used for the call, and the
+post-call production check requires the theorem trace's `public_env` projection
+to match the values consumed from that environment. `TraceHashBundle` now hashes
+the public-environment projection, observer coverage tracks that hash field, and
+`DeploymentAcceptance.lean` proves that accepted calls bind the attested
+environment hash/transcript/projection and that the projection is covered by the
+attested transcript. Verified with `cargo test -p uo-core`,
+`cargo test -p uo-evm`, `cargo test -p uo-evm --features diagnostics
+engine::tests::production_runtime_rejects_diagnostics_build_profile`, and
+`cd proof/lean && lake env lean UOToolchain/DeploymentAcceptance.lean && lake
+env lean UOToolchain/ObserverCoverage.lean`.
+
 ## F12. Fresh coins, nonces, and diagnostics seed paths need production closure
 
 Review grouping: `F12`, `T1.13`.

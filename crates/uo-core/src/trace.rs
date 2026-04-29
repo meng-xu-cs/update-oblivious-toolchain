@@ -6481,6 +6481,7 @@ pub struct TraceHashBundle {
     pub physical_read_trace_hash: String,
     pub physical_write_trace_hash: String,
     pub physical_access_trace_hash: String,
+    pub public_environment_projection_hash: String,
     pub primitive_event_transcript_hash: String,
     pub runtime_proof_object_hash: String,
 }
@@ -7443,6 +7444,12 @@ impl ExecutionTrace {
             .map(|event| (event.object.clone(), event.location.clone(), event.len))
             .collect::<Vec<_>>();
         let primitive_event_transcript = self.primitive_event_transcript()?;
+        let public_environment_projection = self
+            .theorem_trace
+            .public_outcome
+            .as_ref()
+            .map(|public_outcome| public_outcome.public_env.to_vec())
+            .unwrap_or_default();
         Ok(TraceHashBundle {
             opcode_trace_hash: hash_json(&self.opcode_trace)?,
             logical_access_trace_hash: hash_json(&self.logical_accesses)?,
@@ -7450,6 +7457,7 @@ impl ExecutionTrace {
             physical_read_trace_hash: hash_json(&normalized_reads)?,
             physical_write_trace_hash: hash_json(&normalized_physical)?,
             physical_access_trace_hash: hash_json(&(normalized_reads, normalized_physical))?,
+            public_environment_projection_hash: hash_json(&public_environment_projection)?,
             primitive_event_transcript_hash: hash_json(&primitive_event_transcript)?,
             runtime_proof_object_hash: hash_json(&self.runtime_proof_object_payload())?,
         })

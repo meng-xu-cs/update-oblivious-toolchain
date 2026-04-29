@@ -15,8 +15,9 @@ mod return_channel;
 mod runtime;
 
 pub use deployment::{
-    production_build_profile_sha256, production_proof_bundle_sha256, ProductionCallEvidence,
-    ProductionRuntimePolicy,
+    production_build_profile_sha256, production_proof_bundle_sha256,
+    production_public_environment_sha256, production_public_environment_transcript,
+    ProductionCallEvidence, ProductionRuntimePolicy,
 };
 #[cfg(any(test, feature = "diagnostics"))]
 pub use engine::run_artifact_with_seed;

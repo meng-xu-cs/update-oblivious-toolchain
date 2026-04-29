@@ -118,6 +118,10 @@ impl PublicEnvironment {
             .map(|field| format!("{}={}", field.label(), self.value_for(*field)))
             .collect()
     }
+
+    pub fn full_public_bindings(&self) -> Vec<String> {
+        self.public_bindings(&PublicEnvField::ALL)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

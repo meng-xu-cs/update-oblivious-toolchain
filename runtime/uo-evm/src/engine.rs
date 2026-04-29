@@ -1,6 +1,7 @@
 use crate::deployment::{
     validate_production_artifact, validate_production_call_preflight, validate_production_policy,
-    validate_production_proof_bundle, ProductionCallEvidence, ProductionRuntimePolicy,
+    validate_production_proof_bundle, validate_production_public_environment_trace,
+    ProductionCallEvidence, ProductionRuntimePolicy,
 };
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
@@ -82,11 +83,24 @@ impl ProductionContractInstance {
         session: &ReturnChannelSession,
         evidence: &ProductionCallEvidence,
     ) -> Result<CallResult> {
+        let environment = self.inner.environment.clone();
+        self.call_authorized_with_environment(entrypoint, args, session, environment, evidence)
+    }
+
+    pub fn call_authorized_with_environment(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        session: &ReturnChannelSession,
+        environment: PublicEnvironment,
+        evidence: &ProductionCallEvidence,
+    ) -> Result<CallResult> {
         validate_production_call_preflight(
             &self.inner.artifact,
             &self.policy,
             evidence,
             session,
+            &environment,
             self.inner.freshness.snapshot(),
         )?;
         let manifest_entry = self
@@ -97,6 +111,8 @@ impl ProductionContractInstance {
             .entrypoints
             .get(entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
+        let expected_public_environment_projection =
+            environment.public_bindings(&manifest_entry.public_env);
         let execution_session = if manifest_entry.returns == ReturnPolicy::EncryptedToClient {
             Some(session)
         } else {
@@ -104,8 +120,12 @@ impl ProductionContractInstance {
         };
         let result = self
             .inner
-            .call_impl(entrypoint, args, None, execution_session, None)?
+            .call_impl(entrypoint, args, None, execution_session, Some(environment))?
             .0;
+        validate_production_public_environment_trace(
+            &result.trace,
+            &expected_public_environment_projection,
+        )?;
         validate_production_proof_bundle(&self.inner.artifact, &result.trace, evidence)?;
         Ok(result)
     }
@@ -299,7 +319,10 @@ mod tests {
     use super::{ContractInstance, ProductionContractInstance};
     use crate::deployment::{production_build_profile_sha256, ProductionRuntimePolicy};
     #[cfg(not(feature = "diagnostics"))]
-    use crate::deployment::{production_proof_bundle_sha256, ProductionCallEvidence};
+    use crate::deployment::{
+        production_proof_bundle_sha256, production_public_environment_sha256,
+        production_public_environment_transcript, ProductionCallEvidence,
+    };
     use crate::return_channel::{
         return_channel_aad_bytes, ReturnChannelSession, RETURN_CHANNEL_SCHEME,
     };
@@ -310,6 +333,8 @@ mod tests {
     use sha2::{Digest, Sha256};
     use std::fs;
     use std::path::PathBuf;
+    #[cfg(not(feature = "diagnostics"))]
+    use uo_core::PublicEnvironment;
     use uo_core::{
         canonical_runtime_public_object_ids, ContractMetadata, EncryptedReturnPayload, ProgramMode,
         ReturnChannelPublicBinding, Value,
@@ -371,6 +396,7 @@ mod tests {
         artifact: &uo_core::CompiledArtifact,
         policy: &ProductionRuntimePolicy,
         session: &ReturnChannelSession,
+        environment: &PublicEnvironment,
         freshness_epoch: u64,
         rollback_counter: u64,
         next_call_counter: u64,
@@ -384,6 +410,8 @@ mod tests {
             proof_root_sha256: policy.proof_root_sha256.clone(),
             sgx_quote_sha256: policy.accepted_sgx_quote_sha256.clone(),
             build_profile_sha256: policy.build_profile_sha256.clone(),
+            public_environment: production_public_environment_transcript(environment),
+            public_environment_sha256: production_public_environment_sha256(environment).unwrap(),
             session_id: session.binding().session_id.clone(),
             attestation_transcript_hash: session.binding().attestation_transcript_hash.clone(),
             freshness_epoch,
@@ -614,6 +642,7 @@ bounds:
         let args = vec![b32(7), Value::uint(5)];
         let policy = production_policy();
         let session = return_channel_session();
+        let environment = PublicEnvironment::default();
         let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 91).unwrap();
         let snapshot = probe.freshness.snapshot();
         let probe_result = probe
@@ -625,6 +654,7 @@ bounds:
             &artifact,
             &policy,
             &session,
+            &environment,
             snapshot.epoch,
             snapshot.rollback_counter,
             snapshot.next_call_counter,
@@ -720,6 +750,42 @@ bounds:
             .to_string()
             .contains("production runtime build_profile_sha256 mismatch"));
 
+        let mut wrong_environment_transcript = evidence.clone();
+        wrong_environment_transcript.public_environment[0] =
+            format!("msg.sender={}", Value::Address([0x77u8; 20]));
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(
+                entrypoint,
+                args.clone(),
+                &session,
+                &wrong_environment_transcript,
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime public_environment transcript mismatch"));
+
+        let mut wrong_environment_hash = evidence.clone();
+        wrong_environment_hash.public_environment_sha256 = "00".repeat(32);
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_environment_hash)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime public_environment_sha256 mismatch"));
+
         let mut production = ProductionContractInstance::deploy_with_authorized_seed(
             artifact.clone(),
             policy.clone(),
@@ -772,6 +838,110 @@ bounds:
         assert!(err
             .to_string()
             .contains("production runtime build_profile_sha256 mismatch"));
+    }
+
+    #[cfg(not(feature = "diagnostics"))]
+    #[test]
+    fn production_runtime_binds_attested_public_environment_context() {
+        let source = write_temp(
+            "production-env-auth",
+            r#"
+            contract ProductionEnvAuth {
+                uint256 private secret;
+
+                function setSecret(address expected, uint256 amount) public {
+                    require(msg.sender == expected);
+                    secret = amount;
+                }
+            }
+            "#,
+        );
+        let metadata = r#"
+contract: ProductionEnvAuth
+entrypoints:
+  setSecret(address,uint256):
+    confidential: true
+    secret_args: [amount]
+    returns: forbidden
+    status: public
+state:
+  secret:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#;
+        let artifact = compile_bench(source.to_str().unwrap(), metadata, ProgramMode::Uo);
+        let entrypoint = "setSecret(address,uint256)";
+        let owner = [0x11u8; 20];
+        let other = [0x22u8; 20];
+        let args = vec![Value::Address(owner), Value::uint(9)];
+        let environment = PublicEnvironment::with_caller(owner);
+        let policy = production_policy();
+        let session = return_channel_session();
+
+        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 41).unwrap();
+        let snapshot = probe.freshness.snapshot();
+        let probe_result = probe
+            .call_with_environment(entrypoint, args.clone(), environment.clone())
+            .unwrap();
+        assert!(!probe_result.aborted);
+        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
+        let evidence = production_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            snapshot.epoch,
+            snapshot.rollback_counter,
+            snapshot.next_call_counter,
+            proof_hash,
+        );
+
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            41,
+        )
+        .unwrap();
+        let accepted = production
+            .call_authorized_with_environment(
+                entrypoint,
+                args.clone(),
+                &session,
+                environment.clone(),
+                &evidence,
+            )
+            .unwrap();
+        assert!(!accepted.aborted);
+        assert_eq!(
+            accepted
+                .trace
+                .theorem_trace
+                .public_outcome
+                .as_ref()
+                .unwrap()
+                .public_env
+                .as_ref(),
+            &[format!("msg.sender={}", Value::Address(owner))]
+        );
+
+        let mut production =
+            ProductionContractInstance::deploy_with_authorized_seed(artifact, policy, 41).unwrap();
+        let err = production
+            .call_authorized_with_environment(
+                entrypoint,
+                args,
+                &session,
+                PublicEnvironment::with_caller(other),
+                &evidence,
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime public_environment transcript mismatch"));
     }
 
     #[cfg(feature = "diagnostics")]

@@ -187,6 +187,7 @@ pub const TRACE_HASH_BUNDLE_FIELDS: &[&str] = &[
     "physical_read_trace_hash",
     "physical_write_trace_hash",
     "physical_access_trace_hash",
+    "public_environment_projection_hash",
     "primitive_event_transcript_hash",
     "runtime_proof_object_hash",
 ];
