@@ -1,10 +1,17 @@
+use crate::deployment::{
+    validate_production_artifact, validate_production_call_preflight,
+    validate_production_proof_bundle, ProductionCallEvidence, ProductionRuntimePolicy,
+};
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
 use crate::runtime::{
     deploy_contract_runtime, run_contract_call, ContractRuntime, PathOramFreshCoinPlan,
 };
 use anyhow::{anyhow, bail, Result};
-use uo_core::{CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, Value};
+use uo_core::{
+    CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, ReturnPolicy,
+    Value,
+};
 
 #[derive(Debug)]
 pub struct ContractInstance {
@@ -30,11 +37,75 @@ pub struct CallResult {
     pub trace: ExecutionTrace,
 }
 
+#[derive(Debug)]
+pub struct ProductionContractInstance {
+    inner: ContractInstance,
+    policy: ProductionRuntimePolicy,
+}
+
 #[cfg(feature = "diagnostics")]
 #[derive(Debug)]
 pub struct DiagnosticCallResult {
     pub call: CallResult,
     pub telemetry: CallTelemetry,
+}
+
+impl ProductionContractInstance {
+    pub fn deploy(artifact: CompiledArtifact, policy: ProductionRuntimePolicy) -> Result<Self> {
+        validate_production_artifact(&artifact)?;
+        Ok(Self {
+            inner: ContractInstance::deploy(artifact)?,
+            policy,
+        })
+    }
+
+    #[cfg(any(test, feature = "diagnostics"))]
+    fn deploy_with_authorized_seed(
+        artifact: CompiledArtifact,
+        policy: ProductionRuntimePolicy,
+        deploy_seed: u64,
+    ) -> Result<Self> {
+        validate_production_artifact(&artifact)?;
+        Ok(Self {
+            inner: ContractInstance::deploy_with_seed(artifact, deploy_seed)?,
+            policy,
+        })
+    }
+
+    pub fn call_authorized(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        session: &ReturnChannelSession,
+        evidence: &ProductionCallEvidence,
+    ) -> Result<CallResult> {
+        validate_production_call_preflight(
+            &self.inner.artifact,
+            &self.policy,
+            evidence,
+            session,
+            self.inner.freshness.snapshot(),
+        )?;
+        let manifest_entry = self
+            .inner
+            .artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get(entrypoint)
+            .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
+        let execution_session = if manifest_entry.returns == ReturnPolicy::EncryptedToClient {
+            Some(session)
+        } else {
+            None
+        };
+        let result = self
+            .inner
+            .call_impl(entrypoint, args, None, execution_session, None)?
+            .0;
+        validate_production_proof_bundle(&self.inner.artifact, &result.trace, evidence)?;
+        Ok(result)
+    }
 }
 
 impl ContractInstance {
@@ -222,7 +293,10 @@ pub fn run_artifact_with_seed(
 
 #[cfg(test)]
 mod tests {
-    use super::ContractInstance;
+    use super::{ContractInstance, ProductionContractInstance};
+    use crate::deployment::{
+        production_proof_bundle_sha256, ProductionCallEvidence, ProductionRuntimePolicy,
+    };
     use crate::return_channel::{
         return_channel_aad_bytes, ReturnChannelSession, RETURN_CHANNEL_SCHEME,
     };
@@ -264,6 +338,52 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    fn alternate_return_channel_session() -> ReturnChannelSession {
+        ReturnChannelSession::new(
+            [8u8; 32],
+            ReturnChannelPublicBinding {
+                scheme: RETURN_CHANNEL_SCHEME.into(),
+                session_id: "44".repeat(32),
+                client_public_key_hash: "55".repeat(32),
+                attestation_transcript_hash: "66".repeat(32),
+            },
+        )
+        .unwrap()
+    }
+
+    fn production_policy() -> ProductionRuntimePolicy {
+        ProductionRuntimePolicy {
+            runtime_binary_sha256: "aa".repeat(32),
+            proof_root_sha256: "bb".repeat(32),
+            accepted_sgx_quote_sha256: "cc".repeat(32),
+        }
+    }
+
+    fn production_evidence(
+        artifact: &uo_core::CompiledArtifact,
+        policy: &ProductionRuntimePolicy,
+        session: &ReturnChannelSession,
+        freshness_epoch: u64,
+        rollback_counter: u64,
+        next_call_counter: u64,
+        proof_bundle_sha256: String,
+    ) -> ProductionCallEvidence {
+        let identity = artifact.admitted_package.as_ref().unwrap();
+        ProductionCallEvidence {
+            admitted_package_sha256: identity.package_sha256.clone(),
+            toolchain_manifest_sha256: identity.toolchain_manifest_sha256.clone(),
+            runtime_binary_sha256: policy.runtime_binary_sha256.clone(),
+            proof_root_sha256: policy.proof_root_sha256.clone(),
+            sgx_quote_sha256: policy.accepted_sgx_quote_sha256.clone(),
+            session_id: session.binding().session_id.clone(),
+            attestation_transcript_hash: session.binding().attestation_transcript_hash.clone(),
+            freshness_epoch,
+            rollback_counter,
+            next_call_counter,
+            proof_bundle_sha256,
+        }
     }
 
     fn decrypt_return_payload(
@@ -471,6 +591,152 @@ bounds:
             second_decrypted,
             Value::uint(8).canonical_bytes_boxed().unwrap().into_vec()
         );
+    }
+
+    #[test]
+    fn production_runtime_requires_attested_proof_bundle_session_and_freshness() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let entrypoint = "add(bytes32,uint256)";
+        let args = vec![b32(7), Value::uint(5)];
+        let policy = production_policy();
+        let session = return_channel_session();
+        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 91).unwrap();
+        let snapshot = probe.freshness.snapshot();
+        let probe_result = probe
+            .call_impl(entrypoint, args.clone(), None, None, None)
+            .unwrap()
+            .0;
+        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
+        let evidence = production_evidence(
+            &artifact,
+            &policy,
+            &session,
+            snapshot.epoch,
+            snapshot.rollback_counter,
+            snapshot.next_call_counter,
+            proof_hash,
+        );
+
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let accepted = production
+            .call_authorized(entrypoint, args.clone(), &session, &evidence)
+            .unwrap();
+        assert_eq!(
+            production_proof_bundle_sha256(&artifact, &accepted.trace).unwrap(),
+            evidence.proof_bundle_sha256
+        );
+
+        let mut missing_proof = evidence.clone();
+        missing_proof.proof_bundle_sha256.clear();
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &missing_proof)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("proof_bundle_sha256 must be a 64-character hex SHA-256 digest"));
+
+        let mut wrong_proof = evidence.clone();
+        wrong_proof.proof_bundle_sha256 = "00".repeat(32);
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_proof)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime proof_bundle_sha256 mismatch"));
+
+        let mut wrong_toolchain = evidence.clone();
+        wrong_toolchain.toolchain_manifest_sha256 = "00".repeat(32);
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_toolchain)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime toolchain_manifest_sha256 mismatch"));
+
+        let mut wrong_quote = evidence.clone();
+        wrong_quote.sgx_quote_sha256 = "00".repeat(32);
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_quote)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime sgx_quote_sha256 mismatch"));
+
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(
+                entrypoint,
+                args.clone(),
+                &alternate_return_channel_session(),
+                &evidence,
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime session_id mismatch"));
+
+        let mut wrong_rollback = evidence.clone();
+        wrong_rollback.rollback_counter += 1;
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_rollback)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime rollback_counter mismatch"));
+
+        let mut unadmitted = artifact;
+        unadmitted.admitted_package = None;
+        let err = ProductionContractInstance::deploy_with_authorized_seed(unadmitted, policy, 91)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime requires admitted_package identity"));
     }
 
     #[test]

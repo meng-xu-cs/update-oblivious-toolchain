@@ -15,7 +15,7 @@ View_SGX(c) =
 
 - `public_outcome` and `boundary_schedule` are exact.
 - `storage_trace` is exact for exact backends and ORAM-related for
-  `path_oram_local_posmap_v1`.
+  proof-grade Path ORAM routes.
 - `micro_trace` is normalized and simulated from `L_sgx_micro`; raw
   micro-event equality is not claimed.
 
@@ -99,6 +99,16 @@ The matching drift checks include:
 - `sgx_deployment_assumption_bundle_pinned`
 - `sgx_deployment_assumption_mechanism_matrix_pinned`
 - `return_channel_crypto_evidence_pinned`
+
+## Production Acceptance
+
+The operational production gate is separate from the observer definition.
+`ProductionContractInstance::call_authorized` requires a deployment policy and
+per-call evidence binding the admitted package, toolchain manifest, runtime
+binary hash, proof-root hash, accepted SGX quote hash, return-channel session
+id, attestation transcript hash, and freshness/rollback counters. The call
+result is accepted only after the emitted trace yields a runtime confidential
+proof-bundle hash matching the supplied evidence.
 
 ## Non-Claim
 

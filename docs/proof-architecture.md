@@ -61,7 +61,7 @@ The proof development is organized around these layers:
   `PaperPathOramTheoremRoute`.
 - SGX/TEE observer: `SgxBoundary`, `SgxRelation`, `SgxController`,
   `SgxControllerTrace`, `SgxMicroModel`, `SgxObserverFreeze`,
-  `TeeDeployment`.
+  `TeeDeployment`, `DeploymentAcceptance`.
 
 The default `UOToolchain` umbrella imports `UOToolchain.ProofGradeRoot`.
 Legacy axiom-backed demonstrations are isolated behind `UOToolchain.LegacyRoot`

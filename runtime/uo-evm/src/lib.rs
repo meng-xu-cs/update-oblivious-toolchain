@@ -7,15 +7,19 @@
 )]
 
 mod controller;
+mod deployment;
 mod engine;
 mod freshness;
 mod oram;
 mod return_channel;
 mod runtime;
 
+pub use deployment::{
+    production_proof_bundle_sha256, ProductionCallEvidence, ProductionRuntimePolicy,
+};
 #[cfg(any(test, feature = "diagnostics"))]
 pub use engine::run_artifact_with_seed;
-pub use engine::{run_artifact, CallResult, ContractInstance};
+pub use engine::{run_artifact, CallResult, ContractInstance, ProductionContractInstance};
 #[cfg(feature = "diagnostics")]
 pub use engine::{CallTelemetry, DiagnosticCallResult};
 pub use return_channel::{ReturnChannelSession, RETURN_CHANNEL_SCHEME};

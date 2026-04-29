@@ -12,6 +12,7 @@ import UOToolchain.Composition
 import UOToolchain.StandardOramReduction
 import UOToolchain.PathOramSecurity
 import UOToolchain.TeeDeployment
+import UOToolchain.DeploymentAcceptance
 import UOToolchain.SgxBoundary
 import UOToolchain.SgxRelation
 import UOToolchain.SgxController

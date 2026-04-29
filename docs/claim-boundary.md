@@ -26,15 +26,36 @@ The artifact-level admitted-package hash is a canonical SHA-256 binding over
 the source-language tag (`uo-solidity-like-dsl-v1`), source bytes, canonical
 sidecar metadata JSON, compilation mode, compiler version, toolchain manifest
 digest, and package schema tag. It is checked for equality by the proof-grade
-translation bundle. It is not yet a deployment attestation hash for the runtime
-binary or SGX quote.
+translation bundle. It is not by itself a deployment attestation hash; the
+production deployment theorem binds it to the runtime binary hash, proof-root
+hash, SGX quote, return-channel session transcript, and freshness counters.
+
+## Deployment Theorem
+
+The deployment theorem is separate from the paper theorem over the
+instrumented runtime observer. A production runtime result is accepted only
+when the runtime has:
+
+- a current admitted-package identity and matching toolchain manifest digest;
+- a runtime confidential proof-bundle hash for the emitted trace;
+- a deployment policy matching the measured runtime binary hash, proof-root
+  hash, and accepted SGX quote hash;
+- a return-channel session id and attestation transcript hash matching the
+  supplied session; and
+- freshness evidence matching the runtime epoch, rollback counter, and next
+  call counter at call entry.
+
+The Rust enforcement point is `ProductionContractInstance::call_authorized`.
+The Lean theorem surface is `DeploymentAcceptance.lean`, which exposes the
+field bindings required by `DeploymentCallAccepted`.
 
 ## Backend Scope
 
 - Exact-UO is claimed for exact backends on the repository's instrumented
   abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`.
 - The theorem-facing computational-UO path is only
-  `path_oram_local_posmap_v1`.
+  `path_oram_local_posmap_v1` for the bounded local-position-map route and
+  `path_oram_private_posmap_v1` for scalable private position metadata.
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
 
@@ -58,8 +79,8 @@ The components are interpreted as follows:
   declassification labels, public-state declassification labels, and modeled
   public gas.
 - `boundary_schedule` is the exact enclave boundary sequence.
-- `storage_trace` is exact for exact backends and related through the Path ORAM
-  theorem for `path_oram_local_posmap_v1`.
+- `storage_trace` is exact for exact backends and related through the
+  proof-grade Path ORAM route.
 - `micro_trace` is SGX-specific and is normalized/simulated from
   `L_sgx_micro`; the theorem does not claim raw page-id or full micro-event
   equality.

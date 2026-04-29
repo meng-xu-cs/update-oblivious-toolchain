@@ -30,3 +30,10 @@ payloads, and `TraceHashBundle` exposes both the transcript hash and the
 runtime proof-object hash. A fully verified extractor would still reduce the
 TCB, but omitted or mutated proof payloads are no longer outside the checked
 hash surface.
+
+Production acceptance uses `ProductionContractInstance::call_authorized`.
+That path refuses calls without a current admitted-package identity, matching
+toolchain manifest digest, runtime confidential proof-bundle hash, runtime
+binary hash, proof-root hash, accepted SGX quote hash, attested
+return-channel session transcript, and freshness/rollback counters matching
+the runtime state at call entry.

@@ -47,12 +47,12 @@ not as independent findings.
 | F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Landed |
 | F-09 | Path ORAM capacity cap mirrored in Lean | TB-09, TH-09 | Agree | P1 | Landed |
 | F-10 | Smaller metadata canonicality gaps | TB-10, negative tests 5-6 | Agree | P1 | Landed |
-| F-11 | Direct paper-main noninterference theorem | TH-02 | Agree | P1 | Open - required |
-| F-12 | Adaptive history theorem | TH-03 | Agree | P1 | Open - required |
-| F-13 | Solidity dialect theorem or boundary | TH-07, practical blocker 5 | Agree | P2 | Open - required |
-| F-14 | Environment/auth model | practical blocker 4 | Agree | P2 | Open - required |
-| F-15 | Capacity/evidence scaling | practical blocker 2, action plan P3 | Agree | P3 | Open - required |
-| F-16 | Deployment theorem and runtime acceptance | practical blocker 3, practical blocker 6 | Agree | P3 | Open - required |
+| F-11 | Direct paper-main noninterference theorem | TH-02 | Agree | P1 | Landed |
+| F-12 | Adaptive history theorem | TH-03 | Agree | P1 | Landed |
+| F-13 | Solidity dialect theorem or boundary | TH-07, practical blocker 5 | Agree | P2 | Landed |
+| F-14 | Environment/auth model | practical blocker 4 | Agree | P2 | Landed |
+| F-15 | Capacity/evidence scaling | practical blocker 2, action plan P3 | Agree | P3 | Landed |
+| F-16 | Deployment theorem and runtime acceptance | practical blocker 3, practical blocker 6 | Agree | P3 | Landed |
 
 No non-usability findings are rejected.
 
@@ -605,7 +605,7 @@ freshness/rollback evidence. Claim docs must explicitly separate instrumented
 runtime execution from raw EVM bytecode deployment.
 
 Status:
-Open - required.
+Landed.
 
 ## Excluded Finding
 
@@ -653,4 +653,4 @@ The remediation work must add or update tests for:
 - [x] F-13 landed and checked against claim wording/semantics tests.
 - [x] F-14 landed and checked by compiler/runtime/Lean tests.
 - [x] F-15 landed with scalable proof evidence.
-- [ ] F-16 landed with production runtime acceptance tests.
+- [x] F-16 landed with production runtime acceptance tests.
