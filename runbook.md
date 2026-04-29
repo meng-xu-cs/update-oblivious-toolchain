@@ -5,7 +5,7 @@ Current design and claim wording live under [`docs/`](docs/README.md).
 
 ## What Exists
 
-- restricted Solidity compiler and artifact emitter: `compiler/uo-solc`
+- restricted Solidity-like DSL compiler and artifact emitter: `compiler/uo-solc`
 - diagnostics checker: `checker/uo-check`
 - in-process runtime and proof-object exporter: `runtime/uo-evm`
 - Lean theorem/checker workspace: `proof/lean`

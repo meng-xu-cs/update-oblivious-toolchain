@@ -515,6 +515,9 @@ fn store_env_value(
 
 #[cfg(test)]
 mod tests {
+    use super::eval_binary;
+    use uo_core::{BinaryOp, Uint256, Value};
+
     #[test]
     fn shell_source_stays_public_only() {
         let source = include_str!("shell.rs")
@@ -542,5 +545,29 @@ mod tests {
                 "shell.rs should not import confidential runtime surface `{forbidden}`"
             );
         }
+    }
+
+    #[test]
+    fn public_shell_uses_uo_solidity_like_uint256_semantics() {
+        assert_eq!(
+            eval_binary(
+                &BinaryOp::Add,
+                Value::uint(Uint256::MAX),
+                Value::uint(Uint256::ONE),
+            )
+            .unwrap(),
+            Value::uint(0),
+            "the DSL wraps uint256 addition instead of Solidity 0.8 checked overflow"
+        );
+        assert_eq!(
+            eval_binary(&BinaryOp::Div, Value::uint(7), Value::uint(0)).unwrap(),
+            Value::uint(0),
+            "the DSL returns zero for division by zero instead of Solidity 0.8 revert"
+        );
+        assert_eq!(
+            eval_binary(&BinaryOp::Mod, Value::uint(7), Value::uint(0)).unwrap(),
+            Value::uint(0),
+            "the DSL returns zero for modulo by zero instead of Solidity 0.8 revert"
+        );
     }
 }

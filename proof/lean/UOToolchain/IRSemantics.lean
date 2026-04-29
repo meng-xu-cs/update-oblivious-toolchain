@@ -2,7 +2,7 @@ import UOToolchain.TraceModel
 import UOToolchain.IRSyntax
 
 /-!
-# Semantics layer for the admitted Solidity subset
+# Semantics layer for the admitted Solidity-like UO DSL
 
 This module sits at the boundary between the abstract trace-producer
 abstraction used by the existing `ExactObjects` / `Composition` /

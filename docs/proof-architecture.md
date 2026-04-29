@@ -5,9 +5,11 @@ This document explains how the checked artifacts connect to the paper claim.
 ## Source And Compiler Layer
 
 The proof-facing compiler story starts from the post-resolution Sol AST / UO IR
-accepted by the Lean model. The important Lean modules are:
+accepted by the Lean model for `uo-solidity-like-dsl-v1`. The important Lean
+modules are:
 
 - `UOToolchain.Sol`
+- `UOToolchain.SolidityDialectBoundary`
 - `UOToolchain.IRSyntax`
 - `UOToolchain.IRSemantics`
 - `UOToolchain.CompilerInvariant`
@@ -17,7 +19,7 @@ accepted by the Lean model. The important Lean modules are:
 The direct checker `checkProofGradeTranslationArtifacts` is an executable proof
 witness for concrete source/artifact pairs. It is not the trust root: compiler
 correctness is represented by Lean theorems over the admitted post-resolution
-language, while parser/preprocessing remains the explicit front-end trust
+DSL, while parser/preprocessing remains the explicit front-end trust
 surface.
 
 ## Runtime Bridge

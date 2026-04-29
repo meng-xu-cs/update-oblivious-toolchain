@@ -16,7 +16,7 @@ pub mod types;
 
 pub use artifact::{
     AdmittedPackageIdentity, ArtifactFormat, CompiledArtifact, ToolchainManifest,
-    ADMITTED_PACKAGE_SCHEMA, TOOLCHAIN_MANIFEST_SCHEMA,
+    ADMITTED_PACKAGE_SCHEMA, SOURCE_LANGUAGE, TOOLCHAIN_MANIFEST_SCHEMA,
 };
 pub use confidential_core::{
     RuntimeConfidentialCoreBundle, RuntimeConfidentialCoreBundleError,

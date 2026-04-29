@@ -690,7 +690,7 @@ level: a Lean-proved, semantics-preserving correspondence between
 the Sol AST evaluator and the IR evaluator on every lowering.
 Combined with the W4.4 IR-to-kernel program preservation, this
 closes the source-to-kernel correctness chain for the structural
-fragment of the admitted Solidity subset. -/
+fragment of the admitted Solidity-like UO DSL. -/
 theorem proofGrade_sol_to_ir_program_preservation
     (fn : Sol.Function) (cfg : IR.OperationalConfig)
     (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn)) :

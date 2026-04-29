@@ -1,14 +1,15 @@
 {
   "compiler_version": "0.1.0",
   "admitted_package": {
-    "schema": "uo-admitted-package-v3",
+    "schema": "uo-admitted-package-v4",
+    "source_language": "uo-solidity-like-dsl-v1",
     "source_sha256": "189206eda78843b786e1835056ddce154d2784db22bc36a427f784e1fbcf4b84",
     "metadata_sha256": "0446033b909c694f99c48b61258dbb4a9f689bbe741c78661a000497c2199028",
     "raw_metadata_sha256": "4e8cea809cea850858cee9374dada4f1eb35e6ed612636c73ee6f484fefc4cd0",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "71b72becdf17a691fd0813caae8759ad3afc65a82594fa6ea7abddb419c98f89",
-    "package_sha256": "7de2bca79863404d94b170cb22e22edefd5b6d68d1c0b2626c2adf20c3b196d0"
+    "toolchain_manifest_sha256": "c45d9198caccd6ae12ed0cfde8f16787cb01d922c270b7837582d9c935a0f6b3",
+    "package_sha256": "2b20a9c97c6d8c592eec27f73cb6d2a5d440c96a1169d0d7b343cdf47429f21e"
   },
   "contract": {
     "contract": "ERC20Lite",

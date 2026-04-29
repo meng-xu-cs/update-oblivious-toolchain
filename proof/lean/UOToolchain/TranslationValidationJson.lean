@@ -115,6 +115,7 @@ deriving Repr, DecidableEq, FromJson, ToJson
 
 structure ImportedAdmittedPackageIdentity where
   schema : String
+  source_language : String
   source_sha256 : String
   metadata_sha256 : String
   compilation_mode : String
@@ -123,11 +124,13 @@ structure ImportedAdmittedPackageIdentity where
   package_sha256 : String
 deriving Repr, DecidableEq, FromJson, ToJson
 
-private def admittedPackageSchema : String := "uo-admitted-package-v3"
+private def admittedPackageSchema : String := "uo-admitted-package-v4"
+private def admittedPackageSourceLanguage : String := "uo-solidity-like-dsl-v1"
 
 def ImportedAdmittedPackageIdentity.WellFormed
   (identity : ImportedAdmittedPackageIdentity) : Prop :=
   identity.schema = admittedPackageSchema ∧
+    identity.source_language = admittedPackageSourceLanguage ∧
     identity.toolchain_manifest_sha256.length = 64
 
 instance (identity : ImportedAdmittedPackageIdentity) :
@@ -138,6 +141,7 @@ instance (identity : ImportedAdmittedPackageIdentity) :
 def ImportedAdmittedPackageIdentity.checkWellFormed
   (identity : ImportedAdmittedPackageIdentity) : Bool :=
   (identity.schema == admittedPackageSchema) &&
+    (identity.source_language == admittedPackageSourceLanguage) &&
     (identity.toolchain_manifest_sha256.length == 64)
 
 @[simp] theorem importedAdmittedPackageIdentity_checkWellFormed_eq_true_iff
@@ -145,7 +149,7 @@ def ImportedAdmittedPackageIdentity.checkWellFormed
   identity.checkWellFormed = true ↔ identity.WellFormed := by
   unfold ImportedAdmittedPackageIdentity.checkWellFormed
     ImportedAdmittedPackageIdentity.WellFormed
-  simp
+  simp [and_assoc]
 
 structure ImportedProofRelevantTranslationBundle where
   source_path : String

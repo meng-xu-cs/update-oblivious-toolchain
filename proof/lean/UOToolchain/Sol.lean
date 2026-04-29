@@ -4,10 +4,10 @@ import UOToolchain.ConfidentialFragment
 import UOToolchain.KernelDsl
 
 /-!
-# W4.2: Solidity AST mirror, operational semantics, and AST-to-IR lowering
+# W4.2: Solidity-like DSL AST mirror, operational semantics, and AST-to-IR lowering
 
 This module is the WP4 W4.2 deliverable: a typed Lean mirror of the
-admitted Solidity AST surface that `uo-solc` lowers from
+admitted Solidity-like AST surface that `uo-solc` lowers from
 `solang_parser::pt::Statement` / `pt::Expression`, together with an
 operational semantics for that surface and a lowering function plus
 preservation theorem connecting the AST semantics to the IR semantics
@@ -22,7 +22,7 @@ families:
 
 - **Source-syntax constructors** (`literal`, `var`, `unary`, `binary`,
   `conditional`, `keccak256`, `declare`, `assign`, `require_`,
-  `ifStmt`, `forLoop`, `retStmt`) that mirror Solidity surface syntax.
+  `ifStmt`, `forLoop`, `retStmt`) that mirror the admitted source syntax.
   Each maps to its same-named IR counterpart up to renaming
   (`conditional` lowers to `IR.Expr.select`, `require_` to
   `IR.Statement.require`).
@@ -52,7 +52,7 @@ W4.4 Session B-2 proofs.
 ## Why a separate AST mirror?
 
 The W4.2 charter task requires a Lean-side semantics for the
-admitted Solidity subset, distinct from the IR. Without it, the
+admitted Solidity-like DSL, distinct from the IR. Without it, the
 "source-to-IR correctness" theorem has no source-side semantic
 referent. This module provides the source-side referent at the
 typed-AST level (the `solang_parser::pt` parser is treated as a

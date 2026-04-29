@@ -1,15 +1,16 @@
 # UO Toolchain
 
 This repository contains a research-grade prototype of an update-oblivious
-toolchain for a restricted Solidity subset. It centers on compiled artifacts,
+toolchain for a restricted Solidity-like UO DSL. It centers on compiled artifacts,
 an instrumented confidential runtime, Lean-checked proof objects, and
 reproducible validation reports. It does not target "deploy raw EVM bytecode to
 a public chain" as its main execution model.
 
 ## Components
 
-- `compiler/uo-solc`: parses sidecar-annotated Solidity, validates the
-  supported subset, lowers to UO IR, and emits theorem-facing manifests.
+- `compiler/uo-solc`: parses sidecar-annotated Solidity-like source text,
+  validates the supported DSL, lowers to UO IR, and emits theorem-facing
+  manifests.
 - `checker/uo-check`: CLI diagnostics and compatibility tooling; it is not in
   the proof-grade TCB.
 - `runtime/uo-evm`: executes raw and UO artifacts in-process and emits traces,

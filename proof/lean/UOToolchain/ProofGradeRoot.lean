@@ -4,6 +4,7 @@ import UOToolchain.IRSyntax
 import UOToolchain.IRSemantics
 import UOToolchain.KernelDsl
 import UOToolchain.Sol
+import UOToolchain.SolidityDialectBoundary
 import UOToolchain.ExactObjects
 import UOToolchain.CompilerInvariant
 import UOToolchain.OramModel

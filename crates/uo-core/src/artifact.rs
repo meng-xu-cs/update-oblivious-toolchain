@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-pub const ADMITTED_PACKAGE_SCHEMA: &str = "uo-admitted-package-v3";
+pub const ADMITTED_PACKAGE_SCHEMA: &str = "uo-admitted-package-v4";
+pub const SOURCE_LANGUAGE: &str = "uo-solidity-like-dsl-v1";
 pub const TOOLCHAIN_MANIFEST_SCHEMA: &str = "uo-toolchain-manifest-v1";
 const PROOF_CHECKER_SCHEMA: &str = "uo-proof-checker-translation-validation-v1";
 const RUNTIME_MODEL_TAG: &str = "uo-runtime-source-model-v1";
@@ -41,6 +42,7 @@ pub struct CompiledArtifact {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AdmittedPackageIdentity {
     pub schema: String,
+    pub source_language: String,
     pub source_sha256: String,
     pub metadata_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -96,6 +98,7 @@ impl AdmittedPackageIdentity {
         let toolchain_manifest_sha256 = ToolchainManifest::current(compiler_version).sha256()?;
         let package_input = AdmittedPackageHashInput {
             schema: ADMITTED_PACKAGE_SCHEMA,
+            source_language: SOURCE_LANGUAGE,
             source_sha256: &source_sha256,
             metadata_sha256: &metadata_sha256,
             raw_metadata_sha256: raw_metadata_sha256.as_deref(),
@@ -106,6 +109,7 @@ impl AdmittedPackageIdentity {
         let package_sha256 = sha256_hex(&canonical_json_bytes(&package_input)?);
         Ok(Self {
             schema: ADMITTED_PACKAGE_SCHEMA.into(),
+            source_language: SOURCE_LANGUAGE.into(),
             source_sha256,
             metadata_sha256,
             raw_metadata_sha256,
@@ -124,6 +128,13 @@ impl AdmittedPackageIdentity {
                 ADMITTED_PACKAGE_SCHEMA
             );
         }
+        if self.source_language != SOURCE_LANGUAGE {
+            bail!(
+                "admitted package source_language mismatch: {} != {}",
+                self.source_language,
+                SOURCE_LANGUAGE
+            );
+        }
         let expected_toolchain_sha256 =
             ToolchainManifest::current(&self.compiler_version).sha256()?;
         if self.toolchain_manifest_sha256 != expected_toolchain_sha256 {
@@ -139,6 +150,7 @@ impl AdmittedPackageIdentity {
     fn recomputed_package_sha256(&self) -> Result<String> {
         let package_input = AdmittedPackageHashInput {
             schema: ADMITTED_PACKAGE_SCHEMA,
+            source_language: &self.source_language,
             source_sha256: &self.source_sha256,
             metadata_sha256: &self.metadata_sha256,
             raw_metadata_sha256: self.raw_metadata_sha256.as_deref(),
@@ -208,6 +220,7 @@ impl ToolchainManifest {
 #[derive(Serialize)]
 struct AdmittedPackageHashInput<'a> {
     schema: &'static str,
+    source_language: &'a str,
     source_sha256: &'a str,
     metadata_sha256: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -246,7 +259,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{AdmittedPackageIdentity, ToolchainManifest, ADMITTED_PACKAGE_SCHEMA};
+    use super::{
+        AdmittedPackageIdentity, ToolchainManifest, ADMITTED_PACKAGE_SCHEMA, SOURCE_LANGUAGE,
+    };
     use serde::Serialize;
 
     #[derive(Serialize)]
@@ -303,6 +318,7 @@ mod tests {
                 .unwrap();
         let expected_toolchain_sha256 = ToolchainManifest::current("test").sha256().unwrap();
         assert_eq!(identity.schema, ADMITTED_PACKAGE_SCHEMA);
+        assert_eq!(identity.source_language, SOURCE_LANGUAGE);
         assert_eq!(
             identity.toolchain_manifest_sha256,
             expected_toolchain_sha256
@@ -321,6 +337,29 @@ mod tests {
         assert!(err
             .to_string()
             .contains("toolchain_manifest_sha256 mismatch"));
+    }
+
+    #[test]
+    fn admitted_package_identity_rejects_source_language_tamper() {
+        let mut identity =
+            AdmittedPackageIdentity::new("contract C {}", &MetadataA { z: 2, a: 1 }, "uo", "test")
+                .unwrap();
+        identity.source_language = "solidity-0.8".into();
+        let err = identity.validate_current_toolchain().unwrap_err();
+        assert!(err.to_string().contains("source_language mismatch"));
+    }
+
+    #[test]
+    fn admitted_package_identity_package_hash_covers_source_language() {
+        let identity =
+            AdmittedPackageIdentity::new("contract C {}", &MetadataA { z: 2, a: 1 }, "uo", "test")
+                .unwrap();
+        let mut tampered = identity.clone();
+        tampered.source_language = "solidity-0.8".into();
+        assert_ne!(
+            identity.package_sha256,
+            tampered.recomputed_package_sha256().unwrap()
+        );
     }
 
     #[test]

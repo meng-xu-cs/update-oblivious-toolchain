@@ -95,14 +95,15 @@ Status:
 Landed.
 
 Landing notes:
-Admitted package identity is now schema `uo-admitted-package-v3` and includes
-`toolchain_manifest_sha256`. The manifest digest is generated from build-time
-hashes covering the Rust toolchain file, `Cargo.lock`, workspace/crate
-manifests, the pinned parser version, Lean toolchain, `ProofGradeRoot` and Lean
-import set, generated-code surfaces, runtime model source, and deployment/SGX
-binding model source/tags. The checker rejects missing/stale identities,
-schema drift, toolchain digest drift, package-hash drift, and source/artifact
-admitted-package mismatch. Bench artifacts were regenerated with v3 identities.
+Admitted package identity is now schema `uo-admitted-package-v4` and includes
+`source_language` plus `toolchain_manifest_sha256`. The manifest digest is
+generated from build-time hashes covering the Rust toolchain file,
+`Cargo.lock`, workspace/crate manifests, the pinned parser version, Lean
+toolchain, `ProofGradeRoot` and Lean import set, generated-code surfaces,
+runtime model source, and deployment/SGX binding model source/tags. The checker
+rejects missing/stale identities, schema drift, source-language drift,
+toolchain digest drift, package-hash drift, and source/artifact
+admitted-package mismatch. Bench artifacts were regenerated with v4 identities.
 
 ### F-02 - Strict Sidecar Parse/Hash Boundary
 
@@ -512,7 +513,7 @@ Solidity semantics without the bridge. Once the bridge lands, Lean must state
 the versioned relation and tests must cover semantic divergences.
 
 Status:
-Open - required.
+Landed.
 
 ### F-14 - Environment/Auth Model
 
@@ -649,7 +650,7 @@ The remediation work must add or update tests for:
 - [x] F-10 landed and tested.
 - [x] F-11 landed and checked by Lean.
 - [x] F-12 landed and checked by Lean.
-- [ ] F-13 landed and checked against claim wording/semantics tests.
+- [x] F-13 landed and checked against claim wording/semantics tests.
 - [ ] F-14 landed and checked by compiler/runtime/Lean tests.
 - [ ] F-15 landed with scalable proof evidence.
 - [ ] F-16 landed with production runtime acceptance tests.

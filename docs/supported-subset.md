@@ -1,6 +1,11 @@
-# Supported Subset
+# Supported Source DSL
 
-Accepted Solidity features in this prototype:
+The accepted source language is `uo-solidity-like-dsl-v1`: a restricted,
+Solidity-shaped DSL parsed through `solang_parser` and lowered to the
+post-resolution Sol AST consumed by Lean. It is not currently a theorem claim
+over full Solidity 0.8 semantics.
+
+Accepted source features in this prototype:
 
 - `bool`, `uint256`, `bytes32`, `address`
 - arithmetic, bitwise operators, comparisons, and boolean connectives over the
@@ -59,22 +64,30 @@ Sidecar metadata requirements:
   capped at capacity `128` until a recursive/private position map replaces the
   local metadata scan
 - gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
-- generated artifacts carry an admitted-package hash over the source bytes,
-  canonical sidecar metadata JSON, compilation mode, compiler version, and
-  package schema tag; the proof-grade translation bundle requires the source
-  and artifact package identities to match
+- generated artifacts carry an admitted-package hash over the source-language
+  tag, source bytes, canonical sidecar metadata JSON, compilation mode,
+  compiler version, toolchain manifest digest, and package schema tag; the
+  proof-grade translation bundle requires the source and artifact package
+  identities to match
 
-Execution-model note:
+Execution-model notes:
 
 - accepted `uint256` syntax is executed in the EVM unsigned 256-bit domain;
   Rust runtime values, canonical fixed-size encodings, compiler literals, and
   the Lean IR evaluator all normalize arithmetic modulo `2^256`, with division
-  or modulo by zero returning zero
+  or modulo by zero returning zero. This deliberately differs from Solidity
+  0.8 checked arithmetic and division/modulo-by-zero revert behavior until a
+  versioned Solidity semantics bridge is proved.
 - `keccak256(abi.encodePacked(...))` is supported by the runtime with real
   Keccak over canonical fixed-size bytes, but the current Lean source/IR/kernel
   preservation proofs use a deterministic mock hash. They prove preservation
   through the shared abstraction, not value-level equality with the real
   Keccak output.
+- The Lean bridge target for regaining a Solidity 0.8 theorem claim is
+  `VersionedSoliditySemanticsBridge` in
+  `proof/lean/UOToolchain/SolidityDialectBoundary.lean`. It names the required
+  obligations for checked arithmetic, division/modulo-by-zero, ABI encoding,
+  revert/rollback, and public context variables.
 - source-to-kernel correctness is stated for the post-resolution Sol AST / UO
   IR consumed by the Lean model. Parser-level preprocessing remains trusted
   until a raw-source-to-post-resolution witness relation is mechanized.

@@ -7,23 +7,25 @@ wording elsewhere.
 ## Paper Theorem
 
 For every admitted program package `(P, M, V)`, where `P` is the restricted
-Solidity source, `M` is the strict sidecar metadata, and `V` records the
-compiler/proof/runtime model versions, if `uo-solc` compiles the package to
-artifact `A`, the artifact records the matching admitted-package hash, the Lean
-source/artifact checker accepts the pair, the real runtime executes `A` and
-emits proof objects accepted by Lean, and the explicit backend, cryptographic,
-and TEE deployment assumptions hold, then the execution's normalized
-hostile-host observer satisfies the paper update-obliviousness theorem against
-the stated observer and the artifact-declared return/status/public-state
-declassification policy.
+Solidity-like UO DSL source, `M` is the strict sidecar metadata, and `V`
+records the compiler/proof/runtime model versions, if `uo-solc` compiles the
+package to artifact `A`, the artifact records the matching admitted-package
+hash, the Lean source/artifact checker accepts the pair, the real runtime
+executes `A` and emits proof objects accepted by Lean, and the explicit
+backend, cryptographic, and TEE deployment assumptions hold, then the
+execution's normalized hostile-host observer satisfies the paper
+update-obliviousness theorem against the stated observer and the
+artifact-declared return/status/public-state declassification policy.
 
 The compiler-side trust story starts at the post-resolution Sol AST / UO IR
-consumed by Lean. Parser-level preprocessing remains trusted until a
-raw-source-to-post-resolution witness relation is mechanized.
+consumed by Lean. The active source theorem is for `uo-solidity-like-dsl-v1`,
+not full Solidity 0.8 semantics. Parser-level preprocessing remains trusted
+until a raw-source-to-post-resolution witness relation is mechanized.
 
 The artifact-level admitted-package hash is a canonical SHA-256 binding over
-the source bytes, canonical sidecar metadata JSON, compilation mode, compiler
-version, and package schema tag. It is checked for equality by the proof-grade
+the source-language tag (`uo-solidity-like-dsl-v1`), source bytes, canonical
+sidecar metadata JSON, compilation mode, compiler version, toolchain manifest
+digest, and package schema tag. It is checked for equality by the proof-grade
 translation bundle. It is not yet a deployment attestation hash for the runtime
 binary or SGX quote.
 
@@ -73,7 +75,7 @@ The concrete SGX/TEE observer pins live in
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | explicit Lean assumption paired with the same concrete sealed-record crypto route |
 | `stashOverflowBounded` | bounds Path ORAM stash failure for deployed parameters | explicit Lean assumption paired with the JACM Path ORAM stash theorem at `Z = 5` and pinned deployed parameters |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
-| Parser/preprocessing equivalence | connects raw Solidity text to the post-resolution AST consumed by Lean | still trusted front-end surface |
+| Parser/preprocessing equivalence | connects raw Solidity-like source text to the post-resolution AST consumed by Lean | still trusted front-end surface |
 | Real Keccak equivalence | connects runtime `tiny_keccak::Keccak::v256()` to the Lean mock-hash abstraction | not yet proved; Lean preservation uses the shared abstraction |
 
 The fresh-leaf remapping bridge is not a separate backend assumption. The
@@ -106,5 +108,8 @@ This repository does not claim:
   electromagnetic, or wall-clock obliviousness
 - value-level equality between the Lean mock hash and real runtime Keccak
   outputs
+- Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or
+  context-variable semantics; the Lean bridge target for regaining that claim
+  is `VersionedSoliditySemanticsBridge` in `SolidityDialectBoundary.lean`
 
 Those would require additional models and proofs, not only more prose.

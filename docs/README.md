@@ -11,7 +11,7 @@ belongs.
 | Project overview and quick commands | [`README.md`](../README.md) |
 | Operator commands and artifact modes | [`runbook.md`](../runbook.md) |
 | Paper theorem, observer, assumptions, TCB, and non-claims | [`claim-boundary.md`](./claim-boundary.md) |
-| Accepted Solidity/metadata subset | [`supported-subset.md`](./supported-subset.md) |
+| Accepted Solidity-like DSL/metadata subset | [`supported-subset.md`](./supported-subset.md) |
 | Lean/proof architecture and validation reports | [`proof-architecture.md`](./proof-architecture.md) |
 | Path ORAM theorem route, provenance, and bibliography | [`path-oram.md`](./path-oram.md), [`path-oram-theorem-sources.bib`](./path-oram-theorem-sources.bib) |
 | Runtime boundary, TEE observer, and secret-state ownership | [`runtime/README.md`](./runtime/README.md) |

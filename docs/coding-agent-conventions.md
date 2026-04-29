@@ -14,7 +14,7 @@ Topic-owned sources of truth:
   [`claim-boundary.md`](./claim-boundary.md)
 - proof/checker structure and validation reports:
   [`proof-architecture.md`](./proof-architecture.md)
-- accepted Solidity/metadata subset:
+- accepted Solidity-like DSL/metadata subset:
   [`supported-subset.md`](./supported-subset.md)
 - Path ORAM theorem/provenance route:
   [`path-oram.md`](./path-oram.md)

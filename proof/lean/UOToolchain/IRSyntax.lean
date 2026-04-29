@@ -1,7 +1,7 @@
 /-!
 # UO IR syntax (Lean mirror of `crates/uo-core/src/ir.rs`)
 
-This module pins the admitted Solidity subset's IR surface as Lean inductives,
+This module pins the admitted Solidity-like UO DSL's IR surface as Lean inductives,
 mirroring the Rust IR data types one-for-one. Operational semantics is
 defined separately in `IRSemantics.lean`.
 
