@@ -442,12 +442,15 @@ def Function.initialEnv (fn : Function)
 def evalFunction (fn : Function) (cfg : OperationalConfig) : Outcome :=
   match fn.initialEnv cfg.publicArgs cfg.secretArgs with
   | none =>
-      { Outcome.empty with
-        status := .evalError "argument arity mismatch"
-        finalPublicState := some cfg.publicState }
+      let outcome :=
+        { Outcome.empty with
+          status := .evalError "argument arity mismatch" }
+      Outcome.withPublicStateTransition outcome
+        (Outcome.toPublicStateTransition outcome cfg.publicState cfg.publicState)
   | some env =>
       let (cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
-      outcome.withFinalPublicState cfg'.publicState
+      Outcome.withPublicStateTransition outcome
+        (Outcome.toPublicStateTransition outcome cfg.publicState cfg'.publicState)
 
 /-! ## AST → IR lowering
 
@@ -610,19 +613,19 @@ theorem lowerStatement_preserves_semantics
       evalStatement cfg env oc s = IR.evalStatement cfg env oc (lowerStatement s)
   | .declare name ty value => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
-      rw [lowerExpr_preserves_semantics cfg env value]
+      simp only [lowerExpr_preserves_semantics cfg env value]
       rfl
   | .assign name value => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
-      rw [lowerExpr_preserves_semantics cfg env value]
+      simp only [lowerExpr_preserves_semantics cfg env value]
       rfl
   | .require_ cond => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
-      rw [lowerExpr_preserves_semantics cfg env cond]
+      simp only [lowerExpr_preserves_semantics cfg env cond]
       rfl
   | .abortIf cond => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
-      rw [lowerExpr_preserves_semantics cfg env cond]
+      simp only [lowerExpr_preserves_semantics cfg env cond]
       rfl
   | .cellSet objectId value predicate => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
@@ -729,7 +732,7 @@ theorem lowerStatement_preserves_semantics
       simp only [evalStatement, lowerStatement, IR.evalStatement]
   | .retStmt (some value) => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
-      rw [lowerExpr_preserves_semantics cfg env value]
+      simp only [lowerExpr_preserves_semantics cfg env value]
       rfl
 termination_by s => (sizeOf s, 0, 0)
 

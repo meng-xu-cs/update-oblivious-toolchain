@@ -255,7 +255,11 @@ inductive EvalStatus where
   | abortedByUser
   | unsupported (kind : String)
   | evalError (msg : String)
-  deriving Repr, Inhabited
+  deriving Repr, DecidableEq, Inhabited
+
+def EvalStatus.commitsCandidate : EvalStatus → Bool
+  | .completed => true
+  | _ => false
 
 /-- Per-object ORAM access count: pair `(objectId, accesses)` matching the
 manifest-facing `oramAccesses` view. -/
@@ -274,6 +278,39 @@ def bump (counts : OramAccessCounts) (objectId : Nat) : OramAccessCounts :=
 
 end OramAccessCounts
 
+private def natListContains (needle : Nat) : List Nat → Bool
+  | [] => false
+  | value :: rest => value == needle || natListContains needle rest
+
+private def uniqueNatList : List Nat → List Nat
+  | [] => []
+  | value :: rest =>
+      let tail := uniqueNatList rest
+      if natListContains value tail then tail else value :: tail
+
+private def ObjectStore.objectIds (store : ObjectStore) : List Nat :=
+  store.map Prod.fst
+
+private def optionalValueEquivalent : Option Value → Option Value → Bool
+  | none, none => true
+  | some lhs, some rhs => Value.beq lhs rhs
+  | _, _ => false
+
+def publicStateDelta (initial committed : ObjectStore) : List Nat :=
+  uniqueNatList (initial.objectIds ++ committed.objectIds) |>.filter
+    (fun objectId =>
+      !optionalValueEquivalent
+        (initial.lookup objectId)
+        (committed.lookup objectId))
+
+structure PublicStateTransition where
+  initialPublicState : ObjectStore
+  candidatePublicState : ObjectStore
+  committedPublicState : ObjectStore
+  publicDelta : List Nat
+  abortStatus : Bool
+  deriving Inhabited
+
 /-- The richer outcome the operational evaluator emits.
 
 * `trace` matches the existing `TraceModel.Trace` surface so all downstream
@@ -290,6 +327,9 @@ end OramAccessCounts
   or an internal `evalError`.
 * `finalPublicState` records the public store after the call. It is populated
   by `evalContract`; intermediate statement/body outcomes leave it as `none`.
+* `publicStateTransition` records the initial, candidate, and committed public
+  stores. On any non-completed status, the committed store is the initial
+  store, pinning rollback-on-abort at the evaluator boundary.
 
 The W4.1 evaluator never panics; it always returns an outcome.
 -/
@@ -300,6 +340,7 @@ structure Outcome where
   kernelSteps : List String
   status : EvalStatus
   finalPublicState : Option ObjectStore
+  publicStateTransition : Option PublicStateTransition
 
 namespace Outcome
 
@@ -310,6 +351,7 @@ namespace Outcome
   , kernelSteps := []
   , status := EvalStatus.completed
   , finalPublicState := none
+  , publicStateTransition := none
   }
 
 @[inline] def withGas (oc : Outcome) (gasUsed : Nat) : Outcome :=
@@ -320,6 +362,46 @@ namespace Outcome
 @[inline] def withFinalPublicState
   (oc : Outcome) (publicState : ObjectStore) : Outcome :=
   { oc with finalPublicState := some publicState }
+
+@[inline] def abortedForCommit (oc : Outcome) : Bool :=
+  !oc.status.commitsCandidate
+
+@[inline] def committedPublicState
+  (oc : Outcome) (initialPublicState candidatePublicState : ObjectStore) :
+  ObjectStore :=
+  if oc.status.commitsCandidate then candidatePublicState else initialPublicState
+
+@[inline] def toPublicStateTransition
+  (oc : Outcome) (initialPublicState candidatePublicState : ObjectStore) :
+  PublicStateTransition :=
+  let committedPublicState := oc.committedPublicState initialPublicState candidatePublicState
+  { initialPublicState
+  , candidatePublicState
+  , committedPublicState
+  , publicDelta := publicStateDelta initialPublicState committedPublicState
+  , abortStatus := oc.abortedForCommit
+  }
+
+@[inline] def withPublicStateTransition
+  (oc : Outcome) (transition : PublicStateTransition) : Outcome :=
+  { oc with
+    finalPublicState := some transition.committedPublicState
+    publicStateTransition := some transition
+  }
+
+theorem committedPublicState_abortedByUser
+  (oc : Outcome) (initialPublicState candidatePublicState : ObjectStore)
+  (hStatus : oc.status = EvalStatus.abortedByUser) :
+  oc.committedPublicState initialPublicState candidatePublicState = initialPublicState := by
+  unfold committedPublicState
+  simp [hStatus, EvalStatus.commitsCandidate]
+
+theorem committedPublicState_requireFailed
+  (oc : Outcome) (initialPublicState candidatePublicState : ObjectStore)
+  (hStatus : oc.status = EvalStatus.requireFailed) :
+  oc.committedPublicState initialPublicState candidatePublicState = initialPublicState := by
+  unfold committedPublicState
+  simp [hStatus, EvalStatus.commitsCandidate]
 
 end Outcome
 
@@ -1068,18 +1150,71 @@ evaluator surface. -/
 def evalContract (cfg : OperationalConfig) : Outcome :=
   match cfg.entrypointFn? with
   | none =>
-      { Outcome.empty with
-        status := .evalError s!"unknown entrypoint {cfg.entrypoint}"
-        finalPublicState := some cfg.publicState }
+      let outcome :=
+        { Outcome.empty with
+          status := .evalError s!"unknown entrypoint {cfg.entrypoint}" }
+      outcome.withPublicStateTransition
+        (outcome.toPublicStateTransition cfg.publicState cfg.publicState)
   | some fn =>
       match cfg.initialEnv fn with
       | none =>
-          { Outcome.empty with
-            status := .evalError "argument arity mismatch"
-            finalPublicState := some cfg.publicState }
+          let outcome :=
+            { Outcome.empty with
+              status := .evalError "argument arity mismatch" }
+          outcome.withPublicStateTransition
+            (outcome.toPublicStateTransition cfg.publicState cfg.publicState)
       | some env =>
           let (cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
-          outcome.withFinalPublicState cfg'.publicState
+          outcome.withPublicStateTransition
+            (outcome.toPublicStateTransition cfg.publicState cfg'.publicState)
+
+theorem evalContract_commits_initial_publicState_on_aborted_body
+  (cfg cfg' : OperationalConfig)
+  (fn : CompiledFunction)
+  (env env' : LocalEnv)
+  (outcome : Outcome)
+  (hEntry : cfg.entrypointFn? = some fn)
+  (hEnv : cfg.initialEnv fn = some env)
+  (hEval : evalBody cfg env Outcome.empty fn.body = (cfg', env', outcome))
+  (hStatus : outcome.status = EvalStatus.abortedByUser) :
+  (evalContract cfg).finalPublicState = some cfg.publicState := by
+  unfold evalContract
+  simp [hEntry, hEnv, hEval, Outcome.withPublicStateTransition,
+    Outcome.toPublicStateTransition, Outcome.committedPublicState,
+    hStatus, EvalStatus.commitsCandidate]
+
+theorem evalContract_commits_initial_publicState_on_requireFailed_body
+  (cfg cfg' : OperationalConfig)
+  (fn : CompiledFunction)
+  (env env' : LocalEnv)
+  (outcome : Outcome)
+  (hEntry : cfg.entrypointFn? = some fn)
+  (hEnv : cfg.initialEnv fn = some env)
+  (hEval : evalBody cfg env Outcome.empty fn.body = (cfg', env', outcome))
+  (hStatus : outcome.status = EvalStatus.requireFailed) :
+  (evalContract cfg).finalPublicState = some cfg.publicState := by
+  unfold evalContract
+  simp [hEntry, hEnv, hEval, Outcome.withPublicStateTransition,
+    Outcome.toPublicStateTransition, Outcome.committedPublicState,
+    hStatus, EvalStatus.commitsCandidate]
+
+theorem publicStateTransition_requireFailed_commits_initial
+  (initialPublicState candidatePublicState : ObjectStore) :
+  (Outcome.toPublicStateTransition
+      ({ Outcome.empty with status := EvalStatus.requireFailed } : Outcome)
+      initialPublicState
+      candidatePublicState).committedPublicState =
+    initialPublicState := by
+  rfl
+
+theorem publicStateTransition_abortIf_commits_initial
+  (initialPublicState candidatePublicState : ObjectStore) :
+  (Outcome.toPublicStateTransition
+      ({ Outcome.empty with status := EvalStatus.abortedByUser } : Outcome)
+      initialPublicState
+      candidatePublicState).committedPublicState =
+    initialPublicState := by
+  rfl
 
 end IR
 

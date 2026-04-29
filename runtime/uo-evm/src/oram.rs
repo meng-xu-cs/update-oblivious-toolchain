@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use rand_chacha::ChaCha20Rng;
+use serde_json::json;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::ir::StateObject;
 use uo_core::manifest::{OramManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME};
@@ -313,6 +314,25 @@ impl OramState {
             object_name: spec.name.clone(),
             access_counter: self.access_counter,
         }
+    }
+
+    pub(crate) fn public_state_snapshot_value(&self) -> serde_json::Value {
+        let entries = self
+            .entries
+            .iter()
+            .map(|entry| {
+                json!({
+                    "occupied": entry.occupied,
+                    "key": &entry.key,
+                    "value": &entry.value,
+                })
+            })
+            .collect::<Vec<_>>();
+        json!({
+            "kind": "oram_map",
+            "access_counter": self.access_counter,
+            "entries": entries,
+        })
     }
 
     #[cfg(test)]

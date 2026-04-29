@@ -1,5 +1,7 @@
 use crate::controller::CallRecorder;
-use crate::runtime::state::{ContractRuntime, PublicRuntimeShadowState};
+use crate::runtime::state::{
+    public_state_transition_from_hashes, ContractRuntime, PublicRuntimeShadowState,
+};
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
@@ -39,6 +41,7 @@ pub(in crate::runtime) fn run_public_entrypoint(
         .ok_or_else(|| anyhow!("unknown public entrypoint: {entrypoint}"))?;
     let allocator = AllocatorPlan::from_manifest(manifest_entry);
     let public_object_ids = runtime.public_object_ids()?;
+    let initial_public_state_hash = runtime.public_state_digest()?;
     let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.as_ref())?;
     let mut shadow = runtime.prepare_public_shadow(&mut kernel, public_object_ids.as_ref())?;
     let execution = interpret_public_entrypoint(
@@ -49,7 +52,15 @@ pub(in crate::runtime) fn run_public_entrypoint(
         recorder,
         &mut kernel,
     )?;
+    let candidate_public_state_hash = shadow.public_state_digest()?;
     runtime.commit_public_shadow(&mut kernel, &mut shadow, execution.aborted, recorder)?;
+    let committed_public_state_hash = shadow.public_state_digest()?;
+    let public_state_transition = public_state_transition_from_hashes(
+        initial_public_state_hash,
+        candidate_public_state_hash,
+        committed_public_state_hash,
+        execution.aborted,
+    )?;
     let (runtime_kernel_machine_finish_witness, runtime_kernel_finish_bundle) =
         kernel.finish_with_machine_witness(&function.signature)?;
     runtime.replace_with_cold_public_shadow(shadow)?;
@@ -63,7 +74,8 @@ pub(in crate::runtime) fn run_public_entrypoint(
         execution.aborted,
         execution.return_value,
         execution.opcode_trace.into_boxed_slice(),
-    ))
+    )
+    .with_public_state_transition(public_state_transition))
 }
 
 fn interpret_public_entrypoint(
@@ -169,6 +181,7 @@ fn exec_statement(
                 .ok_or_else(|| anyhow!("abort condition must be boolean"))?;
             if cond {
                 state.aborted = true;
+                state.returned = true;
             }
         }
         Statement::If {

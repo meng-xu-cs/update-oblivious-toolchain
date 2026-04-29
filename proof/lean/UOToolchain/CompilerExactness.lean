@@ -243,21 +243,59 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
           exact False.elim (hNotManyAccesses hMany)
       · have hNotSurrogate : ¬ oram.scheme = "surrogate_public_schedule_v1" := by
           simpa [translationSurrogateOramScheme] using hSurrogate
-        have hExpanded := hShape
-        simp
-          [ validateImportedOramShape
-          , hOram
-          , hNotSurrogate
-          , translationPathOramScheme
-          , translationSurrogateOramScheme
-          , and_assoc
-          ] at hExpanded
-        rcases hExpanded with
-          ⟨_hStateKind, _hStateBackend, _hManifestKind, _hManifestBackend,
-            _hStateScheme, _hAccessBound, hPathScheme, hBucketCount, _hOddBucketCount,
-            _hLeafPowerOfTwo, hBlocksPerBucket, hBucketSize, hStashBound, hRecursionDepth,
-            _hTreeHeight, _hBucketCountShape, hMetadataPagesPerAccess, hBucketsPerAccess,
-            hAccessesPerCall⟩
+        have hPathScheme : oram.scheme = translationPathOramScheme := by
+          have hExpanded := hShape
+          simp [validateImportedOramShape, hOram, hNotSurrogate,
+            translationSurrogateOramScheme, translationPathOramScheme] at hExpanded
+          rcases hExpanded with ⟨_hPrefix, hPathString, _hRest⟩
+          simpa [translationPathOramScheme] using hPathString
+        have hBlocksPerBucket : oram.blocks_per_bucket = 5 := by
+          by_cases hEq : oram.blocks_per_bucket = 5
+          · exact hEq
+          · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
+        have hBucketSize :
+            oram.bucket_size =
+              translationOramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size := by
+          by_cases hEq :
+              oram.bucket_size =
+                translationOramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size
+          · exact hEq
+          · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
+        have hBucketCount : 0 < oram.bucket_count := by
+          by_cases hPos : 0 < oram.bucket_count
+          · exact hPos
+          · simp [validateImportedOramShape, hOram, hPathScheme, hPos,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
+        have hStashBound :
+            oram.stash_bound = max (stateObject.capacity.getD 1) 1 := by
+          by_cases hEq : oram.stash_bound = max (stateObject.capacity.getD 1) 1
+          · exact hEq
+          · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
+        have hRecursionDepth : oram.recursion_depth = 0 := by
+          by_cases hEq : oram.recursion_depth = 0
+          · exact hEq
+          · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
+        have hMetadataPagesPerAccess :
+            oram.metadata_pages_per_access = oram.metadata_pages + 1 := by
+          by_cases hEq : oram.metadata_pages_per_access = oram.metadata_pages + 1
+          · exact hEq
+          · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
+        have hBucketsPerAccess :
+            oram.buckets_per_access = oram.tree_height + 1 := by
+          by_cases hEq : oram.buckets_per_access = oram.tree_height + 1
+          · exact hEq
+          · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
+        have hAccessesPerCall : oram.accesses_per_call = 1 := by
+          by_cases hEq : oram.accesses_per_call = 1
+          · exact hEq
+          · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
+              translationSurrogateOramScheme, translationPathOramScheme] at hShape
         have hWellFormedPath :
             WellFormedPathOramObject
               { objectId := stateObject.id

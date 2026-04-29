@@ -40,7 +40,7 @@ not as independent findings.
 | F-01 | Public entrypoint observer leak | TB-01, TH-01, negative tests 1-2 | Agree | P0 | Landed |
 | F-02 | Strict sidecar parse/hash boundary | TB-02, negative test 4 | Agree | P0 | Landed |
 | F-03 | Full `(P, M, V)` identity binding | TB-03, TH-08, practical blocker 6 | Agree | P0 | Landed |
-| F-04 | Abort/rollback theorem | TB-04, TH-04, negative test 3 | Agree | P0 | Open - required |
+| F-04 | Abort/rollback theorem | TB-04, TH-04, negative test 3 | Agree | P0 | Landed |
 | F-05 | Exact declassification framing | TB-05, TH-05, negative test 5 | Agree | P0 | Open - required |
 | F-06 | Proof-relevant observer coverage | TB-06, TH-06 | Agree | P0 | Open - required |
 | F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Open - required |
@@ -194,6 +194,18 @@ agree that the committed public state equals the initial public state.
 Status:
 Landed.
 
+Landing notes:
+Source, IR, kernel, and runtime traces now carry a public-state transition with
+initial, candidate, committed, delta, and abort-status fields. Lean
+`evalContract`, Sol evaluation, and kernel evaluation use rollback-on-abort:
+non-completed calls commit the initial public state, with dedicated theorems
+for `requireFailed` and `abortedByUser`. Runtime public calls hash the initial,
+candidate, and committed public states, include the transition in primitive and
+proof-object transcripts, and stop executing after `abortIf`. A runtime test
+checks a public write followed by `require(false)` rolls back the committed
+state. Proof-grade Lean root and regenerated benchmark artifact validation pass
+against the updated manifest digest.
+
 ### F-05 - Exact Declassification Framing
 
 Grouped finding:
@@ -313,7 +325,7 @@ have a specific invariant and a test that would fail if the invariant is
 violated.
 
 Status:
-Open - required.
+Landed.
 
 ### F-09 - Path ORAM Capacity Cap Mirrored In Lean
 
@@ -340,7 +352,7 @@ above 128 must fail Lean validation even if the Rust generator would not
 normally emit it.
 
 Status:
-Open - required.
+Landed.
 
 ### F-10 - Smaller Metadata Canonicality Gaps
 
@@ -587,7 +599,7 @@ The remediation work must add or update tests for:
 - [x] F-01 landed and tested.
 - [x] F-02 landed and tested.
 - [x] F-03 landed and tested.
-- [ ] F-04 landed and tested.
+- [x] F-04 landed and tested.
 - [ ] F-05 landed and tested.
 - [ ] F-06 landed and tested.
 - [ ] F-07 landed and tested.

@@ -241,6 +241,70 @@ mod tests {
     }
 
     #[test]
+    fn public_require_after_write_rolls_back_committed_public_state() {
+        let source = write_temp(
+            "rollback-require",
+            r#"
+            contract C {
+                uint256 private x;
+                function setThenFail(uint256 v) public {
+                    x = v;
+                    require(false);
+                }
+                function read() public returns (uint256) {
+                    return x;
+                }
+            }
+            "#,
+        );
+        let artifact = compile_bench(
+            source.to_str().unwrap(),
+            r#"
+contract: C
+entrypoints:
+  setThenFail(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  read():
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+            ProgramMode::Raw,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
+
+        let failed = instance
+            .call("setThenFail(uint256)", vec![Value::uint(7)])
+            .unwrap();
+        assert!(failed.aborted);
+        let transition = failed.trace.public_state_transition.as_ref().unwrap();
+        assert!(transition.aborted);
+        assert!(transition.commits_initial_on_abort());
+        assert_eq!(
+            transition.committed_public_state_hash,
+            transition.initial_public_state_hash
+        );
+        assert_ne!(
+            transition.candidate_public_state_hash,
+            transition.initial_public_state_hash
+        );
+
+        let read = instance.call("read()", vec![]).unwrap();
+        assert!(!read.aborted);
+        assert_eq!(read.return_value, Some(Value::uint(0)));
+    }
+
+    #[test]
     fn encrypted_return_requires_session_and_keeps_plaintext_out_of_public_outcome() {
         let source = write_temp(
             "encrypted-return",

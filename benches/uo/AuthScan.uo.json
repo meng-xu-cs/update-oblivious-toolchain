@@ -7,8 +7,8 @@
     "raw_metadata_sha256": "2e2649c5dc37f9f60e14eaa7736a8e73b9ed7b2bfbc24359d7d3f12800af48ed",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "6532ba9d7a515160c521fbc090630fc22ecfc163d7a61c75e91d41105b8df287",
-    "package_sha256": "b6816058b0b867733a30db148e51fdc8b7faa3c20dded5168474ab19c3c087b2"
+    "toolchain_manifest_sha256": "36bc4bccb470bd6ab9e5c6fb8d370d42bf947b70d432ce15ea087636220d254f",
+    "package_sha256": "7464c33415c46464cf37d09d70593b504b20ff0412a4bfe57da6c3ee7cc50e8f"
   },
   "contract": {
     "contract": "AuthScan",

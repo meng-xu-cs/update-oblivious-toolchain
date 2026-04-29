@@ -2,13 +2,15 @@ use crate::controller::{CallRecorder, PublicCallSummary};
 use crate::runtime::fresh_coins::{PathOramFreshCoinEntry, PathOramFreshCoinPlan};
 use crate::runtime::objects::RuntimeObject;
 use anyhow::{anyhow, bail, Result};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, CommittedRuntimeWitnessSnapshot,
     CommittedRuntimeWitnessSnapshotBuilder, ConfidentialKernelSlotProgram, FixedBoxBuilder,
-    RuntimeCallOutcome, RuntimeKernelFinishBundle, TracedRuntimeCallOutcome,
-    TracedRuntimeCallStart, Value,
+    RuntimeCallOutcome, RuntimeKernelFinishBundle, RuntimePublicStateTransition,
+    TracedRuntimeCallOutcome, TracedRuntimeCallStart, Value,
 };
 use uo_kernel_runtime::{
     RuntimeKernelConfidentialStore, RuntimeKernelMachine as PublicRuntimeKernel,
@@ -34,6 +36,12 @@ pub(in crate::runtime) struct RuntimeShadowState {
 struct RuntimeObjectEntry {
     object_id: u32,
     object: RuntimeObject,
+}
+
+#[derive(Serialize)]
+struct RuntimePublicObjectStateSnapshot {
+    object_id: u32,
+    payload: serde_json::Value,
 }
 
 #[derive(Debug, Default)]
@@ -89,6 +97,20 @@ impl RuntimeObjectTable {
             object_ids.push(entry.object_id)?;
         }
         object_ids.finish()
+    }
+
+    fn public_state_digest(&self) -> Result<String> {
+        let mut allocator = public_state_snapshot_allocator()?;
+        let mut snapshots = Vec::new();
+        for entry in &self.entries {
+            if let Some(payload) = entry.object.public_state_snapshot_value(&mut allocator)? {
+                snapshots.push(RuntimePublicObjectStateSnapshot {
+                    object_id: entry.object_id,
+                    payload,
+                });
+            }
+        }
+        hash_json(&snapshots)
     }
 
     fn get(&self, object_id: u32) -> Option<&RuntimeObject> {
@@ -192,6 +214,10 @@ impl ContractRuntime {
 
     pub(in crate::runtime) fn public_object_ids(&self) -> Result<Box<[u32]>> {
         self.committed.public_object_ids()
+    }
+
+    pub(in crate::runtime) fn public_state_digest(&self) -> Result<String> {
+        self.committed.public_state_digest()
     }
 
     pub(in crate::runtime) fn begin_traced_call(
@@ -405,6 +431,10 @@ impl CommittedRuntimeState {
         self.objects.object_ids()
     }
 
+    fn public_state_digest(&self) -> Result<String> {
+        self.objects.public_state_digest()
+    }
+
     fn ensure_confidential_program_targets_uo_backends(
         &self,
         program: &ConfidentialKernelSlotProgram,
@@ -575,6 +605,10 @@ impl CommittedRuntimeState {
 }
 
 impl RuntimeShadowState {
+    fn public_state_digest(&self) -> Result<String> {
+        self.objects.public_state_digest()
+    }
+
     pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
         self.objects
             .get_mut(object_id)
@@ -725,6 +759,10 @@ impl PublicRuntimeShadowState {
         self.shadow.object_mut(object_id)
     }
 
+    pub(in crate::runtime) fn public_state_digest(&self) -> Result<String> {
+        self.shadow.public_state_digest()
+    }
+
     pub(in crate::runtime) fn commit_against(
         &mut self,
         committed: &CommittedRuntimeState,
@@ -739,6 +777,35 @@ impl PublicRuntimeShadowState {
     pub(in crate::runtime) fn into_cold_committed_state(self) -> Result<CommittedRuntimeState> {
         self.shadow.into_cold_committed_state()
     }
+}
+
+pub(in crate::runtime) fn public_state_transition_from_hashes(
+    initial_public_state_hash: String,
+    candidate_public_state_hash: String,
+    committed_public_state_hash: String,
+    aborted: bool,
+) -> Result<RuntimePublicStateTransition> {
+    RuntimePublicStateTransition::from_hashes(
+        initial_public_state_hash,
+        candidate_public_state_hash,
+        committed_public_state_hash,
+        aborted,
+    )
+    .map_err(anyhow::Error::from)
+}
+
+fn public_state_snapshot_allocator() -> Result<AllocatorSession> {
+    AllocatorSession::new(AllocatorPlan {
+        arena_bytes: 1 << 20,
+        max_stack_words: 4096,
+        scratch_bytes: 1 << 20,
+        max_kernel_ops: 1 << 20,
+    })
+}
+
+fn hash_json<T: Serialize + ?Sized>(value: &T) -> Result<String> {
+    let payload = serde_json::to_vec(value)?;
+    Ok(hex::encode(Sha256::digest(payload)))
 }
 
 impl RuntimeKernelObjectStore for ConfidentialRuntimeShadowState {

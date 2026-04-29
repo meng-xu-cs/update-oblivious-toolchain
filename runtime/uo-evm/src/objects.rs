@@ -3,6 +3,7 @@ use crate::oram::{MapEntry, OramState, PathOramLeafCoinSource};
 use anyhow::{anyhow, bail, Result};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+use serde_json::json;
 use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
@@ -685,6 +686,64 @@ impl RuntimeObject {
             Self::UoSmallMap(object) => &object.spec.name,
             Self::UoOramMap(object) => &object.spec.name,
         }
+    }
+
+    pub(in crate::runtime) fn public_state_snapshot_value(
+        &self,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Option<serde_json::Value>> {
+        let is_confidential = match self {
+            Self::RawCell(object) | Self::UoCell(object) => object.spec.confidential,
+            Self::RawArray(object) | Self::UoArray(object) => object.spec.confidential,
+            Self::RawMap(object) => object.spec.confidential,
+            Self::UoSmallMap(object) => object.spec.confidential,
+            Self::UoOramMap(object) => object.spec.confidential,
+        };
+        if is_confidential {
+            return Ok(None);
+        }
+        Ok(Some(match self {
+            Self::RawCell(object) => {
+                json!({"kind": "cell", "name": &object.spec.name, "value": &object.value})
+            }
+            Self::UoCell(object) => {
+                let value = object.decode_value_from_storage(allocator)?;
+                json!({"kind": "cell", "name": &object.spec.name, "value": value})
+            }
+            Self::RawArray(object) => {
+                json!({"kind": "array", "name": &object.spec.name, "values": &object.values})
+            }
+            Self::UoArray(object) => {
+                let values = object.decode_values_from_storage(allocator)?;
+                json!({"kind": "array", "name": &object.spec.name, "values": values})
+            }
+            Self::RawMap(object) => {
+                let entries = object
+                    .entries
+                    .iter()
+                    .map(|(key, entry)| json!({"key": key, "value": &entry.value}))
+                    .collect::<Vec<_>>();
+                json!({"kind": "map", "name": &object.spec.name, "entries": entries})
+            }
+            Self::UoSmallMap(object) => {
+                let entries = object
+                    .decode_entries_from_storage(allocator)?
+                    .iter()
+                    .map(|entry| {
+                        json!({
+                            "occupied": entry.is_occupied(),
+                            "key": entry.key(),
+                            "value": entry.value(),
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                json!({"kind": "map", "name": &object.spec.name, "entries": entries})
+            }
+            Self::UoOramMap(object) => {
+                let state = object.oram.public_state_snapshot_value();
+                json!({"kind": "oram_map", "name": &object.spec.name, "state": state})
+            }
+        }))
     }
 
     pub(in crate::runtime) fn get_cell(&mut self, trace: &mut CallRecorder) -> Result<Value> {

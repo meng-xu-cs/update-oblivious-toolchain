@@ -126,6 +126,7 @@ fn finalize_call_trace(
         aborted,
         return_value,
         opcode_trace,
+        public_state_transition,
         runtime_witness_state,
     ) = traced_outcome
         .into_finalized_call_trace_parts(runtime_call_start)
@@ -155,6 +156,7 @@ fn finalize_call_trace(
             opcode_trace,
             gas_used,
             Some(deploy_seed),
+            public_state_transition,
             runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_witness_state,

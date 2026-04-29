@@ -6467,6 +6467,7 @@ pub enum RuntimePrimitiveEventKind {
     LogicalWrite,
     PhysicalRead,
     PhysicalWrite,
+    PublicStateTransition,
     TheoremTrace,
     RuntimeKernelWitness,
     RuntimeKernelRefinementWitness,
@@ -6490,6 +6491,43 @@ pub struct RuntimePrimitiveEvent {
     pub payload_hash: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct RuntimePublicStateTransition {
+    pub initial_public_state_hash: String,
+    pub candidate_public_state_hash: String,
+    pub committed_public_state_hash: String,
+    pub public_delta_hash: String,
+    pub aborted: bool,
+}
+
+impl RuntimePublicStateTransition {
+    pub fn from_hashes(
+        initial_public_state_hash: impl Into<String>,
+        candidate_public_state_hash: impl Into<String>,
+        committed_public_state_hash: impl Into<String>,
+        aborted: bool,
+    ) -> Result<Self, serde_json::Error> {
+        let initial_public_state_hash = initial_public_state_hash.into();
+        let candidate_public_state_hash = candidate_public_state_hash.into();
+        let committed_public_state_hash = committed_public_state_hash.into();
+        let public_delta_hash = hash_json(&(
+            initial_public_state_hash.as_str(),
+            committed_public_state_hash.as_str(),
+        ))?;
+        Ok(Self {
+            initial_public_state_hash,
+            candidate_public_state_hash,
+            committed_public_state_hash,
+            public_delta_hash,
+            aborted,
+        })
+    }
+
+    pub fn commits_initial_on_abort(&self) -> bool {
+        !self.aborted || self.committed_public_state_hash == self.initial_public_state_hash
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct ExecutionTrace {
     #[serde(default)]
@@ -6506,6 +6544,8 @@ pub struct ExecutionTrace {
     pub gas_used: u64,
     #[serde(default)]
     pub theorem_trace: TheoremTrace,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_state_transition: Option<RuntimePublicStateTransition>,
     #[serde(default)]
     runtime_seed: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -6711,6 +6751,7 @@ pub struct RuntimeCallOutcome {
     aborted: bool,
     return_value: Option<Value>,
     opcode_trace: Box<[String]>,
+    public_state_transition: Option<RuntimePublicStateTransition>,
 }
 
 impl RuntimeCallOutcome {
@@ -6727,7 +6768,16 @@ impl RuntimeCallOutcome {
             aborted,
             return_value,
             opcode_trace,
+            public_state_transition: None,
         }
+    }
+
+    pub fn with_public_state_transition(
+        mut self,
+        transition: RuntimePublicStateTransition,
+    ) -> Self {
+        self.public_state_transition = Some(transition);
+        self
     }
 
     pub fn into_theorem_trace_parts(
@@ -6738,6 +6788,7 @@ impl RuntimeCallOutcome {
         bool,
         Option<Value>,
         Box<[String]>,
+        Option<RuntimePublicStateTransition>,
     ) {
         (
             self.runtime_kernel_machine_finish_witness,
@@ -6745,6 +6796,7 @@ impl RuntimeCallOutcome {
             self.aborted,
             self.return_value,
             self.opcode_trace,
+            self.public_state_transition,
         )
     }
 }
@@ -6816,6 +6868,7 @@ impl FinalizedRuntimeCallTraceParts {
         bool,
         Option<Value>,
         Box<[String]>,
+        Option<RuntimePublicStateTransition>,
         TracedRuntimeCallWitnessState,
     ) {
         let Self {
@@ -6828,6 +6881,7 @@ impl FinalizedRuntimeCallTraceParts {
             aborted,
             return_value,
             opcode_trace,
+            public_state_transition,
         ) = runtime_call_outcome.into_theorem_trace_parts();
         (
             runtime_kernel_machine_finish_witness,
@@ -6835,6 +6889,7 @@ impl FinalizedRuntimeCallTraceParts {
             aborted,
             return_value,
             opcode_trace,
+            public_state_transition,
             runtime_witness_state,
         )
     }
@@ -6881,6 +6936,7 @@ impl RuntimePublicCallTraceBundle {
         opcode_trace: Box<[String]>,
         gas_used: u64,
         runtime_seed: Option<u64>,
+        public_state_transition: Option<RuntimePublicStateTransition>,
         runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
         runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
         runtime_witness_state: TracedRuntimeCallWitnessState,
@@ -6910,6 +6966,7 @@ impl RuntimePublicCallTraceBundle {
             gas_used,
             theorem_trace,
             runtime_seed,
+            public_state_transition,
             runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
@@ -6933,6 +6990,7 @@ pub struct RuntimeExecutionTraceFinalizationInput {
     gas_used: u64,
     theorem_trace: TheoremTrace,
     runtime_seed: Option<u64>,
+    public_state_transition: Option<RuntimePublicStateTransition>,
     runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
     runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
     runtime_controller_certificate: RuntimeControllerCertificate,
@@ -6954,6 +7012,7 @@ pub(crate) struct RuntimeExecutionTraceParts {
     gas_used: u64,
     theorem_trace: TheoremTrace,
     runtime_seed: Option<u64>,
+    public_state_transition: Option<RuntimePublicStateTransition>,
     runtime_kernel_witness: Option<RuntimeKernelWitness>,
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
     runtime_kernel_machine_finish_witness: Option<RuntimeKernelMachineFinishWitness>,
@@ -7036,6 +7095,7 @@ impl RuntimeExecutionTraceParts {
         gas_used: u64,
         theorem_trace: TheoremTrace,
         runtime_seed: Option<u64>,
+        public_state_transition: Option<RuntimePublicStateTransition>,
         runtime_kernel_witness: Option<RuntimeKernelWitness>,
         runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
         runtime_kernel_machine_finish_witness: Option<RuntimeKernelMachineFinishWitness>,
@@ -7067,6 +7127,7 @@ impl RuntimeExecutionTraceParts {
             gas_used,
             theorem_trace,
             runtime_seed,
+            public_state_transition,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
             runtime_kernel_machine_finish_witness,
@@ -7094,6 +7155,7 @@ impl RuntimeExecutionTraceFinalizationInput {
         gas_used: u64,
         theorem_trace: TheoremTrace,
         runtime_seed: Option<u64>,
+        public_state_transition: Option<RuntimePublicStateTransition>,
         runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
         runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
         runtime_controller_certificate: RuntimeControllerCertificate,
@@ -7113,6 +7175,7 @@ impl RuntimeExecutionTraceFinalizationInput {
             gas_used,
             theorem_trace,
             runtime_seed,
+            public_state_transition,
             runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
@@ -7239,6 +7302,7 @@ impl ExecutionTrace {
             gas_used,
             theorem_trace,
             runtime_seed,
+            public_state_transition,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
             runtime_kernel_machine_finish_witness,
@@ -7260,6 +7324,7 @@ impl ExecutionTrace {
             physical_writes,
             gas_used,
             theorem_trace,
+            public_state_transition,
             runtime_seed,
             runtime_kernel_witness,
             runtime_kernel_refinement_witness,
@@ -7291,6 +7356,7 @@ impl ExecutionTrace {
             gas_used,
             theorem_trace,
             runtime_seed,
+            public_state_transition,
             runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             runtime_controller_certificate,
@@ -7310,6 +7376,7 @@ impl ExecutionTrace {
             gas_used,
             theorem_trace,
             runtime_seed,
+            public_state_transition,
             None,
             None,
             Some(runtime_kernel_machine_finish_witness),
@@ -7422,6 +7489,11 @@ impl ExecutionTrace {
         }
         push_primitive_event(
             &mut events,
+            RuntimePrimitiveEventKind::PublicStateTransition,
+            &self.public_state_transition,
+        )?;
+        push_primitive_event(
+            &mut events,
             RuntimePrimitiveEventKind::TheoremTrace,
             &self.theorem_trace,
         )?;
@@ -7530,6 +7602,7 @@ impl ExecutionTrace {
 
     fn runtime_proof_object_payload(&self) -> RuntimeProofObjectPayload<'_> {
         RuntimeProofObjectPayload {
+            public_state_transition: &self.public_state_transition,
             theorem_trace: &self.theorem_trace,
             runtime_kernel_witness: &self.runtime_kernel_witness,
             runtime_kernel_refinement_witness: &self.runtime_kernel_refinement_witness,
@@ -8012,6 +8085,7 @@ struct IndexedTranscriptPayload<'a, T: ?Sized> {
 
 #[derive(Serialize)]
 struct RuntimeProofObjectPayload<'a> {
+    public_state_transition: &'a Option<RuntimePublicStateTransition>,
     theorem_trace: &'a TheoremTrace,
     runtime_kernel_witness: &'a Option<RuntimeKernelWitness>,
     runtime_kernel_refinement_witness: &'a Option<RuntimeKernelRefinementWitness>,
@@ -8455,6 +8529,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
                 Some(finish_bundle),
                 None,
                 vec![].into_boxed_slice(),
@@ -8498,6 +8573,7 @@ mod tests {
                 vec![].into_boxed_slice(),
                 0,
                 TheoremTrace::default(),
+                None,
                 None,
                 None,
                 None,
@@ -8552,6 +8628,7 @@ mod tests {
                 0,
                 TheoremTrace::default(),
                 None,
+                None,
                 Some(drifted_kernel_witness),
                 None,
                 None,
@@ -8587,6 +8664,7 @@ mod tests {
                 vec![].into_boxed_slice(),
                 0,
                 TheoremTrace::default(),
+                None,
                 None,
                 None,
                 Some(drifted_runtime_kernel_refinement_witness),
@@ -8957,6 +9035,7 @@ mod tests {
                 controller_shape: Some(controller_shape.clone()),
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
+            public_state_transition: None,
             runtime_seed: Some(seed),
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
@@ -10246,6 +10325,7 @@ mod tests {
                 controller_shape: Some(controller_shape.clone()),
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
+            public_state_transition: None,
             runtime_seed: None,
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,
@@ -10311,6 +10391,7 @@ mod tests {
                 controller_shape: Some(controller_shape.clone()),
                 normalized_micro_trace: Some(normalized_micro_trace.clone()),
             },
+            public_state_transition: None,
             runtime_seed: None,
             runtime_kernel_witness: None,
             runtime_kernel_refinement_witness: None,

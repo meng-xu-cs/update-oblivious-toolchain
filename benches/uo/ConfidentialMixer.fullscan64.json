@@ -7,8 +7,8 @@
     "raw_metadata_sha256": "48d487229a297c0a259700e0f9de085f6fa2d0422583885b80736868d6a039da",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "6532ba9d7a515160c521fbc090630fc22ecfc163d7a61c75e91d41105b8df287",
-    "package_sha256": "aa377f4887b4ae1949ea7b59177a5abcc48d8b573da85bec27795fca82b6d61d"
+    "toolchain_manifest_sha256": "36bc4bccb470bd6ab9e5c6fb8d370d42bf947b70d432ce15ea087636220d254f",
+    "package_sha256": "97c9be97dd1d6dc9dcfd577d1bb10336b08fbd19abb7627869a6b7ce73a4e2c7"
   },
   "contract": {
     "contract": "ConfidentialMixer",

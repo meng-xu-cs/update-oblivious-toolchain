@@ -436,12 +436,15 @@ returned outcome. -/
 def evalKernelProgram (kp : KernelProgram) (cfg : OperationalConfig) : Outcome :=
   match kp.initialEnv cfg.publicArgs cfg.secretArgs with
   | none =>
-      { Outcome.empty with
-        status := .evalError "argument arity mismatch"
-        finalPublicState := some cfg.publicState }
+      let outcome :=
+        { Outcome.empty with
+          status := .evalError "argument arity mismatch" }
+      outcome.withPublicStateTransition
+        (outcome.toPublicStateTransition cfg.publicState cfg.publicState)
   | some env =>
       let (cfg', _env', outcome) := evalKernelBody cfg env Outcome.empty kp.body
-      outcome.withFinalPublicState cfg'.publicState
+      outcome.withPublicStateTransition
+        (outcome.toPublicStateTransition cfg.publicState cfg'.publicState)
 
 /-! ### W4.5: Static expected kernel-step schedule
 
@@ -2795,9 +2798,12 @@ theorem evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
     (evalKernelProgram kp cfg).kernelSteps = kp.expectedKernelSteps := by
   unfold evalKernelProgram at hStatus hPub ⊢
   cases hEnv : kp.initialEnv cfg.publicArgs cfg.secretArgs with
-  | none => simp [hEnv] at hStatus
+  | none =>
+      simp [hEnv, Outcome.withPublicStateTransition, Outcome.toPublicStateTransition,
+        Outcome.committedPublicState, EvalStatus.commitsCandidate] at hStatus
   | some env =>
       simp only [hEnv] at hStatus hPub ⊢
+      simp [Outcome.withPublicStateTransition] at hStatus hPub ⊢
       have hOcPub : (Outcome.empty : Outcome).publicResult = none := rfl
       have hBodyEq := evalKernelBody_kernelSteps_eq_expected_of_completed
         cfg env Outcome.empty hOcPub kp.body hStatus hPub
