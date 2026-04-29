@@ -1,17 +1,19 @@
 {
   "compiler_version": "0.1.0",
   "admitted_package": {
-    "schema": "uo-admitted-package-v1",
+    "schema": "uo-admitted-package-v3",
     "source_sha256": "234fe8ee8ec1332afc02b3f7446ef82d93ed2c0d62180b88012be70e98a57262",
-    "metadata_sha256": "9c055b1e871e13e81a5a6495ae67396710d0faea8cd92cc57a4b0d942e64a381",
+    "metadata_sha256": "e1e3389bd58c7b8fa306dc2dcda4b368933e5c4c59f7a34092f8f9188efa1078",
+    "raw_metadata_sha256": "3663f2d25a5b3943f5b9fbd8884f6fc869ac86b3f5b8fb7db26e0abf8565b5c3",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "package_sha256": "51be4837fb9087ad737624af2ea061c47eb332a8142ffe319172379d608d63d2"
+    "toolchain_manifest_sha256": "6532ba9d7a515160c521fbc090630fc22ecfc163d7a61c75e91d41105b8df287",
+    "package_sha256": "0dbf1b62f91ba495c8bb0fd635e8ceaeada25f11a1d8381995c61e6def3e8b4f"
   },
   "contract": {
     "contract": "ConfidentialMixer",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
+    "source_file": "benches/raw/ConfidentialMixer.sol",
     "state": [
       {
         "id": 1,
@@ -678,7 +680,61 @@
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "balanceOf(bytes32)",
+          "params": [
+            {
+              "name": "commitment",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "commitment"
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "balanceOf(bytes32)",
+          "param_count": 1,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 1,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "totalValue()",
@@ -700,7 +756,46 @@
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "totalValue()",
+          "params": [],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 2
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "totalValue()",
+          "param_count": 0,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 0,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 2
+              }
+            }
+          ]
+        }
       }
     ],
     "manifest": {
@@ -746,7 +841,78 @@
             "return"
           ],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "balanceOf(bytes32)",
+            "params": [
+              {
+                "name": "commitment",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "commitment"
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "balanceOf(bytes32)",
+            "param_count": 1,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 1,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -991,7 +1157,63 @@
             "return"
           ],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "totalValue()",
+            "params": [],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "totalValue()",
+            "param_count": 0,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 0,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "CellGet",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 1,
           "uocell_writes": 0,
           "uoarray_reads": 0,

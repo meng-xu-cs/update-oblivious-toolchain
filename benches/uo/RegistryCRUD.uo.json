@@ -1,17 +1,19 @@
 {
   "compiler_version": "0.1.0",
   "admitted_package": {
-    "schema": "uo-admitted-package-v1",
+    "schema": "uo-admitted-package-v3",
     "source_sha256": "c4bce1c020f6ec45575cdd30211d39a50374b557d0afa607415e7c0288466e70",
-    "metadata_sha256": "40c4f033138df44dd5d22187c20f5798090d79426f8c40599bfb78863327503d",
+    "metadata_sha256": "3412b49e87cb0a0af3a6d1506d256df9b21a14bfc8e11ff6cbad767f82c3469f",
+    "raw_metadata_sha256": "24fa7b498fca6d446c85616431edf61fbe4942ec4a3df620dd7b7fbc8f331533",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "package_sha256": "4983d7a2f765b85010a41a3abac573f2a92eeccfeef982282e470cfb6803891d"
+    "toolchain_manifest_sha256": "6532ba9d7a515160c521fbc090630fc22ecfc163d7a61c75e91d41105b8df287",
+    "package_sha256": "ad353c7511562078664447d1a5ada93ca124c035b9b61f86bba3841823e77886"
   },
   "contract": {
     "contract": "RegistryCRUD",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.sol",
+    "source_file": "benches/raw/RegistryCRUD.sol",
     "state": [
       {
         "id": 1,
@@ -630,7 +632,61 @@
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "read(bytes32)",
+          "params": [
+            {
+              "name": "key",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "key"
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "read(bytes32)",
+          "param_count": 1,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 1,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            }
+          ]
+        }
       }
     ],
     "manifest": {
@@ -1053,7 +1109,78 @@
             "return"
           ],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "read(bytes32)",
+            "params": [
+              {
+                "name": "key",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "key"
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "read(bytes32)",
+            "param_count": 1,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 1,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,

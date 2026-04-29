@@ -119,8 +119,33 @@ structure ImportedAdmittedPackageIdentity where
   metadata_sha256 : String
   compilation_mode : String
   compiler_version : String
+  toolchain_manifest_sha256 : String
   package_sha256 : String
 deriving Repr, DecidableEq, FromJson, ToJson
+
+private def admittedPackageSchema : String := "uo-admitted-package-v3"
+
+def ImportedAdmittedPackageIdentity.WellFormed
+  (identity : ImportedAdmittedPackageIdentity) : Prop :=
+  identity.schema = admittedPackageSchema ∧
+    identity.toolchain_manifest_sha256.length = 64
+
+instance (identity : ImportedAdmittedPackageIdentity) :
+    Decidable identity.WellFormed := by
+  unfold ImportedAdmittedPackageIdentity.WellFormed
+  infer_instance
+
+def ImportedAdmittedPackageIdentity.checkWellFormed
+  (identity : ImportedAdmittedPackageIdentity) : Bool :=
+  (identity.schema == admittedPackageSchema) &&
+    (identity.toolchain_manifest_sha256.length == 64)
+
+@[simp] theorem importedAdmittedPackageIdentity_checkWellFormed_eq_true_iff
+  (identity : ImportedAdmittedPackageIdentity) :
+  identity.checkWellFormed = true ↔ identity.WellFormed := by
+  unfold ImportedAdmittedPackageIdentity.checkWellFormed
+    ImportedAdmittedPackageIdentity.WellFormed
+  simp
 
 structure ImportedProofRelevantTranslationBundle where
   source_path : String
@@ -3352,6 +3377,33 @@ def ImportedProofRelevantTranslationBundle.artifactViewMatchesRawProjection
   | .ok projected => projected == bundle.artifact_view
   | .error _ => false
 
+def ImportedProofRelevantTranslationBundle.admittedPackageIdentityWellFormed
+  (bundle : ImportedProofRelevantTranslationBundle) : Prop :=
+  match bundle.source_admitted_package with
+  | some identity => identity.WellFormed
+  | none => False
+
+instance (bundle : ImportedProofRelevantTranslationBundle) :
+    Decidable bundle.admittedPackageIdentityWellFormed := by
+  unfold ImportedProofRelevantTranslationBundle.admittedPackageIdentityWellFormed
+  split
+  · infer_instance
+  · infer_instance
+
+def ImportedProofRelevantTranslationBundle.checkAdmittedPackageIdentityWellFormed
+  (bundle : ImportedProofRelevantTranslationBundle) : Bool :=
+  match bundle.source_admitted_package with
+  | some identity => identity.checkWellFormed
+  | none => false
+
+@[simp] theorem importedProofRelevantTranslationBundle_checkAdmittedPackageIdentityWellFormed_eq_true_iff
+  (bundle : ImportedProofRelevantTranslationBundle) :
+  bundle.checkAdmittedPackageIdentityWellFormed = true ↔
+    bundle.admittedPackageIdentityWellFormed := by
+  unfold ImportedProofRelevantTranslationBundle.checkAdmittedPackageIdentityWellFormed
+    ImportedProofRelevantTranslationBundle.admittedPackageIdentityWellFormed
+  cases bundle.source_admitted_package <;> simp
+
 def ImportedProofRelevantTranslationBundle.Valid
   (bundle : ImportedProofRelevantTranslationBundle) : Prop :=
   bundle.sourceViewMatchesRawProjection = true ∧
@@ -3362,7 +3414,8 @@ def ImportedProofRelevantTranslationBundle.Valid
     bundle.metadata_contract = bundle.source_view.contract ∧
     bundle.metadata_contract = bundle.artifact_view.contract ∧
     bundle.source_admitted_package = bundle.artifact_admitted_package ∧
-    bundle.source_admitted_package.isSome = true
+    bundle.source_admitted_package.isSome = true ∧
+    bundle.admittedPackageIdentityWellFormed
 
 instance (bundle : ImportedProofRelevantTranslationBundle) :
     Decidable bundle.Valid := by
@@ -3379,7 +3432,8 @@ def ImportedProofRelevantTranslationBundle.checkValid
     (bundle.metadata_contract == bundle.source_view.contract) &&
     (bundle.metadata_contract == bundle.artifact_view.contract) &&
     decide (bundle.source_admitted_package = bundle.artifact_admitted_package) &&
-    bundle.source_admitted_package.isSome
+    bundle.source_admitted_package.isSome &&
+    bundle.checkAdmittedPackageIdentityWellFormed
 
 def ImportedProofRelevantTranslationBundle.ProofGradeValid
   (bundle : ImportedProofRelevantTranslationBundle) : Prop :=
@@ -3433,6 +3487,10 @@ def ImportedProofRelevantTranslationBundle.validationErrors
       []) ++
     (if bundle.source_admitted_package.isSome != true then
       ["source admitted package identity is missing"]
+    else
+      []) ++
+    (if bundle.checkAdmittedPackageIdentityWellFormed != true then
+      ["source admitted package identity is not schema-v3/toolchain-bound"]
     else
       [])
 

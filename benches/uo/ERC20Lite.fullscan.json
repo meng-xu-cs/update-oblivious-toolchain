@@ -1,17 +1,19 @@
 {
   "compiler_version": "0.1.0",
   "admitted_package": {
-    "schema": "uo-admitted-package-v1",
+    "schema": "uo-admitted-package-v3",
     "source_sha256": "189206eda78843b786e1835056ddce154d2784db22bc36a427f784e1fbcf4b84",
-    "metadata_sha256": "b650f661b789e51ba231d912686d0c323e417c49276c4dc657215873c056fe2f",
+    "metadata_sha256": "adb0c49cf7b94d3a09f0326e65f6a2a69fb4dc8c8e82c5b0d27517c14f6bbcc2",
+    "raw_metadata_sha256": "385f530bee1b11d05d2b4ddc9378b4384335f7608dcff5d9ab01d98ffc2d1dfe",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "package_sha256": "4487625fc067eae4c9998d3959bd6fdc4c48f3fe6de013004a5f3ae8b3817b4b"
+    "toolchain_manifest_sha256": "6532ba9d7a515160c521fbc090630fc22ecfc163d7a61c75e91d41105b8df287",
+    "package_sha256": "14c300c0d170988511bca8f67e03c830292c72106c598facb657d64764dae5db"
   },
   "contract": {
     "contract": "ERC20Lite",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
+    "source_file": "benches/raw/ERC20Lite.sol",
     "state": [
       {
         "id": 2,
@@ -91,12 +93,108 @@
                   }
                 }
               },
-              "predicate": null
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
             }
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "mint(address,uint256)",
+          "params": [
+            {
+              "name": "owner",
+              "ty": {
+                "Scalar": "Address"
+              }
+            },
+            {
+              "name": "amount",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              }
+            }
+          ],
+          "return_type": null,
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "var",
+                "name": "owner"
+              },
+              "value": {
+                "kind": "binary",
+                "op": "Add",
+                "lhs": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "owner"
+                  }
+                },
+                "rhs": {
+                  "kind": "var",
+                  "name": "amount"
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "mint(address,uint256)",
+          "param_count": 2,
+          "return_type": null,
+          "secret_args": [],
+          "slot_count": 2,
+          "body": [
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "slot",
+                "slot": 0
+              },
+              "value": {
+                "kind": "binary",
+                "op": "Add",
+                "lhs": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                },
+                "rhs": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "approve(address,address,uint256)",
@@ -1348,7 +1446,61 @@
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "balanceOf(address)",
+          "params": [
+            {
+              "name": "owner",
+              "ty": {
+                "Scalar": "Address"
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "owner"
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "balanceOf(address)",
+          "param_count": 1,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 1,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            }
+          ]
+        }
       },
       {
         "signature": "allowanceOf(address,address)",
@@ -1406,7 +1558,104 @@
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "allowanceOf(address,address)",
+          "params": [
+            {
+              "name": "owner",
+              "ty": {
+                "Scalar": "Address"
+              }
+            },
+            {
+              "name": "spender",
+              "ty": {
+                "Scalar": "Address"
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "declare",
+              "name": "key",
+              "ty": {
+                "Scalar": "Bytes32"
+              },
+              "value": {
+                "kind": "keccak256",
+                "parts": [
+                  {
+                    "kind": "var",
+                    "name": "owner"
+                  },
+                  {
+                    "kind": "var",
+                    "name": "spender"
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 2,
+                "key": {
+                  "kind": "var",
+                  "name": "key"
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "allowanceOf(address,address)",
+          "param_count": 2,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 3,
+          "body": [
+            {
+              "kind": "declare",
+              "slot": 2,
+              "value": {
+                "kind": "keccak256",
+                "parts": [
+                  {
+                    "kind": "slot",
+                    "slot": 0
+                  },
+                  {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 2,
+                "key": {
+                  "kind": "slot",
+                  "slot": 2
+                }
+              }
+            }
+          ]
+        }
       }
     ],
     "manifest": {
@@ -1445,7 +1694,7 @@
           "public_gas_budget": 2521,
           "arena_bytes": 4160,
           "max_stack_words": 65,
-          "max_hash_part_bytes": 0,
+          "max_hash_part_bytes": 20,
           "return_canonical_len": 32,
           "returns": "declassified",
           "status": "public",
@@ -1453,7 +1702,121 @@
             "return"
           ],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "allowanceOf(address,address)",
+            "params": [
+              {
+                "name": "owner",
+                "ty": {
+                  "Scalar": "Address"
+                }
+              },
+              {
+                "name": "spender",
+                "ty": {
+                  "Scalar": "Address"
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "declare",
+                "name": "key",
+                "ty": {
+                  "Scalar": "Bytes32"
+                },
+                "value": {
+                  "kind": "keccak256",
+                  "parts": [
+                    {
+                      "kind": "var",
+                      "name": "owner"
+                    },
+                    {
+                      "kind": "var",
+                      "name": "spender"
+                    }
+                  ]
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 2,
+                  "key": {
+                    "kind": "var",
+                    "name": "key"
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "allowanceOf(address,address)",
+            "param_count": 2,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 3,
+            "body": [
+              {
+                "kind": "declare",
+                "slot": 2,
+                "value": {
+                  "kind": "keccak256",
+                  "parts": [
+                    {
+                      "kind": "slot",
+                      "slot": 0
+                    },
+                    {
+                      "kind": "slot",
+                      "slot": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 2,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 2
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -1646,7 +2009,78 @@
             "return"
           ],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "balanceOf(address)",
+            "params": [
+              {
+                "name": "owner",
+                "ty": {
+                  "Scalar": "Address"
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "owner"
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "balanceOf(address)",
+            "param_count": 1,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 1,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -1663,7 +2097,7 @@
             "amount"
           ],
           "entry_input_len": 52,
-          "public_gas_budget": 2278,
+          "public_gas_budget": 2285,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -1671,7 +2105,120 @@
           "status": "public",
           "declassifies": [],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "mint(address,uint256)",
+            "params": [
+              {
+                "name": "owner",
+                "ty": {
+                  "Scalar": "Address"
+                }
+              },
+              {
+                "name": "amount",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                }
+              }
+            ],
+            "return_type": null,
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "owner"
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "Add",
+                  "lhs": {
+                    "kind": "map_get",
+                    "object_id": 1,
+                    "key": {
+                      "kind": "var",
+                      "name": "owner"
+                    }
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "amount"
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "mint(address,uint256)",
+            "param_count": 2,
+            "return_type": null,
+            "secret_args": [],
+            "slot_count": 2,
+            "body": [
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "Add",
+                  "lhs": {
+                    "kind": "map_get",
+                    "object_id": 1,
+                    "key": {
+                      "kind": "slot",
+                      "slot": 0
+                    }
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 0,
           "uocell_writes": 0,
           "uoarray_reads": 0,
@@ -2487,10 +3034,10 @@
     }
   },
   "diagnostics": [],
-  "transformed_source": "function mint(address,uint256)(address owner, uint256 amount) {\n  map[1][owner] = (map_get(1, owner) Add amount) @ None\n}\n\nfunction approve(address,address,uint256)(address owner, address spender, uint256 amount) {\n  let key = keccak256(owner, spender)\n  map[2][key] = amount @ Some(\"true\")\n}\n\nfunction transfer(address,address,uint256)(address from, address to, uint256 amount) {\n  let fromBalance = map_get(1, from)\n  abort_if Not((fromBalance Gte amount))\n  map[1][from] = (fromBalance Sub amount) @ Some(\"true\")\n  map[1][to] = (map_get(1, to) Add amount) @ Some(\"true\")\n  return 1\n}\n\nfunction transferFrom(address,address,address,uint256)(address owner, address spender, address to, uint256 amount) {\n  let key = keccak256(owner, spender)\n  let allowance = map_get(2, key)\n  let fromBalance = map_get(1, owner)\n  abort_if Not((allowance Gte amount))\n  abort_if Not((fromBalance Gte amount))\n  map[2][key] = (allowance Sub amount) @ Some(\"true\")\n  map[1][owner] = (fromBalance Sub amount) @ Some(\"true\")\n  map[1][to] = (map_get(1, to) Add amount) @ Some(\"true\")\n  return 1\n}\n\nfunction balanceOf(address)(address owner) {\n  return map_get(1, owner)\n}\n\nfunction allowanceOf(address,address)(address owner, address spender) {\n  let key = keccak256(owner, spender)\n  return map_get(2, key)\n}",
+  "transformed_source": "function mint(address,uint256)(address owner, uint256 amount) {\n  map[1][owner] = (map_get(1, owner) Add amount) @ Some(\"true\")\n}\n\nfunction approve(address,address,uint256)(address owner, address spender, uint256 amount) {\n  let key = keccak256(owner, spender)\n  map[2][key] = amount @ Some(\"true\")\n}\n\nfunction transfer(address,address,uint256)(address from, address to, uint256 amount) {\n  let fromBalance = map_get(1, from)\n  abort_if Not((fromBalance Gte amount))\n  map[1][from] = (fromBalance Sub amount) @ Some(\"true\")\n  map[1][to] = (map_get(1, to) Add amount) @ Some(\"true\")\n  return 1\n}\n\nfunction transferFrom(address,address,address,uint256)(address owner, address spender, address to, uint256 amount) {\n  let key = keccak256(owner, spender)\n  let allowance = map_get(2, key)\n  let fromBalance = map_get(1, owner)\n  abort_if Not((allowance Gte amount))\n  abort_if Not((fromBalance Gte amount))\n  map[2][key] = (allowance Sub amount) @ Some(\"true\")\n  map[1][owner] = (fromBalance Sub amount) @ Some(\"true\")\n  map[1][to] = (map_get(1, to) Add amount) @ Some(\"true\")\n  return 1\n}\n\nfunction balanceOf(address)(address owner) {\n  return map_get(1, owner)\n}\n\nfunction allowanceOf(address,address)(address owner, address spender) {\n  let key = keccak256(owner, spender)\n  return map_get(2, key)\n}",
   "disassembly": [
     "fn mint(address,uint256):",
-    "  0000 map[1][owner] = (map_get(1, owner) Add amount) @ None",
+    "  0000 map[1][owner] = (map_get(1, owner) Add amount) @ Some(\"true\")",
     "fn approve(address,address,uint256):",
     "  0000 let key = keccak256(owner, spender)",
     "  0001 map[2][key] = amount @ Some(\"true\")",

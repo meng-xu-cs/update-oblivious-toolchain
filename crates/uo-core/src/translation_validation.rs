@@ -444,6 +444,27 @@ const BUNDLE_FIELDS: &[&str] = &[
     "source_view",
 ];
 
+const ADMITTED_PACKAGE_FIELDS: &[&str] = &[
+    "compilation_mode",
+    "compiler_version",
+    "metadata_sha256",
+    "package_sha256",
+    "schema",
+    "source_sha256",
+    "toolchain_manifest_sha256",
+];
+
+const ADMITTED_PACKAGE_FIELDS_WITH_RAW_METADATA: &[&str] = &[
+    "compilation_mode",
+    "compiler_version",
+    "metadata_sha256",
+    "package_sha256",
+    "raw_metadata_sha256",
+    "schema",
+    "source_sha256",
+    "toolchain_manifest_sha256",
+];
+
 const CONTRACT_VIEW_FIELDS: &[&str] = &["contract", "functions", "manifest", "mode", "state"];
 
 const STATE_OBJECT_VIEW_FIELDS: &[&str] = &[
@@ -558,6 +579,24 @@ fn require_object_fields(value: &Value, path: &str, expected: &[&str]) -> Result
         );
     }
     Ok(())
+}
+
+fn require_admitted_package_fields(value: &Value, path: &str) -> Result<()> {
+    if value.is_null() {
+        return Ok(());
+    }
+    match require_object_fields(value, path, ADMITTED_PACKAGE_FIELDS) {
+        Ok(()) => Ok(()),
+        Err(required_err) => {
+            require_object_fields(value, path, ADMITTED_PACKAGE_FIELDS_WITH_RAW_METADATA).map_err(
+                |with_raw_err| {
+                    anyhow::anyhow!(
+                        "{required_err}; accepted raw-metadata shape also failed: {with_raw_err}"
+                    )
+                },
+            )
+        }
+    }
 }
 
 fn require_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>> {
@@ -676,6 +715,14 @@ fn validate_contract_view_fields(value: &Value, path: &str) -> Result<()> {
 
 pub fn validate_proof_relevant_translation_bundle_json(value: &Value) -> Result<()> {
     require_object_fields(value, "bundle", BUNDLE_FIELDS)?;
+    require_admitted_package_fields(
+        require_field(value, "bundle", "source_admitted_package")?,
+        "source_admitted_package",
+    )?;
+    require_admitted_package_fields(
+        require_field(value, "bundle", "artifact_admitted_package")?,
+        "artifact_admitted_package",
+    )?;
     validate_contract_view_fields(
         require_field(value, "bundle", "source_view")?,
         "source_view",

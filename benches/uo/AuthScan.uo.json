@@ -1,17 +1,19 @@
 {
   "compiler_version": "0.1.0",
   "admitted_package": {
-    "schema": "uo-admitted-package-v1",
+    "schema": "uo-admitted-package-v3",
     "source_sha256": "fa6bceebfe68a1f2d6ff0e7a59ec7523f3441907bd7191999974dca405589548",
-    "metadata_sha256": "093cc65a66d32e45b49ce5c7ff6ec072a2bdaccd158cc1af7319d8ef733ac5fb",
+    "metadata_sha256": "03501058e942900ada5d0aefce7cdaa48e716ce00539ef8fa188acf95189a544",
+    "raw_metadata_sha256": "2e2649c5dc37f9f60e14eaa7736a8e73b9ed7b2bfbc24359d7d3f12800af48ed",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "package_sha256": "bcb7a86ca4b67b178b5ef7ab1ae430dbcc77dfa96a54bd08f28694a475927212"
+    "toolchain_manifest_sha256": "6532ba9d7a515160c521fbc090630fc22ecfc163d7a61c75e91d41105b8df287",
+    "package_sha256": "b6816058b0b867733a30db148e51fdc8b7faa3c20dded5168474ab19c3c087b2"
   },
   "contract": {
     "contract": "AuthScan",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
+    "source_file": "benches/raw/AuthScan.sol",
     "state": [
       {
         "id": 1,
@@ -679,7 +681,46 @@
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "readLast()",
+          "params": [],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 2
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "readLast()",
+          "param_count": 0,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 0,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 2
+              }
+            }
+          ]
+        }
       }
     ],
     "manifest": {
@@ -1168,7 +1209,63 @@
             "return"
           ],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "readLast()",
+            "params": [],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "readLast()",
+            "param_count": 0,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 0,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "CellGet",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 1,
           "uocell_writes": 0,
           "uoarray_reads": 0,

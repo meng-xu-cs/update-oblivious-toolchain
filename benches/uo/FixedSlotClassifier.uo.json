@@ -1,17 +1,19 @@
 {
   "compiler_version": "0.1.0",
   "admitted_package": {
-    "schema": "uo-admitted-package-v1",
+    "schema": "uo-admitted-package-v3",
     "source_sha256": "8680887ee074a5dcbf38f6d1c24cabe4ce8b9bae2ee5dbe0f4f7bb4994bb660a",
-    "metadata_sha256": "fd6d5493f179b424399ae6ce67a76dec2deb54fb85ef57106f75d6c4cb7560d1",
+    "metadata_sha256": "a25f837626a2ce8460f701c19ed33f254dee49c6dddec64bce9d9250168dd849",
+    "raw_metadata_sha256": "9c808ef91300a273ad03abbf4eef4dfd3f792c8bc025ea6babf04a92c6c361d5",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "package_sha256": "53c2b98e04c35004636a76392e6bd36379b668473bfba730ed0e4cd785ebe6ac"
+    "toolchain_manifest_sha256": "6532ba9d7a515160c521fbc090630fc22ecfc163d7a61c75e91d41105b8df287",
+    "package_sha256": "4871b7420491666bae8572b84ef680eebaf24e7b72e54847321dd3b3afa9d684"
   },
   "contract": {
     "contract": "FixedSlotClassifier",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+    "source_file": "benches/raw/FixedSlotClassifier.sol",
     "state": [
       {
         "id": 1,
@@ -366,7 +368,46 @@
           }
         ],
         "secret_args": [],
-        "confidential": false
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "peek()",
+          "params": [],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 1
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "peek()",
+          "param_count": 0,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 0,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 1
+              }
+            }
+          ]
+        }
       }
     ],
     "manifest": {
@@ -542,7 +583,63 @@
             "return"
           ],
           "public_state_declassifies": [],
-          "kernel_steps": [],
+          "confidential_program": {
+            "entrypoint_id": "peek()",
+            "params": [],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 1
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "peek()",
+            "param_count": 0,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 0,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 1
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "CellGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
           "uocell_reads": 1,
           "uocell_writes": 0,
           "uoarray_reads": 0,

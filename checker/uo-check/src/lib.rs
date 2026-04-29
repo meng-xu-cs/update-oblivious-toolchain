@@ -29,6 +29,18 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
         "artifact contract {} mode {:?}",
         artifact.contract.contract, artifact.contract.mode
     ));
+    let admitted_package = artifact
+        .admitted_package
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("artifact is missing admitted package identity"))?;
+    if admitted_package.compiler_version != artifact.compiler_version {
+        bail!(
+            "admitted package compiler_version mismatch: {} != {}",
+            admitted_package.compiler_version,
+            artifact.compiler_version
+        );
+    }
+    admitted_package.validate_current_toolchain()?;
     if artifact.contract.manifest.contract != artifact.contract.contract {
         bail!(
             "manifest contract mismatch: {} != {}",
@@ -41,6 +53,13 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
         bail!(
             "manifest compilation_mode mismatch: {} != {}",
             artifact.contract.manifest.compilation_mode,
+            expected_mode
+        );
+    }
+    if admitted_package.compilation_mode != expected_mode {
+        bail!(
+            "admitted package compilation_mode mismatch: {} != {}",
+            admitted_package.compilation_mode,
             expected_mode
         );
     }
@@ -297,6 +316,7 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             );
         }
     }
+    report.push("admitted package identity/toolchain binding: ok".into());
     report.push("manifest/object exactness: ok".into());
     report.push("manifest/entrypoint exactness: ok".into());
     report.push("forbidden control flow in confidential IR: none".into());
@@ -440,6 +460,12 @@ fn assert_translation_equivalence(
     }
     if actual.contract.manifest != expected.contract.manifest {
         bail!("source/artifact manifest mismatch");
+    }
+    if actual.admitted_package != expected.admitted_package {
+        bail!("source/artifact admitted package identity mismatch");
+    }
+    if actual.admitted_package.is_none() {
+        bail!("source/artifact admitted package identity is missing");
     }
     Ok(())
 }
@@ -1124,8 +1150,34 @@ bounds:
     fn artifact_checker_derives_manifest_exactness() {
         let (_, _, artifact) = sample_artifact();
         let report = check_artifact(&artifact).unwrap();
+        assert!(report.contains(&"admitted package identity/toolchain binding: ok".to_string()));
         assert!(report.contains(&"manifest/object exactness: ok".to_string()));
         assert!(report.contains(&"manifest/entrypoint exactness: ok".to_string()));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_toolchain_manifest_digest_drift() {
+        let (_, _, mut artifact) = sample_artifact();
+        artifact
+            .admitted_package
+            .as_mut()
+            .unwrap()
+            .toolchain_manifest_sha256 = "0".repeat(64);
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("toolchain_manifest_sha256 mismatch"));
+    }
+
+    #[test]
+    fn source_checker_rejects_admitted_package_identity_drift() {
+        let (source, metadata, mut artifact) = sample_artifact();
+        artifact.admitted_package.as_mut().unwrap().package_sha256 = "1".repeat(64);
+        let err = check_artifact_against_source(source.to_str().unwrap(), &metadata, &artifact)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("admitted package package_sha256 mismatch"));
     }
 
     #[test]
