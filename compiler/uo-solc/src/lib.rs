@@ -2102,12 +2102,13 @@ fn collect_policy_sensitivity(
             Statement::Declare { name, value, .. } | Statement::Assign { name, value } => {
                 set_taint(
                     name,
-                    expr_is_policy_sensitive(value, frontend, tainted),
+                    control_sensitive || expr_is_policy_sensitive(value, frontend, tainted),
                     tainted,
                 );
             }
             Statement::Require { cond } | Statement::AbortIf { cond } => {
-                sensitivity.status_sensitive |= expr_is_policy_sensitive(cond, frontend, tainted);
+                sensitivity.status_sensitive |=
+                    control_sensitive || expr_is_policy_sensitive(cond, frontend, tainted);
             }
             Statement::If {
                 cond,
@@ -2201,7 +2202,7 @@ fn collect_policy_sensitivity(
             Statement::Return { value } => {
                 if let Some(value) = value {
                     sensitivity.return_sensitive |=
-                        expr_is_policy_sensitive(value, frontend, tainted);
+                        control_sensitive || expr_is_policy_sensitive(value, frontend, tainted);
                 }
             }
         }
@@ -2277,11 +2278,21 @@ fn expr_is_policy_sensitive(expr: &Expr, frontend: &Frontend, tainted: &BTreeSet
                 || expr_is_policy_sensitive(when_true, frontend, tainted)
                 || expr_is_policy_sensitive(when_false, frontend, tainted)
         }
-        Expr::CellGet { object_id }
-        | Expr::ArrayGet { object_id, .. }
-        | Expr::MapGet { object_id, .. } => state_object_by_id(frontend, *object_id)
+        Expr::CellGet { object_id } => state_object_by_id(frontend, *object_id)
             .map(|object| object.confidential)
             .unwrap_or(true),
+        Expr::ArrayGet { object_id, index } => {
+            state_object_by_id(frontend, *object_id)
+                .map(|object| object.confidential)
+                .unwrap_or(true)
+                || expr_is_policy_sensitive(index, frontend, tainted)
+        }
+        Expr::MapGet { object_id, key } => {
+            state_object_by_id(frontend, *object_id)
+                .map(|object| object.confidential)
+                .unwrap_or(true)
+                || expr_is_policy_sensitive(key, frontend, tainted)
+        }
         Expr::StructField { base, .. } => expr_is_policy_sensitive(base, frontend, tainted),
         Expr::ArrayIndex { base, index } => {
             expr_is_policy_sensitive(base, frontend, tainted)
@@ -3613,6 +3624,118 @@ bounds:
     }
 
     #[test]
+    fn rejects_secret_dependent_control_status_without_declassification() {
+        let source = write_temp(
+            "secret-control-status",
+            r#"
+            contract C {
+                function f(uint256 secret) public {
+                    if (secret > 0) {
+                        require(false);
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: forbidden
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("secret-dependent success/abort status"));
+    }
+
+    #[test]
+    fn rejects_secret_control_assigned_status_without_declassification() {
+        let source = write_temp(
+            "secret-control-assigned-status",
+            r#"
+            contract C {
+                function f(uint256 secret) public {
+                    uint256 out = 0;
+                    if (secret > 0) {
+                        out = 1;
+                    } else {
+                        out = 2;
+                    }
+                    require(out == 0);
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: forbidden
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("secret-dependent success/abort status"));
+    }
+
+    #[test]
+    fn rejects_secret_indexed_public_map_status_without_declassification() {
+        let source = write_temp(
+            "secret-public-map-index-status",
+            r#"
+            contract C {
+                mapping(uint256 => uint256) private publicValues;
+                function f(uint256 secret) public {
+                    require(publicValues[secret] == 0);
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  publicValues:
+    kind: map
+    key: uint256
+    value: uint256
+    backend: raw
+    confidential: false
+    capacity: 8
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("secret-dependent success/abort status"));
+    }
+
+    #[test]
     fn rejects_public_getter_over_confidential_state_without_declassification() {
         let source = write_temp(
             "public-confidential-getter",
@@ -3620,6 +3743,49 @@ bounds:
             contract C {
                 uint256 private x;
                 function f() public returns (uint256) { return x; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("returns data derived from confidential state or secret arguments"));
+    }
+
+    #[test]
+    fn rejects_secret_control_assigned_return_without_declassification() {
+        let source = write_temp(
+            "secret-control-assigned-return",
+            r#"
+            contract C {
+                uint256 private x;
+                function f() public returns (uint256) {
+                    uint256 out = 0;
+                    if (x > 0) {
+                        out = 1;
+                    } else {
+                        out = 2;
+                    }
+                    return out;
+                }
             }
             "#,
         );

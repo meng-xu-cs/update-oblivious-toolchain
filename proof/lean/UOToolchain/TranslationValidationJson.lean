@@ -1141,6 +1141,317 @@ private def accessedObjectIdsInBodyStrings (body : List String) : Except String 
   body.foldlM (init := ([] : List Nat)) fun acc item => do
     pure <| mergeDistinctNatLists acc (← collectAccessedObjectIdsStatement (← parseJsonString item))
 
+structure PolicySensitivityJson where
+  returnSensitive : Bool := false
+  statusSensitive : Bool := false
+  sensitivePublicWrites : List String := []
+deriving Repr, DecidableEq
+
+private def insertStringSet (value : String) (values : List String) : List String :=
+  if values.contains value then values else value :: values
+
+private def mergeStringSets (lhs rhs : List String) : List String :=
+  rhs.foldl (fun acc value => insertStringSet value acc) lhs
+
+private def PolicySensitivityJson.merge
+  (lhs rhs : PolicySensitivityJson) : PolicySensitivityJson :=
+  { returnSensitive := lhs.returnSensitive || rhs.returnSensitive
+  , statusSensitive := lhs.statusSensitive || rhs.statusSensitive
+  , sensitivePublicWrites :=
+      mergeStringSets lhs.sensitivePublicWrites rhs.sensitivePublicWrites
+  }
+
+private def setPolicyTaint
+  (name : String) (sensitive : Bool) (tainted : List String) : List String :=
+  if sensitive then
+    insertStringSet name tainted
+  else
+    tainted.erase name
+
+private def stateObjectConfidentialById
+  (state : List ImportedProofRelevantStateObjectView)
+  (objectId : Nat) : Bool :=
+  match stateObjectById? state objectId with
+  | some object => object.confidential
+  | none => true
+
+mutual
+
+private partial def policyExprSensitive
+  (state : List ImportedProofRelevantStateObjectView)
+  (tainted : List String)
+  (json : Json) : Except String Bool := do
+  if taggedPayload? json "Literal" |>.isSome then
+    pure false
+  else if let some payload := taggedPayload? json "Var" then
+    let name : String ← fromJson? payload
+    pure (tainted.contains name)
+  else if let some inner := taggedPayload? json "Unary" then
+    policyExprSensitive state tainted (← lookupFieldJson inner "expr")
+  else if let some inner := taggedPayload? json "Binary" then
+    pure ((← policyExprSensitive state tainted (← lookupFieldJson inner "lhs")) ||
+      (← policyExprSensitive state tainted (← lookupFieldJson inner "rhs")))
+  else if let some inner := taggedPayload? json "Select" then
+    pure ((← policyExprSensitive state tainted (← lookupFieldJson inner "cond")) ||
+      (← policyExprSensitive state tainted (← lookupFieldJson inner "when_true")) ||
+      (← policyExprSensitive state tainted (← lookupFieldJson inner "when_false")))
+  else if let some inner := taggedPayload? json "CellGet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    pure (stateObjectConfidentialById state objectId)
+  else if let some inner := taggedPayload? json "ArrayGet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    pure (stateObjectConfidentialById state objectId ||
+      (← policyExprSensitive state tainted (← lookupFieldJson inner "index")))
+  else if let some inner := taggedPayload? json "MapGet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    pure (stateObjectConfidentialById state objectId ||
+      (← policyExprSensitive state tainted (← lookupFieldJson inner "key")))
+  else if let some inner := taggedPayload? json "StructField" then
+    policyExprSensitive state tainted (← lookupFieldJson inner "base")
+  else if let some inner := taggedPayload? json "ArrayIndex" then
+    pure ((← policyExprSensitive state tainted (← lookupFieldJson inner "base")) ||
+      (← policyExprSensitive state tainted (← lookupFieldJson inner "index")))
+  else if let some inner := taggedPayload? json "Keccak256" then
+    policyExprListSensitive state tainted (← lookupFieldAs inner "parts")
+  else
+    throw "unsupported expression shape in translation bundle"
+
+private partial def policyExprListSensitive
+  (state : List ImportedProofRelevantStateObjectView)
+  (tainted : List String)
+  (items : List Json) : Except String Bool :=
+  items.foldlM (init := false) fun acc item => do
+    if acc then
+      pure true
+    else
+      policyExprSensitive state tainted item
+
+end
+
+mutual
+
+private partial def markAssignedLocalsJson
+  (json : Json) (tainted : List String) : Except String (List String) := do
+  if let some inner := taggedPayload? json "Declare" then
+    pure <| insertStringSet (← lookupFieldAs inner "name") tainted
+  else if let some inner := taggedPayload? json "Assign" then
+    pure <| insertStringSet (← lookupFieldAs inner "name") tainted
+  else if let some inner := taggedPayload? json "If" then
+    let tainted ← markAssignedLocalsJsonArray (← lookupFieldAs inner "then_body") tainted
+    markAssignedLocalsJsonArray (← lookupFieldAs inner "else_body") tainted
+  else if let some inner := taggedPayload? json "For" then
+    markAssignedLocalsJsonArray (← lookupFieldAs inner "body") tainted
+  else if (taggedPayload? json "Require").isSome ||
+      (taggedPayload? json "AbortIf").isSome ||
+      (taggedPayload? json "CellSet").isSome ||
+      (taggedPayload? json "ArraySet").isSome ||
+      (taggedPayload? json "MapPut").isSome ||
+      (taggedPayload? json "Return").isSome then
+    pure tainted
+  else
+    throw "unsupported statement shape in translation bundle"
+
+private partial def markAssignedLocalsJsonArray
+  (items : List Json) (tainted : List String) : Except String (List String) :=
+  items.foldlM (init := tainted) fun acc item => markAssignedLocalsJson item acc
+
+end
+
+private def recordSensitivePublicWrite
+  (state : List ImportedProofRelevantStateObjectView)
+  (objectId : Nat)
+  (isSensitive : Bool)
+  (sensitivity : PolicySensitivityJson) : Except String PolicySensitivityJson := do
+  if !isSensitive then
+    pure sensitivity
+  else
+    match stateObjectById? state objectId with
+    | some object =>
+        if object.confidential then
+          pure sensitivity
+        else
+          pure
+            { sensitivity with
+              sensitivePublicWrites :=
+                insertStringSet object.name sensitivity.sensitivePublicWrites }
+    | none => throw s!"unknown object id {objectId}"
+
+mutual
+
+private partial def collectPolicySensitivityStatement
+  (state : List ImportedProofRelevantStateObjectView)
+  (json : Json)
+  (tainted : List String)
+  (controlSensitive : Bool) :
+  Except String (List String × PolicySensitivityJson) := do
+  if let some inner := taggedPayload? json "Declare" then
+    let name : String ← lookupFieldAs inner "name"
+    let value ← lookupFieldJson inner "value"
+    pure
+      ( setPolicyTaint name
+          (controlSensitive || (← policyExprSensitive state tainted value)) tainted
+      , {} )
+  else if let some inner := taggedPayload? json "Assign" then
+    let name : String ← lookupFieldAs inner "name"
+    let value ← lookupFieldJson inner "value"
+    pure
+      ( setPolicyTaint name
+          (controlSensitive || (← policyExprSensitive state tainted value)) tainted
+      , {} )
+  else if let some inner := taggedPayload? json "Require" then
+    let sensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "cond")
+    pure (tainted, { statusSensitive := controlSensitive || sensitive })
+  else if let some inner := taggedPayload? json "AbortIf" then
+    let sensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "cond")
+    pure (tainted, { statusSensitive := controlSensitive || sensitive })
+  else if let some inner := taggedPayload? json "If" then
+    let condSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "cond")
+    let thenBody : List Json ← lookupFieldAs inner "then_body"
+    let elseBody : List Json ← lookupFieldAs inner "else_body"
+    let thenTainted ←
+      if condSensitive then
+        markAssignedLocalsJsonArray thenBody tainted
+      else
+        pure tainted
+    let elseTainted ←
+      if condSensitive then
+        markAssignedLocalsJsonArray elseBody tainted
+      else
+        pure tainted
+    let (thenOut, thenSensitivity) ←
+      collectPolicySensitivityStatements
+        state thenBody thenTainted (controlSensitive || condSensitive)
+    let (elseOut, elseSensitivity) ←
+      collectPolicySensitivityStatements
+        state elseBody elseTainted (controlSensitive || condSensitive)
+    pure
+      ( mergeStringSets thenOut elseOut
+      , thenSensitivity.merge elseSensitivity )
+  else if let some inner := taggedPayload? json "For" then
+    let startExpr ← lookupFieldJson inner "start"
+    let endExpr ← lookupFieldJson inner "end"
+    let body : List Json ← lookupFieldAs inner "body"
+    let loopSensitive :=
+      controlSensitive ||
+        (← policyExprSensitive state tainted startExpr) ||
+        (← policyExprSensitive state tainted endExpr)
+    collectPolicySensitivityStatements state body tainted loopSensitive
+  else if let some inner := taggedPayload? json "CellSet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    let valueSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "value")
+    let predicateSensitive ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure false
+      | some predicate => policyExprSensitive state tainted predicate
+    let sensitivity ←
+      recordSensitivePublicWrite
+        state objectId (controlSensitive || valueSensitive || predicateSensitive) {}
+    pure (tainted, sensitivity)
+  else if let some inner := taggedPayload? json "ArraySet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    let indexSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "index")
+    let valueSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "value")
+    let predicateSensitive ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure false
+      | some predicate => policyExprSensitive state tainted predicate
+    let sensitivity ←
+      recordSensitivePublicWrite
+        state objectId
+        (controlSensitive || indexSensitive || valueSensitive || predicateSensitive)
+        {}
+    pure (tainted, sensitivity)
+  else if let some inner := taggedPayload? json "MapPut" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    let keySensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "key")
+    let valueSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "value")
+    let predicateSensitive ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure false
+      | some predicate => policyExprSensitive state tainted predicate
+    let sensitivity ←
+      recordSensitivePublicWrite
+        state objectId
+        (controlSensitive || keySensitive || valueSensitive || predicateSensitive)
+        {}
+    pure (tainted, sensitivity)
+  else if let some inner := taggedPayload? json "Return" then
+    let returnSensitive ←
+      match ← lookupOptionalFieldJson inner "value" with
+      | none => pure false
+      | some value => policyExprSensitive state tainted value
+    pure (tainted, { returnSensitive := controlSensitive || returnSensitive })
+  else
+    throw "unsupported statement shape in translation bundle"
+
+private partial def collectPolicySensitivityStatements
+  (state : List ImportedProofRelevantStateObjectView)
+  (items : List Json)
+  (tainted : List String)
+  (controlSensitive : Bool) :
+  Except String (List String × PolicySensitivityJson) :=
+  items.foldlM (init := (tainted, ({} : PolicySensitivityJson))) fun acc item => do
+    let (tainted, sensitivity) := acc
+    let (tainted, nextSensitivity) ←
+      collectPolicySensitivityStatement state item tainted controlSensitive
+    pure (tainted, sensitivity.merge nextSensitivity)
+
+end
+
+private def paramNameAt? :
+  List ImportedProofRelevantParamView → Nat → Option String
+  | [], _ => none
+  | param :: _, 0 => some param.name
+  | _ :: rest, index + 1 => paramNameAt? rest index
+
+private def policySensitivityBodyStrings
+  (state : List ImportedProofRelevantStateObjectView)
+  (secretArgs : List Nat)
+  (params : List ImportedProofRelevantParamView)
+  (body : List String) : Except String PolicySensitivityJson := do
+  let tainted :=
+    secretArgs.foldl
+      (fun acc index =>
+        match paramNameAt? params index with
+        | some name => insertStringSet name acc
+        | none => acc)
+      []
+  let bodyJson ← body.mapM parseJsonString
+  let (_, sensitivity) ←
+    collectPolicySensitivityStatements state bodyJson tainted false
+  pure sensitivity
+
+private def sensitivePublicWritesDeclared
+  (sensitivity : PolicySensitivityJson)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  sensitivity.sensitivePublicWrites.all
+    (fun name => entry.public_state_declassifies.contains name)
+
+private def sensitiveReturnPolicyWellFormed
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView)
+  (sensitivity : PolicySensitivityJson) : Bool :=
+  if sensitivity.returnSensitive then
+    (entry.returns == "declassified" && entry.declassifies.contains "return") ||
+      (entry.returns == "encrypted_to_client" && fn.confidential &&
+        !(entry.declassifies.contains "return"))
+  else
+    true
+
+private def sensitiveStatusPolicyWellFormed
+  (entry : ImportedProofRelevantEntrypointView)
+  (sensitivity : PolicySensitivityJson) : Bool :=
+  if sensitivity.statusSensitive then
+    entry.status == "declassified" && entry.declassifies.contains "success"
+  else
+    true
+
+private def declaredDeclassificationPoliciesWellFormed
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  (entry.returns != "declassified" || entry.declassifies.contains "return") &&
+    (entry.returns != "encrypted_to_client" || !(entry.declassifies.contains "return")) &&
+    (entry.status != "declassified" || entry.declassifies.contains "success")
+
 mutual
 
 private partial def statementLoopsHaveExactBounds
@@ -1193,17 +1504,15 @@ private def functionLoopAdmissionWellFormed
 
 private def functionPublicAccessPolicyWellFormed
   (state : List ImportedProofRelevantStateObjectView)
-  (fn : ImportedProofRelevantFunctionView) : Bool :=
-  if fn.confidential then
-    true
-  else
-    match accessedObjectIdsInBodyStrings fn.body with
-    | .ok objectIds =>
-        objectIds.all (fun objectId =>
-          match stateObjectById? state objectId with
-          | some object => object.confidential == false
-          | none => false)
-    | .error _ => false
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  match policySensitivityBodyStrings state fn.secret_args fn.params fn.body with
+  | .ok sensitivity =>
+      declaredDeclassificationPoliciesWellFormed entry &&
+        sensitiveReturnPolicyWellFormed fn entry sensitivity &&
+        sensitiveStatusPolicyWellFormed entry sensitivity &&
+        sensitivePublicWritesDeclared sensitivity entry
+  | .error _ => false
 
 private def functionMetadataWellFormed
   (view : ImportedProofRelevantContractView)
@@ -1213,7 +1522,7 @@ private def functionMetadataWellFormed
     functionLoopAdmissionWellFormed fn &&
     publicStateDeclassifyTargetsWellFormed
       view.state entry.public_state_declassifies &&
-    functionPublicAccessPolicyWellFormed view.state fn
+    functionPublicAccessPolicyWellFormed view.state fn entry
 
 private def functionsMetadataWellFormed
   (view : ImportedProofRelevantContractView) :
@@ -1519,6 +1828,7 @@ private def functionMetadataMismatchMessage
       view.state entry.public_state_declassifies
   let loopAdmissionOk := functionLoopAdmissionWellFormed fn
   let publicAccessOk := functionPublicAccessPolicyWellFormed view.state fn
+    entry
   s!"{fn.signature}: metadata policy failed (secret policy={secretPolicyOk}, loop admission={loopAdmissionOk}, public_state_declassifies={publicTargetsOk}, public access={publicAccessOk})"
 
 private def metadataMismatchMessages

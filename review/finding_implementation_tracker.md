@@ -15,7 +15,7 @@ Status legend:
 | --- | --- | --- | --- |
 | T1/M1/M2/M3 | Public persistent state and history/final-state declassification theorem | landed | Compiler public-write policy and metadata are landed. Lean outcomes now carry final public state, and history semantics exposes final-public-state equality. |
 | T2/M4 | Proof-grade loop/control-flow admission | landed | UO compiler and Lean proof-grade metadata admission reject non-exact loop bounds. |
-| T3/M4 | Fail-closed metadata policy | landed | Compiler sidecar consistency, public/confidential access checks, UO raw-confidential-state rejection, and Lean `functionMetadataWellFormed` are landed. |
+| T3/M4 | Fail-closed metadata policy | landed | Compiler sidecar consistency, declassification-aware taint checks for return/status/public-state channels, implicit control-flow taint, UO raw-confidential-state rejection, and the matching Lean `functionMetadataWellFormed` checker are landed. |
 | T4/M5 | Artifact/proof-relevant view completeness | landed | Proof-relevant serialization now emits explicit nulls, validates required field completeness recursively, and has mutation coverage. |
 | T5/M7 | Runtime proof-object extraction transcript completeness | landed | Execution traces now carry SHA-256 hashes for a typed primitive-event transcript and runtime proof-object payload; probe boundary evidence marks the transcript binding. |
 | T6 | Lean operational-state well-formedness | landed | `OperationalConfig.WellFormed`, object-map-based reads, fail-closed writes, and `writeObject?_wellFormed` preservation are landed; ProofGrade lemmas now require admitted writes. |

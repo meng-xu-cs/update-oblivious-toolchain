@@ -38292,10 +38292,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains("pub(in crate::runtime) struct FinalizedCallTrace");
     let finalized_call_trace_api_is_explicit = runtime_module_source
         .contains("pub(crate) fn run_contract_call(")
-        && runtime_module_source
-            .contains("-> Result<(Option<Value>, bool, ExecutionTrace, usize)> {")
+        && runtime_module_source.contains("Option<EncryptedReturnPayload>,")
         && engine_impl_source
-            .contains("let (return_value, aborted, trace, zero_writes) = run_contract_call(")
+            .contains("let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(")
+        && engine_impl_source.contains("return_channel,")
         && !engine_impl_source.contains("finalized.into_engine_result_parts()")
         && !theorem_source.contains("into_engine_result_parts(");
     let finalized_call_trace_consumption_surface_files =
@@ -38304,9 +38304,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let finalized_call_trace_consumption_surface_restricted =
         finalized_call_trace_consumption_surface_files
             == expected_finalized_call_trace_consumption_surface_files;
-    let engine_public_trace_uses_output_shape_only = engine_impl_source
-        .contains("let (return_value, aborted, trace, zero_writes) = run_contract_call(")
-        && theorem_trace_bridge_api_is_compact
+    let engine_public_trace_uses_output_shape_only = engine_impl_source.contains(
+        "let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(",
+    ) && theorem_trace_bridge_api_is_compact
         && theorem_private_surface_restricted
         && finalized_call_trace_fields_private
         && finalized_call_trace_api_is_explicit
@@ -42369,11 +42369,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("uo-evm = { path = \"../../runtime/uo-evm\", features = [\"diagnostics\"] }");
     let default_call_result_omits_runtime_telemetry = engine_source
         .contains("pub struct CallResult {")
+        && call_result_struct_source
+            .contains("pub encrypted_return: Option<EncryptedReturnPayload>,")
         && call_result_struct_source.contains("pub trace: ExecutionTrace,")
         && !call_result_struct_source.contains("telemetry")
         && engine_source.contains("pub fn call(")
         && engine_source.contains("-> Result<CallResult> {")
-        && engine_source.contains("self.call_impl(entrypoint, args, None)?.0");
+        && engine_source.contains("self.call_impl(entrypoint, args, None, None)?.0");
     let call_result_nonclone = engine_source.contains("#[derive(Debug)]\npub struct CallResult {")
         && !engine_source.contains("#[derive(Clone, Debug)]\npub struct CallResult {");
     let diagnostic_call_api_exposes_runtime_telemetry = engine_source
@@ -42382,7 +42384,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && engine_source.contains("pub telemetry: CallTelemetry,")
         && engine_source.contains("pub fn call_with_diagnostics(")
         && engine_source
-            .contains("let (call, zero_writes) = self.call_impl(entrypoint, args, None)?;")
+            .contains("let (call, zero_writes) = self.call_impl(entrypoint, args, None, None)?;")
         && engine_source.contains("telemetry: CallTelemetry { zero_writes },");
     let diagnostic_call_result_nonclone = engine_source
         .contains("#[derive(Debug)]\npub struct DiagnosticCallResult {")
@@ -42404,7 +42406,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("ExecutionTrace::from_runtime_finalization_input(")
         && theorem_source
             .contains("let (gas_used, zero_writes, trace_bundle) = finalize_public_call_trace(")
-        && theorem_source.contains("Ok((return_value, aborted, trace, zero_writes))")
+        && theorem_source.contains("host_return_value,")
+        && theorem_source.contains("encrypted_return,")
+        && theorem_source.contains("zero_writes,")
         && !theorem_source.contains("host_proxy_metrics");
     let theorem_finalizer_uses_finish_bundle_as_single_runtime_source = theorem_source
         .contains("trace_bundle.into_runtime_finalization_input(")
