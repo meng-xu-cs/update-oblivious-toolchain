@@ -4,9 +4,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-pub const ADMITTED_PACKAGE_SCHEMA: &str = "uo-admitted-package-v4";
+pub const ADMITTED_PACKAGE_SCHEMA: &str = "uo-admitted-package-v5";
 pub const SOURCE_LANGUAGE: &str = "uo-solidity-like-dsl-v1";
 pub const TOOLCHAIN_MANIFEST_SCHEMA: &str = "uo-toolchain-manifest-v1";
+pub const RAW_METADATA_CANONICALIZATION_SCHEMA: &str = "uo-raw-metadata-canonicalization-v1";
+pub const RAW_METADATA_CANONICALIZATION_PARSER: &str = "serde-yaml-contract-metadata-v1";
 const PROOF_CHECKER_SCHEMA: &str = "uo-proof-checker-translation-validation-v1";
 const RUNTIME_MODEL_TAG: &str = "uo-runtime-source-model-v1";
 const DEPLOYMENT_ATTESTATION_MODEL_TAG: &str = "uo-sgx-admitted-package-digest-session-binding-v1";
@@ -47,6 +49,8 @@ pub struct AdmittedPackageIdentity {
     pub metadata_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raw_metadata_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_canonicalization_sha256: Option<String>,
     pub compilation_mode: String,
     pub compiler_version: String,
     pub toolchain_manifest_sha256: String,
@@ -95,6 +99,12 @@ impl AdmittedPackageIdentity {
         let source_sha256 = sha256_hex(source.as_bytes());
         let metadata_sha256 = sha256_hex(&canonical_json_bytes(metadata)?);
         let raw_metadata_sha256 = raw_metadata.map(sha256_hex);
+        let metadata_canonicalization_sha256 = raw_metadata_sha256
+            .as_deref()
+            .map(|raw_metadata_sha256| {
+                metadata_canonicalization_sha256(raw_metadata_sha256, &metadata_sha256)
+            })
+            .transpose()?;
         let toolchain_manifest_sha256 = ToolchainManifest::current(compiler_version).sha256()?;
         let package_input = AdmittedPackageHashInput {
             schema: ADMITTED_PACKAGE_SCHEMA,
@@ -102,6 +112,7 @@ impl AdmittedPackageIdentity {
             source_sha256: &source_sha256,
             metadata_sha256: &metadata_sha256,
             raw_metadata_sha256: raw_metadata_sha256.as_deref(),
+            metadata_canonicalization_sha256: metadata_canonicalization_sha256.as_deref(),
             compilation_mode,
             compiler_version,
             toolchain_manifest_sha256: &toolchain_manifest_sha256,
@@ -113,6 +124,7 @@ impl AdmittedPackageIdentity {
             source_sha256,
             metadata_sha256,
             raw_metadata_sha256,
+            metadata_canonicalization_sha256,
             compilation_mode: compilation_mode.into(),
             compiler_version: compiler_version.into(),
             toolchain_manifest_sha256,
@@ -147,6 +159,26 @@ impl AdmittedPackageIdentity {
         Ok(())
     }
 
+    pub fn validate_proof_grade(&self) -> Result<()> {
+        self.validate_current_toolchain()?;
+        validate_sha256_hex(
+            "admitted package raw_metadata_sha256",
+            &self.raw_metadata_sha256,
+        )?;
+        validate_sha256_hex(
+            "admitted package metadata_canonicalization_sha256",
+            &self.metadata_canonicalization_sha256,
+        )?;
+        let raw_metadata_sha256 = self.raw_metadata_sha256.as_ref().expect("validated above");
+        let expected_canonicalization_sha256 =
+            metadata_canonicalization_sha256(raw_metadata_sha256, &self.metadata_sha256)?;
+        if self.metadata_canonicalization_sha256.as_ref() != Some(&expected_canonicalization_sha256)
+        {
+            bail!("admitted package metadata_canonicalization_sha256 mismatch");
+        }
+        Ok(())
+    }
+
     fn recomputed_package_sha256(&self) -> Result<String> {
         let package_input = AdmittedPackageHashInput {
             schema: ADMITTED_PACKAGE_SCHEMA,
@@ -154,6 +186,7 @@ impl AdmittedPackageIdentity {
             source_sha256: &self.source_sha256,
             metadata_sha256: &self.metadata_sha256,
             raw_metadata_sha256: self.raw_metadata_sha256.as_deref(),
+            metadata_canonicalization_sha256: self.metadata_canonicalization_sha256.as_deref(),
             compilation_mode: &self.compilation_mode,
             compiler_version: &self.compiler_version,
             toolchain_manifest_sha256: &self.toolchain_manifest_sha256,
@@ -225,9 +258,41 @@ struct AdmittedPackageHashInput<'a> {
     metadata_sha256: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     raw_metadata_sha256: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata_canonicalization_sha256: Option<&'a str>,
     compilation_mode: &'a str,
     compiler_version: &'a str,
     toolchain_manifest_sha256: &'a str,
+}
+
+#[derive(Serialize)]
+struct MetadataCanonicalizationHashInput<'a> {
+    schema: &'static str,
+    parser: &'static str,
+    raw_metadata_sha256: &'a str,
+    metadata_sha256: &'a str,
+}
+
+fn metadata_canonicalization_sha256(
+    raw_metadata_sha256: &str,
+    metadata_sha256: &str,
+) -> Result<String> {
+    let input = MetadataCanonicalizationHashInput {
+        schema: RAW_METADATA_CANONICALIZATION_SCHEMA,
+        parser: RAW_METADATA_CANONICALIZATION_PARSER,
+        raw_metadata_sha256,
+        metadata_sha256,
+    };
+    Ok(sha256_hex(&canonical_json_bytes(&input)?))
+}
+
+fn validate_sha256_hex(label: &str, value: &Option<String>) -> Result<()> {
+    match value {
+        Some(value) if value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()) => {
+            Ok(())
+        }
+        _ => bail!("{label} must be a 64-character hex SHA-256 digest"),
+    }
 }
 
 fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>> {
@@ -308,7 +373,12 @@ mod tests {
         .unwrap();
         assert_eq!(lhs.metadata_sha256, rhs.metadata_sha256);
         assert_ne!(lhs.raw_metadata_sha256, rhs.raw_metadata_sha256);
+        assert_ne!(
+            lhs.metadata_canonicalization_sha256,
+            rhs.metadata_canonicalization_sha256
+        );
         assert_ne!(lhs.package_sha256, rhs.package_sha256);
+        lhs.validate_proof_grade().unwrap();
     }
 
     #[test]
@@ -325,6 +395,35 @@ mod tests {
         );
         assert_eq!(identity.toolchain_manifest_sha256.len(), 64);
         identity.validate_current_toolchain().unwrap();
+    }
+
+    #[test]
+    fn admitted_package_identity_proof_grade_requires_raw_metadata_witness() {
+        let identity =
+            AdmittedPackageIdentity::new("contract C {}", &MetadataA { z: 2, a: 1 }, "uo", "test")
+                .unwrap();
+        let err = identity.validate_proof_grade().unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("raw_metadata_sha256 must be a 64-character hex SHA-256 digest"));
+    }
+
+    #[test]
+    fn admitted_package_identity_rejects_canonicalization_witness_tamper() {
+        let mut identity = AdmittedPackageIdentity::new_with_raw_metadata(
+            "contract C {}",
+            &MetadataA { z: 2, a: 1 },
+            b"z: 2\na: 1\n",
+            "uo",
+            "test",
+        )
+        .unwrap();
+        identity.metadata_canonicalization_sha256 = Some("0".repeat(64));
+        identity.package_sha256 = identity.recomputed_package_sha256().unwrap();
+        let err = identity.validate_proof_grade().unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("metadata_canonicalization_sha256 mismatch"));
     }
 
     #[test]

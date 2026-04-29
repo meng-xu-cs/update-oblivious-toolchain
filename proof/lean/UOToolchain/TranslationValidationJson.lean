@@ -122,19 +122,23 @@ structure ImportedAdmittedPackageIdentity where
   source_language : String
   source_sha256 : String
   metadata_sha256 : String
+  raw_metadata_sha256 : String
+  metadata_canonicalization_sha256 : String
   compilation_mode : String
   compiler_version : String
   toolchain_manifest_sha256 : String
   package_sha256 : String
 deriving Repr, DecidableEq, FromJson, ToJson
 
-private def admittedPackageSchema : String := "uo-admitted-package-v4"
+private def admittedPackageSchema : String := "uo-admitted-package-v5"
 private def admittedPackageSourceLanguage : String := "uo-solidity-like-dsl-v1"
 
 def ImportedAdmittedPackageIdentity.WellFormed
   (identity : ImportedAdmittedPackageIdentity) : Prop :=
   identity.schema = admittedPackageSchema ∧
     identity.source_language = admittedPackageSourceLanguage ∧
+    identity.raw_metadata_sha256.length = 64 ∧
+    identity.metadata_canonicalization_sha256.length = 64 ∧
     identity.toolchain_manifest_sha256.length = 64
 
 instance (identity : ImportedAdmittedPackageIdentity) :
@@ -146,6 +150,8 @@ def ImportedAdmittedPackageIdentity.checkWellFormed
   (identity : ImportedAdmittedPackageIdentity) : Bool :=
   (identity.schema == admittedPackageSchema) &&
     (identity.source_language == admittedPackageSourceLanguage) &&
+    (identity.raw_metadata_sha256.length == 64) &&
+    (identity.metadata_canonicalization_sha256.length == 64) &&
     (identity.toolchain_manifest_sha256.length == 64)
 
 @[simp] theorem importedAdmittedPackageIdentity_checkWellFormed_eq_true_iff
@@ -3580,7 +3586,7 @@ def ImportedProofRelevantTranslationBundle.validationErrors
     else
       []) ++
     (if bundle.checkAdmittedPackageIdentityWellFormed != true then
-      ["source admitted package identity is not schema-v3/toolchain-bound"]
+      ["source admitted package identity is not schema-v5/raw-metadata/toolchain-bound"]
     else
       [])
 

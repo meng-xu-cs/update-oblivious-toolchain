@@ -71,12 +71,30 @@ impl ProofRelevantTranslationBundle {
     pub fn views_match(&self) -> bool {
         self.source_view == self.artifact_view
             && self.source_admitted_package == self.artifact_admitted_package
-            && self.source_admitted_package.is_some()
+            && self
+                .source_admitted_package
+                .as_ref()
+                .is_some_and(admitted_package_has_raw_metadata_witness)
     }
 
     pub fn validate_field_completeness(&self) -> Result<()> {
         validate_proof_relevant_translation_bundle_json(&serde_json::to_value(self)?)
     }
+}
+
+fn admitted_package_has_raw_metadata_witness(identity: &AdmittedPackageIdentity) -> bool {
+    identity
+        .raw_metadata_sha256
+        .as_ref()
+        .is_some_and(|value| is_sha256_hex(value))
+        && identity
+            .metadata_canonicalization_sha256
+            .as_ref()
+            .is_some_and(|value| is_sha256_hex(value))
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -455,17 +473,7 @@ const BUNDLE_FIELDS: &[&str] = &[
 const ADMITTED_PACKAGE_FIELDS: &[&str] = &[
     "compilation_mode",
     "compiler_version",
-    "metadata_sha256",
-    "package_sha256",
-    "schema",
-    "source_language",
-    "source_sha256",
-    "toolchain_manifest_sha256",
-];
-
-const ADMITTED_PACKAGE_FIELDS_WITH_RAW_METADATA: &[&str] = &[
-    "compilation_mode",
-    "compiler_version",
+    "metadata_canonicalization_sha256",
     "metadata_sha256",
     "package_sha256",
     "raw_metadata_sha256",
@@ -599,18 +607,7 @@ fn require_admitted_package_fields(value: &Value, path: &str) -> Result<()> {
     if value.is_null() {
         return Ok(());
     }
-    match require_object_fields(value, path, ADMITTED_PACKAGE_FIELDS) {
-        Ok(()) => Ok(()),
-        Err(required_err) => {
-            require_object_fields(value, path, ADMITTED_PACKAGE_FIELDS_WITH_RAW_METADATA).map_err(
-                |with_raw_err| {
-                    anyhow::anyhow!(
-                        "{required_err}; accepted raw-metadata shape also failed: {with_raw_err}"
-                    )
-                },
-            )
-        }
-    }
+    require_object_fields(value, path, ADMITTED_PACKAGE_FIELDS)
 }
 
 fn require_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>> {

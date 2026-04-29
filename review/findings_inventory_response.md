@@ -205,6 +205,21 @@ ambiguous sidecars rejected before artifact identity is admitted. Then prove
 that the Lean-imported metadata is exactly the canonical interpretation of the
 raw sidecar.
 
+Status: Fixed. Proof-grade admitted packages now use schema
+`uo-admitted-package-v5`, carry both `raw_metadata_sha256` and
+`metadata_canonicalization_sha256`, and include those fields in the package
+digest. `compile_with_metadata_bytes` reparses the raw sidecar and rejects
+mismatches before admission, production deployment validates the proof-grade raw
+metadata witness, and proof-grade translation validation now requires raw
+metadata bytes instead of the parsed-only library path. The Lean importer
+requires the raw metadata and canonicalization digests, and committed benchmark
+artifacts were regenerated with the new package identity. Verified with
+`cargo test -p uo-core`, `cargo test -p uo-solc`, `cargo test -p uo-evm`,
+`cargo test -p uo-evm --features diagnostics
+engine::tests::production_runtime_rejects_diagnostics_build_profile`,
+`cd proof/lean && lake env lean UOToolchain/TranslationValidationJson.lean`,
+`./scripts/compile_benches.sh`, and `cargo fmt --check`.
+
 ## F9. Public outcome, final public state, and release safety remain theorem hypotheses
 
 Review grouping: `F9`, `T1.10`, `O2.1`, `O2.7`.

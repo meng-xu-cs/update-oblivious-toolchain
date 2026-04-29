@@ -341,8 +341,9 @@ mod tests {
     };
 
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
-        let metadata: ContractMetadata = serde_yaml::from_str(metadata).unwrap();
-        uo_solc::compile(source, &metadata, mode).unwrap()
+        let parsed_metadata: ContractMetadata = serde_yaml::from_str(metadata).unwrap();
+        uo_solc::compile_with_metadata_bytes(source, &parsed_metadata, metadata.as_bytes(), mode)
+            .unwrap()
     }
 
     fn write_temp(name: &str, contents: &str) -> PathBuf {

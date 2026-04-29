@@ -109,6 +109,13 @@ fn compile_impl(
 ) -> Result<CompiledArtifact> {
     let source = fs::read_to_string(source_path)
         .with_context(|| format!("failed to read Solidity source {}", source_path))?;
+    if let Some(raw_metadata) = raw_metadata {
+        let parsed_metadata: ContractMetadata = serde_yaml::from_slice(raw_metadata)
+            .context("failed to parse raw metadata bytes for proof-grade admission")?;
+        if &parsed_metadata != metadata {
+            bail!("raw metadata bytes do not canonicalize to the supplied metadata");
+        }
+    }
     let frontend = parse_frontend(source_path, &source, metadata)?;
     if matches!(mode, ProgramMode::Uo) {
         validate_uo_state_backend_policy(&frontend)?;
@@ -211,8 +218,10 @@ pub fn translation_validation_bundle_against_artifact(
     metadata: &ContractMetadata,
     artifact: &CompiledArtifact,
 ) -> Result<ProofRelevantTranslationBundle> {
-    let expected = compile(source_path, metadata, artifact.contract.mode.clone())?;
-    ProofRelevantTranslationBundle::from_artifacts(source_path, metadata, &expected, artifact)
+    let _ = (source_path, metadata, artifact);
+    bail!(
+        "proof-grade translation validation requires raw metadata bytes; use translation_validation_bundle_against_artifact_with_metadata_bytes"
+    )
 }
 
 pub fn translation_validation_bundle_against_artifact_with_metadata_bytes(
@@ -3328,7 +3337,10 @@ fn render_expr(expr: &Expr) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{compile, validate_source};
+    use super::{
+        compile, compile_with_metadata_bytes, translation_validation_bundle_against_artifact,
+        translation_validation_bundle_against_artifact_with_metadata_bytes, validate_source,
+    };
     use std::fs;
     use std::path::PathBuf;
     use uo_core::{ContractMetadata, Expr, ProgramMode, PublicEnvField, Statement, Uint256, Value};
@@ -3345,6 +3357,96 @@ mod tests {
 
     fn parse_metadata(yaml: &str) -> ContractMetadata {
         serde_yaml::from_str(yaml).unwrap()
+    }
+
+    fn simple_metadata_yaml() -> &'static str {
+        r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#
+    }
+
+    fn simple_source() -> PathBuf {
+        write_temp(
+            "raw-metadata-admission",
+            r#"
+            contract C {
+                uint256 private x;
+                function f(uint256 a) public { x = a; }
+            }
+            "#,
+        )
+    }
+
+    #[test]
+    fn proof_grade_compile_binds_raw_metadata_and_canonicalization_witness() {
+        let source = simple_source();
+        let metadata_yaml = simple_metadata_yaml();
+        let metadata = parse_metadata(metadata_yaml);
+        let artifact = compile_with_metadata_bytes(
+            source.to_str().unwrap(),
+            &metadata,
+            metadata_yaml.as_bytes(),
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let identity = artifact.admitted_package.as_ref().unwrap();
+        assert!(identity.raw_metadata_sha256.is_some());
+        assert!(identity.metadata_canonicalization_sha256.is_some());
+        identity.validate_proof_grade().unwrap();
+
+        let bundle = translation_validation_bundle_against_artifact_with_metadata_bytes(
+            source.to_str().unwrap(),
+            &metadata,
+            metadata_yaml.as_bytes(),
+            &artifact,
+        )
+        .unwrap();
+        assert!(bundle.views_match());
+    }
+
+    #[test]
+    fn proof_grade_compile_rejects_mismatched_raw_metadata() {
+        let source = simple_source();
+        let metadata = parse_metadata(simple_metadata_yaml());
+        let err = compile_with_metadata_bytes(
+            source.to_str().unwrap(),
+            &metadata,
+            b"contract: Other\nentrypoints: {}\nstate: {}\nbounds:\n  loops: {}\n",
+            ProgramMode::Uo,
+        )
+        .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("raw metadata bytes do not canonicalize to the supplied metadata"));
+    }
+
+    #[test]
+    fn proof_grade_translation_validation_requires_raw_metadata_bytes() {
+        let source = simple_source();
+        let metadata = parse_metadata(simple_metadata_yaml());
+        let artifact = compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+        let err = translation_validation_bundle_against_artifact(
+            source.to_str().unwrap(),
+            &metadata,
+            &artifact,
+        )
+        .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("proof-grade translation validation requires raw metadata bytes"));
     }
 
     #[test]

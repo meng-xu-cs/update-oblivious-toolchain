@@ -66,7 +66,7 @@ pub(crate) fn validate_production_artifact(artifact: &CompiledArtifact) -> Resul
         .as_ref()
         .ok_or_else(|| anyhow!("production runtime requires admitted_package identity"))?;
     identity
-        .validate_current_toolchain()
+        .validate_proof_grade()
         .map_err(|err| anyhow!("production runtime admitted package validation failed: {err}"))?;
     validate_sha256_hex("admitted_package.package_sha256", &identity.package_sha256)?;
     validate_sha256_hex(

@@ -1,15 +1,16 @@
 {
   "compiler_version": "0.1.0",
   "admitted_package": {
-    "schema": "uo-admitted-package-v4",
+    "schema": "uo-admitted-package-v5",
     "source_language": "uo-solidity-like-dsl-v1",
     "source_sha256": "8680887ee074a5dcbf38f6d1c24cabe4ce8b9bae2ee5dbe0f4f7bb4994bb660a",
     "metadata_sha256": "13e0014f59d6e1b39ce815ec7d5c62ba62cdc2d44c563a1afaf64b4dbcdb85aa",
     "raw_metadata_sha256": "9c808ef91300a273ad03abbf4eef4dfd3f792c8bc025ea6babf04a92c6c361d5",
+    "metadata_canonicalization_sha256": "e9fb68daeb2cf2fd00bfc143f41348e21f9e352f872365c63a322db533dcfd0a",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "b3209e8aeee474b946020c31b7ffd7a0d9d6f1d8784d87993c0b78e2fdc0e99a",
-    "package_sha256": "35ea96434dc2933db36eb563e167abc640abde70fb614430a6b05b41b07ab94c"
+    "toolchain_manifest_sha256": "6a008f519e5876e60c3582ef277b6256c9a9e2d4d1cdb302ef74f6aedee76bfc",
+    "package_sha256": "15c131c39b8ad8def97b8eb7a0381758bb3556587da79da27606d3645f315cdf"
   },
   "contract": {
     "contract": "FixedSlotClassifier",
