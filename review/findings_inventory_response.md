@@ -43,6 +43,10 @@ when every gated `results/` report is green and every review-side validation
 inventory is generated from that exact result set. This preserves the evidence
 claim rather than relying on prose that a stale artifact should be ignored.
 
+Status: Fixed. The review false-path snapshots are generated and checked by
+`scripts/rebuild_review_validation_false_paths.sh`, and `scripts/run_validation.sh`
+now refreshes and verifies them after the proof-grade reports are produced.
+
 ## F2. Static-drift probes are a hidden and brittle trust boundary
 
 Review grouping: `F2`, `T1.2`.

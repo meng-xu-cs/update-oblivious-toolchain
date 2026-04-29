@@ -42,3 +42,5 @@ cd "$ROOT"
 )
 cargo test
 cargo run -q -p mplus-probe -- "${PROBE_ARGS[@]}"
+./scripts/rebuild_review_validation_false_paths.sh --write
+./scripts/rebuild_review_validation_false_paths.sh --check
