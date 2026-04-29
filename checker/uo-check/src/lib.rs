@@ -1,10 +1,13 @@
 use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
-use uo_core::ir::{BackendKind, ContainerKind, Expr, ProgramMode, StateObject, Statement};
-use uo_core::manifest::PATH_ORAM_SCHEME;
+use uo_core::ir::{
+    BackendKind, CompiledFunction, ContainerKind, Expr, ProgramMode, StateObject, Statement,
+};
+use uo_core::manifest::{EntrypointManifest, PATH_ORAM_SCHEME};
 use uo_core::{
-    lower_confidential_kernel_statements, CompiledArtifact, ContractMetadata, OramManifest,
-    ProofRelevantTranslationBundle, StateObjectManifest, Type, Uint256,
+    lower_confidential_kernel_statements, CompiledArtifact, ContractMetadata, DeclassificationKind,
+    OramManifest, ProofRelevantTranslationBundle, ReturnPolicy, StateObjectManifest, StatusPolicy,
+    Type, Uint256,
 };
 
 #[cfg(test)]
@@ -173,6 +176,7 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 expected_return_canonical_len
             );
         }
+        validate_manifest_release_policy(function, entry, &artifact.contract.state)?;
         let counts = count_body(&function.body);
         if entry.arena_bytes != 4096 + counts.local_count * 64 {
             bail!(
@@ -468,6 +472,336 @@ fn assert_translation_equivalence(
         bail!("source/artifact admitted package identity is missing");
     }
     Ok(())
+}
+
+#[derive(Default)]
+struct ArtifactPolicySensitivity {
+    return_sensitive: bool,
+    status_sensitive: bool,
+    sensitive_public_writes: BTreeSet<String>,
+}
+
+fn validate_manifest_release_policy(
+    function: &CompiledFunction,
+    entry: &EntrypointManifest,
+    state: &[StateObject],
+) -> Result<()> {
+    let sensitivity = artifact_policy_sensitivity(function, state)?;
+    if entry.returns == ReturnPolicy::Public && sensitivity.return_sensitive {
+        bail!(
+            "manifest return policy mismatch for entrypoint {}: sensitive return requires declassification",
+            function.signature
+        );
+    }
+    if entry.returns == ReturnPolicy::Declassified
+        && !(function.confidential || sensitivity.return_sensitive)
+    {
+        bail!(
+            "manifest return policy mismatch for entrypoint {}: unused plaintext return declassification",
+            function.signature
+        );
+    }
+    if entry.returns == ReturnPolicy::EncryptedToClient
+        && entry.declassifies.contains(&DeclassificationKind::Return)
+    {
+        bail!(
+            "manifest declassification mismatch for entrypoint {}: encrypted return must not declassify plaintext return",
+            function.signature
+        );
+    }
+    if entry.status == StatusPolicy::Public && sensitivity.status_sensitive {
+        bail!(
+            "manifest status policy mismatch for entrypoint {}: sensitive status requires declassification",
+            function.signature
+        );
+    }
+    if entry.status == StatusPolicy::Declassified && !sensitivity.status_sensitive {
+        bail!(
+            "manifest status policy mismatch for entrypoint {}: unused success declassification",
+            function.signature
+        );
+    }
+    let expected_declassifies = expected_declassifies(entry.returns, entry.status);
+    let declared_declassifies = entry.declassifies.iter().copied().collect::<BTreeSet<_>>();
+    if declared_declassifies != expected_declassifies {
+        bail!(
+            "manifest declassifies mismatch for entrypoint {}",
+            function.signature
+        );
+    }
+    let declared_public_state = entry
+        .public_state_declassifies
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if declared_public_state != sensitivity.sensitive_public_writes {
+        bail!(
+            "manifest public_state_declassifies mismatch for entrypoint {}",
+            function.signature
+        );
+    }
+    Ok(())
+}
+
+fn expected_declassifies(
+    returns: ReturnPolicy,
+    status: StatusPolicy,
+) -> BTreeSet<DeclassificationKind> {
+    let mut expected = BTreeSet::new();
+    if returns == ReturnPolicy::Declassified {
+        expected.insert(DeclassificationKind::Return);
+    }
+    if status == StatusPolicy::Declassified {
+        expected.insert(DeclassificationKind::Success);
+    }
+    expected
+}
+
+fn artifact_policy_sensitivity(
+    function: &CompiledFunction,
+    state: &[StateObject],
+) -> Result<ArtifactPolicySensitivity> {
+    let mut tainted = BTreeSet::new();
+    for index in &function.secret_args {
+        if let Some((name, _)) = function.params.get(*index) {
+            tainted.insert(name.clone());
+        }
+    }
+    let mut sensitivity = ArtifactPolicySensitivity::default();
+    collect_artifact_policy_sensitivity(
+        &function.body,
+        state,
+        &mut tainted,
+        &mut sensitivity,
+        false,
+    )?;
+    Ok(sensitivity)
+}
+
+fn collect_artifact_policy_sensitivity(
+    statements: &[Statement],
+    state: &[StateObject],
+    tainted: &mut BTreeSet<String>,
+    sensitivity: &mut ArtifactPolicySensitivity,
+    control_sensitive: bool,
+) -> Result<()> {
+    for statement in statements {
+        match statement {
+            Statement::Declare { name, value, .. } | Statement::Assign { name, value } => {
+                set_artifact_taint(
+                    name,
+                    control_sensitive || artifact_expr_sensitive(value, state, tainted),
+                    tainted,
+                );
+            }
+            Statement::Require { cond } | Statement::AbortIf { cond } => {
+                sensitivity.status_sensitive |=
+                    control_sensitive || artifact_expr_sensitive(cond, state, tainted);
+            }
+            Statement::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                let cond_sensitive = artifact_expr_sensitive(cond, state, tainted);
+                let mut then_tainted = tainted.clone();
+                let mut else_tainted = tainted.clone();
+                if cond_sensitive {
+                    mark_artifact_assigned_locals(then_body, &mut then_tainted);
+                    mark_artifact_assigned_locals(else_body, &mut else_tainted);
+                }
+                collect_artifact_policy_sensitivity(
+                    then_body,
+                    state,
+                    &mut then_tainted,
+                    sensitivity,
+                    control_sensitive || cond_sensitive,
+                )?;
+                collect_artifact_policy_sensitivity(
+                    else_body,
+                    state,
+                    &mut else_tainted,
+                    sensitivity,
+                    control_sensitive || cond_sensitive,
+                )?;
+                tainted.extend(then_tainted);
+                tainted.extend(else_tainted);
+            }
+            Statement::For {
+                start, end, body, ..
+            } => {
+                let loop_sensitive = control_sensitive
+                    || artifact_expr_sensitive(start, state, tainted)
+                    || artifact_expr_sensitive(end, state, tainted);
+                collect_artifact_policy_sensitivity(
+                    body,
+                    state,
+                    tainted,
+                    sensitivity,
+                    loop_sensitive,
+                )?;
+            }
+            Statement::CellSet {
+                object_id,
+                value,
+                predicate,
+            } => {
+                record_artifact_sensitive_public_write(
+                    *object_id,
+                    control_sensitive
+                        || artifact_expr_sensitive(value, state, tainted)
+                        || predicate
+                            .as_ref()
+                            .is_some_and(|expr| artifact_expr_sensitive(expr, state, tainted)),
+                    state,
+                    sensitivity,
+                )?;
+            }
+            Statement::ArraySet {
+                object_id,
+                index,
+                value,
+                predicate,
+            } => {
+                record_artifact_sensitive_public_write(
+                    *object_id,
+                    control_sensitive
+                        || artifact_expr_sensitive(index, state, tainted)
+                        || artifact_expr_sensitive(value, state, tainted)
+                        || predicate
+                            .as_ref()
+                            .is_some_and(|expr| artifact_expr_sensitive(expr, state, tainted)),
+                    state,
+                    sensitivity,
+                )?;
+            }
+            Statement::MapPut {
+                object_id,
+                key,
+                value,
+                predicate,
+            } => {
+                record_artifact_sensitive_public_write(
+                    *object_id,
+                    control_sensitive
+                        || artifact_expr_sensitive(key, state, tainted)
+                        || artifact_expr_sensitive(value, state, tainted)
+                        || predicate
+                            .as_ref()
+                            .is_some_and(|expr| artifact_expr_sensitive(expr, state, tainted)),
+                    state,
+                    sensitivity,
+                )?;
+            }
+            Statement::Return { value } => {
+                if let Some(value) = value {
+                    sensitivity.return_sensitive |=
+                        control_sensitive || artifact_expr_sensitive(value, state, tainted);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn artifact_expr_sensitive(expr: &Expr, state: &[StateObject], tainted: &BTreeSet<String>) -> bool {
+    match expr {
+        Expr::Var(name) => tainted.contains(name),
+        Expr::Unary { expr, .. } => artifact_expr_sensitive(expr, state, tainted),
+        Expr::Binary { lhs, rhs, .. } => {
+            artifact_expr_sensitive(lhs, state, tainted)
+                || artifact_expr_sensitive(rhs, state, tainted)
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            artifact_expr_sensitive(cond, state, tainted)
+                || artifact_expr_sensitive(when_true, state, tainted)
+                || artifact_expr_sensitive(when_false, state, tainted)
+        }
+        Expr::CellGet { object_id } => artifact_state_object_by_id(state, *object_id)
+            .map(|object| object.confidential)
+            .unwrap_or(true),
+        Expr::ArrayGet { object_id, index } => {
+            artifact_state_object_by_id(state, *object_id)
+                .map(|object| object.confidential)
+                .unwrap_or(true)
+                || artifact_expr_sensitive(index, state, tainted)
+        }
+        Expr::MapGet { object_id, key } => {
+            artifact_state_object_by_id(state, *object_id)
+                .map(|object| object.confidential)
+                .unwrap_or(true)
+                || artifact_expr_sensitive(key, state, tainted)
+        }
+        Expr::StructField { base, .. } => artifact_expr_sensitive(base, state, tainted),
+        Expr::ArrayIndex { base, index } => {
+            artifact_expr_sensitive(base, state, tainted)
+                || artifact_expr_sensitive(index, state, tainted)
+        }
+        Expr::Keccak256 { parts } => parts
+            .iter()
+            .any(|part| artifact_expr_sensitive(part, state, tainted)),
+        Expr::Literal(_) => false,
+    }
+}
+
+fn record_artifact_sensitive_public_write(
+    object_id: u32,
+    is_sensitive: bool,
+    state: &[StateObject],
+    sensitivity: &mut ArtifactPolicySensitivity,
+) -> Result<()> {
+    if !is_sensitive {
+        return Ok(());
+    }
+    let object = artifact_state_object_by_id(state, object_id)
+        .ok_or_else(|| anyhow::anyhow!("unknown state object id {}", object_id))?;
+    if !object.confidential {
+        sensitivity
+            .sensitive_public_writes
+            .insert(object.name.clone());
+    }
+    Ok(())
+}
+
+fn artifact_state_object_by_id(state: &[StateObject], object_id: u32) -> Option<&StateObject> {
+    state.iter().find(|object| object.id == object_id)
+}
+
+fn set_artifact_taint(name: &str, is_tainted: bool, tainted: &mut BTreeSet<String>) {
+    if is_tainted {
+        tainted.insert(name.to_string());
+    } else {
+        tainted.remove(name);
+    }
+}
+
+fn mark_artifact_assigned_locals(statements: &[Statement], tainted: &mut BTreeSet<String>) {
+    for statement in statements {
+        match statement {
+            Statement::Declare { name, .. } | Statement::Assign { name, .. } => {
+                tainted.insert(name.clone());
+            }
+            Statement::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                mark_artifact_assigned_locals(then_body, tainted);
+                mark_artifact_assigned_locals(else_body, tainted);
+            }
+            Statement::For { body, .. } => mark_artifact_assigned_locals(body, tainted),
+            Statement::Require { .. }
+            | Statement::AbortIf { .. }
+            | Statement::CellSet { .. }
+            | Statement::ArraySet { .. }
+            | Statement::MapPut { .. }
+            | Statement::Return { .. } => {}
+        }
+    }
 }
 
 #[derive(Default)]
@@ -1075,7 +1409,8 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
     use uo_core::{
-        CompiledArtifact, ContractMetadata, Expr, ProgramMode, RuntimeKernelStepManifest, Value,
+        CompiledArtifact, ContractMetadata, DeclassificationKind, Expr, ProgramMode, ReturnPolicy,
+        RuntimeKernelStepManifest, StatusPolicy, Value,
     };
     use uo_precompiles::UoOpcode;
 
@@ -1195,6 +1530,111 @@ bounds:
         assert!(err
             .to_string()
             .contains("manifest secret_args mismatch for entrypoint"));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_plaintext_return_declassification_drift() {
+        let source = write_temp(
+            "return-policy",
+            "sol",
+            r#"
+            contract C {
+                function f(uint256 secret) public returns (uint256) { return secret; }
+            }
+            "#,
+        );
+        let metadata = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let mut artifact =
+            uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+        let signature = artifact.contract.functions[0].signature.clone();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap();
+        entry.returns = ReturnPolicy::Public;
+        entry.declassifies.clear();
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("sensitive return requires declassification"));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_unused_success_declassification_drift() {
+        let (_, _, mut artifact) = sample_artifact();
+        let signature = artifact.contract.functions[0].signature.clone();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap();
+        entry.status = StatusPolicy::Declassified;
+        entry.declassifies = vec![DeclassificationKind::Success];
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err.to_string().contains("unused success declassification"));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_public_state_declassification_drift() {
+        let source = write_temp(
+            "public-state-release",
+            "sol",
+            r#"
+            contract C {
+                uint256 private publicCell;
+                function f(uint256 value) public { publicCell = value; }
+            }
+            "#,
+        );
+        let metadata = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  publicCell:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let mut artifact =
+            uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+        let signature = artifact.contract.functions[0].signature.clone();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap()
+            .public_state_declassifies = vec!["publicCell".into()];
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("manifest public_state_declassifies mismatch"));
     }
 
     #[test]

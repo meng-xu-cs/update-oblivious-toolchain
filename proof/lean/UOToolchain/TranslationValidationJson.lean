@@ -1590,26 +1590,44 @@ private def sensitiveReturnPolicyWellFormed
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView)
   (sensitivity : PolicySensitivityJson) : Bool :=
-  if sensitivity.returnSensitive then
-    (entry.returns == "declassified" && entry.declassifies.contains "return") ||
-      (entry.returns == "encrypted_to_client" && fn.confidential &&
-        !(entry.declassifies.contains "return"))
+  if entry.returns == "declassified" then
+    entry.declassifies.contains "return" &&
+      (fn.confidential || sensitivity.returnSensitive)
+  else if sensitivity.returnSensitive then
+    entry.returns == "encrypted_to_client" && fn.confidential &&
+      !(entry.declassifies.contains "return")
   else
     true
 
 private def sensitiveStatusPolicyWellFormed
   (entry : ImportedProofRelevantEntrypointView)
   (sensitivity : PolicySensitivityJson) : Bool :=
-  if sensitivity.statusSensitive then
-    entry.status == "declassified" && entry.declassifies.contains "success"
+  if entry.status == "declassified" then
+    entry.declassifies.contains "success" && sensitivity.statusSensitive
+  else if sensitivity.statusSensitive then
+    false
   else
     true
+
+private def declassificationLabelUsedByPolicy
+  (entry : ImportedProofRelevantEntrypointView) (label : String) : Bool :=
+  (label == "return" && entry.returns == "declassified") ||
+    (label == "success" && entry.status == "declassified")
 
 private def declaredDeclassificationPoliciesWellFormed
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
   (entry.returns != "declassified" || entry.declassifies.contains "return") &&
     (entry.returns != "encrypted_to_client" || !(entry.declassifies.contains "return")) &&
-    (entry.status != "declassified" || entry.declassifies.contains "success")
+    (entry.status != "declassified" || entry.declassifies.contains "success") &&
+    entry.declassifies.all (declassificationLabelUsedByPolicy entry)
+
+private def publicStateDeclassifiesExact
+  (sensitivity : PolicySensitivityJson)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  sensitivity.sensitivePublicWrites.all
+    (fun name => entry.public_state_declassifies.contains name) &&
+    entry.public_state_declassifies.all
+      (fun name => sensitivity.sensitivePublicWrites.contains name)
 
 mutual
 
@@ -1671,7 +1689,7 @@ private def functionPublicAccessPolicyWellFormed
         declaredDeclassificationPoliciesWellFormed entry &&
         sensitiveReturnPolicyWellFormed fn entry sensitivity &&
         sensitiveStatusPolicyWellFormed entry sensitivity &&
-        sensitivePublicWritesDeclared sensitivity entry
+        publicStateDeclassifiesExact sensitivity entry
   | .error _ => false
 
 theorem functionPublicAccessPolicyWellFormed_public_no_confidential_reads

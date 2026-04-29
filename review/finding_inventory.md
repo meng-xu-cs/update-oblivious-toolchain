@@ -41,7 +41,7 @@ not as independent findings.
 | F-02 | Strict sidecar parse/hash boundary | TB-02, negative test 4 | Agree | P0 | Landed |
 | F-03 | Full `(P, M, V)` identity binding | TB-03, TH-08, practical blocker 6 | Agree | P0 | Landed |
 | F-04 | Abort/rollback theorem | TB-04, TH-04, negative test 3 | Agree | P0 | Landed |
-| F-05 | Exact declassification framing | TB-05, TH-05, negative test 5 | Agree | P0 | Open - required |
+| F-05 | Exact declassification framing | TB-05, TH-05, negative test 5 | Agree | P0 | Landed |
 | F-06 | Proof-relevant observer coverage | TB-06, TH-06 | Agree | P0 | Open - required |
 | F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Open - required |
 | F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Landed |
@@ -234,7 +234,19 @@ public-state releases wider than the declared release function. Lean must prove
 relational noninterference modulo exactly these release functions.
 
 Status:
-Open - required.
+Landed.
+
+Landing notes:
+Declassification labels are now exact: `return` is allowed only for
+`returns: declassified`, `success` only for `status: declassified`, and unused
+or missing labels fail compiler and checker validation. Declassified plaintext
+returns must be confidential or return-sensitive; declassified status must be
+status-sensitive. Public-state releases must exactly match the sensitive public
+write target set, so unused or broader `public_state_declassifies` entries are
+rejected. The proof-relevant Lean import predicate mirrors exact return,
+status, and public-state release checks. Added compiler and checker tests for
+duplicate labels, unused `success`, plaintext return policy drift, and
+public-state release drift; regenerated and validated benchmark artifacts.
 
 ### F-06 - Proof-Relevant Observer Coverage
 
@@ -600,7 +612,7 @@ The remediation work must add or update tests for:
 - [x] F-02 landed and tested.
 - [x] F-03 landed and tested.
 - [x] F-04 landed and tested.
-- [ ] F-05 landed and tested.
+- [x] F-05 landed and tested.
 - [ ] F-06 landed and tested.
 - [ ] F-07 landed and tested.
 - [x] F-08 landed and tested.

@@ -2029,7 +2029,17 @@ fn validate_entrypoint_policy(
             entry_meta,
             DeclassificationKind::Return,
             "returns: declassified",
-        )?,
+        )
+        .and_then(|_| {
+            if entrypoint_confidential || sensitivity.return_sensitive {
+                Ok(())
+            } else {
+                bail!(
+                    "entrypoint {} declares returns: declassified but the return is not secret-dependent; use returns: public",
+                    signature
+                )
+            }
+        })?,
         (true, ReturnPolicy::EncryptedToClient) if !entrypoint_confidential => bail!(
             "entrypoint {} declares encrypted_to_client returns but is not confidential",
             signature
@@ -2054,12 +2064,19 @@ fn validate_entrypoint_policy(
             DeclassificationKind::Success,
             "status: declassified",
         )?;
+        if !sensitivity.status_sensitive {
+            bail!(
+                "entrypoint {} declares status: declassified but success status is not secret-dependent; use status: public",
+                signature
+            );
+        }
     } else if sensitivity.status_sensitive {
         bail!(
             "entrypoint {} has secret-dependent success/abort status; declare status: declassified",
             signature
         );
     }
+    validate_exact_declassification_labels(signature, entry_meta, returns, status)?;
     let declared_public_state = entry_meta
         .public_state_declassifies
         .iter()
@@ -2075,6 +2092,18 @@ fn validate_entrypoint_policy(
             "entrypoint {} writes data or predicates derived from confidential state or secret arguments to public state {}; declare public_state_declassifies for the target object(s)",
             signature,
             undeclared_public_writes.join(", ")
+        );
+    }
+    let unused_public_state_releases = declared_public_state
+        .iter()
+        .filter(|name| !sensitivity.sensitive_public_writes.contains(name.as_str()))
+        .map(|name| (*name).clone())
+        .collect::<Vec<_>>();
+    if !unused_public_state_releases.is_empty() {
+        bail!(
+            "entrypoint {} declares public_state_declassifies for non-sensitive public state {}; remove the unused release target(s)",
+            signature,
+            unused_public_state_releases.join(", ")
         );
     }
     Ok(())
@@ -2129,6 +2158,43 @@ fn require_declassifies(
             kind
         )
     }
+}
+
+fn validate_exact_declassification_labels(
+    signature: &str,
+    entry_meta: &uo_core::EntrypointMetadata,
+    returns: ReturnPolicy,
+    status: StatusPolicy,
+) -> Result<()> {
+    let mut expected = BTreeSet::new();
+    if returns == ReturnPolicy::Declassified {
+        expected.insert(DeclassificationKind::Return);
+    }
+    if status == StatusPolicy::Declassified {
+        expected.insert(DeclassificationKind::Success);
+    }
+    let declared = entry_meta
+        .declassifies
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    if declared == expected {
+        return Ok(());
+    }
+    let unused = declared.difference(&expected).copied().collect::<Vec<_>>();
+    if !unused.is_empty() {
+        bail!(
+            "entrypoint {} declares unused declassifies label(s) {:?}",
+            signature,
+            unused
+        );
+    }
+    let missing = expected.difference(&declared).copied().collect::<Vec<_>>();
+    bail!(
+        "entrypoint {} is missing required declassifies label(s) {:?}",
+        signature,
+        missing
+    )
 }
 
 fn policy_sensitivity(
@@ -4247,9 +4313,9 @@ bounds:
     }
 
     #[test]
-    fn accepts_explicit_public_state_declassification() {
+    fn rejects_unused_public_state_declassification_for_public_value() {
         let source = write_temp(
-            "public-state-declassified",
+            "public-state-declassified-public-value",
             r#"
             contract C {
                 uint256 private publicCell;
@@ -4276,14 +4342,106 @@ bounds:
   loops: {}
 "#,
         );
-        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
-        let entry = artifact
-            .contract
-            .manifest
-            .entrypoints
-            .get("leak(uint256)")
-            .unwrap();
-        assert_eq!(entry.public_state_declassifies, vec!["publicCell"]);
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err.to_string().contains(
+            "declares public_state_declassifies for non-sensitive public state publicCell"
+        ));
+    }
+
+    #[test]
+    fn rejects_unused_success_declassification_label() {
+        let source = write_temp(
+            "unused-success-declassifies",
+            r#"
+            contract C {
+                function f() public {}
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+    declassifies: [success]
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f() declares unused declassifies label"));
+    }
+
+    #[test]
+    fn rejects_declassified_public_return_without_sensitive_release() {
+        let source = write_temp(
+            "unused-return-declassifies",
+            r#"
+            contract C {
+                function f(uint256 value) public returns (uint256) { return value; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return]
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("declares returns: declassified but the return is not secret-dependent"));
+    }
+
+    #[test]
+    fn rejects_public_state_declassification_without_sensitive_write() {
+        let source = write_temp(
+            "unused-public-state-declassifies",
+            r#"
+            contract C {
+                uint256 private publicCell;
+                function f(uint256 value) public { publicCell = value; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+    public_state_declassifies: [publicCell]
+state:
+  publicCell:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err.to_string().contains(
+            "declares public_state_declassifies for non-sensitive public state publicCell"
+        ));
     }
 
     #[test]
