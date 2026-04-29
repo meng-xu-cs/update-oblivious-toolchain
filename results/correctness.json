@@ -14,7 +14,7 @@
         "executable": true,
         "gas_used": 4096,
         "getters": [
-          1
+          "1"
         ],
         "physical_writes": 1,
         "rejected": false,
@@ -36,11 +36,11 @@
         "executable": true,
         "gas_used": 8192,
         "getters": [
-          1
+          "1"
         ],
         "physical_writes": 5,
         "rejected": false,
-        "return": 1
+        "return": "1"
       },
       "uo_matches_expected": true
     },
@@ -52,12 +52,12 @@
         "executable": true,
         "gas_used": 12288,
         "getters": [
-          3,
-          3
+          "3",
+          "3"
         ],
         "physical_writes": 49,
         "rejected": false,
-        "return": 2
+        "return": "2"
       },
       "oram_matches_expected": true,
       "raw": {
@@ -71,12 +71,12 @@
         "executable": true,
         "gas_used": 16384,
         "getters": [
-          3,
-          3
+          "3",
+          "3"
         ],
         "physical_writes": 9,
         "rejected": false,
-        "return": 2
+        "return": "2"
       },
       "uo_matches_expected": true
     },
@@ -88,13 +88,13 @@
         "executable": true,
         "gas_used": 16384,
         "getters": [
-          7,
-          3,
-          1
+          "7",
+          "3",
+          "1"
         ],
         "physical_writes": 178,
         "rejected": false,
-        "return": 1
+        "return": "1"
       },
       "oram_matches_expected": true,
       "raw": {
@@ -108,13 +108,13 @@
         "executable": true,
         "gas_used": 24576,
         "getters": [
-          7,
-          3,
-          1
+          "7",
+          "3",
+          "1"
         ],
         "physical_writes": 24,
         "rejected": false,
-        "return": 1
+        "return": "1"
       },
       "uo_matches_expected": true
     },
@@ -132,11 +132,11 @@
         "executable": true,
         "gas_used": 12288,
         "getters": [
-          0
+          "0"
         ],
         "physical_writes": 8,
         "rejected": false,
-        "return": 1
+        "return": "1"
       },
       "uo_matches_expected": true
     }

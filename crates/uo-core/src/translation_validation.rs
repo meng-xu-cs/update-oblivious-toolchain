@@ -183,7 +183,7 @@ impl ProofRelevantFunctionView {
             body: function
                 .body
                 .iter()
-                .map(|statement| canonical_json_string(statement))
+                .map(canonical_json_string)
                 .collect::<Result<Vec<_>>>()?,
             secret_args: function.secret_args.clone(),
             confidential: function.confidential,

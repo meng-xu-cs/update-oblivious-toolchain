@@ -1980,12 +1980,12 @@ pub fn lower_confidential_kernel_statements(
                 },
             )?;
     }
-    Ok(lowered.finish().map_err(
+    lowered.finish().map_err(
         |error| ConfidentialKernelLoweringError::FixedBufferInvariant {
             entrypoint: entrypoint.into(),
             detail: error.to_string(),
         },
-    )?)
+    )
 }
 
 pub fn lower_confidential_kernel_expr(

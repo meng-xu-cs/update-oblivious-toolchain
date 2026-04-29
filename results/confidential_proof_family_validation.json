@@ -28,7 +28,7 @@
         "secret_arg_count": 1,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 63978,
+      "confidential_proof_bundle_family_json_bytes": 64001,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -301,7 +301,7 @@
         "secret_arg_count": 1,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 63978,
+      "confidential_proof_bundle_family_json_bytes": 64001,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -574,7 +574,7 @@
         "secret_arg_count": 1,
         "statement_count": 7
       },
-      "confidential_proof_bundle_family_json_bytes": 145451,
+      "confidential_proof_bundle_family_json_bytes": 145728,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -1073,7 +1073,7 @@
         "secret_arg_count": 1,
         "statement_count": 7
       },
-      "confidential_proof_bundle_family_json_bytes": 145451,
+      "confidential_proof_bundle_family_json_bytes": 145721,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -2007,7 +2007,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 108772,
+      "confidential_proof_bundle_family_json_bytes": 108765,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -2442,7 +2442,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 150141,
+      "confidential_proof_bundle_family_json_bytes": 150127,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -4186,7 +4186,7 @@
         "secret_arg_count": 3,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 175539,
+      "confidential_proof_bundle_family_json_bytes": 175532,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -4854,7 +4854,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 235750,
+      "confidential_proof_bundle_family_json_bytes": 235737,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -5709,7 +5709,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 235710,
+      "confidential_proof_bundle_family_json_bytes": 235718,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -6564,7 +6564,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 323962,
+      "confidential_proof_bundle_family_json_bytes": 324043,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -7626,7 +7626,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 323935,
+      "confidential_proof_bundle_family_json_bytes": 324018,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -8688,7 +8688,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 845672,
+      "confidential_proof_bundle_family_json_bytes": 845647,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -11506,7 +11506,7 @@
         "secret_arg_count": 4,
         "statement_count": 9
       },
-      "confidential_proof_bundle_family_json_bytes": 2642844,
+      "confidential_proof_bundle_family_json_bytes": 2642937,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,

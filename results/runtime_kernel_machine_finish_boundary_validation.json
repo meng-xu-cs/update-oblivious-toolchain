@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 2522,
+      "boundary_json_bytes": 2524,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -218,7 +218,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 2522,
+      "boundary_json_bytes": 2524,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -421,7 +421,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 6438,
+      "boundary_json_bytes": 6456,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -827,7 +827,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 6438,
+      "boundary_json_bytes": 6456,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -10326,7 +10326,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 100932,
+      "boundary_json_bytes": 100934,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,

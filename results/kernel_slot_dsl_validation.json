@@ -23,7 +23,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 1935,
+      "kernel_slot_dsl_bundle_json_bytes": 1937,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -158,7 +158,7 @@
         "statement_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 1935,
+      "kernel_slot_dsl_bundle_json_bytes": 1937,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -293,7 +293,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_slot_dsl_bundle_json_bytes": 5401,
+      "kernel_slot_dsl_bundle_json_bytes": 5419,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -613,7 +613,7 @@
         "statement_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "kernel_slot_dsl_bundle_json_bytes": 5401,
+      "kernel_slot_dsl_bundle_json_bytes": 5419,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -9216,7 +9216,7 @@
         "statement_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "kernel_slot_dsl_bundle_json_bytes": 99824,
+      "kernel_slot_dsl_bundle_json_bytes": 99826,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

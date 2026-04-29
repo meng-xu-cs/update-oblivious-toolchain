@@ -360,6 +360,7 @@ impl RuntimeKernelMachine {
         Ok(value)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn run_confidential_call<S: RuntimeKernelConfidentialStore>(
         mut self,
         program: &ConfidentialKernelSlotProgram,

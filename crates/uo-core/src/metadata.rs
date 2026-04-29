@@ -19,7 +19,7 @@ pub struct EntrypointMetadata {
     #[serde(default)]
     pub public_gas_budget: Option<u64>,
     #[serde(default)]
-    pub confidential: bool,
+    pub confidential: Option<bool>,
     #[serde(default)]
     pub returns: Option<ReturnPolicy>,
     #[serde(default)]

@@ -1,3 +1,11 @@
+#![allow(
+    clippy::duplicate_mod,
+    clippy::manual_unwrap_or_default,
+    clippy::only_used_in_recursion,
+    clippy::too_many_arguments,
+    clippy::type_complexity
+)]
+
 mod controller;
 mod engine;
 mod oram;

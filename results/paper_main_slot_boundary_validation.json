@@ -89,7 +89,7 @@
       "accepted": true,
       "boundary_schedule_uniform": true,
       "boundary_uniform": true,
-      "bundle_json_bytes": 808556,
+      "bundle_json_bytes": 808558,
       "canonical_leaf_seed_space_matches": false,
       "canonical_leaf_seed_space_size": 274877906944,
       "canonical_leaf_values_match_runtime_seed": false,

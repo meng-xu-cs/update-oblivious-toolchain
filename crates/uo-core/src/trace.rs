@@ -343,6 +343,7 @@ pub struct RuntimeObservedOramAccessWitness {
 }
 
 impl RuntimeObservedOramAccessWitness {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         object_id: u32,
         scheme: impl Into<String>,
@@ -386,6 +387,14 @@ impl RuntimeObservedOramAccessWitness {
         )
     }
 }
+
+type RuntimePathOramBucketTrace = (Vec<(String, String)>, Vec<(String, String)>);
+type RuntimeExecutionTraceOramParts = (
+    Box<[RuntimeOramAccessCounterWitness]>,
+    Box<[RuntimeOramAccessCounterWitness]>,
+    Box<[RuntimePathOramPositionMapWitness]>,
+    Box<[RuntimePathOramPositionMapWitness]>,
+);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeOramLeafWitness {
@@ -5627,6 +5636,7 @@ impl RuntimeControllerObserverCertificate {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn from_runtime_observer_parts(
         public_outcome: PublicOutcomeTrace,
         boundary_schedule: Box<[BoundaryEvent]>,
@@ -5657,6 +5667,7 @@ impl RuntimeControllerObserverCertificate {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn from_runtime_observer_with_oram_accesses(
         public_outcome: PublicOutcomeTrace,
         boundary_schedule: Box<[BoundaryEvent]>,
@@ -5906,7 +5917,7 @@ fn runtime_path_oram_bucket_trace(
     physical_reads: &[PhysicalReadEvent],
     physical_writes: &[PhysicalWriteEvent],
     oram_objects: &[RuntimeOramObjectWitness],
-) -> Result<(Vec<(String, String)>, Vec<(String, String)>), RefinementWitnessError> {
+) -> Result<RuntimePathOramBucketTrace, RefinementWitnessError> {
     let path_objects = oram_objects
         .iter()
         .filter(|object| object.scheme == PATH_ORAM_SCHEME)
@@ -5937,7 +5948,7 @@ fn runtime_path_oram_bucket_trace(
 
 fn runtime_path_oram_bucket_trace_of_leaf_schedule(
     leaf_schedule: &[RuntimeOramLeafWitness],
-) -> (Vec<(String, String)>, Vec<(String, String)>) {
+) -> RuntimePathOramBucketTrace {
     let mut read_buckets = Vec::new();
     let mut write_buckets = Vec::new();
     for step in leaf_schedule {
@@ -6755,14 +6766,7 @@ impl TracedRuntimeCallWitnessState {
         }
     }
 
-    pub fn into_execution_trace_parts(
-        mut self,
-    ) -> (
-        Box<[RuntimeOramAccessCounterWitness]>,
-        Box<[RuntimeOramAccessCounterWitness]>,
-        Box<[RuntimePathOramPositionMapWitness]>,
-        Box<[RuntimePathOramPositionMapWitness]>,
-    ) {
+    pub fn into_execution_trace_parts(mut self) -> RuntimeExecutionTraceOramParts {
         (
             std::mem::take(&mut self.runtime_oram_access_counters_before),
             std::mem::take(&mut self.runtime_oram_access_counters_after),

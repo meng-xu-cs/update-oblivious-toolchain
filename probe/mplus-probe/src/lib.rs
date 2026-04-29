@@ -1,4 +1,12 @@
 #![recursion_limit = "2048"]
+#![allow(
+    clippy::bool_comparison,
+    clippy::needless_lifetimes,
+    clippy::needless_option_as_deref,
+    clippy::too_many_arguments,
+    clippy::unnecessary_sort_by,
+    clippy::vec_init_then_push
+)]
 
 use anyhow::{anyhow, bail, Context, Result};
 use rayon::prelude::*;
@@ -332,6 +340,7 @@ const DEFAULT_HEAVY_ARTIFACT_BUDGET_BYTES: u64 = 20 * 1024 * 1024 * 1024;
 const CANONICAL_SIZE_ESTIMATE_SAMPLE_SEEDS: usize = 8;
 const EXPECTED_LEAN_TOOLCHAIN_PIN: &str = "leanprover/lean4:v4.30.0-rc2";
 const EXPECTED_LEAN_RELEASE: &str = "4.30.0-rc2";
+const EXPECTED_RUST_TOOLCHAIN_CHANNEL: &str = "1.82.0";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum ArtifactMaterializationMode {
@@ -371,6 +380,12 @@ struct ReproducibilityManifest {
     lean_toolchain_exact_release: bool,
     lean_version: String,
     lake_version: String,
+    rust_toolchain_channel: String,
+    rust_toolchain_exact_release: bool,
+    rust_toolchain_sha256: String,
+    rustc_version: String,
+    cargo_version: String,
+    cargo_lock_sha256: String,
     files: Vec<ReproducibilityManifestEntry>,
 }
 
@@ -2146,6 +2161,18 @@ pub fn write_reproducibility_manifest(out_dir: &str) -> Result<()> {
         );
     }
     let (lean_version, lake_version) = lean_lake_version_strings()?;
+    let rust_toolchain_channel = read_rust_toolchain_channel()?;
+    let rust_toolchain_exact_release = rust_toolchain_exact_release_pinned(&rust_toolchain_channel);
+    if !rust_toolchain_exact_release {
+        bail!(
+            "Rust toolchain must be pinned to an exact release, found `{}`; expected `{}`",
+            rust_toolchain_channel,
+            EXPECTED_RUST_TOOLCHAIN_CHANNEL
+        );
+    }
+    let (rustc_version, cargo_version) = rust_cargo_version_strings()?;
+    let rust_toolchain_sha256 = file_sha256_hex(&repo_root().join("rust-toolchain.toml"))?;
+    let cargo_lock_sha256 = file_sha256_hex(&repo_root().join("Cargo.lock"))?;
     let mut files = Vec::new();
     collect_bundle_files(root, root, &mut files)?;
     let entries = files
@@ -2169,12 +2196,18 @@ pub fn write_reproducibility_manifest(out_dir: &str) -> Result<()> {
         })
         .collect::<Result<Vec<_>>>()?;
     let manifest = ReproducibilityManifest {
-        format_version: 2,
+        format_version: 3,
         file_count: entries.len(),
         lean_toolchain,
         lean_toolchain_exact_release,
         lean_version,
         lake_version,
+        rust_toolchain_channel,
+        rust_toolchain_exact_release,
+        rust_toolchain_sha256,
+        rustc_version,
+        cargo_version,
+        cargo_lock_sha256,
         files: entries,
     };
     fs::write(
@@ -2201,6 +2234,30 @@ fn lean_toolchain_exact_release_pinned(toolchain: &str) -> bool {
         && !toolchain.contains(":stable")
 }
 
+fn read_rust_toolchain_channel() -> Result<String> {
+    let path = repo_root().join("rust-toolchain.toml");
+    let source =
+        fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    source
+        .lines()
+        .find_map(|line| {
+            let trimmed = line.trim();
+            trimmed
+                .strip_prefix("channel")
+                .and_then(|rest| rest.trim_start().strip_prefix('='))
+                .map(|value| value.trim().trim_matches('"').to_owned())
+        })
+        .filter(|channel| !channel.is_empty())
+        .ok_or_else(|| anyhow!("missing channel in {}", path.display()))
+}
+
+fn rust_toolchain_exact_release_pinned(channel: &str) -> bool {
+    channel == EXPECTED_RUST_TOOLCHAIN_CHANNEL
+        && !channel.contains("stable")
+        && !channel.contains("nightly")
+        && !channel.contains("beta")
+}
+
 fn command_stdout_trimmed(command: &str, args: &[&str], cwd: &Path) -> Result<String> {
     let output = Command::new(command)
         .args(args)
@@ -2224,6 +2281,18 @@ fn lean_lake_version_strings() -> Result<(String, String)> {
     let lean_version = command_stdout_trimmed("lean", &["--version"], &lean_dir)?;
     let lake_version = command_stdout_trimmed("lake", &["--version"], &lean_dir)?;
     Ok((lean_version, lake_version))
+}
+
+fn rust_cargo_version_strings() -> Result<(String, String)> {
+    let root = repo_root();
+    let rustc_version = command_stdout_trimmed("rustc", &["--version"], &root)?;
+    let cargo_version = command_stdout_trimmed("cargo", &["--version"], &root)?;
+    Ok((rustc_version, cargo_version))
+}
+
+fn file_sha256_hex(path: &Path) -> Result<String> {
+    let bytes = fs::read(path).with_context(|| format!("reading {}", path.display()))?;
+    Ok(hex::encode(Sha256::digest(&bytes)))
 }
 
 fn collect_bundle_files(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
@@ -2924,6 +2993,12 @@ fn static_drift_check_inventory() -> JsonValue {
             "work_package": "F18",
             "target": "`reproducibility_manifest.json` records the exact Lean toolchain pin plus `lean --version` and `lake --version`, and manifest generation fails closed on non-exact pins",
             "report_field": "kernel_model_alignment_validation.lean_lake_versions_recorded_in_manifest",
+        },
+        {
+            "name": "rust_toolchain_and_lock_recorded_in_manifest",
+            "work_package": "F18",
+            "target": "`reproducibility_manifest.json` records the exact Rust toolchain channel, `rustc --version`, `cargo --version`, `rust-toolchain.toml` hash, and `Cargo.lock` hash, and manifest generation fails closed on non-exact Rust pins",
+            "report_field": "kernel_model_alignment_validation.rust_toolchain_and_lock_recorded_in_manifest",
         },
         {
             "name": "sgx_deployment_assumption_mechanism_matrix_pinned",
@@ -28755,6 +28830,24 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && probe_source.contains("lean_version: String")
         && probe_source.contains("lake_version: String")
         && probe_source.contains("lean_lake_version_strings()?");
+    let rust_toolchain_channel = read_rust_toolchain_channel()?;
+    let (rustc_version, cargo_version) = rust_cargo_version_strings()?;
+    let rust_toolchain_exact_release_pinned =
+        rust_toolchain_exact_release_pinned(&rust_toolchain_channel)
+            && rustc_version.contains(EXPECTED_RUST_TOOLCHAIN_CHANNEL)
+            && cargo_version.contains(EXPECTED_RUST_TOOLCHAIN_CHANNEL);
+    let rust_toolchain_and_lock_recorded_in_manifest =
+        repo_root().join("rust-toolchain.toml").is_file()
+            && repo_root().join("Cargo.lock").is_file()
+            && probe_source.contains("rust_toolchain_channel: String")
+            && probe_source.contains("rust_toolchain_exact_release: bool")
+            && probe_source.contains("rust_toolchain_sha256: String")
+            && probe_source.contains("rustc_version: String")
+            && probe_source.contains("cargo_version: String")
+            && probe_source.contains("cargo_lock_sha256: String")
+            && probe_source.contains("read_rust_toolchain_channel()?")
+            && probe_source.contains("rust_cargo_version_strings()?")
+            && probe_source.contains("file_sha256_hex(&repo_root().join(\"Cargo.lock\"))?");
     let rust_runtime_small_confidential_kernel_boundary_field_names = extract_rust_struct_fields(
         &probe_source,
         "ImportedRuntimeImplementationSmallConfidentialKernelBoundary",
@@ -34959,6 +35052,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && theorem_adjacent_unsafe_isolated_to_fixed_buffer
         && lean_toolchain_exact_release_pinned
         && lean_lake_versions_recorded_in_manifest
+        && rust_toolchain_exact_release_pinned
+        && rust_toolchain_and_lock_recorded_in_manifest
         && runtime_small_confidential_kernel_boundary_field_names_match
         && runtime_small_confidential_kernel_boundary_small_kernel_theorem_present
         && runtime_small_confidential_kernel_boundary_slot_adapter_theorem_present
@@ -35641,6 +35736,14 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             lean_toolchain_exact_release_pinned,
         "lean_lake_versions_recorded_in_manifest":
             lean_lake_versions_recorded_in_manifest,
+        "rust_toolchain_channel": rust_toolchain_channel,
+        "expected_rust_toolchain_channel": EXPECTED_RUST_TOOLCHAIN_CHANNEL,
+        "rustc_version": rustc_version,
+        "cargo_version": cargo_version,
+        "rust_toolchain_exact_release_pinned":
+            rust_toolchain_exact_release_pinned,
+        "rust_toolchain_and_lock_recorded_in_manifest":
+            rust_toolchain_and_lock_recorded_in_manifest,
         "rust_runtime_small_confidential_kernel_boundary_field_names":
             rust_runtime_small_confidential_kernel_boundary_field_names,
         "lean_runtime_small_confidential_kernel_boundary_field_names":

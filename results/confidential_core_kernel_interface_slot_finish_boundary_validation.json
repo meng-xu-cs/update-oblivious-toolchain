@@ -20,7 +20,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 8196,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 8197,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "FixedSlotClassifier",
@@ -284,7 +284,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 8194,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 8196,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "FixedSlotClassifier",
@@ -548,7 +548,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17737,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17754,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -1038,7 +1038,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17737,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17755,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -2380,7 +2380,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 18723,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 18724,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -4756,7 +4756,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 28084,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 28090,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5602,7 +5602,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 28084,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 28087,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -6448,7 +6448,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 38156,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 38153,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -7501,7 +7501,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 38154,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 38151,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -8554,7 +8554,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 99002,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 98992,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -11363,7 +11363,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 305404,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 305400,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",

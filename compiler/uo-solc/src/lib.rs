@@ -373,9 +373,17 @@ fn lower_function(
         .as_ref()
         .ok_or_else(|| anyhow!("function {} has no body", signature))?;
     let mut lowered = lower_block(body, ctx)?;
-    validate_entrypoint_policy(&signature, &return_type, &lowered, entry_meta, ctx.frontend)?;
+    let entrypoint_confidential = required_entrypoint_confidential(&signature, entry_meta)?;
+    validate_entrypoint_policy(
+        &signature,
+        &return_type,
+        &lowered,
+        entry_meta,
+        entrypoint_confidential,
+        ctx.frontend,
+    )?;
     let confidential = matches!(mode, ProgramMode::Uo)
-        && (entry_meta.confidential || !entry_meta.secret_args.is_empty());
+        && (entrypoint_confidential || !entry_meta.secret_args.is_empty());
     if confidential {
         ensure_confidential_return_shape(&lowered, &signature)?;
         lowered = linearize_statements(&lowered, &Expr::Literal(Value::Bool(true)))?;
@@ -927,16 +935,14 @@ fn lower_for_initializer(
             ctx.locals.insert(name.clone(), ty);
             Ok((name, lower_expr(init, ctx, &BTreeMap::new())?))
         }
-        pt::Statement::Expression(_, expr) => match expr {
-            pt::Expression::Assign(_, left, right) => {
-                let name = match left.as_ref() {
-                    pt::Expression::Variable(identifier) => identifier.name.clone(),
-                    _ => bail!("for-loop initializer must assign to an identifier"),
-                };
-                Ok((name, lower_expr(right, ctx, &BTreeMap::new())?))
-            }
-            _ => bail!("unsupported for-loop initializer"),
-        },
+        pt::Statement::Expression(_, pt::Expression::Assign(_, left, right)) => {
+            let name = match left.as_ref() {
+                pt::Expression::Variable(identifier) => identifier.name.clone(),
+                _ => bail!("for-loop initializer must assign to an identifier"),
+            };
+            Ok((name, lower_expr(right, ctx, &BTreeMap::new())?))
+        }
+        pt::Statement::Expression(_, _) => bail!("unsupported for-loop initializer"),
         _ => bail!("unsupported for-loop initializer"),
     }
 }
@@ -1089,8 +1095,8 @@ fn lower_state_object(
             })
         }
         ContainerKind::Map => {
-            if backend == BackendKind::Raw && state_meta.capacity.is_none() {
-                diagnostics_error("raw map still requires a public capacity in metadata")?;
+            if state_meta.capacity.is_none() {
+                diagnostics_error(format!("map state {} is missing metadata capacity", name))?;
             }
             match &def.ty {
                 pt::Expression::Type(_, pt::Type::Mapping { key, value, .. }) => {
@@ -1866,6 +1872,7 @@ fn validate_entrypoint_policy(
     return_type: &Option<Type>,
     body: &[Statement],
     entry_meta: &uo_core::EntrypointMetadata,
+    entrypoint_confidential: bool,
     frontend: &Frontend,
 ) -> Result<()> {
     let returns = required_return_policy(signature, entry_meta)?;
@@ -1887,7 +1894,7 @@ fn validate_entrypoint_policy(
             "entrypoint {} declares a return policy but has no return value; use returns: forbidden",
             signature
         ),
-        (true, ReturnPolicy::Public) if entry_meta.confidential => bail!(
+        (true, ReturnPolicy::Public) if entrypoint_confidential => bail!(
             "confidential entrypoint {} returns a plaintext value; declare returns: declassified or remove the return",
             signature
         ),
@@ -1927,6 +1934,18 @@ fn required_return_policy(
     entry_meta.returns.ok_or_else(|| {
         anyhow!(
             "entrypoint {} is missing explicit returns policy",
+            signature
+        )
+    })
+}
+
+fn required_entrypoint_confidential(
+    signature: &str,
+    entry_meta: &uo_core::EntrypointMetadata,
+) -> Result<bool> {
+    entry_meta.confidential.ok_or_else(|| {
+        anyhow!(
+            "entrypoint {} is missing explicit confidential policy",
             signature
         )
     })
@@ -3066,6 +3085,42 @@ bounds:
     }
 
     #[test]
+    fn rejects_map_missing_capacity() {
+        let source = write_temp(
+            "map-missing-capacity",
+            r#"
+            contract C {
+                mapping(bytes32 => uint256) private records;
+                function f(bytes32 key, uint256 value) public { records[key] = value; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(bytes32,uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("map state records is missing metadata capacity"));
+    }
+
+    #[test]
     fn rejects_missing_return_policy() {
         let source = write_temp(
             "missing-return-policy",
@@ -3097,6 +3152,40 @@ bounds:
         assert!(err
             .to_string()
             .contains("entrypoint f(uint256) is missing explicit returns policy"));
+    }
+
+    #[test]
+    fn rejects_missing_entrypoint_confidential_policy() {
+        let source = write_temp(
+            "missing-entrypoint-confidential",
+            r#"
+            contract C {
+                uint256 private x;
+                function f(uint256 a) public { x = a; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f(uint256) is missing explicit confidential policy"));
     }
 
     #[test]

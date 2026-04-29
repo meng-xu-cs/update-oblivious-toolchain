@@ -1,5 +1,5 @@
 {
-  "accepted": true,
+  "accepted": false,
   "all_kernel_restricted_signatures_present": true,
   "all_restricted_signatures_present": true,
   "all_state_restricted_signatures_present": true,
@@ -2181,7 +2181,7 @@
   ],
   "traced_runtime_call_witness_state_surface_restricted": true,
   "traced_runtime_call_witness_state_wipes_on_drop": true,
-  "translation_validation_rejects_confidential_raw_kernel_targets": true,
+  "translation_validation_rejects_confidential_raw_kernel_targets": false,
   "translation_validation_uses_canonical_kernel_step_manifest": true,
   "trusted_kernel_checker_uses_slot_bundle": true,
   "trusted_kernel_cli_uses_slot_bundle": true,

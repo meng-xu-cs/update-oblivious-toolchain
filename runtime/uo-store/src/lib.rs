@@ -1,3 +1,5 @@
+#![allow(clippy::borrowed_box, clippy::needless_lifetimes)]
+
 pub mod codec;
 mod store;
 

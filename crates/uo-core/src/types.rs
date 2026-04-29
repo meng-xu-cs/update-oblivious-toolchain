@@ -2,7 +2,12 @@ use crate::fixed_buffer;
 use anyhow::{bail, Result};
 use serde::de::{self, Deserializer, Visitor};
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, fmt, mem::MaybeUninit};
+use std::{
+    cmp::Ordering,
+    fmt,
+    mem::MaybeUninit,
+    ops::{BitAnd, BitOr, BitXor},
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ScalarType {
@@ -188,31 +193,19 @@ impl Uint256 {
         (quotient, remainder)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn bitand(self, rhs: Self) -> Self {
-        Self([
-            self.0[0] & rhs.0[0],
-            self.0[1] & rhs.0[1],
-            self.0[2] & rhs.0[2],
-            self.0[3] & rhs.0[3],
-        ])
+        <Self as BitAnd>::bitand(self, rhs)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn bitor(self, rhs: Self) -> Self {
-        Self([
-            self.0[0] | rhs.0[0],
-            self.0[1] | rhs.0[1],
-            self.0[2] | rhs.0[2],
-            self.0[3] | rhs.0[3],
-        ])
+        <Self as BitOr>::bitor(self, rhs)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn bitxor(self, rhs: Self) -> Self {
-        Self([
-            self.0[0] ^ rhs.0[0],
-            self.0[1] ^ rhs.0[1],
-            self.0[2] ^ rhs.0[2],
-            self.0[3] ^ rhs.0[3],
-        ])
+        <Self as BitXor>::bitxor(self, rhs)
     }
 
     fn shl1(self) -> Self {
@@ -273,6 +266,45 @@ impl Uint256 {
             remainder = current % divisor as u128;
         }
         (Self(out), remainder as u32)
+    }
+}
+
+impl BitAnd for Uint256 {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self([
+            self.0[0] & rhs.0[0],
+            self.0[1] & rhs.0[1],
+            self.0[2] & rhs.0[2],
+            self.0[3] & rhs.0[3],
+        ])
+    }
+}
+
+impl BitOr for Uint256 {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self([
+            self.0[0] | rhs.0[0],
+            self.0[1] | rhs.0[1],
+            self.0[2] | rhs.0[2],
+            self.0[3] | rhs.0[3],
+        ])
+    }
+}
+
+impl BitXor for Uint256 {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self([
+            self.0[0] ^ rhs.0[0],
+            self.0[1] ^ rhs.0[1],
+            self.0[2] ^ rhs.0[2],
+            self.0[3] ^ rhs.0[3],
+        ])
     }
 }
 

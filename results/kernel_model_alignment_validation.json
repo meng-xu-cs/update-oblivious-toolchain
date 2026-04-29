@@ -1,6 +1,7 @@
 {
-  "accepted": true,
+  "accepted": false,
   "adaptive_history_semantics_theorems_present": true,
+  "cargo_version": "cargo 1.82.0 (8f40fc59f 2024-08-21)",
   "confidential_core_bundle_bridge_checks": [
     {
       "expected_files": [
@@ -66,7 +67,7 @@
   "confidential_core_bundle_bridge_surface_restricted": true,
   "confidential_core_reuses_shell_boundary_bundle_only": true,
   "confidential_core_runtime_witness_constructors_private": true,
-  "confidential_kernel_consumes_generated_interpreter": true,
+  "confidential_kernel_consumes_generated_interpreter": false,
   "confidential_kernel_consumes_generated_profiles": true,
   "confidential_kernel_expr_evaluated_operands_match": true,
   "confidential_kernel_expr_kind_names_match": true,
@@ -113,6 +114,7 @@
     "crates/uo-core/src/trace.rs"
   ],
   "expected_runtime_trusted_kernel_bundle_storage_surface_files": [],
+  "expected_rust_toolchain_channel": "1.82.0",
   "expected_theorem_adjacent_unsafe_surface_files": [
     "crates/uo-core/src/fixed_buffer.rs"
   ],
@@ -2003,6 +2005,10 @@
     "opcode_trace",
     "confidential_slot_program"
   ],
+  "rust_toolchain_and_lock_recorded_in_manifest": true,
+  "rust_toolchain_channel": "1.82.0",
+  "rust_toolchain_exact_release_pinned": true,
+  "rustc_version": "rustc 1.82.0 (f6e511eec 2024-10-15)",
   "scratch_region_names_match": true,
   "scratch_region_serde_snake_case": true,
   "seeded_runtime_paper_main_family_bundle_field_names_match": true,

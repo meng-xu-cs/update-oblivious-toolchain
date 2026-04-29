@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1160309,
+  "artifact_json_bytes": 1173927,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeResidualHelperShellBoundary",
   "generated_object_helpers_match_lean_generator_theorem_checked": true,
   "generated_oram_codecs_match_lean_generator_theorem_checked": true,
@@ -259,7 +259,7 @@
     "objects": 87075,
     "oram": 55073,
     "store_codec": 5892,
-    "store_lib": 93,
+    "store_lib": 154,
     "store_store": 2898
   },
   "source_files": [
