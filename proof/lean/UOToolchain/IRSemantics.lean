@@ -464,6 +464,45 @@ modulus avoids Lean's saturating `Nat` subtraction before normalization. -/
 def uint256Sub (a b : Nat) : Nat :=
   uint256 (uint256 a + uint256Modulus - uint256 b)
 
+/- Runtime structural equality for Lean values. Uint payloads are compared in
+the runtime `uint256` domain; composite payloads recurse structurally in the
+same field/order-sensitive shape as Rust `Value` equality. -/
+mutual
+
+partial def Value.runtimeEq : Value → Value → Bool
+  | .bool a, .bool b => a == b
+  | .uint a, .uint b => decide (uint256 a = uint256 b)
+  | .bytes32 a, .bytes32 b => a == b
+  | .address a, .address b => a == b
+  | .structValue a, .structValue b => Value.runtimeEqStructFields a b
+  | .array a, .array b => Value.runtimeEqList a b
+  | .map a, .map b => Value.runtimeEqMapEntries a b
+  | _, _ => false
+
+partial def Value.runtimeEqList : List Value → List Value → Bool
+  | [], [] => true
+  | [], _ :: _ => false
+  | _ :: _, [] => false
+  | x :: xs, y :: ys => Value.runtimeEq x y && Value.runtimeEqList xs ys
+
+partial def Value.runtimeEqStructFields :
+    List (String × Value) → List (String × Value) → Bool
+  | [], [] => true
+  | [], _ :: _ => false
+  | _ :: _, [] => false
+  | (n1, v1) :: rest1, (n2, v2) :: rest2 =>
+      n1 == n2 && Value.runtimeEq v1 v2 && Value.runtimeEqStructFields rest1 rest2
+
+partial def Value.runtimeEqMapEntries :
+    List (Value × Value) → List (Value × Value) → Bool
+  | [], [] => true
+  | [], _ :: _ => false
+  | _ :: _, [] => false
+  | (k1, v1) :: rest1, (k2, v2) :: rest2 =>
+      Value.runtimeEq k1 k2 && Value.runtimeEq v1 v2 && Value.runtimeEqMapEntries rest1 rest2
+
+end
+
 def UnaryOp.eval (op : UnaryOp) (v : Value) : Option Value :=
   match op, v with
   | .not, .bool b => some (.bool (! b))
@@ -484,14 +523,12 @@ def BinaryOp.eval (op : BinaryOp) (lhs rhs : Value) : Option Value :=
   | .bitAnd, .uint a, .uint b => some (.uint (uint256 (uint256 a &&& uint256 b)))
   | .bitOr, .uint a, .uint b => some (.uint (uint256 (uint256 a ||| uint256 b)))
   | .bitXor, .uint a, .uint b => some (.uint (uint256 (uint256 a ^^^ uint256 b)))
+  | .eq, lhs, rhs => some (.bool (Value.runtimeEq lhs rhs))
+  | .neq, lhs, rhs => some (.bool (! Value.runtimeEq lhs rhs))
   | .lt, .uint a, .uint b => some (.bool (decide (uint256 a < uint256 b)))
   | .lte, .uint a, .uint b => some (.bool (decide (uint256 a ≤ uint256 b)))
   | .gt, .uint a, .uint b => some (.bool (decide (uint256 b < uint256 a)))
   | .gte, .uint a, .uint b => some (.bool (decide (uint256 b ≤ uint256 a)))
-  | .eq, .uint a, .uint b => some (.bool (decide (uint256 a = uint256 b)))
-  | .neq, .uint a, .uint b => some (.bool (decide (uint256 a ≠ uint256 b)))
-  | .eq, .bool a, .bool b => some (.bool (decide (a = b)))
-  | .neq, .bool a, .bool b => some (.bool (decide (a ≠ b)))
   | .logicAnd, .bool a, .bool b => some (.bool (a && b))
   | .logicOr, .bool a, .bool b => some (.bool (a || b))
   | _, _, _ => none
@@ -522,6 +559,67 @@ theorem binaryDivByZero_matches_runtime :
 theorem binaryModByZero_matches_runtime :
     BinaryOp.eval .mod (.uint 7) (.uint 0) = some (.uint 0) := by
   rfl
+
+theorem binaryEq_matches_runtimeStructuralValueEquality
+    (lhs rhs : Value) :
+    BinaryOp.eval .eq lhs rhs = some (.bool (Value.runtimeEq lhs rhs)) := by
+  rfl
+
+theorem binaryNeq_matches_runtimeStructuralValueEquality
+    (lhs rhs : Value) :
+    BinaryOp.eval .neq lhs rhs = some (.bool (! Value.runtimeEq lhs rhs)) := by
+  rfl
+
+theorem binaryEq_uint256_normalizes_operands :
+    BinaryOp.eval .eq (.uint (2 ^ 256)) (.uint 0) = some (.bool true) := by
+  rw [binaryEq_matches_runtimeStructuralValueEquality]
+  congr
+  native_decide
+
+theorem binaryEq_bytes32_supported :
+    BinaryOp.eval .eq
+        (.bytes32 (List.replicate 32 0))
+        (.bytes32 (List.replicate 32 0)) =
+      some (.bool true) := by
+  rw [binaryEq_matches_runtimeStructuralValueEquality]
+  congr
+  native_decide
+
+theorem binaryEq_address_supported :
+    BinaryOp.eval .eq
+        (.address (List.replicate 20 0))
+        (.address (List.replicate 20 0)) =
+      some (.bool true) := by
+  rw [binaryEq_matches_runtimeStructuralValueEquality]
+  congr
+  native_decide
+
+theorem binaryEq_fixedArray_supported :
+    BinaryOp.eval .eq
+        (.array [.uint 1, .bool true])
+        (.array [.uint 1, .bool true]) =
+      some (.bool true) := by
+  rw [binaryEq_matches_runtimeStructuralValueEquality]
+  congr
+  native_decide
+
+theorem binaryEq_fixedStruct_supported :
+    BinaryOp.eval .eq
+        (.structValue [("flag", .bool true), ("owner", .address (List.replicate 20 0))])
+        (.structValue [("flag", .bool true), ("owner", .address (List.replicate 20 0))]) =
+      some (.bool true) := by
+  rw [binaryEq_matches_runtimeStructuralValueEquality]
+  congr
+  native_decide
+
+theorem binaryEq_mismatchedConstructors_runtimeStructuralFalse :
+    BinaryOp.eval .eq
+        (.bytes32 (List.replicate 32 0))
+        (.address (List.replicate 20 0)) =
+      some (.bool false) := by
+  rw [binaryEq_matches_runtimeStructuralValueEquality]
+  congr
+  native_decide
 
 /-! ## Store ownership helpers
 

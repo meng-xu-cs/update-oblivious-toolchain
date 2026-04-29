@@ -156,6 +156,12 @@ between Lean equality, runtime equality, and translation validation for all
 well-typed admitted expressions. The only rejected cases should be genuinely
 ill-typed programs, not values that the supported subset advertises.
 
+Status: Fixed. Lean `BinaryOp.eval` now delegates `eq`/`neq` to runtime
+structural value equality: uints are compared in the canonical `uint256`
+domain, and `bytes32`, `address`, fixed arrays, fixed structs, and mismatched
+constructors are covered by proof witnesses. Verified with `lake env lean
+UOToolchain/IRSemantics.lean` and full `lake build`.
+
 ## F7. Struct field and local fixed-array indexing are advertised but not proof-grade in confidential code
 
 Review grouping: `F7`, `T1.9`, `P3.7`.
