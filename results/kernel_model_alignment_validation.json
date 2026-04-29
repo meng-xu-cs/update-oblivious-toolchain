@@ -1,5 +1,5 @@
 {
-  "accepted": false,
+  "accepted": true,
   "adaptive_history_semantics_theorems_present": true,
   "cargo_version": "cargo 1.82.0 (8f40fc59f 2024-08-21)",
   "confidential_core_bundle_bridge_checks": [
@@ -67,7 +67,7 @@
   "confidential_core_bundle_bridge_surface_restricted": true,
   "confidential_core_reuses_shell_boundary_bundle_only": true,
   "confidential_core_runtime_witness_constructors_private": true,
-  "confidential_kernel_consumes_generated_interpreter": false,
+  "confidential_kernel_consumes_generated_interpreter": true,
   "confidential_kernel_consumes_generated_profiles": true,
   "confidential_kernel_expr_evaluated_operands_match": true,
   "confidential_kernel_expr_kind_names_match": true,
@@ -115,9 +115,7 @@
   ],
   "expected_runtime_trusted_kernel_bundle_storage_surface_files": [],
   "expected_rust_toolchain_channel": "1.82.0",
-  "expected_theorem_adjacent_unsafe_surface_files": [
-    "crates/uo-core/src/fixed_buffer.rs"
-  ],
+  "expected_theorem_adjacent_unsafe_surface_files": [],
   "fixed_buffer_has_audited_unsafe_helpers": true,
   "generated_confidential_kernel_source_matches_lean": true,
   "generated_kernel_machine_source_matches_lean": true,
@@ -825,7 +823,7 @@
   "runtime_confidential_core_slot_bundle_nonclone": true,
   "runtime_confidential_statement_trace_bridge_boundary_bridge_theorem_present": true,
   "runtime_confidential_statement_trace_bridge_boundary_field_names_match": true,
-  "runtime_crypto_primitive_identity_pinned": false,
+  "runtime_crypto_primitive_identity_pinned": true,
   "runtime_freshness_discipline_audit_present": true,
   "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_bridge_theorem_present": true,
   "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_field_names_match": true,
@@ -2175,9 +2173,7 @@
   "store_codec_consumes_generated_transport": true,
   "store_runtime_consumes_generated_store_helpers": true,
   "theorem_adjacent_unsafe_isolated_to_fixed_buffer": true,
-  "theorem_adjacent_unsafe_surface_files": [
-    "crates/uo-core/src/fixed_buffer.rs"
-  ],
+  "theorem_adjacent_unsafe_surface_files": [],
   "trusted_kernel_slot_bundle_bridge_checks": [
     {
       "expected_files": [

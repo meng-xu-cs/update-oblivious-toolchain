@@ -27,7 +27,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 2
+        "entrypoint_count": 3
       },
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
@@ -242,7 +242,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 2
+        "entrypoint_count": 3
       },
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
@@ -457,7 +457,7 @@
           "select_count": 4,
           "struct_field_count": 0
         },
-        "entrypoint_count": 1
+        "entrypoint_count": 2
       },
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
@@ -875,7 +875,7 @@
           "select_count": 4,
           "struct_field_count": 0
         },
-        "entrypoint_count": 1
+        "entrypoint_count": 2
       },
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
@@ -1293,7 +1293,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 3
+        "entrypoint_count": 4
       },
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -1670,7 +1670,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 3
+        "entrypoint_count": 4
       },
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -2047,7 +2047,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 2
+        "entrypoint_count": 4
       },
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2508,7 +2508,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 2
+        "entrypoint_count": 4
       },
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2969,7 +2969,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 3
+        "entrypoint_count": 6
       },
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
@@ -3576,7 +3576,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 3
+        "entrypoint_count": 6
       },
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
@@ -7777,7 +7777,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 2
+        "entrypoint_count": 4
       },
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -10518,7 +10518,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 3
+        "entrypoint_count": 6
       },
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",

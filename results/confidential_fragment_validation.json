@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "scenario_count": 18,
+  "scenario_count": 33,
   "scenarios": [
     {
       "accepted": true,
@@ -15,6 +15,16 @@
     {
       "accepted": true,
       "array_index_count": 0,
+      "artifact": "AuthScan/uo",
+      "contract": "AuthScan",
+      "entrypoint": "readLast()",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
       "artifact": "ConfidentialMixer/uo",
       "contract": "ConfidentialMixer",
       "entrypoint": "deposit(bytes32,uint256)",
@@ -28,6 +38,26 @@
       "artifact": "ConfidentialMixer/uo",
       "contract": "ConfidentialMixer",
       "entrypoint": "withdraw(bytes32,uint256)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/uo",
+      "contract": "ConfidentialMixer",
+      "entrypoint": "balanceOf(bytes32)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/uo",
+      "contract": "ConfidentialMixer",
+      "entrypoint": "totalValue()",
       "non_branchless_select_arm_count": 0,
       "select_count": 0,
       "struct_field_count": 0
@@ -55,6 +85,26 @@
     {
       "accepted": true,
       "array_index_count": 0,
+      "artifact": "ConfidentialMixer/oram",
+      "contract": "ConfidentialMixer",
+      "entrypoint": "balanceOf(bytes32)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/oram",
+      "contract": "ConfidentialMixer",
+      "entrypoint": "totalValue()",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
       "artifact": "ConfidentialMixer/fullscan64",
       "contract": "ConfidentialMixer",
       "entrypoint": "deposit(bytes32,uint256)",
@@ -68,6 +118,36 @@
       "artifact": "ConfidentialMixer/fullscan64",
       "contract": "ConfidentialMixer",
       "entrypoint": "withdraw(bytes32,uint256)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/fullscan64",
+      "contract": "ConfidentialMixer",
+      "entrypoint": "balanceOf(bytes32)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/fullscan64",
+      "contract": "ConfidentialMixer",
+      "entrypoint": "totalValue()",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ERC20Lite/uo",
+      "contract": "ERC20Lite",
+      "entrypoint": "mint(address,uint256)",
       "non_branchless_select_arm_count": 0,
       "select_count": 0,
       "struct_field_count": 0
@@ -105,6 +185,36 @@
     {
       "accepted": true,
       "array_index_count": 0,
+      "artifact": "ERC20Lite/uo",
+      "contract": "ERC20Lite",
+      "entrypoint": "balanceOf(address)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ERC20Lite/uo",
+      "contract": "ERC20Lite",
+      "entrypoint": "allowanceOf(address,address)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ERC20Lite/oram",
+      "contract": "ERC20Lite",
+      "entrypoint": "mint(address,uint256)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
       "artifact": "ERC20Lite/oram",
       "contract": "ERC20Lite",
       "entrypoint": "approve(address,address,uint256)",
@@ -128,6 +238,26 @@
       "artifact": "ERC20Lite/oram",
       "contract": "ERC20Lite",
       "entrypoint": "transferFrom(address,address,address,uint256)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ERC20Lite/oram",
+      "contract": "ERC20Lite",
+      "entrypoint": "balanceOf(address)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ERC20Lite/oram",
+      "contract": "ERC20Lite",
+      "entrypoint": "allowanceOf(address,address)",
       "non_branchless_select_arm_count": 0,
       "select_count": 0,
       "struct_field_count": 0
@@ -148,6 +278,16 @@
       "artifact": "FixedSlotClassifier/uo",
       "contract": "FixedSlotClassifier",
       "entrypoint": "sameSame(uint256)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "FixedSlotClassifier/uo",
+      "contract": "FixedSlotClassifier",
+      "entrypoint": "peek()",
       "non_branchless_select_arm_count": 0,
       "select_count": 0,
       "struct_field_count": 0
@@ -181,10 +321,20 @@
       "non_branchless_select_arm_count": 0,
       "select_count": 1,
       "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "RegistryCRUD/uo",
+      "contract": "RegistryCRUD",
+      "entrypoint": "read(bytes32)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
     }
   ],
   "total_array_indices": 0,
-  "total_confidential_entrypoints": 18,
+  "total_confidential_entrypoints": 33,
   "total_non_branchless_select_arms": 0,
   "total_selects": 5,
   "total_struct_fields": 0

@@ -9192,8 +9192,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         runtime_implementation_interface.clone();
     tampered_runtime_implementation_bounded_journal_vec_bounce.trace_source = replace_exactly_once(
         &tampered_runtime_implementation_bounded_journal_vec_bounce.trace_source,
-        "fixed_buffer::clone_initialized_prefix_to_box(&self.entries, self.len)",
-        "self.as_slice().to_vec().into_boxed_slice()",
+        "entries: fixed_buffer::FixedPrefixBuffer<T>,",
+        "entries: Vec<T>,",
         "runtime implementation bounded-journal Vec bounce tamper",
     )?;
     scenarios.push(validate_tampered_json_case(
@@ -9209,7 +9209,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_interface",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the bounded-journal exact boxed snapshot path with the stale Vec bounce, so the implementation interface must reject drift away from fixed-buffer runtime witness journals",
+            "mutation": "replace the bounded-journal fixed-prefix buffer with the stale growable Vec carrier, so the implementation interface must reject drift away from fixed-buffer runtime witness journals",
         }),
     )?);
     let mut tampered_runtime_implementation_state_duplicate_direct_index =
@@ -26446,11 +26446,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         )
         && source_contains_compact(
             &generated_confidential_kernel_source,
-            "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;",
+            "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = index.to_usize_saturating();\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;",
         )
         && source_contains_compact(
             &generated_confidential_kernel_source,
-            "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = usize::try_from(index).unwrap_or(usize::MAX);\n            runtime.array_get(*object_id, index)",
+            "ConfidentialKernelSlotExpr::ArrayGet { object_id, index } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = index.to_usize_saturating();\n            runtime.array_get(*object_id, index)",
         )
         && generated_confidential_kernel_source
             .contains("ConfidentialKernelSlotStatement::Require { .. } => {")
@@ -28827,7 +28827,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_runtime_audit_surfaces_source
             .contains("RuntimeFreshnessSurface.diagnosticFreshCoinInjection")
         && lean_runtime_audit_surfaces_source
-            .contains("CanonicalFreshCoinRuntimePathOramWitnessFamily.freshCoinValueDistribution_eq_canonical")
+            .contains("CanonicalFreshCoinRuntimePathOramWitnessFamily.freshCoinSeedSpaceExact")
         && lean_runtime_audit_surfaces_source
             .contains("theorem runtimeFreshnessDiscipline_allAccepted")
         && lean_runtime_audit_surfaces_source
@@ -28838,31 +28838,22 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         .extend(collect_production_pattern_hits(&runtime_src, "unsafe {")?);
     theorem_adjacent_unsafe_surface_files.sort();
     theorem_adjacent_unsafe_surface_files.dedup();
-    let expected_theorem_adjacent_unsafe_surface_files =
-        vec![String::from("crates/uo-core/src/fixed_buffer.rs")];
-    let fixed_buffer_has_audited_unsafe_helpers = fixed_buffer_source.contains(
-        "pub(crate) fn initialized_prefix<T>(entries: &[MaybeUninit<T>], len: usize) -> &[T]",
-    ) && fixed_buffer_source
-        .contains("pub(crate) fn move_initialized_prefix_to_box<T>(")
-        && fixed_buffer_source.contains("pub(crate) fn clone_initialized_prefix_to_box<T: Clone>(")
-        && fixed_buffer_source.contains(
-            "pub(crate) fn assume_init_boxed_slice<T>(entries: Box<[MaybeUninit<T>]>) -> Box<[T]>",
-        )
-        && fixed_buffer_source.contains(
-            "pub(crate) fn drop_initialized_prefix<T>(entries: &mut [MaybeUninit<T>], len: usize)",
-        )
-        && fixed_buffer_source.contains("pub struct FixedPrefixBuffer<T>")
+    let expected_theorem_adjacent_unsafe_surface_files = Vec::<String>::new();
+    let fixed_buffer_has_audited_unsafe_helpers = fixed_buffer_source
+        .contains("pub struct FixedPrefixBuffer<T>")
+        && fixed_buffer_source.contains("entries: Vec<T>,")
+        && fixed_buffer_source.contains("capacity: usize,")
+        && fixed_buffer_source.contains("pub fn with_capacity(capacity: usize) -> Self")
+        && fixed_buffer_source.contains("entries: Vec::with_capacity(capacity),")
         && fixed_buffer_source.contains("pub fn push(&mut self, value: T) -> Result<(), T>")
-        && fixed_buffer_source.contains("pub fn into_boxed_slice(mut self) -> Box<[T]>")
-        && fixed_buffer_source.contains("// SAFETY:")
-        && fixed_buffer_source.contains("unsafe { slice::from_raw_parts(ptr, len) }")
-        && fixed_buffer_source.contains("unsafe { entry.assume_init_read() }")
-        && fixed_buffer_source.contains("unsafe { Box::from_raw(raw) }")
-        && fixed_buffer_source.contains("unsafe { entry.assume_init_drop() }");
+        && fixed_buffer_source.contains("if self.entries.len() == self.capacity")
+        && fixed_buffer_source.contains("self.entries.push(value);")
+        && fixed_buffer_source.contains("pub fn into_boxed_slice(self) -> Box<[T]>")
+        && fixed_buffer_source.contains("self.entries.into_boxed_slice()")
+        && !production_source_slice(&fixed_buffer_source).contains("unsafe {");
     let theorem_adjacent_unsafe_isolated_to_fixed_buffer = theorem_adjacent_unsafe_surface_files
         == expected_theorem_adjacent_unsafe_surface_files
         && fixed_buffer_has_audited_unsafe_helpers
-        && types_source.contains("use crate::fixed_buffer;")
         && core_trace_source.contains("use crate::fixed_buffer;")
         && confidential_kernel_source.contains("use crate::fixed_buffer;")
         && kernel_runtime_source.contains("fixed_buffer, ConfidentialKernelEffectRuntime")
@@ -30447,7 +30438,6 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && !shell_source.contains("Sha3::")
         && runtime_evm_cargo_toml_source.contains("tiny-keccak.workspace = true")
         && !runtime_evm_cargo_toml_source.contains("sha3")
-        && !runtime_evm_cargo_toml_source.contains("sha2")
         && runtime_uo_store_cargo_toml_source.contains("chacha20poly1305.workspace = true")
         && !runtime_uo_store_cargo_toml_source.contains("aes-gcm")
         && !runtime_uo_store_cargo_toml_source.contains("aes_gcm")
@@ -37155,7 +37145,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("PublicCallSummary::from_manifest_entry");
     let engine_keeps_confidential_call_inputs_inside_runtime = !engine_impl_source
         .contains("ConfidentialCallInputs::from_manifest_entry")
-        && engine_impl_source.contains("let args = args.into_boxed_slice();")
+        && engine_impl_source.contains("let args = runtime_args.into_boxed_slice();")
         && theorem_source.contains("super::run_runtime_entrypoint(")
         && !theorem_source.contains("ConfidentialCallInputs::from_raw_args(args)")
         && theorem_source.contains("args: Box<[Value]>")
@@ -37868,13 +37858,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             == expected_committed_runtime_witness_snapshot_surface_files;
     let runtime_state_uses_exact_boxed_builder = types_impl_source
         .contains("pub struct FixedBoxBuilder<T>")
-        && types_impl_source.contains("use crate::fixed_buffer;")
-        && types_impl_source.contains("entries: Box<[MaybeUninit<T>]>,")
-        && types_impl_source.contains("entries: Box::<[T]>::new_uninit_slice(len),")
-        && types_impl_source.contains("pub fn finish(mut self) -> Result<Box<[T]>>")
-        && types_impl_source.contains("fixed_buffer::assume_init_boxed_slice(entries)")
-        && types_impl_source
-            .contains("fixed_buffer::drop_initialized_prefix(&mut self.entries, self.initialized);")
+        && types_impl_source.contains("entries: Vec<T>,")
+        && types_impl_source.contains("capacity: usize,")
+        && types_impl_source.contains("entries: Vec::with_capacity(len),")
+        && types_impl_source.contains("pub fn finish(self) -> Result<Box<[T]>>")
+        && types_impl_source.contains("Ok(self.entries.into_boxed_slice())")
         && state_source.contains("FixedBoxBuilder,")
         && state_source.contains("let mut object_ids = FixedBoxBuilder::new(self.entries.len());")
         && state_source.contains("let mut entries = FixedBoxBuilder::new(object_ids.len());")
@@ -37909,33 +37897,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("snapshot.push(")
         && state_source.contains("snapshot.finish().map_err(anyhow::Error::from)")
         && core_trace_source.contains("pub struct CommittedRuntimeWitnessSnapshotBuilder")
-        && core_trace_source.contains(
-            "runtime_oram_access_counters: Box<[MaybeUninit<RuntimeOramAccessCounterWitness>]>,",
-        )
-        && core_trace_source.contains(
-            "runtime_oram_position_maps: Box<[MaybeUninit<RuntimePathOramPositionMapWitness>]>,",
-        )
         && core_trace_source
-            .contains("Box::<[RuntimeOramAccessCounterWitness]>::new_uninit_slice(len)")
+            .contains("runtime_oram_access_counters: Vec<RuntimeOramAccessCounterWitness>,")
         && core_trace_source
-            .contains("Box::<[RuntimePathOramPositionMapWitness]>::new_uninit_slice(len)")
+            .contains("runtime_oram_position_maps: Vec<RuntimePathOramPositionMapWitness>,")
+        && core_trace_source.contains("capacity: usize,")
+        && core_trace_source.contains("Vec::with_capacity(len)")
         && core_trace_source.contains("pub fn push(")
-        && core_trace_source.contains("let counter_slot = self")
+        && core_trace_source.contains(".push(runtime_oram_access_counter);")
+        && core_trace_source.contains(".push(runtime_oram_position_map);")
         && core_trace_source.contains(".runtime_oram_access_counters")
-        && core_trace_source.contains(".get_mut(index)")
-        && core_trace_source.contains("let position_map_slot = self")
         && core_trace_source.contains(".runtime_oram_position_maps")
-        && core_trace_source.contains("counter_slot.write(runtime_oram_access_counter);")
-        && core_trace_source.contains("position_map_slot.write(runtime_oram_position_map);")
         && core_trace_source.contains("pub fn finish(")
-        && core_trace_source.contains("fixed_buffer::assume_init_boxed_slice(std::mem::take(")
-        && core_trace_source.contains("impl Drop for CommittedRuntimeWitnessSnapshotBuilder")
-        && core_trace_source.contains(
-            "fixed_buffer::drop_initialized_prefix(\n            &mut self.runtime_oram_access_counters,\n            self.initialized,\n        );",
-        )
-        && core_trace_source.contains(
-            "fixed_buffer::drop_initialized_prefix(\n            &mut self.runtime_oram_position_maps,\n            self.initialized,\n        );",
-        )
+        && core_trace_source.contains("self.runtime_oram_access_counters.into_boxed_slice()")
+        && core_trace_source.contains("self.runtime_oram_position_maps.into_boxed_slice()")
         && !core_trace_source.contains(
             "self.runtime_oram_access_counters[self.initialized].write(runtime_oram_access_counter);",
         )
@@ -38450,23 +38425,19 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("pub struct RuntimeKernelBoundaryTracker")
         && core_trace_source.contains("kernel_execution: RuntimeKernelExecutionTracker")
         && core_trace_source.contains("struct BoundedJournal<T>")
-        && core_trace_source.contains("entries: Box<[MaybeUninit<T>]>")
+        && core_trace_source.contains("entries: fixed_buffer::FixedPrefixBuffer<T>,")
         && core_trace_source.contains("kernel_steps: BoundedJournal<RuntimeKernelStepWitness>")
         && core_trace_source
             .contains("RuntimeKernelExecutionTracker::with_kernel_op_budget(max_kernel_ops)")
         && core_trace_source
             .contains("kernel_steps: BoundedJournal::with_capacity(max_kernel_ops)")
-        && core_trace_source.contains("let Some(slot) = self.entries.get_mut(self.len) else {")
-        && core_trace_source.contains("slot.write(value);")
-        && core_trace_source.contains("fixed_buffer::initialized_prefix(&self.entries, self.len)")
         && core_trace_source
-            .contains("fixed_buffer::clone_initialized_prefix_to_box(&self.entries, self.len)")
-        && core_trace_source
-            .contains("fixed_buffer::move_initialized_prefix_to_box(&mut self.entries, self.len)")
-        && core_trace_source
-            .contains("fixed_buffer::drop_initialized_prefix(&mut self.entries, self.len);")
-        && core_trace_source.contains("for (slot, entry) in journal")
-        && core_trace_source.contains(".zip(self.as_slice().iter().cloned())")
+            .contains("entries: fixed_buffer::FixedPrefixBuffer::with_capacity(capacity)")
+        && core_trace_source.contains("self.entries.push(value)")
+        && core_trace_source.contains("self.entries.as_slice()")
+        && core_trace_source.contains("self.as_slice().to_vec().into_boxed_slice()")
+        && core_trace_source.contains("self.entries.into_boxed_slice()")
+        && core_trace_source.contains("for entry in self.as_slice().iter().cloned()")
         && core_trace_source.contains(".bind_expected_kernel_steps(expected_kernel_steps)")
         && core_trace_source.contains("self.kernel_execution.record_step(observed)?;")
         && core_trace_source.contains("self.kernel_steps.push(observed)")
@@ -38481,10 +38452,6 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !core_trace_source.contains("emitted_kernel_steps: Vec<RuntimeKernelStepWitness>")
         && !core_trace_source.contains("Vec::with_capacity(max_kernel_ops.max(1))")
         && !core_trace_source.contains("self.entries[self.len].write(value)")
-        && !core_trace_source.contains("let mut entries = Box::<[T]>::new_uninit_slice(self.len);")
-        && !core_trace_source.contains("self.as_slice().to_vec().into_boxed_slice()")
-        && !core_trace_source
-            .contains("entries[index].write(unsafe { self.entries[index].assume_init_read() });")
         && !core_trace_source.contains("journal.entries[index].write(entry);")
         && !core_trace_source.contains("&mut self.entries[..self.len]")
         && !kernel_runtime_source
@@ -38655,13 +38622,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("crates/uo-core/src/trace.rs")],
         ),
         (
-            "entries: Box<[MaybeUninit<T>]>",
+            "entries: fixed_buffer::FixedPrefixBuffer<T>",
             &core_src,
-            vec![
-                String::from("crates/uo-core/src/fixed_buffer.rs"),
-                String::from("crates/uo-core/src/trace.rs"),
-                String::from("crates/uo-core/src/types.rs"),
-            ],
+            vec![String::from("crates/uo-core/src/trace.rs")],
         ),
         (
             "kernel_steps: BoundedJournal<RuntimeKernelStepWitness>",
@@ -39590,16 +39553,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("pub fn kernel_steps(&self) -> Box<[ConfidentialKernelStep]>")
         && confidential_kernel_source.contains("struct FixedKernelStepBuffer")
         && confidential_kernel_source
-            .contains("steps: Box<[MaybeUninit<ConfidentialKernelStep>]>,")
+            .contains("steps: fixed_buffer::FixedPrefixBuffer<ConfidentialKernelStep>,")
         && confidential_kernel_source.contains("fn push(&mut self, step: ConfidentialKernelStep)")
+        && confidential_kernel_source.contains("fn finish(self) -> Box<[ConfidentialKernelStep]>")
         && confidential_kernel_source
-            .contains("fn finish(mut self) -> Box<[ConfidentialKernelStep]>")
-        && confidential_kernel_source
-            .contains("if let Some(slot) = self.steps.get_mut(self.len) {")
-        && confidential_kernel_source
-            .contains("fixed_buffer::move_initialized_prefix_to_box(&mut self.steps, self.len)")
-        && confidential_kernel_source
-            .contains("fixed_buffer::drop_initialized_prefix(&mut self.steps, self.len);")
+            .contains("steps: fixed_buffer::FixedPrefixBuffer::with_capacity(capacity),")
+        && confidential_kernel_source.contains("let _ = self.steps.push(step);")
+        && confidential_kernel_source.contains("self.steps.into_boxed_slice()")
         && confidential_kernel_source.contains("pub fn runtime_step_count(&self) -> usize")
         && confidential_kernel_source.contains("pub fn kernel_step_count(&self) -> usize")
         && confidential_kernel_source
@@ -39617,7 +39577,6 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !confidential_kernel_source.contains("&mut self.steps[..self.len]")
         && !confidential_kernel_source.contains("steps: Vec<ConfidentialKernelStep>,")
         && !confidential_kernel_source.contains("steps: Vec::with_capacity(len)")
-        && !confidential_kernel_source.contains("self.steps.into_boxed_slice()")
         && !confidential_kernel_source.contains("let mut steps = Vec::new();")
         && !confidential_kernel_source.contains("let mut steps = vec![ConfidentialKernelStep");
     let manifest_kernel_step_interfaces_use_exact_size_buffers = manifest_source.contains(
@@ -39741,7 +39700,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && lean_translation_validation_json_source
             .contains("confidentialEntrypointsAvoidRawKernelTargets")
         && lean_translation_validation_json_source
-            .contains("confidential kernel schedules target raw or unknown state objects")
+            .contains("confidential kernel schedules target raw, non-confidential, or unknown state objects")
         && lean_translation_validation_json_source
             .contains("theorem ImportedProofRelevantContractView.confidential_kernel_step_targets_non_raw_of_lookup")
         && lean_compiler_exactness_source.contains("confidentialKernelTargetsNonRaw")
@@ -40827,8 +40786,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &runtime_evm_src,
         ".runtime_confidential_proof_bundle_family(",
     )?;
-    let expected_runtime_confidential_proof_bundle_family_consumer_files =
-        vec![String::from("runtime/uo-evm/src/main.rs")];
+    let expected_runtime_confidential_proof_bundle_family_consumer_files = vec![
+        String::from("runtime/uo-evm/src/deployment.rs"),
+        String::from("runtime/uo-evm/src/main.rs"),
+    ];
     let runtime_confidential_proof_bundle_family_consumer_surface_restricted =
         runtime_confidential_proof_bundle_family_consumer_files
             == expected_runtime_confidential_proof_bundle_family_consumer_files
@@ -41320,17 +41281,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let core_value_array_uses_boxed_representation = types_impl_source
         .contains("Array(Box<[Value]>)")
         && types_impl_source.contains("struct FixedBoxBuilder<T>")
-        && types_impl_source.contains("use crate::fixed_buffer;")
-        && types_impl_source.contains("entries: Box<[MaybeUninit<T>]>,")
-        && types_impl_source.contains("pub fn from_fn<F>(len: usize, mut make: F) -> Box<[T]>")
-        && types_impl_source
-            .contains("for (index, slot) in builder.entries.iter_mut().enumerate() {")
-        && types_impl_source.contains("slot.write(make(index));")
-        && types_impl_source.contains(".get_mut(self.initialized)")
-        && types_impl_source.contains("slot.write(value);")
-        && types_impl_source.contains(
-            "fixed_buffer::drop_initialized_prefix(&mut self.entries, self.initialized);",
-        )
+        && types_impl_source.contains("entries: Vec<T>,")
+        && types_impl_source.contains("capacity: usize,")
+        && types_impl_source.contains("pub fn from_fn<F>(len: usize, make: F) -> Box<[T]>")
+        && types_impl_source.contains("(0..len).map(make).collect::<Vec<_>>().into_boxed_slice()")
+        && types_impl_source.contains("self.entries.push(value);")
+        && types_impl_source.contains("Ok(self.entries.into_boxed_slice())")
         && generated_value_ops_impl_source.contains("pub fn zero_for_type(ty: &Type) -> Self {")
         && generated_value_ops_impl_source.contains(
             "let values = FixedBoxBuilder::from_fn(*len, |_| Value::zero_for_type(element));",
@@ -41351,7 +41307,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !types_impl_source.contains("&mut self.entries[..self.initialized]");
     let core_value_struct_uses_boxed_representation = types_source
         .contains("Struct(Box<[(String, Value)]>)")
-        && types_impl_source.contains("pub fn from_fn<F>(len: usize, mut make: F) -> Box<[T]>")
+        && types_impl_source.contains("pub fn from_fn<F>(len: usize, make: F) -> Box<[T]>")
         && generated_value_ops_impl_source.contains("let mut field_iter = fields.iter();")
         && generated_value_ops_impl_source
             .contains("let fields = FixedBoxBuilder::from_fn(fields.len(), |_| {")
@@ -42394,7 +42350,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !call_result_struct_source.contains("telemetry")
         && engine_source.contains("pub fn call(")
         && engine_source.contains("-> Result<CallResult> {")
-        && engine_source.contains("self.call_impl(entrypoint, args, None, None)?.0");
+        && engine_source.contains("self.call_impl(entrypoint, args, None, None, None)?.0");
     let call_result_nonclone = engine_source.contains("#[derive(Debug)]\npub struct CallResult {")
         && !engine_source.contains("#[derive(Clone, Debug)]\npub struct CallResult {");
     let diagnostic_call_api_exposes_runtime_telemetry = engine_source
@@ -42402,8 +42358,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && engine_source.contains("pub struct DiagnosticCallResult {")
         && engine_source.contains("pub telemetry: CallTelemetry,")
         && engine_source.contains("pub fn call_with_diagnostics(")
-        && engine_source
-            .contains("let (call, zero_writes) = self.call_impl(entrypoint, args, None, None)?;")
+        && engine_source.contains(
+            "let (call, zero_writes) = self.call_impl(entrypoint, args, None, None, None)?;",
+        )
         && engine_source.contains("telemetry: CallTelemetry { zero_writes },");
     let diagnostic_call_result_nonclone = engine_source
         .contains("#[derive(Debug)]\npub struct DiagnosticCallResult {")
