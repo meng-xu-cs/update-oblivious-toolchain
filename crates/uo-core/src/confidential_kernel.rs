@@ -3,7 +3,7 @@ use crate::ir::{BinaryOp, CompiledFunction, Expr, StateObject, Statement, UnaryO
 use crate::types::{FixedBoxBuilder, Type, Value};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, mem::MaybeUninit};
+use std::collections::BTreeMap;
 use thiserror::Error;
 use uo_precompiles::UoOpcode;
 
@@ -535,35 +535,22 @@ pub struct ConfidentialKernelStep {
 }
 
 struct FixedKernelStepBuffer {
-    steps: Box<[MaybeUninit<ConfidentialKernelStep>]>,
-    len: usize,
+    steps: fixed_buffer::FixedPrefixBuffer<ConfidentialKernelStep>,
 }
 
 impl FixedKernelStepBuffer {
     fn new(capacity: usize) -> Self {
         Self {
-            steps: Box::<[ConfidentialKernelStep]>::new_uninit_slice(capacity),
-            len: 0,
+            steps: fixed_buffer::FixedPrefixBuffer::with_capacity(capacity),
         }
     }
 
     fn push(&mut self, step: ConfidentialKernelStep) {
-        if let Some(slot) = self.steps.get_mut(self.len) {
-            slot.write(step);
-            self.len += 1;
-        }
+        let _ = self.steps.push(step);
     }
 
-    fn finish(mut self) -> Box<[ConfidentialKernelStep]> {
-        let out = fixed_buffer::move_initialized_prefix_to_box(&mut self.steps, self.len);
-        self.len = 0;
-        out
-    }
-}
-
-impl Drop for FixedKernelStepBuffer {
-    fn drop(&mut self) {
-        fixed_buffer::drop_initialized_prefix(&mut self.steps, self.len);
+    fn finish(self) -> Box<[ConfidentialKernelStep]> {
+        self.steps.into_boxed_slice()
     }
 }
 

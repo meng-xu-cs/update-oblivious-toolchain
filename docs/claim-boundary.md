@@ -89,6 +89,7 @@ that leaf-seed-space interface directly.
 | Rust runtime kernel plus witness/certificate/bundle extraction and serialization | trusted implementation-side extraction surface; replay and reconstruction reduce but do not eliminate this trust |
 | Source-backed runtime implementation boundaries | source-frozen/static-drift evidence, not full Rust semantic refinement |
 | Rust code outside the tiny confidential kernel | not part of the confidential-work TCB when pinned to public-only or generated-helper routes |
+| Fixed-capacity Rust buffer helpers | safe `Vec`-backed wrappers; no production `unsafe` or `MaybeUninit` surface remains in `fixed_buffer` |
 | `uo-solc` | not trusted as a proof oracle for accepted artifacts; parser/preprocessing remains trusted |
 | `uo-check` | diagnostics/debug wrapper, outside the proof-grade TCB |
 | `mplus-probe` | orchestration and reporting, outside the proof-grade TCB |

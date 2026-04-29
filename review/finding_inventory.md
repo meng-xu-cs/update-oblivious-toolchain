@@ -44,7 +44,7 @@ not as independent findings.
 | F-05 | Exact declassification framing | TB-05, TH-05, negative test 5 | Agree | P0 | Open - required |
 | F-06 | Proof-relevant observer coverage | TB-06, TH-06 | Agree | P0 | Open - required |
 | F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Open - required |
-| F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Open - required |
+| F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Landed |
 | F-09 | Path ORAM capacity cap mirrored in Lean | TB-09, TH-09 | Agree | P1 | Landed |
 | F-10 | Smaller metadata canonicality gaps | TB-10, negative tests 5-6 | Agree | P1 | Landed |
 | F-11 | Direct paper-main noninterference theorem | TH-02 | Agree | P1 | Open - required |
@@ -182,7 +182,7 @@ The Rust runtime, compiler IR, Lean evaluator, and proof-grade checker must all
 agree that the committed public state equals the initial public state.
 
 Status:
-Open - required.
+Landed.
 
 ### F-05 - Exact Declassification Framing
 
@@ -581,7 +581,7 @@ The remediation work must add or update tests for:
 - [ ] F-05 landed and tested.
 - [ ] F-06 landed and tested.
 - [ ] F-07 landed and tested.
-- [ ] F-08 landed and tested.
+- [x] F-08 landed and tested.
 - [x] F-09 landed and tested.
 - [x] F-10 landed and tested.
 - [ ] F-11 landed and checked by Lean.

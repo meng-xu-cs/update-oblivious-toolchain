@@ -1,11 +1,9 @@
-use crate::fixed_buffer;
 use anyhow::{bail, Result};
 use serde::de::{self, Deserializer, Visitor};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt,
-    mem::MaybeUninit,
     ops::{BitAnd, BitOr, BitXor},
 };
 
@@ -481,66 +479,46 @@ pub(crate) use generated_value_ops::masked_select_bool;
 const CANONICAL_LENGTH_PREFIX_BYTES: usize = 8;
 
 pub struct FixedBoxBuilder<T> {
-    entries: Box<[MaybeUninit<T>]>,
-    initialized: usize,
+    entries: Vec<T>,
+    capacity: usize,
 }
 
 impl<T> FixedBoxBuilder<T> {
     pub fn new(len: usize) -> Self {
         Self {
-            entries: Box::<[T]>::new_uninit_slice(len),
-            initialized: 0,
+            entries: Vec::with_capacity(len),
+            capacity: len,
         }
     }
 
-    pub fn from_fn<F>(len: usize, mut make: F) -> Box<[T]>
+    pub fn from_fn<F>(len: usize, make: F) -> Box<[T]>
     where
         F: FnMut(usize) -> T,
     {
-        let mut builder = Self::new(len);
-        for (index, slot) in builder.entries.iter_mut().enumerate() {
-            slot.write(make(index));
-            builder.initialized += 1;
-        }
-        let entries = std::mem::take(&mut builder.entries);
-        builder.initialized = 0;
-        fixed_buffer::assume_init_boxed_slice(entries)
+        (0..len).map(make).collect::<Vec<_>>().into_boxed_slice()
     }
 
     pub fn push(&mut self, value: T) -> Result<()> {
-        if self.initialized >= self.entries.len() {
+        if self.entries.len() >= self.capacity {
             bail!(
                 "fixed value buffer overflow: initialized {} exceeds capacity {}",
-                self.initialized,
-                self.entries.len()
+                self.entries.len(),
+                self.capacity
             );
         }
-        let slot = self
-            .entries
-            .get_mut(self.initialized)
-            .ok_or_else(|| anyhow::anyhow!("fixed value buffer slot unavailable"))?;
-        slot.write(value);
-        self.initialized += 1;
+        self.entries.push(value);
         Ok(())
     }
 
-    pub fn finish(mut self) -> Result<Box<[T]>> {
-        if self.initialized != self.entries.len() {
+    pub fn finish(self) -> Result<Box<[T]>> {
+        if self.entries.len() != self.capacity {
             bail!(
                 "fixed value buffer underfilled: initialized {} of {} slots",
-                self.initialized,
-                self.entries.len()
+                self.entries.len(),
+                self.capacity
             );
         }
-        let entries = std::mem::take(&mut self.entries);
-        self.initialized = 0;
-        Ok(fixed_buffer::assume_init_boxed_slice(entries))
-    }
-}
-
-impl<T> Drop for FixedBoxBuilder<T> {
-    fn drop(&mut self) {
-        fixed_buffer::drop_initialized_prefix(&mut self.entries, self.initialized);
+        Ok(self.entries.into_boxed_slice())
     }
 }
 

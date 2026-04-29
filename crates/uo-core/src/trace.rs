@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::mem::MaybeUninit;
 use thiserror::Error;
 use uo_precompiles::UoOpcode;
 
@@ -649,67 +648,50 @@ pub struct RuntimeKernelScheduleTracker {
 }
 
 struct BoundedJournal<T> {
-    entries: Box<[MaybeUninit<T>]>,
-    len: usize,
+    entries: fixed_buffer::FixedPrefixBuffer<T>,
 }
 
 impl<T> BoundedJournal<T> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
-            entries: Box::<[T]>::new_uninit_slice(capacity),
-            len: 0,
+            entries: fixed_buffer::FixedPrefixBuffer::with_capacity(capacity),
         }
     }
 
     fn len(&self) -> usize {
-        self.len
-    }
-
-    fn capacity(&self) -> usize {
         self.entries.len()
     }
 
+    fn capacity(&self) -> usize {
+        self.entries.capacity()
+    }
+
     fn as_slice(&self) -> &[T] {
-        fixed_buffer::initialized_prefix(&self.entries, self.len)
+        self.entries.as_slice()
     }
 
     fn push(&mut self, value: T) -> Result<(), T> {
-        if self.len == self.entries.len() {
-            return Err(value);
-        }
-        let Some(slot) = self.entries.get_mut(self.len) else {
-            return Err(value);
-        };
-        slot.write(value);
-        self.len += 1;
-        Ok(())
+        self.entries.push(value)
     }
 
     fn to_boxed_slice(&self) -> Box<[T]>
     where
         T: Clone,
     {
-        fixed_buffer::clone_initialized_prefix_to_box(&self.entries, self.len)
+        self.as_slice().to_vec().into_boxed_slice()
     }
 
-    fn into_boxed_slice(mut self) -> Box<[T]> {
-        let entries = fixed_buffer::move_initialized_prefix_to_box(&mut self.entries, self.len);
-        self.len = 0;
-        entries
+    fn into_boxed_slice(self) -> Box<[T]> {
+        self.entries.into_boxed_slice()
     }
 }
 
 impl<T: Clone> Clone for BoundedJournal<T> {
     fn clone(&self) -> Self {
         let mut journal = Self::with_capacity(self.capacity());
-        for (slot, entry) in journal
-            .entries
-            .iter_mut()
-            .zip(self.as_slice().iter().cloned())
-        {
-            slot.write(entry);
+        for entry in self.as_slice().iter().cloned() {
+            let _ = journal.push(entry);
         }
-        journal.len = self.len;
         journal
     }
 }
@@ -730,12 +712,6 @@ impl<T: PartialEq> PartialEq for BoundedJournal<T> {
 }
 
 impl<T: Eq> Eq for BoundedJournal<T> {}
-
-impl<T> Drop for BoundedJournal<T> {
-    fn drop(&mut self) {
-        fixed_buffer::drop_initialized_prefix(&mut self.entries, self.len);
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuntimeKernelExecutionTracker {
@@ -6631,19 +6607,17 @@ pub enum CommittedRuntimeWitnessSnapshotBuilderError {
 
 #[derive(Debug)]
 pub struct CommittedRuntimeWitnessSnapshotBuilder {
-    runtime_oram_access_counters: Box<[MaybeUninit<RuntimeOramAccessCounterWitness>]>,
-    runtime_oram_position_maps: Box<[MaybeUninit<RuntimePathOramPositionMapWitness>]>,
-    initialized: usize,
+    runtime_oram_access_counters: Vec<RuntimeOramAccessCounterWitness>,
+    runtime_oram_position_maps: Vec<RuntimePathOramPositionMapWitness>,
+    capacity: usize,
 }
 
 impl CommittedRuntimeWitnessSnapshotBuilder {
     pub fn new(len: usize) -> Self {
         Self {
-            runtime_oram_access_counters:
-                Box::<[RuntimeOramAccessCounterWitness]>::new_uninit_slice(len),
-            runtime_oram_position_maps:
-                Box::<[RuntimePathOramPositionMapWitness]>::new_uninit_slice(len),
-            initialized: 0,
+            runtime_oram_access_counters: Vec::with_capacity(len),
+            runtime_oram_position_maps: Vec::with_capacity(len),
+            capacity: len,
         }
     }
 
@@ -6652,60 +6626,31 @@ impl CommittedRuntimeWitnessSnapshotBuilder {
         runtime_oram_access_counter: RuntimeOramAccessCounterWitness,
         runtime_oram_position_map: RuntimePathOramPositionMapWitness,
     ) -> Result<(), CommittedRuntimeWitnessSnapshotBuilderError> {
-        let index = self.initialized;
-        if index >= self.runtime_oram_access_counters.len()
-            || index >= self.runtime_oram_position_maps.len()
+        if self.runtime_oram_access_counters.len() >= self.capacity
+            || self.runtime_oram_position_maps.len() >= self.capacity
         {
             return Err(CommittedRuntimeWitnessSnapshotBuilderError::Overflow);
         }
-        let counter_slot = self
-            .runtime_oram_access_counters
-            .get_mut(index)
-            .ok_or(CommittedRuntimeWitnessSnapshotBuilderError::Overflow)?;
-        let position_map_slot = self
-            .runtime_oram_position_maps
-            .get_mut(index)
-            .ok_or(CommittedRuntimeWitnessSnapshotBuilderError::Overflow)?;
-        counter_slot.write(runtime_oram_access_counter);
-        position_map_slot.write(runtime_oram_position_map);
-        self.initialized += 1;
+        self.runtime_oram_access_counters
+            .push(runtime_oram_access_counter);
+        self.runtime_oram_position_maps
+            .push(runtime_oram_position_map);
         Ok(())
     }
 
     pub fn finish(
-        mut self,
+        self,
     ) -> Result<CommittedRuntimeWitnessSnapshot, CommittedRuntimeWitnessSnapshotBuilderError> {
-        let capacity = self.runtime_oram_access_counters.len();
-        if self.initialized != capacity {
+        if self.runtime_oram_access_counters.len() != self.capacity {
             return Err(CommittedRuntimeWitnessSnapshotBuilderError::Underfilled {
-                initialized: self.initialized,
-                capacity,
+                initialized: self.runtime_oram_access_counters.len(),
+                capacity: self.capacity,
             });
         }
-        let runtime_oram_access_counters = fixed_buffer::assume_init_boxed_slice(std::mem::take(
-            &mut self.runtime_oram_access_counters,
-        ));
-        let runtime_oram_position_maps = fixed_buffer::assume_init_boxed_slice(std::mem::take(
-            &mut self.runtime_oram_position_maps,
-        ));
-        self.initialized = 0;
         Ok(CommittedRuntimeWitnessSnapshot::new(
-            runtime_oram_access_counters,
-            runtime_oram_position_maps,
+            self.runtime_oram_access_counters.into_boxed_slice(),
+            self.runtime_oram_position_maps.into_boxed_slice(),
         ))
-    }
-}
-
-impl Drop for CommittedRuntimeWitnessSnapshotBuilder {
-    fn drop(&mut self) {
-        fixed_buffer::drop_initialized_prefix(
-            &mut self.runtime_oram_access_counters,
-            self.initialized,
-        );
-        fixed_buffer::drop_initialized_prefix(
-            &mut self.runtime_oram_position_maps,
-            self.initialized,
-        );
     }
 }
 

@@ -32,6 +32,7 @@ object.
 | Rust witness/certificate/bundle extraction and serialization | trusted producer, reduced by replay/reconstruction checks |
 | Source-backed implementation boundaries | static-drift evidence, not semantic Rust verification |
 | Rust shell/object code outside the tiny kernel | outside the confidential-work TCB when pinned to public-only or generated-helper routes |
+| Fixed-capacity Rust buffer helpers | safe `Vec`-backed wrappers; no production `unsafe` or `MaybeUninit` surface remains in `fixed_buffer` |
 | `uo-check` and `mplus-probe` | outside the proof-grade TCB |
 
 ## Main Validators
