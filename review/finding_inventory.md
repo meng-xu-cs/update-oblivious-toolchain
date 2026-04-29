@@ -42,7 +42,7 @@ not as independent findings.
 | F-03 | Full `(P, M, V)` identity binding | TB-03, TH-08, practical blocker 6 | Agree | P0 | Landed |
 | F-04 | Abort/rollback theorem | TB-04, TH-04, negative test 3 | Agree | P0 | Landed |
 | F-05 | Exact declassification framing | TB-05, TH-05, negative test 5 | Agree | P0 | Landed |
-| F-06 | Proof-relevant observer coverage | TB-06, TH-06 | Agree | P0 | Open - required |
+| F-06 | Proof-relevant observer coverage | TB-06, TH-06 | Agree | P0 | Landed |
 | F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Open - required |
 | F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Landed |
 | F-09 | Path ORAM capacity cap mirrored in Lean | TB-09, TH-09 | Agree | P1 | Landed |
@@ -276,7 +276,20 @@ evidence, or runtime observer certificates without adding coverage and Lean
 mirror evidence.
 
 Status:
-Open - required.
+Landed.
+
+Landing notes:
+Added a Rust observer coverage table for the runtime manifest, public outcome,
+return-channel AAD and ciphertext evidence, controller observer certificates,
+hidden ORAM certificates, theorem traces, trace hashes, primitive events,
+public-state transitions, and the full `ExecutionTrace` schema. The coverage
+table classifies fields as Lean-included, public input, exact declared release,
+or cryptographically hidden under the named AEAD/freshness/ORAM assumptions.
+Added source-structure mutation gates that parse the Rust struct definitions in
+`uo-core` and `uo-evm`, so adding an observer-affecting field to the covered
+schemas fails unless the coverage table is updated. Added a Lean
+`ObserverCoverage` mirror and imported it into the proof-grade root; Rust tests
+also require every Rust coverage key to appear in the Lean mirror.
 
 ## P1 Runtime And Proof Hardening
 
@@ -598,6 +611,8 @@ The remediation work must add or update tests for:
 - write followed by abort/require failure;
 - unknown sidecar fields at top, entrypoint, state, and bounds levels;
 - duplicate or unused declassification and secret-argument labels;
+- observer-affecting runtime schema fields without Rust coverage and Lean
+  mirror entries;
 - irrelevant `oram_scheme` on non-ORAM state;
 - omitted or mismatched array capacity;
 - Path ORAM capacity above 128 in imported Lean proof view;
@@ -613,7 +628,7 @@ The remediation work must add or update tests for:
 - [x] F-03 landed and tested.
 - [x] F-04 landed and tested.
 - [x] F-05 landed and tested.
-- [ ] F-06 landed and tested.
+- [x] F-06 landed and tested.
 - [ ] F-07 landed and tested.
 - [x] F-08 landed and tested.
 - [x] F-09 landed and tested.

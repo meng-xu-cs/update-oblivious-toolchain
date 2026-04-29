@@ -56,6 +56,7 @@ import UOToolchain.RuntimePathOramPairJson
 import UOToolchain.RuntimeCanonicalPathOramPairJson
 import UOToolchain.HistorySemantics
 import UOToolchain.RuntimeAuditSurfaces
+import UOToolchain.ObserverCoverage
 import UOToolchain.TranslationValidationJson
 import UOToolchain.CompilerExactness
 import UOToolchain.RuntimePaperInstantiation

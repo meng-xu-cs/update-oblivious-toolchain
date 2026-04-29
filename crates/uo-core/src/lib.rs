@@ -7,6 +7,7 @@ pub mod ir;
 pub mod kernel_dsl;
 pub mod manifest;
 pub mod metadata;
+pub mod observer_coverage;
 pub mod shell_boundary;
 pub mod trace;
 pub mod translation_validation;
@@ -67,6 +68,12 @@ pub use manifest::{
 pub use metadata::{
     BoundsMetadata, ContractMetadata, DeclassificationKind, EntrypointMetadata, ReturnPolicy,
     StateMetadata, StatusPolicy,
+};
+pub use observer_coverage::{
+    observer_field_coverage, observer_field_coverage_table, observer_schema_coverage,
+    validate_observer_coverage_table, ObserverCoverageClassification, ObserverFieldCoverage,
+    ObserverFieldCoverageOverride, ObserverSchemaCoverage, OBSERVER_FIELD_COVERAGE_OVERRIDES,
+    OBSERVER_SCHEMA_COVERAGE,
 };
 pub use shell_boundary::{
     RuntimeKernelInterfaceBundle, RuntimeKernelInterfaceBundleError, RuntimeShellBoundaryBundle,
