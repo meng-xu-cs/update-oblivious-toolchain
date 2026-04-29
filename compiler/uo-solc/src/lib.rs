@@ -6,7 +6,7 @@ use uo_core::ir::{
     PublicEnvField, StateObject, Statement, UnaryOp,
 };
 use uo_core::manifest::{
-    EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
+    is_path_oram_scheme, EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest,
     SURROGATE_ORAM_SCHEME,
 };
 use uo_core::{
@@ -1380,7 +1380,7 @@ fn build_manifest_entry(
                     if object.backend == BackendKind::Oram =>
                 {
                     let per_access = OramManifest::for_object(object)?.total_commit_ops();
-                    if object.oram_scheme == PATH_ORAM_SCHEME {
+                    if is_path_oram_scheme(&object.oram_scheme) {
                         per_access * oram_accesses.get(object_id).copied().unwrap_or(0)
                     } else {
                         per_access
@@ -3515,6 +3515,56 @@ bounds:
             manifest_entry.entry_input_len,
             1 * 32 + 20 + 20 + 32 + 32 + 32
         );
+    }
+
+    #[test]
+    fn accepts_private_posmap_path_oram_above_local_cap() {
+        let source = write_temp(
+            "private-posmap-large",
+            r#"
+            contract C {
+                mapping(address => uint256) private balances;
+                function put(address owner, uint256 amount) public {
+                    balances[owner] = amount;
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  put(address,uint256):
+    confidential: true
+    secret_args: [owner, amount]
+    returns: forbidden
+    status: public
+state:
+  balances:
+    kind: map
+    key: address
+    value: uint256
+    backend: oram
+    oram_scheme: path_oram_private_posmap_v1
+    capacity: 1024
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let manifest = artifact
+            .contract
+            .manifest
+            .objects
+            .first()
+            .unwrap()
+            .oram
+            .as_ref()
+            .unwrap();
+        assert_eq!(manifest.scheme, "path_oram_private_posmap_v1");
+        assert_eq!(manifest.recursion_depth, 1);
+        assert_eq!(manifest.bucket_count, 2047);
     }
 
     #[test]

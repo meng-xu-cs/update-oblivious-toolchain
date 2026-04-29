@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use rand_chacha::ChaCha20Rng;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::ir::StateObject;
-use uo_core::manifest::PATH_ORAM_SCHEME;
+use uo_core::manifest::is_path_oram_scheme;
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, WriteClass};
 use uo_core::{
     FixedBoxBuilder, RuntimeMaskedUsizeOptionWitness, RuntimePathOramTransitionKind,
@@ -2210,7 +2210,7 @@ pub(super) fn serialize_oram_block_into(
         .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
     let key_len = fixed_scalar_width(key_type)?;
     let value_len = fixed_scalar_width(&spec.value_type)?;
-    let path_bytes = if spec.oram_scheme == PATH_ORAM_SCHEME {
+    let path_bytes = if is_path_oram_scheme(&spec.oram_scheme) {
         ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES
     } else {
         0
@@ -2230,7 +2230,7 @@ pub(super) fn serialize_oram_block_into(
         &[u8::from(block.occupied)],
         "writing ORAM block tag",
     )?;
-    if spec.oram_scheme == PATH_ORAM_SCHEME {
+    if is_path_oram_scheme(&spec.oram_scheme) {
         cursor = write_u64_be_at(
             out,
             cursor,
@@ -2272,7 +2272,7 @@ pub(super) fn deserialize_oram_block(spec: &StateObject, bytes: &[u8]) -> Result
         .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
     let key_len = fixed_scalar_width(key_type)?;
     let value_len = fixed_scalar_width(&spec.value_type)?;
-    let path_bytes = if spec.oram_scheme == PATH_ORAM_SCHEME {
+    let path_bytes = if is_path_oram_scheme(&spec.oram_scheme) {
         ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES
     } else {
         0
@@ -2294,7 +2294,7 @@ pub(super) fn deserialize_oram_block(spec: &StateObject, bytes: &[u8]) -> Result
         1 => true,
         other => bail!("invalid ORAM block tag {other:#x} for {}", spec.name),
     };
-    let (slot_index, leaf, key_start) = if spec.oram_scheme == PATH_ORAM_SCHEME {
+    let (slot_index, leaf, key_start) = if is_path_oram_scheme(&spec.oram_scheme) {
         (
             usize::try_from(read_u64_be_at(bytes, 1, "reading ORAM block slot index")?)
                 .map_err(|_| anyhow!("slot index overflow for {}", spec.name))?,

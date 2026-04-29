@@ -3,7 +3,7 @@ use rand_chacha::ChaCha20Rng;
 use serde_json::json;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::ir::StateObject;
-use uo_core::manifest::{OramManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME};
+use uo_core::manifest::{is_path_oram_scheme, OramManifest, SURROGATE_ORAM_SCHEME};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, WriteClass};
 use uo_core::Value;
 use uo_core::{
@@ -104,7 +104,7 @@ impl OramParameters {
     }
 
     fn is_path_oram(&self) -> bool {
-        self.scheme == PATH_ORAM_SCHEME
+        is_path_oram_scheme(&self.scheme)
     }
 
     fn leaf_count(&self) -> usize {
@@ -729,13 +729,13 @@ mod tests {
         encode_path_metadata_pages, generated_oram_codecs::decode_path_metadata_pages,
         oram_bucket_bytes, oram_bucket_from_entries, oram_bucket_with_live_blocks,
         repeat_boxed_map_entries, repeat_boxed_masked_usize_options, MapEntry, MaskedUsizeOption,
-        OramBlock, OramParameters, OramState, PathOramLeafCoinSource, PATH_ORAM_SCHEME,
-        SURROGATE_ORAM_SCHEME,
+        OramBlock, OramParameters, OramState, PathOramLeafCoinSource, SURROGATE_ORAM_SCHEME,
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use uo_allocator::{AllocatorPlan, AllocatorSession};
     use uo_core::ir::{BackendKind, ContainerKind, StateObject};
+    use uo_core::manifest::PATH_ORAM_SCHEME;
     use uo_core::trace::WriteClass;
     use uo_core::{ScalarType, Type, Value};
     use uo_store::StoreCipher;

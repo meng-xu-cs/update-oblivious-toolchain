@@ -873,11 +873,27 @@ def countBodyStrings (body : List String) : Except String CountSummary :=
 
 def translationPathOramScheme : String := "path_oram_local_posmap_v1"
 
+def translationPathOramPrivatePosmapScheme : String := "path_oram_private_posmap_v1"
+
 def translationPathOramLocalPosmapMaxCapacity : Nat := 128
 
 def translationSurrogateOramScheme : String := "surrogate_public_schedule_v1"
 
 def translationOramBucketHeaderBytes : Nat := 24
+
+def translationIsPathOramScheme (scheme : String) : Bool :=
+  scheme == translationPathOramScheme || scheme == translationPathOramPrivatePosmapScheme
+
+def translationPathOramPositionMapShapeWellFormed
+  (scheme : String)
+  (capacity recursionDepth : Nat) : Bool :=
+  if scheme == translationPathOramScheme then
+    capacity <= translationPathOramLocalPosmapMaxCapacity &&
+      recursionDepth == 0
+  else if scheme == translationPathOramPrivatePosmapScheme then
+    recursionDepth == 1
+  else
+    false
 
 private def mergeDistinctNatLists (lhs rhs : List Nat) : List Nat :=
   rhs.foldl (init := lhs) fun acc objectId =>
@@ -1793,17 +1809,19 @@ def validateImportedOramShape
             oram.stash_bound == 0 &&
             oram.recursion_depth == 0 &&
             oram.accesses_per_call == 1
-        else if oram.scheme == translationPathOramScheme then
+        else if translationIsPathOramScheme oram.scheme then
           let leafCount := (oram.bucket_count + 1) / 2
           oram.bucket_count > 0 &&
-            stateObject.capacity.getD 1 <= translationPathOramLocalPosmapMaxCapacity &&
+            translationPathOramPositionMapShapeWellFormed
+              oram.scheme
+              (stateObject.capacity.getD 1)
+              oram.recursion_depth &&
             oram.bucket_count % 2 == 1 &&
             isPowerOfTwo leafCount &&
             oram.blocks_per_bucket == 5 &&
             oram.bucket_size ==
               translationOramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size &&
             oram.stash_bound == max (stateObject.capacity.getD 1) 1 &&
-            oram.recursion_depth == 0 &&
             oram.tree_height == log2Ceil leafCount &&
             oram.bucket_count == 2 * leafCount - 1 &&
             oram.metadata_pages_per_access == oram.metadata_pages + 1 &&
@@ -1857,6 +1875,36 @@ theorem validateImportedOramShape_rejects_path_oram_capacity_above_local_posmap_
       1 = false := by
   native_decide
 
+private def privateOverCapacityPathOramStateForCheck : ImportedProofRelevantStateObjectView :=
+  { overCapacityPathOramStateForCheck with
+    oram_scheme := translationPathOramPrivatePosmapScheme
+  }
+
+private def privateOverCapacityPathOramManifestForCheck : ImportedProofRelevantManifestObjectView :=
+  { overCapacityPathOramManifestForCheck with
+    oram := some
+      { scheme := translationPathOramPrivatePosmapScheme
+      , block_size := 64
+      , bucket_size := translationOramBucketHeaderBytes + 5 * 64
+      , bucket_count := 511
+      , blocks_per_bucket := 5
+      , tree_height := 8
+      , stash_bound := translationPathOramLocalPosmapMaxCapacity + 1
+      , recursion_depth := 1
+      , metadata_pages := 1
+      , metadata_pages_per_access := 2
+      , buckets_per_access := 9
+      , accesses_per_call := 1
+      }
+  }
+
+theorem validateImportedOramShape_accepts_private_posmap_capacity_above_local_posmap_cap :
+  validateImportedOramShape
+      privateOverCapacityPathOramStateForCheck
+      privateOverCapacityPathOramManifestForCheck
+      1 = true := by
+  native_decide
+
 def expectedCommitOpsForFunction
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView) :
@@ -1878,7 +1926,7 @@ def expectedCommitOpsForFunction
               match manifestObject.oram with
               | some oram =>
                   let perAccess := totalCommitOps oram
-                  if stateObject.oram_scheme == translationPathOramScheme then
+                  if translationIsPathOramScheme stateObject.oram_scheme then
                     pure <| perAccess * lookupPairCount objectId oramAccesses
                   else
                     pure perAccess

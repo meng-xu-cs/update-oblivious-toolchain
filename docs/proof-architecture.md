@@ -11,6 +11,7 @@ modules are:
 - `UOToolchain.Sol`
 - `UOToolchain.SolidityDialectBoundary`
 - `UOToolchain.EnvironmentAuthModel`
+- `UOToolchain.ScalablePathOramEvidence`
 - `UOToolchain.IRSyntax`
 - `UOToolchain.IRSemantics`
 - `UOToolchain.CompilerInvariant`
@@ -56,7 +57,8 @@ The proof development is organized around these layers:
   disciplines.
 - ORAM theorem route: `OramGame`, `StandardOramReduction`,
   `PathOramSecurity`, `PathOramLocalPosmapV1`,
-  `PathOramJACMTheorem`, `PaperPathOramTheoremRoute`.
+  `ScalablePathOramEvidence`, `PathOramJACMTheorem`,
+  `PaperPathOramTheoremRoute`.
 - SGX/TEE observer: `SgxBoundary`, `SgxRelation`, `SgxController`,
   `SgxControllerTrace`, `SgxMicroModel`, `SgxObserverFreeze`,
   `TeeDeployment`.

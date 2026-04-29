@@ -58,6 +58,7 @@ abbrev NatTable := List (Nat × Nat)
 def oramBucketHeaderBytes : Nat := 24
 def surrogateOramScheme : String := "surrogate_public_schedule_v1"
 def pathOramScheme : String := "path_oram_local_posmap_v1"
+def privatePathOramScheme : String := "path_oram_private_posmap_v1"
 def surrogateOramBlocksPerBucket : Nat := 2
 def pathOramBlocksPerBucket : Nat := 5
 
@@ -143,8 +144,21 @@ def WellFormedPathOramObject (object : OramObjectManifest) : Prop :=
   object.bucketsPerAccess = object.treeHeight + 1 ∧
   object.accessesPerCall = 1
 
+def WellFormedPrivatePathOramObject (object : OramObjectManifest) : Prop :=
+  object.scheme = privatePathOramScheme ∧
+  object.blocksPerBucket = pathOramBlocksPerBucket ∧
+  object.bucketSize = oramBucketHeaderBytes + object.blocksPerBucket * object.blockSize ∧
+  0 < object.bucketCount ∧
+  object.stashBound = max object.capacity 1 ∧
+  object.recursionDepth = 1 ∧
+  object.metadataPagesPerAccess = object.metadataPages + 1 ∧
+  object.bucketsPerAccess = object.treeHeight + 1 ∧
+  object.accessesPerCall = 1
+
 def WellFormedOramObject (object : OramObjectManifest) : Prop :=
-  WellFormedSurrogateOramObject object ∨ WellFormedPathOramObject object
+  WellFormedSurrogateOramObject object ∨
+    WellFormedPathOramObject object ∨
+    WellFormedPrivatePathOramObject object
 
 def totalPhysicalReadsPerAccess (object : OramObjectManifest) (accessCounter : Nat) : Nat :=
   1 + (accessSchedule object accessCounter).metadataPages.length +
@@ -212,13 +226,17 @@ theorem totalPhysicalReadsPerAccess_eq_manifest
   (hWellFormed : WellFormedOramObject object) :
   totalPhysicalReadsPerAccess object accessCounter =
     object.metadataPagesPerAccess + object.bucketsPerAccess := by
-  rcases hWellFormed with hSurrogate | hPath
+  rcases hWellFormed with hSurrogate | hPathOrPrivate
   · rcases hSurrogate with
       ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, hMetadata, _hBuckets, _hStash, _hRecursion, _hAccesses⟩
     simp [totalPhysicalReadsPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
-  · rcases hPath with
+  · rcases hPathOrPrivate with hPath | hPrivate
+    · rcases hPath with
+        ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion, hMetadata, _hBuckets, _hAccesses⟩
+      simp [totalPhysicalReadsPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
+    · rcases hPrivate with
       ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion, hMetadata, _hBuckets, _hAccesses⟩
-    simp [totalPhysicalReadsPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
+      simp [totalPhysicalReadsPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
 
 theorem totalPhysicalWritesPerAccess_eq_manifest
   {object : OramObjectManifest}
@@ -226,13 +244,17 @@ theorem totalPhysicalWritesPerAccess_eq_manifest
   (hWellFormed : WellFormedOramObject object) :
   totalPhysicalWritesPerAccess object accessCounter =
     object.metadataPagesPerAccess + object.bucketsPerAccess := by
-  rcases hWellFormed with hSurrogate | hPath
+  rcases hWellFormed with hSurrogate | hPathOrPrivate
   · rcases hSurrogate with
       ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, hMetadata, _hBuckets, _hStash, _hRecursion, _hAccesses⟩
     simp [totalPhysicalWritesPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
-  · rcases hPath with
+  · rcases hPathOrPrivate with hPath | hPrivate
+    · rcases hPath with
+        ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion, hMetadata, _hBuckets, _hAccesses⟩
+      simp [totalPhysicalWritesPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
+    · rcases hPrivate with
       ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion, hMetadata, _hBuckets, _hAccesses⟩
-    simp [totalPhysicalWritesPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
+      simp [totalPhysicalWritesPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
 
 theorem totalPhysicalBudgets_match
   {object : OramObjectManifest}

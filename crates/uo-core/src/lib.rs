@@ -8,6 +8,7 @@ pub mod kernel_dsl;
 pub mod manifest;
 pub mod metadata;
 pub mod observer_coverage;
+pub mod scaling;
 pub mod shell_boundary;
 pub mod trace;
 pub mod translation_validation;
@@ -62,8 +63,9 @@ pub use kernel_dsl::{
     RuntimeShellBoundarySlotBundle, RuntimeShellBoundarySlotBundleError,
 };
 pub use manifest::{
-    validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeKernelStepManifest,
-    RuntimeManifest, StateObjectManifest, PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY,
+    is_path_oram_scheme, validate_oram_access_shape, EntrypointManifest, OramManifest,
+    RuntimeKernelStepManifest, RuntimeManifest, StateObjectManifest,
+    PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY, PATH_ORAM_PRIVATE_POSMAP_SCHEME,
 };
 pub use metadata::{
     BoundsMetadata, ContractMetadata, DeclassificationKind, EntrypointMetadata, ReturnPolicy,
@@ -75,6 +77,7 @@ pub use observer_coverage::{
     ObserverFieldCoverageOverride, ObserverSchemaCoverage, OBSERVER_FIELD_COVERAGE_OVERRIDES,
     OBSERVER_SCHEMA_COVERAGE,
 };
+pub use scaling::ScalablePathOramEvidence;
 pub use shell_boundary::{
     RuntimeKernelInterfaceBundle, RuntimeKernelInterfaceBundleError, RuntimeShellBoundaryBundle,
     RuntimeShellBoundaryBundleError, RuntimeShellContract, RuntimeShellTrace,

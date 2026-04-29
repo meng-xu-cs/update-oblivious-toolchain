@@ -66,9 +66,9 @@ Sidecar metadata requirements:
 - map and array capacities must be positive
 - confidential entrypoints must declare `secret_args`
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is
-  intended; the theorem-facing route is `path_oram_local_posmap_v1`, currently
-  capped at capacity `128` until a recursive/private position map replaces the
-  local metadata scan
+  intended; `path_oram_local_posmap_v1` remains capped at capacity `128`,
+  while larger theorem-facing maps use `path_oram_private_posmap_v1` with
+  compact symbolic position-map evidence
 - gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
 - generated artifacts carry an admitted-package hash over the source-language
   tag, source bytes, canonical sidecar metadata JSON, compilation mode,

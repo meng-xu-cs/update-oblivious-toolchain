@@ -9,7 +9,12 @@ use uo_precompiles::UoOpcode;
 
 pub const SURROGATE_ORAM_SCHEME: &str = "surrogate_public_schedule_v1";
 pub const PATH_ORAM_SCHEME: &str = "path_oram_local_posmap_v1";
+pub const PATH_ORAM_PRIVATE_POSMAP_SCHEME: &str = "path_oram_private_posmap_v1";
 pub const PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY: usize = 128;
+
+pub fn is_path_oram_scheme(scheme: &str) -> bool {
+    scheme == PATH_ORAM_SCHEME || scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeManifest {
@@ -200,8 +205,8 @@ impl ConfidentialKernelSlotProgram {
 
 impl OramManifest {
     pub fn path_leaf_count(&self) -> Result<usize> {
-        if self.scheme != PATH_ORAM_SCHEME {
-            bail!("path_leaf_count is only defined for {}", PATH_ORAM_SCHEME);
+        if !is_path_oram_scheme(&self.scheme) {
+            bail!("path_leaf_count is only defined for Path ORAM schemes");
         }
         if self.bucket_count == 0 || self.bucket_count % 2 == 0 {
             bail!("path ORAM bucket_count must equal 2 * leaf_count - 1");
@@ -242,8 +247,8 @@ impl OramManifest {
                     accesses_per_call: 1,
                 })
             }
-            PATH_ORAM_SCHEME => {
-                if capacity > PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY {
+            scheme @ (PATH_ORAM_SCHEME | PATH_ORAM_PRIVATE_POSMAP_SCHEME) => {
+                if scheme == PATH_ORAM_SCHEME && capacity > PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY {
                     bail!(
                         "{} supports capacities up to {} in the current proof-grade route; use a recursive/private position map before admitting capacity {}",
                         PATH_ORAM_SCHEME,
@@ -260,14 +265,18 @@ impl OramManifest {
                 let stash_pages = stash_bound.div_ceil(8);
                 let metadata_pages = position_map_pages + stash_pages;
                 Ok(Self {
-                    scheme: PATH_ORAM_SCHEME.into(),
+                    scheme: scheme.into(),
                     block_size,
                     bucket_size: 24 + blocks_per_bucket * block_size,
                     bucket_count: 2 * leaf_count - 1,
                     blocks_per_bucket,
                     tree_height,
                     stash_bound,
-                    recursion_depth: 0,
+                    recursion_depth: if scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
+                        1
+                    } else {
+                        0
+                    },
                     metadata_pages,
                     metadata_pages_per_access: metadata_pages + 1,
                     buckets_per_access: tree_height + 1,
@@ -335,7 +344,7 @@ impl OramManifest {
                     bail!("surrogate ORAM accesses_per_call must be 1");
                 }
             }
-            PATH_ORAM_SCHEME => {
+            PATH_ORAM_SCHEME | PATH_ORAM_PRIVATE_POSMAP_SCHEME => {
                 let leaf_count = self.path_leaf_count()?;
                 if self.blocks_per_bucket != 5 {
                     bail!("path ORAM requires 5 blocks per bucket");
@@ -349,8 +358,13 @@ impl OramManifest {
                 if self.stash_bound != capacity.max(1) {
                     bail!("path ORAM stash_bound must equal max(capacity, 1)");
                 }
-                if self.recursion_depth != 0 {
-                    bail!("path ORAM recursion_depth must be 0");
+                let expected_recursion_depth = if self.scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
+                    1
+                } else {
+                    0
+                };
+                if self.recursion_depth != expected_recursion_depth {
+                    bail!("path ORAM recursion_depth does not match position-map route");
                 }
                 if self.tree_height != log2_ceil(leaf_count) {
                     bail!("path ORAM tree_height must equal log2(leaf_count)");

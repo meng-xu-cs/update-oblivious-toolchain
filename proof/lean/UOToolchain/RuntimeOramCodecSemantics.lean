@@ -2623,14 +2623,23 @@ theorem wellFormedPathBucketBytes_matchesCodec
       bucketBytes object.blocksPerBucket object.blockSize := by
   exact hObject.2.2.1
 
+theorem wellFormedPrivatePathBucketBytes_matchesCodec
+    {object : OramObjectManifest}
+    (hObject : WellFormedPrivatePathOramObject object) :
+    object.bucketSize =
+      bucketBytes object.blocksPerBucket object.blockSize := by
+  exact hObject.2.2.1
+
 theorem wellFormedOramBucketBytes_matchesCodec
     {object : OramObjectManifest}
     (hObject : WellFormedOramObject object) :
     object.bucketSize =
       bucketBytes object.blocksPerBucket object.blockSize := by
-  rcases hObject with hSurrogate | hPath
+  rcases hObject with hSurrogate | hPathOrPrivate
   · exact wellFormedSurrogateBucketBytes_matchesCodec hSurrogate
-  · exact wellFormedPathBucketBytes_matchesCodec hPath
+  · rcases hPathOrPrivate with hPath | hPrivate
+    · exact wellFormedPathBucketBytes_matchesCodec hPath
+    · exact wellFormedPrivatePathBucketBytes_matchesCodec hPrivate
 
 end RuntimeOramCodecSemantics
 

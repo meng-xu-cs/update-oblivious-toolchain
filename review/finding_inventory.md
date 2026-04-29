@@ -574,7 +574,7 @@ certificate size and validation time scale sub-enumeratively for representative
 larger capacities.
 
 Status:
-Open - required.
+Landed.
 
 ### F-16 - Deployment Theorem And Runtime Acceptance
 
@@ -652,5 +652,5 @@ The remediation work must add or update tests for:
 - [x] F-12 landed and checked by Lean.
 - [x] F-13 landed and checked against claim wording/semantics tests.
 - [x] F-14 landed and checked by compiler/runtime/Lean tests.
-- [ ] F-15 landed with scalable proof evidence.
+- [x] F-15 landed with scalable proof evidence.
 - [ ] F-16 landed with production runtime acceptance tests.

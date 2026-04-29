@@ -8,7 +8,7 @@ use serde_json::json;
 use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
-use uo_core::manifest::PATH_ORAM_SCHEME;
+use uo_core::manifest::is_path_oram_scheme;
 use uo_core::Value;
 use uo_core::{
     FixedBoxBuilder, RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
@@ -655,7 +655,7 @@ impl RuntimeObject {
         &self,
     ) -> Result<Option<RuntimePathOramPositionMapWitness>> {
         match self {
-            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
                 Ok(Some(object.oram.path_position_map_witness(&object.spec)?))
             }
             _ => Ok(None),
@@ -665,7 +665,7 @@ impl RuntimeObject {
     pub(in crate::runtime) fn exposes_path_oram_witnesses(&self) -> bool {
         matches!(
             self,
-            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme)
         )
     }
 
@@ -680,7 +680,7 @@ impl RuntimeObject {
         &self,
     ) -> Option<RuntimeOramAccessCounterWitness> {
         match self {
-            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
                 Some(object.oram.access_counter_witness(&object.spec))
             }
             _ => None,
@@ -1299,7 +1299,7 @@ impl RuntimeObject {
             (Self::UoOramMap(new), Self::UoOramMap(old)) => {
                 let mut next = new;
                 if next.accessed {
-                    if next.spec.oram_scheme == PATH_ORAM_SCHEME {
+                    if is_path_oram_scheme(&next.spec.oram_scheme) {
                         if aborted {
                             next.oram
                                 .restore_from_old(&old.spec, &old.oram, allocator)?;
@@ -1361,7 +1361,7 @@ impl RuntimeObject {
 
     pub(in crate::runtime) fn enable_injected_path_oram_leaf_coins(&mut self) {
         if let Self::UoOramMap(object) = self {
-            if object.spec.oram_scheme == PATH_ORAM_SCHEME {
+            if is_path_oram_scheme(&object.spec.oram_scheme) {
                 object.leaf_coin_source = PathOramLeafCoinSource::require_injected();
             }
         }
@@ -1372,7 +1372,7 @@ impl RuntimeObject {
         coins: Box<[usize]>,
     ) -> Result<()> {
         match self {
-            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
                 object.leaf_coin_source.install(coins);
                 Ok(())
             }
@@ -1383,7 +1383,7 @@ impl RuntimeObject {
 
     pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed(&self) -> Result<()> {
         match self {
-            Self::UoOramMap(object) if object.spec.oram_scheme == PATH_ORAM_SCHEME => {
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
                 object.leaf_coin_source.ensure_exhausted(&object.spec.name)
             }
             _ => Ok(()),
