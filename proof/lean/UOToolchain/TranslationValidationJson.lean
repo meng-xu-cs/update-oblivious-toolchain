@@ -178,7 +178,7 @@ private def publicStateDeclassifyTargetsWellFormed
 private def functionSecretPolicyWellFormed
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
-  (if fn.confidential then !fn.secret_args.isEmpty else fn.secret_args.isEmpty) &&
+  (if fn.confidential then true else fn.secret_args.isEmpty) &&
     (entry.secret_args == fn.secret_args)
 
 structure CountSummary where
@@ -1145,6 +1145,7 @@ structure PolicySensitivityJson where
   returnSensitive : Bool := false
   statusSensitive : Bool := false
   sensitivePublicWrites : List String := []
+  confidentialReads : List String := []
 deriving Repr, DecidableEq
 
 private def insertStringSet (value : String) (values : List String) : List String :=
@@ -1159,6 +1160,7 @@ private def PolicySensitivityJson.merge
   , statusSensitive := lhs.statusSensitive || rhs.statusSensitive
   , sensitivePublicWrites :=
       mergeStringSets lhs.sensitivePublicWrites rhs.sensitivePublicWrites
+  , confidentialReads := mergeStringSets lhs.confidentialReads rhs.confidentialReads
   }
 
 private def setPolicyTaint
@@ -1174,6 +1176,17 @@ private def stateObjectConfidentialById
   match stateObjectById? state objectId with
   | some object => object.confidential
   | none => true
+
+private def confidentialReadNamesForObjectId
+  (state : List ImportedProofRelevantStateObjectView)
+  (objectId : Nat) : Except String (List String) :=
+  match stateObjectById? state objectId with
+  | some object =>
+      if object.confidential then
+        pure [object.name]
+      else
+        pure []
+  | none => throw s!"unknown object id {objectId}"
 
 mutual
 
@@ -1230,6 +1243,55 @@ end
 
 mutual
 
+private partial def policyExprConfidentialReads
+  (state : List ImportedProofRelevantStateObjectView)
+  (json : Json) : Except String (List String) := do
+  if taggedPayload? json "Literal" |>.isSome then
+    pure []
+  else if taggedPayload? json "Var" |>.isSome then
+    pure []
+  else if let some inner := taggedPayload? json "Unary" then
+    policyExprConfidentialReads state (← lookupFieldJson inner "expr")
+  else if let some inner := taggedPayload? json "Binary" then
+    pure <| mergeStringSets
+      (← policyExprConfidentialReads state (← lookupFieldJson inner "lhs"))
+      (← policyExprConfidentialReads state (← lookupFieldJson inner "rhs"))
+  else if let some inner := taggedPayload? json "Select" then
+    let condReads ← policyExprConfidentialReads state (← lookupFieldJson inner "cond")
+    let trueReads ← policyExprConfidentialReads state (← lookupFieldJson inner "when_true")
+    let falseReads ← policyExprConfidentialReads state (← lookupFieldJson inner "when_false")
+    pure <| mergeStringSets (mergeStringSets condReads trueReads) falseReads
+  else if let some inner := taggedPayload? json "CellGet" then
+    confidentialReadNamesForObjectId state (← lookupFieldAs inner "object_id")
+  else if let some inner := taggedPayload? json "ArrayGet" then
+    pure <| mergeStringSets
+      (← confidentialReadNamesForObjectId state (← lookupFieldAs inner "object_id"))
+      (← policyExprConfidentialReads state (← lookupFieldJson inner "index"))
+  else if let some inner := taggedPayload? json "MapGet" then
+    pure <| mergeStringSets
+      (← confidentialReadNamesForObjectId state (← lookupFieldAs inner "object_id"))
+      (← policyExprConfidentialReads state (← lookupFieldJson inner "key"))
+  else if let some inner := taggedPayload? json "StructField" then
+    policyExprConfidentialReads state (← lookupFieldJson inner "base")
+  else if let some inner := taggedPayload? json "ArrayIndex" then
+    pure <| mergeStringSets
+      (← policyExprConfidentialReads state (← lookupFieldJson inner "base"))
+      (← policyExprConfidentialReads state (← lookupFieldJson inner "index"))
+  else if let some inner := taggedPayload? json "Keccak256" then
+    policyExprListConfidentialReads state (← lookupFieldAs inner "parts")
+  else
+    throw "unsupported expression shape in translation bundle"
+
+private partial def policyExprListConfidentialReads
+  (state : List ImportedProofRelevantStateObjectView)
+  (items : List Json) : Except String (List String) :=
+  items.foldlM (init := []) fun acc item => do
+    pure <| mergeStringSets acc (← policyExprConfidentialReads state item)
+
+end
+
+mutual
+
 private partial def markAssignedLocalsJson
   (json : Json) (tainted : List String) : Except String (List String) := do
   if let some inner := taggedPayload? json "Declare" then
@@ -1276,6 +1338,10 @@ private def recordSensitivePublicWrite
                 insertStringSet object.name sensitivity.sensitivePublicWrites }
     | none => throw s!"unknown object id {objectId}"
 
+private def confidentialReadSensitivity
+  (reads : List String) : PolicySensitivityJson :=
+  { confidentialReads := reads }
+
 mutual
 
 private partial def collectPolicySensitivityStatement
@@ -1287,25 +1353,33 @@ private partial def collectPolicySensitivityStatement
   if let some inner := taggedPayload? json "Declare" then
     let name : String ← lookupFieldAs inner "name"
     let value ← lookupFieldJson inner "value"
+    let reads ← policyExprConfidentialReads state value
     pure
       ( setPolicyTaint name
           (controlSensitive || (← policyExprSensitive state tainted value)) tainted
-      , {} )
+      , confidentialReadSensitivity reads )
   else if let some inner := taggedPayload? json "Assign" then
     let name : String ← lookupFieldAs inner "name"
     let value ← lookupFieldJson inner "value"
+    let reads ← policyExprConfidentialReads state value
     pure
       ( setPolicyTaint name
           (controlSensitive || (← policyExprSensitive state tainted value)) tainted
-      , {} )
+      , confidentialReadSensitivity reads )
   else if let some inner := taggedPayload? json "Require" then
-    let sensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "cond")
-    pure (tainted, { statusSensitive := controlSensitive || sensitive })
+    let cond ← lookupFieldJson inner "cond"
+    let sensitive ← policyExprSensitive state tainted cond
+    let reads ← policyExprConfidentialReads state cond
+    pure (tainted, { statusSensitive := controlSensitive || sensitive, confidentialReads := reads })
   else if let some inner := taggedPayload? json "AbortIf" then
-    let sensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "cond")
-    pure (tainted, { statusSensitive := controlSensitive || sensitive })
+    let cond ← lookupFieldJson inner "cond"
+    let sensitive ← policyExprSensitive state tainted cond
+    let reads ← policyExprConfidentialReads state cond
+    pure (tainted, { statusSensitive := controlSensitive || sensitive, confidentialReads := reads })
   else if let some inner := taggedPayload? json "If" then
-    let condSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "cond")
+    let cond ← lookupFieldJson inner "cond"
+    let condSensitive ← policyExprSensitive state tainted cond
+    let condReads ← policyExprConfidentialReads state cond
     let thenBody : List Json ← lookupFieldAs inner "then_body"
     let elseBody : List Json ← lookupFieldAs inner "else_body"
     let thenTainted ←
@@ -1326,61 +1400,103 @@ private partial def collectPolicySensitivityStatement
         state elseBody elseTainted (controlSensitive || condSensitive)
     pure
       ( mergeStringSets thenOut elseOut
-      , thenSensitivity.merge elseSensitivity )
+      , (confidentialReadSensitivity condReads).merge
+          (thenSensitivity.merge elseSensitivity) )
   else if let some inner := taggedPayload? json "For" then
     let startExpr ← lookupFieldJson inner "start"
     let endExpr ← lookupFieldJson inner "end"
     let body : List Json ← lookupFieldAs inner "body"
+    let boundReads ←
+      pure <| mergeStringSets
+        (← policyExprConfidentialReads state startExpr)
+        (← policyExprConfidentialReads state endExpr)
     let loopSensitive :=
       controlSensitive ||
         (← policyExprSensitive state tainted startExpr) ||
         (← policyExprSensitive state tainted endExpr)
-    collectPolicySensitivityStatements state body tainted loopSensitive
+    let (out, bodySensitivity) ←
+      collectPolicySensitivityStatements state body tainted loopSensitive
+    pure (out, (confidentialReadSensitivity boundReads).merge bodySensitivity)
   else if let some inner := taggedPayload? json "CellSet" then
     let objectId : Nat ← lookupFieldAs inner "object_id"
-    let valueSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "value")
+    let value ← lookupFieldJson inner "value"
+    let valueSensitive ← policyExprSensitive state tainted value
+    let valueReads ← policyExprConfidentialReads state value
     let predicateSensitive ←
       match ← lookupOptionalFieldJson inner "predicate" with
       | none => pure false
       | some predicate => policyExprSensitive state tainted predicate
+    let predicateReads ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure []
+      | some predicate => policyExprConfidentialReads state predicate
     let sensitivity ←
       recordSensitivePublicWrite
         state objectId (controlSensitive || valueSensitive || predicateSensitive) {}
-    pure (tainted, sensitivity)
+    pure (tainted,
+      sensitivity.merge
+        (confidentialReadSensitivity (mergeStringSets valueReads predicateReads)))
   else if let some inner := taggedPayload? json "ArraySet" then
     let objectId : Nat ← lookupFieldAs inner "object_id"
-    let indexSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "index")
-    let valueSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "value")
+    let index ← lookupFieldJson inner "index"
+    let value ← lookupFieldJson inner "value"
+    let indexSensitive ← policyExprSensitive state tainted index
+    let valueSensitive ← policyExprSensitive state tainted value
+    let indexReads ← policyExprConfidentialReads state index
+    let valueReads ← policyExprConfidentialReads state value
     let predicateSensitive ←
       match ← lookupOptionalFieldJson inner "predicate" with
       | none => pure false
       | some predicate => policyExprSensitive state tainted predicate
+    let predicateReads ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure []
+      | some predicate => policyExprConfidentialReads state predicate
     let sensitivity ←
       recordSensitivePublicWrite
         state objectId
         (controlSensitive || indexSensitive || valueSensitive || predicateSensitive)
         {}
-    pure (tainted, sensitivity)
+    pure (tainted,
+      sensitivity.merge
+        (confidentialReadSensitivity
+          (mergeStringSets (mergeStringSets indexReads valueReads) predicateReads)))
   else if let some inner := taggedPayload? json "MapPut" then
     let objectId : Nat ← lookupFieldAs inner "object_id"
-    let keySensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "key")
-    let valueSensitive ← policyExprSensitive state tainted (← lookupFieldJson inner "value")
+    let key ← lookupFieldJson inner "key"
+    let value ← lookupFieldJson inner "value"
+    let keySensitive ← policyExprSensitive state tainted key
+    let valueSensitive ← policyExprSensitive state tainted value
+    let keyReads ← policyExprConfidentialReads state key
+    let valueReads ← policyExprConfidentialReads state value
     let predicateSensitive ←
       match ← lookupOptionalFieldJson inner "predicate" with
       | none => pure false
       | some predicate => policyExprSensitive state tainted predicate
+    let predicateReads ←
+      match ← lookupOptionalFieldJson inner "predicate" with
+      | none => pure []
+      | some predicate => policyExprConfidentialReads state predicate
     let sensitivity ←
       recordSensitivePublicWrite
         state objectId
         (controlSensitive || keySensitive || valueSensitive || predicateSensitive)
         {}
-    pure (tainted, sensitivity)
+    pure (tainted,
+      sensitivity.merge
+        (confidentialReadSensitivity
+          (mergeStringSets (mergeStringSets keyReads valueReads) predicateReads)))
   else if let some inner := taggedPayload? json "Return" then
+    let value? ← lookupOptionalFieldJson inner "value"
     let returnSensitive ←
-      match ← lookupOptionalFieldJson inner "value" with
+      match value? with
       | none => pure false
       | some value => policyExprSensitive state tainted value
-    pure (tainted, { returnSensitive := controlSensitive || returnSensitive })
+    let reads ←
+      match value? with
+      | none => pure []
+      | some value => policyExprConfidentialReads state value
+    pure (tainted, { returnSensitive := controlSensitive || returnSensitive, confidentialReads := reads })
   else
     throw "unsupported statement shape in translation bundle"
 
@@ -1426,6 +1542,22 @@ private def sensitivePublicWritesDeclared
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
   sensitivity.sensitivePublicWrites.all
     (fun name => entry.public_state_declassifies.contains name)
+
+def publicEntrypointConfidentialReadsWellFormed
+  (fn : ImportedProofRelevantFunctionView)
+  (sensitivity : PolicySensitivityJson) : Bool :=
+  fn.confidential || sensitivity.confidentialReads.isEmpty
+
+theorem publicEntrypointConfidentialReadsWellFormed_no_reads
+  {fn : ImportedProofRelevantFunctionView}
+  {sensitivity : PolicySensitivityJson}
+  (hPolicy : publicEntrypointConfidentialReadsWellFormed fn sensitivity = true)
+  (hPublic : fn.confidential = false) :
+  sensitivity.confidentialReads.isEmpty = true := by
+  unfold publicEntrypointConfidentialReadsWellFormed at hPolicy
+  rw [hPublic] at hPolicy
+  simp only [Bool.false_or] at hPolicy
+  exact hPolicy
 
 private def sensitiveReturnPolicyWellFormed
   (fn : ImportedProofRelevantFunctionView)
@@ -1508,11 +1640,27 @@ private def functionPublicAccessPolicyWellFormed
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
   match policySensitivityBodyStrings state fn.secret_args fn.params fn.body with
   | .ok sensitivity =>
-      declaredDeclassificationPoliciesWellFormed entry &&
+      publicEntrypointConfidentialReadsWellFormed fn sensitivity &&
+        declaredDeclassificationPoliciesWellFormed entry &&
         sensitiveReturnPolicyWellFormed fn entry sensitivity &&
         sensitiveStatusPolicyWellFormed entry sensitivity &&
         sensitivePublicWritesDeclared sensitivity entry
   | .error _ => false
+
+theorem functionPublicAccessPolicyWellFormed_public_no_confidential_reads
+  {state : List ImportedProofRelevantStateObjectView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  {sensitivity : PolicySensitivityJson}
+  (hSensitivity :
+    policySensitivityBodyStrings state fn.secret_args fn.params fn.body = .ok sensitivity)
+  (hPolicy : functionPublicAccessPolicyWellFormed state fn entry = true)
+  (hPublic : fn.confidential = false) :
+  sensitivity.confidentialReads.isEmpty = true := by
+  unfold functionPublicAccessPolicyWellFormed at hPolicy
+  rw [hSensitivity] at hPolicy
+  simp only [Bool.and_eq_true] at hPolicy
+  exact publicEntrypointConfidentialReadsWellFormed_no_reads hPolicy.1.1.1.1 hPublic
 
 private def functionMetadataWellFormed
   (view : ImportedProofRelevantContractView)
@@ -1829,7 +1977,11 @@ private def functionMetadataMismatchMessage
   let loopAdmissionOk := functionLoopAdmissionWellFormed fn
   let publicAccessOk := functionPublicAccessPolicyWellFormed view.state fn
     entry
-  s!"{fn.signature}: metadata policy failed (secret policy={secretPolicyOk}, loop admission={loopAdmissionOk}, public_state_declassifies={publicTargetsOk}, public access={publicAccessOk})"
+  let confidentialReadSummary :=
+    match policySensitivityBodyStrings view.state fn.secret_args fn.params fn.body with
+    | .ok sensitivity => String.intercalate "," sensitivity.confidentialReads
+    | .error err => s!"<policy sensitivity error: {err}>"
+  s!"{fn.signature}: metadata policy failed (secret policy={secretPolicyOk}, loop admission={loopAdmissionOk}, public_state_declassifies={publicTargetsOk}, public access={publicAccessOk}, confidential_reads=[{confidentialReadSummary}])"
 
 private def metadataMismatchMessages
   (view : ImportedProofRelevantContractView) :

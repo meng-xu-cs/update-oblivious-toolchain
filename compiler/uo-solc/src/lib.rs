@@ -1980,6 +1980,7 @@ struct PolicySensitivity {
     return_sensitive: bool,
     status_sensitive: bool,
     sensitive_public_writes: BTreeSet<String>,
+    confidential_reads: BTreeSet<String>,
 }
 
 fn validate_entrypoint_policy(
@@ -1993,6 +1994,18 @@ fn validate_entrypoint_policy(
     let returns = required_return_policy(signature, entry_meta)?;
     let status = required_status_policy(signature, entry_meta)?;
     let sensitivity = policy_sensitivity(body, entry_meta, frontend)?;
+    if !entrypoint_confidential && !sensitivity.confidential_reads.is_empty() {
+        bail!(
+            "entrypoint {} reads confidential state {}; mark it confidential",
+            signature,
+            sensitivity
+                .confidential_reads
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
     match (return_type.is_some(), returns) {
         (true, ReturnPolicy::Forbidden) => bail!(
             "entrypoint {} returns a value but declares returns: forbidden",
@@ -2143,6 +2156,11 @@ fn collect_policy_sensitivity(
     for statement in statements {
         match statement {
             Statement::Declare { name, value, .. } | Statement::Assign { name, value } => {
+                collect_confidential_reads_in_expr(
+                    value,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
                 set_taint(
                     name,
                     control_sensitive || expr_is_policy_sensitive(value, frontend, tainted),
@@ -2150,6 +2168,11 @@ fn collect_policy_sensitivity(
                 );
             }
             Statement::Require { cond } | Statement::AbortIf { cond } => {
+                collect_confidential_reads_in_expr(
+                    cond,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
                 sensitivity.status_sensitive |=
                     control_sensitive || expr_is_policy_sensitive(cond, frontend, tainted);
             }
@@ -2158,6 +2181,11 @@ fn collect_policy_sensitivity(
                 then_body,
                 else_body,
             } => {
+                collect_confidential_reads_in_expr(
+                    cond,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
                 let cond_sensitive = expr_is_policy_sensitive(cond, frontend, tainted);
                 let mut then_tainted = tainted.clone();
                 let mut else_tainted = tainted.clone();
@@ -2185,6 +2213,16 @@ fn collect_policy_sensitivity(
             Statement::For {
                 start, end, body, ..
             } => {
+                collect_confidential_reads_in_expr(
+                    start,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
+                collect_confidential_reads_in_expr(
+                    end,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
                 let loop_sensitive = control_sensitive
                     || expr_is_policy_sensitive(start, frontend, tainted)
                     || expr_is_policy_sensitive(end, frontend, tainted);
@@ -2195,6 +2233,18 @@ fn collect_policy_sensitivity(
                 value,
                 predicate,
             } => {
+                collect_confidential_reads_in_expr(
+                    value,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
+                if let Some(predicate) = predicate {
+                    collect_confidential_reads_in_expr(
+                        predicate,
+                        frontend,
+                        &mut sensitivity.confidential_reads,
+                    )?;
+                }
                 record_sensitive_public_write(
                     *object_id,
                     control_sensitive
@@ -2212,6 +2262,23 @@ fn collect_policy_sensitivity(
                 value,
                 predicate,
             } => {
+                collect_confidential_reads_in_expr(
+                    index,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
+                collect_confidential_reads_in_expr(
+                    value,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
+                if let Some(predicate) = predicate {
+                    collect_confidential_reads_in_expr(
+                        predicate,
+                        frontend,
+                        &mut sensitivity.confidential_reads,
+                    )?;
+                }
                 record_sensitive_public_write(
                     *object_id,
                     control_sensitive
@@ -2230,6 +2297,23 @@ fn collect_policy_sensitivity(
                 value,
                 predicate,
             } => {
+                collect_confidential_reads_in_expr(
+                    key,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
+                collect_confidential_reads_in_expr(
+                    value,
+                    frontend,
+                    &mut sensitivity.confidential_reads,
+                )?;
+                if let Some(predicate) = predicate {
+                    collect_confidential_reads_in_expr(
+                        predicate,
+                        frontend,
+                        &mut sensitivity.confidential_reads,
+                    )?;
+                }
                 record_sensitive_public_write(
                     *object_id,
                     control_sensitive
@@ -2244,11 +2328,74 @@ fn collect_policy_sensitivity(
             }
             Statement::Return { value } => {
                 if let Some(value) = value {
+                    collect_confidential_reads_in_expr(
+                        value,
+                        frontend,
+                        &mut sensitivity.confidential_reads,
+                    )?;
                     sensitivity.return_sensitive |=
                         control_sensitive || expr_is_policy_sensitive(value, frontend, tainted);
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn collect_confidential_reads_in_expr(
+    expr: &Expr,
+    frontend: &Frontend,
+    reads: &mut BTreeSet<String>,
+) -> Result<()> {
+    match expr {
+        Expr::Var(_) | Expr::Literal(_) => {}
+        Expr::Unary { expr, .. } => collect_confidential_reads_in_expr(expr, frontend, reads)?,
+        Expr::Binary { lhs, rhs, .. } => {
+            collect_confidential_reads_in_expr(lhs, frontend, reads)?;
+            collect_confidential_reads_in_expr(rhs, frontend, reads)?;
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            collect_confidential_reads_in_expr(cond, frontend, reads)?;
+            collect_confidential_reads_in_expr(when_true, frontend, reads)?;
+            collect_confidential_reads_in_expr(when_false, frontend, reads)?;
+        }
+        Expr::CellGet { object_id } => record_confidential_read(*object_id, frontend, reads)?,
+        Expr::ArrayGet { object_id, index } => {
+            record_confidential_read(*object_id, frontend, reads)?;
+            collect_confidential_reads_in_expr(index, frontend, reads)?;
+        }
+        Expr::MapGet { object_id, key } => {
+            record_confidential_read(*object_id, frontend, reads)?;
+            collect_confidential_reads_in_expr(key, frontend, reads)?;
+        }
+        Expr::StructField { base, .. } => {
+            collect_confidential_reads_in_expr(base, frontend, reads)?;
+        }
+        Expr::ArrayIndex { base, index } => {
+            collect_confidential_reads_in_expr(base, frontend, reads)?;
+            collect_confidential_reads_in_expr(index, frontend, reads)?;
+        }
+        Expr::Keccak256 { parts } => {
+            for part in parts {
+                collect_confidential_reads_in_expr(part, frontend, reads)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn record_confidential_read(
+    object_id: u32,
+    frontend: &Frontend,
+    reads: &mut BTreeSet<String>,
+) -> Result<()> {
+    let object = state_object_by_id(frontend, object_id)?;
+    if object.confidential {
+        reads.insert(object.name.clone());
     }
     Ok(())
 }
@@ -2688,10 +2835,6 @@ fn validate_entrypoint_metadata_well_formed(
     match entry_meta.confidential {
         Some(false) if !entry_meta.secret_args.is_empty() => bail!(
             "entrypoint {} declares confidential: false but also declares secret_args",
-            signature
-        ),
-        Some(true) if entry_meta.secret_args.is_empty() => bail!(
-            "entrypoint {} declares confidential: true but omits secret_args",
             signature
         ),
         _ => {}
@@ -3901,7 +4044,122 @@ bounds:
         let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
         assert!(err
             .to_string()
-            .contains("returns data derived from confidential state or secret arguments"));
+            .contains("entrypoint f() reads confidential state x"));
+    }
+
+    #[test]
+    fn rejects_public_confidential_read_without_output_or_write() {
+        let source = write_temp(
+            "public-confidential-read-only",
+            r#"
+            contract C {
+                uint256 private x;
+                function f() public { uint256 shadow = x; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f() reads confidential state x"));
+    }
+
+    #[test]
+    fn rejects_secret_dependent_public_read_in_public_entrypoint() {
+        let source = write_temp(
+            "public-secret-dependent-public-read",
+            r#"
+            contract C {
+                uint256 private secretCell;
+                uint256 private publicCell;
+                function f() public {
+                    if (secretCell > 0) {
+                        uint256 shadow = publicCell;
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  secretCell:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+  publicCell:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f() reads confidential state secretCell"));
+    }
+
+    #[test]
+    fn rejects_public_confidential_read_status() {
+        let source = write_temp(
+            "public-confidential-read-status",
+            r#"
+            contract C {
+                uint256 private x;
+                function f() public { require(x > 0); }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f() reads confidential state x"));
     }
 
     #[test]
@@ -3944,7 +4202,7 @@ bounds:
         let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
         assert!(err
             .to_string()
-            .contains("returns data derived from confidential state or secret arguments"));
+            .contains("entrypoint f() reads confidential state x"));
     }
 
     #[test]
@@ -3985,7 +4243,7 @@ bounds:
         let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
         assert!(err
             .to_string()
-            .contains("writes data or predicates derived from confidential state"));
+            .contains("entrypoint leak() reads confidential state secretCell"));
     }
 
     #[test]
@@ -3994,9 +4252,8 @@ bounds:
             "public-state-declassified",
             r#"
             contract C {
-                uint256 private secretCell;
                 uint256 private publicCell;
-                function leak() public { publicCell = secretCell; }
+                function leak(uint256 value) public { publicCell = value; }
             }
             "#,
         );
@@ -4004,17 +4261,12 @@ bounds:
             r#"
 contract: C
 entrypoints:
-  leak():
+  leak(uint256):
     confidential: false
     returns: forbidden
     status: public
     public_state_declassifies: [publicCell]
 state:
-  secretCell:
-    kind: cell
-    value: uint256
-    backend: full_scan
-    confidential: true
   publicCell:
     kind: cell
     value: uint256
@@ -4029,7 +4281,7 @@ bounds:
             .contract
             .manifest
             .entrypoints
-            .get("leak()")
+            .get("leak(uint256)")
             .unwrap();
         assert_eq!(entry.public_state_declassifies, vec!["publicCell"]);
     }
@@ -4076,7 +4328,7 @@ bounds:
         let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
         assert!(err
             .to_string()
-            .contains("writes data or predicates derived from confidential state"));
+            .contains("entrypoint leak() reads confidential state secretCell"));
     }
 
     #[test]
@@ -4170,12 +4422,13 @@ bounds:
     }
 
     #[test]
-    fn rejects_confidential_true_without_secret_args() {
+    fn accepts_confidential_true_without_secret_args_when_reading_confidential_state() {
         let source = write_temp(
             "metadata-confidential-no-secret",
             r#"
             contract C {
-                function f() public {}
+                uint256 private x;
+                function f() public { uint256 shadow = x; }
             }
             "#,
         );
@@ -4187,15 +4440,25 @@ entrypoints:
     confidential: true
     returns: forbidden
     status: public
-state: {}
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
 bounds:
   loops: {}
 "#,
         );
-        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("declares confidential: true but omits secret_args"));
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let function = artifact
+            .contract
+            .functions
+            .iter()
+            .find(|function| function.signature == "f()")
+            .unwrap();
+        assert!(function.confidential);
+        assert!(function.secret_args.is_empty());
     }
 
     #[test]

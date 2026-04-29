@@ -14,12 +14,12 @@ entrypoints:
     status: declassified
     declassifies: [return, success]
   balanceOf(bytes32):
-    confidential: false
+    confidential: true
     returns: declassified
     status: public
     declassifies: [return]
   totalValue():
-    confidential: false
+    confidential: true
     returns: declassified
     status: public
     declassifies: [return]

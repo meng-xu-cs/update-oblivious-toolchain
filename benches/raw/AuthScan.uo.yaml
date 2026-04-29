@@ -12,7 +12,7 @@ entrypoints:
     status: public
     declassifies: [return]
   readLast():
-    confidential: false
+    confidential: true
     returns: declassified
     status: public
     declassifies: [return]

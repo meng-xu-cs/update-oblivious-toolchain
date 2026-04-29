@@ -17,7 +17,7 @@ entrypoints:
     status: public
     declassifies: [return]
   read(bytes32):
-    confidential: false
+    confidential: true
     returns: declassified
     status: public
     declassifies: [return]

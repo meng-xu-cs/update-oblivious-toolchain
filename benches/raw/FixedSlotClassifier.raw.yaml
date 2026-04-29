@@ -11,7 +11,7 @@ entrypoints:
     returns: forbidden
     status: public
   peek():
-    confidential: false
+    confidential: true
     returns: declassified
     status: public
     declassifies: [return]
