@@ -22,6 +22,9 @@ inductive HostVisibleOutcomeKind where
   | success
   | abort
   | runtimePublicError
+  | publicGasAccounting
+  | capacityOverflow
+  | runtimeTypeShapeError
   | proofCheckerFailure
   | commitRollback
   | cryptographicIntegrityFailure
@@ -81,13 +84,46 @@ def runtimeHostVisibleOutcomeTaxonomy :
   , { kind := .runtimePublicError
     , classification := .publicDetermined
     , hostPayloadRule :=
-        "remaining runtime Result errors are public shape, capacity, canonical encoding, or authenticated decode/integrity failures"
+        "remaining runtime Result errors are public shape, canonical encoding, or authenticated decode/integrity failures"
     , normalizationRule :=
         "secret-dependent map/stash miss paths are rejected from the host-visible Result surface or absorbed into fixed in-band abort effects"
     , theoremAnchor :=
         "RuntimeImplementationInterface.runtimeHostVisibleErrorsUsePublicIntegrityTaxonomy"
     , probeAnchor :=
         "runtime_implementation_interface_host_visible_error_taxonomy_theorem_present"
+    }
+  , { kind := .publicGasAccounting
+    , classification := .publicDetermined
+    , hostPayloadRule :=
+        "gas_used is computed from manifest public budgets and fixed runtime cost formulas, not from secret data"
+    , normalizationRule :=
+        "PublicOutcomeTrace.gas_used and ExecutionTrace.gas_used must agree and are covered by public outcome/imported runtime witness checks"
+    , theoremAnchor :=
+        "RuntimeRefinementWitness.gasUsed / RuntimeControllerObserverCertificate.public_outcome"
+    , probeAnchor :=
+        "runtime_public_gas_budget_constant_for_secret_variants"
+    }
+  , { kind := .capacityOverflow
+    , classification := .publicDetermined
+    , hostPayloadRule :=
+        "capacity overflow is admitted only where the public manifest bound fixes the capacity and the failure class is public"
+    , normalizationRule :=
+        "ORAM working stash and write-log overflow checks fail against public bounds; confidential miss/overflow alternatives are normalized in band"
+    , theoremAnchor :=
+        "RuntimeOramWriteLogDiscipline exact-capacity/no-overflow theorems"
+    , probeAnchor :=
+        "runtime_oram_capacity_overflow_uses_public_bound"
+    }
+  , { kind := .runtimeTypeShapeError
+    , classification := .publicDetermined
+    , hostPayloadRule :=
+        "runtime type, shape, and canonical-length errors are determined by admitted manifest/type metadata"
+    , normalizationRule :=
+        "canonical encoders, fixed buffers, and store/ORAM codecs reject malformed public shapes before exposing secret-dependent payloads"
+    , theoremAnchor :=
+        "RuntimeImplementationInterface runtime value/store/ORAM codec accepted-shape theorems"
+    , probeAnchor :=
+        "runtime_type_shape_errors_are_manifest_determined"
     }
   , { kind := .proofCheckerFailure
     , classification := .publicDetermined
@@ -129,6 +165,9 @@ theorem runtimeHostVisibleOutcomeTaxonomy_coversRequiredKinds :
       [ HostVisibleOutcomeKind.success
       , HostVisibleOutcomeKind.abort
       , HostVisibleOutcomeKind.runtimePublicError
+      , HostVisibleOutcomeKind.publicGasAccounting
+      , HostVisibleOutcomeKind.capacityOverflow
+      , HostVisibleOutcomeKind.runtimeTypeShapeError
       , HostVisibleOutcomeKind.proofCheckerFailure
       , HostVisibleOutcomeKind.commitRollback
       , HostVisibleOutcomeKind.cryptographicIntegrityFailure
@@ -141,7 +180,10 @@ theorem runtimeHostVisibleOutcomeTaxonomy_allClosed :
   intro entry hMem
   unfold runtimeHostVisibleOutcomeTaxonomy at hMem
   simp at hMem
-  rcases hMem with h | h | h | h | h | h
+  rcases hMem with h | h | h | h | h | h | h | h | h
+  · subst h; rfl
+  · subst h; rfl
+  · subst h; rfl
   · subst h; rfl
   · subst h; rfl
   · subst h; rfl

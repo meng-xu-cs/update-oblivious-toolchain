@@ -240,6 +240,20 @@ backend trust boundaries, then derive public-outcome, boundary, controller,
 final-state, and release safety internally before invoking the paper-main
 theorem.
 
+Status: Fixed. `AcceptedPackageCapstone.lean` now provides accepted-package
+capstone theorems for exact and Path ORAM routes. The exact route carries the
+accepted translation bundle, deployment evidence, backend exactness proof,
+public-outcome/boundary/controller safety, final-public-state safety, and
+release-function safety in one accepted evidence object before invoking the
+paper-main theorem. The Path ORAM route ties the same accepted translation and
+deployment evidence to the `SeededRuntimePaperMainBundle`, whose proof object
+already carries public-outcome and boundary safety. Both routes expose
+public-outcome field equality for `terminationStatus`, `statusPolicy`,
+`gasUsed`, return policy/payload, declassifications, entrypoint id, public args,
+and output shape under equal admitted public inputs/state. Verified with
+`cd proof/lean && lake build UOToolchain.AcceptedPackageCapstone` and
+`cd proof/lean && lake build UOToolchain.ProofGradeRoot`.
+
 ## F10. Adaptive-history theorem omits the full hostile-host observer
 
 Review grouping: `F10`, `T1.11`, `O2.2`.
@@ -369,6 +383,19 @@ metadata, represented in the existing release policy, normalized by a proved
 runtime relation, or governed by the cryptographic integrity boundary already
 stated by the toolchain theorem. Every failure category must be accounted for
 inside the public-outcome proof.
+
+Status: Fixed. `RuntimeAuditSurfaces.lean` now includes first-class taxonomy
+entries for public gas accounting, capacity overflow, and runtime type/shape
+errors in addition to success/abort, runtime public errors, proof-check
+failures, commit/rollback, and cryptographic integrity failures. The taxonomy
+has a closed coverage theorem, and `AcceptedPackageCapstone.lean` connects that
+taxonomy to accepted package evidence. It also adds proof-grade runtime
+proof-object theorems showing `ExecutionTrace.gasUsed` equals
+`SGXPublicOutcome.gasUsed`, controller/boundary surfaces are reconstructed from
+the checked controller certificate, and the checked kernel schedule has the
+claimed finished final state. Verified with `cd proof/lean && lake build
+UOToolchain.AcceptedPackageCapstone` and `cd proof/lean && lake build
+UOToolchain.ProofGradeRoot`.
 
 ## F15. Materialized and estimated proof artifacts are too large for scalable use
 
