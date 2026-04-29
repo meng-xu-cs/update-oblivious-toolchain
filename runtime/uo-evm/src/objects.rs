@@ -1,4 +1,5 @@
 use crate::controller::CallRecorder;
+use crate::freshness::derive_path_oram_leaf_seed;
 use crate::oram::{MapEntry, OramState, PathOramLeafCoinSource};
 use anyhow::{anyhow, bail, Result};
 use rand::{RngCore, SeedableRng};
@@ -349,6 +350,7 @@ pub(crate) struct OramMapObject {
     oram: OramState,
     accessed: bool,
     dirty: bool,
+    leaf_coin_seed: u64,
     leaf_coin_source: PathOramLeafCoinSource,
     rng: ChaCha20Rng,
 }
@@ -360,7 +362,8 @@ impl OramMapObject {
             oram: self.oram.clone_committed_cold(&self.spec)?,
             accessed: false,
             dirty: false,
-            leaf_coin_source: PathOramLeafCoinSource::random(),
+            leaf_coin_seed: self.leaf_coin_seed,
+            leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(self.leaf_coin_seed),
             rng: self.rng.clone(),
         })
     }
@@ -375,7 +378,7 @@ impl OramMapObject {
         self.oram.cold_commit();
         self.accessed = false;
         self.dirty = false;
-        self.leaf_coin_source = PathOramLeafCoinSource::random();
+        self.leaf_coin_source = PathOramLeafCoinSource::from_domain_seed(self.leaf_coin_seed);
         Ok(())
     }
 }
@@ -436,7 +439,8 @@ impl RuntimeObject {
         if spec.confidential && matches!(spec.backend, BackendKind::Raw) {
             bail!("confidential object {} uses raw backend", spec.name);
         }
-        let mut rng = ChaCha20Rng::seed_from_u64(master_rng.next_u64());
+        let object_seed = master_rng.next_u64();
+        let mut rng = ChaCha20Rng::seed_from_u64(object_seed);
         match (&spec.kind, &spec.backend) {
             (ContainerKind::Cell, BackendKind::Raw) => {
                 let logical = cold_zero_value(&spec.value_type);
@@ -538,14 +542,18 @@ impl RuntimeObject {
                     rng,
                 }))
             }
-            (ContainerKind::Map, BackendKind::Oram) => Ok(Self::UoOramMap(OramMapObject {
-                spec: spec.clone(),
-                oram: OramState::instantiate(spec, &mut rng)?,
-                accessed: false,
-                dirty: false,
-                leaf_coin_source: PathOramLeafCoinSource::random(),
-                rng,
-            })),
+            (ContainerKind::Map, BackendKind::Oram) => {
+                let leaf_coin_seed = derive_path_oram_leaf_seed(object_seed, spec.id, &spec.name);
+                Ok(Self::UoOramMap(OramMapObject {
+                    spec: spec.clone(),
+                    oram: OramState::instantiate(spec, &mut rng)?,
+                    accessed: false,
+                    dirty: false,
+                    leaf_coin_seed,
+                    leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(leaf_coin_seed),
+                    rng,
+                }))
+            }
         }
     }
 
@@ -570,7 +578,8 @@ impl RuntimeObject {
                 oram: object.oram.clone_for_tx(&object.spec, allocator)?,
                 accessed: false,
                 dirty: false,
-                leaf_coin_source: PathOramLeafCoinSource::random(),
+                leaf_coin_seed: object.leaf_coin_seed,
+                leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(object.leaf_coin_seed),
                 rng: object.rng.clone(),
             })),
         }
@@ -1316,7 +1325,8 @@ impl RuntimeObject {
                 }
                 next.accessed = false;
                 next.dirty = false;
-                next.leaf_coin_source = PathOramLeafCoinSource::random();
+                next.leaf_coin_source =
+                    PathOramLeafCoinSource::from_domain_seed(next.leaf_coin_seed);
                 Ok(Self::UoOramMap(next))
             }
             _ => bail!("mismatched object kinds during commit"),
@@ -1343,7 +1353,8 @@ impl RuntimeObject {
             Self::UoOramMap(object) => {
                 object.accessed = false;
                 object.dirty = false;
-                object.leaf_coin_source = PathOramLeafCoinSource::random();
+                object.leaf_coin_source =
+                    PathOramLeafCoinSource::from_domain_seed(object.leaf_coin_seed);
             }
         }
     }

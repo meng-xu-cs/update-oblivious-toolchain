@@ -1,8 +1,7 @@
+use crate::freshness::RuntimeCallFreshness;
 use anyhow::{bail, Result};
 use chacha20poly1305::aead::AeadInPlace;
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce};
-use rand::rngs::OsRng;
-use rand::RngCore;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -70,6 +69,7 @@ pub(crate) fn encrypt_return_value(
     public_args: &[String],
     value: &Value,
     session: &ReturnChannelSession,
+    call_freshness: RuntimeCallFreshness,
 ) -> Result<EncryptedReturnPayload> {
     let manifest_entry = artifact
         .contract
@@ -97,8 +97,7 @@ pub(crate) fn encrypt_return_value(
         session.binding(),
     )?;
     let aad_hash = hex::encode(Sha256::digest(&aad));
-    let mut nonce = [0u8; NONCE_BYTES];
-    OsRng.fill_bytes(&mut nonce);
+    let nonce = call_freshness.derive_return_nonce(session.binding(), &aad_hash);
     let cipher = ChaCha20Poly1305::new_from_slice(&session.key)
         .map_err(|_| anyhow::anyhow!("invalid encrypted return channel key length"))?;
     let tag = cipher

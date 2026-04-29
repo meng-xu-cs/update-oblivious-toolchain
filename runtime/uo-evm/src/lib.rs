@@ -8,6 +8,7 @@
 
 mod controller;
 mod engine;
+mod freshness;
 mod oram;
 mod return_channel;
 mod runtime;

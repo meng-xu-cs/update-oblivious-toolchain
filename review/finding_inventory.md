@@ -43,7 +43,7 @@ not as independent findings.
 | F-04 | Abort/rollback theorem | TB-04, TH-04, negative test 3 | Agree | P0 | Landed |
 | F-05 | Exact declassification framing | TB-05, TH-05, negative test 5 | Agree | P0 | Landed |
 | F-06 | Proof-relevant observer coverage | TB-06, TH-06 | Agree | P0 | Landed |
-| F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Open - required |
+| F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Landed |
 | F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Landed |
 | F-09 | Path ORAM capacity cap mirrored in Lean | TB-09, TH-09 | Agree | P1 | Landed |
 | F-10 | Smaller metadata canonicality gaps | TB-10, negative tests 5-6 | Agree | P1 | Landed |
@@ -321,7 +321,21 @@ counter mismatch. Lean must expose the counter/freshness preconditions consumed
 by the ORAM/AEAD theorem route.
 
 Status:
-Open - required.
+Landed.
+
+Landing notes:
+Added runtime freshness state with epoch, call, and rollback counters. Encrypted
+return nonces now derive from epoch, rollback counter, call counter,
+return-channel binding, and AAD hash rather than ad hoc `OsRng` sampling.
+Runtime object seeds derive from the deployment epoch and object identity, and
+Path ORAM production fresh leaves derive from object seed, object id, access
+counter, and per-access coin counter. Diagnostic fresh-coin injection remains
+behind `cfg(feature = "diagnostics")`, with source guards confirming production
+code uses counter-derived leaves. Added tests for nonce domain separation,
+counter monotonicity, crash/restart counter resumption, rollback-counter
+mismatch rejection, ORAM leaf counter domain separation, and the production
+source guard. Lean now exposes runtime freshness counter preconditions and the
+freshness taxonomy includes return-channel nonces.
 
 ### F-08 - Theorem-Adjacent Unsafe Rust
 
@@ -629,7 +643,7 @@ The remediation work must add or update tests for:
 - [x] F-04 landed and tested.
 - [x] F-05 landed and tested.
 - [x] F-06 landed and tested.
-- [ ] F-07 landed and tested.
+- [x] F-07 landed and tested.
 - [x] F-08 landed and tested.
 - [x] F-09 landed and tested.
 - [x] F-10 landed and tested.

@@ -269,14 +269,25 @@ pub(crate) struct OramState {
     cipher: StoreCipher,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) enum PathOramLeafCoinSource {
-    #[default]
-    Random,
+    Random {
+        seed: u64,
+        next_index: u64,
+    },
     Injected {
         coins: Box<[usize]>,
         next_index: usize,
     },
+}
+
+impl Default for PathOramLeafCoinSource {
+    fn default() -> Self {
+        Self::Random {
+            seed: 0,
+            next_index: 0,
+        }
+    }
 }
 
 impl OramState {

@@ -1,4 +1,5 @@
 use crate::controller::{finalize_public_call_trace, CallRecorder, PublicCallSummary};
+use crate::freshness::RuntimeCallFreshness;
 use crate::return_channel::{encrypt_return_value, ReturnChannelSession};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::ContractRuntime;
@@ -42,6 +43,7 @@ struct FinalizeCallTraceInput<'a> {
     entrypoint: &'a str,
     confidential: bool,
     deploy_seed: u64,
+    call_freshness: RuntimeCallFreshness,
     manifest_entry: &'a EntrypointManifest,
     manifest_objects: &'a [StateObjectManifest],
     traced_outcome: TracedRuntimeCallOutcome,
@@ -54,6 +56,7 @@ pub(in crate::runtime) fn run_traced_call(
     entrypoint: &str,
     confidential: bool,
     deploy_seed: u64,
+    call_freshness: RuntimeCallFreshness,
     args: Box<[Value]>,
     fresh_coins: Option<PathOramFreshCoinPlan>,
     return_channel: Option<&ReturnChannelSession>,
@@ -88,6 +91,7 @@ pub(in crate::runtime) fn run_traced_call(
         entrypoint,
         confidential,
         deploy_seed,
+        call_freshness,
         manifest_entry,
         manifest_objects: &artifact.contract.manifest.objects,
         traced_outcome,
@@ -110,6 +114,7 @@ fn finalize_call_trace(
         entrypoint,
         confidential,
         deploy_seed,
+        call_freshness,
         manifest_entry,
         manifest_objects,
         traced_outcome,
@@ -138,6 +143,7 @@ fn finalize_call_trace(
         public_call.public_args(),
         &return_value,
         return_channel,
+        call_freshness,
     )?;
     let (gas_used, zero_writes, trace_bundle) = finalize_public_call_trace(
         recorder,
@@ -184,11 +190,19 @@ fn encrypted_return_payload_of(
     public_args: &[String],
     return_value: &Option<Value>,
     return_channel: Option<&ReturnChannelSession>,
+    call_freshness: RuntimeCallFreshness,
 ) -> Result<Option<EncryptedReturnPayload>> {
     match (return_value, manifest_entry.returns, return_channel) {
-        (Some(value), ReturnPolicy::EncryptedToClient, Some(session)) => Ok(Some(
-            encrypt_return_value(artifact, entrypoint, public_args, value, session)?,
-        )),
+        (Some(value), ReturnPolicy::EncryptedToClient, Some(session)) => {
+            Ok(Some(encrypt_return_value(
+                artifact,
+                entrypoint,
+                public_args,
+                value,
+                session,
+                call_freshness,
+            )?))
+        }
         (Some(_), ReturnPolicy::EncryptedToClient, None) => {
             bail!("encrypted_to_client return requires a return channel session")
         }

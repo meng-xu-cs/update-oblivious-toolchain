@@ -1,4 +1,5 @@
 use crate::controller::{CallRecorder, PublicCallSummary};
+use crate::freshness::derive_runtime_object_seed;
 use crate::runtime::fresh_coins::{PathOramFreshCoinEntry, PathOramFreshCoinPlan};
 use crate::runtime::objects::RuntimeObject;
 use anyhow::{anyhow, bail, Result};
@@ -383,15 +384,12 @@ impl ContractRuntime {
 impl CommittedRuntimeState {
     fn deploy(contract_state: &[StateObject], deploy_seed: u64) -> Result<Self> {
         let mut objects = FixedBoxBuilder::new(contract_state.len());
-        let mut master_seed = deploy_seed;
         for spec in contract_state {
+            let object_seed = derive_runtime_object_seed(deploy_seed, spec.id, &spec.name);
             objects.push(RuntimeObjectEntry {
                 object_id: spec.id,
-                object: RuntimeObject::instantiate_with_seed(spec, master_seed)?,
+                object: RuntimeObject::instantiate_with_seed(spec, object_seed)?,
             })?;
-            master_seed = master_seed
-                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add(0xA5A5_A5A5_A5A5_A5A5);
         }
         let mut objects = objects.finish()?;
         objects.sort_by_key(|entry| entry.object_id);

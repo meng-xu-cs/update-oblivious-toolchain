@@ -3,7 +3,6 @@
 #![allow(dead_code)]
 
 use anyhow::{anyhow, bail, Result};
-use rand::RngCore;
 use rand_chacha::ChaCha20Rng;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::ir::StateObject;
@@ -14,6 +13,8 @@ use uo_core::{
     RuntimePathOramTransitionWitness, Type, Value,
 };
 use uo_store::StoreCipher;
+
+use crate::freshness::derive_path_oram_leaf;
 
 use super::{
     decode_oram_directory_page_into_slice, decode_scalar_value, encode_oram_directory_page_into,
@@ -544,24 +545,33 @@ impl Drop for OramState {
     }
 }
 
-fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {
-    (rng.next_u64() as usize) % leaf_count.max(1)
-}
-
 impl Drop for PathOramLeafCoinSource {
     fn drop(&mut self) {
-        if let Self::Injected { coins, next_index } = self {
-            for leaf in coins.iter_mut() {
-                *leaf = 0;
+        match self {
+            Self::Random { seed, next_index } => {
+                *seed = 0;
+                *next_index = 0;
             }
-            *next_index = 0;
+            Self::Injected { coins, next_index } => {
+                for leaf in coins.iter_mut() {
+                    *leaf = 0;
+                }
+                *next_index = 0;
+            }
         }
     }
 }
 
 impl PathOramLeafCoinSource {
     pub(crate) fn random() -> Self {
-        Self::Random
+        Self::from_domain_seed(0)
+    }
+
+    pub(crate) fn from_domain_seed(seed: u64) -> Self {
+        Self::Random {
+            seed,
+            next_index: 0,
+        }
     }
 
     pub(crate) fn require_injected() -> Self {
@@ -580,12 +590,28 @@ impl PathOramLeafCoinSource {
 
     pub(crate) fn take_leaf(
         &mut self,
+        object_id: u32,
         object_name: &str,
+        access_counter: u64,
         leaf_count: usize,
         rng: &mut ChaCha20Rng,
     ) -> Result<usize> {
         match self {
-            Self::Random => Ok(sample_leaf(rng, leaf_count)),
+            Self::Random { seed, next_index } => {
+                let leaf = derive_path_oram_leaf(
+                    *seed,
+                    object_id,
+                    object_name,
+                    access_counter,
+                    *next_index,
+                    leaf_count,
+                );
+                *next_index = next_index.checked_add(1).ok_or_else(|| {
+                    anyhow!("path ORAM fresh-leaf counter overflow for {object_name}")
+                })?;
+                let _ = rng;
+                Ok(leaf)
+            }
             Self::Injected { coins, next_index } => {
                 let leaf = coins.get(*next_index).copied().ok_or_else(|| {
                     anyhow!(
@@ -609,7 +635,7 @@ impl PathOramLeafCoinSource {
 
     pub(crate) fn ensure_exhausted(&self, object_name: &str) -> Result<()> {
         match self {
-            Self::Random => Ok(()),
+            Self::Random { .. } => Ok(()),
             Self::Injected { coins, next_index } if *next_index == coins.len() => Ok(()),
             Self::Injected { coins, next_index } => bail!(
                 "path ORAM object {} left {} injected fresh-leaf coins unused",
@@ -1673,7 +1699,8 @@ pub(super) fn run_path_get(
     rng: &mut ChaCha20Rng,
 ) -> Result<(Value, OramTranscript, bool)> {
     let leaf_count = state.parameters.leaf_count();
-    let fresh_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;
+    let fresh_leaf =
+        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count, rng)?;
     let access_leaf = access_leaf_for_key(&state.entries, &state.position_map, key, fresh_leaf);
     let slot = slot_for_key(&state.entries, key);
     let slot_present = slot.is_some();
@@ -1726,7 +1753,8 @@ pub(super) fn run_path_put(
     let slot = slot_for_key(&state.entries, &key);
     let slot_present = slot.is_some();
     let prior_leaf = select_position_map_leaf(&state.position_map, &slot);
-    let miss_access_leaf = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;
+    let miss_access_leaf =
+        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count, rng)?;
     let access_leaf = masked_select_usize(
         prior_leaf.is_some(),
         prior_leaf.unwrap_or(0),
@@ -1741,7 +1769,8 @@ pub(super) fn run_path_put(
     let update_existing = apply & slot_present & !value_is_zero;
     let delete_existing = apply & slot_present & value_is_zero;
     let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;
-    let next_leaf_value = leaf_coins.take_leaf(&spec.name, leaf_count, rng)?;
+    let next_leaf_value =
+        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count, rng)?;
     let selected_next_leaf = MaskedUsizeOption::some(next_leaf_value);
     let no_next_leaf = MaskedUsizeOption::none();
     let next_leaf = masked_select_option_usize(

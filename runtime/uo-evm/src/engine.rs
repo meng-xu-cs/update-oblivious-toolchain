@@ -1,10 +1,9 @@
+use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
 use crate::runtime::{
     deploy_contract_runtime, run_contract_call, ContractRuntime, PathOramFreshCoinPlan,
 };
 use anyhow::{anyhow, bail, Result};
-use rand::rngs::OsRng;
-use rand::RngCore;
 use uo_core::{CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, Value};
 
 #[derive(Debug)]
@@ -12,6 +11,7 @@ pub struct ContractInstance {
     artifact: CompiledArtifact,
     state: ContractRuntime,
     deploy_seed: u64,
+    freshness: RuntimeFreshnessState,
 }
 
 #[cfg(feature = "diagnostics")]
@@ -37,7 +37,8 @@ pub struct DiagnosticCallResult {
 
 impl ContractInstance {
     pub fn deploy(artifact: CompiledArtifact) -> Result<Self> {
-        let deploy_seed = OsRng.next_u64();
+        let freshness = RuntimeFreshnessState::from_os_rng();
+        let deploy_seed = freshness.snapshot().epoch;
         Self::deploy_with_seed_internal(artifact, deploy_seed)
     }
 
@@ -51,6 +52,7 @@ impl ContractInstance {
             state: deploy_contract_runtime(&artifact.contract.state, deploy_seed)?,
             artifact,
             deploy_seed,
+            freshness: RuntimeFreshnessState::from_epoch(deploy_seed),
         })
     }
 
@@ -114,15 +116,18 @@ impl ContractInstance {
             );
         }
         let args = args.into_boxed_slice();
+        let call_freshness = self.freshness.begin_call()?;
         let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(
             &mut self.state,
             &self.artifact,
             &function,
             self.deploy_seed,
+            call_freshness,
             args,
             fresh_coins,
             return_channel,
         )?;
+        self.freshness.finish_call(aborted)?;
         Ok((
             CallResult {
                 return_value,
@@ -376,6 +381,30 @@ bounds:
         assert_eq!(
             decrypted,
             Value::uint(7).canonical_bytes_boxed().unwrap().into_vec()
+        );
+
+        let second = instance
+            .call_with_return_channel("f(uint256)", vec![Value::uint(8)], &session)
+            .unwrap();
+        let second_payload = second.encrypted_return.as_ref().unwrap();
+        assert_ne!(payload.nonce, second_payload.nonce);
+        let second_decrypted = decrypt_return_payload(
+            &artifact,
+            "f(uint256)",
+            second
+                .trace
+                .theorem_trace
+                .public_outcome
+                .as_ref()
+                .unwrap()
+                .public_args
+                .as_ref(),
+            second_payload,
+            &session,
+        );
+        assert_eq!(
+            second_decrypted,
+            Value::uint(8).canonical_bytes_boxed().unwrap().into_vec()
         );
     }
 

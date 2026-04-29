@@ -14,6 +14,7 @@ mod state;
 mod theorem;
 
 use crate::controller::CallRecorder;
+use crate::freshness::RuntimeCallFreshness;
 use crate::return_channel::ReturnChannelSession;
 use anyhow::Result;
 pub use fresh_coins::PathOramFreshCoinPlan;
@@ -46,6 +47,7 @@ pub(crate) fn run_contract_call(
     artifact: &CompiledArtifact,
     function: &CompiledFunction,
     deploy_seed: u64,
+    call_freshness: RuntimeCallFreshness,
     args: Box<[Value]>,
     fresh_coins: Option<PathOramFreshCoinPlan>,
     return_channel: Option<&ReturnChannelSession>,
@@ -62,6 +64,7 @@ pub(crate) fn run_contract_call(
         &function.signature,
         function.confidential,
         deploy_seed,
+        call_freshness,
         args,
         fresh_coins,
         return_channel,
