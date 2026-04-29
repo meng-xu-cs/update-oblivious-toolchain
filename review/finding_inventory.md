@@ -449,7 +449,7 @@ trace, micro trace, final public state/rollback behavior, and release
 functions.
 
 Status:
-Open - required.
+Landed.
 
 ### F-12 - Adaptive History Theorem
 
@@ -647,7 +647,7 @@ The remediation work must add or update tests for:
 - [x] F-08 landed and tested.
 - [x] F-09 landed and tested.
 - [x] F-10 landed and tested.
-- [ ] F-11 landed and checked by Lean.
+- [x] F-11 landed and checked by Lean.
 - [ ] F-12 landed and checked by Lean.
 - [ ] F-13 landed and checked against claim wording/semantics tests.
 - [ ] F-14 landed and checked by compiler/runtime/Lean tests.
