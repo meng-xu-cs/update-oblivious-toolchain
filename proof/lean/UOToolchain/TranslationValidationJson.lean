@@ -27,6 +27,7 @@ deriving Repr, DecidableEq, FromJson, ToJson
 structure ImportedProofRelevantFunctionView where
   signature : String
   params : List ImportedProofRelevantParamView
+  public_env : List String
   return_type : Option String
   body : List String
   secret_args : List Nat
@@ -75,7 +76,10 @@ structure ImportedProofRelevantEntrypointView where
   signature : String
   secret_args : List Nat
   param_names : List String
+  public_env : List String
   entry_input_len : Nat
+  initializer : Bool
+  requires_initialized : Bool
   public_gas_budget : Nat
   arena_bytes : Nat
   max_stack_words : Nat
@@ -183,6 +187,17 @@ def lookupEntrypoint
       else
         lookupEntrypoint signature rest
 
+def publicEnvFieldParamName : String → String
+  | "msg_sender" => "__uo_env_msg_sender"
+  | "tx_origin" => "__uo_env_tx_origin"
+  | "block_number" => "__uo_env_block_number"
+  | "block_timestamp" => "__uo_env_block_timestamp"
+  | "block_chain_id" => "__uo_env_block_chainid"
+  | other => s!"__uo_env_unknown_{other}"
+
+def publicEnvParamNames (fields : List String) : List String :=
+  fields.map publicEnvFieldParamName
+
 private def functionsMatchManifestSecrets :
   List ImportedProofRelevantFunctionView →
   List ImportedProofRelevantEntrypointView → Bool
@@ -193,6 +208,7 @@ private def functionsMatchManifestSecrets :
       | some entry =>
           (entry.secret_args == fn.secret_args) &&
             (entry.param_names == fn.params.map ImportedProofRelevantParamView.name) &&
+            (entry.public_env == fn.public_env) &&
             functionsMatchManifestSecrets rest entrypoints
 
 private def publicStateDeclassifyTargetsWellFormed
@@ -489,7 +505,10 @@ private def parseImportedManifestEntrypointViewFromRawJson
     { signature := signature
     , secret_args := ← lookupFieldAs json "secret_args"
     , param_names := ← lookupFieldAs json "param_names"
+    , public_env := (← lookupOptionalFieldAs json "public_env").getD []
     , entry_input_len := entryInputLen?.getD 0
+    , initializer := (← lookupOptionalFieldAs json "initializer").getD false
+    , requires_initialized := (← lookupOptionalFieldAs json "requires_initialized").getD false
     , public_gas_budget := ← lookupFieldAs json "public_gas_budget"
     , arena_bytes := ← lookupFieldAs json "arena_bytes"
     , max_stack_words := ← lookupFieldAs json "max_stack_words"
@@ -540,6 +559,7 @@ private def parseImportedFunctionViewFromRawJson
   pure
     { signature := ← lookupFieldAs json "signature"
     , params := ← (← expectJsonArray paramsJson).mapM parseImportedParamViewFromRawJson
+    , public_env := (← lookupOptionalFieldAs json "public_env").getD []
     , return_type := returnType?.map Json.compress
     , body := bodyJsons.map Json.compress
     , secret_args := ← lookupFieldAs json "secret_args"
@@ -3681,8 +3701,9 @@ private theorem functionsMatchManifestSecrets_exact_of_lookup
   (hMatch : functionsMatchManifestSecrets functions entrypoints = true)
   (hMem : fn ∈ functions)
   (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
-  entry.secret_args = fn.secret_args ∧
-    entry.param_names = fn.params.map ImportedProofRelevantParamView.name := by
+  (entry.secret_args = fn.secret_args ∧
+    entry.param_names = fn.params.map ImportedProofRelevantParamView.name) ∧
+    entry.public_env = fn.public_env := by
   induction functions generalizing fn entry with
   | nil =>
       cases hMem
@@ -3929,11 +3950,25 @@ theorem ImportedProofRelevantContractView.manifest_secrets_exact_of_lookup
   (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
   entry.secret_args = fn.secret_args ∧
     entry.param_names = fn.params.map ImportedProofRelevantParamView.name := by
-  exact
+  exact (
     functionsMatchManifestSecrets_exact_of_lookup
       (view.structural_exactness_checks hValid).2.1
       hMem
-      hLookup
+      hLookup).1
+
+theorem ImportedProofRelevantContractView.manifest_public_env_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  entry.public_env = fn.public_env := by
+  exact (
+    functionsMatchManifestSecrets_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.1
+      hMem
+      hLookup).2
 
 theorem ImportedProofRelevantContractView.confidential_lowering_exact_of_lookup
   (view : ImportedProofRelevantContractView)

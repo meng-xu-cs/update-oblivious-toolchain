@@ -258,6 +258,7 @@ mod tests {
         let artifact = sample_artifact(vec![CompiledFunction {
             signature: "auth(bytes32)".into(),
             params: vec![],
+            public_env: vec![],
             return_type: Some(Type::Scalar(crate::ScalarType::Uint(256))),
             body: vec![Statement::Return {
                 value: Some(Expr::Select {
@@ -290,6 +291,7 @@ mod tests {
         let artifact = sample_artifact(vec![CompiledFunction {
             signature: "bad()".into(),
             params: vec![],
+            public_env: vec![],
             return_type: None,
             body: vec![
                 Statement::Declare {
@@ -329,6 +331,7 @@ mod tests {
         let artifact = sample_artifact(vec![CompiledFunction {
             signature: "badSelect()".into(),
             params: vec![],
+            public_env: vec![],
             return_type: None,
             body: vec![Statement::Return {
                 value: Some(Expr::Select {
@@ -357,6 +360,7 @@ mod tests {
         let artifact = sample_artifact(vec![CompiledFunction {
             signature: "big()".into(),
             params: vec![],
+            public_env: vec![],
             return_type: Some(Type::Scalar(crate::ScalarType::Uint(256))),
             body: vec![Statement::Return {
                 value: Some(Expr::Literal(Value::uint((1u128 << 100) + 7))),

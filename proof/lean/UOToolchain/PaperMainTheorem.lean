@@ -108,6 +108,12 @@ theorem paperMainExact_publicInputs_of_publicAgreement
   lhs.input.publicArgs = rhs.input.publicArgs :=
   samePublicProjection_publicArgs_eq hPublic
 
+theorem paperMainExact_publicEnvironment_of_publicAgreement
+  {lhs rhs : Config}
+  (hPublic : PaperMainExactSameAdmittedPackagePublicInputsAndState lhs rhs) :
+  lhs.input.publicEnv = rhs.input.publicEnv :=
+  samePublicProjection_publicEnv_eq hPublic
+
 theorem paperMainExact_initialPublicState_of_publicAgreement
   {lhs rhs : Config}
   (hPublic : PaperMainExactSameAdmittedPackagePublicInputsAndState lhs rhs) :
@@ -161,8 +167,9 @@ def paperMainExactView
       (run cfg))
 
 /-- Direct exact-backend paper-main theorem.  For two executions of the same
-admitted package with equal public inputs, equal public initial state, and
-equal declared release functions, the complete `View_SGX` is identical. -/
+admitted package with equal public inputs, equal public environment, equal
+public initial state, and equal declared release functions, the complete
+`View_SGX` is identical. -/
 theorem paperMain_exact_backend_noninterference
   {run : TraceSemantics}
   {publicOutcome : Config → SGXPublicOutcome}

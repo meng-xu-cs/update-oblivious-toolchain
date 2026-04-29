@@ -157,6 +157,7 @@ pub struct ProofRelevantParamView {
 pub struct ProofRelevantFunctionView {
     pub signature: String,
     pub params: Vec<ProofRelevantParamView>,
+    pub public_env: Vec<crate::ir::PublicEnvField>,
     pub return_type: Option<String>,
     pub body: Vec<String>,
     pub secret_args: Vec<usize>,
@@ -181,6 +182,7 @@ impl ProofRelevantFunctionView {
                     })
                 })
                 .collect::<Result<Vec<_>>>()?,
+            public_env: function.public_env.clone(),
             return_type: function
                 .return_type
                 .as_ref()
@@ -307,7 +309,10 @@ pub struct ProofRelevantEntrypointView {
     pub signature: String,
     pub secret_args: Vec<usize>,
     pub param_names: Vec<String>,
+    pub public_env: Vec<crate::ir::PublicEnvField>,
     pub entry_input_len: usize,
+    pub initializer: bool,
+    pub requires_initialized: bool,
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
@@ -339,7 +344,10 @@ impl ProofRelevantEntrypointView {
             signature: signature.into(),
             secret_args: entrypoint.secret_args.clone(),
             param_names: entrypoint.param_names.clone(),
+            public_env: entrypoint.public_env.clone(),
             entry_input_len: entrypoint.entry_input_len,
+            initializer: entrypoint.initializer,
+            requires_initialized: entrypoint.requires_initialized,
             public_gas_budget: entrypoint.public_gas_budget,
             arena_bytes: entrypoint.arena_bytes,
             max_stack_words: entrypoint.max_stack_words,
@@ -491,6 +499,7 @@ const FUNCTION_VIEW_FIELDS: &[&str] = &[
     "confidential_program",
     "confidential_slot_program",
     "params",
+    "public_env",
     "return_type",
     "secret_args",
     "signature",
@@ -530,12 +539,14 @@ const ENTRYPOINT_VIEW_FIELDS: &[&str] = &[
     "confidential_slot_program",
     "declassifies",
     "entry_input_len",
+    "initializer",
     "kernel_steps",
     "max_commit_ops",
     "max_hash_part_bytes",
     "max_stack_words",
     "oram_accesses",
     "param_names",
+    "public_env",
     "public_gas_budget",
     "public_state_declassifies",
     "return_canonical_len",
@@ -543,6 +554,7 @@ const ENTRYPOINT_VIEW_FIELDS: &[&str] = &[
     "secret_args",
     "signature",
     "status",
+    "requires_initialized",
     "uoarray_reads",
     "uoarray_writes",
     "uocell_reads",
@@ -769,6 +781,7 @@ mod tests {
         let function = CompiledFunction {
             signature: "f(uint256)".into(),
             params: vec![("x".into(), Type::Scalar(ScalarType::Uint(256)))],
+            public_env: vec![],
             return_type: Some(Type::Scalar(ScalarType::Uint(256))),
             body: vec![Statement::ArraySet {
                 object_id: 7,
@@ -821,7 +834,10 @@ mod tests {
         let entrypoint = EntrypointManifest {
             secret_args: vec![0],
             param_names: vec!["secret".into()],
+            public_env: vec![],
             entry_input_len: 32,
+            initializer: false,
+            requires_initialized: false,
             public_gas_budget: 2000,
             arena_bytes: 4096,
             max_stack_words: 64,
@@ -862,7 +878,10 @@ mod tests {
         let entrypoint = EntrypointManifest {
             secret_args: vec![],
             param_names: vec![],
+            public_env: vec![],
             entry_input_len: 0,
+            initializer: false,
+            requires_initialized: false,
             public_gas_budget: 2000,
             arena_bytes: 4096,
             max_stack_words: 64,
@@ -898,7 +917,10 @@ mod tests {
         let entrypoint = EntrypointManifest {
             secret_args: vec![0],
             param_names: vec!["secret".into()],
+            public_env: vec![],
             entry_input_len: 32,
+            initializer: false,
+            requires_initialized: false,
             public_gas_budget: 2000,
             arena_bytes: 4096,
             max_stack_words: 64,

@@ -17,9 +17,9 @@ Current design and claim wording live under [`docs/`](docs/README.md).
 The accepted language and sidecar metadata surface is maintained in
 [`docs/supported-subset.md`](docs/supported-subset.md). The short version:
 fixed-size scalar/array/struct state, bounded `for` loops, explicit sidecar
-capacities, explicit public/confidential entrypoints, and no external calls,
-dynamic storage, inheritance, constructors/fallbacks, events, inline assembly,
-or early confidential returns.
+capacities, explicit public/confidential entrypoints, manifest-bound public
+environment inputs, and no external calls, dynamic storage, inheritance,
+constructors/fallbacks, events, inline assembly, or early confidential returns.
 
 ## Main Commands
 

@@ -53,7 +53,7 @@ pub use fragment::{
 };
 pub use ir::{
     BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
-    Statement, UnaryOp,
+    PublicEnvField, PublicEnvironment, Statement, UnaryOp,
 };
 pub use kernel_dsl::{
     RuntimeKernelDslBundle, RuntimeKernelDslBundleError, RuntimeKernelLoweringBundle,

@@ -109,7 +109,9 @@ This repository does not claim:
 - value-level equality between the Lean mock hash and real runtime Keccak
   outputs
 - Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or
-  context-variable semantics; the Lean bridge target for regaining that claim
-  is `VersionedSoliditySemanticsBridge` in `SolidityDialectBoundary.lean`
+  context-variable semantics beyond the admitted public environment fields
+  (`msg.sender`, `tx.origin`, `block.number`, `block.timestamp`, and
+  `block.chainid`); the Lean bridge target for regaining that claim is
+  `VersionedSoliditySemanticsBridge` in `SolidityDialectBoundary.lean`
 
 Those would require additional models and proofs, not only more prose.

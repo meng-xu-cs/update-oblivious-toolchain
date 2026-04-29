@@ -166,6 +166,8 @@ pub struct EncryptedReturnPayload {
 pub struct PublicOutcomeTrace {
     pub entrypoint_id: String,
     pub public_args: Box<[String]>,
+    #[serde(default, skip_serializing_if = "boxed_strings_is_empty")]
+    pub public_env: Box<[String]>,
     pub termination_status: bool,
     #[serde(default)]
     pub status_policy: StatusPolicy,
@@ -181,6 +183,10 @@ pub struct PublicOutcomeTrace {
     pub gas_used: u64,
 }
 
+fn boxed_strings_is_empty(values: &Box<[String]>) -> bool {
+    values.is_empty()
+}
+
 impl PublicOutcomeTrace {
     pub fn new(
         entrypoint_id: impl Into<String>,
@@ -192,6 +198,7 @@ impl PublicOutcomeTrace {
         Self {
             entrypoint_id: entrypoint_id.into(),
             public_args,
+            public_env: Box::default(),
             termination_status,
             status_policy: StatusPolicy::Public,
             output_shape,
@@ -201,6 +208,11 @@ impl PublicOutcomeTrace {
             declassifies: Box::default(),
             gas_used,
         }
+    }
+
+    pub fn with_public_env(mut self, public_env: Box<[String]>) -> Self {
+        self.public_env = public_env;
+        self
     }
 
     pub fn with_host_visibility(
@@ -222,6 +234,7 @@ impl PublicOutcomeTrace {
 pub struct PublicCallSummary {
     entry_input_len: usize,
     public_args: Box<[String]>,
+    public_env: Box<[String]>,
 }
 
 impl PublicCallSummary {
@@ -236,17 +249,31 @@ impl PublicCallSummary {
                 args.len()
             );
         }
+        let public_args = manifest_entry
+            .param_names
+            .iter()
+            .zip(args.iter())
+            .enumerate()
+            .filter(|(index, _)| !manifest_entry.secret_args.contains(index))
+            .map(|(_, (name, value))| format!("{name}={value}"))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        let env_offset = manifest_entry
+            .param_names
+            .len()
+            .checked_sub(manifest_entry.public_env.len())
+            .ok_or_else(|| anyhow!("manifest public_env longer than param_names"))?;
+        let public_env = manifest_entry
+            .public_env
+            .iter()
+            .zip(args.iter().skip(env_offset))
+            .map(|(field, value)| format!("{}={value}", field.label()))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
         Ok(Self {
             entry_input_len: manifest_entry.entry_input_len,
-            public_args: manifest_entry
-                .param_names
-                .iter()
-                .zip(args.iter())
-                .enumerate()
-                .filter(|(index, _)| !manifest_entry.secret_args.contains(index))
-                .map(|(_, (name, value))| format!("{name}={value}"))
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
+            public_args,
+            public_env,
         })
     }
 
@@ -258,8 +285,8 @@ impl PublicCallSummary {
         &self.public_args
     }
 
-    pub fn into_public_args(self) -> Box<[String]> {
-        self.public_args
+    pub fn into_public_parts(self) -> (Box<[String]>, Box<[String]>) {
+        (self.public_args, self.public_env)
     }
 }
 
@@ -8864,6 +8891,7 @@ mod tests {
         PublicOutcomeTrace {
             entrypoint_id: "put(bytes32,uint256)".into(),
             public_args: Box::default(),
+            public_env: Box::default(),
             termination_status: true,
             status_policy: Default::default(),
             output_shape: OutputShape::default(),
@@ -9157,7 +9185,10 @@ mod tests {
         EntrypointManifest {
             secret_args: vec![],
             param_names: vec![],
+            public_env: vec![],
             entry_input_len: 0,
+            initializer: false,
+            requires_initialized: false,
             public_gas_budget: 99,
             arena_bytes: 0,
             max_stack_words: 0,
@@ -9192,7 +9223,10 @@ mod tests {
             EntrypointManifest {
                 secret_args: vec![],
                 param_names: vec![],
+                public_env: vec![],
                 entry_input_len: 0,
+                initializer: false,
+                requires_initialized: false,
                 public_gas_budget: 99,
                 arena_bytes: 0,
                 max_stack_words: 0,
@@ -9226,6 +9260,7 @@ mod tests {
                 functions: vec![CompiledFunction {
                     signature: entrypoint,
                     params: vec![],
+                    public_env: vec![],
                     return_type: None,
                     body: vec![],
                     secret_args: vec![],
@@ -10188,6 +10223,7 @@ mod tests {
         let public_outcome = PublicOutcomeTrace {
             entrypoint_id: "f()".into(),
             public_args: Box::default(),
+            public_env: Box::default(),
             termination_status: true,
             status_policy: Default::default(),
             output_shape: OutputShape::default(),

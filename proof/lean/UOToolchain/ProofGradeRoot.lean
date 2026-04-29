@@ -56,6 +56,7 @@ import UOToolchain.RuntimeCoinsJson
 import UOToolchain.RuntimePathOramPairJson
 import UOToolchain.RuntimeCanonicalPathOramPairJson
 import UOToolchain.HistorySemantics
+import UOToolchain.EnvironmentAuthModel
 import UOToolchain.RuntimeAuditSurfaces
 import UOToolchain.ObserverCoverage
 import UOToolchain.TranslationValidationJson

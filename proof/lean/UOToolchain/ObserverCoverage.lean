@@ -72,6 +72,7 @@ def observerCoveragePublicInputKeys : List String :=
   , "ReturnChannelAad.return_canonical_len"
   , "ReturnChannelAad.public_args"
   , "ReturnChannelAad.binding"
+  , "PublicOutcomeTrace.public_env"
   ]
 
 def observerCoverageClassificationFor
@@ -102,7 +103,10 @@ def observerCoverageKeys : List String :=
   , "RuntimeKernelStepManifest.object_id"
   , "EntrypointManifest.secret_args"
   , "EntrypointManifest.param_names"
+  , "EntrypointManifest.public_env"
   , "EntrypointManifest.entry_input_len"
+  , "EntrypointManifest.initializer"
+  , "EntrypointManifest.requires_initialized"
   , "EntrypointManifest.public_gas_budget"
   , "EntrypointManifest.arena_bytes"
   , "EntrypointManifest.max_stack_words"
@@ -159,6 +163,7 @@ def observerCoverageKeys : List String :=
   , "ReturnChannelAad.binding"
   , "PublicOutcomeTrace.entrypoint_id"
   , "PublicOutcomeTrace.public_args"
+  , "PublicOutcomeTrace.public_env"
   , "PublicOutcomeTrace.termination_status"
   , "PublicOutcomeTrace.status_policy"
   , "PublicOutcomeTrace.output_shape"
@@ -287,6 +292,7 @@ theorem observerCoverage_publicInputKeysPinned :
       , "ReturnChannelAad.return_canonical_len"
       , "ReturnChannelAad.public_args"
       , "ReturnChannelAad.binding"
+      , "PublicOutcomeTrace.public_env"
       ] := by
   rfl
 

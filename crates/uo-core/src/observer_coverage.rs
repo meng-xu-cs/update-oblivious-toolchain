@@ -59,7 +59,10 @@ pub const RUNTIME_KERNEL_STEP_MANIFEST_FIELDS: &[&str] = &["opcode", "object_id"
 pub const ENTRYPOINT_MANIFEST_FIELDS: &[&str] = &[
     "secret_args",
     "param_names",
+    "public_env",
     "entry_input_len",
+    "initializer",
+    "requires_initialized",
     "public_gas_budget",
     "arena_bytes",
     "max_stack_words",
@@ -131,6 +134,7 @@ pub const RETURN_CHANNEL_AAD_FIELDS: &[&str] = &[
 pub const PUBLIC_OUTCOME_TRACE_FIELDS: &[&str] = &[
     "entrypoint_id",
     "public_args",
+    "public_env",
     "termination_status",
     "status_policy",
     "output_shape",

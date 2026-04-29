@@ -10,6 +10,7 @@ modules are:
 
 - `UOToolchain.Sol`
 - `UOToolchain.SolidityDialectBoundary`
+- `UOToolchain.EnvironmentAuthModel`
 - `UOToolchain.IRSyntax`
 - `UOToolchain.IRSemantics`
 - `UOToolchain.CompilerInvariant`
@@ -43,7 +44,8 @@ The runtime boundary and trusted-kernel details are owned by
 
 The proof development is organized around these layers:
 
-- Core semantics: `TraceModel`, `HistorySemantics`, `IRSemantics`,
+- Core semantics: `TraceModel`, `HistorySemantics`, `EnvironmentAuthModel`,
+  `IRSemantics`,
   `ExactObjects`, `Composition`.
 - Confidential fragment and shared DSL: `ConfidentialFragment`,
   `ConfidentialKernelDsl`, `KernelDsl`.

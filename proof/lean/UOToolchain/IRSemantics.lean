@@ -51,6 +51,7 @@ deriving Repr, DecidableEq
 
 structure TraceInput where
   publicArgs : List String
+  publicEnv : List String := []
   secretArgs : List String
 deriving Repr, DecidableEq
 
@@ -64,6 +65,7 @@ deriving Repr, DecidableEq
 structure TracePublicProjection where
   program : TraceProgram
   publicArgs : List String
+  publicEnv : List String
   publicState : List String
 deriving Repr, DecidableEq
 
@@ -72,6 +74,7 @@ abbrev TraceSemantics := TraceConfig → Trace
 def tracePublicProjection (cfg : TraceConfig) : TracePublicProjection :=
   { program := cfg.program
   , publicArgs := cfg.input.publicArgs
+  , publicEnv := cfg.input.publicEnv
   , publicState := cfg.publicState
   }
 
@@ -101,6 +104,11 @@ theorem sameTracePublicProjection_publicArgs_eq {lhs rhs : TraceConfig} :
     sameTracePublicProjection lhs rhs → lhs.input.publicArgs = rhs.input.publicArgs := by
   intro h
   exact congrArg TracePublicProjection.publicArgs h
+
+theorem sameTracePublicProjection_publicEnv_eq {lhs rhs : TraceConfig} :
+    sameTracePublicProjection lhs rhs → lhs.input.publicEnv = rhs.input.publicEnv := by
+  intro h
+  exact congrArg TracePublicProjection.publicEnv h
 
 theorem sameTracePublicProjection_publicState_eq {lhs rhs : TraceConfig} :
     sameTracePublicProjection lhs rhs → lhs.publicState = rhs.publicState := by
@@ -143,6 +151,10 @@ theorem samePublicProjection_publicArgs_eq {lhs rhs : Config} :
     samePublicProjection lhs rhs → lhs.input.publicArgs = rhs.input.publicArgs :=
   sameTracePublicProjection_publicArgs_eq
 
+theorem samePublicProjection_publicEnv_eq {lhs rhs : Config} :
+    samePublicProjection lhs rhs → lhs.input.publicEnv = rhs.input.publicEnv :=
+  sameTracePublicProjection_publicEnv_eq
+
 theorem samePublicProjection_publicState_eq {lhs rhs : Config} :
     samePublicProjection lhs rhs → lhs.publicState = rhs.publicState :=
   sameTracePublicProjection_publicState_eq
@@ -182,6 +194,7 @@ structure OperationalConfig where
   contract : CompiledContract
   entrypoint : String
   publicArgs : List Value
+  publicEnv : List (String × Value) := []
   secretArgs : List Value
   publicState : ObjectStore
   secretState : ObjectStore
@@ -193,6 +206,7 @@ structure OperationalPublicProjection where
   contract : CompiledContract
   entrypoint : String
   publicArgs : List Value
+  publicEnv : List (String × Value)
   publicState : ObjectStore
   deriving Inhabited
 
@@ -200,11 +214,13 @@ def operationalPublicProjection (cfg : OperationalConfig) : OperationalPublicPro
   { contract := cfg.contract
   , entrypoint := cfg.entrypoint
   , publicArgs := cfg.publicArgs
+  , publicEnv := cfg.publicEnv
   , publicState := cfg.publicState
   }
 
 /-- Two operational configurations have the same public projection when
-their contract, entrypoint, public arguments, and public store agree. -/
+their contract, entrypoint, public arguments, public environment, and public
+store agree. -/
 def sameOperationalPublicProjection (lhs rhs : OperationalConfig) : Prop :=
   operationalPublicProjection lhs = operationalPublicProjection rhs
 
@@ -241,6 +257,12 @@ theorem sameOperationalPublicProjection_publicArgs_eq
     sameOperationalPublicProjection lhs rhs → lhs.publicArgs = rhs.publicArgs := by
   intro h
   exact congrArg OperationalPublicProjection.publicArgs h
+
+theorem sameOperationalPublicProjection_publicEnv_eq
+  {lhs rhs : OperationalConfig} :
+    sameOperationalPublicProjection lhs rhs → lhs.publicEnv = rhs.publicEnv := by
+  intro h
+  exact congrArg OperationalPublicProjection.publicEnv h
 
 theorem sameOperationalPublicProjection_publicState_eq
   {lhs rhs : OperationalConfig} :

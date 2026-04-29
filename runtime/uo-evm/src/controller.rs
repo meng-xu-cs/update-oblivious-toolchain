@@ -292,13 +292,15 @@ impl CallRecorder {
             output_shape.return_length,
         ));
         let entry_input_len = public_call.entry_input_len();
+        let (public_args, public_env) = public_call.into_public_parts();
         let public_outcome = PublicOutcomeTrace::new(
             self.entrypoint.clone(),
-            public_call.into_public_args(),
+            public_args,
             !aborted,
             output_shape,
             gas_used,
         )
+        .with_public_env(public_env)
         .with_host_visibility(manifest_entry, return_payload, encrypted_return_payload);
         let controller_observer =
             RuntimeControllerObserverCertificate::from_runtime_observer_with_oram_accesses(

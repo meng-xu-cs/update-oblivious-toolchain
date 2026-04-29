@@ -1,6 +1,6 @@
 use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSlotProgram};
 use crate::manifest::RuntimeManifest;
-use crate::types::{Type, Value};
+use crate::types::{ScalarType, Type, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -21,6 +21,103 @@ pub enum BackendKind {
     Raw,
     FullScan,
     Oram,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum PublicEnvField {
+    MsgSender,
+    TxOrigin,
+    BlockNumber,
+    BlockTimestamp,
+    BlockChainId,
+}
+
+impl PublicEnvField {
+    pub const ALL: [Self; 5] = [
+        Self::MsgSender,
+        Self::TxOrigin,
+        Self::BlockNumber,
+        Self::BlockTimestamp,
+        Self::BlockChainId,
+    ];
+
+    pub fn param_name(self) -> &'static str {
+        match self {
+            Self::MsgSender => "__uo_env_msg_sender",
+            Self::TxOrigin => "__uo_env_tx_origin",
+            Self::BlockNumber => "__uo_env_block_number",
+            Self::BlockTimestamp => "__uo_env_block_timestamp",
+            Self::BlockChainId => "__uo_env_block_chainid",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::MsgSender => "msg.sender",
+            Self::TxOrigin => "tx.origin",
+            Self::BlockNumber => "block.number",
+            Self::BlockTimestamp => "block.timestamp",
+            Self::BlockChainId => "block.chainid",
+        }
+    }
+
+    pub fn ty(self) -> Type {
+        match self {
+            Self::MsgSender | Self::TxOrigin => Type::Scalar(ScalarType::Address),
+            Self::BlockNumber | Self::BlockTimestamp | Self::BlockChainId => {
+                Type::Scalar(ScalarType::Uint(256))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PublicEnvironment {
+    pub caller: [u8; 20],
+    pub tx_origin: [u8; 20],
+    pub block_number: u64,
+    pub block_timestamp: u64,
+    pub chain_id: u64,
+}
+
+impl Default for PublicEnvironment {
+    fn default() -> Self {
+        Self {
+            caller: [0u8; 20],
+            tx_origin: [0u8; 20],
+            block_number: 0,
+            block_timestamp: 0,
+            chain_id: 1,
+        }
+    }
+}
+
+impl PublicEnvironment {
+    pub fn with_caller(caller: [u8; 20]) -> Self {
+        Self {
+            caller,
+            tx_origin: caller,
+            ..Self::default()
+        }
+    }
+
+    pub fn value_for(&self, field: PublicEnvField) -> Value {
+        match field {
+            PublicEnvField::MsgSender => Value::Address(self.caller),
+            PublicEnvField::TxOrigin => Value::Address(self.tx_origin),
+            PublicEnvField::BlockNumber => Value::uint(self.block_number),
+            PublicEnvField::BlockTimestamp => Value::uint(self.block_timestamp),
+            PublicEnvField::BlockChainId => Value::uint(self.chain_id),
+        }
+    }
+
+    pub fn public_bindings(&self, fields: &[PublicEnvField]) -> Vec<String> {
+        fields
+            .iter()
+            .map(|field| format!("{}={}", field.label(), self.value_for(*field)))
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -167,6 +264,8 @@ pub enum Statement {
 pub struct CompiledFunction {
     pub signature: String,
     pub params: Vec<(String, Type)>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub public_env: Vec<PublicEnvField>,
     #[serde(default)]
     pub return_type: Option<Type>,
     pub body: Vec<Statement>,

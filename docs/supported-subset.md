@@ -18,6 +18,9 @@ Accepted source features in this prototype:
 - pure/view internal helpers that consist of a single return expression
 - `require(expr);`
 - `keccak256(abi.encodePacked(...))` on fixed-size arguments
+- public environment reads for `msg.sender`, `tx.origin`, `block.number`,
+  `block.timestamp`, and `block.chainid`; these are manifest-bound public
+  inputs, not secrets
 - explicit public getter/setup entrypoints and explicit confidential entrypoints
 - single return values on admitted functions
 - state-map lowering through sidecar metadata rather than unconstrained native
@@ -53,6 +56,9 @@ Sidecar metadata requirements:
 - `returns: encrypted_to_client` must not declare `declassifies: [return]`;
   the host-visible outcome contains ciphertext, nonce, AAD hash, and session
   binding evidence, not the plaintext return
+- an entrypoint may set `initializer: true` to mark the one-time public setup
+  phase; when a contract has an initializer, other entrypoints default to
+  `requires_initialized: true` unless explicitly set otherwise
 - entrypoints that write data or predicates derived from confidential state or
   secret arguments into public state must name those public objects in
   `public_state_declassifies`
@@ -87,7 +93,8 @@ Execution-model notes:
   `VersionedSoliditySemanticsBridge` in
   `proof/lean/UOToolchain/SolidityDialectBoundary.lean`. It names the required
   obligations for checked arithmetic, division/modulo-by-zero, ABI encoding,
-  revert/rollback, and public context variables.
+  revert/rollback, and any Solidity context variables beyond the admitted
+  public environment fields listed above.
 - source-to-kernel correctness is stated for the post-resolution Sol AST / UO
   IR consumed by the Lean model. Parser-level preprocessing remains trusted
   until a raw-source-to-post-resolution witness relation is mechanized.

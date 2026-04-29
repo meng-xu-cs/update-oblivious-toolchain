@@ -4,7 +4,7 @@ use crate::runtime::{
     deploy_contract_runtime, run_contract_call, ContractRuntime, PathOramFreshCoinPlan,
 };
 use anyhow::{anyhow, bail, Result};
-use uo_core::{CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, Value};
+use uo_core::{CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, Value};
 
 #[derive(Debug)]
 pub struct ContractInstance {
@@ -12,6 +12,8 @@ pub struct ContractInstance {
     state: ContractRuntime,
     deploy_seed: u64,
     freshness: RuntimeFreshnessState,
+    environment: PublicEnvironment,
+    initialized: bool,
 }
 
 #[cfg(feature = "diagnostics")]
@@ -48,16 +50,39 @@ impl ContractInstance {
     }
 
     fn deploy_with_seed_internal(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
+        let initialized = !artifact
+            .contract
+            .manifest
+            .entrypoints
+            .values()
+            .any(|entry| entry.initializer);
         Ok(Self {
             state: deploy_contract_runtime(&artifact.contract.state, deploy_seed)?,
             artifact,
             deploy_seed,
             freshness: RuntimeFreshnessState::from_epoch(deploy_seed),
+            environment: PublicEnvironment::default(),
+            initialized,
         })
     }
 
     pub fn call(&mut self, entrypoint: &str, args: Vec<Value>) -> Result<CallResult> {
-        Ok(self.call_impl(entrypoint, args, None, None)?.0)
+        Ok(self.call_impl(entrypoint, args, None, None, None)?.0)
+    }
+
+    pub fn set_public_environment(&mut self, environment: PublicEnvironment) {
+        self.environment = environment;
+    }
+
+    pub fn call_with_environment(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        environment: PublicEnvironment,
+    ) -> Result<CallResult> {
+        Ok(self
+            .call_impl(entrypoint, args, None, None, Some(environment))?
+            .0)
     }
 
     pub fn call_with_return_channel(
@@ -66,7 +91,9 @@ impl ContractInstance {
         args: Vec<Value>,
         session: &ReturnChannelSession,
     ) -> Result<CallResult> {
-        Ok(self.call_impl(entrypoint, args, None, Some(session))?.0)
+        Ok(self
+            .call_impl(entrypoint, args, None, Some(session), None)?
+            .0)
     }
 
     #[cfg(feature = "diagnostics")]
@@ -76,7 +103,9 @@ impl ContractInstance {
         args: Vec<Value>,
         fresh_coins: PathOramFreshCoinPlan,
     ) -> Result<CallResult> {
-        Ok(self.call_impl(entrypoint, args, Some(fresh_coins), None)?.0)
+        Ok(self
+            .call_impl(entrypoint, args, Some(fresh_coins), None, None)?
+            .0)
     }
 
     #[cfg(feature = "diagnostics")]
@@ -85,7 +114,7 @@ impl ContractInstance {
         entrypoint: &str,
         args: Vec<Value>,
     ) -> Result<DiagnosticCallResult> {
-        let (call, zero_writes) = self.call_impl(entrypoint, args, None, None)?;
+        let (call, zero_writes) = self.call_impl(entrypoint, args, None, None, None)?;
         Ok(DiagnosticCallResult {
             call,
             telemetry: CallTelemetry { zero_writes },
@@ -98,6 +127,7 @@ impl ContractInstance {
         args: Vec<Value>,
         fresh_coins: Option<PathOramFreshCoinPlan>,
         return_channel: Option<&ReturnChannelSession>,
+        environment: Option<PublicEnvironment>,
     ) -> Result<(CallResult, usize)> {
         let function = self
             .artifact
@@ -107,15 +137,47 @@ impl ContractInstance {
             .find(|function| function.signature == entrypoint)
             .cloned()
             .ok_or_else(|| anyhow!("unknown entrypoint: {entrypoint}"))?;
-        if function.params.len() != args.len() {
+        let (initializer, requires_initialized) = {
+            let manifest_entry = self
+                .artifact
+                .contract
+                .manifest
+                .entrypoints
+                .get(entrypoint)
+                .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
+            if function.public_env != manifest_entry.public_env {
+                bail!("entrypoint {entrypoint} public environment manifest drift");
+            }
+            (
+                manifest_entry.initializer,
+                manifest_entry.requires_initialized,
+            )
+        };
+        if requires_initialized && !self.initialized {
+            bail!("entrypoint {entrypoint} requires initialized contract state");
+        }
+        if initializer && self.initialized {
+            bail!("initializer entrypoint {entrypoint} already executed");
+        }
+        let source_arg_count = function
+            .params
+            .len()
+            .checked_sub(function.public_env.len())
+            .ok_or_else(|| anyhow!("entrypoint {entrypoint} public_env longer than params"))?;
+        if source_arg_count != args.len() {
             bail!(
-                "entrypoint {} expects {} args, got {}",
+                "entrypoint {} expects {} source args, got {}",
                 function.signature,
-                function.params.len(),
+                source_arg_count,
                 args.len()
             );
         }
-        let args = args.into_boxed_slice();
+        let environment = environment.unwrap_or_else(|| self.environment.clone());
+        let mut runtime_args = args;
+        for field in &function.public_env {
+            runtime_args.push(environment.value_for(*field));
+        }
+        let args = runtime_args.into_boxed_slice();
         let call_freshness = self.freshness.begin_call()?;
         let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(
             &mut self.state,
@@ -128,6 +190,9 @@ impl ContractInstance {
             return_channel,
         )?;
         self.freshness.finish_call(aborted)?;
+        if initializer && !aborted {
+            self.initialized = true;
+        }
         Ok((
             CallResult {
                 return_value,

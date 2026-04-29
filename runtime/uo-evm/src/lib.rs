@@ -27,14 +27,16 @@ mod tests {
     use super::ContractInstance;
     #[cfg(feature = "diagnostics")]
     use super::PathOramFreshCoinPlan;
+    use std::fs;
+    use std::path::PathBuf;
     use uo_core::ir::BackendKind;
     #[cfg(feature = "diagnostics")]
     use uo_core::{
         canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
     };
     use uo_core::{
-        ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, RefinementWitnessError,
-        RuntimeConfidentialCoreKernelInterfaceSlotBundleError,
+        ContractMetadata, ExecutionTrace, KernelWitnessError, ProgramMode, PublicEnvironment,
+        RefinementWitnessError, RuntimeConfidentialCoreKernelInterfaceSlotBundleError,
         RuntimeConfidentialCoreShellBoundaryLoweringBundleError,
         RuntimeConfidentialCoreShellBoundarySlotBundleError,
         RuntimeConfidentialProofBundleFamilyError, RuntimeKernelInterfaceBundleError,
@@ -49,6 +51,16 @@ mod tests {
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
         let metadata: ContractMetadata = serde_yaml::from_str(metadata).unwrap();
         uo_solc::compile(source, &metadata, mode).unwrap()
+    }
+
+    fn write_temp(name: &str, contents: &str) -> PathBuf {
+        let path = PathBuf::from(format!(
+            "/tmp/uo-evm-lib-test-{}-{}.sol",
+            name,
+            std::process::id()
+        ));
+        fs::write(&path, contents).unwrap();
+        path
     }
 
     #[test]
@@ -122,6 +134,179 @@ mod tests {
         );
         assert_eq!(zero.trace.gas_used, 4096);
         assert_eq!(one.trace.gas_used, 4096);
+    }
+
+    #[test]
+    fn public_environment_drives_setup_and_authorization() {
+        let source = write_temp(
+            "env-auth",
+            r#"
+            contract EnvAuth {
+                address private owner;
+                bool private initialized;
+                uint256 private value;
+                uint256 private secret;
+
+                function setup(address expected) public {
+                    require(msg.sender == expected);
+                    owner = msg.sender;
+                    initialized = true;
+                }
+
+                function setPublic(uint256 amount) public {
+                    require(initialized);
+                    require(msg.sender == owner);
+                    value = amount;
+                }
+
+                function valueOf() public returns (uint256) {
+                    return value;
+                }
+
+                function setSecret(address expected, uint256 amount) public {
+                    require(msg.sender == expected);
+                    secret = amount;
+                }
+            }
+            "#,
+        );
+        let metadata = r#"
+contract: EnvAuth
+entrypoints:
+  setup(address):
+    confidential: false
+    returns: forbidden
+    status: public
+    initializer: true
+  setPublic(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  valueOf():
+    confidential: false
+    returns: public
+    status: public
+  setSecret(address,uint256):
+    confidential: true
+    secret_args: [amount]
+    returns: forbidden
+    status: public
+state:
+  owner:
+    kind: cell
+    value: address
+    backend: raw
+    confidential: false
+  initialized:
+    kind: cell
+    value: bool
+    backend: raw
+    confidential: false
+  value:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+  secret:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#;
+        let artifact = compile_bench(source.to_str().unwrap(), metadata, ProgramMode::Uo);
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let owner = [0x11u8; 20];
+        let other = [0x22u8; 20];
+
+        let err = instance
+            .call_with_environment(
+                "setPublic(uint256)",
+                vec![Value::uint(7)],
+                PublicEnvironment::with_caller(owner),
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires initialized contract state"));
+
+        let unauthorized_setup = instance
+            .call_with_environment(
+                "setup(address)",
+                vec![Value::Address(owner)],
+                PublicEnvironment::with_caller(other),
+            )
+            .unwrap();
+        assert!(unauthorized_setup.aborted);
+
+        let authorized_setup = instance
+            .call_with_environment(
+                "setup(address)",
+                vec![Value::Address(owner)],
+                PublicEnvironment::with_caller(owner),
+            )
+            .unwrap();
+        assert!(!authorized_setup.aborted);
+        assert_eq!(
+            authorized_setup
+                .trace
+                .theorem_trace
+                .public_outcome
+                .as_ref()
+                .unwrap()
+                .public_env
+                .as_ref(),
+            &[format!("msg.sender={}", Value::Address(owner))]
+        );
+
+        let err = instance
+            .call_with_environment(
+                "setup(address)",
+                vec![Value::Address(owner)],
+                PublicEnvironment::with_caller(owner),
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("already executed"));
+
+        let unauthorized_public = instance
+            .call_with_environment(
+                "setPublic(uint256)",
+                vec![Value::uint(7)],
+                PublicEnvironment::with_caller(other),
+            )
+            .unwrap();
+        assert!(unauthorized_public.aborted);
+
+        let authorized_public = instance
+            .call_with_environment(
+                "setPublic(uint256)",
+                vec![Value::uint(7)],
+                PublicEnvironment::with_caller(owner),
+            )
+            .unwrap();
+        assert!(!authorized_public.aborted);
+        let value = instance
+            .call_with_environment("valueOf()", vec![], PublicEnvironment::with_caller(owner))
+            .unwrap();
+        assert_eq!(value.return_value, Some(Value::uint(7)));
+
+        let unauthorized_secret = instance
+            .call_with_environment(
+                "setSecret(address,uint256)",
+                vec![Value::Address(owner), Value::uint(9)],
+                PublicEnvironment::with_caller(other),
+            )
+            .unwrap();
+        assert!(unauthorized_secret.aborted);
+        let authorized_secret = instance
+            .call_with_environment(
+                "setSecret(address,uint256)",
+                vec![Value::Address(owner), Value::uint(9)],
+                PublicEnvironment::with_caller(owner),
+            )
+            .unwrap();
+        assert!(!authorized_secret.aborted);
     }
 
     #[test]

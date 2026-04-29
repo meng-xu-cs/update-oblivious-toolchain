@@ -2252,6 +2252,7 @@ mod tests {
         CompiledFunction {
             signature: "demo(uint256)".into(),
             params: vec![("arg".into(), uint_type())],
+            public_env: vec![],
             return_type: Some(uint_type()),
             body: vec![
                 Statement::Declare {
@@ -2488,6 +2489,7 @@ mod tests {
         let function = CompiledFunction {
             signature: "dup(uint256)".into(),
             params: vec![("arg".into(), uint_type())],
+            public_env: vec![],
             return_type: None,
             body: vec![Statement::Declare {
                 name: "arg".into(),
@@ -2516,6 +2518,7 @@ mod tests {
         let function = CompiledFunction {
             signature: "unknown(uint256)".into(),
             params: vec![("arg".into(), uint_type())],
+            public_env: vec![],
             return_type: None,
             body: vec![Statement::Assign {
                 name: "missing".into(),
@@ -2543,6 +2546,7 @@ mod tests {
         let function = CompiledFunction {
             signature: "guard(uint256)".into(),
             params: vec![("arg".into(), uint_type())],
+            public_env: vec![],
             return_type: None,
             body: vec![Statement::Require {
                 cond: Expr::Var("arg".into()),
@@ -2818,6 +2822,7 @@ mod tests {
         let function = CompiledFunction {
             signature: "hashy(uint256)".into(),
             params: vec![("arg".into(), uint_type())],
+            public_env: vec![],
             return_type: Some(Type::Scalar(ScalarType::Bytes32)),
             body: vec![
                 Statement::Declare {

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use uo_core::ir::{
     BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
-    StateObject, Statement, UnaryOp,
+    PublicEnvField, StateObject, Statement, UnaryOp,
 };
 use uo_core::manifest::{
     EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest, PATH_ORAM_SCHEME,
@@ -32,6 +32,7 @@ struct Frontend {
     structs: BTreeMap<String, Type>,
     state_by_name: BTreeMap<String, StateObject>,
     entrypoint_metadata: BTreeMap<String, uo_core::EntrypointMetadata>,
+    has_initializer: bool,
     functions: Vec<pt::FunctionDefinition>,
     helpers: BTreeMap<String, HelperFunction>,
     diagnostics: Vec<String>,
@@ -47,6 +48,7 @@ struct HelperFunction {
 struct LowerCtx<'a> {
     frontend: &'a Frontend,
     locals: BTreeMap<String, Type>,
+    used_public_env: BTreeSet<PublicEnvField>,
     loop_counter: usize,
 }
 
@@ -66,6 +68,7 @@ pub fn validate_source(source_path: &str, metadata: &ContractMetadata) -> Result
         let mut ctx = LowerCtx {
             frontend: &frontend,
             locals: BTreeMap::new(),
+            used_public_env: BTreeSet::new(),
             loop_counter: 0,
         };
         let _ = lower_function(function, entry_meta, ProgramMode::Raw, &mut ctx)?;
@@ -124,6 +127,7 @@ fn compile_impl(
         let mut ctx = LowerCtx {
             frontend: &frontend,
             locals: BTreeMap::new(),
+            used_public_env: BTreeSet::new(),
             loop_counter: 0,
         };
         let compiled = lower_function(function, entry_meta, mode.clone(), &mut ctx)?;
@@ -373,6 +377,7 @@ fn parse_frontend(
         }
     }
     let mut entrypoint_metadata = BTreeMap::new();
+    let mut initializer_signature: Option<String> = None;
     for function in &functions {
         let signature = function_signature(function)
             .ok_or_else(|| anyhow!("function without name is unsupported"))?;
@@ -380,6 +385,21 @@ fn parse_frontend(
             entrypoint_metadata.insert(signature.clone(), entry_meta.clone());
             ensure_secret_args_exist(function, entry_meta)?;
             validate_entrypoint_metadata_well_formed(&signature, entry_meta, &state_by_name)?;
+            if entry_meta.initializer {
+                if entry_meta.requires_initialized == Some(true) {
+                    bail!(
+                        "initializer entrypoint {} cannot also require initialized state",
+                        signature
+                    );
+                }
+                if initializer_signature.is_some() {
+                    bail!("only one initializer entrypoint is supported");
+                }
+                if required_entrypoint_confidential(&signature, entry_meta)? {
+                    bail!("initializer entrypoint {} must be public", signature);
+                }
+                initializer_signature = Some(signature.clone());
+            }
         } else {
             bail!(
                 "entrypoint {} is missing explicit metadata; declare it public or confidential in the sidecar",
@@ -393,6 +413,7 @@ fn parse_frontend(
         structs,
         state_by_name,
         entrypoint_metadata,
+        has_initializer: initializer_signature.is_some(),
         functions,
         helpers,
         diagnostics,
@@ -409,6 +430,7 @@ fn lower_function(
         .ok_or_else(|| anyhow!("function without name is unsupported"))?;
     let params = lower_params(&function.params, &ctx.frontend.structs)?;
     for (name, ty) in &params {
+        ensure_not_reserved_public_env_name(name)?;
         ctx.locals.insert(name.clone(), ty.clone());
     }
     let return_type = lower_returns(&function.returns, &ctx.frontend.structs)?;
@@ -417,6 +439,22 @@ fn lower_function(
         .as_ref()
         .ok_or_else(|| anyhow!("function {} has no body", signature))?;
     let mut lowered = lower_block(body, ctx)?;
+    let public_env = PublicEnvField::ALL
+        .into_iter()
+        .filter(|field| ctx.used_public_env.contains(field))
+        .collect::<Vec<_>>();
+    let mut compiled_params = params.clone();
+    for field in &public_env {
+        let name = field.param_name().to_string();
+        if compiled_params.iter().any(|(param, _)| param == &name) {
+            bail!(
+                "entrypoint {} parameter {} is reserved for public environment lowering",
+                signature,
+                name
+            );
+        }
+        compiled_params.push((name, field.ty()));
+    }
     if matches!(mode, ProgramMode::Uo) {
         validate_static_loop_bounds(&lowered, &BTreeMap::new())?;
     }
@@ -447,7 +485,7 @@ fn lower_function(
     let (confidential_program, confidential_slot_program) = if confidential {
         let confidential_program = ConfidentialKernelProgram {
             entrypoint_id: signature.clone(),
-            params: params
+            params: compiled_params
                 .iter()
                 .map(|(name, ty)| ConfidentialKernelParam {
                     name: name.clone(),
@@ -469,7 +507,8 @@ fn lower_function(
     };
     Ok(CompiledFunction {
         signature,
-        params,
+        params: compiled_params,
+        public_env,
         return_type,
         body: lowered,
         secret_args,
@@ -553,6 +592,7 @@ fn lower_statement(statement: &pt::Statement, ctx: &mut LowerCtx<'_>) -> Result<
                 .ok_or_else(|| anyhow!("local variable without name"))?
                 .name
                 .clone();
+            ensure_not_reserved_public_env_name(&name)?;
             let ty = lower_type_expr(&decl.ty, &ctx.frontend.structs)?;
             let value = if let Some(init) = init {
                 lower_expr(init, ctx, &BTreeMap::new())?
@@ -777,6 +817,10 @@ fn lower_expr(
             })
         }
         pt::Expression::MemberAccess(_, base, member) => {
+            if let Some(field) = public_env_member(base, member.name.as_str())? {
+                ctx.used_public_env.insert(field);
+                return Ok(Expr::Var(field.param_name().to_string()));
+            }
             if member.name == "length" {
                 if let pt::Expression::Variable(identifier) = base.as_ref() {
                     if let Some(state) = ctx.frontend.state_by_name.get(&identifier.name) {
@@ -845,6 +889,43 @@ fn lower_expr(
         | pt::Expression::ArrayLiteral(_, _)
         | pt::Expression::New(_, _) => bail!("unsupported Solidity expression"),
     }
+}
+
+fn public_env_member(base: &pt::Expression, member: &str) -> Result<Option<PublicEnvField>> {
+    match base {
+        pt::Expression::Variable(identifier) if identifier.name == "msg" && member == "sender" => {
+            Ok(Some(PublicEnvField::MsgSender))
+        }
+        pt::Expression::Variable(identifier) if identifier.name == "tx" && member == "origin" => {
+            Ok(Some(PublicEnvField::TxOrigin))
+        }
+        pt::Expression::Variable(identifier) if identifier.name == "block" => match member {
+            "number" => Ok(Some(PublicEnvField::BlockNumber)),
+            "timestamp" => Ok(Some(PublicEnvField::BlockTimestamp)),
+            "chainid" => Ok(Some(PublicEnvField::BlockChainId)),
+            other => bail!("unsupported public block context field block.{other}"),
+        },
+        pt::Expression::Variable(identifier)
+            if identifier.name == "msg" || identifier.name == "tx" =>
+        {
+            bail!(
+                "unsupported public transaction context field {}.{}",
+                identifier.name,
+                member
+            )
+        }
+        _ => Ok(None),
+    }
+}
+
+fn ensure_not_reserved_public_env_name(name: &str) -> Result<()> {
+    if PublicEnvField::ALL
+        .iter()
+        .any(|field| field.param_name() == name)
+    {
+        bail!("identifier {name} is reserved for public environment lowering");
+    }
+    Ok(())
 }
 
 fn maybe_lower_keccak(
@@ -989,6 +1070,7 @@ fn lower_for_initializer(
                 .ok_or_else(|| anyhow!("for-loop index variable missing name"))?
                 .name
                 .clone();
+            ensure_not_reserved_public_env_name(&name)?;
             let ty = lower_type_expr(&decl.ty, &ctx.frontend.structs)?;
             ctx.locals.insert(name.clone(), ty);
             Ok((name, lower_expr(init, ctx, &BTreeMap::new())?))
@@ -1345,11 +1427,16 @@ fn build_manifest_entry(
             .iter()
             .map(|(name, _)| name.clone())
             .collect(),
+        public_env: function.public_env.clone(),
         entry_input_len: function
             .params
             .iter()
             .map(|(_, ty)| ty.canonical_len())
             .sum(),
+        initializer: entry_meta.initializer,
+        requires_initialized: entry_meta
+            .requires_initialized
+            .unwrap_or(ctx_requires_initialized(entry_meta, frontend)),
         public_gas_budget: budget,
         arena_bytes: 4096 + counts.local_count * 64,
         max_stack_words: 64 + counts.local_count,
@@ -1371,6 +1458,10 @@ fn build_manifest_entry(
         max_commit_ops,
         oram_accesses,
     })
+}
+
+fn ctx_requires_initialized(entry_meta: &uo_core::EntrypointMetadata, frontend: &Frontend) -> bool {
+    frontend.has_initializer && !entry_meta.initializer
 }
 
 fn validate_oram_access_shape(
@@ -3240,7 +3331,7 @@ mod tests {
     use super::{compile, validate_source};
     use std::fs;
     use std::path::PathBuf;
-    use uo_core::{ContractMetadata, Expr, ProgramMode, Statement, Uint256, Value};
+    use uo_core::{ContractMetadata, Expr, ProgramMode, PublicEnvField, Statement, Uint256, Value};
 
     fn write_temp(name: &str, contents: &str) -> PathBuf {
         let path = PathBuf::from(format!(
@@ -3350,6 +3441,80 @@ bounds:
         assert!(err
             .to_string()
             .contains("metadata references unknown entrypoint g(uint256)"));
+    }
+
+    #[test]
+    fn lowers_public_environment_as_manifest_bound_inputs() {
+        let source = write_temp(
+            "public-env",
+            r#"
+            contract C {
+                uint256 private x;
+                function f(uint256 amount) public {
+                    require(msg.sender == tx.origin);
+                    require(block.chainid == 1);
+                    x = amount + block.number + block.timestamp;
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let function = artifact.contract.functions.first().unwrap();
+        assert_eq!(
+            function.public_env,
+            vec![
+                PublicEnvField::MsgSender,
+                PublicEnvField::TxOrigin,
+                PublicEnvField::BlockNumber,
+                PublicEnvField::BlockTimestamp,
+                PublicEnvField::BlockChainId,
+            ]
+        );
+        assert_eq!(function.params[0].0, "amount");
+        assert_eq!(
+            function
+                .params
+                .iter()
+                .skip(1)
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "__uo_env_msg_sender",
+                "__uo_env_tx_origin",
+                "__uo_env_block_number",
+                "__uo_env_block_timestamp",
+                "__uo_env_block_chainid",
+            ]
+        );
+        let manifest_entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("f(uint256)")
+            .unwrap();
+        assert_eq!(manifest_entry.public_env, function.public_env);
+        assert_eq!(
+            manifest_entry.entry_input_len,
+            1 * 32 + 20 + 20 + 32 + 32 + 32
+        );
     }
 
     #[test]

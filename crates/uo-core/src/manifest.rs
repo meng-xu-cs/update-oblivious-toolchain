@@ -1,5 +1,5 @@
 use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSlotProgram};
-use crate::ir::{BackendKind, ContainerKind, StateObject};
+use crate::ir::{BackendKind, ContainerKind, PublicEnvField, StateObject};
 use crate::metadata::{DeclassificationKind, ReturnPolicy, StatusPolicy};
 use crate::types::{ScalarType, Type};
 use anyhow::{anyhow, bail, Result};
@@ -48,8 +48,14 @@ pub struct EntrypointManifest {
     pub secret_args: Vec<usize>,
     #[serde(default)]
     pub param_names: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub public_env: Vec<PublicEnvField>,
     #[serde(default)]
     pub entry_input_len: usize,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub initializer: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub requires_initialized: bool,
     pub public_gas_budget: u64,
     pub arena_bytes: usize,
     pub max_stack_words: usize,
@@ -80,6 +86,10 @@ pub struct EntrypointManifest {
     pub max_commit_ops: usize,
     #[serde(default)]
     pub oram_accesses: BTreeMap<u32, usize>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -520,7 +530,10 @@ mod tests {
             EntrypointManifest {
                 secret_args: vec![0],
                 param_names: vec!["key".into()],
+                public_env: vec![],
                 entry_input_len: 32,
+                initializer: false,
+                requires_initialized: false,
                 public_gas_budget: 4096,
                 arena_bytes: 4096,
                 max_stack_words: 64,
@@ -618,7 +631,10 @@ mod tests {
         let manifest = EntrypointManifest {
             secret_args: vec![0],
             param_names: vec!["secret".into()],
+            public_env: vec![],
             entry_input_len: 32,
+            initializer: false,
+            requires_initialized: false,
             public_gas_budget: 4096,
             arena_bytes: 4096,
             max_stack_words: 64,
