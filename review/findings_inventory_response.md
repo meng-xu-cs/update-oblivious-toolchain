@@ -288,6 +288,18 @@ runtime binary/proof-root hashes. Preserve and strengthen the existing nonce
 domain-separation, counter monotonicity, rollback, and fresh-coin uniqueness
 theorems so freshness is discharged by implementation evidence.
 
+Status: Fixed. Runtime production policy and call evidence now bind the
+measured production build-profile hash, production deployment validates the
+policy before admitting an instance, and
+`DeploymentAcceptance.lean` carries a build-profile evidence artifact tied to
+the runtime binary and proof-root hashes. The accepted profile proves diagnostics
+seed injection and deterministic replay entrypoints are disabled while preserving
+the existing nonce, rollback, counter, and fresh-coin freshness theorems.
+Verified with `cargo test -p uo-evm`,
+`cargo test -p uo-evm --features diagnostics
+engine::tests::production_runtime_rejects_diagnostics_build_profile`, and
+`cd proof/lean && lake env lean UOToolchain/DeploymentAcceptance.lean`.
+
 ## F13. Proof-object extraction and JSON serialization remain a large trusted surface
 
 Review grouping: `F13`, `T1.14`.

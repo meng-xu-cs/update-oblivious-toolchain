@@ -1,5 +1,5 @@
 use crate::deployment::{
-    validate_production_artifact, validate_production_call_preflight,
+    validate_production_artifact, validate_production_call_preflight, validate_production_policy,
     validate_production_proof_bundle, ProductionCallEvidence, ProductionRuntimePolicy,
 };
 use crate::freshness::RuntimeFreshnessState;
@@ -53,6 +53,7 @@ pub struct DiagnosticCallResult {
 impl ProductionContractInstance {
     pub fn deploy(artifact: CompiledArtifact, policy: ProductionRuntimePolicy) -> Result<Self> {
         validate_production_artifact(&artifact)?;
+        validate_production_policy(&policy)?;
         Ok(Self {
             inner: ContractInstance::deploy(artifact)?,
             policy,
@@ -60,12 +61,14 @@ impl ProductionContractInstance {
     }
 
     #[cfg(any(test, feature = "diagnostics"))]
+    #[cfg_attr(all(not(test), feature = "diagnostics"), allow(dead_code))]
     fn deploy_with_authorized_seed(
         artifact: CompiledArtifact,
         policy: ProductionRuntimePolicy,
         deploy_seed: u64,
     ) -> Result<Self> {
         validate_production_artifact(&artifact)?;
+        validate_production_policy(&policy)?;
         Ok(Self {
             inner: ContractInstance::deploy_with_seed(artifact, deploy_seed)?,
             policy,
@@ -294,9 +297,9 @@ pub fn run_artifact_with_seed(
 #[cfg(test)]
 mod tests {
     use super::{ContractInstance, ProductionContractInstance};
-    use crate::deployment::{
-        production_proof_bundle_sha256, ProductionCallEvidence, ProductionRuntimePolicy,
-    };
+    use crate::deployment::{production_build_profile_sha256, ProductionRuntimePolicy};
+    #[cfg(not(feature = "diagnostics"))]
+    use crate::deployment::{production_proof_bundle_sha256, ProductionCallEvidence};
     use crate::return_channel::{
         return_channel_aad_bytes, ReturnChannelSession, RETURN_CHANNEL_SCHEME,
     };
@@ -340,6 +343,7 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg(not(feature = "diagnostics"))]
     fn alternate_return_channel_session() -> ReturnChannelSession {
         ReturnChannelSession::new(
             [8u8; 32],
@@ -358,9 +362,11 @@ mod tests {
             runtime_binary_sha256: "aa".repeat(32),
             proof_root_sha256: "bb".repeat(32),
             accepted_sgx_quote_sha256: "cc".repeat(32),
+            build_profile_sha256: production_build_profile_sha256(),
         }
     }
 
+    #[cfg(not(feature = "diagnostics"))]
     fn production_evidence(
         artifact: &uo_core::CompiledArtifact,
         policy: &ProductionRuntimePolicy,
@@ -377,6 +383,7 @@ mod tests {
             runtime_binary_sha256: policy.runtime_binary_sha256.clone(),
             proof_root_sha256: policy.proof_root_sha256.clone(),
             sgx_quote_sha256: policy.accepted_sgx_quote_sha256.clone(),
+            build_profile_sha256: policy.build_profile_sha256.clone(),
             session_id: session.binding().session_id.clone(),
             attestation_transcript_hash: session.binding().attestation_transcript_hash.clone(),
             freshness_epoch,
@@ -593,6 +600,7 @@ bounds:
         );
     }
 
+    #[cfg(not(feature = "diagnostics"))]
     #[test]
     fn production_runtime_requires_attested_proof_bundle_session_and_freshness() {
         let artifact = compile_bench(
@@ -697,6 +705,21 @@ bounds:
             .to_string()
             .contains("production runtime sgx_quote_sha256 mismatch"));
 
+        let mut wrong_build_profile = evidence.clone();
+        wrong_build_profile.build_profile_sha256 = "00".repeat(32);
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_build_profile)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime build_profile_sha256 mismatch"));
+
         let mut production = ProductionContractInstance::deploy_with_authorized_seed(
             artifact.clone(),
             policy.clone(),
@@ -730,13 +753,46 @@ bounds:
             .to_string()
             .contains("production runtime rollback_counter mismatch"));
 
-        let mut unadmitted = artifact;
+        let mut unadmitted = artifact.clone();
         unadmitted.admitted_package = None;
         let err = ProductionContractInstance::deploy_with_authorized_seed(unadmitted, policy, 91)
             .unwrap_err();
         assert!(err
             .to_string()
             .contains("production runtime requires admitted_package identity"));
+
+        let mut diagnostics_policy = production_policy();
+        diagnostics_policy.build_profile_sha256 = "00".repeat(32);
+        let err = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact,
+            diagnostics_policy,
+            91,
+        )
+        .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime build_profile_sha256 mismatch"));
+    }
+
+    #[cfg(feature = "diagnostics")]
+    #[test]
+    fn production_runtime_rejects_diagnostics_build_profile() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let err = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact,
+            production_policy(),
+            91,
+        )
+        .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime build profile enables diagnostics"));
     }
 
     #[test]

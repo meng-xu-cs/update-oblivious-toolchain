@@ -5,11 +5,19 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uo_core::{CompiledArtifact, ExecutionTrace};
 
+#[cfg(feature = "diagnostics")]
+pub const RUNTIME_BUILD_PROFILE_DESCRIPTOR: &str =
+    "uo-runtime-build-profile-v1:diagnostics-enabled";
+#[cfg(not(feature = "diagnostics"))]
+pub const RUNTIME_BUILD_PROFILE_DESCRIPTOR: &str =
+    "uo-runtime-build-profile-v1:production-no-diagnostics";
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProductionRuntimePolicy {
     pub runtime_binary_sha256: String,
     pub proof_root_sha256: String,
     pub accepted_sgx_quote_sha256: String,
+    pub build_profile_sha256: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -19,6 +27,7 @@ pub struct ProductionCallEvidence {
     pub runtime_binary_sha256: String,
     pub proof_root_sha256: String,
     pub sgx_quote_sha256: String,
+    pub build_profile_sha256: String,
     pub session_id: String,
     pub attestation_transcript_hash: String,
     pub freshness_epoch: u64,
@@ -33,6 +42,10 @@ pub fn production_proof_bundle_sha256(
 ) -> Result<String> {
     let bundle = trace.runtime_confidential_proof_bundle_family(artifact)?;
     Ok(sha256_hex(&serde_json::to_vec(&bundle)?))
+}
+
+pub fn production_build_profile_sha256() -> String {
+    sha256_hex(RUNTIME_BUILD_PROFILE_DESCRIPTOR.as_bytes())
 }
 
 pub(crate) fn validate_production_artifact(artifact: &CompiledArtifact) -> Result<()> {
@@ -91,6 +104,11 @@ pub(crate) fn validate_production_call_preflight(
         &policy.accepted_sgx_quote_sha256,
     )?;
     require_equal(
+        "build_profile_sha256",
+        &evidence.build_profile_sha256,
+        &policy.build_profile_sha256,
+    )?;
+    require_equal(
         "session_id",
         &evidence.session_id,
         &session.binding().session_id,
@@ -124,6 +142,10 @@ pub(crate) fn validate_production_call_preflight(
     Ok(())
 }
 
+pub(crate) fn validate_production_policy(policy: &ProductionRuntimePolicy) -> Result<()> {
+    validate_policy(policy)
+}
+
 pub(crate) fn validate_production_proof_bundle(
     artifact: &CompiledArtifact,
     trace: &ExecutionTrace,
@@ -143,7 +165,17 @@ fn validate_policy(policy: &ProductionRuntimePolicy) -> Result<()> {
     validate_sha256_hex(
         "accepted_sgx_quote_sha256",
         &policy.accepted_sgx_quote_sha256,
-    )
+    )?;
+    validate_sha256_hex("build_profile_sha256", &policy.build_profile_sha256)?;
+    require_equal(
+        "build_profile_sha256",
+        &policy.build_profile_sha256,
+        &production_build_profile_sha256(),
+    )?;
+    if cfg!(feature = "diagnostics") {
+        bail!("production runtime build profile enables diagnostics");
+    }
+    Ok(())
 }
 
 fn validate_evidence_hashes(evidence: &ProductionCallEvidence) -> Result<()> {
@@ -155,6 +187,7 @@ fn validate_evidence_hashes(evidence: &ProductionCallEvidence) -> Result<()> {
     validate_sha256_hex("runtime_binary_sha256", &evidence.runtime_binary_sha256)?;
     validate_sha256_hex("proof_root_sha256", &evidence.proof_root_sha256)?;
     validate_sha256_hex("sgx_quote_sha256", &evidence.sgx_quote_sha256)?;
+    validate_sha256_hex("build_profile_sha256", &evidence.build_profile_sha256)?;
     validate_sha256_hex("session_id", &evidence.session_id)?;
     validate_sha256_hex(
         "attestation_transcript_hash",
