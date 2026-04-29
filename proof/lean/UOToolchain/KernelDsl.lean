@@ -422,11 +422,10 @@ end
 /-- Build the initial environment for a `KernelProgram` exactly the way
 `OperationalConfig.initialEnv` does for `CompiledFunction`. -/
 def KernelProgram.initialEnv (kp : KernelProgram)
-    (publicArgs secretArgs : List Value) : Option LocalEnv :=
-  let allArgs := publicArgs ++ secretArgs
-  if allArgs.length = kp.params.length then
-    some <| (kp.params.zip allArgs).foldl
-      (fun env entry => env.insert entry.fst.name entry.snd) []
+    (declaredArgs : List Value) : Option LocalEnv :=
+  if declaredArgs.length = kp.params.length then
+    some <| (kp.params.zip declaredArgs).foldl
+      (fun env entry => LocalEnv.insert env entry.fst.name entry.snd) ([] : LocalEnv)
   else
     none
 
@@ -434,7 +433,7 @@ def KernelProgram.initialEnv (kp : KernelProgram)
 the body using `evalKernelBody`, recording the final public store in the
 returned outcome. -/
 def evalKernelProgram (kp : KernelProgram) (cfg : OperationalConfig) : Outcome :=
-  match kp.initialEnv cfg.publicArgs cfg.secretArgs with
+  match kp.initialEnv cfg.declaredArgs with
   | none =>
       let outcome :=
         { Outcome.empty with
@@ -1710,7 +1709,7 @@ agreement lemma the program-level theorem uses. -/
 theorem KernelProgram.initialEnv_eq_of_params_eq
     (cfg : OperationalConfig) (fn : CompiledFunction) (kp : KernelProgram)
     (hParams : kp.params = fn.params) :
-    kp.initialEnv cfg.publicArgs cfg.secretArgs = cfg.initialEnv fn := by
+    kp.initialEnv cfg.declaredArgs = cfg.initialEnv fn := by
   unfold KernelProgram.initialEnv OperationalConfig.initialEnv
   rw [hParams]
 
@@ -2797,7 +2796,7 @@ theorem evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
     (hPub : (evalKernelProgram kp cfg).publicResult = none) :
     (evalKernelProgram kp cfg).kernelSteps = kp.expectedKernelSteps := by
   unfold evalKernelProgram at hStatus hPub ⊢
-  cases hEnv : kp.initialEnv cfg.publicArgs cfg.secretArgs with
+  cases hEnv : kp.initialEnv cfg.declaredArgs with
   | none =>
       simp [hEnv, Outcome.withPublicStateTransition, Outcome.toPublicStateTransition,
         Outcome.committedPublicState, EvalStatus.commitsCandidate] at hStatus

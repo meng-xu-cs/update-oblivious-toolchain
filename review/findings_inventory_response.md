@@ -114,6 +114,23 @@ validation, and proof-grade theorems to use that representation. Add a theorem
 that the Rust manifest/runtime argument layout and the Lean initial environment
 bind the same variables for every admitted parameter order.
 
+Status: Fixed. Lean `TraceInput` and `IR.OperationalConfig` now carry
+`declaredArgs` as the parameter-order input vector while retaining
+`publicArgs`/`secretArgs` only as observer projections. `IR.OperationalConfig`,
+`Sol.Function`, and `KernelProgram` initial-environment construction now bind
+parameters from `declaredArgs`; public and secret projections are derived by
+filtering that vector with manifest `secretArgs` indices. The new Lean layout
+theorems show that an admitted declared-order layout projects to the public and
+secret views and that initial binding uses the declared vector. A runtime
+regression covers the non-prefix case `public, secret, public`: the manifest
+records secret index `1`, the public observer exposes only the two public
+arguments in source order, and the encrypted return decrypts to the value
+computed from declared-order binding. Verified with `cd proof/lean && lake
+build UOToolchain.Sol UOToolchain.KernelDsl`, `cd proof/lean && lake build
+UOToolchain.ProofGradeRoot`, `cargo test -p uo-evm
+confidential_entrypoint_binds_mixed_public_secret_args_in_declared_order`,
+`cargo test -p uo-evm`, and `cargo fmt --check`.
+
 ## F5. Map/array edge semantics and capacity overflow are misaligned
 
 Review grouping: `F5`, `T1.6`, `T1.7`, `O2.5`, `P3.5`, `P3.6`.

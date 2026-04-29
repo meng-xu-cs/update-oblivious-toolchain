@@ -629,6 +629,73 @@ bounds:
         );
     }
 
+    #[test]
+    fn confidential_entrypoint_binds_mixed_public_secret_args_in_declared_order() {
+        let source = write_temp(
+            "mixed-argument-order",
+            r#"
+            contract MixedArgumentOrder {
+                function f(uint256 left, uint256 secret, uint256 right) public returns (uint256) {
+                    return left * 100 + secret * 10 + right;
+                }
+            }
+            "#,
+        );
+        let artifact = compile_bench(
+            source.to_str().unwrap(),
+            r#"
+contract: MixedArgumentOrder
+entrypoints:
+  f(uint256,uint256,uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: encrypted_to_client
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+            ProgramMode::Uo,
+        );
+        let manifest_entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("f(uint256,uint256,uint256)")
+            .unwrap();
+        assert_eq!(
+            manifest_entry.param_names,
+            vec!["left".to_owned(), "secret".to_owned(), "right".to_owned()]
+        );
+        assert_eq!(manifest_entry.secret_args, vec![1]);
+
+        let session = return_channel_session();
+        let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+        let result = instance
+            .call_with_return_channel(
+                "f(uint256,uint256,uint256)",
+                vec![Value::uint(1), Value::uint(7), Value::uint(3)],
+                &session,
+            )
+            .unwrap();
+        let public_outcome = result.trace.theorem_trace.public_outcome.as_ref().unwrap();
+        assert_eq!(
+            public_outcome.public_args.as_ref(),
+            ["left=1".to_owned(), "right=3".to_owned()]
+        );
+        let decrypted = decrypt_return_payload(
+            &artifact,
+            "f(uint256,uint256,uint256)",
+            &public_outcome.public_args,
+            result.encrypted_return.as_ref().unwrap(),
+            &session,
+        );
+        assert_eq!(
+            decrypted,
+            Value::uint(173).canonical_bytes_boxed().unwrap().into_vec()
+        );
+    }
+
     #[cfg(not(feature = "diagnostics"))]
     #[test]
     fn production_runtime_requires_attested_proof_bundle_session_and_freshness() {

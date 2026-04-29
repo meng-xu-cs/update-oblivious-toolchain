@@ -53,6 +53,7 @@ structure TraceInput where
   publicArgs : List String
   publicEnv : List String := []
   secretArgs : List String
+  declaredArgs : List String := publicArgs ++ secretArgs
 deriving Repr, DecidableEq
 
 structure TraceConfig where
@@ -159,6 +160,27 @@ theorem samePublicProjection_publicState_eq {lhs rhs : Config} :
     samePublicProjection lhs rhs → lhs.publicState = rhs.publicState :=
   sameTracePublicProjection_publicState_eq
 
+def listGet? {α : Type} : List α → Nat → Option α
+  | [], _ => none
+  | value :: _, 0 => some value
+  | _ :: rest, index + 1 => listGet? rest index
+
+def declaredPublicArgsBySecretIndices {α : Type}
+    (secretIndices : List Nat) (args : List α) : List α :=
+  ((List.range args.length).zip args).filterMap fun entry =>
+    if secretIndices.contains entry.fst then none else some entry.snd
+
+def declaredSecretArgsByIndices? {α : Type}
+    (secretIndices : List Nat) (args : List α) : Option (List α) :=
+  secretIndices.mapM fun index => listGet? args index
+
+def TraceInput.DeclaredArgumentLayoutMatches
+    (input : TraceInput) (secretIndices : List Nat) : Prop :=
+  input.publicArgs =
+      declaredPublicArgsBySecretIndices secretIndices input.declaredArgs ∧
+    declaredSecretArgsByIndices? secretIndices input.declaredArgs =
+      some input.secretArgs
+
 /-! ## Operational evaluator interface (real WP4 surface)
 
 Everything below this comment is the new *real* operational evaluator
@@ -196,6 +218,7 @@ structure OperationalConfig where
   publicArgs : List Value
   publicEnv : List (String × Value) := []
   secretArgs : List Value
+  declaredArgs : List Value := publicArgs ++ secretArgs
   publicState : ObjectStore
   secretState : ObjectStore
   deriving Inhabited
@@ -269,6 +292,14 @@ theorem sameOperationalPublicProjection_publicState_eq
     sameOperationalPublicProjection lhs rhs → lhs.publicState = rhs.publicState := by
   intro h
   exact congrArg OperationalPublicProjection.publicState h
+
+def OperationalConfig.DeclaredArgumentLayoutMatches
+    (cfg : OperationalConfig) (fn : CompiledFunction) : Prop :=
+  cfg.declaredArgs.length = fn.params.length ∧
+    cfg.publicArgs =
+      declaredPublicArgsBySecretIndices fn.secretArgs cfg.declaredArgs ∧
+    declaredSecretArgsByIndices? fn.secretArgs cfg.declaredArgs =
+      some cfg.secretArgs
 
 /-- Termination status of a single evaluator run. -/
 inductive EvalStatus where
@@ -1249,19 +1280,45 @@ def OperationalConfig.entrypointFn? (cfg : OperationalConfig) :
     Option CompiledFunction :=
   cfg.contract.functions.find? (fun fn => fn.signature = cfg.entrypoint)
 
-/-- Construct the initial environment from the entrypoint parameters and
-the supplied public/secret arguments. The current cut concatenates the
-public arguments first, then the secret arguments, in their declared
-order; this matches `uo-solc`'s parameter encoding for confidential
-entrypoints. -/
+/-- Construct the initial environment from the entrypoint parameters and the
+declared-order argument vector. Public and secret argument lists remain observer
+projections; they are not used to reorder parameter binding. -/
 def OperationalConfig.initialEnv (cfg : OperationalConfig)
     (fn : CompiledFunction) : Option LocalEnv :=
-  let allArgs := cfg.publicArgs ++ cfg.secretArgs
-  if allArgs.length = fn.params.length then
-    some <| (fn.params.zip allArgs).foldl
-      (fun env entry => env.insert entry.fst.name entry.snd) []
+  if cfg.declaredArgs.length = fn.params.length then
+    some <| (fn.params.zip cfg.declaredArgs).foldl
+      (fun env entry => LocalEnv.insert env entry.fst.name entry.snd) ([] : LocalEnv)
   else
     none
+
+theorem OperationalConfig.initialEnv_declared_order_of_length
+    (cfg : OperationalConfig) (fn : CompiledFunction)
+    (hLen : cfg.declaredArgs.length = fn.params.length) :
+    cfg.initialEnv fn =
+      some
+        ((fn.params.zip cfg.declaredArgs).foldl
+          (fun env entry => LocalEnv.insert env entry.fst.name entry.snd)
+          ([] : LocalEnv)) := by
+  unfold OperationalConfig.initialEnv
+  simp [hLen]
+
+theorem OperationalConfig.declared_layout_projects_public_and_secret
+    (cfg : OperationalConfig) (fn : CompiledFunction)
+    (hLayout : cfg.DeclaredArgumentLayoutMatches fn) :
+    cfg.publicArgs =
+        declaredPublicArgsBySecretIndices fn.secretArgs cfg.declaredArgs ∧
+      declaredSecretArgsByIndices? fn.secretArgs cfg.declaredArgs =
+        some cfg.secretArgs ∧
+      cfg.initialEnv fn =
+        some
+          ((fn.params.zip cfg.declaredArgs).foldl
+            (fun env entry => LocalEnv.insert env entry.fst.name entry.snd)
+            ([] : LocalEnv)) := by
+  exact
+    ⟨ hLayout.2.1
+    , hLayout.2.2
+    , cfg.initialEnv_declared_order_of_length fn hLayout.1
+    ⟩
 
 /-- Big-step contract evaluator. Looks up the entrypoint, binds arguments,
 walks the body, and returns the resulting `Outcome`, including the final

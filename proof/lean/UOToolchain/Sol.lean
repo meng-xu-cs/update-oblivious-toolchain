@@ -426,21 +426,19 @@ termination_by (sizeOf body, endN - i)
 
 end
 
-/-- Construct the initial environment from the Sol function's parameters
-and the supplied public/secret arguments. Mirrors
-`IR.OperationalConfig.initialEnv`. -/
+/-- Construct the initial environment from the Sol function's parameters and
+the declared-order argument vector. Mirrors `IR.OperationalConfig.initialEnv`. -/
 def Function.initialEnv (fn : Function)
-    (publicArgs secretArgs : List IR.Value) : Option LocalEnv :=
-  let allArgs := publicArgs ++ secretArgs
-  if allArgs.length = fn.params.length then
-    some <| (fn.params.zip allArgs).foldl
-      (fun env entry => env.insert entry.fst.name entry.snd) []
+    (declaredArgs : List IR.Value) : Option LocalEnv :=
+  if declaredArgs.length = fn.params.length then
+    some <| (fn.params.zip declaredArgs).foldl
+      (fun env entry => LocalEnv.insert env entry.fst.name entry.snd) ([] : LocalEnv)
   else
     none
 
 /-- Big-step program-level Sol evaluator. -/
 def evalFunction (fn : Function) (cfg : OperationalConfig) : Outcome :=
-  match fn.initialEnv cfg.publicArgs cfg.secretArgs with
+  match fn.initialEnv cfg.declaredArgs with
   | none =>
       let outcome :=
         { Outcome.empty with
@@ -798,7 +796,7 @@ to the same `foldl` because `(lowerFunction fn).params = fn.params`
 definitionally. -/
 theorem lowerFunction_initialEnv_eq
     (fn : Function) (cfg : OperationalConfig) :
-    fn.initialEnv cfg.publicArgs cfg.secretArgs =
+    fn.initialEnv cfg.declaredArgs =
       cfg.initialEnv (lowerFunction fn) := rfl
 
 /-- Program-level preservation: the Sol-side `evalFunction` agrees
@@ -814,7 +812,7 @@ theorem lowerFunction_preserves_semantics
   -- `some env` branch.
   unfold evalFunction IR.evalContract
   simp only [hEntry, ← lowerFunction_initialEnv_eq fn cfg]
-  cases hEnv : fn.initialEnv cfg.publicArgs cfg.secretArgs with
+  cases hEnv : fn.initialEnv cfg.declaredArgs with
   | none => rfl
   | some env =>
       simp only []
