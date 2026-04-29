@@ -20,15 +20,23 @@ fn main() -> Result<()> {
         (Some(artifact_path), Some(source), Some(metadata_path)) => {
             let artifact: uo_core::CompiledArtifact =
                 serde_json::from_slice(&std::fs::read(&artifact_path)?)?;
-            let metadata: uo_core::ContractMetadata =
-                serde_yaml::from_slice(&std::fs::read(&metadata_path)?)?;
+            let metadata_bytes = std::fs::read(&metadata_path)?;
+            let metadata: uo_core::ContractMetadata = serde_yaml::from_slice(&metadata_bytes)?;
             if let Some(output_path) = &debug_translation_bundle_out {
-                let bundle = uo_check::translation_validation_bundle_against_source(
-                    &source, &metadata, &artifact,
+                let bundle = uo_check::translation_validation_bundle_against_source_with_metadata_bytes(
+                    &source,
+                    &metadata,
+                    &metadata_bytes,
+                    &artifact,
                 )?;
                 std::fs::write(output_path, serde_json::to_vec_pretty(&bundle)?)?;
             }
-            let mut report = uo_check::check_artifact_against_source(&source, &metadata, &artifact)?;
+            let mut report = uo_check::check_artifact_against_source_with_metadata_bytes(
+                &source,
+                &metadata,
+                &metadata_bytes,
+                &artifact,
+            )?;
             if let Some(output_path) = debug_translation_bundle_out.as_ref() {
                 report.push(format!(
                     "debug translation bundle written to {}",

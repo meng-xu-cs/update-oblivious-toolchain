@@ -30,9 +30,14 @@ struct Cli {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let metadata: uo_core::ContractMetadata =
-        serde_yaml::from_slice(&std::fs::read(&cli.metadata)?)?;
-    let artifact = uo_solc::compile(&cli.source, &metadata, cli.mode.into())?;
+    let metadata_bytes = std::fs::read(&cli.metadata)?;
+    let metadata: uo_core::ContractMetadata = serde_yaml::from_slice(&metadata_bytes)?;
+    let artifact = uo_solc::compile_with_metadata_bytes(
+        &cli.source,
+        &metadata,
+        &metadata_bytes,
+        cli.mode.into(),
+    )?;
     std::fs::write(cli.out, serde_json::to_vec_pretty(&artifact)?)?;
     Ok(())
 }

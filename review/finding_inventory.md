@@ -38,7 +38,7 @@ not as independent findings.
 | ID | Group | Sources | Response | Phase | Status |
 | --- | --- | --- | --- | --- | --- |
 | F-01 | Public entrypoint observer leak | TB-01, TH-01, negative tests 1-2 | Agree | P0 | Open - required |
-| F-02 | Strict sidecar parse/hash boundary | TB-02, negative test 4 | Agree | P0 | Open - required |
+| F-02 | Strict sidecar parse/hash boundary | TB-02, negative test 4 | Agree | P0 | Landed |
 | F-03 | Full `(P, M, V)` identity binding | TB-03, TH-08, practical blocker 6 | Agree | P0 | Open - required |
 | F-04 | Abort/rollback theorem | TB-04, TH-04, negative test 3 | Agree | P0 | Open - required |
 | F-05 | Exact declassification framing | TB-05, TH-05, negative test 5 | Agree | P0 | Open - required |
@@ -120,7 +120,7 @@ same parsed policy with different raw sidecar bytes must produce distinct raw
 sidecar hashes, and admitted-package v2 equality must check the raw digest.
 
 Status:
-Open - required.
+Landed.
 
 ### F-03 - Full `(P, M, V)` Identity Binding
 
@@ -575,7 +575,7 @@ The remediation work must add or update tests for:
 ## Closure Checklist
 
 - [ ] F-01 landed and tested.
-- [ ] F-02 landed and tested.
+- [x] F-02 landed and tested.
 - [ ] F-03 landed and tested.
 - [ ] F-04 landed and tested.
 - [ ] F-05 landed and tested.

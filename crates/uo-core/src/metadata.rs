@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ContractMetadata {
     pub contract: String,
     #[serde(default)]
@@ -13,6 +14,7 @@ pub struct ContractMetadata {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct EntrypointMetadata {
     #[serde(default)]
     pub secret_args: Vec<String>,
@@ -56,6 +58,7 @@ pub enum DeclassificationKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct StateMetadata {
     pub kind: String,
     #[serde(default)]
@@ -70,7 +73,86 @@ pub struct StateMetadata {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BoundsMetadata {
     #[serde(default)]
     pub loops: BTreeMap<String, usize>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ContractMetadata;
+
+    #[test]
+    fn sidecar_rejects_unknown_top_level_field() {
+        let err = serde_yaml::from_str::<ContractMetadata>(
+            r#"
+contract: C
+unexpected: true
+entrypoints: {}
+state: {}
+bounds:
+  loops: {}
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn sidecar_rejects_unknown_entrypoint_field() {
+        let err = serde_yaml::from_str::<ContractMetadata>(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+    declassify_public_state: [x]
+state: {}
+bounds:
+  loops: {}
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn sidecar_rejects_unknown_state_field() {
+        let err = serde_yaml::from_str::<ContractMetadata>(
+            r#"
+contract: C
+entrypoints: {}
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+    storage_class: public
+bounds:
+  loops: {}
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn sidecar_rejects_unknown_bounds_field() {
+        let err = serde_yaml::from_str::<ContractMetadata>(
+            r#"
+contract: C
+entrypoints: {}
+state: {}
+bounds:
+  loops: {}
+  max_steps: 5
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+    }
 }

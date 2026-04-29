@@ -86,6 +86,24 @@ pub fn compile(
     metadata: &ContractMetadata,
     mode: ProgramMode,
 ) -> Result<CompiledArtifact> {
+    compile_impl(source_path, metadata, None, mode)
+}
+
+pub fn compile_with_metadata_bytes(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    raw_metadata: &[u8],
+    mode: ProgramMode,
+) -> Result<CompiledArtifact> {
+    compile_impl(source_path, metadata, Some(raw_metadata), mode)
+}
+
+fn compile_impl(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    raw_metadata: Option<&[u8]>,
+    mode: ProgramMode,
+) -> Result<CompiledArtifact> {
     let source = fs::read_to_string(source_path)
         .with_context(|| format!("failed to read Solidity source {}", source_path))?;
     let frontend = parse_frontend(source_path, &source, metadata)?;
@@ -162,14 +180,21 @@ pub fn compile(
         manifest,
     };
     let disassembly = disassemble_contract(&contract);
-    Ok(CompiledArtifact {
-        compiler_version: compiler_version.clone(),
-        admitted_package: Some(AdmittedPackageIdentity::new(
+    let admitted_package = match raw_metadata {
+        Some(raw_metadata) => AdmittedPackageIdentity::new_with_raw_metadata(
             &source,
             metadata,
+            raw_metadata,
             &compilation_mode,
             &compiler_version,
-        )?),
+        )?,
+        None => {
+            AdmittedPackageIdentity::new(&source, metadata, &compilation_mode, &compiler_version)?
+        }
+    };
+    Ok(CompiledArtifact {
+        compiler_version: compiler_version.clone(),
+        admitted_package: Some(admitted_package),
         contract,
         diagnostics: frontend.diagnostics,
         transformed_source: Some(render_contract(&functions)),
@@ -183,6 +208,21 @@ pub fn translation_validation_bundle_against_artifact(
     artifact: &CompiledArtifact,
 ) -> Result<ProofRelevantTranslationBundle> {
     let expected = compile(source_path, metadata, artifact.contract.mode.clone())?;
+    ProofRelevantTranslationBundle::from_artifacts(source_path, metadata, &expected, artifact)
+}
+
+pub fn translation_validation_bundle_against_artifact_with_metadata_bytes(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    raw_metadata: &[u8],
+    artifact: &CompiledArtifact,
+) -> Result<ProofRelevantTranslationBundle> {
+    let expected = compile_with_metadata_bytes(
+        source_path,
+        metadata,
+        raw_metadata,
+        artifact.contract.mode.clone(),
+    )?;
     ProofRelevantTranslationBundle::from_artifacts(source_path, metadata, &expected, artifact)
 }
 
@@ -2659,7 +2699,11 @@ fn validate_entrypoint_metadata_well_formed(
     let mut seen_secret_args = BTreeSet::new();
     for secret in &entry_meta.secret_args {
         if !seen_secret_args.insert(secret) {
-            bail!("entrypoint {} repeats secret_args entry {}", signature, secret);
+            bail!(
+                "entrypoint {} repeats secret_args entry {}",
+                signature,
+                secret
+            );
         }
     }
     let mut seen_declassifies = BTreeSet::new();

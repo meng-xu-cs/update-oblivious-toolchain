@@ -309,8 +309,34 @@ pub fn check_artifact_against_source(
     metadata: &ContractMetadata,
     artifact: &CompiledArtifact,
 ) -> Result<Vec<String>> {
+    check_artifact_against_source_impl(source_path, metadata, None, artifact)
+}
+
+pub fn check_artifact_against_source_with_metadata_bytes(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    raw_metadata: &[u8],
+    artifact: &CompiledArtifact,
+) -> Result<Vec<String>> {
+    check_artifact_against_source_impl(source_path, metadata, Some(raw_metadata), artifact)
+}
+
+fn check_artifact_against_source_impl(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    raw_metadata: Option<&[u8]>,
+    artifact: &CompiledArtifact,
+) -> Result<Vec<String>> {
     let mut report = check_artifact(artifact)?;
-    let expected = uo_solc::compile(source_path, metadata, artifact.contract.mode.clone())?;
+    let expected = match raw_metadata {
+        Some(raw_metadata) => uo_solc::compile_with_metadata_bytes(
+            source_path,
+            metadata,
+            raw_metadata,
+            artifact.contract.mode.clone(),
+        )?,
+        None => uo_solc::compile(source_path, metadata, artifact.contract.mode.clone())?,
+    };
     assert_translation_equivalence(&expected, artifact)?;
     report.push("source/artifact translation validation: ok".into());
     Ok(report)
@@ -322,6 +348,20 @@ pub fn translation_validation_bundle_against_source(
     artifact: &CompiledArtifact,
 ) -> Result<ProofRelevantTranslationBundle> {
     uo_solc::translation_validation_bundle_against_artifact(source_path, metadata, artifact)
+}
+
+pub fn translation_validation_bundle_against_source_with_metadata_bytes(
+    source_path: &str,
+    metadata: &ContractMetadata,
+    raw_metadata: &[u8],
+    artifact: &CompiledArtifact,
+) -> Result<ProofRelevantTranslationBundle> {
+    uo_solc::translation_validation_bundle_against_artifact_with_metadata_bytes(
+        source_path,
+        metadata,
+        raw_metadata,
+        artifact,
+    )
 }
 
 fn manifest_mode(mode: &ProgramMode) -> &'static str {
