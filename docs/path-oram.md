@@ -52,6 +52,12 @@ and exposes one theorem-facing `leafRun` from the runtime witness family. The
 repo's `PathOramStorageEnvelope` supplies those wrapper-specific public-shape
 and storage-projection facts.
 
+The current local-position-map route is intentionally capped at capacity `128`
+(`PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY`). Larger maps must use a future
+recursive/private position map before they are admitted to the proof-grade
+Path ORAM route; this prevents the linear encrypted-metadata scan from being
+mistaken for a scalable large-map implementation.
+
 ## Assumption Provenance
 
 | Assumption | Provenance |

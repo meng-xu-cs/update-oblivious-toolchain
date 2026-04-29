@@ -4228,6 +4228,7 @@ def RuntimeRefinementWitness.sgxView
   , outputShape := witness.publicOutcome.outputShape
   , returnPolicy := witness.publicOutcome.returnPolicy
   , returnPayload := witness.publicOutcome.returnPayload
+  , encryptedReturnPayload := witness.publicOutcome.encryptedReturnPayload
   , declassifies := witness.publicOutcome.declassifies
   , gasUsed := witness.publicOutcome.gasUsed
   }

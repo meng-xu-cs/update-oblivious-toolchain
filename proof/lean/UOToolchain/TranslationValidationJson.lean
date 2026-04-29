@@ -84,6 +84,7 @@ structure ImportedProofRelevantEntrypointView where
   returns : String
   status : String
   declassifies : List String
+  public_state_declassifies : List String
   confidential_program : Option String
   confidential_slot_program : Option String
   kernel_steps : List ImportedProofRelevantKernelStepView
@@ -164,6 +165,21 @@ private def functionsMatchManifestSecrets :
           (entry.secret_args == fn.secret_args) &&
             (entry.param_names == fn.params.map ImportedProofRelevantParamView.name) &&
             functionsMatchManifestSecrets rest entrypoints
+
+private def publicStateDeclassifyTargetsWellFormed
+  (state : List ImportedProofRelevantStateObjectView)
+  (targets : List String) : Bool :=
+  distinctList targets &&
+    targets.all (fun target =>
+      match state.find? (fun object => object.name == target) with
+      | some object => object.confidential == false
+      | none => false)
+
+private def functionSecretPolicyWellFormed
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  (if fn.confidential then !fn.secret_args.isEmpty else fn.secret_args.isEmpty) &&
+    (entry.secret_args == fn.secret_args)
 
 structure CountSummary where
   localCount : Nat := 0
@@ -438,6 +454,8 @@ private def parseImportedManifestEntrypointViewFromRawJson
   (signature : String)
   (json : Json) : Except String ImportedProofRelevantEntrypointView := do
   let entryInputLen? : Option Nat ← lookupOptionalFieldAs json "entry_input_len"
+  let publicStateDeclassifies? : Option (List String) ←
+    lookupOptionalFieldAs json "public_state_declassifies"
   pure
     { signature := signature
     , secret_args := ← lookupFieldAs json "secret_args"
@@ -451,6 +469,7 @@ private def parseImportedManifestEntrypointViewFromRawJson
     , returns := ← lookupFieldAs json "returns"
     , status := ← lookupFieldAs json "status"
     , declassifies := ← lookupFieldAs json "declassifies"
+    , public_state_declassifies := publicStateDeclassifies?.getD []
     , confidential_program := (← lookupOptionalFieldJson json "confidential_program").map Json.compress
     , confidential_slot_program :=
         (← lookupOptionalFieldJson json "confidential_slot_program").map Json.compress
@@ -1122,6 +1141,92 @@ private def accessedObjectIdsInBodyStrings (body : List String) : Except String 
   body.foldlM (init := ([] : List Nat)) fun acc item => do
     pure <| mergeDistinctNatLists acc (← collectAccessedObjectIdsStatement (← parseJsonString item))
 
+mutual
+
+private partial def statementLoopsHaveExactBounds
+  (json : Json)
+  (loopEnv : List (String × Nat) := []) : Except String Bool := do
+  if let some inner := taggedPayload? json "If" then
+    let thenOk ← statementsLoopsHaveExactBounds (← lookupFieldAs inner "then_body") loopEnv
+    let elseOk ← statementsLoopsHaveExactBounds (← lookupFieldAs inner "else_body") loopEnv
+    pure (thenOk && elseOk)
+  else if let some inner := taggedPayload? json "For" then
+    let startExpr ← lookupFieldJson inner "start"
+    let endExpr ← lookupFieldJson inner "end"
+    let body : List Json ← lookupFieldAs inner "body"
+    let indexVar : String ← lookupFieldAs inner "index_var"
+    match evalLoopBoundJson startExpr loopEnv, evalLoopBoundJson endExpr loopEnv with
+    | some startValue, some endValue =>
+        let rec go (index : Nat) : Except String Bool := do
+          if index < endValue then
+            let bodyOk ← statementsLoopsHaveExactBounds body ((indexVar, index) :: loopEnv)
+            if bodyOk then
+              go (index + 1)
+            else
+              pure false
+          else
+            pure true
+        go startValue
+    | _, _ => pure false
+  else
+    pure true
+
+private partial def statementsLoopsHaveExactBounds
+  (items : List Json)
+  (loopEnv : List (String × Nat) := []) : Except String Bool :=
+  items.foldlM (init := true) fun acc item => do
+    if !acc then
+      pure false
+    else
+      statementLoopsHaveExactBounds item loopEnv
+
+end
+
+private def functionLoopAdmissionWellFormed
+  (fn : ImportedProofRelevantFunctionView) : Bool :=
+  match fn.body.mapM (fun item => parseJsonString item) with
+  | .ok body =>
+      match statementsLoopsHaveExactBounds body with
+      | .ok ok => ok
+      | .error _ => false
+  | .error _ => false
+
+private def functionPublicAccessPolicyWellFormed
+  (state : List ImportedProofRelevantStateObjectView)
+  (fn : ImportedProofRelevantFunctionView) : Bool :=
+  if fn.confidential then
+    true
+  else
+    match accessedObjectIdsInBodyStrings fn.body with
+    | .ok objectIds =>
+        objectIds.all (fun objectId =>
+          match stateObjectById? state objectId with
+          | some object => object.confidential == false
+          | none => false)
+    | .error _ => false
+
+private def functionMetadataWellFormed
+  (view : ImportedProofRelevantContractView)
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  functionSecretPolicyWellFormed fn entry &&
+    functionLoopAdmissionWellFormed fn &&
+    publicStateDeclassifyTargetsWellFormed
+      view.state entry.public_state_declassifies &&
+    functionPublicAccessPolicyWellFormed view.state fn
+
+private def functionsMetadataWellFormed
+  (view : ImportedProofRelevantContractView) :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → Bool
+  | [], _ => true
+  | fn :: rest, entrypoints =>
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => false
+      | some entry =>
+          functionMetadataWellFormed view fn entry &&
+            functionsMetadataWellFormed view rest entrypoints
+
 def countOramAccessesInBodyStrings
   (body : List String)
   (state : List ImportedProofRelevantStateObjectView) :
@@ -1403,6 +1508,33 @@ private def manifestCommitOpMismatchMessages
             tail
           else
             functionMaxCommitOpsMismatchMessage view fn entry :: tail
+
+private def functionMetadataMismatchMessage
+  (view : ImportedProofRelevantContractView)
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : String :=
+  let secretPolicyOk := functionSecretPolicyWellFormed fn entry
+  let publicTargetsOk :=
+    publicStateDeclassifyTargetsWellFormed
+      view.state entry.public_state_declassifies
+  let loopAdmissionOk := functionLoopAdmissionWellFormed fn
+  let publicAccessOk := functionPublicAccessPolicyWellFormed view.state fn
+  s!"{fn.signature}: metadata policy failed (secret policy={secretPolicyOk}, loop admission={loopAdmissionOk}, public_state_declassifies={publicTargetsOk}, public access={publicAccessOk})"
+
+private def metadataMismatchMessages
+  (view : ImportedProofRelevantContractView) :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → List String
+  | [], _ => []
+  | fn :: rest, entrypoints =>
+      let tail := metadataMismatchMessages view rest entrypoints
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => s!"{fn.signature}: missing manifest entrypoint" :: tail
+      | some entry =>
+          if functionMetadataWellFormed view fn entry then
+            tail
+          else
+            functionMetadataMismatchMessage view fn entry :: tail
 
 private def stateObjectMatchesManifestObject
   (stateObject : ImportedProofRelevantStateObjectView)
@@ -2600,7 +2732,8 @@ def ImportedProofRelevantContractView.checkStructuralValid
     functionsMatchManifestBoundaryLengths view.functions view.manifest.entrypoints &&
     functionsMatchManifestCounts view.functions view.manifest.entrypoints &&
     functionsMatchManifestOramAccesses view view.functions view.manifest.entrypoints &&
-    functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints
+    functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints &&
+    functionsMetadataWellFormed view view.functions view.manifest.entrypoints
 
 def ImportedProofRelevantContractView.StructuralValid
   (view : ImportedProofRelevantContractView) : Prop :=
@@ -2688,6 +2821,12 @@ def ImportedProofRelevantContractView.validationErrors
       ["manifest max_commit_ops do not match recomputed body accesses for: " ++
         String.intercalate ", "
           (manifestCommitOpMismatchMessages view view.functions view.manifest.entrypoints)]
+    else
+      []) ++
+    (if !(functionsMetadataWellFormed view view.functions view.manifest.entrypoints) then
+      ["metadata policy checks failed for: " ++
+        String.intercalate ", "
+          (metadataMismatchMessages view view.functions view.manifest.entrypoints)]
     else
       [])
 
@@ -3152,7 +3291,8 @@ private theorem ImportedProofRelevantContractView.structural_exactness_checks
   have hChecks := hValid
   simp [ImportedProofRelevantContractView.StructuralValid,
     ImportedProofRelevantContractView.checkStructuralValid] at hChecks
-  rcases hChecks with ⟨hPrefix16, hCommit⟩
+  rcases hChecks with ⟨hPrefix17, _hMetadata⟩
+  rcases hPrefix17 with ⟨hPrefix16, hCommit⟩
   rcases hPrefix16 with ⟨hPrefix15, hOram⟩
   rcases hPrefix15 with ⟨hPrefix14, hCounts⟩
   rcases hPrefix14 with ⟨hPrefix13, hBoundary⟩
@@ -3168,7 +3308,8 @@ private theorem ImportedProofRelevantContractView.structural_confidential_kernel
   have hChecks := hValid
   simp [ImportedProofRelevantContractView.StructuralValid,
     ImportedProofRelevantContractView.checkStructuralValid] at hChecks
-  rcases hChecks with ⟨hPrefix16, _hCommit⟩
+  rcases hChecks with ⟨hPrefix17, _hMetadata⟩
+  rcases hPrefix17 with ⟨hPrefix16, _hCommit⟩
   rcases hPrefix16 with ⟨hPrefix15, _hOram⟩
   rcases hPrefix15 with ⟨hPrefix14, _hCounts⟩
   rcases hPrefix14 with ⟨hPrefix13, _hBoundary⟩
@@ -3179,6 +3320,15 @@ private theorem ImportedProofRelevantContractView.structural_confidential_kernel
   rcases hPrefix9 with ⟨hPrefix8, _hFunctionSignatures⟩
   rcases hPrefix8 with ⟨_hPrefix7, hTargets⟩
   exact hTargets
+
+private theorem ImportedProofRelevantContractView.structural_metadata_wellFormed
+  (view : ImportedProofRelevantContractView)
+  (hValid : view.StructuralValid) :
+  functionsMetadataWellFormed view view.functions view.manifest.entrypoints = true := by
+  have hChecks := hValid
+  simp [ImportedProofRelevantContractView.StructuralValid,
+    ImportedProofRelevantContractView.checkStructuralValid] at hChecks
+  exact hChecks.2
 
 theorem ImportedProofRelevantContractView.manifest_secrets_exact_of_lookup
   (view : ImportedProofRelevantContractView)

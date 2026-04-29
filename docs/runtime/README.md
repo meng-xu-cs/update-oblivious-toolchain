@@ -23,7 +23,10 @@ trusted, and how the SGX/TEE observer is pinned.
 - Keep emitted proof objects checkable by Lean and covered by probe drift and
   tamper reports.
 
-The current remaining trusted runtime surface is the implementation-side
-extraction path for witnesses, certificates, bundles, and serialization below
-the checked boundary. Replacing that with a verified extractor or a primitive
-event-transcript hash is future strengthening.
+Runtime proof-object extraction is bound to an append-only primitive event
+transcript. `ExecutionTrace::primitive_event_transcript` records typed hashes
+for opcode, logical, physical, theorem, controller, ORAM, and kernel proof
+payloads, and `TraceHashBundle` exposes both the transcript hash and the
+runtime proof-object hash. A fully verified extractor would still reduce the
+TCB, but omitted or mutated proof payloads are no longer outside the checked
+hash surface.

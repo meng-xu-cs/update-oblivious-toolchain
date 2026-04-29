@@ -837,11 +837,13 @@ theorem proofGrade_lowered_compiled_function_params
 
 For the three masked-store statements that emit a kernel step, the
 runtime kernelSteps bookkeeping is exactly `oc.kernelSteps ++ [tag]`
-whenever the value sub-expression returns `.value _` (and, for
-arraySet/mapPut, the index/key sub-expression returns `.value _` and
-the predicate, if present, evaluates to `.value (.bool _)`). These
-"sub-expression-success" preconditions are structural and avoid the
-pathological `.status .completed` case on `evalKernelExpr`.
+whenever the value sub-expression returns `.value _`, the target object
+write is admitted by `writeObject?`, and, for arraySet/mapPut, the
+index/key sub-expression returns `.value _` and the predicate, if
+present, evaluates to `.value (.bool _)`. These
+"sub-expression-success plus admitted write" preconditions are
+structural and avoid the pathological `.status .completed` case on
+`evalKernelExpr` while matching the fail-closed object-map semantics.
 
 The narrow lift below covers `cellSet objectId value none` — the
 simplest masked-store form — and witnesses the pattern that the
@@ -849,69 +851,83 @@ broader runtime-vs-static theorem will follow once a structural
 "all-sub-expressions-succeed" predicate is defined for the body. -/
 
 /-- Narrow runtime-vs-static lift for `cellSet _ _ none`: when the
-value sub-expression returns `.value newVal`, the runtime
-`kernelSteps` is exactly `oc.kernelSteps ++ ["CellSet"]`. -/
+value sub-expression returns `.value newVal` and the object-map write
+is admitted, the runtime `kernelSteps` is exactly
+`oc.kernelSteps ++ ["CellSet"]`. -/
 theorem proofGrade_kernel_cell_set_none_kernelSteps
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (objectId : Nat) (value : IR.KernelExpr) (newVal : IR.Value)
-    (hValue : IR.evalKernelExpr cfg env value = .value newVal) :
+    (cfg' : IR.OperationalConfig)
+    (hValue : IR.evalKernelExpr cfg env value = .value newVal)
+    (hWrite : cfg.writeObject? objectId newVal = some cfg') :
     (IR.evalKernelStatement cfg env oc
       (.cellSet objectId value none)).snd.snd.kernelSteps =
       oc.kernelSteps ++
         IR.KernelStatement.expectedStep (.cellSet objectId value none) := by
-  simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep, hValue]
+  simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep, hValue, hWrite]
 
 /-- Narrow runtime-vs-static lift for `arraySet _ _ _ none`: when both
 index and value sub-expressions return `.value _`, the index is a
-uint, and the read is a well-shaped array, the runtime `kernelSteps`
-is exactly `oc.kernelSteps ++ ["ArraySet"]`. -/
+uint, the read is a well-shaped array, and the object-map write is
+admitted, the runtime `kernelSteps` is exactly
+`oc.kernelSteps ++ ["ArraySet"]`. -/
 theorem proofGrade_kernel_array_set_none_kernelSteps
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (objectId : Nat) (index value : IR.KernelExpr) (idx : Nat) (newVal : IR.Value)
     (values : List IR.Value)
+    (cfg' : IR.OperationalConfig)
     (hIndex : IR.evalKernelExpr cfg env index = .value (.uint idx))
     (hValue : IR.evalKernelExpr cfg env value = .value newVal)
     (hRead : cfg.readObject objectId = some (.array values))
-    (hInBounds : ¬ idx ≥ values.length) :
+    (hInBounds : ¬ idx ≥ values.length)
+    (hWrite :
+      cfg.writeObject? objectId (.array (IR.Value.arraySetAt values idx newVal)) =
+        some cfg') :
     (IR.evalKernelStatement cfg env oc
       (.arraySet objectId index value none)).snd.snd.kernelSteps =
       oc.kernelSteps ++
         IR.KernelStatement.expectedStep (.arraySet objectId index value none) := by
   simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
-    hIndex, hValue, hRead, hInBounds]
+    hIndex, hValue, hRead, hInBounds, hWrite]
 
 /-- Narrow runtime-vs-static lift for `mapPut _ _ _ none`: when both
-key and value sub-expressions return `.value _` and the read is a
-well-shaped map (or unset), the runtime `kernelSteps` is exactly
-`oc.kernelSteps ++ ["MapPut"]`. -/
+key and value sub-expressions return `.value _`, the read is a
+well-shaped map (or unset), and the object-map write is admitted, the
+runtime `kernelSteps` is exactly `oc.kernelSteps ++ ["MapPut"]`. -/
 theorem proofGrade_kernel_map_put_none_kernelSteps_existing
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (objectId : Nat) (key value : IR.KernelExpr)
     (keyVal newVal : IR.Value)
     (entries : List (IR.Value × IR.Value))
+    (cfg' : IR.OperationalConfig)
     (hKey : IR.evalKernelExpr cfg env key = .value keyVal)
     (hValue : IR.evalKernelExpr cfg env value = .value newVal)
-    (hRead : cfg.readObject objectId = some (.map entries)) :
+    (hRead : cfg.readObject objectId = some (.map entries))
+    (hWrite :
+      cfg.writeObject? objectId (.map (IR.Value.mapInsert entries keyVal newVal)) =
+        some cfg') :
     (IR.evalKernelStatement cfg env oc
       (.mapPut objectId key value none)).snd.snd.kernelSteps =
       oc.kernelSteps ++
         IR.KernelStatement.expectedStep (.mapPut objectId key value none) := by
   simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
-    hKey, hValue, hRead]
+    hKey, hValue, hRead, hWrite]
 
 theorem proofGrade_kernel_map_put_none_kernelSteps_fresh
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (objectId : Nat) (key value : IR.KernelExpr)
     (keyVal newVal : IR.Value)
+    (cfg' : IR.OperationalConfig)
     (hKey : IR.evalKernelExpr cfg env key = .value keyVal)
     (hValue : IR.evalKernelExpr cfg env value = .value newVal)
-    (hRead : cfg.readObject objectId = none) :
+    (hRead : cfg.readObject objectId = none)
+    (hWrite : cfg.writeObject? objectId (.map [(keyVal, newVal)]) = some cfg') :
     (IR.evalKernelStatement cfg env oc
       (.mapPut objectId key value none)).snd.snd.kernelSteps =
       oc.kernelSteps ++
         IR.KernelStatement.expectedStep (.mapPut objectId key value none) := by
   simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
-    hKey, hValue, hRead]
+    hKey, hValue, hRead, hWrite]
 
 /-! ### W4.5 program-level runtime-vs-static `kernelSteps` lift
 

@@ -9,6 +9,7 @@ use uo_precompiles::UoOpcode;
 
 pub const SURROGATE_ORAM_SCHEME: &str = "surrogate_public_schedule_v1";
 pub const PATH_ORAM_SCHEME: &str = "path_oram_local_posmap_v1";
+pub const PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY: usize = 128;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeManifest {
@@ -62,6 +63,8 @@ pub struct EntrypointManifest {
     pub status: StatusPolicy,
     #[serde(default)]
     pub declassifies: Vec<DeclassificationKind>,
+    #[serde(default)]
+    pub public_state_declassifies: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidential_program: Option<ConfidentialKernelProgram>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -153,6 +156,25 @@ pub struct OramManifest {
     pub accesses_per_call: usize,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OramResourceBounds {
+    pub scheme: String,
+    pub capacity: usize,
+    pub metadata_pages: usize,
+    pub metadata_pages_per_access: usize,
+    pub buckets_per_access: usize,
+    pub commit_ops_per_access: usize,
+    pub accesses: usize,
+    pub commit_ops_for_entrypoint: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EntrypointResourceBounds {
+    pub signature: String,
+    pub max_commit_ops: usize,
+    pub oram_bounds: Vec<OramResourceBounds>,
+}
+
 impl ConfidentialKernelSlotProgram {
     pub fn expected_runtime_step_manifest(&self) -> Box<[RuntimeKernelStepManifest]> {
         self.expected_runtime_steps()
@@ -211,6 +233,14 @@ impl OramManifest {
                 })
             }
             PATH_ORAM_SCHEME => {
+                if capacity > PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY {
+                    bail!(
+                        "{} supports capacities up to {} in the current proof-grade route; use a recursive/private position map before admitting capacity {}",
+                        PATH_ORAM_SCHEME,
+                        PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY,
+                        capacity
+                    );
+                }
                 let leaf_count = capacity.max(2).next_power_of_two();
                 let tree_height = log2_ceil(leaf_count);
                 let block_size = 1 + 8 + 8 + key_bytes + value_bytes;
@@ -240,6 +270,24 @@ impl OramManifest {
 
     pub fn total_commit_ops(&self) -> usize {
         self.metadata_pages_per_access + self.buckets_per_access
+    }
+
+    pub fn resource_bounds_for_capacity(
+        &self,
+        capacity: usize,
+        accesses: usize,
+    ) -> OramResourceBounds {
+        let commit_ops_per_access = self.total_commit_ops();
+        OramResourceBounds {
+            scheme: self.scheme.clone(),
+            capacity,
+            metadata_pages: self.metadata_pages,
+            metadata_pages_per_access: self.metadata_pages_per_access,
+            buckets_per_access: self.buckets_per_access,
+            commit_ops_per_access,
+            accesses,
+            commit_ops_for_entrypoint: commit_ops_per_access.saturating_mul(accesses),
+        }
     }
 
     pub fn supports_multi_access_per_entrypoint(&self) -> bool {
@@ -316,6 +364,34 @@ impl OramManifest {
     }
 }
 
+impl RuntimeManifest {
+    pub fn entrypoint_resource_bounds(&self, signature: &str) -> Result<EntrypointResourceBounds> {
+        let entrypoint = self
+            .entrypoints
+            .get(signature)
+            .ok_or_else(|| anyhow!("manifest entrypoint {} is missing", signature))?;
+        let mut oram_bounds = Vec::new();
+        for (object_id, accesses) in &entrypoint.oram_accesses {
+            let object = self
+                .objects
+                .iter()
+                .find(|object| object.id == *object_id)
+                .ok_or_else(|| anyhow!("manifest object id {} is missing", object_id))?;
+            let oram = object
+                .oram
+                .as_ref()
+                .ok_or_else(|| anyhow!("manifest object {} is missing ORAM bounds", object.name))?;
+            oram_bounds
+                .push(oram.resource_bounds_for_capacity(object.capacity.unwrap_or(0), *accesses));
+        }
+        Ok(EntrypointResourceBounds {
+            signature: signature.into(),
+            max_commit_ops: entrypoint.max_commit_ops,
+            oram_bounds,
+        })
+    }
+}
+
 pub fn validate_oram_access_shape(
     signature: &str,
     oram_accesses: &BTreeMap<u32, usize>,
@@ -378,7 +454,10 @@ fn state_object_by_id(state: &[StateObject], object_id: u32) -> Result<&StateObj
 
 #[cfg(test)]
 mod tests {
-    use super::{EntrypointManifest, OramManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME};
+    use super::{
+        EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest,
+        StateObjectManifest, PATH_ORAM_SCHEME,
+    };
     use crate::confidential_kernel::ConfidentialKernelSlotProgram;
     use crate::ir::{BackendKind, ContainerKind, StateObject};
     use crate::types::{ScalarType, Type};
@@ -421,6 +500,78 @@ mod tests {
         assert!(err
             .to_string()
             .contains("path ORAM leaf count must be a power of two"));
+    }
+
+    #[test]
+    fn path_oram_local_posmap_rejects_capacity_above_current_ceiling() {
+        let object = path_oram_object(super::PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY + 1);
+        let err = OramManifest::for_object(&object)
+            .expect_err("oversized local-posmap path ORAM capacity must be rejected");
+        assert!(err.to_string().contains("supports capacities up to 128"));
+    }
+
+    #[test]
+    fn entrypoint_resource_bounds_expose_public_oram_cost_formula() {
+        let object = path_oram_object(9);
+        let oram = OramManifest::for_object(&object).expect("path ORAM manifest");
+        let mut entrypoints = BTreeMap::new();
+        entrypoints.insert(
+            "touch(bytes32)".into(),
+            EntrypointManifest {
+                secret_args: vec![0],
+                param_names: vec!["key".into()],
+                entry_input_len: 32,
+                public_gas_budget: 4096,
+                arena_bytes: 4096,
+                max_stack_words: 64,
+                max_hash_part_bytes: 0,
+                return_canonical_len: None,
+                returns: Default::default(),
+                status: Default::default(),
+                declassifies: Vec::new(),
+                public_state_declassifies: Vec::new(),
+                confidential_program: None,
+                confidential_slot_program: None,
+                kernel_steps: Vec::new(),
+                uocell_reads: 0,
+                uocell_writes: 0,
+                uoarray_reads: 0,
+                uoarray_writes: 0,
+                uomap_reads: 0,
+                uomap_writes: 1,
+                max_commit_ops: oram.total_commit_ops() * 2,
+                oram_accesses: BTreeMap::from([(7, 2)]),
+            },
+        );
+        let manifest = RuntimeManifest {
+            contract: "Bounds".into(),
+            compilation_mode: "uo".into(),
+            objects: vec![StateObjectManifest {
+                id: 7,
+                name: "balances".into(),
+                kind: "map".into(),
+                backend: "oram".into(),
+                capacity: Some(9),
+                value_type: Some("uint256".into()),
+                key_type: Some("bytes32".into()),
+                oram: Some(oram.clone()),
+            }],
+            entrypoints,
+        };
+
+        let bounds = manifest
+            .entrypoint_resource_bounds("touch(bytes32)")
+            .expect("resource bounds");
+        assert_eq!(bounds.max_commit_ops, oram.total_commit_ops() * 2);
+        assert_eq!(bounds.oram_bounds[0].capacity, 9);
+        assert_eq!(
+            bounds.oram_bounds[0].commit_ops_per_access,
+            oram.metadata_pages_per_access + oram.buckets_per_access
+        );
+        assert_eq!(
+            bounds.oram_bounds[0].commit_ops_for_entrypoint,
+            bounds.oram_bounds[0].commit_ops_per_access * 2
+        );
     }
 
     #[test]
@@ -476,6 +627,7 @@ mod tests {
             returns: Default::default(),
             status: Default::default(),
             declassifies: Vec::new(),
+            public_state_declassifies: Vec::new(),
             confidential_program: None,
             confidential_slot_program: Some(slot_program.clone()),
             kernel_steps: vec![RuntimeKernelStepManifest {

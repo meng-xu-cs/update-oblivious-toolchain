@@ -26,6 +26,8 @@ pub struct EntrypointMetadata {
     pub status: Option<StatusPolicy>,
     #[serde(default)]
     pub declassifies: Vec<DeclassificationKind>,
+    #[serde(default)]
+    pub public_state_declassifies: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]

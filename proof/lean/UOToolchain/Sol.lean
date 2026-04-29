@@ -174,21 +174,16 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value (.bool false) => evalExpr cfg env whenFalse
       | .value _ => .status (.evalError "select condition not boolean")
   | .cellGet objectId =>
-      match cfg.publicState.lookup objectId, cfg.secretState.lookup objectId with
-      | some v, _ => .value v
-      | none, some v => .value v
-      | none, none => .status (.evalError s!"cellGet on unknown object {objectId}")
+      match cfg.readObject objectId with
+      | some v => .value v
+      | none => .status (.evalError s!"cellGet on unknown object {objectId}")
   | .arrayGet objectId indexExpr =>
       match evalExpr cfg env indexExpr with
       | .status s => .status s
       | .value indexVal =>
           match indexVal with
           | .uint idx =>
-              let arrayVal? : Option IR.Value :=
-                match cfg.publicState.lookup objectId with
-                | some v => some v
-                | none => cfg.secretState.lookup objectId
-              match arrayVal? with
+              match cfg.readObject objectId with
               | some (.array values) =>
                   match values[idx]? with
                   | some v => .value v
@@ -203,11 +198,7 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       match evalExpr cfg env keyExpr with
       | .status s => .status s
       | .value keyVal =>
-          let mapVal? : Option IR.Value :=
-            match cfg.publicState.lookup objectId with
-            | some v => some v
-            | none => cfg.secretState.lookup objectId
-          match mapVal? with
+          match cfg.readObject objectId with
           | some (.map entries) =>
               match IR.Value.mapLookup entries keyVal with
               | some v => .value v
@@ -277,12 +268,20 @@ def evalStatement
           let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["CellSet"] }
           match predicate with
           | none =>
-              (cfg.writeObject objectId newVal, env, oc')
+              match cfg.writeObject? objectId newVal with
+              | some cfg' => (cfg', env, oc')
+              | none =>
+                  let msg := s!"cellSet on unknown object {objectId}"
+                  (cfg, env, { oc with status := .evalError msg })
           | some predExpr =>
               match evalExpr cfg env predExpr with
               | .status s => (cfg, env, { oc with status := s })
               | .value (.bool true) =>
-                  (cfg.writeObject objectId newVal, env, oc')
+                  match cfg.writeObject? objectId newVal with
+                  | some cfg' => (cfg', env, oc')
+                  | none =>
+                      let msg := s!"cellSet on unknown object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
               | .value (.bool false) => (cfg, env, oc')
               | .value _ =>
                   (cfg, env, { oc with status := .evalError "cellSet predicate not boolean" })
@@ -318,7 +317,11 @@ def evalStatement
                           else
                             let updated :=
                               IR.Value.array (IR.Value.arraySetAt values idx newVal)
-                            (cfg.writeObject objectId updated, env, oc')
+                            match cfg.writeObject? objectId updated with
+                            | some cfg' => (cfg', env, oc')
+                            | none =>
+                                let msg := s!"arraySet on unknown object {objectId}"
+                                (cfg, env, { oc with status := .evalError msg })
                       | some _ =>
                           let msg := s!"arraySet on non-array object {objectId}"
                           (cfg, env, { oc with status := .evalError msg })
@@ -353,13 +356,21 @@ def evalStatement
                   | some (.map entries) =>
                       let updated :=
                         IR.Value.map (IR.Value.mapInsert entries keyVal newVal)
-                      (cfg.writeObject objectId updated, env, oc')
+                      match cfg.writeObject? objectId updated with
+                      | some cfg' => (cfg', env, oc')
+                      | none =>
+                          let msg := s!"mapPut on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
                   | some _ =>
                       let msg := s!"mapPut on non-map object {objectId}"
                       (cfg, env, { oc with status := .evalError msg })
                   | none =>
                       let updated := IR.Value.map [(keyVal, newVal)]
-                      (cfg.writeObject objectId updated, env, oc')
+                      match cfg.writeObject? objectId updated with
+                      | some cfg' => (cfg', env, oc')
+                      | none =>
+                          let msg := s!"mapPut on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
   | .ifStmt cond thenBody elseBody =>
       match evalExpr cfg env cond with
       | .status s => (cfg, env, { oc with status := s })
@@ -431,10 +442,12 @@ def Function.initialEnv (fn : Function)
 def evalFunction (fn : Function) (cfg : OperationalConfig) : Outcome :=
   match fn.initialEnv cfg.publicArgs cfg.secretArgs with
   | none =>
-      { Outcome.empty with status := .evalError "argument arity mismatch" }
+      { Outcome.empty with
+        status := .evalError "argument arity mismatch"
+        finalPublicState := some cfg.publicState }
   | some env =>
-      let (_cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
-      outcome
+      let (cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
+      outcome.withFinalPublicState cfg'.publicState
 
 /-! ## AST → IR lowering
 

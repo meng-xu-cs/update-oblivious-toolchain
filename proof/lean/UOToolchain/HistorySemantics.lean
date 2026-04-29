@@ -8,7 +8,8 @@ namespace UOToolchain
 
 This module names the public transcript shape used when lifting the single-call
 observer to adaptive call histories. It also makes the ordered logical object
-schedule an explicit public leakage component for mixed exact/ORAM backends.
+schedule and final public store projection explicit public leakage components
+for mixed exact/ORAM backends.
 -/
 
 structure HostCallRequest where
@@ -19,6 +20,7 @@ deriving Repr, DecidableEq
 structure HostCallObservation where
   publicOutcome : SGXPublicOutcome
   orderedObjectSchedule : List Nat
+  finalPublicState : List String
 deriving Repr, DecidableEq
 
 abbrev HostTranscript := List HostCallObservation
@@ -41,6 +43,10 @@ def RuntimeHistory.publicTranscript
 def RuntimeHistory.orderedObjectSchedule
   (history : RuntimeHistory) : List Nat :=
   history.steps.flatMap (fun step => step.observation.orderedObjectSchedule)
+
+def RuntimeHistory.finalPublicStates
+  (history : RuntimeHistory) : List (List String) :=
+  history.steps.map (fun step => step.observation.finalPublicState)
 
 def HistoryStepWitness.PublicEq
   (lhs rhs : HistoryStepWitness) : Prop :=
@@ -127,6 +133,28 @@ theorem runtimeHistory_orderedObjectSchedule_eq_of_stepwise_publicEq
   (hEq : HistoryStepsPublicEq lhs.steps rhs.steps) :
   lhs.orderedObjectSchedule = rhs.orderedObjectSchedule := by
   exact historyStepsPublicEq_orderedObjectSchedule_eq hEq
+
+theorem historyStepsPublicEq_finalPublicStates_eq
+  {lhs rhs : List HistoryStepWitness}
+  (hEq : HistoryStepsPublicEq lhs rhs) :
+  lhs.map (fun step => step.observation.finalPublicState) =
+    rhs.map (fun step => step.observation.finalPublicState) := by
+  induction lhs generalizing rhs with
+  | nil =>
+      cases rhs <;> simp [HistoryStepsPublicEq] at hEq ⊢
+  | cons lhsHead lhsTail ih =>
+      cases rhs with
+      | nil => simp [HistoryStepsPublicEq] at hEq
+      | cons rhsHead rhsTail =>
+          rcases hEq with ⟨hHead, hTail⟩
+          rcases hHead with ⟨_hRequest, hObservation⟩
+          simp [hObservation, ih hTail]
+
+theorem runtimeHistory_finalPublicStates_eq_of_stepwise_publicEq
+  {lhs rhs : RuntimeHistory}
+  (hEq : HistoryStepsPublicEq lhs.steps rhs.steps) :
+  lhs.finalPublicStates = rhs.finalPublicStates := by
+  exact historyStepsPublicEq_finalPublicStates_eq hEq
 
 def HistoryFollowsStrategyFrom
   (strategy : AdaptiveHostStrategy) :

@@ -12,10 +12,9 @@ use crate::metadata::{DeclassificationKind, ReturnPolicy, StatusPolicy};
 use crate::types::{FixedBoxBuilder, Value};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::hash::{Hash, Hasher};
 use std::mem::MaybeUninit;
 use thiserror::Error;
 use uo_precompiles::UoOpcode;
@@ -146,6 +145,25 @@ impl OutputShape {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ReturnChannelPublicBinding {
+    pub scheme: String,
+    pub session_id: String,
+    pub client_public_key_hash: String,
+    pub attestation_transcript_hash: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct EncryptedReturnPayload {
+    pub binding: ReturnChannelPublicBinding,
+    pub aad_hash: String,
+    pub nonce: String,
+    pub ciphertext: String,
+    pub tag: String,
+    pub plaintext_canonical_len: usize,
+    pub wire_len: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct PublicOutcomeTrace {
     pub entrypoint_id: String,
     pub public_args: Box<[String]>,
@@ -157,6 +175,8 @@ pub struct PublicOutcomeTrace {
     pub return_policy: ReturnPolicy,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub return_payload: Option<String>,
+    #[serde(default)]
+    pub encrypted_return_payload: Option<EncryptedReturnPayload>,
     #[serde(default)]
     pub declassifies: Box<[DeclassificationKind]>,
     pub gas_used: u64,
@@ -178,6 +198,7 @@ impl PublicOutcomeTrace {
             output_shape,
             return_policy: ReturnPolicy::Forbidden,
             return_payload: None,
+            encrypted_return_payload: None,
             declassifies: Box::default(),
             gas_used,
         }
@@ -187,10 +208,12 @@ impl PublicOutcomeTrace {
         mut self,
         manifest_entry: &EntrypointManifest,
         return_payload: Option<String>,
+        encrypted_return_payload: Option<EncryptedReturnPayload>,
     ) -> Self {
         self.status_policy = manifest_entry.status;
         self.return_policy = manifest_entry.returns;
         self.return_payload = return_payload;
+        self.encrypted_return_payload = encrypted_return_payload;
         self.declassifies = manifest_entry.declassifies.clone().into_boxed_slice();
         self
     }
@@ -230,6 +253,10 @@ impl PublicCallSummary {
 
     pub fn entry_input_len(&self) -> usize {
         self.entry_input_len
+    }
+
+    pub fn public_args(&self) -> &[String] {
+        &self.public_args
     }
 
     pub fn into_public_args(self) -> Box<[String]> {
@@ -6451,6 +6478,40 @@ pub struct TraceHashBundle {
     pub physical_read_trace_hash: String,
     pub physical_write_trace_hash: String,
     pub physical_access_trace_hash: String,
+    pub primitive_event_transcript_hash: String,
+    pub runtime_proof_object_hash: String,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimePrimitiveEventKind {
+    RuntimeSeed,
+    Opcode,
+    LogicalAccess,
+    LogicalWrite,
+    PhysicalRead,
+    PhysicalWrite,
+    TheoremTrace,
+    RuntimeKernelWitness,
+    RuntimeKernelRefinementWitness,
+    RuntimeKernelFinishBundle,
+    RuntimeKernelMachineFinishWitness,
+    RuntimeTrustedKernelBundle,
+    RuntimeControllerCertificate,
+    RuntimeOramObject,
+    RuntimeOramLeafSchedule,
+    RuntimeOramAccessCounterBefore,
+    RuntimeOramAccessCounterAfter,
+    RuntimeOramPositionMapBefore,
+    RuntimeOramPositionMapAfter,
+    RuntimeOramLeafStateTransition,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct RuntimePrimitiveEvent {
+    pub index: usize,
+    pub kind: RuntimePrimitiveEventKind,
+    pub payload_hash: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
@@ -7342,6 +7403,7 @@ impl ExecutionTrace {
             .iter()
             .map(|event| (event.object.clone(), event.location.clone(), event.len))
             .collect::<Vec<_>>();
+        let primitive_event_transcript = self.primitive_event_transcript()?;
         Ok(TraceHashBundle {
             opcode_trace_hash: hash_json(&self.opcode_trace)?,
             logical_access_trace_hash: hash_json(&self.logical_accesses)?,
@@ -7349,7 +7411,195 @@ impl ExecutionTrace {
             physical_read_trace_hash: hash_json(&normalized_reads)?,
             physical_write_trace_hash: hash_json(&normalized_physical)?,
             physical_access_trace_hash: hash_json(&(normalized_reads, normalized_physical))?,
+            primitive_event_transcript_hash: hash_json(&primitive_event_transcript)?,
+            runtime_proof_object_hash: hash_json(&self.runtime_proof_object_payload())?,
         })
+    }
+
+    pub fn primitive_event_transcript(
+        &self,
+    ) -> Result<Box<[RuntimePrimitiveEvent]>, serde_json::Error> {
+        let mut events = Vec::new();
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::RuntimeSeed,
+            &self.runtime_seed,
+        )?;
+        for (index, opcode) in self.opcode_trace.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::Opcode,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: opcode,
+                },
+            )?;
+        }
+        for (index, event) in self.logical_accesses.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::LogicalAccess,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: event,
+                },
+            )?;
+        }
+        for (index, event) in self.logical_writes.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::LogicalWrite,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: event,
+                },
+            )?;
+        }
+        for (index, event) in self.physical_reads.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::PhysicalRead,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: event,
+                },
+            )?;
+        }
+        for (index, event) in self.physical_writes.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::PhysicalWrite,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: event,
+                },
+            )?;
+        }
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::TheoremTrace,
+            &self.theorem_trace,
+        )?;
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::RuntimeKernelWitness,
+            &self.runtime_kernel_witness,
+        )?;
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::RuntimeKernelRefinementWitness,
+            &self.runtime_kernel_refinement_witness,
+        )?;
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::RuntimeKernelFinishBundle,
+            &self.runtime_kernel_finish_bundle,
+        )?;
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::RuntimeKernelMachineFinishWitness,
+            &self.runtime_kernel_machine_finish_witness,
+        )?;
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::RuntimeTrustedKernelBundle,
+            &self.runtime_trusted_kernel_bundle,
+        )?;
+        push_primitive_event(
+            &mut events,
+            RuntimePrimitiveEventKind::RuntimeControllerCertificate,
+            &self.runtime_controller_certificate,
+        )?;
+        for (index, witness) in self.runtime_oram_objects.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::RuntimeOramObject,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: witness,
+                },
+            )?;
+        }
+        for (index, witness) in self.runtime_oram_leaf_schedule.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::RuntimeOramLeafSchedule,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: witness,
+                },
+            )?;
+        }
+        for (index, witness) in self.runtime_oram_access_counters_before.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::RuntimeOramAccessCounterBefore,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: witness,
+                },
+            )?;
+        }
+        for (index, witness) in self.runtime_oram_access_counters_after.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::RuntimeOramAccessCounterAfter,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: witness,
+                },
+            )?;
+        }
+        for (index, witness) in self.runtime_oram_position_map_before.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::RuntimeOramPositionMapBefore,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: witness,
+                },
+            )?;
+        }
+        for (index, witness) in self.runtime_oram_position_map_after.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::RuntimeOramPositionMapAfter,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: witness,
+                },
+            )?;
+        }
+        for (index, witness) in self.runtime_oram_leaf_state_transitions.iter().enumerate() {
+            push_primitive_event(
+                &mut events,
+                RuntimePrimitiveEventKind::RuntimeOramLeafStateTransition,
+                &IndexedTranscriptPayload {
+                    index,
+                    value: witness,
+                },
+            )?;
+        }
+        Ok(events.into_boxed_slice())
+    }
+
+    fn runtime_proof_object_payload(&self) -> RuntimeProofObjectPayload<'_> {
+        RuntimeProofObjectPayload {
+            theorem_trace: &self.theorem_trace,
+            runtime_kernel_witness: &self.runtime_kernel_witness,
+            runtime_kernel_refinement_witness: &self.runtime_kernel_refinement_witness,
+            runtime_kernel_finish_bundle: &self.runtime_kernel_finish_bundle,
+            runtime_kernel_machine_finish_witness: &self.runtime_kernel_machine_finish_witness,
+            runtime_trusted_kernel_bundle: &self.runtime_trusted_kernel_bundle,
+            runtime_controller_certificate: &self.runtime_controller_certificate,
+            runtime_oram_objects: &self.runtime_oram_objects,
+            runtime_oram_leaf_schedule: &self.runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before: &self.runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after: &self.runtime_oram_access_counters_after,
+            runtime_oram_position_map_before: &self.runtime_oram_position_map_before,
+            runtime_oram_position_map_after: &self.runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions: &self.runtime_oram_leaf_state_transitions,
+        }
     }
 
     fn refinement_trace(&self) -> RefinementTrace {
@@ -7809,11 +8059,46 @@ pub fn classify_write(old: &[u8], new: &[u8]) -> WriteClass {
     }
 }
 
-fn hash_json<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
+#[derive(Serialize)]
+struct IndexedTranscriptPayload<'a, T: ?Sized> {
+    index: usize,
+    value: &'a T,
+}
+
+#[derive(Serialize)]
+struct RuntimeProofObjectPayload<'a> {
+    theorem_trace: &'a TheoremTrace,
+    runtime_kernel_witness: &'a Option<RuntimeKernelWitness>,
+    runtime_kernel_refinement_witness: &'a Option<RuntimeKernelRefinementWitness>,
+    runtime_kernel_finish_bundle: &'a Option<RuntimeKernelFinishBundle>,
+    runtime_kernel_machine_finish_witness: &'a Option<RuntimeKernelMachineFinishWitness>,
+    runtime_trusted_kernel_bundle: &'a Option<RuntimeTrustedKernelBundle>,
+    runtime_controller_certificate: &'a Option<RuntimeControllerCertificate>,
+    runtime_oram_objects: &'a [RuntimeOramObjectWitness],
+    runtime_oram_leaf_schedule: &'a [RuntimeOramLeafWitness],
+    runtime_oram_access_counters_before: &'a [RuntimeOramAccessCounterWitness],
+    runtime_oram_access_counters_after: &'a [RuntimeOramAccessCounterWitness],
+    runtime_oram_position_map_before: &'a [RuntimePathOramPositionMapWitness],
+    runtime_oram_position_map_after: &'a [RuntimePathOramPositionMapWitness],
+    runtime_oram_leaf_state_transitions: &'a [RuntimePathOramTransitionWitness],
+}
+
+fn push_primitive_event<T: Serialize + ?Sized>(
+    events: &mut Vec<RuntimePrimitiveEvent>,
+    kind: RuntimePrimitiveEventKind,
+    payload: &T,
+) -> Result<(), serde_json::Error> {
+    events.push(RuntimePrimitiveEvent {
+        index: events.len(),
+        kind,
+        payload_hash: hash_json(payload)?,
+    });
+    Ok(())
+}
+
+fn hash_json<T: Serialize + ?Sized>(value: &T) -> Result<String, serde_json::Error> {
     let payload = serde_json::to_vec(value)?;
-    let mut hasher = DefaultHasher::new();
-    payload.hash(&mut hasher);
-    Ok(format!("{:016x}", hasher.finish()))
+    Ok(hex::encode(Sha256::digest(payload)))
 }
 
 #[cfg(test)]
@@ -7823,7 +8108,8 @@ mod tests {
         classify_write, collect_kernel_steps_from_expr,
         extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
         max_runtime_kernel_refinement_event_count, runtime_path_oram_fresh_coin_scaffold_of_step,
-        runtime_path_oram_fresh_coin_values_of_step, CanonicalFreshCoinRuntimePathOramTheoremInput,
+        runtime_path_oram_fresh_coin_values_of_step, BoundaryEvent,
+        CanonicalFreshCoinRuntimePathOramTheoremInput,
         CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
         CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
         LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
@@ -7839,7 +8125,7 @@ mod tests {
         RuntimeMaskedUsizeOptionWitness, RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness,
         RuntimeOramLeafWitness, RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
         RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
-        RuntimePathOramTransitionWitness, RuntimeRefinementWitness,
+        RuntimePathOramTransitionWitness, RuntimePrimitiveEventKind, RuntimeRefinementWitness,
         SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
         SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePaperMainSlotFamilyBundleError,
         SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
@@ -7859,6 +8145,41 @@ mod tests {
         assert_eq!(classify_write(&[0, 0], &[1, 2]), WriteClass::Set);
         assert_eq!(classify_write(&[1, 2], &[0, 0]), WriteClass::Clear);
         assert_eq!(classify_write(&[1, 2], &[2, 3]), WriteClass::Update);
+    }
+
+    #[test]
+    fn primitive_event_transcript_hash_binds_trace_and_proof_payloads() {
+        let mut trace = ExecutionTrace::default();
+        trace.opcode_trace = vec!["CellGet".to_string()].into_boxed_slice();
+        trace.logical_accesses = vec![LogicalEvent {
+            kind: "uocell_get".into(),
+            object: "balance".into(),
+            detail: "cell".into(),
+        }]
+        .into_boxed_slice();
+
+        let before = trace.hashes().unwrap();
+        let transcript = trace.primitive_event_transcript().unwrap();
+        assert_eq!(before.primitive_event_transcript_hash.len(), 64);
+        assert_eq!(before.runtime_proof_object_hash.len(), 64);
+        assert!(transcript
+            .iter()
+            .any(|event| event.kind == RuntimePrimitiveEventKind::Opcode));
+        assert!(transcript
+            .iter()
+            .any(|event| event.kind == RuntimePrimitiveEventKind::TheoremTrace));
+
+        trace.theorem_trace.boundary_schedule =
+            vec![BoundaryEvent::enter("deposit(uint256)", 32)].into_boxed_slice();
+        let after = trace.hashes().unwrap();
+        assert_ne!(
+            before.primitive_event_transcript_hash,
+            after.primitive_event_transcript_hash
+        );
+        assert_ne!(
+            before.runtime_proof_object_hash,
+            after.runtime_proof_object_hash
+        );
     }
 
     #[test]
@@ -8525,6 +8846,7 @@ mod tests {
             output_shape: OutputShape::default(),
             return_policy: Default::default(),
             return_payload: None,
+            encrypted_return_payload: None,
             declassifies: Box::default(),
             gas_used,
         }
@@ -8820,6 +9142,7 @@ mod tests {
             returns: Default::default(),
             status: Default::default(),
             declassifies: Vec::new(),
+            public_state_declassifies: Vec::new(),
             confidential_program: None,
             kernel_steps: confidential_slot_program
                 .expected_runtime_step_manifest()
@@ -8854,6 +9177,7 @@ mod tests {
                 returns: Default::default(),
                 status: Default::default(),
                 declassifies: Vec::new(),
+                public_state_declassifies: Vec::new(),
                 confidential_program: None,
                 confidential_slot_program: Some(confidential_slot_program.clone()),
                 kernel_steps: vec![],
@@ -9845,6 +10169,7 @@ mod tests {
             output_shape: OutputShape::default(),
             return_policy: Default::default(),
             return_payload: None,
+            encrypted_return_payload: None,
             declassifies: Box::default(),
             gas_used: 1,
         };

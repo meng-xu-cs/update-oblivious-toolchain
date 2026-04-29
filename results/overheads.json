@@ -1,27 +1,1416 @@
 {
   "cases": [
     {
+      "benchmark": "FixedSlotClassifier/classify",
+      "entrypoint": "classify(uint256)",
+      "full_scan": {
+        "bytes_read": 124.0,
+        "bytes_written": 124.0,
+        "executable": true,
+        "gas_used": 4096,
+        "physical_reads": 1,
+        "physical_writes": 1,
+        "rejected": false,
+        "trace_json_bytes": 9457
+      },
+      "raw": {
+        "error": "confidential object last uses raw backend",
+        "executable": false,
+        "rejected": true
+      },
+      "variants": [
+        {
+          "artifact_json_bytes": 3725,
+          "backend": "raw",
+          "benchmark": "FixedSlotClassifier/classify",
+          "capacity": null,
+          "entrypoint": "classify(uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 1,
+            "oram_bounds": [],
+            "signature": "classify(uint256)"
+          },
+          "error": "confidential object last uses raw backend",
+          "executable": false,
+          "rejected": true,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "last"
+            }
+          ]
+        },
+        {
+          "artifact_json_bytes": 7679,
+          "backend": "full_scan",
+          "benchmark": "FixedSlotClassifier/classify",
+          "bytes_read": 124.0,
+          "bytes_written": 124.0,
+          "capacity": null,
+          "entrypoint": "classify(uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 1,
+            "oram_bounds": [],
+            "signature": "classify(uint256)"
+          },
+          "executable": true,
+          "gas_used": 4096,
+          "physical_reads": 1,
+          "physical_writes": 1,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "last"
+            }
+          ],
+          "trace_json_bytes": 9457
+        }
+      ]
+    },
+    {
+      "benchmark": "AuthScan/auth",
+      "entrypoint": "auth(bytes32)",
+      "full_scan": {
+        "bytes_read": 2108.0,
+        "bytes_written": 620.0,
+        "executable": true,
+        "gas_used": 8192,
+        "physical_reads": 17,
+        "physical_writes": 5,
+        "rejected": false,
+        "trace_json_bytes": 20077
+      },
+      "raw": {
+        "error": "confidential object TOKENS uses raw backend",
+        "executable": false,
+        "rejected": true
+      },
+      "variants": [
+        {
+          "artifact_json_bytes": 4425,
+          "backend": "raw",
+          "benchmark": "AuthScan/auth",
+          "capacity": "4",
+          "entrypoint": "auth(bytes32)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 5,
+            "oram_bounds": [],
+            "signature": "auth(bytes32)"
+          },
+          "error": "confidential object TOKENS uses raw backend",
+          "executable": false,
+          "rejected": true,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 4,
+              "confidential": true,
+              "kind": "Array",
+              "name": "TOKENS"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "lastAuth"
+            }
+          ]
+        },
+        {
+          "artifact_json_bytes": 12387,
+          "backend": "full_scan",
+          "benchmark": "AuthScan/auth",
+          "bytes_read": 2108.0,
+          "bytes_written": 620.0,
+          "capacity": "4",
+          "entrypoint": "auth(bytes32)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 5,
+            "oram_bounds": [],
+            "signature": "auth(bytes32)"
+          },
+          "executable": true,
+          "gas_used": 8192,
+          "physical_reads": 17,
+          "physical_writes": 5,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": 4,
+              "confidential": true,
+              "kind": "Array",
+              "name": "TOKENS"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "lastAuth"
+            }
+          ],
+          "trace_json_bytes": 20077
+        }
+      ]
+    },
+    {
       "benchmark": "ConfidentialMixer/deposit",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "full_scan": {
+        "bytes_read": 3288.0,
+        "bytes_written": 1644.0,
+        "executable": true,
+        "gas_used": 16384,
+        "physical_reads": 18,
+        "physical_writes": 9,
+        "rejected": false,
+        "trace_json_bytes": 23984
+      },
       "full_scan_64": {
+        "bytes_read": 24568.0,
         "bytes_written": 12284.0,
         "executable": true,
         "gas_used": 32768,
+        "physical_reads": 130,
         "physical_writes": 65,
-        "rejected": false
+        "rejected": false,
+        "trace_json_bytes": 107743
       },
-      "oram_64": {
+      "oram": {
+        "bytes_read": 56644.0,
         "bytes_written": 56520.0,
         "executable": true,
         "gas_used": 12288,
+        "physical_reads": 50,
         "physical_writes": 49,
-        "rejected": false
+        "rejected": false,
+        "trace_json_bytes": 156541
+      },
+      "oram_64": {
+        "bytes_read": 56644.0,
+        "bytes_written": 56520.0,
+        "executable": true,
+        "gas_used": 12288,
+        "physical_reads": 50,
+        "physical_writes": 49,
+        "rejected": false,
+        "trace_json_bytes": 156541
       },
       "oram_improves_physical_writes": true,
+      "oram_improves_physical_writes_baseline": "full_scan_64",
       "raw": {
         "error": "confidential object balances uses raw backend",
         "executable": false,
         "rejected": true
-      }
+      },
+      "variants": [
+        {
+          "artifact_json_bytes": 6206,
+          "backend": "raw",
+          "benchmark": "ConfidentialMixer/deposit",
+          "capacity": "8",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "deposit(bytes32,uint256)"
+          },
+          "error": "confidential object balances uses raw backend",
+          "executable": false,
+          "rejected": true,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ]
+        },
+        {
+          "artifact_json_bytes": 13773,
+          "backend": "full_scan",
+          "benchmark": "ConfidentialMixer/deposit",
+          "bytes_read": 3288.0,
+          "bytes_written": 1644.0,
+          "capacity": "8",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "deposit(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 16384,
+          "physical_reads": 18,
+          "physical_writes": 9,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 23984
+        },
+        {
+          "artifact_json_bytes": 13778,
+          "backend": "full_scan_64",
+          "benchmark": "ConfidentialMixer/deposit",
+          "bytes_read": 24568.0,
+          "bytes_written": 12284.0,
+          "capacity": "64",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 65,
+            "oram_bounds": [],
+            "signature": "deposit(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 32768,
+          "physical_reads": 130,
+          "physical_writes": 65,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": 64,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 107743
+        },
+        {
+          "artifact_json_bytes": 14039,
+          "backend": "full_scan+oram",
+          "benchmark": "ConfidentialMixer/deposit",
+          "bytes_read": 56644.0,
+          "bytes_written": 56520.0,
+          "capacity": "64",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 49,
+            "oram_bounds": [
+              {
+                "accesses": 2,
+                "buckets_per_access": 7,
+                "capacity": 64,
+                "commit_ops_for_entrypoint": 48,
+                "commit_ops_per_access": 24,
+                "metadata_pages": 16,
+                "metadata_pages_per_access": 17,
+                "scheme": "path_oram_local_posmap_v1"
+              }
+            ],
+            "signature": "deposit(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 12288,
+          "physical_reads": 50,
+          "physical_writes": 49,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "oram",
+              "capacity": 64,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 156541
+        }
+      ]
+    },
+    {
+      "benchmark": "ConfidentialMixer/withdraw",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "full_scan": {
+        "bytes_read": 3288.0,
+        "bytes_written": 1644.0,
+        "executable": true,
+        "gas_used": 16384,
+        "physical_reads": 18,
+        "physical_writes": 9,
+        "rejected": false,
+        "trace_json_bytes": 24129
+      },
+      "full_scan_64": {
+        "bytes_read": 24568.0,
+        "bytes_written": 12284.0,
+        "executable": true,
+        "gas_used": 32768,
+        "physical_reads": 130,
+        "physical_writes": 65,
+        "rejected": false,
+        "trace_json_bytes": 107888
+      },
+      "oram": {
+        "bytes_read": 56644.0,
+        "bytes_written": 56520.0,
+        "executable": true,
+        "gas_used": 12288,
+        "physical_reads": 50,
+        "physical_writes": 49,
+        "rejected": false,
+        "trace_json_bytes": 156678
+      },
+      "oram_64": {
+        "bytes_read": 56644.0,
+        "bytes_written": 56520.0,
+        "executable": true,
+        "gas_used": 12288,
+        "physical_reads": 50,
+        "physical_writes": 49,
+        "rejected": false,
+        "trace_json_bytes": 156678
+      },
+      "oram_improves_physical_writes": true,
+      "oram_improves_physical_writes_baseline": "full_scan_64",
+      "raw": {
+        "error": "confidential object balances uses raw backend",
+        "executable": false,
+        "rejected": true
+      },
+      "variants": [
+        {
+          "artifact_json_bytes": 6206,
+          "backend": "raw",
+          "benchmark": "ConfidentialMixer/withdraw",
+          "capacity": "8",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "withdraw(bytes32,uint256)"
+          },
+          "error": "confidential object balances uses raw backend",
+          "executable": false,
+          "rejected": true,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ]
+        },
+        {
+          "artifact_json_bytes": 13773,
+          "backend": "full_scan",
+          "benchmark": "ConfidentialMixer/withdraw",
+          "bytes_read": 3288.0,
+          "bytes_written": 1644.0,
+          "capacity": "8",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "withdraw(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 16384,
+          "physical_reads": 18,
+          "physical_writes": 9,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 24129
+        },
+        {
+          "artifact_json_bytes": 13778,
+          "backend": "full_scan_64",
+          "benchmark": "ConfidentialMixer/withdraw",
+          "bytes_read": 24568.0,
+          "bytes_written": 12284.0,
+          "capacity": "64",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 65,
+            "oram_bounds": [],
+            "signature": "withdraw(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 32768,
+          "physical_reads": 130,
+          "physical_writes": 65,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": 64,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 107888
+        },
+        {
+          "artifact_json_bytes": 14039,
+          "backend": "full_scan+oram",
+          "benchmark": "ConfidentialMixer/withdraw",
+          "bytes_read": 56644.0,
+          "bytes_written": 56520.0,
+          "capacity": "64",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 49,
+            "oram_bounds": [
+              {
+                "accesses": 2,
+                "buckets_per_access": 7,
+                "capacity": 64,
+                "commit_ops_for_entrypoint": 48,
+                "commit_ops_per_access": 24,
+                "metadata_pages": 16,
+                "metadata_pages_per_access": 17,
+                "scheme": "path_oram_local_posmap_v1"
+              }
+            ],
+            "signature": "withdraw(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 12288,
+          "physical_reads": 50,
+          "physical_writes": 49,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "oram",
+              "capacity": 64,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 156678
+        }
+      ]
+    },
+    {
+      "benchmark": "ERC20Lite/transferFrom",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "full_scan": {
+        "bytes_read": 11392.0,
+        "bytes_written": 4368.0,
+        "executable": true,
+        "gas_used": 24576,
+        "physical_reads": 64,
+        "physical_writes": 24,
+        "rejected": false,
+        "trace_json_bytes": 54529
+      },
+      "oram": {
+        "bytes_read": 198768.0,
+        "bytes_written": 198768.0,
+        "executable": true,
+        "gas_used": 16384,
+        "physical_reads": 178,
+        "physical_writes": 178,
+        "rejected": false,
+        "trace_json_bytes": 499466
+      },
+      "oram_improves_physical_writes": false,
+      "oram_improves_physical_writes_baseline": "full_scan",
+      "raw": {
+        "error": "confidential object allowances uses raw backend",
+        "executable": false,
+        "rejected": true
+      },
+      "variants": [
+        {
+          "artifact_json_bytes": 10210,
+          "backend": "raw",
+          "benchmark": "ERC20Lite/transferFrom",
+          "capacity": "8+16",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 24,
+            "oram_bounds": [],
+            "signature": "transferFrom(address,address,address,uint256)"
+          },
+          "error": "confidential object allowances uses raw backend",
+          "executable": false,
+          "rejected": true,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 16,
+              "confidential": true,
+              "kind": "Map",
+              "name": "allowances"
+            },
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            }
+          ]
+        },
+        {
+          "artifact_json_bytes": 24630,
+          "backend": "full_scan",
+          "benchmark": "ERC20Lite/transferFrom",
+          "bytes_read": 11392.0,
+          "bytes_written": 4368.0,
+          "capacity": "8+16",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 24,
+            "oram_bounds": [],
+            "signature": "transferFrom(address,address,address,uint256)"
+          },
+          "executable": true,
+          "gas_used": 24576,
+          "physical_reads": 64,
+          "physical_writes": 24,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": 16,
+              "confidential": true,
+              "kind": "Map",
+              "name": "allowances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            }
+          ],
+          "trace_json_bytes": 54529
+        },
+        {
+          "artifact_json_bytes": 25167,
+          "backend": "oram",
+          "benchmark": "ERC20Lite/transferFrom",
+          "bytes_read": 198768.0,
+          "bytes_written": 198768.0,
+          "capacity": "64+128",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 178,
+            "oram_bounds": [
+              {
+                "accesses": 4,
+                "buckets_per_access": 7,
+                "capacity": 64,
+                "commit_ops_for_entrypoint": 96,
+                "commit_ops_per_access": 24,
+                "metadata_pages": 16,
+                "metadata_pages_per_access": 17,
+                "scheme": "path_oram_local_posmap_v1"
+              },
+              {
+                "accesses": 2,
+                "buckets_per_access": 8,
+                "capacity": 128,
+                "commit_ops_for_entrypoint": 82,
+                "commit_ops_per_access": 41,
+                "metadata_pages": 32,
+                "metadata_pages_per_access": 33,
+                "scheme": "path_oram_local_posmap_v1"
+              }
+            ],
+            "signature": "transferFrom(address,address,address,uint256)"
+          },
+          "executable": true,
+          "gas_used": 16384,
+          "physical_reads": 178,
+          "physical_writes": 178,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "oram",
+              "capacity": 128,
+              "confidential": true,
+              "kind": "Map",
+              "name": "allowances"
+            },
+            {
+              "backend": "oram",
+              "capacity": 64,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            }
+          ],
+          "trace_json_bytes": 499466
+        }
+      ]
+    },
+    {
+      "benchmark": "RegistryCRUD/clearIfMatch",
+      "entrypoint": "clearIfMatch(bytes32,uint256)",
+      "full_scan": {
+        "bytes_read": 3040.0,
+        "bytes_written": 1520.0,
+        "executable": true,
+        "gas_used": 12288,
+        "physical_reads": 16,
+        "physical_writes": 8,
+        "rejected": false,
+        "trace_json_bytes": 21496
+      },
+      "raw": {
+        "error": "confidential object records uses raw backend",
+        "executable": false,
+        "rejected": true
+      },
+      "variants": [
+        {
+          "artifact_json_bytes": 5120,
+          "backend": "raw",
+          "benchmark": "RegistryCRUD/clearIfMatch",
+          "capacity": "8",
+          "entrypoint": "clearIfMatch(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 8,
+            "oram_bounds": [],
+            "signature": "clearIfMatch(bytes32,uint256)"
+          },
+          "error": "confidential object records uses raw backend",
+          "executable": false,
+          "rejected": true,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "records"
+            }
+          ]
+        },
+        {
+          "artifact_json_bytes": 12204,
+          "backend": "full_scan",
+          "benchmark": "RegistryCRUD/clearIfMatch",
+          "bytes_read": 3040.0,
+          "bytes_written": 1520.0,
+          "capacity": "8",
+          "entrypoint": "clearIfMatch(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 8,
+            "oram_bounds": [],
+            "signature": "clearIfMatch(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 12288,
+          "physical_reads": 16,
+          "physical_writes": 8,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "full_scan",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "records"
+            }
+          ],
+          "trace_json_bytes": 21496
+        }
+      ]
+    }
+  ],
+  "coverage": {
+    "matrix_row_count": 17,
+    "metrics": [
+      "gas_used",
+      "physical_reads",
+      "physical_writes",
+      "bytes_read",
+      "bytes_written",
+      "trace_json_bytes",
+      "artifact_json_bytes",
+      "entrypoint_resource_bounds"
+    ],
+    "workload_count": 6
+  },
+  "matrix": [
+    {
+      "artifact_json_bytes": 3725,
+      "backend": "raw",
+      "benchmark": "FixedSlotClassifier/classify",
+      "capacity": null,
+      "entrypoint": "classify(uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 1,
+        "oram_bounds": [],
+        "signature": "classify(uint256)"
+      },
+      "error": "confidential object last uses raw backend",
+      "executable": false,
+      "rejected": true,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "last"
+        }
+      ]
+    },
+    {
+      "artifact_json_bytes": 7679,
+      "backend": "full_scan",
+      "benchmark": "FixedSlotClassifier/classify",
+      "bytes_read": 124.0,
+      "bytes_written": 124.0,
+      "capacity": null,
+      "entrypoint": "classify(uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 1,
+        "oram_bounds": [],
+        "signature": "classify(uint256)"
+      },
+      "executable": true,
+      "gas_used": 4096,
+      "physical_reads": 1,
+      "physical_writes": 1,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "last"
+        }
+      ],
+      "trace_json_bytes": 9457
+    },
+    {
+      "artifact_json_bytes": 4425,
+      "backend": "raw",
+      "benchmark": "AuthScan/auth",
+      "capacity": "4",
+      "entrypoint": "auth(bytes32)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 5,
+        "oram_bounds": [],
+        "signature": "auth(bytes32)"
+      },
+      "error": "confidential object TOKENS uses raw backend",
+      "executable": false,
+      "rejected": true,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 4,
+          "confidential": true,
+          "kind": "Array",
+          "name": "TOKENS"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "lastAuth"
+        }
+      ]
+    },
+    {
+      "artifact_json_bytes": 12387,
+      "backend": "full_scan",
+      "benchmark": "AuthScan/auth",
+      "bytes_read": 2108.0,
+      "bytes_written": 620.0,
+      "capacity": "4",
+      "entrypoint": "auth(bytes32)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 5,
+        "oram_bounds": [],
+        "signature": "auth(bytes32)"
+      },
+      "executable": true,
+      "gas_used": 8192,
+      "physical_reads": 17,
+      "physical_writes": 5,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": 4,
+          "confidential": true,
+          "kind": "Array",
+          "name": "TOKENS"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "lastAuth"
+        }
+      ],
+      "trace_json_bytes": 20077
+    },
+    {
+      "artifact_json_bytes": 6206,
+      "backend": "raw",
+      "benchmark": "ConfidentialMixer/deposit",
+      "capacity": "8",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "deposit(bytes32,uint256)"
+      },
+      "error": "confidential object balances uses raw backend",
+      "executable": false,
+      "rejected": true,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ]
+    },
+    {
+      "artifact_json_bytes": 13773,
+      "backend": "full_scan",
+      "benchmark": "ConfidentialMixer/deposit",
+      "bytes_read": 3288.0,
+      "bytes_written": 1644.0,
+      "capacity": "8",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "deposit(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 16384,
+      "physical_reads": 18,
+      "physical_writes": 9,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 23984
+    },
+    {
+      "artifact_json_bytes": 13778,
+      "backend": "full_scan_64",
+      "benchmark": "ConfidentialMixer/deposit",
+      "bytes_read": 24568.0,
+      "bytes_written": 12284.0,
+      "capacity": "64",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 65,
+        "oram_bounds": [],
+        "signature": "deposit(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 32768,
+      "physical_reads": 130,
+      "physical_writes": 65,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": 64,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 107743
+    },
+    {
+      "artifact_json_bytes": 14039,
+      "backend": "full_scan+oram",
+      "benchmark": "ConfidentialMixer/deposit",
+      "bytes_read": 56644.0,
+      "bytes_written": 56520.0,
+      "capacity": "64",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 49,
+        "oram_bounds": [
+          {
+            "accesses": 2,
+            "buckets_per_access": 7,
+            "capacity": 64,
+            "commit_ops_for_entrypoint": 48,
+            "commit_ops_per_access": 24,
+            "metadata_pages": 16,
+            "metadata_pages_per_access": 17,
+            "scheme": "path_oram_local_posmap_v1"
+          }
+        ],
+        "signature": "deposit(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 12288,
+      "physical_reads": 50,
+      "physical_writes": 49,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "oram",
+          "capacity": 64,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 156541
+    },
+    {
+      "artifact_json_bytes": 6206,
+      "backend": "raw",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "capacity": "8",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "withdraw(bytes32,uint256)"
+      },
+      "error": "confidential object balances uses raw backend",
+      "executable": false,
+      "rejected": true,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ]
+    },
+    {
+      "artifact_json_bytes": 13773,
+      "backend": "full_scan",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "bytes_read": 3288.0,
+      "bytes_written": 1644.0,
+      "capacity": "8",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "withdraw(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 16384,
+      "physical_reads": 18,
+      "physical_writes": 9,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 24129
+    },
+    {
+      "artifact_json_bytes": 13778,
+      "backend": "full_scan_64",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "bytes_read": 24568.0,
+      "bytes_written": 12284.0,
+      "capacity": "64",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 65,
+        "oram_bounds": [],
+        "signature": "withdraw(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 32768,
+      "physical_reads": 130,
+      "physical_writes": 65,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": 64,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 107888
+    },
+    {
+      "artifact_json_bytes": 14039,
+      "backend": "full_scan+oram",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "bytes_read": 56644.0,
+      "bytes_written": 56520.0,
+      "capacity": "64",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 49,
+        "oram_bounds": [
+          {
+            "accesses": 2,
+            "buckets_per_access": 7,
+            "capacity": 64,
+            "commit_ops_for_entrypoint": 48,
+            "commit_ops_per_access": 24,
+            "metadata_pages": 16,
+            "metadata_pages_per_access": 17,
+            "scheme": "path_oram_local_posmap_v1"
+          }
+        ],
+        "signature": "withdraw(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 12288,
+      "physical_reads": 50,
+      "physical_writes": 49,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "oram",
+          "capacity": 64,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 156678
+    },
+    {
+      "artifact_json_bytes": 10210,
+      "backend": "raw",
+      "benchmark": "ERC20Lite/transferFrom",
+      "capacity": "8+16",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 24,
+        "oram_bounds": [],
+        "signature": "transferFrom(address,address,address,uint256)"
+      },
+      "error": "confidential object allowances uses raw backend",
+      "executable": false,
+      "rejected": true,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 16,
+          "confidential": true,
+          "kind": "Map",
+          "name": "allowances"
+        },
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        }
+      ]
+    },
+    {
+      "artifact_json_bytes": 24630,
+      "backend": "full_scan",
+      "benchmark": "ERC20Lite/transferFrom",
+      "bytes_read": 11392.0,
+      "bytes_written": 4368.0,
+      "capacity": "8+16",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 24,
+        "oram_bounds": [],
+        "signature": "transferFrom(address,address,address,uint256)"
+      },
+      "executable": true,
+      "gas_used": 24576,
+      "physical_reads": 64,
+      "physical_writes": 24,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": 16,
+          "confidential": true,
+          "kind": "Map",
+          "name": "allowances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        }
+      ],
+      "trace_json_bytes": 54529
+    },
+    {
+      "artifact_json_bytes": 25167,
+      "backend": "oram",
+      "benchmark": "ERC20Lite/transferFrom",
+      "bytes_read": 198768.0,
+      "bytes_written": 198768.0,
+      "capacity": "64+128",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 178,
+        "oram_bounds": [
+          {
+            "accesses": 4,
+            "buckets_per_access": 7,
+            "capacity": 64,
+            "commit_ops_for_entrypoint": 96,
+            "commit_ops_per_access": 24,
+            "metadata_pages": 16,
+            "metadata_pages_per_access": 17,
+            "scheme": "path_oram_local_posmap_v1"
+          },
+          {
+            "accesses": 2,
+            "buckets_per_access": 8,
+            "capacity": 128,
+            "commit_ops_for_entrypoint": 82,
+            "commit_ops_per_access": 41,
+            "metadata_pages": 32,
+            "metadata_pages_per_access": 33,
+            "scheme": "path_oram_local_posmap_v1"
+          }
+        ],
+        "signature": "transferFrom(address,address,address,uint256)"
+      },
+      "executable": true,
+      "gas_used": 16384,
+      "physical_reads": 178,
+      "physical_writes": 178,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "oram",
+          "capacity": 128,
+          "confidential": true,
+          "kind": "Map",
+          "name": "allowances"
+        },
+        {
+          "backend": "oram",
+          "capacity": 64,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        }
+      ],
+      "trace_json_bytes": 499466
+    },
+    {
+      "artifact_json_bytes": 5120,
+      "backend": "raw",
+      "benchmark": "RegistryCRUD/clearIfMatch",
+      "capacity": "8",
+      "entrypoint": "clearIfMatch(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 8,
+        "oram_bounds": [],
+        "signature": "clearIfMatch(bytes32,uint256)"
+      },
+      "error": "confidential object records uses raw backend",
+      "executable": false,
+      "rejected": true,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "records"
+        }
+      ]
+    },
+    {
+      "artifact_json_bytes": 12204,
+      "backend": "full_scan",
+      "benchmark": "RegistryCRUD/clearIfMatch",
+      "bytes_read": 3040.0,
+      "bytes_written": 1520.0,
+      "capacity": "8",
+      "entrypoint": "clearIfMatch(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 8,
+        "oram_bounds": [],
+        "signature": "clearIfMatch(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 12288,
+      "physical_reads": 16,
+      "physical_writes": 8,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "full_scan",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "records"
+        }
+      ],
+      "trace_json_bytes": 21496
     }
   ]
 }

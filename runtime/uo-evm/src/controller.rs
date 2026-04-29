@@ -4,8 +4,8 @@ use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};
 pub(crate) use uo_core::PublicCallSummary;
 use uo_core::{
-    BoundaryEvent, ControllerPageBudget, ControllerPhase, FixedBoxBuilder, OutputShape,
-    PublicOutcomeTrace, ReturnPolicy, RuntimeControllerObserverCertificate,
+    BoundaryEvent, ControllerPageBudget, ControllerPhase, EncryptedReturnPayload, FixedBoxBuilder,
+    OutputShape, PublicOutcomeTrace, ReturnPolicy, RuntimeControllerObserverCertificate,
     RuntimeObservedOramAccessWitness, RuntimeOramAccessWitness, RuntimeOramLeafWitness,
     RuntimePathOramTransitionWitness, RuntimePublicCallTraceBundle, Value,
 };
@@ -277,6 +277,7 @@ impl CallRecorder {
         public_call: PublicCallSummary,
         output_shape: OutputShape,
         return_payload: Option<String>,
+        encrypted_return_payload: Option<EncryptedReturnPayload>,
         aborted: bool,
         gas_used: u64,
     ) -> Result<(usize, RuntimePublicCallTraceBundle)> {
@@ -298,7 +299,7 @@ impl CallRecorder {
             output_shape,
             gas_used,
         )
-        .with_host_visibility(manifest_entry, return_payload);
+        .with_host_visibility(manifest_entry, return_payload, encrypted_return_payload);
         let controller_observer =
             RuntimeControllerObserverCertificate::from_runtime_observer_with_oram_accesses(
                 public_outcome,
@@ -506,34 +507,59 @@ fn gas_used_of(
 pub(crate) fn output_shape_of(
     manifest_entry: &EntrypointManifest,
     return_value: &Option<Value>,
+    encrypted_return_payload: &Option<EncryptedReturnPayload>,
 ) -> Result<OutputShape> {
-    match return_value {
-        Some(_) => Ok(OutputShape::returned(
+    match (
+        return_value,
+        manifest_entry.returns,
+        encrypted_return_payload,
+    ) {
+        (Some(_), ReturnPolicy::EncryptedToClient, Some(payload)) => {
+            Ok(OutputShape::returned(payload.wire_len))
+        }
+        (Some(_), ReturnPolicy::EncryptedToClient, None) => {
+            bail!("encrypted_to_client return requires a return channel session")
+        }
+        (Some(_), _, Some(_)) => {
+            bail!("encrypted return payload provided for non-encrypted return")
+        }
+        (Some(_), _, None) => Ok(OutputShape::returned(
             manifest_entry.return_canonical_len.ok_or_else(|| {
                 anyhow::anyhow!(
                     "manifest return_canonical_len missing for entrypoint with return value"
                 )
             })?,
         )),
-        None => Ok(OutputShape::default()),
+        (None, _, Some(_)) => bail!("encrypted return payload provided without a return value"),
+        (None, _, None) => Ok(OutputShape::default()),
     }
 }
 
 pub(crate) fn return_payload_of(
     manifest_entry: &EntrypointManifest,
     return_value: &Option<Value>,
+    encrypted_return_payload: &Option<EncryptedReturnPayload>,
 ) -> Result<Option<String>> {
-    match (return_value, manifest_entry.returns) {
-        (Some(_), ReturnPolicy::Forbidden) => {
+    match (
+        return_value,
+        manifest_entry.returns,
+        encrypted_return_payload,
+    ) {
+        (Some(_), ReturnPolicy::Forbidden, _) => {
             bail!("entrypoint returned a value despite returns: forbidden")
         }
-        (Some(_), ReturnPolicy::EncryptedToClient) => {
-            bail!("encrypted_to_client returns are not implemented")
+        (Some(_), ReturnPolicy::EncryptedToClient, Some(_)) => Ok(None),
+        (Some(_), ReturnPolicy::EncryptedToClient, None) => {
+            bail!("encrypted_to_client return requires a return channel session")
         }
-        (Some(value), ReturnPolicy::Public | ReturnPolicy::Declassified) => {
+        (Some(value), ReturnPolicy::Public | ReturnPolicy::Declassified, None) => {
             Ok(Some(value.to_string()))
         }
-        (None, _) => Ok(None),
+        (Some(_), ReturnPolicy::Public | ReturnPolicy::Declassified, Some(_)) => {
+            bail!("encrypted return payload provided for plaintext return policy")
+        }
+        (None, _, None) => Ok(None),
+        (None, _, Some(_)) => bail!("encrypted return payload provided without a return value"),
     }
 }
 
@@ -543,18 +569,21 @@ pub(crate) fn finalize_public_call_trace(
     manifest_objects: &[StateObjectManifest],
     public_call: PublicCallSummary,
     return_value: &Option<Value>,
+    encrypted_return_payload: Option<EncryptedReturnPayload>,
     aborted: bool,
     confidential: bool,
 ) -> Result<(u64, usize, RuntimePublicCallTraceBundle)> {
     let gas_used = gas_used_of(&recorder, manifest_entry, confidential);
-    let output_shape = output_shape_of(manifest_entry, return_value)?;
-    let return_payload = return_payload_of(manifest_entry, return_value)?;
+    let output_shape = output_shape_of(manifest_entry, return_value, &encrypted_return_payload)?;
+    let return_payload =
+        return_payload_of(manifest_entry, return_value, &encrypted_return_payload)?;
     let (zero_writes, trace_bundle) = recorder.finish(
         manifest_entry,
         manifest_objects,
         public_call,
         output_shape,
         return_payload,
+        encrypted_return_payload,
         aborted,
         gas_used,
     )?;

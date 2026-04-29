@@ -1,5 +1,13 @@
 {
   "compiler_version": "0.1.0",
+  "admitted_package": {
+    "schema": "uo-admitted-package-v1",
+    "source_sha256": "8680887ee074a5dcbf38f6d1c24cabe4ce8b9bae2ee5dbe0f4f7bb4994bb660a",
+    "metadata_sha256": "fd6d5493f179b424399ae6ce67a76dec2deb54fb85ef57106f75d6c4cb7560d1",
+    "compilation_mode": "uo",
+    "compiler_version": "0.1.0",
+    "package_sha256": "53c2b98e04c35004636a76392e6bd36379b668473bfba730ed0e4cd785ebe6ac"
+  },
   "contract": {
     "contract": "FixedSlotClassifier",
     "mode": "Uo",
@@ -52,7 +60,7 @@
                   },
                   "rhs": {
                     "Literal": {
-                      "Uint": 1
+                      "Uint": "1"
                     }
                   }
                 }
@@ -112,7 +120,7 @@
                 "rhs": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 }
               }
@@ -155,7 +163,7 @@
                 "rhs": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 }
               }
@@ -207,7 +215,7 @@
                   },
                   "rhs": {
                     "Literal": {
-                      "Uint": 7
+                      "Uint": "7"
                     }
                   }
                 }
@@ -219,7 +227,7 @@
               "object_id": 1,
               "value": {
                 "Literal": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               },
               "predicate": {
@@ -269,7 +277,7 @@
                 "rhs": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 7
+                    "Uint": "7"
                   }
                 }
               }
@@ -280,7 +288,7 @@
               "value": {
                 "kind": "literal",
                 "value": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               },
               "predicate": {
@@ -314,7 +322,7 @@
                 "rhs": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 7
+                    "Uint": "7"
                   }
                 }
               }
@@ -325,7 +333,7 @@
               "value": {
                 "kind": "literal",
                 "value": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               },
               "predicate": {
@@ -392,6 +400,7 @@
           "returns": "forbidden",
           "status": "public",
           "declassifies": [],
+          "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "classify(uint256)",
             "params": [
@@ -427,7 +436,7 @@
                   "rhs": {
                     "kind": "literal",
                     "value": {
-                      "Uint": 1
+                      "Uint": "1"
                     }
                   }
                 }
@@ -470,7 +479,7 @@
                   "rhs": {
                     "kind": "literal",
                     "value": {
-                      "Uint": 1
+                      "Uint": "1"
                     }
                   }
                 }
@@ -532,6 +541,7 @@
           "declassifies": [
             "return"
           ],
+          "public_state_declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 1,
           "uocell_writes": 0,
@@ -557,6 +567,7 @@
           "returns": "forbidden",
           "status": "public",
           "declassifies": [],
+          "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "sameSame(uint256)",
             "params": [
@@ -592,7 +603,7 @@
                   "rhs": {
                     "kind": "literal",
                     "value": {
-                      "Uint": 7
+                      "Uint": "7"
                     }
                   }
                 }
@@ -603,7 +614,7 @@
                 "value": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 },
                 "predicate": {
@@ -637,7 +648,7 @@
                   "rhs": {
                     "kind": "literal",
                     "value": {
-                      "Uint": 7
+                      "Uint": "7"
                     }
                   }
                 }
@@ -648,7 +659,7 @@
                 "value": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 },
                 "predicate": {

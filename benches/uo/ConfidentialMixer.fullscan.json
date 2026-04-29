@@ -1,5 +1,13 @@
 {
   "compiler_version": "0.1.0",
+  "admitted_package": {
+    "schema": "uo-admitted-package-v1",
+    "source_sha256": "234fe8ee8ec1332afc02b3f7446ef82d93ed2c0d62180b88012be70e98a57262",
+    "metadata_sha256": "9c055b1e871e13e81a5a6495ae67396710d0faea8cd92cc57a4b0d942e64a381",
+    "compilation_mode": "uo",
+    "compiler_version": "0.1.0",
+    "package_sha256": "51be4837fb9087ad737624af2ea061c47eb332a8142ffe319172379d608d63d2"
+  },
   "contract": {
     "contract": "ConfidentialMixer",
     "mode": "Uo",
@@ -737,6 +745,7 @@
           "declassifies": [
             "return"
           ],
+          "public_state_declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -764,6 +773,7 @@
           "returns": "forbidden",
           "status": "public",
           "declassifies": [],
+          "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "deposit(bytes32,uint256)",
             "params": [
@@ -980,6 +990,7 @@
           "declassifies": [
             "return"
           ],
+          "public_state_declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 1,
           "uocell_writes": 0,
@@ -1011,6 +1022,7 @@
             "return",
             "success"
           ],
+          "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "withdraw(bytes32,uint256)",
             "params": [

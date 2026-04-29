@@ -6,7 +6,7 @@ use crate::manifest::{
 };
 use crate::metadata::{ContractMetadata, DeclassificationKind, ReturnPolicy, StatusPolicy};
 use crate::AdmittedPackageIdentity;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -37,9 +37,9 @@ fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
 pub struct ProofRelevantTranslationBundle {
     pub source_path: String,
     pub metadata_contract: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub source_admitted_package: Option<AdmittedPackageIdentity>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub artifact_admitted_package: Option<AdmittedPackageIdentity>,
     pub source_contract_json: String,
     pub artifact_contract_json: String,
@@ -54,7 +54,7 @@ impl ProofRelevantTranslationBundle {
         source_artifact: &CompiledArtifact,
         artifact: &CompiledArtifact,
     ) -> Result<Self> {
-        Ok(Self {
+        let bundle = Self {
             source_path: source_path.into(),
             metadata_contract: metadata.contract.clone(),
             source_admitted_package: source_artifact.admitted_package.clone(),
@@ -63,13 +63,19 @@ impl ProofRelevantTranslationBundle {
             artifact_contract_json: serde_json::to_string(&artifact.contract)?,
             source_view: ProofRelevantContractView::from_artifact(source_artifact)?,
             artifact_view: ProofRelevantContractView::from_artifact(artifact)?,
-        })
+        };
+        bundle.validate_field_completeness()?;
+        Ok(bundle)
     }
 
     pub fn views_match(&self) -> bool {
         self.source_view == self.artifact_view
             && self.source_admitted_package == self.artifact_admitted_package
             && self.source_admitted_package.is_some()
+    }
+
+    pub fn validate_field_completeness(&self) -> Result<()> {
+        validate_proof_relevant_translation_bundle_json(&serde_json::to_value(self)?)
     }
 }
 
@@ -155,9 +161,9 @@ pub struct ProofRelevantFunctionView {
     pub body: Vec<String>,
     pub secret_args: Vec<usize>,
     pub confidential: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub confidential_program: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub confidential_slot_program: Option<String>,
 }
 
@@ -306,14 +312,15 @@ pub struct ProofRelevantEntrypointView {
     pub arena_bytes: usize,
     pub max_stack_words: usize,
     pub max_hash_part_bytes: usize,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub return_canonical_len: Option<usize>,
     pub returns: ReturnPolicy,
     pub status: StatusPolicy,
     pub declassifies: Vec<DeclassificationKind>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_state_declassifies: Vec<String>,
+    #[serde(default)]
     pub confidential_program: Option<ConfidentialKernelProgram>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub confidential_slot_program: Option<ConfidentialKernelSlotProgram>,
     pub kernel_steps: Vec<ProofRelevantKernelStepView>,
     pub uocell_reads: usize,
@@ -341,6 +348,7 @@ impl ProofRelevantEntrypointView {
             returns: entrypoint.returns,
             status: entrypoint.status,
             declassifies: entrypoint.declassifies.clone(),
+            public_state_declassifies: entrypoint.public_state_declassifies.clone(),
             confidential_program: entrypoint.confidential_program.clone(),
             confidential_slot_program: entrypoint.confidential_slot_program.clone(),
             kernel_steps: entrypoint
@@ -425,11 +433,265 @@ fn opcode_tag(opcode: &uo_precompiles::UoOpcode) -> &'static str {
     }
 }
 
+const BUNDLE_FIELDS: &[&str] = &[
+    "artifact_admitted_package",
+    "artifact_contract_json",
+    "artifact_view",
+    "metadata_contract",
+    "source_admitted_package",
+    "source_contract_json",
+    "source_path",
+    "source_view",
+];
+
+const CONTRACT_VIEW_FIELDS: &[&str] = &["contract", "functions", "manifest", "mode", "state"];
+
+const STATE_OBJECT_VIEW_FIELDS: &[&str] = &[
+    "backend",
+    "capacity",
+    "confidential",
+    "id",
+    "key_type",
+    "key_type_short_name",
+    "kind",
+    "name",
+    "oram_scheme",
+    "value_type",
+    "value_type_short_name",
+];
+
+const PARAM_VIEW_FIELDS: &[&str] = &["name", "ty"];
+
+const FUNCTION_VIEW_FIELDS: &[&str] = &[
+    "body",
+    "confidential",
+    "confidential_program",
+    "confidential_slot_program",
+    "params",
+    "return_type",
+    "secret_args",
+    "signature",
+];
+
+const MANIFEST_VIEW_FIELDS: &[&str] = &["compilation_mode", "contract", "entrypoints", "objects"];
+
+const MANIFEST_OBJECT_VIEW_FIELDS: &[&str] = &[
+    "backend",
+    "capacity",
+    "id",
+    "key_type",
+    "kind",
+    "name",
+    "oram",
+    "value_type",
+];
+
+const ORAM_VIEW_FIELDS: &[&str] = &[
+    "accesses_per_call",
+    "block_size",
+    "blocks_per_bucket",
+    "bucket_count",
+    "bucket_size",
+    "buckets_per_access",
+    "metadata_pages",
+    "metadata_pages_per_access",
+    "recursion_depth",
+    "scheme",
+    "stash_bound",
+    "tree_height",
+];
+
+const ENTRYPOINT_VIEW_FIELDS: &[&str] = &[
+    "arena_bytes",
+    "confidential_program",
+    "confidential_slot_program",
+    "declassifies",
+    "entry_input_len",
+    "kernel_steps",
+    "max_commit_ops",
+    "max_hash_part_bytes",
+    "max_stack_words",
+    "oram_accesses",
+    "param_names",
+    "public_gas_budget",
+    "public_state_declassifies",
+    "return_canonical_len",
+    "returns",
+    "secret_args",
+    "signature",
+    "status",
+    "uoarray_reads",
+    "uoarray_writes",
+    "uocell_reads",
+    "uocell_writes",
+    "uomap_reads",
+    "uomap_writes",
+];
+
+const KERNEL_STEP_VIEW_FIELDS: &[&str] = &["object_id", "opcode"];
+
+const ORAM_ACCESS_VIEW_FIELDS: &[&str] = &["accesses", "object_id"];
+
+fn require_object_fields(value: &Value, path: &str, expected: &[&str]) -> Result<()> {
+    let Value::Object(object) = value else {
+        bail!("{path} must be a JSON object");
+    };
+    let mut actual = object.keys().map(String::as_str).collect::<Vec<_>>();
+    actual.sort_unstable();
+    let mut expected_sorted = expected.to_vec();
+    expected_sorted.sort_unstable();
+    if actual != expected_sorted {
+        let missing = expected_sorted
+            .iter()
+            .copied()
+            .filter(|field| !actual.contains(field))
+            .collect::<Vec<_>>();
+        let extra = actual
+            .iter()
+            .copied()
+            .filter(|field| !expected_sorted.contains(field))
+            .collect::<Vec<_>>();
+        bail!(
+            "{path} proof-relevant fields mismatch: missing [{}], extra [{}]",
+            missing.join(", "),
+            extra.join(", ")
+        );
+    }
+    Ok(())
+}
+
+fn require_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>> {
+    match value {
+        Value::Array(items) => Ok(items),
+        _ => bail!("{path} must be a JSON array"),
+    }
+}
+
+fn require_field<'a>(value: &'a Value, path: &str, field: &str) -> Result<&'a Value> {
+    match value {
+        Value::Object(object) => object
+            .get(field)
+            .ok_or_else(|| anyhow::anyhow!("{path} missing field {field}")),
+        _ => bail!("{path} must be a JSON object"),
+    }
+}
+
+fn validate_contract_view_fields(value: &Value, path: &str) -> Result<()> {
+    require_object_fields(value, path, CONTRACT_VIEW_FIELDS)?;
+    for (index, state) in require_array(require_field(value, path, "state")?, "state")?
+        .iter()
+        .enumerate()
+    {
+        require_object_fields(
+            state,
+            &format!("{path}.state[{index}]"),
+            STATE_OBJECT_VIEW_FIELDS,
+        )?;
+    }
+    for (index, function) in require_array(require_field(value, path, "functions")?, "functions")?
+        .iter()
+        .enumerate()
+    {
+        require_object_fields(
+            function,
+            &format!("{path}.functions[{index}]"),
+            FUNCTION_VIEW_FIELDS,
+        )?;
+        for (param_index, param) in
+            require_array(require_field(function, path, "params")?, "params")?
+                .iter()
+                .enumerate()
+        {
+            require_object_fields(
+                param,
+                &format!("{path}.functions[{index}].params[{param_index}]"),
+                PARAM_VIEW_FIELDS,
+            )?;
+        }
+    }
+    let manifest = require_field(value, path, "manifest")?;
+    require_object_fields(manifest, &format!("{path}.manifest"), MANIFEST_VIEW_FIELDS)?;
+    for (index, object) in require_array(
+        require_field(manifest, path, "objects")?,
+        "manifest.objects",
+    )?
+    .iter()
+    .enumerate()
+    {
+        require_object_fields(
+            object,
+            &format!("{path}.manifest.objects[{index}]"),
+            MANIFEST_OBJECT_VIEW_FIELDS,
+        )?;
+        let oram = require_field(object, path, "oram")?;
+        if !oram.is_null() {
+            require_object_fields(
+                oram,
+                &format!("{path}.manifest.objects[{index}].oram"),
+                ORAM_VIEW_FIELDS,
+            )?;
+        }
+    }
+    for (index, entrypoint) in require_array(
+        require_field(manifest, path, "entrypoints")?,
+        "manifest.entrypoints",
+    )?
+    .iter()
+    .enumerate()
+    {
+        require_object_fields(
+            entrypoint,
+            &format!("{path}.manifest.entrypoints[{index}]"),
+            ENTRYPOINT_VIEW_FIELDS,
+        )?;
+        for (step_index, step) in require_array(
+            require_field(entrypoint, path, "kernel_steps")?,
+            "kernel_steps",
+        )?
+        .iter()
+        .enumerate()
+        {
+            require_object_fields(
+                step,
+                &format!("{path}.manifest.entrypoints[{index}].kernel_steps[{step_index}]"),
+                KERNEL_STEP_VIEW_FIELDS,
+            )?;
+        }
+        for (access_index, access) in require_array(
+            require_field(entrypoint, path, "oram_accesses")?,
+            "oram_accesses",
+        )?
+        .iter()
+        .enumerate()
+        {
+            require_object_fields(
+                access,
+                &format!("{path}.manifest.entrypoints[{index}].oram_accesses[{access_index}]"),
+                ORAM_ACCESS_VIEW_FIELDS,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_proof_relevant_translation_bundle_json(value: &Value) -> Result<()> {
+    require_object_fields(value, "bundle", BUNDLE_FIELDS)?;
+    validate_contract_view_fields(
+        require_field(value, "bundle", "source_view")?,
+        "source_view",
+    )?;
+    validate_contract_view_fields(
+        require_field(value, "bundle", "artifact_view")?,
+        "artifact_view",
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        canonical_json_string, ProofRelevantEntrypointView, ProofRelevantFunctionView,
-        ProofRelevantStateObjectView,
+        canonical_json_string, require_object_fields, ProofRelevantEntrypointView,
+        ProofRelevantFunctionView, ProofRelevantStateObjectView, ENTRYPOINT_VIEW_FIELDS,
     };
     use crate::ir::{BackendKind, CompiledFunction, ContainerKind, Expr, StateObject, Statement};
     use crate::{
@@ -519,6 +781,7 @@ mod tests {
             returns: ReturnPolicy::Declassified,
             status: StatusPolicy::Declassified,
             declassifies: vec![DeclassificationKind::Return, DeclassificationKind::Success],
+            public_state_declassifies: vec!["publicTotal".into()],
             confidential_program: None,
             confidential_slot_program: None,
             kernel_steps: vec![],
@@ -539,5 +802,84 @@ mod tests {
             view.declassifies,
             vec![DeclassificationKind::Return, DeclassificationKind::Success]
         );
+        assert_eq!(
+            view.public_state_declassifies,
+            vec!["publicTotal".to_string()]
+        );
+    }
+
+    #[test]
+    fn proof_relevant_entrypoint_view_serializes_optional_fields_as_null() {
+        let entrypoint = EntrypointManifest {
+            secret_args: vec![],
+            param_names: vec![],
+            entry_input_len: 0,
+            public_gas_budget: 2000,
+            arena_bytes: 4096,
+            max_stack_words: 64,
+            max_hash_part_bytes: 0,
+            return_canonical_len: None,
+            returns: ReturnPolicy::Forbidden,
+            status: StatusPolicy::Public,
+            declassifies: vec![],
+            public_state_declassifies: vec![],
+            confidential_program: None,
+            confidential_slot_program: None,
+            kernel_steps: vec![],
+            uocell_reads: 0,
+            uocell_writes: 0,
+            uoarray_reads: 0,
+            uoarray_writes: 0,
+            uomap_reads: 0,
+            uomap_writes: 0,
+            max_commit_ops: 0,
+            oram_accesses: Default::default(),
+        };
+        let view =
+            ProofRelevantEntrypointView::from_manifest_entrypoint("f()", &entrypoint).unwrap();
+        let json = serde_json::to_value(&view).unwrap();
+        let object = json.as_object().unwrap();
+        assert!(object.get("return_canonical_len").unwrap().is_null());
+        assert!(object.get("confidential_program").unwrap().is_null());
+        assert!(object.get("confidential_slot_program").unwrap().is_null());
+    }
+
+    #[test]
+    fn proof_relevant_entrypoint_field_completeness_rejects_missing_field() {
+        let entrypoint = EntrypointManifest {
+            secret_args: vec![0],
+            param_names: vec!["secret".into()],
+            entry_input_len: 32,
+            public_gas_budget: 2000,
+            arena_bytes: 4096,
+            max_stack_words: 64,
+            max_hash_part_bytes: 0,
+            return_canonical_len: Some(32),
+            returns: ReturnPolicy::Declassified,
+            status: StatusPolicy::Declassified,
+            declassifies: vec![DeclassificationKind::Return],
+            public_state_declassifies: vec!["publicTotal".into()],
+            confidential_program: None,
+            confidential_slot_program: None,
+            kernel_steps: vec![],
+            uocell_reads: 0,
+            uocell_writes: 0,
+            uoarray_reads: 0,
+            uoarray_writes: 0,
+            uomap_reads: 0,
+            uomap_writes: 0,
+            max_commit_ops: 0,
+            oram_accesses: Default::default(),
+        };
+        let view = ProofRelevantEntrypointView::from_manifest_entrypoint("f(uint256)", &entrypoint)
+            .unwrap();
+        let mut json = serde_json::to_value(&view).unwrap();
+        json.as_object_mut()
+            .unwrap()
+            .remove("public_state_declassifies");
+        let err = require_object_fields(&json, "entrypoint", ENTRYPOINT_VIEW_FIELDS)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("missing [public_state_declassifies]"));
     }
 }

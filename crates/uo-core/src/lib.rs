@@ -59,7 +59,7 @@ pub use kernel_dsl::{
 };
 pub use manifest::{
     validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeKernelStepManifest,
-    RuntimeManifest, StateObjectManifest,
+    RuntimeManifest, StateObjectManifest, PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY,
 };
 pub use metadata::{
     BoundsMetadata, ContractMetadata, DeclassificationKind, EntrypointMetadata, ReturnPolicy,
@@ -78,15 +78,15 @@ pub use trace::{
     CanonicalFreshCoinTheoremInputError, CanonicalFreshCoinWitnessFamilyError,
     CommittedRuntimeWitnessSnapshot, CommittedRuntimeWitnessSnapshotBuilder,
     CommittedRuntimeWitnessSnapshotBuilderError, ControllerPageBudget, ControllerPhase,
-    ExecutionTrace, ExitEvent, FinalizedRuntimeCallTraceParts, KernelWitnessError, LogicalEvent,
-    NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent,
-    PhysicalWriteEvent, PublicCallSummary, PublicOutcomeTrace, RefinementPhysicalWrite,
-    RefinementTrace, RefinementWitnessError, RuntimeCallOutcome, RuntimeControllerCertificate,
-    RuntimeControllerObserverCertificate, RuntimeExecutionTraceFinalizationError,
-    RuntimeExecutionTraceFinalizationInput, RuntimeKernelBoundaryTracker,
-    RuntimeKernelBoundaryTrackerError, RuntimeKernelExecutionTracker, RuntimeKernelFinishBundle,
-    RuntimeKernelFinishBundleAccessError, RuntimeKernelFinishBundleError,
-    RuntimeKernelFinishSnapshot, RuntimeKernelFinishSnapshotError,
+    EncryptedReturnPayload, ExecutionTrace, ExitEvent, FinalizedRuntimeCallTraceParts,
+    KernelWitnessError, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape,
+    PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PublicCallSummary, PublicOutcomeTrace,
+    RefinementPhysicalWrite, RefinementTrace, RefinementWitnessError, ReturnChannelPublicBinding,
+    RuntimeCallOutcome, RuntimeControllerCertificate, RuntimeControllerObserverCertificate,
+    RuntimeExecutionTraceFinalizationError, RuntimeExecutionTraceFinalizationInput,
+    RuntimeKernelBoundaryTracker, RuntimeKernelBoundaryTrackerError, RuntimeKernelExecutionTracker,
+    RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError,
+    RuntimeKernelFinishBundleError, RuntimeKernelFinishSnapshot, RuntimeKernelFinishSnapshotError,
     RuntimeKernelMachineFinishWitness, RuntimeKernelMachineFinishWitnessError,
     RuntimeKernelRefinementEventKindWitness, RuntimeKernelRefinementEventWitness,
     RuntimeKernelRefinementTracker, RuntimeKernelRefinementTrackerError,

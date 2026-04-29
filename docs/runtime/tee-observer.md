@@ -90,14 +90,15 @@ The TEE deployment assumptions are explicit Lean `Prop` fields:
 Each field has provenance citing Intel SGX references. Runtime audit surfaces
 also map assumptions to implementation evidence, external/deployment-only
 evidence, or removal from the implemented claim. The encrypted return-channel
-case is removed from the implemented claim because the runtime rejects
-`encrypted_to_client` returns.
+case is mapped to implementation evidence for ciphertext-only runtime returns
+plus external deployment evidence for establishing the attested client session
+key.
 
 The matching drift checks include:
 
 - `sgx_deployment_assumption_bundle_pinned`
 - `sgx_deployment_assumption_mechanism_matrix_pinned`
-- `return_channel_crypto_gate_pinned`
+- `return_channel_crypto_evidence_pinned`
 
 ## Non-Claim
 

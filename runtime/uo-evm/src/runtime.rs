@@ -14,12 +14,15 @@ mod state;
 mod theorem;
 
 use crate::controller::CallRecorder;
+use crate::return_channel::ReturnChannelSession;
 use anyhow::Result;
 pub use fresh_coins::PathOramFreshCoinPlan;
 pub(crate) use state::ContractRuntime;
 use uo_core::ir::StateObject;
 use uo_core::manifest::EntrypointManifest;
-use uo_core::{CompiledArtifact, CompiledContract, CompiledFunction, ExecutionTrace};
+use uo_core::{
+    CompiledArtifact, CompiledContract, CompiledFunction, EncryptedReturnPayload, ExecutionTrace,
+};
 use uo_core::{RuntimeCallOutcome, Value};
 
 pub(crate) fn deploy_contract_runtime(
@@ -45,7 +48,14 @@ pub(crate) fn run_contract_call(
     deploy_seed: u64,
     args: Box<[Value]>,
     fresh_coins: Option<PathOramFreshCoinPlan>,
-) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
+    return_channel: Option<&ReturnChannelSession>,
+) -> Result<(
+    Option<Value>,
+    Option<EncryptedReturnPayload>,
+    bool,
+    ExecutionTrace,
+    usize,
+)> {
     theorem::run_traced_call(
         runtime,
         artifact,
@@ -54,6 +64,7 @@ pub(crate) fn run_contract_call(
         deploy_seed,
         args,
         fresh_coins,
+        return_channel,
     )
 }
 

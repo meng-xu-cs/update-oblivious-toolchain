@@ -1,10 +1,12 @@
 use crate::controller::{finalize_public_call_trace, CallRecorder, PublicCallSummary};
+use crate::return_channel::{encrypt_return_value, ReturnChannelSession};
 use crate::runtime::fresh_coins::PathOramFreshCoinPlan;
 use crate::runtime::state::ContractRuntime;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
 use uo_core::{
-    CompiledArtifact, ExecutionTrace, TracedRuntimeCallOutcome, TracedRuntimeCallStart, Value,
+    CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, ReturnPolicy,
+    TracedRuntimeCallOutcome, TracedRuntimeCallStart, Value,
 };
 
 struct CallTraceContext {
@@ -37,11 +39,13 @@ impl CallTraceContext {
 struct FinalizeCallTraceInput<'a> {
     context: CallTraceContext,
     artifact: &'a CompiledArtifact,
+    entrypoint: &'a str,
     confidential: bool,
     deploy_seed: u64,
     manifest_entry: &'a EntrypointManifest,
     manifest_objects: &'a [StateObjectManifest],
     traced_outcome: TracedRuntimeCallOutcome,
+    return_channel: Option<&'a ReturnChannelSession>,
 }
 
 pub(in crate::runtime) fn run_traced_call(
@@ -52,7 +56,14 @@ pub(in crate::runtime) fn run_traced_call(
     deploy_seed: u64,
     args: Box<[Value]>,
     fresh_coins: Option<PathOramFreshCoinPlan>,
-) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
+    return_channel: Option<&ReturnChannelSession>,
+) -> Result<(
+    Option<Value>,
+    Option<EncryptedReturnPayload>,
+    bool,
+    ExecutionTrace,
+    usize,
+)> {
     let manifest_entry = artifact
         .contract
         .manifest
@@ -74,25 +85,35 @@ pub(in crate::runtime) fn run_traced_call(
     finalize_call_trace(FinalizeCallTraceInput {
         context,
         artifact,
+        entrypoint,
         confidential,
         deploy_seed,
         manifest_entry,
         manifest_objects: &artifact.contract.manifest.objects,
         traced_outcome,
+        return_channel,
     })
 }
 
 fn finalize_call_trace(
     input: FinalizeCallTraceInput<'_>,
-) -> Result<(Option<Value>, bool, ExecutionTrace, usize)> {
+) -> Result<(
+    Option<Value>,
+    Option<EncryptedReturnPayload>,
+    bool,
+    ExecutionTrace,
+    usize,
+)> {
     let FinalizeCallTraceInput {
         context,
         artifact,
+        entrypoint,
         confidential,
         deploy_seed,
         manifest_entry,
         manifest_objects,
         traced_outcome,
+        return_channel,
     } = input;
     let CallTraceContext {
         runtime_call_start,
@@ -109,12 +130,21 @@ fn finalize_call_trace(
     ) = traced_outcome
         .into_finalized_call_trace_parts(runtime_call_start)
         .into_execution_trace_inputs();
+    let encrypted_return = encrypted_return_payload_of(
+        artifact,
+        manifest_entry,
+        entrypoint,
+        public_call.public_args(),
+        &return_value,
+        return_channel,
+    )?;
     let (gas_used, zero_writes, trace_bundle) = finalize_public_call_trace(
         recorder,
         manifest_entry,
         manifest_objects,
         public_call,
         &return_value,
+        encrypted_return.clone(),
         aborted,
         confidential,
     )?;
@@ -131,5 +161,39 @@ fn finalize_call_trace(
         ),
     )
     .map_err(anyhow::Error::from)?;
-    Ok((return_value, aborted, trace, zero_writes))
+    let host_return_value = if encrypted_return.is_some() {
+        None
+    } else {
+        return_value
+    };
+    Ok((
+        host_return_value,
+        encrypted_return,
+        aborted,
+        trace,
+        zero_writes,
+    ))
+}
+
+fn encrypted_return_payload_of(
+    artifact: &CompiledArtifact,
+    manifest_entry: &EntrypointManifest,
+    entrypoint: &str,
+    public_args: &[String],
+    return_value: &Option<Value>,
+    return_channel: Option<&ReturnChannelSession>,
+) -> Result<Option<EncryptedReturnPayload>> {
+    match (return_value, manifest_entry.returns, return_channel) {
+        (Some(value), ReturnPolicy::EncryptedToClient, Some(session)) => Ok(Some(
+            encrypt_return_value(artifact, entrypoint, public_args, value, session)?,
+        )),
+        (Some(_), ReturnPolicy::EncryptedToClient, None) => {
+            bail!("encrypted_to_client return requires a return channel session")
+        }
+        (Some(_), _, Some(_)) => bail!("return channel supplied for non-encrypted return policy"),
+        (None, policy, Some(_)) if policy != ReturnPolicy::EncryptedToClient => {
+            bail!("return channel supplied for non-encrypted return policy")
+        }
+        _ => Ok(None),
+    }
 }

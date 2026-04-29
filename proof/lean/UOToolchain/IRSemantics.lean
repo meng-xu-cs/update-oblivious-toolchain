@@ -288,6 +288,8 @@ end OramAccessCounts
 * `status` records normal completion, explicit `Require`/`AbortIf`
   rejection, an `unsupported` IR construct (the evaluator is partial),
   or an internal `evalError`.
+* `finalPublicState` records the public store after the call. It is populated
+  by `evalContract`; intermediate statement/body outcomes leave it as `none`.
 
 The W4.1 evaluator never panics; it always returns an outcome.
 -/
@@ -297,6 +299,7 @@ structure Outcome where
   oramAccessCounts : OramAccessCounts
   kernelSteps : List String
   status : EvalStatus
+  finalPublicState : Option ObjectStore
 
 namespace Outcome
 
@@ -306,12 +309,17 @@ namespace Outcome
   , oramAccessCounts := []
   , kernelSteps := []
   , status := EvalStatus.completed
+  , finalPublicState := none
   }
 
 @[inline] def withGas (oc : Outcome) (gasUsed : Nat) : Outcome :=
   { oc with trace := { oc.trace with gasUsed := gasUsed } }
 
 @[inline] def gasUsed (oc : Outcome) : Nat := oc.trace.gasUsed
+
+@[inline] def withFinalPublicState
+  (oc : Outcome) (publicState : ObjectStore) : Outcome :=
+  { oc with finalPublicState := some publicState }
 
 end Outcome
 
@@ -411,6 +419,280 @@ theorem binaryModByZero_matches_runtime :
     BinaryOp.eval .mod (.uint 7) (.uint 0) = some (.uint 0) := by
   rfl
 
+/-! ## Store ownership helpers
+
+Storage reads and writes are resolved through the declared object map. Unknown
+object ids fail closed instead of defaulting to public state. -/
+
+/-- Look up an object declaration by id in the contract state map. -/
+def OperationalConfig.stateObjectById?
+    (cfg : OperationalConfig) (objectId : Nat) : Option StateObject :=
+  cfg.contract.state.find? (fun so => so.id = objectId)
+
+/-- Confidentiality of a known object. Unknown object ids produce `none`
+instead of defaulting to public. -/
+def OperationalConfig.objectConfidential?
+    (cfg : OperationalConfig) (objectId : Nat) : Option Bool :=
+  match cfg.stateObjectById? objectId with
+  | some so => some so.confidential
+  | none => none
+
+def ObjectStore.remove (store : ObjectStore) (objectId : Nat) : ObjectStore :=
+  store.filter (fun entry => entry.fst ≠ objectId)
+
+theorem ObjectStore.lookup_filter_removed_ne
+    (store : ObjectStore) (removedId queryId : Nat)
+    (hNe : queryId ≠ removedId) :
+    ObjectStore.lookup (store.filter (fun entry => entry.fst ≠ removedId)) queryId =
+      ObjectStore.lookup store queryId := by
+  induction store with
+  | nil =>
+      simp [ObjectStore.lookup]
+  | cons entry rest ih =>
+      rcases entry with ⟨entryId, entryValue⟩
+      by_cases hRemoved : entryId = removedId
+      · have hNotQuery : ¬ entryId = queryId := by
+          intro hQuery
+          exact hNe (hQuery.symm.trans hRemoved)
+        have hRemovedNotQuery : ¬ removedId = queryId := by
+          intro hQuery
+          exact hNe hQuery.symm
+        simpa [ObjectStore.lookup, hRemoved, hNotQuery, hRemovedNotQuery] using ih
+      · by_cases hQuery : entryId = queryId
+        · simp [ObjectStore.lookup, hQuery, hNe]
+        · simpa [ObjectStore.lookup, hRemoved, hQuery] using ih
+
+theorem ObjectStore.lookup_remove_eq
+    (store : ObjectStore) (objectId : Nat) :
+    ObjectStore.lookup (store.remove objectId) objectId = none := by
+  induction store with
+  | nil =>
+      simp [ObjectStore.remove, ObjectStore.lookup]
+  | cons entry rest ih =>
+      rcases entry with ⟨entryId, entryValue⟩
+      by_cases hRemoved : entryId = objectId
+      · simpa [ObjectStore.remove, ObjectStore.lookup, hRemoved] using ih
+      · simpa [ObjectStore.remove, ObjectStore.lookup, hRemoved] using ih
+
+theorem ObjectStore.lookup_remove_ne
+    (store : ObjectStore) (removedId queryId : Nat)
+    (hNe : queryId ≠ removedId) :
+    ObjectStore.lookup (store.remove removedId) queryId =
+      ObjectStore.lookup store queryId := by
+  simpa [ObjectStore.remove] using
+    ObjectStore.lookup_filter_removed_ne store removedId queryId hNe
+
+theorem ObjectStore.lookup_insert_eq
+    (store : ObjectStore) (objectId : Nat) (value : Value) :
+    ObjectStore.lookup (store.insert objectId value) objectId = some value := by
+  simp [ObjectStore.insert, ObjectStore.lookup]
+
+theorem ObjectStore.lookup_insert_ne
+    (store : ObjectStore) (writeId queryId : Nat) (value : Value)
+    (hNe : queryId ≠ writeId) :
+    ObjectStore.lookup (store.insert writeId value) queryId =
+      ObjectStore.lookup store queryId := by
+  have hHead : ¬ writeId = queryId := by
+    intro h
+    exact hNe h.symm
+  simpa [ObjectStore.insert, ObjectStore.lookup, hHead] using
+    ObjectStore.lookup_filter_removed_ne store writeId queryId hNe
+
+/-- Object ids in a store are owned by public state exactly when the contract
+declares them public. -/
+def OperationalConfig.publicStoreAgreesWithObjectMap
+    (cfg : OperationalConfig) : Prop :=
+  ∀ objectId value,
+    cfg.publicState.lookup objectId = some value →
+      cfg.objectConfidential? objectId = some false
+
+/-- Object ids in a store are owned by secret state exactly when the contract
+declares them confidential. -/
+def OperationalConfig.secretStoreAgreesWithObjectMap
+    (cfg : OperationalConfig) : Prop :=
+  ∀ objectId value,
+    cfg.secretState.lookup objectId = some value →
+      cfg.objectConfidential? objectId = some true
+
+/-- Public and secret stores must not both own the same logical object. -/
+def OperationalConfig.storeOwnershipDisjoint
+    (cfg : OperationalConfig) : Prop :=
+  ∀ objectId publicValue secretValue,
+    cfg.publicState.lookup objectId = some publicValue →
+      cfg.secretState.lookup objectId = some secretValue →
+        False
+
+/-- The operational state invariant required by evaluator theorems. It records
+the object-map ownership discipline that the Rust deployment checks enforce
+before execution: declared object ids are unique, every store entry is owned by
+the matching public/secret store, and no object is present in both stores. -/
+def OperationalConfig.WellFormed
+    (cfg : OperationalConfig) : Prop :=
+  (cfg.contract.state.map StateObject.id).Nodup ∧
+    cfg.publicStoreAgreesWithObjectMap ∧
+    cfg.secretStoreAgreesWithObjectMap ∧
+    cfg.storeOwnershipDisjoint
+
+/-- Update the object's value in the appropriate store (public or secret
+based on confidentiality). Unknown objects return `none`. The opposite store
+is scrubbed for the same id to preserve the public/secret ownership split even
+when the input configuration was malformed. -/
+def OperationalConfig.writeObject?
+    (cfg : OperationalConfig) (objectId : Nat) (value : Value) :
+    Option OperationalConfig :=
+  match cfg.objectConfidential? objectId with
+  | some true =>
+      some
+        { cfg with
+          secretState := cfg.secretState.insert objectId value
+          publicState := cfg.publicState.remove objectId }
+  | some false =>
+      some
+        { cfg with
+          publicState := cfg.publicState.insert objectId value
+          secretState := cfg.secretState.remove objectId }
+  | none => none
+
+theorem OperationalConfig.writeObject?_wellFormed
+    {cfg cfg' : OperationalConfig} {objectId : Nat} {value : Value}
+    (hWF : cfg.WellFormed)
+    (hWrite : cfg.writeObject? objectId value = some cfg') :
+    cfg'.WellFormed := by
+  rcases hWF with ⟨hNodup, hPublic, hSecret, hDisjoint⟩
+  unfold OperationalConfig.writeObject? at hWrite
+  cases hConf : cfg.objectConfidential? objectId with
+  | none =>
+      simp [hConf] at hWrite
+  | some confidential =>
+      cases confidential
+      · simp [hConf] at hWrite
+        cases hWrite
+        refine ⟨hNodup, ?_, ?_, ?_⟩
+        · intro queryId storedValue hLookup
+          by_cases hSame : queryId = objectId
+          · subst queryId
+            simpa [OperationalConfig.objectConfidential?,
+              OperationalConfig.stateObjectById?] using hConf
+          · have hOriginal :
+                cfg.publicState.lookup queryId = some storedValue := by
+              simpa [ObjectStore.lookup_insert_ne, hSame] using hLookup
+            simpa [OperationalConfig.objectConfidential?,
+              OperationalConfig.stateObjectById?] using
+                hPublic queryId storedValue hOriginal
+        · intro queryId storedValue hLookup
+          by_cases hSame : queryId = objectId
+          · subst queryId
+            have hNone :
+                (cfg.secretState.remove objectId).lookup objectId = none :=
+              ObjectStore.lookup_remove_eq cfg.secretState objectId
+            simp [hNone] at hLookup
+          · have hOriginal :
+                cfg.secretState.lookup queryId = some storedValue := by
+              simpa [ObjectStore.lookup_remove_ne, hSame] using hLookup
+            simpa [OperationalConfig.objectConfidential?,
+              OperationalConfig.stateObjectById?] using
+                hSecret queryId storedValue hOriginal
+        · intro queryId publicValue secretValue hPublicLookup hSecretLookup
+          by_cases hSame : queryId = objectId
+          · subst queryId
+            have hNone :
+                (cfg.secretState.remove objectId).lookup objectId = none :=
+              ObjectStore.lookup_remove_eq cfg.secretState objectId
+            simp [hNone] at hSecretLookup
+          · have hPublicOriginal :
+                cfg.publicState.lookup queryId = some publicValue := by
+              simpa [ObjectStore.lookup_insert_ne, hSame] using hPublicLookup
+            have hSecretOriginal :
+                cfg.secretState.lookup queryId = some secretValue := by
+              simpa [ObjectStore.lookup_remove_ne, hSame] using hSecretLookup
+            exact hDisjoint queryId publicValue secretValue
+              hPublicOriginal hSecretOriginal
+      · simp [hConf] at hWrite
+        cases hWrite
+        refine ⟨hNodup, ?_, ?_, ?_⟩
+        · intro queryId storedValue hLookup
+          by_cases hSame : queryId = objectId
+          · subst queryId
+            have hNone :
+                (cfg.publicState.remove objectId).lookup objectId = none :=
+              ObjectStore.lookup_remove_eq cfg.publicState objectId
+            simp [hNone] at hLookup
+          · have hOriginal :
+                cfg.publicState.lookup queryId = some storedValue := by
+              simpa [ObjectStore.lookup_remove_ne, hSame] using hLookup
+            simpa [OperationalConfig.objectConfidential?,
+              OperationalConfig.stateObjectById?] using
+                hPublic queryId storedValue hOriginal
+        · intro queryId storedValue hLookup
+          by_cases hSame : queryId = objectId
+          · subst queryId
+            simpa [OperationalConfig.objectConfidential?,
+              OperationalConfig.stateObjectById?] using hConf
+          · have hOriginal :
+                cfg.secretState.lookup queryId = some storedValue := by
+              simpa [ObjectStore.lookup_insert_ne, hSame] using hLookup
+            simpa [OperationalConfig.objectConfidential?,
+              OperationalConfig.stateObjectById?] using
+                hSecret queryId storedValue hOriginal
+        · intro queryId publicValue secretValue hPublicLookup hSecretLookup
+          by_cases hSame : queryId = objectId
+          · subst queryId
+            have hNone :
+                (cfg.publicState.remove objectId).lookup objectId = none :=
+              ObjectStore.lookup_remove_eq cfg.publicState objectId
+            simp [hNone] at hPublicLookup
+          · have hPublicOriginal :
+                cfg.publicState.lookup queryId = some publicValue := by
+              simpa [ObjectStore.lookup_remove_ne, hSame] using hPublicLookup
+            have hSecretOriginal :
+                cfg.secretState.lookup queryId = some secretValue := by
+              simpa [ObjectStore.lookup_insert_ne, hSame] using hSecretLookup
+            exact hDisjoint queryId publicValue secretValue
+              hPublicOriginal hSecretOriginal
+
+/-- Total wrapper for legacy proof statements that already prove object
+existence through `readObject`. New evaluator branches use `writeObject?` so an
+unknown object produces an explicit `evalError`. -/
+def OperationalConfig.writeObject
+    (cfg : OperationalConfig) (objectId : Nat) (value : Value) :
+    OperationalConfig :=
+  match cfg.writeObject? objectId value with
+  | some cfg' => cfg'
+  | none => cfg
+
+/-- Read the object's value from the store declared by the object map. Unknown
+objects fail closed with `none`; public store entries never shadow secret
+objects and secret entries never shadow public objects. -/
+def OperationalConfig.readObject
+    (cfg : OperationalConfig) (objectId : Nat) : Option Value :=
+  match cfg.objectConfidential? objectId with
+  | some true => cfg.secretState.lookup objectId
+  | some false => cfg.publicState.lookup objectId
+  | none => none
+
+theorem OperationalConfig.readObject_unknown_none
+    (cfg : OperationalConfig) (objectId : Nat)
+    (hUnknown : cfg.stateObjectById? objectId = none) :
+    cfg.readObject objectId = none := by
+  simp [OperationalConfig.readObject, OperationalConfig.objectConfidential?,
+    hUnknown]
+
+theorem OperationalConfig.readObject_confidential_uses_secret
+    (cfg : OperationalConfig) (objectId : Nat) (object : StateObject)
+    (hLookup : cfg.stateObjectById? objectId = some object)
+    (hConf : object.confidential = true) :
+    cfg.readObject objectId = cfg.secretState.lookup objectId := by
+  simp [OperationalConfig.readObject, OperationalConfig.objectConfidential?,
+    hLookup, hConf]
+
+theorem OperationalConfig.readObject_public_uses_public
+    (cfg : OperationalConfig) (objectId : Nat) (object : StateObject)
+    (hLookup : cfg.stateObjectById? objectId = some object)
+    (hConf : object.confidential = false) :
+    cfg.readObject objectId = cfg.publicState.lookup objectId := by
+  simp [OperationalConfig.readObject, OperationalConfig.objectConfidential?,
+    hLookup, hConf]
+
 /-- Evaluator outcome for a single expression: either a value, or an
 explicit `EvalStatus` indicating why it could not be produced. -/
 inductive ExprResult where
@@ -458,23 +740,18 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value (.bool false) => evalExpr cfg env whenFalse
       | .value _ => .status (.evalError "select condition not boolean")
   | .cellGet objectId =>
-      match cfg.publicState.lookup objectId, cfg.secretState.lookup objectId with
-      | some v, _ => .value v
-      | none, some v => .value v
-      | none, none => .status (.evalError s!"cellGet on unknown object {objectId}")
+      match cfg.readObject objectId with
+      | some v => .value v
+      | none => .status (.evalError s!"cellGet on unknown object {objectId}")
   | .arrayGet objectId indexExpr =>
       match evalExpr cfg env indexExpr with
       | .status s => .status s
       | .value indexVal =>
           match indexVal with
           | .uint idx =>
-              -- Look up the object's array value in either the public or
-              -- secret store, then index into the underlying `Value.array`.
-              let arrayVal? : Option Value :=
-                match cfg.publicState.lookup objectId with
-                | some v => some v
-                | none => cfg.secretState.lookup objectId
-              match arrayVal? with
+              -- Look up the object's array value through the declared object
+              -- map, then index into the underlying `Value.array`.
+              match cfg.readObject objectId with
               | some (.array values) =>
                   match values[idx]? with
                   | some v => .value v
@@ -489,13 +766,9 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       match evalExpr cfg env keyExpr with
       | .status s => .status s
       | .value keyVal =>
-          -- Look up the object's `Value.map` in either store, then
-          -- search its entries by key using `Value.beq`.
-          let mapVal? : Option Value :=
-            match cfg.publicState.lookup objectId with
-            | some v => some v
-            | none => cfg.secretState.lookup objectId
-          match mapVal? with
+          -- Look up the object's `Value.map` through the declared object map,
+          -- then search its entries by key using `Value.beq`.
+          match cfg.readObject objectId with
           | some (.map entries) =>
               match Value.mapLookup entries keyVal with
               | some v => .value v
@@ -535,46 +808,7 @@ def evalExprList (cfg : OperationalConfig) (env : LocalEnv) :
 
 end
 
-/-! ## Store-update helpers
-
-`cellSet` / `arraySet` / `mapPut` use these helpers to perform the
-predicate-driven masked-store update. The masked semantics says: the
-runtime always performs a write (so the access pattern is public); the
-data written is `if pred then newValue else currentValue`. For the
-W4.1 evaluator's value-flow tracking, this is equivalent to "write
-when pred is true (or absent), leave unchanged otherwise."
-
-The store choice (public vs secret) is determined by the object's
-`StateObject.confidential` flag, looked up in `cfg.contract.state`. If
-the object has no entry there (a malformed program), the evaluator
-defaults to the public store, which the W4.3 admission would already
-have rejected. -/
-
-/-- True if the object is declared as `confidential` in the contract's
-state list. Defaults to `false` (public) for unknown objects. -/
-def OperationalConfig.objectIsConfidential
-    (cfg : OperationalConfig) (objectId : Nat) : Bool :=
-  match cfg.contract.state.find? (fun so => so.id = objectId) with
-  | some so => so.confidential
-  | none => false
-
-/-- Update the object's value in the appropriate store (public or secret
-based on confidentiality). -/
-def OperationalConfig.writeObject
-    (cfg : OperationalConfig) (objectId : Nat) (value : Value) :
-    OperationalConfig :=
-  if cfg.objectIsConfidential objectId then
-    { cfg with secretState := cfg.secretState.insert objectId value }
-  else
-    { cfg with publicState := cfg.publicState.insert objectId value }
-
-/-- Read the object's value from the appropriate store. Public store
-takes precedence; if not found, fall back to the secret store. -/
-def OperationalConfig.readObject
-    (cfg : OperationalConfig) (objectId : Nat) : Option Value :=
-  match cfg.publicState.lookup objectId with
-  | some v => some v
-  | none => cfg.secretState.lookup objectId
+/-! ## Store-update helpers -/
 
 /-- Replace the element at `index` in a `Value.array`'s underlying list.
 Returns the original list if `index` is out of bounds. The W4.1
@@ -639,12 +873,20 @@ def evalStatement
           let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["CellSet"] }
           match predicate with
           | none =>
-              (cfg.writeObject objectId newVal, env, oc')
+              match cfg.writeObject? objectId newVal with
+              | some cfg' => (cfg', env, oc')
+              | none =>
+                  let msg := s!"cellSet on unknown object {objectId}"
+                  (cfg, env, { oc with status := .evalError msg })
           | some predExpr =>
               match evalExpr cfg env predExpr with
               | .status s => (cfg, env, { oc with status := s })
               | .value (.bool true) =>
-                  (cfg.writeObject objectId newVal, env, oc')
+                  match cfg.writeObject? objectId newVal with
+                  | some cfg' => (cfg', env, oc')
+                  | none =>
+                      let msg := s!"cellSet on unknown object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
               | .value (.bool false) => (cfg, env, oc')
               | .value _ =>
                   (cfg, env, { oc with status := .evalError "cellSet predicate not boolean" })
@@ -682,7 +924,11 @@ def evalStatement
                             (cfg, env, { oc with status := .evalError msg })
                           else
                             let updated := Value.array (Value.arraySetAt values idx newVal)
-                            (cfg.writeObject objectId updated, env, oc')
+                            match cfg.writeObject? objectId updated with
+                            | some cfg' => (cfg', env, oc')
+                            | none =>
+                                let msg := s!"arraySet on unknown object {objectId}"
+                                (cfg, env, { oc with status := .evalError msg })
                       | some _ =>
                           let msg := s!"arraySet on non-array object {objectId}"
                           (cfg, env, { oc with status := .evalError msg })
@@ -716,14 +962,22 @@ def evalStatement
                   match cfg.readObject objectId with
                   | some (.map entries) =>
                       let updated := Value.map (Value.mapInsert entries keyVal newVal)
-                      (cfg.writeObject objectId updated, env, oc')
+                      match cfg.writeObject? objectId updated with
+                      | some cfg' => (cfg', env, oc')
+                      | none =>
+                          let msg := s!"mapPut on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
                   | some _ =>
                       let msg := s!"mapPut on non-map object {objectId}"
                       (cfg, env, { oc with status := .evalError msg })
                   | none =>
                       -- New map: start a fresh entries list.
                       let updated := Value.map [(keyVal, newVal)]
-                      (cfg.writeObject objectId updated, env, oc')
+                      match cfg.writeObject? objectId updated with
+                      | some cfg' => (cfg', env, oc')
+                      | none =>
+                          let msg := s!"mapPut on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
   | .ifStmt cond thenBody elseBody =>
       -- Public-conditional control flow: evaluate the condition, then
       -- recurse into the chosen branch via `evalBody`.
@@ -808,21 +1062,24 @@ def OperationalConfig.initialEnv (cfg : OperationalConfig)
     none
 
 /-- Big-step contract evaluator. Looks up the entrypoint, binds arguments,
-walks the body, and returns the resulting `Outcome`. The final
-`OperationalConfig` (with all store updates applied) and `LocalEnv`
-are discarded; downstream paper-facing theorems care only about the
-outcome's public projection / kernel-step trace / public result. -/
+walks the body, and returns the resulting `Outcome`, including the final
+public store. The final secret store and `LocalEnv` remain internal to the
+evaluator surface. -/
 def evalContract (cfg : OperationalConfig) : Outcome :=
   match cfg.entrypointFn? with
   | none =>
-      { Outcome.empty with status := .evalError s!"unknown entrypoint {cfg.entrypoint}" }
+      { Outcome.empty with
+        status := .evalError s!"unknown entrypoint {cfg.entrypoint}"
+        finalPublicState := some cfg.publicState }
   | some fn =>
       match cfg.initialEnv fn with
       | none =>
-          { Outcome.empty with status := .evalError "argument arity mismatch" }
+          { Outcome.empty with
+            status := .evalError "argument arity mismatch"
+            finalPublicState := some cfg.publicState }
       | some env =>
-          let (_cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
-          outcome
+          let (cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
+          outcome.withFinalPublicState cfg'.publicState
 
 end IR
 

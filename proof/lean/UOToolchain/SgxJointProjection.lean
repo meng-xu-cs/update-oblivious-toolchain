@@ -57,6 +57,7 @@ def sgxViewOfJointSample
   , outputShape := publicOutcome.outputShape
   , returnPolicy := publicOutcome.returnPolicy
   , returnPayload := publicOutcome.returnPayload
+  , encryptedReturnPayload := publicOutcome.encryptedReturnPayload
   , declassifies := publicOutcome.declassifies
   , gasUsed := publicOutcome.gasUsed
   }

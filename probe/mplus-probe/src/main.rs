@@ -23,6 +23,7 @@ impl From<ArtifactModeArg> for mplus_probe::ArtifactMaterializationMode {
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum ReportKind {
     StaticChecks,
+    Overheads,
     BridgeValidation,
     KernelValidation,
     KernelRefinementValidation,
@@ -155,7 +156,7 @@ fn main() -> Result<()> {
                     .ok()
                     .and_then(|value| value.parse::<u64>().ok())
             })
-            .unwrap_or(10 * 1024 * 1024 * 1024),
+            .unwrap_or(64 * 1024 * 1024),
         heavy_budget_bytes: cli
             .heavy_budget_bytes
             .or_else(|| {
@@ -169,6 +170,10 @@ fn main() -> Result<()> {
         Some(ReportKind::StaticChecks) => {
             let report = mplus_probe::run_static_checks_report()?;
             write_single_report(&cli.out_dir, "static_checks.json", "static_checks", &report)?;
+        }
+        Some(ReportKind::Overheads) => {
+            let report = mplus_probe::run_overheads_report()?;
+            write_single_report(&cli.out_dir, "overheads.json", "overheads", &report)?;
         }
         Some(ReportKind::BridgeValidation) => {
             let report = mplus_probe::run_bridge_validation_report()?;

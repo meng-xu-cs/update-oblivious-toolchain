@@ -1,5 +1,13 @@
 {
   "compiler_version": "0.1.0",
+  "admitted_package": {
+    "schema": "uo-admitted-package-v1",
+    "source_sha256": "189206eda78843b786e1835056ddce154d2784db22bc36a427f784e1fbcf4b84",
+    "metadata_sha256": "cd955f112fa743f1bc4f0e38b9420a06ef338a65937b88f118ddd5127ca710f0",
+    "compilation_mode": "uo",
+    "compiler_version": "0.1.0",
+    "package_sha256": "b945b8186a6f21016b44c2c1c25a27c48587762dcbd147032175df88c5b53ff0"
+  },
   "contract": {
     "contract": "ERC20Lite",
     "mode": "Uo",
@@ -404,7 +412,7 @@
             "Return": {
               "value": {
                 "Literal": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               }
             }
@@ -548,7 +556,7 @@
               "value": {
                 "kind": "literal",
                 "value": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               }
             }
@@ -661,7 +669,7 @@
               "value": {
                 "kind": "literal",
                 "value": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               }
             }
@@ -881,7 +889,7 @@
             "Return": {
               "value": {
                 "Literal": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               }
             }
@@ -1115,7 +1123,7 @@
               "value": {
                 "kind": "literal",
                 "value": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               }
             }
@@ -1303,7 +1311,7 @@
               "value": {
                 "kind": "literal",
                 "value": {
-                  "Uint": 1
+                  "Uint": "1"
                 }
               }
             }
@@ -1470,6 +1478,7 @@
           "declassifies": [
             "return"
           ],
+          "public_state_declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -1501,6 +1510,7 @@
           "returns": "forbidden",
           "status": "public",
           "declassifies": [],
+          "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "approve(address,address,uint256)",
             "params": [
@@ -1665,6 +1675,7 @@
           "declassifies": [
             "return"
           ],
+          "public_state_declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -1691,6 +1702,7 @@
           "returns": "forbidden",
           "status": "public",
           "declassifies": [],
+          "public_state_declassifies": [],
           "kernel_steps": [],
           "uocell_reads": 0,
           "uocell_writes": 0,
@@ -1726,6 +1738,7 @@
             "return",
             "success"
           ],
+          "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "transfer(address,address,uint256)",
             "params": [
@@ -1858,7 +1871,7 @@
                 "value": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 }
               }
@@ -1971,7 +1984,7 @@
                 "value": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 }
               }
@@ -2043,6 +2056,7 @@
             "return",
             "success"
           ],
+          "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "transferFrom(address,address,address,uint256)",
             "params": [
@@ -2264,7 +2278,7 @@
                 "value": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 }
               }
@@ -2452,7 +2466,7 @@
                 "value": {
                   "kind": "literal",
                   "value": {
-                    "Uint": 1
+                    "Uint": "1"
                   }
                 }
               }

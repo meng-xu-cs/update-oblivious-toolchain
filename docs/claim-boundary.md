@@ -12,10 +12,10 @@ compiler/proof/runtime model versions, if `uo-solc` compiles the package to
 artifact `A`, the artifact records the matching admitted-package hash, the Lean
 source/artifact checker accepts the pair, the real runtime executes `A` and
 emits proof objects accepted by Lean, and the explicit backend, cryptographic,
-and TEE deployment assumptions hold, then the real host-visible execution
-satisfies the paper update-obliviousness theorem against the stated
-hostile-host observer and the artifact-declared return/status declassification
-policy.
+and TEE deployment assumptions hold, then the execution's normalized
+hostile-host observer satisfies the paper update-obliviousness theorem against
+the stated observer and the artifact-declared return/status/public-state
+declassification policy.
 
 The compiler-side trust story starts at the post-resolution Sol AST / UO IR
 consumed by Lean. Parser-level preprocessing remains trusted until a
@@ -52,7 +52,9 @@ The components are interpreted as follows:
 
 - `public_outcome` is exact: entrypoint id, public arguments, termination
   status, declared status policy, return shape, return policy, any public or
-  declassified return payload, declassification labels, and modeled public gas.
+  declassified return payload, encrypted-return ciphertext evidence,
+  declassification labels, public-state declassification labels, and modeled
+  public gas.
 - `boundary_schedule` is the exact enclave boundary sequence.
 - `storage_trace` is exact for exact backends and related through the Path ORAM
   theorem for `path_oram_local_posmap_v1`.

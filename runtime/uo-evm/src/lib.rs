@@ -9,11 +9,15 @@
 mod controller;
 mod engine;
 mod oram;
+mod return_channel;
 mod runtime;
 
-pub use engine::{run_artifact, run_artifact_with_seed, CallResult, ContractInstance};
+#[cfg(any(test, feature = "diagnostics"))]
+pub use engine::run_artifact_with_seed;
+pub use engine::{run_artifact, CallResult, ContractInstance};
 #[cfg(feature = "diagnostics")]
 pub use engine::{CallTelemetry, DiagnosticCallResult};
+pub use return_channel::{ReturnChannelSession, RETURN_CHANNEL_SCHEME};
 #[cfg(feature = "diagnostics")]
 pub use runtime::PathOramFreshCoinPlan;
 

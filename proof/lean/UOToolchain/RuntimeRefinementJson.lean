@@ -221,6 +221,42 @@ def ImportedOutputShape.toOutputShape (shape : ImportedOutputShape) : OutputShap
   , returnLength := shape.return_length
   }
 
+structure ImportedReturnChannelPublicBinding where
+  scheme : String
+  session_id : String
+  client_public_key_hash : String
+  attestation_transcript_hash : String
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedReturnChannelPublicBinding.toBinding
+  (binding : ImportedReturnChannelPublicBinding) : ReturnChannelPublicBinding :=
+  { scheme := binding.scheme
+  , sessionId := binding.session_id
+  , clientPublicKeyHash := binding.client_public_key_hash
+  , attestationTranscriptHash := binding.attestation_transcript_hash
+  }
+
+structure ImportedEncryptedReturnPayload where
+  binding : ImportedReturnChannelPublicBinding
+  aad_hash : String
+  nonce : String
+  ciphertext : String
+  tag : String
+  plaintext_canonical_len : Nat
+  wire_len : Nat
+deriving Repr, DecidableEq, FromJson, ToJson
+
+def ImportedEncryptedReturnPayload.toEncryptedReturnPayload
+  (payload : ImportedEncryptedReturnPayload) : EncryptedReturnPayload :=
+  { binding := payload.binding.toBinding
+  , aadHash := payload.aad_hash
+  , nonce := payload.nonce
+  , ciphertext := payload.ciphertext
+  , tag := payload.tag
+  , plaintextCanonicalLen := payload.plaintext_canonical_len
+  , wireLen := payload.wire_len
+  }
+
 structure ImportedPublicOutcomeTrace where
   entrypoint_id : String
   public_args : List String
@@ -229,6 +265,7 @@ structure ImportedPublicOutcomeTrace where
   output_shape : ImportedOutputShape
   return_policy : String
   return_payload : Option String
+  encrypted_return_payload : Option ImportedEncryptedReturnPayload
   declassifies : List String
   gas_used : Nat
 deriving Repr, DecidableEq, FromJson, ToJson
@@ -242,6 +279,8 @@ def ImportedPublicOutcomeTrace.toPublicOutcome
   , outputShape := outcome.output_shape.toOutputShape
   , returnPolicy := outcome.return_policy
   , returnPayload := outcome.return_payload
+  , encryptedReturnPayload := outcome.encrypted_return_payload.map
+      ImportedEncryptedReturnPayload.toEncryptedReturnPayload
   , declassifies := outcome.declassifies
   , gasUsed := outcome.gas_used
   }
@@ -2296,6 +2335,7 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
       , output_shape := { return_present := false, return_length := 0 }
       , return_policy := "forbidden"
       , return_payload := none
+      , encrypted_return_payload := none
       , declassifies := []
       , gas_used := 7
       }

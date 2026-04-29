@@ -9,17 +9,21 @@ diagnostics = []
 
 [dependencies]
 anyhow.workspace = true
+chacha20poly1305.workspace = true
 clap.workspace = true
+hex.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tiny-keccak.workspace = true
 uo-core = { path = "../../crates/uo-core" }
 uo-allocator = { path = "../uo-allocator" }
 uo-kernel-runtime = { path = "../uo-kernel-runtime" }
 uo-precompiles = { path = "../uo-precompiles" }
 uo-store = { path = "../uo-store" }
+zeroize.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true

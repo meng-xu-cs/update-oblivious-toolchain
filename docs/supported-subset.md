@@ -39,17 +39,25 @@ Sidecar metadata requirements:
   public entrypoints must say `confidential: false`, and confidential
   entrypoints must say `confidential: true`
 - every entrypoint must declare `returns` as `forbidden`, `public`,
-  `declassified`, or `encrypted_to_client`; the current runtime rejects
-  `encrypted_to_client` until an encrypted return channel is implemented, and
-  the `return_channel_crypto_gate_pinned` probe check keeps that unsupported
-  policy out of the implemented claim
+  `declassified`, or `encrypted_to_client`; encrypted client returns are
+  supported only on confidential entrypoints and require callers to use the
+  runtime return-channel session API
 - every entrypoint must declare `status` as `public` or `declassified`
 - `returns: declassified` requires `declassifies: [return]`, and
   `status: declassified` requires `declassifies: [success]`
+- `returns: encrypted_to_client` must not declare `declassifies: [return]`;
+  the host-visible outcome contains ciphertext, nonce, AAD hash, and session
+  binding evidence, not the plaintext return
+- entrypoints that write data or predicates derived from confidential state or
+  secret arguments into public state must name those public objects in
+  `public_state_declassifies`
 - every map must declare a public `capacity`
+- map and array capacities must be positive
 - confidential entrypoints must declare `secret_args`
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is
-  intended; the theorem-facing route is `path_oram_local_posmap_v1`
+  intended; the theorem-facing route is `path_oram_local_posmap_v1`, currently
+  capped at capacity `128` until a recursive/private position map replaces the
+  local metadata scan
 - gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
 - generated artifacts carry an admitted-package hash over the source bytes,
   canonical sidecar metadata JSON, compilation mode, compiler version, and

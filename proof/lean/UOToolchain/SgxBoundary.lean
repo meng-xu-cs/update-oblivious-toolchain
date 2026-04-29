@@ -52,6 +52,23 @@ deriving Repr, DecidableEq
 
 abbrev SharedResourceTrace := List String
 
+structure ReturnChannelPublicBinding where
+  scheme : String
+  sessionId : String
+  clientPublicKeyHash : String
+  attestationTranscriptHash : String
+deriving Repr, DecidableEq
+
+structure EncryptedReturnPayload where
+  binding : ReturnChannelPublicBinding
+  aadHash : String
+  nonce : String
+  ciphertext : String
+  tag : String
+  plaintextCanonicalLen : Nat
+  wireLen : Nat
+deriving Repr, DecidableEq
+
 structure SGXView where
   entrypointId : String
   publicArgs : List String
@@ -66,6 +83,7 @@ structure SGXView where
   outputShape : OutputShape
   returnPolicy : String
   returnPayload : Option String
+  encryptedReturnPayload : Option EncryptedReturnPayload
   declassifies : List String
   gasUsed : Nat
 deriving Repr, DecidableEq

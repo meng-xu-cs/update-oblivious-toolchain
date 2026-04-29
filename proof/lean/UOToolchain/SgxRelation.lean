@@ -30,6 +30,7 @@ structure SGXPublicOutcome where
   outputShape : OutputShape
   returnPolicy : String
   returnPayload : Option String
+  encryptedReturnPayload : Option EncryptedReturnPayload
   declassifies : List String
   gasUsed : Nat
 deriving Repr, DecidableEq
@@ -95,6 +96,7 @@ def sgxPublicOutcome (view : SGXView) : SGXPublicOutcome :=
   , outputShape := view.outputShape
   , returnPolicy := view.returnPolicy
   , returnPayload := view.returnPayload
+  , encryptedReturnPayload := view.encryptedReturnPayload
   , declassifies := view.declassifies
   , gasUsed := view.gasUsed
   }
@@ -285,6 +287,7 @@ def sgxViewOfDeployment (cfg : Config) (result : DeploymentResult) : SGXView :=
   , outputShape := result.outputShape
   , returnPolicy := "forbidden"
   , returnPayload := none
+  , encryptedReturnPayload := none
   , declassifies := []
   , gasUsed := result.trace.gasUsed
   }

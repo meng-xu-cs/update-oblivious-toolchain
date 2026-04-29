@@ -89,6 +89,9 @@ pub fn compile(
     let source = fs::read_to_string(source_path)
         .with_context(|| format!("failed to read Solidity source {}", source_path))?;
     let frontend = parse_frontend(source_path, &source, metadata)?;
+    if matches!(mode, ProgramMode::Uo) {
+        validate_uo_state_backend_policy(&frontend)?;
+    }
     let mut functions = Vec::new();
     let mut manifest_entrypoints = BTreeMap::new();
     for function in &frontend.functions {
@@ -336,6 +339,7 @@ fn parse_frontend(
         if let Some(entry_meta) = metadata.entrypoints.get(&signature) {
             entrypoint_metadata.insert(signature.clone(), entry_meta.clone());
             ensure_secret_args_exist(function, entry_meta)?;
+            validate_entrypoint_metadata_well_formed(&signature, entry_meta, &state_by_name)?;
         } else {
             bail!(
                 "entrypoint {} is missing explicit metadata; declare it public or confidential in the sidecar",
@@ -373,6 +377,9 @@ fn lower_function(
         .as_ref()
         .ok_or_else(|| anyhow!("function {} has no body", signature))?;
     let mut lowered = lower_block(body, ctx)?;
+    if matches!(mode, ProgramMode::Uo) {
+        validate_static_loop_bounds(&lowered, &BTreeMap::new())?;
+    }
     let entrypoint_confidential = required_entrypoint_confidential(&signature, entry_meta)?;
     validate_entrypoint_policy(
         &signature,
@@ -382,8 +389,7 @@ fn lower_function(
         entrypoint_confidential,
         ctx.frontend,
     )?;
-    let confidential = matches!(mode, ProgramMode::Uo)
-        && (entrypoint_confidential || !entry_meta.secret_args.is_empty());
+    let confidential = matches!(mode, ProgramMode::Uo) && entrypoint_confidential;
     if confidential {
         ensure_confidential_return_shape(&lowered, &signature)?;
         lowered = linearize_statements(&lowered, &Expr::Literal(Value::Bool(true)))?;
@@ -466,6 +472,18 @@ fn ensure_confidential_slot_program_uses_uo_backends(
                 program.entrypoint_id,
                 object.name,
                 object_id
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_uo_state_backend_policy(frontend: &Frontend) -> Result<()> {
+    for object in frontend.state_by_name.values() {
+        if object.confidential && object.backend == BackendKind::Raw {
+            bail!(
+                "confidential state object {} uses raw backend in UO mode",
+                object.name
             );
         }
     }
@@ -1068,6 +1086,9 @@ fn lower_state_object(
                 }
                 _ => bail!("array state {} must have a fixed compile-time size", name),
             };
+            if capacity == 0 {
+                bail!("array state {} must have positive capacity", name);
+            }
             if let Some(metadata_capacity) = state_meta.capacity {
                 if metadata_capacity != capacity {
                     bail!(
@@ -1095,8 +1116,11 @@ fn lower_state_object(
             })
         }
         ContainerKind::Map => {
-            if state_meta.capacity.is_none() {
-                diagnostics_error(format!("map state {} is missing metadata capacity", name))?;
+            let capacity = state_meta
+                .capacity
+                .ok_or_else(|| anyhow!("map state {} is missing metadata capacity", name))?;
+            if capacity == 0 {
+                bail!("map state {} must have positive capacity", name);
             }
             match &def.ty {
                 pt::Expression::Type(_, pt::Type::Mapping { key, value, .. }) => {
@@ -1115,7 +1139,7 @@ fn lower_state_object(
                         oram_scheme,
                         value_type,
                         key_type: Some(key_type),
-                        capacity: state_meta.capacity,
+                        capacity: Some(capacity),
                         confidential: state_meta.confidential,
                     })
                 }
@@ -1291,6 +1315,7 @@ fn build_manifest_entry(
         returns: required_return_policy(&function.signature, entry_meta)?,
         status: required_status_policy(&function.signature, entry_meta)?,
         declassifies: entry_meta.declassifies.clone(),
+        public_state_declassifies: entry_meta.public_state_declassifies.clone(),
         confidential_program,
         confidential_slot_program,
         kernel_steps,
@@ -1312,6 +1337,52 @@ fn validate_oram_access_shape(
 ) -> Result<()> {
     let state = frontend.state_by_name.values().cloned().collect::<Vec<_>>();
     uo_core::validate_oram_access_shape(signature, oram_accesses, &state)
+}
+
+fn validate_static_loop_bounds(
+    statements: &[Statement],
+    loop_env: &BTreeMap<String, usize>,
+) -> Result<()> {
+    for statement in statements {
+        match statement {
+            Statement::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                validate_static_loop_bounds(then_body, loop_env)?;
+                validate_static_loop_bounds(else_body, loop_env)?;
+            }
+            Statement::For {
+                loop_id,
+                index_var,
+                start,
+                end,
+                body,
+            } => {
+                let start = eval_loop_bound(start, loop_env).ok_or_else(|| {
+                    anyhow!("loop {} start bound must be compile-time exact", loop_id)
+                })?;
+                let end = eval_loop_bound(end, loop_env).ok_or_else(|| {
+                    anyhow!("loop {} end bound must be compile-time exact", loop_id)
+                })?;
+                for index in start..end {
+                    let mut nested_env = loop_env.clone();
+                    nested_env.insert(index_var.clone(), index);
+                    validate_static_loop_bounds(body, &nested_env)?;
+                }
+            }
+            Statement::Declare { .. }
+            | Statement::Assign { .. }
+            | Statement::Require { .. }
+            | Statement::AbortIf { .. }
+            | Statement::CellSet { .. }
+            | Statement::ArraySet { .. }
+            | Statement::MapPut { .. }
+            | Statement::Return { .. } => {}
+        }
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -1865,6 +1936,7 @@ fn collect_expr_objects(expr: &Expr, ids: &mut BTreeSet<u32>) {
 struct PolicySensitivity {
     return_sensitive: bool,
     status_sensitive: bool,
+    sensitive_public_writes: BTreeSet<String>,
 }
 
 fn validate_entrypoint_policy(
@@ -1877,13 +1949,7 @@ fn validate_entrypoint_policy(
 ) -> Result<()> {
     let returns = required_return_policy(signature, entry_meta)?;
     let status = required_status_policy(signature, entry_meta)?;
-    let sensitivity = policy_sensitivity(body, entry_meta, frontend);
-    if returns == ReturnPolicy::EncryptedToClient {
-        bail!(
-            "entrypoint {} declares encrypted_to_client returns, but encrypted return channels are not implemented yet",
-            signature
-        );
-    }
+    let sensitivity = policy_sensitivity(body, entry_meta, frontend)?;
     match (return_type.is_some(), returns) {
         (true, ReturnPolicy::Forbidden) => bail!(
             "entrypoint {} returns a value but declares returns: forbidden",
@@ -1908,8 +1974,22 @@ fn validate_entrypoint_policy(
             DeclassificationKind::Return,
             "returns: declassified",
         )?,
+        (true, ReturnPolicy::EncryptedToClient) if !entrypoint_confidential => bail!(
+            "entrypoint {} declares encrypted_to_client returns but is not confidential",
+            signature
+        ),
+        (true, ReturnPolicy::EncryptedToClient)
+            if entry_meta
+                .declassifies
+                .contains(&DeclassificationKind::Return) =>
+        {
+            bail!(
+                "entrypoint {} declares encrypted_to_client returns and must not declassify the plaintext return",
+                signature
+            )
+        }
+        (true, ReturnPolicy::EncryptedToClient) => {}
         (true, ReturnPolicy::Public) => {}
-        (true, ReturnPolicy::EncryptedToClient) => unreachable!("handled above"),
     }
     if status == StatusPolicy::Declassified {
         require_declassifies(
@@ -1922,6 +2002,23 @@ fn validate_entrypoint_policy(
         bail!(
             "entrypoint {} has secret-dependent success/abort status; declare status: declassified",
             signature
+        );
+    }
+    let declared_public_state = entry_meta
+        .public_state_declassifies
+        .iter()
+        .collect::<BTreeSet<_>>();
+    let undeclared_public_writes = sensitivity
+        .sensitive_public_writes
+        .iter()
+        .filter(|name| !declared_public_state.contains(name))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !undeclared_public_writes.is_empty() {
+        bail!(
+            "entrypoint {} writes data or predicates derived from confidential state or secret arguments to public state {}; declare public_state_declassifies for the target object(s)",
+            signature,
+            undeclared_public_writes.join(", ")
         );
     }
     Ok(())
@@ -1982,15 +2079,15 @@ fn policy_sensitivity(
     statements: &[Statement],
     entry_meta: &uo_core::EntrypointMetadata,
     frontend: &Frontend,
-) -> PolicySensitivity {
+) -> Result<PolicySensitivity> {
     let mut tainted = entry_meta
         .secret_args
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
     let mut sensitivity = PolicySensitivity::default();
-    collect_policy_sensitivity(statements, frontend, &mut tainted, &mut sensitivity);
-    sensitivity
+    collect_policy_sensitivity(statements, frontend, &mut tainted, &mut sensitivity, false)?;
+    Ok(sensitivity)
 }
 
 fn collect_policy_sensitivity(
@@ -1998,7 +2095,8 @@ fn collect_policy_sensitivity(
     frontend: &Frontend,
     tainted: &mut BTreeSet<String>,
     sensitivity: &mut PolicySensitivity,
-) {
+    control_sensitive: bool,
+) -> Result<()> {
     for statement in statements {
         match statement {
             Statement::Declare { name, value, .. } | Statement::Assign { name, value } => {
@@ -2023,15 +2121,83 @@ fn collect_policy_sensitivity(
                     mark_assigned_locals(then_body, &mut then_tainted);
                     mark_assigned_locals(else_body, &mut else_tainted);
                 }
-                collect_policy_sensitivity(then_body, frontend, &mut then_tainted, sensitivity);
-                collect_policy_sensitivity(else_body, frontend, &mut else_tainted, sensitivity);
+                collect_policy_sensitivity(
+                    then_body,
+                    frontend,
+                    &mut then_tainted,
+                    sensitivity,
+                    control_sensitive || cond_sensitive,
+                )?;
+                collect_policy_sensitivity(
+                    else_body,
+                    frontend,
+                    &mut else_tainted,
+                    sensitivity,
+                    control_sensitive || cond_sensitive,
+                )?;
                 tainted.extend(then_tainted);
                 tainted.extend(else_tainted);
             }
-            Statement::For { body, .. } => {
-                collect_policy_sensitivity(body, frontend, tainted, sensitivity);
+            Statement::For {
+                start, end, body, ..
+            } => {
+                let loop_sensitive = control_sensitive
+                    || expr_is_policy_sensitive(start, frontend, tainted)
+                    || expr_is_policy_sensitive(end, frontend, tainted);
+                collect_policy_sensitivity(body, frontend, tainted, sensitivity, loop_sensitive)?;
             }
-            Statement::CellSet { .. } | Statement::ArraySet { .. } | Statement::MapPut { .. } => {}
+            Statement::CellSet {
+                object_id,
+                value,
+                predicate,
+            } => {
+                record_sensitive_public_write(
+                    *object_id,
+                    control_sensitive
+                        || expr_is_policy_sensitive(value, frontend, tainted)
+                        || predicate
+                            .as_ref()
+                            .is_some_and(|expr| expr_is_policy_sensitive(expr, frontend, tainted)),
+                    frontend,
+                    sensitivity,
+                )?;
+            }
+            Statement::ArraySet {
+                object_id,
+                index,
+                value,
+                predicate,
+            } => {
+                record_sensitive_public_write(
+                    *object_id,
+                    control_sensitive
+                        || expr_is_policy_sensitive(index, frontend, tainted)
+                        || expr_is_policy_sensitive(value, frontend, tainted)
+                        || predicate
+                            .as_ref()
+                            .is_some_and(|expr| expr_is_policy_sensitive(expr, frontend, tainted)),
+                    frontend,
+                    sensitivity,
+                )?;
+            }
+            Statement::MapPut {
+                object_id,
+                key,
+                value,
+                predicate,
+            } => {
+                record_sensitive_public_write(
+                    *object_id,
+                    control_sensitive
+                        || expr_is_policy_sensitive(key, frontend, tainted)
+                        || expr_is_policy_sensitive(value, frontend, tainted)
+                        || predicate
+                            .as_ref()
+                            .is_some_and(|expr| expr_is_policy_sensitive(expr, frontend, tainted)),
+                    frontend,
+                    sensitivity,
+                )?;
+            }
             Statement::Return { value } => {
                 if let Some(value) = value {
                     sensitivity.return_sensitive |=
@@ -2040,6 +2206,25 @@ fn collect_policy_sensitivity(
             }
         }
     }
+    Ok(())
+}
+
+fn record_sensitive_public_write(
+    object_id: u32,
+    is_sensitive: bool,
+    frontend: &Frontend,
+    sensitivity: &mut PolicySensitivity,
+) -> Result<()> {
+    if !is_sensitive {
+        return Ok(());
+    }
+    let object = state_object_by_id(frontend, object_id)?;
+    if !object.confidential {
+        sensitivity
+            .sensitive_public_writes
+            .insert(object.name.clone());
+    }
+    Ok(())
 }
 
 fn set_taint(name: &str, is_tainted: bool, tainted: &mut BTreeSet<String>) {
@@ -2441,6 +2626,49 @@ fn const_usize(expr: &pt::Expression) -> Result<usize> {
     }
 }
 
+fn validate_entrypoint_metadata_well_formed(
+    signature: &str,
+    entry_meta: &uo_core::EntrypointMetadata,
+    state_by_name: &BTreeMap<String, StateObject>,
+) -> Result<()> {
+    match entry_meta.confidential {
+        Some(false) if !entry_meta.secret_args.is_empty() => bail!(
+            "entrypoint {} declares confidential: false but also declares secret_args",
+            signature
+        ),
+        Some(true) if entry_meta.secret_args.is_empty() => bail!(
+            "entrypoint {} declares confidential: true but omits secret_args",
+            signature
+        ),
+        _ => {}
+    }
+    let mut seen = BTreeSet::new();
+    for object_name in &entry_meta.public_state_declassifies {
+        if !seen.insert(object_name) {
+            bail!(
+                "entrypoint {} repeats public_state_declassifies target {}",
+                signature,
+                object_name
+            );
+        }
+        let object = state_by_name.get(object_name).ok_or_else(|| {
+            anyhow!(
+                "entrypoint {} public_state_declassifies unknown state object {}",
+                signature,
+                object_name
+            )
+        })?;
+        if object.confidential {
+            bail!(
+                "entrypoint {} public_state_declassifies target {} is confidential; only public state can be declassified this way",
+                signature,
+                object_name
+            );
+        }
+    }
+    Ok(())
+}
+
 fn ensure_secret_args_exist(
     function: &pt::FunctionDefinition,
     entry_meta: &uo_core::EntrypointMetadata,
@@ -2568,10 +2796,6 @@ fn render_parse_errors(errors: Vec<Diagnostic>) -> anyhow::Error {
             .collect::<Vec<_>>()
             .join("; ")
     )
-}
-
-fn diagnostics_error(message: impl Into<String>) -> Result<()> {
-    bail!("{}", message.into())
 }
 
 fn disassemble_contract(contract: &CompiledContract) -> Vec<String> {
@@ -3121,6 +3345,43 @@ bounds:
     }
 
     #[test]
+    fn rejects_map_zero_capacity() {
+        let source = write_temp(
+            "map-zero-capacity",
+            r#"
+            contract C {
+                mapping(bytes32 => uint256) private records;
+                function f(bytes32 key, uint256 value) public { records[key] = value; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(bytes32,uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 0
+    backend: full_scan
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("map state records must have positive capacity"));
+    }
+
+    #[test]
     fn rejects_missing_return_policy() {
         let source = write_temp(
             "missing-return-policy",
@@ -3219,6 +3480,103 @@ bounds:
     }
 
     #[test]
+    fn accepts_confidential_encrypted_return_without_plaintext_declassification() {
+        let source = write_temp(
+            "confidential-encrypted-return",
+            r#"
+            contract C {
+                function f(uint256 secret) public returns (uint256) { return secret; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: encrypted_to_client
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("f(uint256)")
+            .unwrap();
+        assert_eq!(entry.returns, uo_core::ReturnPolicy::EncryptedToClient);
+        assert!(!entry
+            .declassifies
+            .contains(&uo_core::DeclassificationKind::Return));
+    }
+
+    #[test]
+    fn rejects_public_encrypted_return_policy() {
+        let source = write_temp(
+            "public-encrypted-return",
+            r#"
+            contract C {
+                function f(uint256 value) public returns (uint256) { return value; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: encrypted_to_client
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("declares encrypted_to_client returns but is not confidential"));
+    }
+
+    #[test]
+    fn rejects_encrypted_return_with_plaintext_declassification() {
+        let source = write_temp(
+            "encrypted-return-declassifies",
+            r#"
+            contract C {
+                function f(uint256 secret) public returns (uint256) { return secret; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: encrypted_to_client
+    status: public
+    declassifies: [return]
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("must not declassify the plaintext return"));
+    }
+
+    #[test]
     fn rejects_secret_dependent_status_without_declassification() {
         let source = write_temp(
             "secret-status",
@@ -3290,6 +3648,308 @@ bounds:
     }
 
     #[test]
+    fn rejects_secret_derived_public_state_write_without_declassification() {
+        let source = write_temp(
+            "public-state-leak",
+            r#"
+            contract C {
+                uint256 private secretCell;
+                uint256 private publicCell;
+                function leak() public { publicCell = secretCell; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  leak():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  secretCell:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+  publicCell:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("writes data or predicates derived from confidential state"));
+    }
+
+    #[test]
+    fn accepts_explicit_public_state_declassification() {
+        let source = write_temp(
+            "public-state-declassified",
+            r#"
+            contract C {
+                uint256 private secretCell;
+                uint256 private publicCell;
+                function leak() public { publicCell = secretCell; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  leak():
+    confidential: false
+    returns: forbidden
+    status: public
+    public_state_declassifies: [publicCell]
+state:
+  secretCell:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+  publicCell:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("leak()")
+            .unwrap();
+        assert_eq!(entry.public_state_declassifies, vec!["publicCell"]);
+    }
+
+    #[test]
+    fn rejects_secret_dependent_public_write_predicate() {
+        let source = write_temp(
+            "public-write-predicate-leak",
+            r#"
+            contract C {
+                uint256 private secretCell;
+                uint256 private publicCell;
+                function leak() public {
+                    if (secretCell > 0) {
+                        publicCell = 1;
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  leak():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  secretCell:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+  publicCell:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("writes data or predicates derived from confidential state"));
+    }
+
+    #[test]
+    fn rejects_confidential_false_with_secret_args() {
+        let source = write_temp(
+            "metadata-secret-public",
+            r#"
+            contract C {
+                function f(uint256 secret) public {}
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: false
+    returns: forbidden
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("declares confidential: false but also declares secret_args"));
+    }
+
+    #[test]
+    fn rejects_confidential_true_without_secret_args() {
+        let source = write_temp(
+            "metadata-confidential-no-secret",
+            r#"
+            contract C {
+                function f() public {}
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: true
+    returns: forbidden
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("declares confidential: true but omits secret_args"));
+    }
+
+    #[test]
+    fn rejects_public_state_declassification_of_confidential_object() {
+        let source = write_temp(
+            "metadata-public-state-confidential",
+            r#"
+            contract C {
+                uint256 private x;
+                function f() public {}
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+    public_state_declassifies: [x]
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("public_state_declassifies target x is confidential"));
+    }
+
+    #[test]
+    fn rejects_confidential_raw_state_in_uo_mode() {
+        let source = write_temp(
+            "confidential-raw-state",
+            r#"
+            contract C {
+                uint256 private secretCell;
+                function write(uint256 secret) public { secretCell = secret; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  write(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  secretCell:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("confidential state object secretCell uses raw backend"));
+    }
+
+    #[test]
+    fn rejects_dynamic_public_loop_bounds_in_uo_mode() {
+        let source = write_temp(
+            "dynamic-public-loop",
+            r#"
+            contract C {
+                uint256 private x;
+                function fill(uint256 n) public {
+                    for (uint256 i = 0; i < n; i++) {
+                        x = i;
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  fill(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("loop loop_0 end bound must be compile-time exact"));
+    }
+
+    #[test]
     fn compiles_branchless_classifier() {
         let source = write_temp(
             "classifier",
@@ -3348,6 +4008,7 @@ entrypoints:
     confidential: true
     returns: forbidden
     status: public
+    public_state_declassifies: [last]
 state:
   last:
     kind: cell
@@ -3384,6 +4045,7 @@ entrypoints:
     confidential: true
     returns: forbidden
     status: public
+    public_state_declassifies: [last]
 state:
   last:
     kind: cell
@@ -3441,7 +4103,7 @@ bounds:
         let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
         assert!(err
             .to_string()
-            .contains("loop bounds must be compile-time constants"));
+            .contains("loop loop_0 end bound must be compile-time exact"));
     }
 
     #[test]

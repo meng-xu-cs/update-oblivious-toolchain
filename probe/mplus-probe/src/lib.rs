@@ -335,7 +335,7 @@ struct CanonicalFamilySizeEstimate {
     public_fresh_coin_scaffold_steps: usize,
 }
 
-const DEFAULT_CANONICAL_CERT_BUDGET_BYTES: u64 = 10 * 1024 * 1024 * 1024;
+const DEFAULT_CANONICAL_CERT_BUDGET_BYTES: u64 = 64 * 1024 * 1024;
 const DEFAULT_HEAVY_ARTIFACT_BUDGET_BYTES: u64 = 20 * 1024 * 1024 * 1024;
 const CANONICAL_SIZE_ESTIMATE_SAMPLE_SEEDS: usize = 8;
 const EXPECTED_LEAN_TOOLCHAIN_PIN: &str = "leanprover/lean4:v4.30.0-rc2";
@@ -1278,6 +1278,11 @@ pub fn run_fresh_coin_validation_with_options(options: &ProbeRunOptions) -> Resu
 pub fn run_static_checks_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_static_checks(&suite)
+}
+
+pub fn run_overheads_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_overheads(&suite)
 }
 
 pub fn run_bridge_validation_report() -> Result<JsonValue> {
@@ -2374,10 +2379,44 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
 
     out.push_str("## Runtime Overheads\n\n");
     out.push_str(
-        "| Benchmark | Raw Gas | Raw Writes | Raw Bytes | Full-Scan Gas | Full-Scan Writes | Full-Scan Bytes | ORAM Gas | ORAM Writes | ORAM Bytes |\n",
+        "| Benchmark | Backend | Capacity | Gas | Reads | Writes | Bytes Read | Bytes Written | Trace JSON Bytes | Artifact JSON Bytes | Max Commit Ops |\n",
     );
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
-    if let Some(cases) = summary["runtime_overheads"]["cases"].as_array() {
+    out.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    if let Some(rows) = summary["runtime_overheads"]["matrix"].as_array() {
+        for row in rows {
+            let overhead_cell = |field: &str| -> String {
+                if row["rejected"].as_bool() == Some(true) {
+                    return "rejected".to_string();
+                }
+                if let Some(number) = row[field].as_u64() {
+                    return number.to_string();
+                }
+                if let Some(number) = row[field].as_f64() {
+                    return number.to_string();
+                }
+                "n/a".to_string()
+            };
+            out.push_str(&format!(
+                "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
+                row["benchmark"].as_str().unwrap_or("unknown"),
+                row["backend"].as_str().unwrap_or("unknown"),
+                row["capacity"]
+                    .as_str()
+                    .or_else(|| row["capacity"].as_u64().map(|_| ""))
+                    .unwrap_or("n/a"),
+                overhead_cell("gas_used"),
+                overhead_cell("physical_reads"),
+                overhead_cell("physical_writes"),
+                overhead_cell("bytes_read"),
+                overhead_cell("bytes_written"),
+                overhead_cell("trace_json_bytes"),
+                row["artifact_json_bytes"].as_u64().unwrap_or_default(),
+                row["entrypoint_resource_bounds"]["max_commit_ops"]
+                    .as_u64()
+                    .unwrap_or_default(),
+            ));
+        }
+    } else if let Some(cases) = summary["runtime_overheads"]["cases"].as_array() {
         for case in cases {
             let overhead_cell = |section: &str, field: &str| -> String {
                 let value = &case[section];
@@ -2393,17 +2432,11 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
                 "n/a".to_string()
             };
             out.push_str(&format!(
-                "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
+                "| `{}` | `raw` | `n/a` | `{}` | `n/a` | `{}` | `n/a` | `{}` | `n/a` | `n/a` | `n/a` |\n",
                 case["benchmark"].as_str().unwrap_or("unknown"),
                 overhead_cell("raw", "gas_used"),
                 overhead_cell("raw", "physical_writes"),
                 overhead_cell("raw", "bytes_written"),
-                overhead_cell("full_scan_64", "gas_used"),
-                overhead_cell("full_scan_64", "physical_writes"),
-                overhead_cell("full_scan_64", "bytes_written"),
-                overhead_cell("oram_64", "gas_used"),
-                overhead_cell("oram_64", "physical_writes"),
-                overhead_cell("oram_64", "bytes_written"),
             ));
         }
     }
@@ -3003,14 +3036,14 @@ fn static_drift_check_inventory() -> JsonValue {
         {
             "name": "sgx_deployment_assumption_mechanism_matrix_pinned",
             "work_package": "F17",
-            "target": "the SGX deployment assumption-to-mechanism matrix and first milestone checklist for attestation transcript, sealed storage/freshness, rollback counter, and return-channel gate",
+            "target": "the SGX deployment assumption-to-mechanism matrix and first milestone checklist for attestation transcript, sealed storage/freshness, rollback counter, and encrypted return-channel evidence",
             "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_mechanism_matrix_pinned",
         },
         {
-            "name": "return_channel_crypto_gate_pinned",
+            "name": "return_channel_crypto_evidence_pinned",
             "work_package": "F17",
-            "target": "the current implemented claim rejects `encrypted_to_client` returns until an encrypted return channel with nonce/session-key evidence exists",
-            "report_field": "kernel_model_alignment_validation.return_channel_crypto_gate_pinned",
+            "target": "`encrypted_to_client` returns are admitted only for confidential entrypoints and produce ciphertext-only public outcomes with session binding, nonce/AAD evidence, and a Lean no-plaintext-declassification theorem",
+            "report_field": "kernel_model_alignment_validation.return_channel_crypto_evidence_pinned",
         },
         {
             "name": "runtime_crypto_primitive_identity_pinned",
@@ -3219,7 +3252,7 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "TEE deployment assumptions",
             "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust",
-            "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is gated by the runtime rejection of `encrypted_to_client` returns; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_gate_pinned` pin the surface",
+            "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is mapped to runtime AEAD/session evidence plus a Lean no-plaintext-declassification policy theorem; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_evidence_pinned` pin the surface",
         }
     ])
 }
@@ -20434,7 +20467,7 @@ fn validate_runtime_implementation_kernel_machine_confinement_boundary_case(
             "runtime_witness_extraction_trusted_producer": true,
             "runtime_witness_authority_reduced_by_replay_checks": true,
             "runtime_witness_authority_eliminated": false,
-            "primitive_event_transcript_hash_bound": false,
+            "primitive_event_transcript_hash_bound": true,
             "deeper_extraction_refinement_required": true,
             "shared_confidential_kernel_boundary_theorem_checked": true,
             "small_confidential_kernel_boundary_theorem_checked": true,
@@ -25457,6 +25490,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // record `sgxObserverSurfaceProvenance` references these files
     // as the canonical pins for the W6.1 frozen observer surface.
     let runtime_controller_path = repo_root().join("runtime/uo-evm/src/controller.rs");
+    let runtime_return_channel_path = repo_root().join("runtime/uo-evm/src/return_channel.rs");
+    let runtime_engine_path = repo_root().join("runtime/uo-evm/src/engine.rs");
+    let compiler_source_path = repo_root().join("compiler/uo-solc/src/lib.rs");
     let lean_runtime_implementation_interface_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterface.lean");
     let lean_runtime_implementation_interface_json_path =
@@ -25670,6 +25706,17 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&manifest_alignment_path)))?;
     let runtime_controller_source = fs::read_to_string(&runtime_controller_path)
         .with_context(|| format!("reading {}", display_report_path(&runtime_controller_path)))?;
+    let runtime_return_channel_source = fs::read_to_string(&runtime_return_channel_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&runtime_return_channel_path)
+            )
+        })?;
+    let runtime_engine_source = fs::read_to_string(&runtime_engine_path)
+        .with_context(|| format!("reading {}", display_report_path(&runtime_engine_path)))?;
+    let compiler_source = fs::read_to_string(&compiler_source_path)
+        .with_context(|| format!("reading {}", display_report_path(&compiler_source_path)))?;
     let workspace_cargo_toml_source =
         fs::read_to_string(&workspace_cargo_toml_path).with_context(|| {
             format!(
@@ -30530,12 +30577,37 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("theorem sgxDeploymentFirstMilestoneChecklist_coversRequiredArtifacts")
         && lean_runtime_audit_surfaces_source
             .contains("theorem sgxDeploymentFirstMilestoneChecklist_allMapped");
-    let return_channel_crypto_gate_pinned = lean_runtime_audit_surfaces_source
-        .contains("removedFromImplementedClaim")
-        && lean_runtime_audit_surfaces_source.contains("ReturnPolicy.encrypted_to_client")
+    let old_compiler_return_channel_rejection =
+        ["encrypted return channels", "are not implemented yet"].join(" ");
+    let old_runtime_return_channel_rejection =
+        ["encrypted_to_client returns", "are not implemented"].join(" ");
+    let return_channel_crypto_evidence_pinned = lean_runtime_audit_surfaces_source
+        .contains("def EncryptedReturnPolicyWellFormed")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem encryptedReturnPolicy_noPlaintextDeclassification")
+        && lean_runtime_audit_surfaces_source
+            .contains("theorem encryptedReturnPolicy_hasNonceSessionAndAttestationEvidence")
+        && lean_runtime_audit_surfaces_source.contains("return_channel_crypto_evidence_pinned")
+        && core_trace_source.contains("pub struct ReturnChannelPublicBinding")
+        && core_trace_source.contains("pub struct EncryptedReturnPayload")
+        && core_trace_source
+            .contains("pub encrypted_return_payload: Option<EncryptedReturnPayload>")
+        && compiler_source.contains("ReturnPolicy::EncryptedToClient) if !entrypoint_confidential")
+        && compiler_source.contains("must not declassify the plaintext return")
+        && !compiler_source.contains(&old_compiler_return_channel_rejection)
+        && runtime_engine_source.contains("pub encrypted_return: Option<EncryptedReturnPayload>")
+        && runtime_engine_source.contains("pub fn call_with_return_channel(")
+        && runtime_return_channel_source.contains("pub struct ReturnChannelSession")
+        && runtime_return_channel_source.contains("RETURN_CHANNEL_SCHEME")
+        && runtime_return_channel_source.contains("ChaCha20Poly1305")
+        && runtime_return_channel_source.contains("encrypt_in_place_detached")
+        && runtime_return_channel_source.contains("return_channel_aad_bytes")
+        && runtime_return_channel_source.contains("admitted_package")
+        && runtime_return_channel_source.contains("aad_hash")
+        && runtime_return_channel_source.contains("nonce")
         && runtime_controller_source.contains("ReturnPolicy::EncryptedToClient")
-        && runtime_controller_source
-            .contains("bail!(\"encrypted_to_client returns are not implemented\")");
+        && runtime_controller_source.contains("encrypted_return_payload")
+        && !runtime_controller_source.contains(&old_runtime_return_channel_rejection);
     // W6.4: pin the canonical hostile-host sealing / storage
     // refinement — the runtime's `RefinementTrace` keeps
     // `physical_reads: Box<[PhysicalReadEvent]>` and
@@ -31261,7 +31333,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             && kernel_machine_confinement_validation_fn_source
                 .contains("\"runtime_witness_authority_eliminated\": false")
             && kernel_machine_confinement_validation_fn_source
-                .contains("\"primitive_event_transcript_hash_bound\": false")
+                .contains("\"primitive_event_transcript_hash_bound\": true")
             && kernel_machine_confinement_validation_fn_source
                 .contains("\"deeper_extraction_refinement_required\": true");
     let runtime_implementation_kernel_machine_confinement_paper_native_kernel_assumptions_theorem_present =
@@ -35082,7 +35154,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && sgx_storage_refinement_pinned
         && sgx_deployment_assumption_bundle_pinned
         && sgx_deployment_assumption_mechanism_matrix_pinned
-        && return_channel_crypto_gate_pinned
+        && return_channel_crypto_evidence_pinned
         && runtime_implementation_public_bridge_observer_refinement_boundary_field_names_match
         && runtime_implementation_public_bridge_observer_refinement_boundary_public_bridge_theorem_present
         && runtime_implementation_public_bridge_observer_refinement_boundary_residual_helper_theorem_present
@@ -35816,8 +35888,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             sgx_deployment_assumption_bundle_pinned,
         "sgx_deployment_assumption_mechanism_matrix_pinned":
             sgx_deployment_assumption_mechanism_matrix_pinned,
-        "return_channel_crypto_gate_pinned":
-            return_channel_crypto_gate_pinned,
+        "return_channel_crypto_evidence_pinned":
+            return_channel_crypto_evidence_pinned,
         "rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
             rust_runtime_implementation_public_bridge_observer_refinement_boundary_field_names,
         "lean_runtime_implementation_public_bridge_observer_refinement_boundary_field_names":
@@ -46268,9 +46340,58 @@ fn run_mutual_information_reports(
 }
 
 fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let mut cases = Vec::new();
+    let mut matrix = Vec::new();
+
+    append_overhead_workload(
+        &mut cases,
+        &mut matrix,
+        "FixedSlotClassifier/classify",
+        &suite["FixedSlotClassifier"],
+        &[],
+        &CallSpec {
+            entrypoint: "classify(uint256)",
+            args: vec![Value::uint(1)],
+        },
+        &[CallSpec {
+            entrypoint: "peek()",
+            args: vec![],
+        }],
+    )
+    .context("overheads/FixedSlotClassifier/classify")?;
+
+    append_overhead_workload(
+        &mut cases,
+        &mut matrix,
+        "AuthScan/auth",
+        &suite["AuthScan"],
+        &[
+            CallSpec {
+                entrypoint: "seed(uint256,bytes32)",
+                args: vec![Value::uint(0), b32(1)],
+            },
+            CallSpec {
+                entrypoint: "seed(uint256,bytes32)",
+                args: vec![Value::uint(1), b32(2)],
+            },
+        ],
+        &CallSpec {
+            entrypoint: "auth(bytes32)",
+            args: vec![b32(2)],
+        },
+        &[CallSpec {
+            entrypoint: "readLast()",
+            args: vec![],
+        }],
+    )
+    .context("overheads/AuthScan/auth")?;
+
     let mixer_key = b32(7);
-    let raw = run_optional_raw_scenario(
-        &suite["ConfidentialMixer"].raw,
+    append_overhead_workload(
+        &mut cases,
+        &mut matrix,
+        "ConfidentialMixer/deposit",
+        &suite["ConfidentialMixer"],
         &[],
         &CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
@@ -46278,44 +46399,211 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
         },
         &[],
     )
-    .context("overheads/ConfidentialMixer/raw")?;
-    let fullscan64 = run_scenario(
-        suite["ConfidentialMixer"]
-            .fullscan64
-            .as_ref()
-            .ok_or_else(|| anyhow!("missing fullscan64"))?,
-        &[],
-        &CallSpec {
+    .context("overheads/ConfidentialMixer/deposit")?;
+
+    append_overhead_workload(
+        &mut cases,
+        &mut matrix,
+        "ConfidentialMixer/withdraw",
+        &suite["ConfidentialMixer"],
+        &[CallSpec {
             entrypoint: "deposit(bytes32,uint256)",
-            args: vec![mixer_key.clone(), Value::uint(3)],
-        },
-        &[],
-    )
-    .context("overheads/ConfidentialMixer/fullscan64")?;
-    let oram = run_scenario(
-        suite["ConfidentialMixer"]
-            .oram
-            .as_ref()
-            .ok_or_else(|| anyhow!("missing mixer oram"))?,
-        &[],
+            args: vec![mixer_key.clone(), Value::uint(5)],
+        }],
         &CallSpec {
-            entrypoint: "deposit(bytes32,uint256)",
-            args: vec![mixer_key, Value::uint(3)],
+            entrypoint: "withdraw(bytes32,uint256)",
+            args: vec![mixer_key, Value::uint(2)],
         },
-        &[],
+        &[
+            CallSpec {
+                entrypoint: "balanceOf(bytes32)",
+                args: vec![b32(7)],
+            },
+            CallSpec {
+                entrypoint: "totalValue()",
+                args: vec![],
+            },
+        ],
     )
-    .context("overheads/ConfidentialMixer/oram")?;
+    .context("overheads/ConfidentialMixer/withdraw")?;
+
+    let alice = addr(0x11);
+    let bob = addr(0x22);
+    let carol = addr(0x33);
+    append_overhead_workload(
+        &mut cases,
+        &mut matrix,
+        "ERC20Lite/transferFrom",
+        &suite["ERC20Lite"],
+        &[
+            CallSpec {
+                entrypoint: "mint(address,uint256)",
+                args: vec![alice.clone(), Value::uint(10)],
+            },
+            CallSpec {
+                entrypoint: "approve(address,address,uint256)",
+                args: vec![alice.clone(), bob.clone(), Value::uint(4)],
+            },
+        ],
+        &CallSpec {
+            entrypoint: "transferFrom(address,address,address,uint256)",
+            args: vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(3)],
+        },
+        &[
+            CallSpec {
+                entrypoint: "balanceOf(address)",
+                args: vec![alice],
+            },
+            CallSpec {
+                entrypoint: "balanceOf(address)",
+                args: vec![carol],
+            },
+            CallSpec {
+                entrypoint: "allowanceOf(address,address)",
+                args: vec![addr(0x11), bob],
+            },
+        ],
+    )
+    .context("overheads/ERC20Lite/transferFrom")?;
+
+    let registry_key = b32(4);
+    append_overhead_workload(
+        &mut cases,
+        &mut matrix,
+        "RegistryCRUD/clearIfMatch",
+        &suite["RegistryCRUD"],
+        &[CallSpec {
+            entrypoint: "upsert(bytes32,uint256)",
+            args: vec![registry_key.clone(), Value::uint(9)],
+        }],
+        &CallSpec {
+            entrypoint: "clearIfMatch(bytes32,uint256)",
+            args: vec![registry_key.clone(), Value::uint(9)],
+        },
+        &[CallSpec {
+            entrypoint: "read(bytes32)",
+            args: vec![registry_key],
+        }],
+    )
+    .context("overheads/RegistryCRUD/clearIfMatch")?;
+
     Ok(json!({
-        "cases": [
-            {
-                "benchmark": "ConfidentialMixer/deposit",
-                "raw": optional_scenario_overhead(&raw),
-                "full_scan_64": scenario_overhead(&fullscan64),
-                "oram_64": scenario_overhead(&oram),
-                "oram_improves_physical_writes": oram.target.trace.physical_writes.len() < fullscan64.target.trace.physical_writes.len(),
-            }
-        ]
+        "coverage": {
+            "workload_count": cases.len(),
+            "matrix_row_count": matrix.len(),
+            "metrics": [
+                "gas_used",
+                "physical_reads",
+                "physical_writes",
+                "bytes_read",
+                "bytes_written",
+                "trace_json_bytes",
+                "artifact_json_bytes",
+                "entrypoint_resource_bounds"
+            ],
+        },
+        "cases": cases,
+        "matrix": matrix,
     }))
+}
+
+fn append_overhead_workload(
+    cases: &mut Vec<JsonValue>,
+    matrix: &mut Vec<JsonValue>,
+    benchmark: &'static str,
+    artifacts: &BenchArtifacts,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    getters: &[CallSpec],
+) -> Result<()> {
+    let raw = run_optional_raw_scenario(&artifacts.raw, setup, target, getters)
+        .with_context(|| format!("{benchmark}/raw"))?;
+    let uo = run_scenario(&artifacts.uo, setup, target, getters)
+        .with_context(|| format!("{benchmark}/full_scan"))?;
+    let fullscan64 = artifacts
+        .fullscan64
+        .as_ref()
+        .map(|artifact| {
+            run_scenario(artifact, setup, target, getters)
+                .with_context(|| format!("{benchmark}/full_scan_64"))
+        })
+        .transpose()?;
+    let oram = artifacts
+        .oram
+        .as_ref()
+        .map(|artifact| {
+            run_scenario(artifact, setup, target, getters)
+                .with_context(|| format!("{benchmark}/oram"))
+        })
+        .transpose()?;
+
+    let mut variants = Vec::new();
+    let raw_row =
+        optional_overhead_matrix_row(benchmark, "raw", &artifacts.raw, target.entrypoint, &raw)?;
+    variants.push(raw_row.clone());
+    matrix.push(raw_row);
+
+    let uo_label = artifact_backend_label(&artifacts.uo);
+    let uo_row = overhead_matrix_row(benchmark, &uo_label, &artifacts.uo, target.entrypoint, &uo)?;
+    variants.push(uo_row.clone());
+    matrix.push(uo_row.clone());
+    let mut oram_write_comparison_baseline = ("full_scan", uo.target.trace.physical_writes.len());
+
+    let mut case = json!({
+        "benchmark": benchmark,
+        "entrypoint": target.entrypoint,
+        "raw": optional_scenario_overhead(&raw),
+        "full_scan": scenario_overhead(&uo),
+        "variants": variants,
+    });
+
+    if let Some(fullscan64) = fullscan64 {
+        let fullscan64_artifact = artifacts.fullscan64.as_ref().unwrap();
+        let fullscan64_row = overhead_matrix_row(
+            benchmark,
+            "full_scan_64",
+            fullscan64_artifact,
+            target.entrypoint,
+            &fullscan64,
+        )?;
+        case["full_scan_64"] = scenario_overhead(&fullscan64);
+        case["variants"]
+            .as_array_mut()
+            .expect("variants is an array")
+            .push(fullscan64_row.clone());
+        matrix.push(fullscan64_row);
+        oram_write_comparison_baseline = (
+            "full_scan_64",
+            fullscan64.target.trace.physical_writes.len(),
+        );
+    }
+
+    if let Some(oram) = oram {
+        let oram_artifact = artifacts.oram.as_ref().unwrap();
+        let oram_label = artifact_backend_label(oram_artifact);
+        let oram_row = overhead_matrix_row(
+            benchmark,
+            &oram_label,
+            oram_artifact,
+            target.entrypoint,
+            &oram,
+        )?;
+        case["oram"] = scenario_overhead(&oram);
+        case["variants"]
+            .as_array_mut()
+            .expect("variants is an array")
+            .push(oram_row.clone());
+        matrix.push(oram_row.clone());
+        if artifact_capacity_label(oram_artifact) == Some("64".to_string()) {
+            case["oram_64"] = scenario_overhead(&oram);
+        }
+        case["oram_improves_physical_writes_baseline"] = json!(oram_write_comparison_baseline.0);
+        case["oram_improves_physical_writes"] =
+            json!(oram.target.trace.physical_writes.len() < oram_write_comparison_baseline.1);
+    }
+
+    cases.push(case);
+    Ok(())
 }
 
 struct ScenarioResult {
@@ -47321,8 +47609,13 @@ fn scenario_overhead(result: &ScenarioResult) -> JsonValue {
         "executable": true,
         "rejected": false,
         "gas_used": result.target.trace.gas_used,
+        "physical_reads": result.target.trace.physical_reads.len(),
         "physical_writes": result.target.trace.physical_writes.len(),
+        "bytes_read": result.target.trace.physical_reads.iter().map(|event| event.len).sum::<usize>() as f64,
         "bytes_written": result.target.trace.physical_writes.iter().map(|event| event.len).sum::<usize>() as f64,
+        "trace_json_bytes": serde_json::to_vec(&result.target.trace)
+            .map(|bytes| bytes.len())
+            .unwrap_or_default(),
     })
 }
 
@@ -47334,6 +47627,124 @@ fn optional_scenario_overhead(result: &OptionalScenarioResult) -> JsonValue {
             "rejected": true,
             "error": error,
         }),
+    }
+}
+
+fn overhead_matrix_row(
+    benchmark: &str,
+    backend_label: &str,
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    result: &ScenarioResult,
+) -> Result<JsonValue> {
+    let mut row = scenario_overhead(result);
+    append_artifact_overhead_metadata(&mut row, benchmark, backend_label, artifact, entrypoint)?;
+    Ok(row)
+}
+
+fn optional_overhead_matrix_row(
+    benchmark: &str,
+    backend_label: &str,
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    result: &OptionalScenarioResult,
+) -> Result<JsonValue> {
+    let mut row = optional_scenario_overhead(result);
+    append_artifact_overhead_metadata(&mut row, benchmark, backend_label, artifact, entrypoint)?;
+    Ok(row)
+}
+
+fn append_artifact_overhead_metadata(
+    row: &mut JsonValue,
+    benchmark: &str,
+    backend_label: &str,
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+) -> Result<()> {
+    let object = row
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("overhead row for {} is not a JSON object", benchmark))?;
+    object.insert("benchmark".into(), json!(benchmark));
+    object.insert("entrypoint".into(), json!(entrypoint));
+    object.insert("backend".into(), json!(backend_label));
+    object.insert("capacity".into(), json!(artifact_capacity_label(artifact)));
+    object.insert(
+        "artifact_json_bytes".into(),
+        json!(serde_json::to_vec(artifact)?.len()),
+    );
+    object.insert(
+        "state_objects".into(),
+        json!(artifact
+            .contract
+            .state
+            .iter()
+            .map(|state| json!({
+                "name": &state.name,
+                "kind": format!("{:?}", state.kind),
+                "backend": backend_kind_label(&state.backend),
+                "capacity": state.capacity,
+                "confidential": state.confidential,
+            }))
+            .collect::<Vec<_>>()),
+    );
+    object.insert(
+        "entrypoint_resource_bounds".into(),
+        match artifact
+            .contract
+            .manifest
+            .entrypoint_resource_bounds(entrypoint)
+        {
+            Ok(bounds) => json!(bounds),
+            Err(err) => json!({ "error": err.to_string() }),
+        },
+    );
+    Ok(())
+}
+
+fn artifact_backend_label(artifact: &CompiledArtifact) -> String {
+    let mut backends = artifact
+        .contract
+        .state
+        .iter()
+        .filter(|object| object.confidential)
+        .map(|object| backend_kind_label(&object.backend).to_string())
+        .collect::<BTreeSet<_>>();
+    if backends.is_empty() {
+        backends = artifact
+            .contract
+            .state
+            .iter()
+            .map(|object| backend_kind_label(&object.backend).to_string())
+            .collect::<BTreeSet<_>>();
+    }
+    backends.into_iter().collect::<Vec<_>>().join("+")
+}
+
+fn backend_kind_label(backend: &BackendKind) -> &'static str {
+    match backend {
+        BackendKind::Raw => "raw",
+        BackendKind::FullScan => "full_scan",
+        BackendKind::Oram => "oram",
+    }
+}
+
+fn artifact_capacity_label(artifact: &CompiledArtifact) -> Option<String> {
+    let capacities = artifact
+        .contract
+        .state
+        .iter()
+        .filter_map(|object| object.capacity)
+        .collect::<BTreeSet<_>>();
+    if capacities.is_empty() {
+        None
+    } else {
+        Some(
+            capacities
+                .into_iter()
+                .map(|capacity| capacity.to_string())
+                .collect::<Vec<_>>()
+                .join("+"),
+        )
     }
 }
 
@@ -48146,6 +48557,37 @@ mod tests {
         let overhead_report = run_overheads(&suite).unwrap();
         assert_eq!(
             overhead_report["cases"][0]["raw"]["rejected"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            overhead_report["coverage"]["workload_count"].as_u64(),
+            Some(6)
+        );
+        assert!(overhead_report["matrix"].as_array().unwrap().len() >= 17);
+        assert!(overhead_report["matrix"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| {
+                row["benchmark"].as_str() == Some("ERC20Lite/transferFrom")
+                    && row["backend"].as_str() == Some("oram")
+                    && !row["entrypoint_resource_bounds"]["oram_bounds"]
+                        .as_array()
+                        .unwrap()
+                        .is_empty()
+            }));
+        let mixer_deposit = overhead_report["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["benchmark"].as_str() == Some("ConfidentialMixer/deposit"))
+            .unwrap();
+        assert_eq!(
+            mixer_deposit["oram_improves_physical_writes_baseline"].as_str(),
+            Some("full_scan_64")
+        );
+        assert_eq!(
+            mixer_deposit["oram_improves_physical_writes"].as_bool(),
             Some(true)
         );
     }

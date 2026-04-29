@@ -294,6 +294,7 @@ mod tests {
             returns: Default::default(),
             status: Default::default(),
             declassifies: Vec::new(),
+            public_state_declassifies: Vec::new(),
             confidential_program: None,
             confidential_slot_program: None,
             kernel_steps: vec![

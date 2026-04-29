@@ -298,12 +298,20 @@ def evalKernelStatement
           let oc' := { oc with kernelSteps := oc.kernelSteps ++ ["CellSet"] }
           match predicate with
           | none =>
-              (cfg.writeObject objectId newVal, env, oc')
+              match cfg.writeObject? objectId newVal with
+              | some cfg' => (cfg', env, oc')
+              | none =>
+                  let msg := s!"cellSet on unknown object {objectId}"
+                  (cfg, env, { oc with status := .evalError msg })
           | some predExpr =>
               match evalKernelExpr cfg env predExpr with
               | .status s => (cfg, env, { oc with status := s })
               | .value (.bool true) =>
-                  (cfg.writeObject objectId newVal, env, oc')
+                  match cfg.writeObject? objectId newVal with
+                  | some cfg' => (cfg', env, oc')
+                  | none =>
+                      let msg := s!"cellSet on unknown object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
               | .value (.bool false) => (cfg, env, oc')
               | .value _ =>
                   (cfg, env, { oc with status := .evalError "cellSet predicate not boolean" })
@@ -338,7 +346,11 @@ def evalKernelStatement
                             (cfg, env, { oc with status := .evalError msg })
                           else
                             let updated := Value.array (Value.arraySetAt values idx newVal)
-                            (cfg.writeObject objectId updated, env, oc')
+                            match cfg.writeObject? objectId updated with
+                            | some cfg' => (cfg', env, oc')
+                            | none =>
+                                let msg := s!"arraySet on unknown object {objectId}"
+                                (cfg, env, { oc with status := .evalError msg })
                       | some _ =>
                           let msg := s!"arraySet on non-array object {objectId}"
                           (cfg, env, { oc with status := .evalError msg })
@@ -372,13 +384,21 @@ def evalKernelStatement
                   match cfg.readObject objectId with
                   | some (.map entries) =>
                       let updated := Value.map (Value.mapInsert entries keyVal newVal)
-                      (cfg.writeObject objectId updated, env, oc')
+                      match cfg.writeObject? objectId updated with
+                      | some cfg' => (cfg', env, oc')
+                      | none =>
+                          let msg := s!"mapPut on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
                   | some _ =>
                       let msg := s!"mapPut on non-map object {objectId}"
                       (cfg, env, { oc with status := .evalError msg })
                   | none =>
                       let updated := Value.map [(keyVal, newVal)]
-                      (cfg.writeObject objectId updated, env, oc')
+                      match cfg.writeObject? objectId updated with
+                      | some cfg' => (cfg', env, oc')
+                      | none =>
+                          let msg := s!"mapPut on unknown object {objectId}"
+                          (cfg, env, { oc with status := .evalError msg })
   | .retStmt none => (cfg, env, oc)
   | .retStmt (some value) =>
       match evalKernelExpr cfg env value with
@@ -411,15 +431,17 @@ def KernelProgram.initialEnv (kp : KernelProgram)
     none
 
 /-- Big-step program evaluator: bind the entrypoint arguments and walk
-the body using `evalKernelBody`. Discards the final config / env, like
-`evalContract`. -/
+the body using `evalKernelBody`, recording the final public store in the
+returned outcome. -/
 def evalKernelProgram (kp : KernelProgram) (cfg : OperationalConfig) : Outcome :=
   match kp.initialEnv cfg.publicArgs cfg.secretArgs with
   | none =>
-      { Outcome.empty with status := .evalError "argument arity mismatch" }
+      { Outcome.empty with
+        status := .evalError "argument arity mismatch"
+        finalPublicState := some cfg.publicState }
   | some env =>
-      let (_cfg', _env', outcome) := evalKernelBody cfg env Outcome.empty kp.body
-      outcome
+      let (cfg', _env', outcome) := evalKernelBody cfg env Outcome.empty kp.body
+      outcome.withFinalPublicState cfg'.publicState
 
 /-! ### W4.5: Static expected kernel-step schedule
 
@@ -2557,7 +2579,10 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
           exact absurd hStatus (evalKernelExpr_status_ne_completed cfg env value s hVal)
       | value newVal =>
           cases predicate with
-          | none => simp
+          | none =>
+              cases hWrite : cfg.writeObject? objectId newVal with
+              | none => simp [hVal, hWrite] at hStatus
+              | some cfg' => simp [hWrite]
           | some predExpr =>
               cases hPred : evalKernelExpr cfg env predExpr with
               | status s =>
@@ -2568,7 +2593,9 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                   | bool b =>
                       cases b
                       · simp [hPred]
-                      · simp [hPred]
+                      · cases hWrite : cfg.writeObject? objectId newVal with
+                        | none => simp [hVal, hPred, hWrite] at hStatus
+                        | some cfg' => simp [hPred, hWrite]
                   | _ => simp [hVal, hPred] at hStatus
   | arraySet objectId index value predicate =>
       simp only [evalKernelStatement, KernelStatement.expectedStep] at *
@@ -2593,7 +2620,11 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                           | array values =>
                               by_cases hOob : idx ≥ values.length
                               · simp [hIdx, hVal, hRead, hOob] at hStatus
-                              · simp [hOob]
+                              · cases hWrite :
+                                    cfg.writeObject? objectId
+                                      (Value.array (Value.arraySetAt values idx newVal)) with
+                                | none => simp [hIdx, hVal, hRead, hOob, hWrite] at hStatus
+                                | some cfg' => simp [hOob, hWrite]
                           | _ => simp [hIdx, hVal, hRead] at hStatus
                   | _ => simp [hIdx, hVal] at hStatus
               | some predExpr =>
@@ -2615,7 +2646,12 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                                     | array values =>
                                         by_cases hOob : idx ≥ values.length
                                         · simp [hIdx, hVal, hPred, hRead, hOob] at hStatus
-                                        · simp [hPred, hOob]
+                                        · cases hWrite :
+                                              cfg.writeObject? objectId
+                                                (Value.array (Value.arraySetAt values idx newVal)) with
+                                          | none =>
+                                              simp [hIdx, hVal, hPred, hRead, hOob, hWrite] at hStatus
+                                          | some cfg' => simp [hPred, hOob, hWrite]
                                     | _ => simp [hIdx, hVal, hPred, hRead] at hStatus
                             | _ => simp [hIdx, hVal, hPred] at hStatus
                       | _ => simp [hIdx, hVal, hPred] at hStatus
@@ -2634,10 +2670,19 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
               cases predicate with
               | none =>
                   cases hRead : cfg.readObject objectId with
-                  | none => simp
+                  | none =>
+                      cases hWrite :
+                          cfg.writeObject? objectId (Value.map [(keyVal, newVal)]) with
+                      | none => simp [hKey, hVal, hRead, hWrite] at hStatus
+                      | some cfg' => simp [hWrite]
                   | some objVal =>
                       cases objVal with
-                      | map entries => simp
+                      | map entries =>
+                          cases hWrite :
+                              cfg.writeObject? objectId
+                                (Value.map (Value.mapInsert entries keyVal newVal)) with
+                          | none => simp [hKey, hVal, hRead, hWrite] at hStatus
+                          | some cfg' => simp [hWrite]
                       | _ => simp [hKey, hVal, hRead] at hStatus
               | some predExpr =>
                   cases hPred : evalKernelExpr cfg env predExpr with
@@ -2650,10 +2695,21 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                           cases b
                           · simp [hPred]
                           · cases hRead : cfg.readObject objectId with
-                            | none => simp [hPred]
+                            | none =>
+                                cases hWrite :
+                                    cfg.writeObject? objectId (Value.map [(keyVal, newVal)]) with
+                                | none =>
+                                    simp [hKey, hVal, hPred, hRead, hWrite] at hStatus
+                                | some cfg' => simp [hPred, hWrite]
                             | some objVal =>
                                 cases objVal with
-                                | map entries => simp [hPred]
+                                | map entries =>
+                                    cases hWrite :
+                                        cfg.writeObject? objectId
+                                          (Value.map (Value.mapInsert entries keyVal newVal)) with
+                                    | none =>
+                                        simp [hKey, hVal, hPred, hRead, hWrite] at hStatus
+                                    | some cfg' => simp [hPred, hWrite]
                                 | _ => simp [hKey, hVal, hPred, hRead] at hStatus
                       | _ => simp [hKey, hVal, hPred] at hStatus
 

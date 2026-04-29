@@ -676,7 +676,7 @@ Prototype assumptions:
 Artifact packaging mode:
 
 - This bundle uses compact artifact mode. Canonical Path-ORAM families and proof-grade pair certificates larger than the configured compact budget remain validated through proof-grade theorem-input certificates instead of full explicit materialization.
-- Compact budget: `10737418240` bytes. Heavy-artifact budget: `21474836480` bytes.
+- Compact budget: `67108864` bytes. Heavy-artifact budget: `21474836480` bytes.
 - Heavy artifacts are written under bundle-relative `heavy_artifacts` when heavy mode is selected.
 - `reproducibility_manifest.json` records every emitted file with its bundle-relative path, byte size, and SHA-256 digest.
 - `reviewer_summary.md` renders the same machine-generated reviewer table as `reviewer_summary.json` in Markdown form for paper/artifact writeups.

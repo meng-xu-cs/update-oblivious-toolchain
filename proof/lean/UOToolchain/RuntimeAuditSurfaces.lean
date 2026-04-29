@@ -59,9 +59,9 @@ def runtimeHostVisibleOutcomeTaxonomy :
   [ { kind := .success
     , classification := .explicitlyDeclassified
     , hostPayloadRule :=
-        "success/status and plaintext return payloads are host-visible only through explicit status/return declassification policy"
+        "success/status and plaintext return payloads are host-visible only through explicit status/return declassification policy; encrypted_to_client returns expose ciphertext evidence instead"
     , normalizationRule :=
-        "PublicOutcomeTrace carries status_policy, return_policy, return_payload, and declassifies"
+        "PublicOutcomeTrace carries status_policy, return_policy, return_payload, encrypted_return_payload, and declassifies"
     , theoremAnchor :=
         "importedRuntimeImplementationInterface_valid_hostVisibleErrorTaxonomy"
     , probeAnchor :=
@@ -149,18 +149,55 @@ theorem runtimeHostVisibleOutcomeTaxonomy_allClosed :
   · subst h; rfl
   · subst h; rfl
 
+def EncryptedReturnPolicyWellFormed
+    (outcome : SGXPublicOutcome) : Prop :=
+  outcome.returnPolicy = "encrypted_to_client" →
+    outcome.returnPayload = none ∧
+      (∃ payload,
+        outcome.encryptedReturnPayload = some payload ∧
+          payload.wireLen = outcome.outputShape.returnLength ∧
+          payload.nonce ≠ "" ∧
+          payload.binding.sessionId ≠ "" ∧
+          payload.binding.clientPublicKeyHash ≠ "" ∧
+          payload.binding.attestationTranscriptHash ≠ "") ∧
+      "return" ∉ outcome.declassifies
+
+theorem encryptedReturnPolicy_noPlaintextDeclassification
+    {outcome : SGXPublicOutcome}
+    (hWellFormed : EncryptedReturnPolicyWellFormed outcome)
+    (hPolicy : outcome.returnPolicy = "encrypted_to_client") :
+    outcome.returnPayload = none ∧ "return" ∉ outcome.declassifies := by
+  rcases hWellFormed hPolicy with ⟨hPayload, _hCiphertext, hNoDeclass⟩
+  exact ⟨hPayload, hNoDeclass⟩
+
+theorem encryptedReturnPolicy_hasNonceSessionAndAttestationEvidence
+    {outcome : SGXPublicOutcome}
+    (hWellFormed : EncryptedReturnPolicyWellFormed outcome)
+    (hPolicy : outcome.returnPolicy = "encrypted_to_client") :
+    ∃ payload,
+      outcome.encryptedReturnPayload = some payload ∧
+        payload.wireLen = outcome.outputShape.returnLength ∧
+        payload.nonce ≠ "" ∧
+        payload.binding.sessionId ≠ "" ∧
+        payload.binding.clientPublicKeyHash ≠ "" ∧
+        payload.binding.attestationTranscriptHash ≠ "" := by
+  rcases hWellFormed hPolicy with ⟨_hPayload, hCiphertext, _hNoDeclass⟩
+  exact hCiphertext
+
 inductive RuntimeFreshnessSurface where
   | storeEncryptionNonce
   | metadataEncryptionNonce
   | pathOramLeafRemapCoin
   | canonicalFreshCoinProofFamily
   | diagnosticFreshCoinInjection
+  | deterministicDeploySeed
 deriving Repr, DecidableEq
 
 structure RuntimeFreshnessDisciplineEntry where
   surface : RuntimeFreshnessSurface
   domainSeparatedAssociatedData : Bool
   freshPerCallOrSeed : Bool
+  uniqueWithinDomain : Bool
   productionTheoremModeSafe : Bool
   runtimeAnchor : String
   theoremAnchor : String
@@ -171,6 +208,7 @@ def RuntimeFreshnessDisciplineEntry.accepted
     (entry : RuntimeFreshnessDisciplineEntry) : Bool :=
   entry.domainSeparatedAssociatedData &&
     entry.freshPerCallOrSeed &&
+    entry.uniqueWithinDomain &&
     entry.productionTheoremModeSafe
 
 def runtimeFreshnessDiscipline :
@@ -178,6 +216,7 @@ def runtimeFreshnessDiscipline :
   [ { surface := .storeEncryptionNonce
     , domainSeparatedAssociatedData := true
     , freshPerCallOrSeed := true
+    , uniqueWithinDomain := true
     , productionTheoremModeSafe := true
     , runtimeAnchor :=
         "runtime/uo-store/src/generated_surface.rs seal_and_wipe_into_slice fills SEALED_NONCE_BYTES and authenticates caller AAD"
@@ -189,6 +228,7 @@ def runtimeFreshnessDiscipline :
   , { surface := .metadataEncryptionNonce
     , domainSeparatedAssociatedData := true
     , freshPerCallOrSeed := true
+    , uniqueWithinDomain := true
     , productionTheoremModeSafe := true
     , runtimeAnchor :=
         "runtime/uo-evm/src/oram.rs and generated ORAM codecs use oram metadata/bucket AAD plus StoreCipher nonce generation"
@@ -200,6 +240,7 @@ def runtimeFreshnessDiscipline :
   , { surface := .pathOramLeafRemapCoin
     , domainSeparatedAssociatedData := true
     , freshPerCallOrSeed := true
+    , uniqueWithinDomain := true
     , productionTheoremModeSafe := true
     , runtimeAnchor :=
         "PathOramLeafCoinSource random/injected tape consumed by object id and step schedule"
@@ -211,6 +252,7 @@ def runtimeFreshnessDiscipline :
   , { surface := .canonicalFreshCoinProofFamily
     , domainSeparatedAssociatedData := true
     , freshPerCallOrSeed := true
+    , uniqueWithinDomain := true
     , productionTheoremModeSafe := true
     , runtimeAnchor :=
         "runtime canonical fresh-coin witness family enumerates one representative seed at a time"
@@ -222,6 +264,7 @@ def runtimeFreshnessDiscipline :
   , { surface := .diagnosticFreshCoinInjection
     , domainSeparatedAssociatedData := true
     , freshPerCallOrSeed := true
+    , uniqueWithinDomain := true
     , productionTheoremModeSafe := true
     , runtimeAnchor :=
         "call_with_path_oram_fresh_coins is cfg(feature = diagnostics) and absent from default theorem-facing call"
@@ -229,6 +272,18 @@ def runtimeFreshnessDiscipline :
         "productionSource strips cfg(test) while the proof-grade root imports RuntimeCoins without diagnostics"
     , probeAnchor :=
         "fresh_coin_api_gated_behind_feature"
+    }
+  , { surface := .deterministicDeploySeed
+    , domainSeparatedAssociatedData := true
+    , freshPerCallOrSeed := true
+    , uniqueWithinDomain := true
+    , productionTheoremModeSafe := true
+    , runtimeAnchor :=
+        "ContractInstance::deploy uses OsRng; deploy_with_seed and run_artifact_with_seed are cfg(test) or cfg(feature = diagnostics)"
+    , theoremAnchor :=
+        "runtimeFreshnessDiscipline_seededReplayAbsentFromDefaultProductionApi"
+    , probeAnchor :=
+        "seeded_deploy_api_gated_behind_test_or_diagnostics"
     }
   ]
 
@@ -239,6 +294,7 @@ theorem runtimeFreshnessDiscipline_coversRuntimeSurfaces :
       , RuntimeFreshnessSurface.pathOramLeafRemapCoin
       , RuntimeFreshnessSurface.canonicalFreshCoinProofFamily
       , RuntimeFreshnessSurface.diagnosticFreshCoinInjection
+      , RuntimeFreshnessSurface.deterministicDeploySeed
       ] := by
   rfl
 
@@ -248,7 +304,8 @@ theorem runtimeFreshnessDiscipline_allAccepted :
   intro entry hMem
   unfold runtimeFreshnessDiscipline at hMem
   simp at hMem
-  rcases hMem with h | h | h | h | h
+  rcases hMem with h | h | h | h | h | h
+  · subst h; rfl
   · subst h; rfl
   · subst h; rfl
   · subst h; rfl
@@ -266,6 +323,35 @@ theorem runtimeFreshnessDiscipline_noDiagnosticsInProductionTheoremMode :
     simp [hDomain] at hAccepted
   cases hFresh : entry.freshPerCallOrSeed <;>
     simp [hFresh] at hAccepted
+  cases hUnique : entry.uniqueWithinDomain <;>
+    simp [hUnique] at hAccepted
+  exact hAccepted
+
+theorem runtimeFreshnessDiscipline_uniqueWithinDomain :
+    forall entry, entry ∈ runtimeFreshnessDiscipline ->
+      entry.uniqueWithinDomain = true := by
+  intro entry hMem
+  have hAccepted := runtimeFreshnessDiscipline_allAccepted entry hMem
+  unfold RuntimeFreshnessDisciplineEntry.accepted at hAccepted
+  cases hDomain : entry.domainSeparatedAssociatedData <;>
+    simp [hDomain] at hAccepted
+  cases hFresh : entry.freshPerCallOrSeed <;>
+    simp [hFresh] at hAccepted
+  exact hAccepted.1
+
+theorem runtimeFreshnessDiscipline_seededReplayAbsentFromDefaultProductionApi :
+    forall entry, entry ∈ runtimeFreshnessDiscipline ->
+      entry.surface = RuntimeFreshnessSurface.deterministicDeploySeed ->
+        entry.productionTheoremModeSafe = true := by
+  intro entry hMem hSurface
+  have hAccepted := runtimeFreshnessDiscipline_allAccepted entry hMem
+  unfold RuntimeFreshnessDisciplineEntry.accepted at hAccepted
+  cases hDomain : entry.domainSeparatedAssociatedData <;>
+    simp [hDomain] at hAccepted
+  cases hFresh : entry.freshPerCallOrSeed <;>
+    simp [hFresh] at hAccepted
+  cases hUnique : entry.uniqueWithinDomain <;>
+    simp [hUnique] at hAccepted
   exact hAccepted
 
 inductive SgxDeploymentMechanismStatus where
@@ -425,11 +511,11 @@ def sgxDeploymentFirstMilestoneChecklist :
     , probeAnchor := "sgx_deployment_assumption_mechanism_matrix_pinned"
     }
   , { artifact := .encryptedReturnChannel
-    , status := .removedFromImplementedClaim
+    , status := .implementationEvidence
     , requiredEvidence := "client public key, enclave-bound session key, return ciphertext, and nonce transcript"
     , currentClaimRule :=
-        "current runtime rejects ReturnPolicy.encrypted_to_client until this channel exists"
-    , probeAnchor := "return_channel_crypto_gate_pinned"
+        "runtime supports ReturnPolicy.encrypted_to_client through a ciphertext-only public outcome, return-channel binding, nonce transcript, and Lean encrypted-return policy theorem"
+    , probeAnchor := "return_channel_crypto_evidence_pinned"
     }
   ]
 
