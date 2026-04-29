@@ -1054,7 +1054,9 @@ fn lower_state_object(
         (BackendKind::Oram, None) => {
             bail!("ORAM state {} is missing explicit oram_scheme", name)
         }
-        (_, Some(scheme)) => scheme.clone(),
+        (_, Some(_)) => {
+            bail!("non-ORAM state {} must not declare oram_scheme", name)
+        }
         (_, None) => SURROGATE_ORAM_SCHEME.into(),
     };
     match kind {
@@ -1089,15 +1091,16 @@ fn lower_state_object(
             if capacity == 0 {
                 bail!("array state {} must have positive capacity", name);
             }
-            if let Some(metadata_capacity) = state_meta.capacity {
-                if metadata_capacity != capacity {
-                    bail!(
-                        "array state {} metadata capacity {} does not match source length {}",
-                        name,
-                        metadata_capacity,
-                        capacity
-                    );
-                }
+            let metadata_capacity = state_meta
+                .capacity
+                .ok_or_else(|| anyhow!("array state {} is missing metadata capacity", name))?;
+            if metadata_capacity != capacity {
+                bail!(
+                    "array state {} metadata capacity {} does not match source length {}",
+                    name,
+                    metadata_capacity,
+                    capacity
+                );
             }
             validate_metadata_type(name, "value", &state_meta.value, &element_ty)?;
             if state_meta.key.is_some() {
@@ -2653,6 +2656,22 @@ fn validate_entrypoint_metadata_well_formed(
         ),
         _ => {}
     }
+    let mut seen_secret_args = BTreeSet::new();
+    for secret in &entry_meta.secret_args {
+        if !seen_secret_args.insert(secret) {
+            bail!("entrypoint {} repeats secret_args entry {}", signature, secret);
+        }
+    }
+    let mut seen_declassifies = BTreeSet::new();
+    for declassify in &entry_meta.declassifies {
+        if !seen_declassifies.insert(declassify) {
+            bail!(
+                "entrypoint {} repeats declassifies entry {:?}",
+                signature,
+                declassify
+            );
+        }
+    }
     let mut seen = BTreeSet::new();
     for object_name in &entry_meta.public_state_declassifies {
         if !seen.insert(object_name) {
@@ -3283,6 +3302,41 @@ bounds:
     }
 
     #[test]
+    fn rejects_array_missing_metadata_capacity() {
+        let source = write_temp(
+            "array-missing-capacity",
+            r#"
+            contract C {
+                bytes32[4] private items;
+                function f() public { }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  items:
+    kind: array
+    value: bytes32
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("array state items is missing metadata capacity"));
+    }
+
+    #[test]
     fn rejects_metadata_type_mismatch() {
         let source = write_temp(
             "metadata-type-mismatch",
@@ -3390,6 +3444,42 @@ bounds:
         assert!(err
             .to_string()
             .contains("map state records must have positive capacity"));
+    }
+
+    #[test]
+    fn rejects_oram_scheme_on_non_oram_backend() {
+        let source = write_temp(
+            "non-oram-scheme",
+            r#"
+            contract C {
+                uint256 private x;
+                function f() public { }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("non-ORAM state x must not declare oram_scheme"));
     }
 
     #[test]
@@ -3973,6 +4063,66 @@ bounds:
         assert!(err
             .to_string()
             .contains("declares confidential: false but also declares secret_args"));
+    }
+
+    #[test]
+    fn rejects_duplicate_secret_args() {
+        let source = write_temp(
+            "metadata-duplicate-secret-args",
+            r#"
+            contract C {
+                function f(uint256 secret) public {}
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret, secret]
+    confidential: true
+    returns: forbidden
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f(uint256) repeats secret_args entry secret"));
+    }
+
+    #[test]
+    fn rejects_duplicate_declassifies() {
+        let source = write_temp(
+            "metadata-duplicate-declassifies",
+            r#"
+            contract C {
+                function f() public returns (uint256) { return 1; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: declassified
+    status: public
+    declassifies: [return, return]
+state: {}
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("entrypoint f() repeats declassifies entry Return"));
     }
 
     #[test]

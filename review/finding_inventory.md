@@ -46,7 +46,7 @@ not as independent findings.
 | F-07 | Freshness and randomness discipline | TB-07 | Agree | P1 | Open - required |
 | F-08 | Theorem-adjacent unsafe Rust | TB-08 | Agree | P1 | Open - required |
 | F-09 | Path ORAM capacity cap mirrored in Lean | TB-09, TH-09 | Agree | P1 | Open - required |
-| F-10 | Smaller metadata canonicality gaps | TB-10, negative tests 5-6 | Agree | P1 | Open - required |
+| F-10 | Smaller metadata canonicality gaps | TB-10, negative tests 5-6 | Agree | P1 | Landed |
 | F-11 | Direct paper-main noninterference theorem | TH-02 | Agree | P1 | Open - required |
 | F-12 | Adaptive history theorem | TH-03 | Agree | P1 | Open - required |
 | F-13 | Solidity dialect theorem or boundary | TH-07, practical blocker 5 | Agree | P2 | Open - required |
@@ -357,7 +357,7 @@ capacity mismatch, duplicate `secret_args`, duplicate `declassifies`, and
 duplicate `public_state_declassifies`.
 
 Status:
-Open - required.
+Landed.
 
 ### F-11 - Direct Paper-Main Noninterference Theorem
 
@@ -583,11 +583,10 @@ The remediation work must add or update tests for:
 - [ ] F-07 landed and tested.
 - [ ] F-08 landed and tested.
 - [ ] F-09 landed and tested.
-- [ ] F-10 landed and tested.
+- [x] F-10 landed and tested.
 - [ ] F-11 landed and checked by Lean.
 - [ ] F-12 landed and checked by Lean.
 - [ ] F-13 landed and checked against claim wording/semantics tests.
 - [ ] F-14 landed and checked by compiler/runtime/Lean tests.
 - [ ] F-15 landed with scalable proof evidence.
 - [ ] F-16 landed with production runtime acceptance tests.
-
