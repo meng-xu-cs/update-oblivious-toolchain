@@ -169,8 +169,8 @@
     },
     {
       "path": "kernel_model_alignment_validation.json",
-      "bytes": 78016,
-      "sha256": "b33a55de28b8e35efe1859bf2ec1910fe61ed809eb4d0536a275bed1332702b3"
+      "bytes": 78132,
+      "sha256": "699fa52f0fdd5e975f0ba84f82c4b824b1bd7cdf20374632fef1d997e9b4c25e"
     },
     {
       "path": "kernel_refinement_boundary_validation.json",
@@ -234,13 +234,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 96068,
-      "sha256": "3ad80e36b2aa48452c9a752a266036b317d4fbfab972ed83c7176542560164a4"
+      "bytes": 102735,
+      "sha256": "a43647e5c1b4f168f264d0adcbbd494fccf7bcf43cebaf2bbec6a1055a0a7eb6"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 25207,
-      "sha256": "6227486030894f913c9dea3a02bc723b90eda1affeb463e00c1e47dd6be213d8"
+      "bytes": 26515,
+      "sha256": "4463ef83f887e6bb85d73b9df6572f8a1ac31881309a1045e6720b7a57f5ea42"
     },
     {
       "path": "runtime_boundary_validation.json",

@@ -56,10 +56,40 @@ def ScalablePathOramCertificate.checkPrivatePosmapV1Valid
   (cert : ScalablePathOramCertificate) : Bool :=
   decide cert.PrivatePosmapV1Valid
 
+def ScalablePathOramCertificate.ProofGradePrivatePosmapV1Symbolic
+  (cert : ScalablePathOramCertificate) : Prop :=
+  cert.PrivatePosmapV1Valid ∧
+    cert.SymbolicSizeComplexity ∧
+    cert.Subenumerative ∧
+    cert.TheoremFacingEnumerationFree
+
+instance (cert : ScalablePathOramCertificate) :
+    Decidable cert.ProofGradePrivatePosmapV1Symbolic := by
+  unfold ScalablePathOramCertificate.ProofGradePrivatePosmapV1Symbolic
+  infer_instance
+
+def ScalablePathOramCertificate.checkProofGradePrivatePosmapV1Symbolic
+  (cert : ScalablePathOramCertificate) : Bool :=
+  cert.checkPrivatePosmapV1Valid &&
+    cert.checkSymbolicSizeComplexity &&
+    decide cert.Subenumerative &&
+    cert.checkTheoremFacingEnumerationFree
+
 @[simp] theorem scalablePathOramCertificate_checkPrivatePosmapV1Valid_eq_true_iff
   (cert : ScalablePathOramCertificate) :
   cert.checkPrivatePosmapV1Valid = true ↔ cert.PrivatePosmapV1Valid := by
   simp [ScalablePathOramCertificate.checkPrivatePosmapV1Valid]
+
+@[simp] theorem scalablePathOramCertificate_checkProofGradePrivatePosmapV1Symbolic_eq_true_iff
+  (cert : ScalablePathOramCertificate) :
+  cert.checkProofGradePrivatePosmapV1Symbolic = true ↔
+    cert.ProofGradePrivatePosmapV1Symbolic := by
+  simp [ ScalablePathOramCertificate.checkProofGradePrivatePosmapV1Symbolic
+    , ScalablePathOramCertificate.ProofGradePrivatePosmapV1Symbolic
+    , Bool.and_eq_true
+    , and_assoc
+    , decide_eq_true_eq
+    ]
 
 theorem symbolicPrivatePosmapCertificate_valid
   {capacity leafCount : Nat}
@@ -68,6 +98,11 @@ theorem symbolicPrivatePosmapCertificate_valid
   (symbolicPrivatePosmapCertificate capacity leafCount).PrivatePosmapV1Valid := by
   simp [ScalablePathOramCertificate.PrivatePosmapV1Valid,
     symbolicPrivatePosmapCertificate, privatePosmapScheme, hCapacity, hLeaf]
+
+theorem symbolicPrivatePosmapCertificate_1024_checkProofGradePrivatePosmapV1Symbolic :
+  ((symbolicPrivatePosmapCertificate 1024 1024).checkProofGradePrivatePosmapV1Symbolic) =
+    true := by
+  native_decide
 
 structure PrivatePosmapLevel where
   level : Nat
@@ -202,9 +237,27 @@ def ImportedProofRelevantTranslationBundle.PrivatePosmapCertificatesValidated
 structure PathOramPrivatePosmapV1CertificateEvidence
   (cert : ScalablePathOramCertificate) where
   valid : cert.PrivatePosmapV1Valid
+  symbolicSizeComplexity : cert.SymbolicSizeComplexity
   subenumerative : cert.Subenumerative
+  theoremFacingEnumerationFree : cert.TheoremFacingEnumerationFree
   recursiveSemanticsWellFormed :
     (recursivePrivatePosmapSemantics cert).WellFormed
+
+def PathOramPrivatePosmapV1CertificateEvidence.ofSymbolicCheck
+  {cert : ScalablePathOramCertificate}
+  (hCheck : cert.checkProofGradePrivatePosmapV1Symbolic = true) :
+  PathOramPrivatePosmapV1CertificateEvidence cert := by
+  have hProof : cert.ProofGradePrivatePosmapV1Symbolic :=
+    (scalablePathOramCertificate_checkProofGradePrivatePosmapV1Symbolic_eq_true_iff
+      cert).mp hCheck
+  exact
+    { valid := hProof.1
+    , symbolicSizeComplexity := hProof.2.1
+    , subenumerative := hProof.2.2.1
+    , theoremFacingEnumerationFree := hProof.2.2.2
+    , recursiveSemanticsWellFormed :=
+        recursivePrivatePosmapSemantics_wellFormed hProof.1
+    }
 
 structure PathOramPrivatePosmapV1BundleCertificate
   {modelTags : SGXModelTags}
@@ -213,6 +266,18 @@ structure PathOramPrivatePosmapV1BundleCertificate
   evidence : PathOramPrivatePosmapV1CertificateEvidence cert
   matchesPublicConfig :
     ∀ cfg, cert.MatchesConfig cfg
+
+def PathOramPrivatePosmapV1BundleCertificate.ofSymbolicCheck
+  {modelTags : SGXModelTags}
+  {cert : ScalablePathOramCertificate}
+  {bundle : SeededRuntimePathOramProofBundle modelTags}
+  (hCheck : cert.checkProofGradePrivatePosmapV1Symbolic = true)
+  (hMatches : ∀ cfg, cert.MatchesConfig cfg) :
+  PathOramPrivatePosmapV1BundleCertificate cert bundle :=
+  { evidence :=
+      PathOramPrivatePosmapV1CertificateEvidence.ofSymbolicCheck hCheck
+  , matchesPublicConfig := hMatches
+  }
 
 theorem SeededRuntimePathOramProofBundle.pathOramPrivatePosmapV1_computationalUOWith
   {modelTags : SGXModelTags}
@@ -228,6 +293,22 @@ theorem SeededRuntimePathOramProofBundle.pathOramPrivatePosmapV1_computationalUO
   simpa using
     bundle.computationalUOWith
       assumptions.localPosmapAssumptions.toCanonicalLeafValueSecurityAssumptions
+
+theorem SeededRuntimePathOramProofBundle.pathOramPrivatePosmapV1_computationalUOWith_of_symbolicCheck
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePathOramProofBundle modelTags)
+  (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
+  {cert : ScalablePathOramCertificate}
+  (hCheck : cert.checkProofGradePrivatePosmapV1Symbolic = true)
+  (hMatches : ∀ cfg, cert.MatchesConfig cfg) :
+  ComputationalUOWith
+    (pathOramPrivatePosmapV1SecurityInterface assumptions)
+    bundle.run := by
+  exact
+    bundle.pathOramPrivatePosmapV1_computationalUOWith
+      assumptions
+      (PathOramPrivatePosmapV1BundleCertificate.ofSymbolicCheck
+        hCheck hMatches)
 
 abbrev PathOramPrivatePosmapV1StorageComponentIndistinguishable
   (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
@@ -390,6 +471,52 @@ theorem SeededRuntimePaperMainBundle.pathOramPrivatePosmapV1_paperMain_noninterf
           certificate)
       bundle.publicOutcomeSafe
       bundle.boundarySafe
+      hFinal
+      hRelease
+      hPublic
+
+theorem SeededRuntimePaperMainBundle.pathOramPrivatePosmapV1_paperMain_noninterference_of_symbolicCheck
+  {modelTags : SGXModelTags}
+  (bundle : SeededRuntimePaperMainBundle modelTags)
+  (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
+  {cert : ScalablePathOramCertificate}
+  (hCheck : cert.checkProofGradePrivatePosmapV1Symbolic = true)
+  (hMatches : ∀ cfg, cert.MatchesConfig cfg)
+  {finalPublicStateRollback :
+    OramConfig → PaperMainFinalPublicStateRollback}
+  {releaseFunctions :
+    OramConfig → PaperMainDeclaredReleaseFunctions}
+  (hFinal :
+    PaperMainPublicFieldSafe
+      sameOramPublicProjection
+      finalPublicStateRollback)
+  (hRelease :
+    PaperMainPublicFieldSafe
+      sameOramPublicProjection
+      releaseFunctions)
+  {cfg₁ cfg₂ : OramConfig}
+  (hPublic :
+    PaperMainPathOramSameAdmittedPackagePublicInputsAndState cfg₁ cfg₂) :
+  PaperMainPathOramPrivatePosmapV1NoninterferenceConclusion
+    assumptions
+    (oramToSGXSemantics
+      bundle.toSeededRuntimePathOramProofBundle.run
+      bundle.publicOutcome
+      bundle.boundarySchedule
+      oramControllerMicroTrace)
+    executionLeakage
+    (oramMicroLeakage bundle.publicOutcome modelTags)
+    finalPublicStateRollback
+    releaseFunctions
+    cfg₁
+    cfg₂ := by
+  exact
+    bundle.pathOramPrivatePosmapV1_paperMain_noninterference
+      assumptions
+      (PathOramPrivatePosmapV1BundleCertificate.ofSymbolicCheck
+        (bundle := bundle.toSeededRuntimePathOramProofBundle)
+        hCheck
+        hMatches)
       hFinal
       hRelease
       hPublic

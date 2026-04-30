@@ -2379,6 +2379,53 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
     }
     out.push('\n');
 
+    out.push_str("## Proof Artifact Size Budgets\n\n");
+    out.push_str("| Check | Value |\n");
+    out.push_str("| --- | ---: |\n");
+    let budget = &summary["proof_artifact_size_budget"];
+    out.push_str(&format!(
+        "| Compact budget bytes | `{}` |\n",
+        budget["compact_budget_bytes"].as_u64().unwrap_or_default()
+    ));
+    out.push_str(&format!(
+        "| Heavy-artifact budget bytes | `{}` |\n",
+        budget["heavy_budget_bytes"].as_u64().unwrap_or_default()
+    ));
+    out.push_str(&format!(
+        "| Oversized estimates | `{}` |\n",
+        budget["oversized_estimate_count"]
+            .as_u64()
+            .unwrap_or_default()
+    ));
+    out.push_str(&format!(
+        "| Theorem-facing large artifacts require enumeration | `{}` |\n",
+        budget["theorem_facing_large_artifacts_require_enumeration"]
+            .as_bool()
+            .unwrap_or(true)
+    ));
+    out.push_str(&format!(
+        "| Accepted | `{}` |\n",
+        budget["accepted"].as_bool().unwrap_or(false)
+    ));
+    out.push('\n');
+    out.push_str("| Scenario | Status | Estimated Bytes | Checked Bytes | Within Budget |\n");
+    out.push_str("| --- | --- | ---: | ---: | --- |\n");
+    if let Some(rows) = budget["scenarios"].as_array() {
+        for row in rows {
+            out.push_str(&format!(
+                "| `{}` | `{}` | `{}` | `{}` | `{}` |\n",
+                row["scenario"].as_str().unwrap_or("unknown"),
+                row["validation_status"].as_str().unwrap_or("unknown"),
+                row["estimated_json_bytes"].as_u64().unwrap_or_default(),
+                row["checked_json_bytes"].as_u64().unwrap_or_default(),
+                row["checked_artifact_within_selected_budget"]
+                    .as_bool()
+                    .unwrap_or(false),
+            ));
+        }
+    }
+    out.push('\n');
+
     out.push_str("## Runtime Overheads\n\n");
     out.push_str(
         "| Benchmark | Backend | Capacity | Gas | Reads | Writes | Bytes Read | Bytes Written | Trace JSON Bytes | Artifact JSON Bytes | Max Commit Ops |\n",
@@ -2552,6 +2599,202 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
 
 fn markdown_escape(value: &str) -> String {
     value.replace('|', "\\|")
+}
+
+fn report_artifact_budget_bytes(report: &JsonValue, field: &str) -> Option<u64> {
+    report["artifact_configuration"][field].as_u64()
+}
+
+fn scenario_checked_json_bytes(scenario: &JsonValue) -> Option<u64> {
+    [
+        "theorem_input_json_bytes",
+        "certificate_json_bytes",
+        "witness_family_json_bytes",
+        "heavy_artifact_json_bytes",
+    ]
+    .into_iter()
+    .find_map(|field| scenario[field].as_u64())
+}
+
+fn scenario_estimated_json_bytes(scenario: &JsonValue, estimate_field: &str) -> Option<u64> {
+    scenario[estimate_field]
+        .as_u64()
+        .or_else(|| scenario["size_estimate"]["estimated_family_json_bytes"].as_u64())
+        .or_else(|| scenario_checked_json_bytes(scenario))
+}
+
+fn collect_proof_artifact_budget_scenario(
+    scenarios: &mut Vec<JsonValue>,
+    report: &str,
+    artifact_kind: &str,
+    scenario: &JsonValue,
+    estimate_field: &str,
+    compact_budget_bytes: u64,
+    heavy_budget_bytes: u64,
+) {
+    let validation_status = scenario["validation_status"].as_str().unwrap_or("accepted");
+    let estimated_json_bytes =
+        scenario_estimated_json_bytes(scenario, estimate_field).unwrap_or_default();
+    let checked_json_bytes = scenario_checked_json_bytes(scenario).unwrap_or_default();
+    let exceeds_compact_budget = estimated_json_bytes > compact_budget_bytes;
+    let selected_budget_bytes = if validation_status == "accepted_heavy_artifact" {
+        heavy_budget_bytes
+    } else {
+        compact_budget_bytes
+    };
+    let checked_artifact_within_selected_budget = checked_json_bytes <= selected_budget_bytes;
+    let theorem_input_within_compact_budget = scenario["theorem_input_json_bytes"]
+        .as_u64()
+        .map(|bytes| bytes <= compact_budget_bytes)
+        .unwrap_or(true);
+    let optional_heavy_artifact = validation_status == "accepted_heavy_artifact"
+        && estimated_json_bytes <= heavy_budget_bytes;
+    let oversized_has_non_enumerating_theorem_route = !exceeds_compact_budget
+        || validation_status == "accepted_compact_theorem_input"
+        || optional_heavy_artifact;
+    let proof_grade_accepted = scenario["proof_grade_accepted"]
+        .as_bool()
+        .or_else(|| scenario["lean_validated"].as_bool())
+        .or_else(|| scenario["accepted"].as_bool())
+        .unwrap_or(false);
+
+    scenarios.push(json!({
+        "report": report,
+        "artifact_kind": artifact_kind,
+        "scenario": scenario["scenario"].as_str().unwrap_or("unknown"),
+        "validation_status": validation_status,
+        "estimated_json_bytes": estimated_json_bytes,
+        "checked_json_bytes": checked_json_bytes,
+        "compact_budget_bytes": compact_budget_bytes,
+        "heavy_budget_bytes": heavy_budget_bytes,
+        "exceeds_compact_budget": exceeds_compact_budget,
+        "checked_artifact_within_selected_budget":
+            checked_artifact_within_selected_budget,
+        "theorem_input_within_compact_budget": theorem_input_within_compact_budget,
+        "oversized_has_non_enumerating_theorem_route":
+            oversized_has_non_enumerating_theorem_route,
+        "requires_enumerated_witness_family_for_theorem":
+            exceeds_compact_budget && !oversized_has_non_enumerating_theorem_route,
+        "proof_grade_accepted": proof_grade_accepted,
+        "accepted": scenario["accepted"].as_bool().unwrap_or(false),
+    }));
+}
+
+fn proof_artifact_size_budget_summary(
+    fresh_coin_validation: &JsonValue,
+    canonical_pathoram_pair_validation: &JsonValue,
+) -> JsonValue {
+    let compact_budget_bytes =
+        report_artifact_budget_bytes(fresh_coin_validation, "compact_budget_bytes")
+            .or_else(|| {
+                report_artifact_budget_bytes(
+                    canonical_pathoram_pair_validation,
+                    "compact_budget_bytes",
+                )
+            })
+            .unwrap_or(DEFAULT_CANONICAL_CERT_BUDGET_BYTES);
+    let heavy_budget_bytes =
+        report_artifact_budget_bytes(fresh_coin_validation, "heavy_budget_bytes")
+            .or_else(|| {
+                report_artifact_budget_bytes(
+                    canonical_pathoram_pair_validation,
+                    "heavy_budget_bytes",
+                )
+            })
+            .unwrap_or(DEFAULT_HEAVY_ARTIFACT_BUDGET_BYTES);
+
+    let mut scenarios = Vec::new();
+    if let Some(rows) = fresh_coin_validation["scenarios"].as_array() {
+        for scenario in rows {
+            collect_proof_artifact_budget_scenario(
+                &mut scenarios,
+                "fresh_coin_validation",
+                "canonical_fresh_coin_family",
+                scenario,
+                "estimated_family_json_bytes",
+                compact_budget_bytes,
+                heavy_budget_bytes,
+            );
+        }
+    }
+    if let Some(rows) = canonical_pathoram_pair_validation["scenarios"].as_array() {
+        for scenario in rows {
+            collect_proof_artifact_budget_scenario(
+                &mut scenarios,
+                "canonical_pathoram_pair_validation",
+                "canonical_pathoram_pair_certificate",
+                scenario,
+                "estimated_certificate_json_bytes",
+                compact_budget_bytes,
+                heavy_budget_bytes,
+            );
+        }
+    }
+
+    let scenario_count = scenarios.len();
+    let oversized_estimate_count = scenarios
+        .iter()
+        .filter(|row| row["exceeds_compact_budget"].as_bool() == Some(true))
+        .count();
+    let max_checked_json_bytes = scenarios
+        .iter()
+        .filter_map(|row| row["checked_json_bytes"].as_u64())
+        .max()
+        .unwrap_or_default();
+    let max_estimated_json_bytes = scenarios
+        .iter()
+        .filter_map(|row| row["estimated_json_bytes"].as_u64())
+        .max()
+        .unwrap_or_default();
+    let all_checked_artifacts_within_selected_budget = scenarios.iter().all(|row| {
+        row["checked_artifact_within_selected_budget"]
+            .as_bool()
+            .unwrap_or(false)
+    });
+    let all_theorem_inputs_within_compact_budget = scenarios.iter().all(|row| {
+        row["theorem_input_within_compact_budget"]
+            .as_bool()
+            .unwrap_or(false)
+    });
+    let all_oversized_estimates_have_non_enumerating_route = scenarios.iter().all(|row| {
+        row["oversized_has_non_enumerating_theorem_route"]
+            .as_bool()
+            .unwrap_or(false)
+    });
+    let theorem_facing_large_artifacts_require_enumeration = scenarios.iter().any(|row| {
+        row["requires_enumerated_witness_family_for_theorem"]
+            .as_bool()
+            .unwrap_or(false)
+    });
+    let all_proof_grade_accepted = scenarios
+        .iter()
+        .all(|row| row["proof_grade_accepted"].as_bool().unwrap_or(false));
+    let accepted = scenario_count > 0
+        && all_checked_artifacts_within_selected_budget
+        && all_theorem_inputs_within_compact_budget
+        && all_oversized_estimates_have_non_enumerating_route
+        && !theorem_facing_large_artifacts_require_enumeration
+        && all_proof_grade_accepted;
+
+    json!({
+        "compact_budget_bytes": compact_budget_bytes,
+        "heavy_budget_bytes": heavy_budget_bytes,
+        "scenario_count": scenario_count,
+        "oversized_estimate_count": oversized_estimate_count,
+        "max_checked_json_bytes": max_checked_json_bytes,
+        "max_estimated_json_bytes": max_estimated_json_bytes,
+        "all_checked_artifacts_within_selected_budget":
+            all_checked_artifacts_within_selected_budget,
+        "all_theorem_inputs_within_compact_budget":
+            all_theorem_inputs_within_compact_budget,
+        "all_oversized_estimates_have_non_enumerating_route":
+            all_oversized_estimates_have_non_enumerating_route,
+        "theorem_facing_large_artifacts_require_enumeration":
+            theorem_facing_large_artifacts_require_enumeration,
+        "all_proof_grade_accepted": all_proof_grade_accepted,
+        "accepted": accepted,
+        "scenarios": scenarios,
+    })
 }
 
 fn build_reviewer_summary(
@@ -2875,6 +3118,10 @@ fn build_reviewer_summary(
     });
     estimated_size_metrics.truncate(10);
     materialized_size_metrics.truncate(20);
+    let proof_artifact_size_budget = proof_artifact_size_budget_summary(
+        fresh_coin_validation,
+        canonical_pathoram_pair_validation,
+    );
 
     Ok(json!({
         "proof_checking_cost_ms": report_timings_ms,
@@ -2882,6 +3129,7 @@ fn build_reviewer_summary(
             "top_materialized_report_fields": materialized_size_metrics,
             "top_estimated_report_fields": estimated_size_metrics,
         },
+        "proof_artifact_size_budget": proof_artifact_size_budget,
         "runtime_overheads": overheads,
         "tcb_size": trusted_surface_loc_summary()?,
         "current_tcb": current_tcb_summary(),
@@ -3016,6 +3264,18 @@ fn static_drift_check_inventory() -> JsonValue {
             "work_package": "F2",
             "target": "the Rust-owned `runtime-boundary-schema-v1` obligation list is mirrored by Lean, has unique obligation ids, and proves every proof-critical runtime bridge obligation is Rust-visibility, generated-schema, Lean-theorem, or executable-semantic-refinement backed rather than source-regression backed",
             "report_field": "kernel_model_alignment_validation.runtime_boundary_schema_mechanized",
+        },
+        {
+            "name": "scalable_path_oram_symbolic_route_proof_grade_present",
+            "work_package": "F15",
+            "target": "the private-position-map Path ORAM route has formal symbolic certificate size/zero-enumeration facts and checker-to-ORAM/paper-main theorems",
+            "report_field": "kernel_model_alignment_validation.scalable_path_oram_symbolic_route_proof_grade_present",
+        },
+        {
+            "name": "proof_artifact_size_budget_gate_present",
+            "work_package": "F15",
+            "target": "`reviewer_summary` exposes a proof-artifact size-budget gate, including oversized-estimate routing through theorem inputs rather than required materialization",
+            "report_field": "kernel_model_alignment_validation.proof_artifact_size_budget_gate_present",
         },
         {
             "name": "theorem_adjacent_unsafe_isolated_to_fixed_buffer",
@@ -29457,6 +29717,41 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("AcceptedPrivatePosmapPathOramPackageCapstoneEvidence")
         && lean_accepted_package_capstone_source
             .contains("acceptedPrivatePosmapPathOramPackageCapstone_noninterference");
+    let scalable_path_oram_symbolic_route_proof_grade_present =
+        lean_scalable_path_oram_evidence_source
+            .contains("def scalablePathOramProofBundleBudgetBytes")
+            && lean_scalable_path_oram_evidence_source
+                .contains("theorem scalablePathOramProofBundleBudgetBytes_value")
+            && lean_scalable_path_oram_evidence_source
+                .contains("def ScalablePathOramCertificate.SymbolicSizeComplexity")
+            && lean_scalable_path_oram_evidence_source
+                .contains("def ScalablePathOramCertificate.TheoremFacingEnumerationFree")
+            && lean_scalable_path_oram_evidence_source
+                .contains("def ScalablePathOramCertificate.checkSymbolicSizeComplexity")
+            && lean_scalable_path_oram_evidence_source.contains(
+                "theorem symbolicPrivatePosmapCertificate_symbolicSizeComplexity",
+            )
+            && lean_scalable_path_oram_evidence_source.contains(
+                "theorem symbolicPrivatePosmapCertificate_theoremFacingEnumerationFree",
+            )
+            && lean_path_oram_private_posmap_source.contains(
+                "def ScalablePathOramCertificate.checkProofGradePrivatePosmapV1Symbolic",
+            )
+            && lean_path_oram_private_posmap_source.contains(
+                "theorem SeededRuntimePathOramProofBundle.pathOramPrivatePosmapV1_computationalUOWith_of_symbolicCheck",
+            )
+            && lean_path_oram_private_posmap_source.contains(
+                "theorem SeededRuntimePaperMainBundle.pathOramPrivatePosmapV1_paperMain_noninterference_of_symbolicCheck",
+            );
+    let proof_artifact_size_budget_gate_present = probe_source
+        .contains("fn proof_artifact_size_budget_summary")
+        && probe_source.contains("\"proof_artifact_size_budget\"")
+        && probe_source.contains("all_checked_artifacts_within_selected_budget")
+        && probe_source.contains("all_oversized_estimates_have_non_enumerating_route")
+        && probe_source.contains("theorem_facing_large_artifacts_require_enumeration")
+        && probe_source.contains("accepted_compact_theorem_input")
+        && lean_scalable_path_oram_evidence_source
+            .contains("scalablePathOramProofBundleBudgetBytes = 67108864");
     let mut theorem_adjacent_unsafe_surface_files =
         collect_production_pattern_hits(&crates_src, "unsafe {")?;
     theorem_adjacent_unsafe_surface_files
@@ -35745,6 +36040,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && runtime_boundary_schema_mechanized
         && runtime_proof_object_json_schema_requires_explicit_fields
         && private_posmap_paper_main_route_present
+        && scalable_path_oram_symbolic_route_proof_grade_present
+        && proof_artifact_size_budget_gate_present
         && theorem_adjacent_unsafe_isolated_to_fixed_buffer
         && lean_toolchain_exact_release_pinned
         && lean_lake_versions_recorded_in_manifest
@@ -36442,6 +36739,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_proof_object_json_schema_requires_explicit_fields,
         "private_posmap_paper_main_route_present":
             private_posmap_paper_main_route_present,
+        "scalable_path_oram_symbolic_route_proof_grade_present":
+            scalable_path_oram_symbolic_route_proof_grade_present,
+        "proof_artifact_size_budget_gate_present":
+            proof_artifact_size_budget_gate_present,
         "theorem_adjacent_unsafe_surface_files":
             theorem_adjacent_unsafe_surface_files,
         "expected_theorem_adjacent_unsafe_surface_files":
@@ -49201,9 +49502,10 @@ attached.
 `reviewer_summary.json` plus `reviewer_summary.md` condense the current
 paper-facing metrics into one machine-generated table: they record per-report
 wall-clock cost, the largest materialized and estimated artifact-size fields,
-the runtime overhead report, the current TCB table, explicit assumptions, and
-non-empty source-line counts for the trusted Rust runtime surface plus the
-repo-side Lean theorem/checker surface.
+the proof-artifact size-budget gate for canonical Path-ORAM families and pair
+certificates, the runtime overhead report, the current TCB table, explicit
+assumptions, and non-empty source-line counts for the trusted Rust runtime
+surface plus the repo-side Lean theorem/checker surface.
 
 Security tiers:
 
@@ -49265,8 +49567,9 @@ mod tests {
     use super::{
         addr, check_authscan_correctness, compile_artifact, compile_suite,
         path_oram_fresh_coin_plan_for_runtime_tape, prepare_instance_with_seed,
-        production_source_slice, run_auc_reports, run_mutual_information_reports, run_overheads,
-        run_trace_equivalence, BenchArtifacts, CallSpec,
+        production_source_slice, proof_artifact_size_budget_summary, run_auc_reports,
+        run_mutual_information_reports, run_overheads, run_trace_equivalence, BenchArtifacts,
+        CallSpec,
     };
     use uo_core::{
         canonical_path_oram_leaf_values_of_seed, ProgramMode, RuntimePathOramTransitionKind, Value,
@@ -49488,5 +49791,50 @@ fn after() {
         assert!(!stripped.contains("hidden_test();"));
         assert!(!stripped.contains("mod tests"));
         assert!(!stripped.contains("hidden_mod();"));
+    }
+
+    #[test]
+    fn proof_artifact_size_budget_requires_theorem_input_for_oversized_compact_route() {
+        let fresh_coin_validation = serde_json::json!({
+            "artifact_configuration": {
+                "compact_budget_bytes": 100u64,
+                "heavy_budget_bytes": 1000u64,
+            },
+            "scenarios": [
+                {
+                    "scenario": "large-fresh",
+                    "validation_status": "accepted_compact_theorem_input",
+                    "size_estimate": { "estimated_family_json_bytes": 10_000u64 },
+                    "theorem_input_json_bytes": 75u64,
+                    "proof_grade_accepted": true,
+                    "accepted": true,
+                }
+            ],
+        });
+        let canonical_pair_validation = serde_json::json!({
+            "artifact_configuration": {
+                "compact_budget_bytes": 100u64,
+                "heavy_budget_bytes": 1000u64,
+            },
+            "scenarios": [
+                {
+                    "scenario": "large-pair",
+                    "validation_status": "accepted_compact_theorem_input",
+                    "estimated_certificate_json_bytes": 20_000u64,
+                    "theorem_input_json_bytes": 80u64,
+                    "proof_grade_accepted": true,
+                    "accepted": true,
+                }
+            ],
+        });
+
+        let summary =
+            proof_artifact_size_budget_summary(&fresh_coin_validation, &canonical_pair_validation);
+        assert_eq!(summary["accepted"].as_bool(), Some(true));
+        assert_eq!(
+            summary["theorem_facing_large_artifacts_require_enumeration"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(summary["oversized_estimate_count"].as_u64(), Some(2));
     }
 }

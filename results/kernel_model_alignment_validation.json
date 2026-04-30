@@ -694,6 +694,7 @@
   "oram_runtime_uses_shared_open_decode_helper": true,
   "path_oram_deployed_stash_parameters_pinned": true,
   "private_posmap_paper_main_route_present": true,
+  "proof_artifact_size_budget_gate_present": true,
   "proof_interface_bundle_literal_checks": [
     {
       "expected_files": [
@@ -2134,6 +2135,7 @@
   "rust_toolchain_channel": "1.82.0",
   "rust_toolchain_exact_release_pinned": true,
   "rustc_version": "rustc 1.82.0 (f6e511eec 2024-10-15)",
+  "scalable_path_oram_symbolic_route_proof_grade_present": true,
   "scratch_region_names_match": true,
   "scratch_region_serde_snake_case": true,
   "seeded_runtime_paper_main_family_bundle_field_names_match": true,

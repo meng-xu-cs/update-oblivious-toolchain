@@ -117,6 +117,27 @@
 | `canonical_pathoram_pair_validation.scenarios[1].estimated_certificate_json_bytes` | `199704576` |
 | `canonical_pathoram_pair_validation.scenarios[1].lhs_estimate.estimated_family_json_bytes` | `99328000` |
 
+## Proof Artifact Size Budgets
+
+| Check | Value |
+| --- | ---: |
+| Compact budget bytes | `67108864` |
+| Heavy-artifact budget bytes | `21474836480` |
+| Oversized estimates | `6` |
+| Theorem-facing large artifacts require enumeration | `false` |
+| Accepted | `true` |
+
+| Scenario | Status | Estimated Bytes | Checked Bytes | Within Budget |
+| --- | --- | ---: | ---: | --- |
+| `SingleAccessMap/pathoram/put-fresh-coins` | `accepted` | `4312422` | `4312422` | `true` |
+| `SingleAccessMap/pathoram/add-fresh-coins` | `accepted_compact_theorem_input` | `99328000` | `24409` | `true` |
+| `ConfidentialMixer/pathoram/deposit-fresh-coins` | `accepted_compact_theorem_input` | `16365912064` | `62854` | `true` |
+| `ERC20Lite/pathoram/transferFrom-fresh-coins` | `accepted_compact_theorem_input` | `3540251519579324416` | `202163` | `true` |
+| `SingleAccessMap/pathoram/put-canonical-pair` | `accepted` | `8630849` | `8630849` | `true` |
+| `SingleAccessMap/pathoram/add-canonical-pair` | `accepted_compact_theorem_input` | `199704576` | `58709` | `true` |
+| `ConfidentialMixer/pathoram/deposit-canonical-pair` | `accepted_compact_theorem_input` | `32732872704` | `149108` | `true` |
+| `ERC20Lite/pathoram/transferFrom-canonical-pair` | `accepted_compact_theorem_input` | `7080503039159697408` | `487647` | `true` |
+
 ## Runtime Overheads
 
 | Benchmark | Backend | Capacity | Gas | Reads | Writes | Bytes Read | Bytes Written | Trace JSON Bytes | Artifact JSON Bytes | Max Commit Ops |

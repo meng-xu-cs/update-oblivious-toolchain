@@ -530,6 +530,27 @@ formal size-complexity theorems and CI artifact-size budgets for proof bundles.
 Retain enumerated witnesses as independent finite-capacity validation evidence,
 but do not require enumeration for any theorem-facing scalable map claim.
 
+Status: Fixed. `ScalablePathOramEvidence.lean` now defines the symbolic
+certificate field count, exact certificate-word / validation-step formulas,
+zero theorem-facing witness-family enumeration, and the compact / heavy
+artifact budgets as Lean-level constants with checked values. The
+`path_oram_private_posmap_v1` route now has a proof-grade symbolic checker whose
+acceptance constructs certificate evidence and feeds the existing
+`ComputationalUOWith` and paper-main noninterference theorems, so the checker is
+not merely a size predicate. `mplus-probe` now exposes a
+`proof_artifact_size_budget` reviewer-summary gate and a focused test for
+oversized compact-route artifacts requiring theorem-input validation rather than
+enumeration. The kernel-model alignment report now gates
+`scalable_path_oram_symbolic_route_proof_grade_present` and
+`proof_artifact_size_budget_gate_present`; the false-path inventory was
+regenerated against those gates. Verified with `cd proof/lean && lake build
+UOToolchain.ProofGradeRoot`, `cargo check -p mplus-probe`, the focused
+`cargo test -p mplus-probe
+proof_artifact_size_budget_requires_theorem_input_for_oversized_compact_route`,
+`cargo run -q -p mplus-probe -- --only kernel-model-alignment-validation
+--out-dir results`, and
+`./scripts/rebuild_review_validation_false_paths.sh --check`.
+
 ## Reviewed but not separate findings
 
 - Dynamic arrays, external calls, inheritance, revert/custom errors, and other
