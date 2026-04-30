@@ -11,6 +11,7 @@ use thiserror::Error;
 use uo_precompiles::UoOpcode;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeShellContract {
     public_object_universe: Box<[u32]>,
     canonical_loaded_object_schedule: Box<[u32]>,
@@ -18,6 +19,7 @@ pub struct RuntimeShellContract {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeShellTrace {
     events: Box<[RuntimeKernelRefinementEventWitness]>,
     projected_kernel_schedule: RuntimeKernelScheduleWitness,
@@ -29,6 +31,7 @@ pub struct RuntimeShellTrace {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeShellBoundaryBundle {
     kernel_witness: RuntimeKernelWitness,
     runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,
@@ -37,6 +40,7 @@ pub struct RuntimeShellBoundaryBundle {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelInterfaceBundle {
     shell_boundary_bundle: RuntimeShellBoundaryBundle,
     expected_kernel_steps: Box<[RuntimeKernelStepWitness]>,

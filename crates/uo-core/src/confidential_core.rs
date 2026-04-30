@@ -294,18 +294,21 @@ pub enum RuntimeConfidentialProofBundleFamilyError {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialCoreBundle {
     runtime_witness: RuntimeRefinementWitness,
     confidential_program: ConfidentialKernelProgram,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialCoreSlotBundle {
     runtime_witness: RuntimeRefinementWitness,
     confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialCoreLoweringBundle {
     runtime_witness: RuntimeRefinementWitness,
     confidential_program: ConfidentialKernelProgram,
@@ -313,6 +316,7 @@ pub struct RuntimeConfidentialCoreLoweringBundle {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialCoreShellBoundaryLoweringBundle {
     runtime_witness: RuntimeRefinementWitness,
     shell_boundary_bundle: RuntimeShellBoundaryBundle,
@@ -321,6 +325,7 @@ pub struct RuntimeConfidentialCoreShellBoundaryLoweringBundle {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialCoreShellBoundarySlotBundle {
     runtime_witness: RuntimeRefinementWitness,
     shell_boundary_bundle: RuntimeShellBoundaryBundle,
@@ -328,6 +333,7 @@ pub struct RuntimeConfidentialCoreShellBoundarySlotBundle {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialCoreKernelInterfaceSlotBundle {
     runtime_witness: RuntimeRefinementWitness,
     kernel_interface_bundle: RuntimeKernelInterfaceBundle,
@@ -335,6 +341,7 @@ pub struct RuntimeConfidentialCoreKernelInterfaceSlotBundle {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialCoreKernelFinishSlotBundle {
     runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
     confidential_slot_program: ConfidentialKernelSlotProgram,
@@ -342,6 +349,7 @@ pub struct RuntimeConfidentialCoreKernelFinishSlotBundle {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfidentialProofBundleFamily {
     runtime_kernel_interface_bundle: RuntimeKernelInterfaceBundle,
     runtime_confidential_core_kernel_interface_slot_bundle:

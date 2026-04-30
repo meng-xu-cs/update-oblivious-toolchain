@@ -21,6 +21,7 @@ host-visible gas/failure taxonomy.
 structure PublicOutcomeFieldEquality (lhs rhs : SGXPublicOutcome) : Prop where
   entrypointId : lhs.entrypointId = rhs.entrypointId
   publicArgs : lhs.publicArgs = rhs.publicArgs
+  publicEnv : lhs.publicEnv = rhs.publicEnv
   terminationStatus : lhs.terminationStatus = rhs.terminationStatus
   statusPolicy : lhs.statusPolicy = rhs.statusPolicy
   outputShape : lhs.outputShape = rhs.outputShape
@@ -39,6 +40,7 @@ theorem PublicOutcomeFieldEquality.of_eq
   exact
     { entrypointId := rfl
     , publicArgs := rfl
+    , publicEnv := rfl
     , terminationStatus := rfl
     , statusPolicy := rfl
     , outputShape := rfl

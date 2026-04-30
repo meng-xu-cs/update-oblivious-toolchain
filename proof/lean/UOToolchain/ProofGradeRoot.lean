@@ -59,6 +59,7 @@ import UOToolchain.RuntimeConfidentialCoreShellBoundaryLoweringJson
 import UOToolchain.RuntimeCoinsJson
 import UOToolchain.RuntimePathOramPairJson
 import UOToolchain.RuntimeCanonicalPathOramPairJson
+import UOToolchain.RuntimeProofObjectSchema
 import UOToolchain.HistorySemantics
 import UOToolchain.EnvironmentAuthModel
 import UOToolchain.RuntimeAuditSurfaces

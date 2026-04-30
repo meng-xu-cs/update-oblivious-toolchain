@@ -18,6 +18,16 @@ use std::fmt;
 use thiserror::Error;
 use uo_precompiles::UoOpcode;
 
+fn deserialize_explicit_option<'de, D, T>(
+    deserializer: D,
+) -> std::result::Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
+
 #[cfg(test)]
 use crate::confidential_kernel::lower_confidential_kernel_expr;
 #[cfg(test)]
@@ -43,6 +53,7 @@ impl WriteClass {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct PhysicalWriteEvent {
     pub object: String,
     pub location: String,
@@ -81,6 +92,7 @@ impl PhysicalWriteEvent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct PhysicalReadEvent {
     pub object: String,
     pub location: String,
@@ -88,6 +100,7 @@ pub struct PhysicalReadEvent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct LogicalEvent {
     pub kind: String,
     pub object: String,
@@ -101,6 +114,7 @@ pub enum BoundaryDirection {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct BoundaryEvent {
     pub direction: BoundaryDirection,
     pub api_id: String,
@@ -129,6 +143,7 @@ impl BoundaryEvent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[serde(deny_unknown_fields)]
 pub struct OutputShape {
     pub return_present: bool,
     pub return_length: usize,
@@ -144,6 +159,7 @@ impl OutputShape {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct ReturnChannelPublicBinding {
     pub scheme: String,
     pub session_id: String,
@@ -152,6 +168,7 @@ pub struct ReturnChannelPublicBinding {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct EncryptedReturnPayload {
     pub binding: ReturnChannelPublicBinding,
     pub aad_hash: String,
@@ -163,28 +180,21 @@ pub struct EncryptedReturnPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct PublicOutcomeTrace {
     pub entrypoint_id: String,
     pub public_args: Box<[String]>,
-    #[serde(default, skip_serializing_if = "boxed_strings_is_empty")]
     pub public_env: Box<[String]>,
     pub termination_status: bool,
-    #[serde(default)]
     pub status_policy: StatusPolicy,
     pub output_shape: OutputShape,
-    #[serde(default)]
     pub return_policy: ReturnPolicy,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     pub return_payload: Option<String>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     pub encrypted_return_payload: Option<EncryptedReturnPayload>,
-    #[serde(default)]
     pub declassifies: Box<[DeclassificationKind]>,
     pub gas_used: u64,
-}
-
-fn boxed_strings_is_empty(values: &Box<[String]>) -> bool {
-    values.is_empty()
 }
 
 impl PublicOutcomeTrace {
@@ -305,6 +315,7 @@ pub enum ControllerPhase {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct ControllerPageBudget {
     pub page_kind: String,
     pub event_budget: usize,
@@ -324,6 +335,7 @@ pub enum ExitEvent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct SgxControllerShapeTrace {
     pub boundary_event_budget: usize,
     pub controller_phase_order: Box<[ControllerPhase]>,
@@ -336,12 +348,14 @@ pub struct SgxControllerShapeTrace {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct NormalizedPageEvent {
     pub page_kind: String,
     pub kind: PageEventKind,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[serde(deny_unknown_fields)]
 pub struct NormalizedMicroTrace {
     pub page_trace: Box<[NormalizedPageEvent]>,
     pub exit_pattern: Box<[ExitEvent]>,
@@ -349,6 +363,7 @@ pub struct NormalizedMicroTrace {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeOramAccessWitness {
     pub object_id: u32,
     pub scheme: String,
@@ -379,6 +394,7 @@ impl RuntimeOramAccessWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeObservedOramAccessWitness {
     pub object_id: u32,
     pub scheme: String,
@@ -450,6 +466,7 @@ type RuntimeExecutionTraceOramParts = (
 );
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeOramLeafWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -458,6 +475,7 @@ pub struct RuntimeOramLeafWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeOramLeafScaffoldWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -475,6 +493,7 @@ pub enum RuntimePathOramTransitionKind {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeMaskedUsizeOptionWitness {
     pub present: bool,
     pub value: usize,
@@ -528,6 +547,7 @@ impl RuntimeMaskedUsizeOptionWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimePathOramTransitionWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -540,6 +560,7 @@ pub struct RuntimePathOramTransitionWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimePathOramPositionMapWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -547,6 +568,7 @@ pub struct RuntimePathOramPositionMapWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeOramAccessCounterWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -554,6 +576,7 @@ pub struct RuntimeOramAccessCounterWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeOramObjectWitness {
     pub object_id: u32,
     pub object_name: String,
@@ -573,9 +596,10 @@ pub struct RuntimeOramObjectWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelStepWitness {
     opcode: UoOpcode,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     object_id: Option<u32>,
 }
 
@@ -650,21 +674,21 @@ pub enum RuntimeKernelScratchRegionWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelResourceEventWitness {
     kind: RuntimeKernelResourceEventKindWitness,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     region: Option<RuntimeKernelScratchRegionWitness>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     words: Option<usize>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     bytes: Option<usize>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelScheduleWitness {
-    #[serde(default)]
     opcodes: Box<[UoOpcode]>,
-    #[serde(default)]
     steps: Box<[RuntimeKernelStepWitness]>,
 }
 
@@ -773,27 +797,30 @@ pub enum RuntimeKernelRefinementEventKindWitness {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelRefinementEventWitness {
     kind: RuntimeKernelRefinementEventKindWitness,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     object_id: Option<u32>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     opcode: Option<UoOpcode>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelRefinementWitness {
-    #[serde(default)]
     events: Box<[RuntimeKernelRefinementEventWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeControllerCertificate {
     entry_input_len: usize,
     observed_oram_accesses: Box<[RuntimeOramAccessWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeControllerObserverCertificate {
     public_outcome: PublicOutcomeTrace,
     boundary_schedule: Box<[BoundaryEvent]>,
@@ -803,30 +830,26 @@ pub struct RuntimeControllerObserverCertificate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimePathOramHiddenCertificate {
     trace: RefinementTrace,
     oram_objects: Box<[RuntimeOramObjectWitness]>,
-    #[serde(default)]
     oram_leaf_public_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
-    #[serde(default)]
     oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
-    #[serde(default)]
     oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
-    #[serde(default)]
     oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
-    #[serde(default)]
     oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[serde(deny_unknown_fields)]
 pub struct TheoremTrace {
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     pub public_outcome: Option<PublicOutcomeTrace>,
-    #[serde(default)]
     pub boundary_schedule: Box<[BoundaryEvent]>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     pub controller_shape: Option<SgxControllerShapeTrace>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     pub normalized_micro_trace: Option<NormalizedMicroTrace>,
 }
 
@@ -847,6 +870,7 @@ impl TheoremTrace {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RefinementPhysicalWrite {
     pub object: String,
     pub location: String,
@@ -855,6 +879,7 @@ pub struct RefinementPhysicalWrite {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RefinementTrace {
     pub opcode_trace: Box<[String]>,
     pub logical_accesses: Box<[LogicalEvent]>,
@@ -865,41 +890,41 @@ pub struct RefinementTrace {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeRefinementWitness {
     trace: RefinementTrace,
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     runtime_seed: Option<u64>,
     public_outcome: PublicOutcomeTrace,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     kernel_witness: Option<RuntimeKernelWitness>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
     boundary_schedule: Box<[BoundaryEvent]>,
     controller_shape: SgxControllerShapeTrace,
     normalized_micro_trace: NormalizedMicroTrace,
     controller_certificate: RuntimeControllerCertificate,
     oram_objects: Box<[RuntimeOramObjectWitness]>,
-    #[serde(default)]
     oram_leaf_public_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
-    #[serde(default)]
     oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
-    #[serde(default)]
     oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
-    #[serde(default)]
     oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
-    #[serde(default)]
     oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeTrustedKernelBundle {
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     runtime_seed: Option<u64>,
     controller_observer: RuntimeControllerObserverCertificate,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     kernel_witness: Option<RuntimeKernelWitness>,
     hidden_certificate: RuntimePathOramHiddenCertificate,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelWitness {
     entrypoint_id: String,
     arena_bytes: usize,
@@ -915,15 +940,12 @@ pub struct RuntimeKernelWitness {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    #[serde(default)]
     resource_events: Box<[RuntimeKernelResourceEventWitness]>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
-    #[serde(default)]
     public_object_ids: Box<[u32]>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_public_object_ids: Option<Box<[u32]>>,
-    #[serde(default)]
     kernel_steps: Box<[RuntimeKernelStepWitness]>,
 }
 
@@ -956,6 +978,7 @@ pub struct RuntimeKernelFinishSnapshot {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelFinishBundle {
     entrypoint_id: String,
     arena_bytes: usize,
@@ -971,21 +994,18 @@ pub struct RuntimeKernelFinishBundle {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    #[serde(default)]
     resource_events: Box<[RuntimeKernelResourceEventWitness]>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
-    #[serde(default)]
     public_object_ids: Box<[u32]>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_public_object_ids: Option<Box<[u32]>>,
-    #[serde(default)]
     kernel_steps: Box<[RuntimeKernelStepWitness]>,
-    #[serde(default)]
     runtime_phase_events_before_finish: Box<[RuntimeKernelRefinementEventWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeKernelMachineFinishWitness {
     entrypoint_id: String,
     arena_bytes: usize,
@@ -1001,20 +1021,16 @@ pub struct RuntimeKernelMachineFinishWitness {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    #[serde(default)]
     resource_events: Box<[RuntimeKernelResourceEventWitness]>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
     expected_kernel_step_index: usize,
-    #[serde(default)]
     public_object_ids: Box<[u32]>,
-    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_public_object_ids: Option<Box<[u32]>>,
-    #[serde(default)]
     kernel_steps: Box<[RuntimeKernelStepWitness]>,
     max_kernel_ops: usize,
     max_runtime_phase_event_count: usize,
-    #[serde(default)]
     runtime_phase_events_before_finish: Box<[RuntimeKernelRefinementEventWitness]>,
 }
 
@@ -1025,49 +1041,47 @@ pub struct SeededRuntimeWitnessFamily {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SeededRuntimePathOramWitnessFamily {
     seed_count: usize,
     witnesses: Box<[RuntimeRefinementWitness]>,
-    #[serde(default)]
     public_leaf_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SeededRuntimePaperMainFamilyBundle {
     family: SeededRuntimePathOramWitnessFamily,
     public_outcome: PublicOutcomeTrace,
-    #[serde(default)]
     boundary_schedule: Box<[BoundaryEvent]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SeededRuntimePaperMainSlotFamilyBundle {
     family: SeededRuntimePathOramWitnessFamily,
     public_outcome: PublicOutcomeTrace,
-    #[serde(default)]
     boundary_schedule: Box<[BoundaryEvent]>,
     opcode_trace: Box<[String]>,
     confidential_slot_program: ConfidentialKernelSlotProgram,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
     seed_count: usize,
     witnesses: Box<[RuntimeRefinementWitness]>,
-    #[serde(default)]
     public_leaf_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
-    #[serde(default)]
     public_fresh_coin_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct CanonicalFreshCoinRuntimePathOramTheoremInput {
     seed_count: usize,
     representative_seed: usize,
     representative_witness: RuntimeRefinementWitness,
-    #[serde(default)]
     public_leaf_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
-    #[serde(default)]
     public_fresh_coin_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
 }
 
@@ -8171,6 +8185,44 @@ mod tests {
     use std::collections::BTreeMap;
     use uo_precompiles::UoOpcode;
 
+    fn assert_missing_json_field_rejected<T>(artifact: &T, field: &str)
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned,
+    {
+        let mut json = serde_json::to_value(artifact).unwrap();
+        let object = json
+            .as_object_mut()
+            .expect("proof-grade artifact should serialize as an object");
+        assert!(
+            object.remove(field).is_some(),
+            "serialized artifact should contain required field {field}"
+        );
+        match serde_json::from_value::<T>(json) {
+            Ok(_) => panic!("missing required proof-grade JSON field {field} was accepted"),
+            Err(err) => assert!(
+                err.to_string().contains("missing field"),
+                "expected missing-field error for {field}, got {err}"
+            ),
+        }
+    }
+
+    fn assert_unknown_json_field_rejected<T>(artifact: &T)
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned,
+    {
+        let mut json = serde_json::to_value(artifact).unwrap();
+        json.as_object_mut()
+            .expect("proof-grade artifact should serialize as an object")
+            .insert("unexpected_proof_field".into(), serde_json::json!(true));
+        match serde_json::from_value::<T>(json) {
+            Ok(_) => panic!("unknown proof-grade JSON field was accepted"),
+            Err(err) => assert!(
+                err.to_string().contains("unknown field"),
+                "expected unknown-field error, got {err}"
+            ),
+        }
+    }
+
     #[test]
     fn write_classifier_matches_m_plus_partition() {
         assert_eq!(classify_write(&[0, 0], &[0, 0]), WriteClass::Same);
@@ -8212,6 +8264,63 @@ mod tests {
             before.runtime_proof_object_hash,
             after.runtime_proof_object_hash
         );
+    }
+
+    #[test]
+    fn proof_grade_json_rejects_implicit_defaults_and_unknown_fields() {
+        let public_outcome = sample_public_outcome(7);
+        for field in [
+            "public_env",
+            "status_policy",
+            "return_policy",
+            "return_payload",
+            "encrypted_return_payload",
+            "declassifies",
+        ] {
+            assert_missing_json_field_rejected::<PublicOutcomeTrace>(&public_outcome, field);
+        }
+        assert_unknown_json_field_rejected::<PublicOutcomeTrace>(&public_outcome);
+
+        let kernel_witness = sample_runtime_kernel_witness();
+        for field in [
+            "resource_events",
+            "expected_kernel_steps",
+            "public_object_ids",
+            "expected_public_object_ids",
+            "kernel_steps",
+        ] {
+            assert_missing_json_field_rejected::<RuntimeKernelWitness>(&kernel_witness, field);
+        }
+        assert_unknown_json_field_rejected::<RuntimeKernelWitness>(&kernel_witness);
+
+        let finish_bundle = sample_runtime_kernel_finish_bundle();
+        for field in [
+            "resource_events",
+            "expected_kernel_steps",
+            "public_object_ids",
+            "expected_public_object_ids",
+            "kernel_steps",
+            "runtime_phase_events_before_finish",
+        ] {
+            assert_missing_json_field_rejected::<RuntimeKernelFinishBundle>(&finish_bundle, field);
+        }
+        assert_unknown_json_field_rejected::<RuntimeKernelFinishBundle>(&finish_bundle);
+
+        let family = SeededRuntimePathOramWitnessFamily::new(vec![
+            sample_runtime_refinement_witness_with_seed(0),
+            sample_runtime_refinement_witness_with_seed(1),
+        ])
+        .unwrap();
+        assert_missing_json_field_rejected::<SeededRuntimePathOramWitnessFamily>(
+            &family,
+            "public_leaf_scaffold",
+        );
+        let paper_bundle = SeededRuntimePaperMainFamilyBundle::new(family).unwrap();
+        assert_missing_json_field_rejected::<SeededRuntimePaperMainFamilyBundle>(
+            &paper_bundle,
+            "boundary_schedule",
+        );
+        assert_unknown_json_field_rejected::<SeededRuntimePaperMainFamilyBundle>(&paper_bundle);
     }
 
     #[test]

@@ -25,6 +25,7 @@ namespace UOToolchain
 structure SGXPublicOutcome where
   entrypointId : String
   publicArgs : List String
+  publicEnv : List String
   terminationStatus : Bool
   statusPolicy : String
   outputShape : OutputShape
@@ -91,6 +92,7 @@ deriving Repr, DecidableEq
 def sgxPublicOutcome (view : SGXView) : SGXPublicOutcome :=
   { entrypointId := view.entrypointId
   , publicArgs := view.publicArgs
+  , publicEnv := view.publicEnv
   , terminationStatus := view.terminationStatus
   , statusPolicy := view.statusPolicy
   , outputShape := view.outputShape
@@ -276,6 +278,7 @@ theorem exactSGXViewRelation_of_singleton_eq
 def sgxViewOfDeployment (cfg : Config) (result : DeploymentResult) : SGXView :=
   { entrypointId := cfg.program.entrypoint
   , publicArgs := cfg.input.publicArgs
+  , publicEnv := cfg.input.publicEnv
   , boundarySchedule := []
   , persistentReads := result.trace.physicalReads
   , persistentWrites := result.trace.physicalWrites
@@ -314,8 +317,8 @@ theorem sgxViewOfDeployment_eq_of_viewTEEStore_eq
   cases result₁
   cases result₂
   simp [viewTEEStore, sgxViewOfDeployment] at h ⊢
-  rcases h with ⟨hEntry, hArgs, hTerm, hOutput, hReads, hWrites, hGas⟩
-  exact ⟨hEntry, hArgs, hReads, hWrites, hTerm, hOutput, hGas⟩
+  rcases h with ⟨hEntry, hArgs, hEnv, hTerm, hOutput, hReads, hWrites, hGas⟩
+  exact ⟨hEntry, hArgs, hEnv, hReads, hWrites, hTerm, hOutput, hGas⟩
 
 theorem exactTEEStorage_projects_to_exactSGX
   {run : DeploymentSemantics}

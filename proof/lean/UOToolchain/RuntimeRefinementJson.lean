@@ -5,6 +5,37 @@ open Lean
 
 namespace UOToolchain
 
+def jsonObjectEntries (json : Json) : Except String (List (String × Json)) :=
+  match json with
+  | Json.obj obj => pure obj.toList
+  | _ => throw "expected JSON object"
+
+def jsonLookupFieldJson (json : Json) (field : String) : Except String Json := do
+  let entries ← jsonObjectEntries json
+  match entries.find? (fun entry => entry.fst == field) with
+  | some (_, value) => pure value
+  | none => throw s!"missing object field {field}"
+
+def jsonRequireExactFields (json : Json) (fieldNames : List String) : Except String Unit := do
+  let entries ← jsonObjectEntries json
+  let actualFields := entries.map Prod.fst
+  let missing := fieldNames.filter (fun field => !actualFields.contains field)
+  let unknown := actualFields.filter (fun field => !fieldNames.contains field)
+  if missing.isEmpty && unknown.isEmpty then
+    pure ()
+  else
+    throw
+      s!"JSON object fields mismatch: missing={String.intercalate "," missing}; unknown={String.intercalate "," unknown}"
+
+def jsonLookupFieldAs [FromJson α] (json : Json) (field : String) : Except String α := do
+  fromJson? (← jsonLookupFieldJson json field)
+
+def jsonLookupExplicitOptionFieldAs [FromJson α]
+  (json : Json) (field : String) : Except String (Option α) := do
+  match ← jsonLookupFieldJson json field with
+  | Json.null => pure none
+  | value => some <$> fromJson? value
+
 inductive ImportedWriteClass where
   | Set
   | Clear
@@ -257,9 +288,24 @@ def ImportedEncryptedReturnPayload.toEncryptedReturnPayload
   , wireLen := payload.wire_len
   }
 
+def importedPublicOutcomeTraceFieldNames : List String :=
+  [ "entrypoint_id"
+  , "public_args"
+  , "public_env"
+  , "termination_status"
+  , "status_policy"
+  , "output_shape"
+  , "return_policy"
+  , "return_payload"
+  , "encrypted_return_payload"
+  , "declassifies"
+  , "gas_used"
+  ]
+
 structure ImportedPublicOutcomeTrace where
   entrypoint_id : String
   public_args : List String
+  public_env : List String
   termination_status : Bool
   status_policy : String
   output_shape : ImportedOutputShape
@@ -268,12 +314,31 @@ structure ImportedPublicOutcomeTrace where
   encrypted_return_payload : Option ImportedEncryptedReturnPayload
   declassifies : List String
   gas_used : Nat
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedPublicOutcomeTrace where
+  fromJson? json := do
+    jsonRequireExactFields json importedPublicOutcomeTraceFieldNames
+    pure
+      { entrypoint_id := ← jsonLookupFieldAs json "entrypoint_id"
+      , public_args := ← jsonLookupFieldAs json "public_args"
+      , public_env := ← jsonLookupFieldAs json "public_env"
+      , termination_status := ← jsonLookupFieldAs json "termination_status"
+      , status_policy := ← jsonLookupFieldAs json "status_policy"
+      , output_shape := ← jsonLookupFieldAs json "output_shape"
+      , return_policy := ← jsonLookupFieldAs json "return_policy"
+      , return_payload := ← jsonLookupExplicitOptionFieldAs json "return_payload"
+      , encrypted_return_payload :=
+          ← jsonLookupExplicitOptionFieldAs json "encrypted_return_payload"
+      , declassifies := ← jsonLookupFieldAs json "declassifies"
+      , gas_used := ← jsonLookupFieldAs json "gas_used"
+      }
 
 def ImportedPublicOutcomeTrace.toPublicOutcome
   (outcome : ImportedPublicOutcomeTrace) : SGXPublicOutcome :=
   { entrypointId := outcome.entrypoint_id
   , publicArgs := outcome.public_args
+  , publicEnv := outcome.public_env
   , terminationStatus := outcome.termination_status
   , statusPolicy := outcome.status_policy
   , outputShape := outcome.output_shape.toOutputShape
@@ -380,6 +445,14 @@ structure ImportedRuntimeControllerCertificate where
   entry_input_len : Nat
   observed_oram_accesses : List ImportedRuntimeOramAccessCertificate
 deriving Repr, DecidableEq, FromJson, ToJson
+
+def importedRuntimeControllerObserverCertificateFieldNames : List String :=
+  [ "public_outcome"
+  , "boundary_schedule"
+  , "controller_shape"
+  , "normalized_micro_trace"
+  , "controller_certificate"
+  ]
 
 def ImportedRuntimeControllerCertificate.toRuntimeControllerCertificate
   (certificate : ImportedRuntimeControllerCertificate) : RuntimeControllerCertificate :=
@@ -605,6 +678,16 @@ structure ImportedRuntimePathOramHiddenCertificate where
   oram_leaf_state_transitions : List ImportedRuntimePathOramTransitionCertificate
 deriving Repr, DecidableEq, FromJson, ToJson
 
+def importedRuntimePathOramHiddenCertificateFieldNames : List String :=
+  [ "trace"
+  , "oram_objects"
+  , "oram_leaf_public_scaffold"
+  , "oram_leaf_schedule"
+  , "oram_position_map_before"
+  , "oram_position_map_after"
+  , "oram_leaf_state_transitions"
+  ]
+
 def ImportedRuntimePathOramHiddenCertificate.toRuntimePathOramHiddenCertificate
   (certificate : ImportedRuntimePathOramHiddenCertificate) :
   RuntimePathOramHiddenCertificate :=
@@ -667,10 +750,21 @@ def importedRuntimeKernelOpcodeRequiresObjectId
   (opcode : String) : Bool :=
   decide (opcode ∈ importedRuntimeKernelObjectOpcodeNames)
 
+def importedRuntimeKernelStepFieldNames : List String :=
+  ["opcode", "object_id"]
+
 structure ImportedRuntimeKernelStep where
   opcode : String
   object_id : Option Nat
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRuntimeKernelStep where
+  fromJson? json := do
+    jsonRequireExactFields json importedRuntimeKernelStepFieldNames
+    pure
+      { opcode := ← jsonLookupFieldAs json "opcode"
+      , object_id := ← jsonLookupExplicitOptionFieldAs json "object_id"
+      }
 
 def ImportedRuntimeKernelStep.toRuntimeKernelStep
   (step : ImportedRuntimeKernelStep) : RuntimeKernelStep :=
@@ -681,6 +775,9 @@ def ImportedRuntimeKernelStep.toRuntimeKernelStep
 def ImportedRuntimeKernelStep.checkShapeValid
   (step : ImportedRuntimeKernelStep) : Bool :=
   decide (step.object_id.isSome = importedRuntimeKernelOpcodeRequiresObjectId step.opcode)
+
+def importedRuntimeKernelScheduleFieldNames : List String :=
+  ["opcodes", "steps"]
 
 structure ImportedRuntimeKernelSchedule where
   opcodes : List String
@@ -783,12 +880,47 @@ theorem importedRuntimeKernelSchedule_valid_finalState_exact
       simp at hFinished hObjects
       simp [hFinal, hFinished, hObjects]
 
+def importedRuntimeKernelResourceEventFieldNames : List String :=
+  ["kind", "region", "words", "bytes"]
+
 structure ImportedRuntimeKernelResourceEvent where
   kind : String
   region : Option String
   words : Option Nat
   bytes : Option Nat
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRuntimeKernelResourceEvent where
+  fromJson? json := do
+    jsonRequireExactFields json importedRuntimeKernelResourceEventFieldNames
+    pure
+      { kind := ← jsonLookupFieldAs json "kind"
+      , region := ← jsonLookupExplicitOptionFieldAs json "region"
+      , words := ← jsonLookupExplicitOptionFieldAs json "words"
+      , bytes := ← jsonLookupExplicitOptionFieldAs json "bytes"
+      }
+
+def importedRuntimeKernelWitnessFieldNames : List String :=
+  [ "entrypoint_id"
+  , "arena_bytes"
+  , "max_stack_words"
+  , "scratch_bytes"
+  , "peak_stack_words"
+  , "value_scratch_peak_bytes"
+  , "value_scratch_live_bytes_end"
+  , "value_scratch_wipe_count"
+  , "hash_scratch_peak_bytes"
+  , "hash_scratch_live_bytes_end"
+  , "hash_scratch_wipe_count"
+  , "io_scratch_peak_bytes"
+  , "io_scratch_live_bytes_end"
+  , "io_scratch_wipe_count"
+  , "resource_events"
+  , "expected_kernel_steps"
+  , "public_object_ids"
+  , "expected_public_object_ids"
+  , "kernel_steps"
+  ]
 
 structure ImportedRuntimeKernelWitness where
   entrypoint_id : String
@@ -810,7 +942,36 @@ structure ImportedRuntimeKernelWitness where
   public_object_ids : List Nat
   expected_public_object_ids : Option (List Nat)
   kernel_steps : List ImportedRuntimeKernelStep
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRuntimeKernelWitness where
+  fromJson? json := do
+    jsonRequireExactFields json importedRuntimeKernelWitnessFieldNames
+    pure
+      { entrypoint_id := ← jsonLookupFieldAs json "entrypoint_id"
+      , arena_bytes := ← jsonLookupFieldAs json "arena_bytes"
+      , max_stack_words := ← jsonLookupFieldAs json "max_stack_words"
+      , scratch_bytes := ← jsonLookupFieldAs json "scratch_bytes"
+      , peak_stack_words := ← jsonLookupFieldAs json "peak_stack_words"
+      , value_scratch_peak_bytes := ← jsonLookupFieldAs json "value_scratch_peak_bytes"
+      , value_scratch_live_bytes_end :=
+          ← jsonLookupFieldAs json "value_scratch_live_bytes_end"
+      , value_scratch_wipe_count := ← jsonLookupFieldAs json "value_scratch_wipe_count"
+      , hash_scratch_peak_bytes := ← jsonLookupFieldAs json "hash_scratch_peak_bytes"
+      , hash_scratch_live_bytes_end :=
+          ← jsonLookupFieldAs json "hash_scratch_live_bytes_end"
+      , hash_scratch_wipe_count := ← jsonLookupFieldAs json "hash_scratch_wipe_count"
+      , io_scratch_peak_bytes := ← jsonLookupFieldAs json "io_scratch_peak_bytes"
+      , io_scratch_live_bytes_end := ← jsonLookupFieldAs json "io_scratch_live_bytes_end"
+      , io_scratch_wipe_count := ← jsonLookupFieldAs json "io_scratch_wipe_count"
+      , resource_events := ← jsonLookupFieldAs json "resource_events"
+      , expected_kernel_steps :=
+          ← jsonLookupExplicitOptionFieldAs json "expected_kernel_steps"
+      , public_object_ids := ← jsonLookupFieldAs json "public_object_ids"
+      , expected_public_object_ids :=
+          ← jsonLookupExplicitOptionFieldAs json "expected_public_object_ids"
+      , kernel_steps := ← jsonLookupFieldAs json "kernel_steps"
+      }
 
 def ImportedRuntimeKernelWitness.emittedKernelSchedule
   (witness : ImportedRuntimeKernelWitness) : ImportedRuntimeKernelSchedule :=
@@ -1412,11 +1573,26 @@ def loadAndCheckImportedProofGradeRuntimeKernelWitness
       throw <| IO.userError
         s!"failed to validate proof-grade runtime kernel witness: {err}"
 
+def importedRuntimeKernelRefinementEventFieldNames : List String :=
+  ["kind", "object_id", "opcode"]
+
 structure ImportedRuntimeKernelRefinementEvent where
   kind : String
   object_id : Option Nat
   opcode : Option String
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRuntimeKernelRefinementEvent where
+  fromJson? json := do
+    jsonRequireExactFields json importedRuntimeKernelRefinementEventFieldNames
+    pure
+      { kind := ← jsonLookupFieldAs json "kind"
+      , object_id := ← jsonLookupExplicitOptionFieldAs json "object_id"
+      , opcode := ← jsonLookupExplicitOptionFieldAs json "opcode"
+      }
+
+def importedRuntimeKernelRefinementWitnessFieldNames : List String :=
+  ["events"]
 
 def ImportedRuntimeKernelRefinementEvent.toRuntimeKernelRefinementEvent
   (event : ImportedRuntimeKernelRefinementEvent) : RuntimeKernelRefinementEvent :=
@@ -1563,6 +1739,24 @@ def loadAndCheckImportedProofGradeRuntimeKernelRefinementWitness
       throw <| IO.userError
         s!"failed to validate proof-grade runtime kernel refinement witness: {err}"
 
+def importedRuntimeRefinementWitnessFieldNames : List String :=
+  [ "trace"
+  , "runtime_seed"
+  , "public_outcome"
+  , "kernel_witness"
+  , "runtime_kernel_refinement_witness"
+  , "boundary_schedule"
+  , "controller_shape"
+  , "normalized_micro_trace"
+  , "controller_certificate"
+  , "oram_objects"
+  , "oram_leaf_public_scaffold"
+  , "oram_leaf_schedule"
+  , "oram_position_map_before"
+  , "oram_position_map_after"
+  , "oram_leaf_state_transitions"
+  ]
+
 structure ImportedRuntimeRefinementWitness where
   trace : ImportedRefinementTrace
   runtime_seed : Option Nat
@@ -1579,7 +1773,29 @@ structure ImportedRuntimeRefinementWitness where
   oram_position_map_before : List ImportedRuntimePathOramPositionMapCertificate
   oram_position_map_after : List ImportedRuntimePathOramPositionMapCertificate
   oram_leaf_state_transitions : List ImportedRuntimePathOramTransitionCertificate
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRuntimeRefinementWitness where
+  fromJson? json := do
+    jsonRequireExactFields json importedRuntimeRefinementWitnessFieldNames
+    pure
+      { trace := ← jsonLookupFieldAs json "trace"
+      , runtime_seed := ← jsonLookupExplicitOptionFieldAs json "runtime_seed"
+      , public_outcome := ← jsonLookupFieldAs json "public_outcome"
+      , kernel_witness := ← jsonLookupExplicitOptionFieldAs json "kernel_witness"
+      , runtime_kernel_refinement_witness :=
+          ← jsonLookupExplicitOptionFieldAs json "runtime_kernel_refinement_witness"
+      , boundary_schedule := ← jsonLookupFieldAs json "boundary_schedule"
+      , controller_shape := ← jsonLookupFieldAs json "controller_shape"
+      , normalized_micro_trace := ← jsonLookupFieldAs json "normalized_micro_trace"
+      , controller_certificate := ← jsonLookupFieldAs json "controller_certificate"
+      , oram_objects := ← jsonLookupFieldAs json "oram_objects"
+      , oram_leaf_public_scaffold := ← jsonLookupFieldAs json "oram_leaf_public_scaffold"
+      , oram_leaf_schedule := ← jsonLookupFieldAs json "oram_leaf_schedule"
+      , oram_position_map_before := ← jsonLookupFieldAs json "oram_position_map_before"
+      , oram_position_map_after := ← jsonLookupFieldAs json "oram_position_map_after"
+      , oram_leaf_state_transitions := ← jsonLookupFieldAs json "oram_leaf_state_transitions"
+      }
 
 def ImportedRuntimeRefinementWitness.toRuntimeWitness
   (witness : ImportedRuntimeRefinementWitness) : RuntimeRefinementWitness :=
@@ -2330,6 +2546,7 @@ def sampleImportedRuntimeRefinementWitness : ImportedRuntimeRefinementWitness :=
   , public_outcome :=
       { entrypoint_id := "put(bytes32,uint256)"
       , public_args := []
+      , public_env := []
       , termination_status := true
       , status_policy := "public"
       , output_shape := { return_present := false, return_length := 0 }

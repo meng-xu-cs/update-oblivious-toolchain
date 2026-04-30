@@ -459,6 +459,23 @@ be rejected by default; admit a default only when a schema-level theorem proves
 that it is equivalent to an explicit field value. Expand tamper tests to cover
 every observer field and every proof-object field used by an importer.
 
+Status: Fixed. Proof-grade Rust JSON surfaces now use fail-closed serde
+admission for proof objects: unknown fields are denied, proof-relevant defaulted
+fields are no longer implicit, and nullable proof fields must be explicitly
+present as `null` or a value. Lean now mirrors that policy with
+`RuntimeProofObjectSchema.lean`, an explicit schema/no-default theorem, and
+exact-field importers for nullable proof objects. The SGX/public outcome model
+also carries `publicEnv` end-to-end so the schema covers every public observer
+field. Tamper validation now removes every observer/proof-object field across
+controller, hidden-certificate, kernel-witness, machine-finish, finish-bundle,
+and paper-main bundle routes and verifies rejection. Verified with `cargo test
+-p uo-core`, `cd proof/lean && lake build UOToolchain.ProofGradeRoot`,
+`cargo run -q -p mplus-probe -- --only kernel-model-alignment-validation
+--out-dir results`, `cargo run -q -p mplus-probe -- --only static-checks
+--out-dir results`, and `cargo run -q -p mplus-probe -- --only
+tamper-validation --out-dir results` (386 tamper scenarios, zero unexpected
+acceptances).
+
 ## F14. Gas and host-visible failure taxonomy need a stronger theorem
 
 Review grouping: `F14`, `O2.10`.

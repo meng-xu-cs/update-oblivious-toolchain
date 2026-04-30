@@ -68,6 +68,7 @@ def sgxViewOfOramView
   let storage := sgxStorageOfOramView view
   { entrypointId := publicOutcome.entrypointId
   , publicArgs := publicOutcome.publicArgs
+  , publicEnv := publicOutcome.publicEnv
   , boundarySchedule := boundarySchedule
   , persistentReads := storage.persistentReads
   , persistentWrites := storage.persistentWrites

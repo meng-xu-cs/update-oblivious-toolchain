@@ -4482,6 +4482,82 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "increment first observed ORAM access recursion_depth",
         }),
     )?);
+    scenarios.push(validate_missing_required_json_fields_case(
+        "controller/observer_required_field_omission",
+        &controller_certificate,
+        &[
+            RequiredJsonFieldPath { label: "public_outcome", path: &["public_outcome"] },
+            RequiredJsonFieldPath { label: "boundary_schedule", path: &["boundary_schedule"] },
+            RequiredJsonFieldPath { label: "controller_shape", path: &["controller_shape"] },
+            RequiredJsonFieldPath {
+                label: "normalized_micro_trace",
+                path: &["normalized_micro_trace"],
+            },
+            RequiredJsonFieldPath {
+                label: "controller_certificate",
+                path: &["controller_certificate"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.entrypoint_id",
+                path: &["public_outcome", "entrypoint_id"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.public_args",
+                path: &["public_outcome", "public_args"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.public_env",
+                path: &["public_outcome", "public_env"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.termination_status",
+                path: &["public_outcome", "termination_status"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.status_policy",
+                path: &["public_outcome", "status_policy"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.output_shape",
+                path: &["public_outcome", "output_shape"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.return_policy",
+                path: &["public_outcome", "return_policy"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.return_payload",
+                path: &["public_outcome", "return_payload"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.encrypted_return_payload",
+                path: &["public_outcome", "encrypted_return_payload"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.declassifies",
+                path: &["public_outcome", "declassifies"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.gas_used",
+                path: &["public_outcome", "gas_used"],
+            },
+        ],
+        |certificate_path| {
+            Ok(Command::new(&controller_checker)
+                .arg(certificate_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "controller/observer_required_field_omission",
+            "artifact_kind": "runtime_controller_observer_certificate",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove each top-level observer field and each public-outcome observer field, one at a time, so the Lean importer must reject implicit/defaulted proof-grade JSON",
+        }),
+    )?);
 
     let mut tampered_hidden_certificate = serde_json::to_value(&hidden_certificate)?;
     let after_leaves = tampered_hidden_certificate
@@ -4564,6 +4640,42 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "set an absent fixed-shape position-map witness leaf to present=false,value=1 without changing its semantic Option value",
+        }),
+    )?);
+    scenarios.push(validate_missing_required_json_fields_case(
+        "hidden/path_oram_required_field_omission",
+        &hidden_certificate,
+        &[
+            RequiredJsonFieldPath { label: "trace", path: &["trace"] },
+            RequiredJsonFieldPath { label: "oram_objects", path: &["oram_objects"] },
+            RequiredJsonFieldPath {
+                label: "oram_leaf_public_scaffold",
+                path: &["oram_leaf_public_scaffold"],
+            },
+            RequiredJsonFieldPath {
+                label: "oram_leaf_schedule",
+                path: &["oram_leaf_schedule"],
+            },
+            RequiredJsonFieldPath {
+                label: "oram_position_map_before",
+                path: &["oram_position_map_before"],
+            },
+            RequiredJsonFieldPath {
+                label: "oram_position_map_after",
+                path: &["oram_position_map_after"],
+            },
+            RequiredJsonFieldPath {
+                label: "oram_leaf_state_transitions",
+                path: &["oram_leaf_state_transitions"],
+            },
+        ],
+        |certificate_path| Ok(Command::new(&hidden_checker).arg(certificate_path).output()?),
+        json!({
+            "scenario": "hidden/path_oram_required_field_omission",
+            "artifact_kind": "runtime_path_oram_hidden_certificate",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove each hidden-certificate proof-object field, one at a time, so the Lean importer must reject implicit/defaulted proof-grade JSON",
         }),
     )?);
 
@@ -4693,6 +4805,77 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "drift the first object-bearing kernel step object_id",
+        }),
+    )?);
+    scenarios.push(validate_missing_required_json_fields_case(
+        "kernel/kernel_witness_required_field_omission",
+        &kernel_witness,
+        &[
+            RequiredJsonFieldPath { label: "entrypoint_id", path: &["entrypoint_id"] },
+            RequiredJsonFieldPath { label: "arena_bytes", path: &["arena_bytes"] },
+            RequiredJsonFieldPath { label: "max_stack_words", path: &["max_stack_words"] },
+            RequiredJsonFieldPath { label: "scratch_bytes", path: &["scratch_bytes"] },
+            RequiredJsonFieldPath { label: "peak_stack_words", path: &["peak_stack_words"] },
+            RequiredJsonFieldPath {
+                label: "value_scratch_peak_bytes",
+                path: &["value_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "value_scratch_live_bytes_end",
+                path: &["value_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "value_scratch_wipe_count",
+                path: &["value_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_peak_bytes",
+                path: &["hash_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_live_bytes_end",
+                path: &["hash_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_wipe_count",
+                path: &["hash_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_peak_bytes",
+                path: &["io_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_live_bytes_end",
+                path: &["io_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_wipe_count",
+                path: &["io_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath { label: "resource_events", path: &["resource_events"] },
+            RequiredJsonFieldPath {
+                label: "expected_kernel_steps",
+                path: &["expected_kernel_steps"],
+            },
+            RequiredJsonFieldPath { label: "public_object_ids", path: &["public_object_ids"] },
+            RequiredJsonFieldPath {
+                label: "expected_public_object_ids",
+                path: &["expected_public_object_ids"],
+            },
+            RequiredJsonFieldPath { label: "kernel_steps", path: &["kernel_steps"] },
+        ],
+        |kernel_path| {
+            Ok(Command::new(&kernel_checker)
+                .arg(kernel_path)
+                .arg(target.entrypoint)
+                .output()?)
+        },
+        json!({
+            "scenario": "kernel/kernel_witness_required_field_omission",
+            "artifact_kind": "proofgrade_runtime_kernel_witness",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove each runtime-kernel witness proof-object field, one at a time, so the Lean importer must reject implicit/defaulted proof-grade JSON",
         }),
     )?);
 
@@ -5433,6 +5616,89 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "decrement expected_kernel_step_index while keeping the projected finish bundle unchanged, so the standalone machine-finish witness checker must reject an unconsumed expected-kernel schedule",
+        }),
+    )?);
+    scenarios.push(validate_missing_required_json_fields_case(
+        "runtime_kernel_machine_finish_witness/required_field_omission",
+        &runtime_kernel_machine_finish_witness,
+        &[
+            RequiredJsonFieldPath { label: "entrypoint_id", path: &["entrypoint_id"] },
+            RequiredJsonFieldPath { label: "arena_bytes", path: &["arena_bytes"] },
+            RequiredJsonFieldPath { label: "max_stack_words", path: &["max_stack_words"] },
+            RequiredJsonFieldPath { label: "scratch_bytes", path: &["scratch_bytes"] },
+            RequiredJsonFieldPath { label: "peak_stack_words", path: &["peak_stack_words"] },
+            RequiredJsonFieldPath {
+                label: "value_scratch_peak_bytes",
+                path: &["value_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "value_scratch_live_bytes_end",
+                path: &["value_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "value_scratch_wipe_count",
+                path: &["value_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_peak_bytes",
+                path: &["hash_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_live_bytes_end",
+                path: &["hash_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_wipe_count",
+                path: &["hash_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_peak_bytes",
+                path: &["io_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_live_bytes_end",
+                path: &["io_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_wipe_count",
+                path: &["io_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath { label: "resource_events", path: &["resource_events"] },
+            RequiredJsonFieldPath {
+                label: "expected_kernel_steps",
+                path: &["expected_kernel_steps"],
+            },
+            RequiredJsonFieldPath {
+                label: "expected_kernel_step_index",
+                path: &["expected_kernel_step_index"],
+            },
+            RequiredJsonFieldPath { label: "public_object_ids", path: &["public_object_ids"] },
+            RequiredJsonFieldPath {
+                label: "expected_public_object_ids",
+                path: &["expected_public_object_ids"],
+            },
+            RequiredJsonFieldPath { label: "kernel_steps", path: &["kernel_steps"] },
+            RequiredJsonFieldPath { label: "max_kernel_ops", path: &["max_kernel_ops"] },
+            RequiredJsonFieldPath {
+                label: "max_runtime_phase_event_count",
+                path: &["max_runtime_phase_event_count"],
+            },
+            RequiredJsonFieldPath {
+                label: "runtime_phase_events_before_finish",
+                path: &["runtime_phase_events_before_finish"],
+            },
+        ],
+        |witness_path| {
+            Ok(Command::new(&runtime_kernel_machine_finish_witness_checker)
+                .arg(witness_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_kernel_machine_finish_witness/required_field_omission",
+            "artifact_kind": "proofgrade_runtime_kernel_machine_finish_witness",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove each machine-finish witness proof-object field, one at a time, so the Lean importer must reject implicit/defaulted proof-grade JSON",
         }),
     )?);
 
@@ -13961,6 +14227,80 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "erase the explicit expected_public_object_ids list while checking the pre-witness runtime kernel finish boundary route",
         }),
     )?);
+    scenarios.push(validate_missing_required_json_fields_case(
+        "kernel_finish_boundary/required_field_omission",
+        &kernel_finish_bundle,
+        &[
+            RequiredJsonFieldPath { label: "entrypoint_id", path: &["entrypoint_id"] },
+            RequiredJsonFieldPath { label: "arena_bytes", path: &["arena_bytes"] },
+            RequiredJsonFieldPath { label: "max_stack_words", path: &["max_stack_words"] },
+            RequiredJsonFieldPath { label: "scratch_bytes", path: &["scratch_bytes"] },
+            RequiredJsonFieldPath { label: "peak_stack_words", path: &["peak_stack_words"] },
+            RequiredJsonFieldPath {
+                label: "value_scratch_peak_bytes",
+                path: &["value_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "value_scratch_live_bytes_end",
+                path: &["value_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "value_scratch_wipe_count",
+                path: &["value_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_peak_bytes",
+                path: &["hash_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_live_bytes_end",
+                path: &["hash_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "hash_scratch_wipe_count",
+                path: &["hash_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_peak_bytes",
+                path: &["io_scratch_peak_bytes"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_live_bytes_end",
+                path: &["io_scratch_live_bytes_end"],
+            },
+            RequiredJsonFieldPath {
+                label: "io_scratch_wipe_count",
+                path: &["io_scratch_wipe_count"],
+            },
+            RequiredJsonFieldPath { label: "resource_events", path: &["resource_events"] },
+            RequiredJsonFieldPath {
+                label: "expected_kernel_steps",
+                path: &["expected_kernel_steps"],
+            },
+            RequiredJsonFieldPath { label: "public_object_ids", path: &["public_object_ids"] },
+            RequiredJsonFieldPath {
+                label: "expected_public_object_ids",
+                path: &["expected_public_object_ids"],
+            },
+            RequiredJsonFieldPath { label: "kernel_steps", path: &["kernel_steps"] },
+            RequiredJsonFieldPath {
+                label: "runtime_phase_events_before_finish",
+                path: &["runtime_phase_events_before_finish"],
+            },
+        ],
+        |bundle_path| {
+            Ok(Command::new(&kernel_finish_boundary_checker)
+                .arg(bundle_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "kernel_finish_boundary/required_field_omission",
+            "artifact_kind": "proofgrade_runtime_kernel_finish_boundary",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove each runtime-kernel finish-bundle proof-object field, one at a time, so the Lean importer must reject implicit/defaulted proof-grade JSON",
+        }),
+    )?);
 
     let mut tampered_trusted_kernel_bundle = serde_json::to_value(&trusted_kernel_bundle)?;
     let trusted_leaf = tampered_trusted_kernel_bundle["trusted_kernel_bundle"]
@@ -14112,6 +14452,74 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "increment the explicit shared gas_used field while checking the exact exported paper-main runtime-kernel boundary route",
         }),
     )?);
+    scenarios.push(validate_missing_required_json_fields_case(
+        "seeded_paper_main_bundle/required_field_omission",
+        &seeded_paper_main_bundle,
+        &[
+            RequiredJsonFieldPath { label: "family", path: &["family"] },
+            RequiredJsonFieldPath { label: "public_outcome", path: &["public_outcome"] },
+            RequiredJsonFieldPath { label: "boundary_schedule", path: &["boundary_schedule"] },
+            RequiredJsonFieldPath {
+                label: "public_outcome.entrypoint_id",
+                path: &["public_outcome", "entrypoint_id"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.public_args",
+                path: &["public_outcome", "public_args"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.public_env",
+                path: &["public_outcome", "public_env"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.termination_status",
+                path: &["public_outcome", "termination_status"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.status_policy",
+                path: &["public_outcome", "status_policy"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.output_shape",
+                path: &["public_outcome", "output_shape"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.return_policy",
+                path: &["public_outcome", "return_policy"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.return_payload",
+                path: &["public_outcome", "return_payload"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.encrypted_return_payload",
+                path: &["public_outcome", "encrypted_return_payload"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.declassifies",
+                path: &["public_outcome", "declassifies"],
+            },
+            RequiredJsonFieldPath {
+                label: "public_outcome.gas_used",
+                path: &["public_outcome", "gas_used"],
+            },
+        ],
+        |bundle_path| {
+            Ok(Command::new(&paper_main_family_bundle_checker)
+                .arg(bundle_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "seeded_paper_main_bundle/required_field_omission",
+            "artifact_kind": "proofgrade_seeded_runtime_paper_main_family_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put-seeded",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove each paper-main family-bundle field and each public-outcome observer field, one at a time, so the Lean importer must reject implicit/defaulted proof-grade JSON",
+        }),
+    )?);
     let mut tampered_seeded_paper_main_slot_bundle =
         serde_json::to_value(&seeded_paper_main_slot_bundle)?;
     tampered_seeded_paper_main_slot_bundle["confidential_slot_program"]["entrypoint_id"] =
@@ -14218,6 +14626,35 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put-seeded",
             "entrypoint": target.entrypoint,
             "mutation": "remove the final slot statement inside the exported SeededRuntimePaperMainSlotFamilyBundle while keeping the seeded family fixed",
+        }),
+    )?);
+    scenarios.push(validate_missing_required_json_fields_case(
+        "seeded_paper_main_slot_bundle/required_field_omission",
+        &seeded_paper_main_slot_bundle,
+        &[
+            RequiredJsonFieldPath { label: "family", path: &["family"] },
+            RequiredJsonFieldPath { label: "public_outcome", path: &["public_outcome"] },
+            RequiredJsonFieldPath { label: "boundary_schedule", path: &["boundary_schedule"] },
+            RequiredJsonFieldPath { label: "opcode_trace", path: &["opcode_trace"] },
+            RequiredJsonFieldPath {
+                label: "confidential_slot_program",
+                path: &["confidential_slot_program"],
+            },
+        ],
+        |bundle_path| {
+            Ok(Command::new(&paper_main_slot_family_bundle_checker)
+                .arg(bundle_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": "seeded_paper_main_slot_bundle/required_field_omission",
+            "artifact_kind": "proofgrade_seeded_runtime_paper_main_slot_family_bundle",
+            "benchmark": "SingleAccessMap/pathoram/put-seeded",
+            "entrypoint": target.entrypoint,
+            "mutation": "remove each paper-main slot-bundle proof-object field, one at a time, so the Lean importer must reject implicit/defaulted proof-grade JSON",
         }),
     )?);
 
@@ -25127,6 +25564,30 @@ fn extract_rust_struct_fields(source: &str, struct_name: &str) -> Result<Vec<Str
     }
 }
 
+fn rust_struct_derives_without_clone(source: &str, struct_name: &str, derive_args: &str) -> bool {
+    let markers = [
+        format!("pub struct {struct_name} {{"),
+        format!("pub(crate) struct {struct_name} {{"),
+        format!("struct {struct_name} {{"),
+    ];
+    let Some(start) = markers
+        .iter()
+        .filter_map(|marker| source.find(marker))
+        .min()
+    else {
+        return false;
+    };
+    let derive_attr = format!("#[derive({derive_args})]");
+    let attr_lines = source[..start]
+        .lines()
+        .rev()
+        .map(str::trim)
+        .take_while(|line| line.starts_with("#["))
+        .collect::<Vec<_>>();
+    attr_lines.iter().any(|line| *line == derive_attr)
+        && !attr_lines.iter().any(|line| line.contains("Clone"))
+}
+
 fn extract_rust_impl_block(source: &str, type_name: &str) -> Result<String> {
     let marker = format!("impl {type_name} {{");
     let start = source
@@ -25511,6 +25972,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         repo_root().join("proof/lean/UOToolchain/RuntimeAuditSurfaces.lean");
     let lean_runtime_boundary_schema_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeBoundarySchema.lean");
+    let lean_runtime_proof_object_schema_path =
+        repo_root().join("proof/lean/UOToolchain/RuntimeProofObjectSchema.lean");
     let lean_scalable_path_oram_evidence_path =
         repo_root().join("proof/lean/UOToolchain/ScalablePathOramEvidence.lean");
     let lean_path_oram_private_posmap_path =
@@ -25810,6 +26273,13 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_runtime_boundary_schema_path)
+            )
+        })?;
+    let lean_runtime_proof_object_schema_source =
+        fs::read_to_string(&lean_runtime_proof_object_schema_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_runtime_proof_object_schema_path)
             )
         })?;
     let lean_scalable_path_oram_evidence_source =
@@ -28935,6 +29405,29 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("theorem runtimeBoundaryObligationIds_nodup")
         && lean_runtime_boundary_schema_source
             .contains("theorem runtimeBoundarySchema_allProofCriticalMechanized");
+    let runtime_proof_object_json_schema_requires_explicit_fields =
+        lean_proofgrade_root_source.contains("import UOToolchain.RuntimeProofObjectSchema")
+            && lean_runtime_proof_object_schema_source
+                .contains("structure RuntimeProofObjectJsonSchema")
+            && lean_runtime_proof_object_schema_source
+                .contains("def runtimeProofObjectJsonSchemas")
+            && lean_runtime_proof_object_schema_source
+                .contains("def runtimeProofObjectJsonSchemaRequireExplicitFields")
+            && lean_runtime_proof_object_schema_source.contains(
+                "theorem runtimeProofObjectJsonSchema_no_defaulted_missing_fields",
+            )
+            && lean_runtime_proof_object_schema_source
+                .contains("theorem runtimeProofObjectJsonSchema_names_nodup")
+            && lean_runtime_proof_object_schema_source.contains("public_env")
+            && lean_runtime_refinement_json_source
+                .contains("def importedPublicOutcomeTraceFieldNames")
+            && lean_runtime_refinement_json_source.contains(", \"public_env\"")
+            && !core_trace_source.contains(
+                "#[serde(default, skip_serializing_if = \"boxed_strings_is_empty\")]",
+            )
+            && !core_trace_source.contains(
+                "pub struct SeededRuntimePaperMainFamilyBundle {\n    family: SeededRuntimePathOramWitnessFamily,\n    public_outcome: PublicOutcomeTrace,\n    #[serde(default)]\n    boundary_schedule: Box<[BoundaryEvent]>,\n}",
+            );
     let private_posmap_paper_main_route_present = lean_proofgrade_root_source
         .contains("import UOToolchain.PathOramPrivatePosmapV1")
         && lean_scalable_path_oram_evidence_source
@@ -34033,10 +34526,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("pub runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness,")
         && !shell_boundary_source.contains("pub shell_contract: RuntimeShellContract,")
         && !shell_boundary_source.contains("pub shell_trace: RuntimeShellTrace,");
-    let runtime_shell_boundary_bundle_nonclone = shell_boundary_source.contains(
-        "#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeShellBoundaryBundle {",
-    ) && !shell_boundary_source.contains(
-        "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeShellBoundaryBundle {",
+    let runtime_shell_boundary_bundle_nonclone = rust_struct_derives_without_clone(
+        &shell_boundary_source,
+        "RuntimeShellBoundaryBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
     );
     let runtime_shell_boundary_bundle_api_is_explicit = shell_boundary_source
         .contains("pub fn kernel_witness(&self) -> &RuntimeKernelWitness {")
@@ -34061,10 +34554,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && !shell_boundary_source.contains("pub expected_public_object_ids: Box<[u32]>,")
         && !shell_boundary_source
             .contains("pub expected_kernel_schedule: RuntimeKernelScheduleWitness,");
-    let runtime_kernel_interface_bundle_nonclone = shell_boundary_source.contains(
-        "#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeKernelInterfaceBundle {",
-    ) && !shell_boundary_source.contains(
-        "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeKernelInterfaceBundle {",
+    let runtime_kernel_interface_bundle_nonclone = rust_struct_derives_without_clone(
+        &shell_boundary_source,
+        "RuntimeKernelInterfaceBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
     );
     let runtime_kernel_interface_bundle_api_is_explicit = shell_boundary_source
         .contains("pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {")
@@ -34163,11 +34656,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         .contains("pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {")
         && confidential_core_source
             .contains("pub fn confidential_program(&self) -> &ConfidentialKernelProgram {");
-    let runtime_confidential_core_bundle_nonclone = confidential_core_source
-        .contains("#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreBundle {")
-        && !confidential_core_source.contains(
-            "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreBundle {",
-        );
+    let runtime_confidential_core_bundle_nonclone = rust_struct_derives_without_clone(
+        &confidential_core_source,
+        "RuntimeConfidentialCoreBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
+    );
     let runtime_confidential_core_slot_bundle_fields_private = confidential_core_source
         .contains("pub struct RuntimeConfidentialCoreSlotBundle {")
         && confidential_core_source.contains("runtime_witness: RuntimeRefinementWitness,")
@@ -34178,11 +34671,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
     let runtime_confidential_core_slot_bundle_api_is_explicit = confidential_core_source
         .contains("pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {");
-    let runtime_confidential_core_slot_bundle_nonclone = confidential_core_source
-        .contains("#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreSlotBundle {")
-        && !confidential_core_source.contains(
-            "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreSlotBundle {",
-        );
+    let runtime_confidential_core_slot_bundle_nonclone = rust_struct_derives_without_clone(
+        &confidential_core_source,
+        "RuntimeConfidentialCoreSlotBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
+    );
     let runtime_confidential_core_lowering_bundle_fields_private = confidential_core_source
         .contains("pub struct RuntimeConfidentialCoreLoweringBundle {")
         && confidential_core_source.contains("runtime_witness: RuntimeRefinementWitness,")
@@ -34199,11 +34692,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && confidential_core_source.contains(
             "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
         );
-    let runtime_confidential_core_lowering_bundle_nonclone = confidential_core_source
-        .contains("#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreLoweringBundle {")
-        && !confidential_core_source.contains(
-            "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreLoweringBundle {",
-        );
+    let runtime_confidential_core_lowering_bundle_nonclone = rust_struct_derives_without_clone(
+        &confidential_core_source,
+        "RuntimeConfidentialCoreLoweringBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
+    );
     let runtime_confidential_core_shell_boundary_lowering_bundle_impl = extract_rust_impl_block(
         &confidential_core_source,
         "RuntimeConfidentialCoreShellBoundaryLoweringBundle",
@@ -34233,11 +34726,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .contains("pub confidential_program: ConfidentialKernelProgram,")
             && !confidential_core_source
                 .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
-    let runtime_confidential_core_shell_boundary_lowering_bundle_nonclone = confidential_core_source.contains(
-        "#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreShellBoundaryLoweringBundle {",
-    ) && !confidential_core_source.contains(
-        "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreShellBoundaryLoweringBundle {",
-    );
+    let runtime_confidential_core_shell_boundary_lowering_bundle_nonclone =
+        rust_struct_derives_without_clone(
+            &confidential_core_source,
+            "RuntimeConfidentialCoreShellBoundaryLoweringBundle",
+            "Debug, Serialize, Deserialize, PartialEq, Eq",
+        );
     let runtime_confidential_core_shell_boundary_lowering_bundle_api_is_explicit =
         runtime_confidential_core_shell_boundary_lowering_bundle_impl
             .contains("pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {")
@@ -34261,11 +34755,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .contains("pub shell_boundary_bundle: RuntimeShellBoundaryBundle,")
             && !confidential_core_source
                 .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
-    let runtime_confidential_core_shell_boundary_slot_bundle_nonclone = confidential_core_source.contains(
-        "#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreShellBoundarySlotBundle {",
-    ) && !confidential_core_source.contains(
-        "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreShellBoundarySlotBundle {",
-    );
+    let runtime_confidential_core_shell_boundary_slot_bundle_nonclone =
+        rust_struct_derives_without_clone(
+            &confidential_core_source,
+            "RuntimeConfidentialCoreShellBoundarySlotBundle",
+            "Debug, Serialize, Deserialize, PartialEq, Eq",
+        );
     let runtime_confidential_core_shell_boundary_slot_bundle_api_is_explicit =
         runtime_confidential_core_shell_boundary_slot_bundle_impl
             .contains("pub fn shell_boundary_bundle(&self) -> &RuntimeShellBoundaryBundle {")
@@ -34287,11 +34782,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .contains("pub kernel_interface_bundle: RuntimeKernelInterfaceBundle,")
             && !confidential_core_source
                 .contains("pub confidential_slot_program: ConfidentialKernelSlotProgram,");
-    let runtime_confidential_core_kernel_interface_slot_bundle_nonclone = confidential_core_source.contains(
-        "#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreKernelInterfaceSlotBundle {",
-    ) && !confidential_core_source.contains(
-        "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeConfidentialCoreKernelInterfaceSlotBundle {",
-    );
+    let runtime_confidential_core_kernel_interface_slot_bundle_nonclone =
+        rust_struct_derives_without_clone(
+            &confidential_core_source,
+            "RuntimeConfidentialCoreKernelInterfaceSlotBundle",
+            "Debug, Serialize, Deserialize, PartialEq, Eq",
+        );
     let runtime_confidential_core_kernel_interface_slot_bundle_api_is_explicit =
         runtime_confidential_core_kernel_interface_slot_bundle_impl
             .contains("pub fn kernel_interface_bundle(&self) -> &RuntimeKernelInterfaceBundle {")
@@ -34300,15 +34796,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             )
             && !runtime_confidential_core_kernel_interface_slot_bundle_impl
                 .contains("pub fn runtime_witness(&self) -> &RuntimeRefinementWitness {");
-    let runtime_shell_boundary_lowering_bundle_nonclone = kernel_dsl_source.contains(
-        "#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeShellBoundaryLoweringBundle {",
-    ) && !kernel_dsl_source.contains(
-        "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeShellBoundaryLoweringBundle {",
+    let runtime_shell_boundary_lowering_bundle_nonclone = rust_struct_derives_without_clone(
+        &kernel_dsl_source,
+        "RuntimeShellBoundaryLoweringBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
     );
-    let runtime_shell_boundary_slot_bundle_nonclone = kernel_dsl_source.contains(
-        "#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeShellBoundarySlotBundle {",
-    ) && !kernel_dsl_source.contains(
-        "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeShellBoundarySlotBundle {",
+    let runtime_shell_boundary_slot_bundle_nonclone = rust_struct_derives_without_clone(
+        &kernel_dsl_source,
+        "RuntimeShellBoundarySlotBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
     );
     let confidential_core_runtime_witness_constructors_private = confidential_core_source
         .contains("fn from_runtime_witness(")
@@ -34569,11 +35065,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && trusted_kernel_source.contains(
             "pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {",
         );
-    let runtime_trusted_kernel_slot_bundle_nonclone = trusted_kernel_source
-        .contains("#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeTrustedKernelSlotBundle {")
-        && !trusted_kernel_source.contains(
-            "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeTrustedKernelSlotBundle {",
-        );
+    let runtime_trusted_kernel_slot_bundle_nonclone = rust_struct_derives_without_clone(
+        &trusted_kernel_source,
+        "RuntimeTrustedKernelSlotBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
+    );
     let trusted_kernel_slot_bundle_uses_manifest_slot_program = trusted_kernel_source
         .contains("manifest_entry")
         && trusted_kernel_source.contains(".confidential_slot_program")
@@ -35247,6 +35743,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && host_visible_outcome_taxonomy_audit_present
         && runtime_freshness_discipline_audit_present
         && runtime_boundary_schema_mechanized
+        && runtime_proof_object_json_schema_requires_explicit_fields
         && private_posmap_paper_main_route_present
         && theorem_adjacent_unsafe_isolated_to_fixed_buffer
         && lean_toolchain_exact_release_pinned
@@ -35573,6 +36070,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 display_report_path(&lean_runtime_oram_write_log_model_path),
             "lean_runtime_oram_helper_semantics":
                 display_report_path(&lean_runtime_oram_helper_semantics_path),
+            "lean_runtime_proof_object_schema":
+                display_report_path(&lean_runtime_proof_object_schema_path),
             "lean_runtime_store_codec_semantics":
                 display_report_path(&lean_runtime_store_codec_semantics_path),
             "lean_runtime_store_helper_semantics":
@@ -35939,6 +36438,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_boundary_schema_rust_lean_ids_match,
         "runtime_boundary_schema_mechanized":
             runtime_boundary_schema_mechanized,
+        "runtime_proof_object_json_schema_requires_explicit_fields":
+            runtime_proof_object_json_schema_requires_explicit_fields,
         "private_posmap_paper_main_route_present":
             private_posmap_paper_main_route_present,
         "theorem_adjacent_unsafe_surface_files":
@@ -40038,6 +40539,21 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && probe_source.contains(
             "inject a handwritten Keccak construction marker into state.rs",
         );
+    let tamper_validation_covers_required_proof_json_field_omission = probe_source
+        .contains("\"controller/observer_required_field_omission\"")
+        && probe_source.contains("\"hidden/path_oram_required_field_omission\"")
+        && probe_source.contains("\"kernel/kernel_witness_required_field_omission\"")
+        && probe_source
+            .contains("\"runtime_kernel_machine_finish_witness/required_field_omission\"")
+        && probe_source.contains("\"kernel_finish_boundary/required_field_omission\"")
+        && probe_source.contains("\"seeded_paper_main_bundle/required_field_omission\"")
+        && probe_source.contains("\"seeded_paper_main_slot_bundle/required_field_omission\"")
+        && probe_source.contains("public_outcome.public_env")
+        && probe_source.contains(
+            "remove each top-level observer field and each public-outcome observer field",
+        )
+        && probe_source.contains("remove each runtime-kernel witness proof-object field")
+        && probe_source.contains("remove each runtime-kernel finish-bundle proof-object field");
     let kernel_finish_boundary_validation_uses_boundary_checker = probe_source
         .contains("lean_proofgrade_kernel_finish_boundary_checker_path()?")
         && probe_source.contains("fn run_kernel_finish_boundary_validation(")
@@ -40141,16 +40657,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("runtime_kernel_finish_bundle")
         && core_trace_source.contains("runtime_kernel_finish_bundle: RuntimeKernelFinishBundle")
         && main_source.contains("OutputFormat::KernelFinish");
-    let runtime_trusted_kernel_bundle_nonclone = core_trace_source
-        .contains("#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeTrustedKernelBundle {")
-        && !core_trace_source.contains(
-            "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeTrustedKernelBundle {",
-        );
-    let runtime_kernel_finish_bundle_nonclone = core_trace_source
-        .contains("#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeKernelFinishBundle {")
-        && !core_trace_source.contains(
-            "#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]\npub struct RuntimeKernelFinishBundle {",
-        );
+    let runtime_trusted_kernel_bundle_nonclone = rust_struct_derives_without_clone(
+        &core_trace_source,
+        "RuntimeTrustedKernelBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
+    );
+    let runtime_kernel_finish_bundle_nonclone = rust_struct_derives_without_clone(
+        &core_trace_source,
+        "RuntimeKernelFinishBundle",
+        "Debug, Serialize, Deserialize, PartialEq, Eq",
+    );
     let runtime_confidential_core_kernel_finish_slot_bundle_surface_present =
         confidential_core_source
             .contains("pub struct RuntimeConfidentialCoreKernelFinishSlotBundle {")
@@ -42376,6 +42892,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("pub fn public_leaf_scaffold(&self) -> &[RuntimeOramLeafScaffoldWitness] {");
     let seeded_runtime_paper_main_family_bundle_fields_private = core_trace_source
         .contains(
+            "pub struct SeededRuntimePaperMainFamilyBundle {\n    family: SeededRuntimePathOramWitnessFamily,\n    public_outcome: PublicOutcomeTrace,\n    boundary_schedule: Box<[BoundaryEvent]>,\n}",
+        ) && !core_trace_source.contains(
             "pub struct SeededRuntimePaperMainFamilyBundle {\n    family: SeededRuntimePathOramWitnessFamily,\n    public_outcome: PublicOutcomeTrace,\n    #[serde(default)]\n    boundary_schedule: Box<[BoundaryEvent]>,\n}",
         );
     let seeded_runtime_paper_main_family_bundle_api_is_explicit = core_trace_source
@@ -42386,6 +42904,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("pub fn boundary_schedule(&self) -> &[BoundaryEvent] {");
     let seeded_runtime_paper_main_slot_family_bundle_fields_private = core_trace_source
         .contains(
+            "pub struct SeededRuntimePaperMainSlotFamilyBundle {\n    family: SeededRuntimePathOramWitnessFamily,\n    public_outcome: PublicOutcomeTrace,\n    boundary_schedule: Box<[BoundaryEvent]>,\n    opcode_trace: Box<[String]>,\n    confidential_slot_program: ConfidentialKernelSlotProgram,\n}",
+        ) && !core_trace_source.contains(
             "pub struct SeededRuntimePaperMainSlotFamilyBundle {\n    family: SeededRuntimePathOramWitnessFamily,\n    public_outcome: PublicOutcomeTrace,\n    #[serde(default)]\n    boundary_schedule: Box<[BoundaryEvent]>,\n    opcode_trace: Box<[String]>,\n    confidential_slot_program: ConfidentialKernelSlotProgram,\n}",
         );
     let seeded_runtime_paper_main_slot_family_bundle_api_is_explicit = core_trace_source
@@ -44317,6 +44837,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             tamper_validation_covers_shell_canonical_hashing_guard_order_drift,
         "tamper_validation_covers_host_coordination_secret_serialization_drift":
             tamper_validation_covers_host_coordination_secret_serialization_drift,
+        "tamper_validation_covers_required_proof_json_field_omission":
+            tamper_validation_covers_required_proof_json_field_omission,
         "kernel_slot_boundary_validation_uses_boundary_checker":
             kernel_slot_boundary_validation_uses_boundary_checker,
         "paper_main_family_validation_uses_bundle_checker":
@@ -44985,6 +45507,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && tamper_validation_covers_runtime_kernel_machine_capacity_drift
             && tamper_validation_covers_shell_canonical_hashing_guard_order_drift
             && tamper_validation_covers_host_coordination_secret_serialization_drift
+            && tamper_validation_covers_required_proof_json_field_omission
             && kernel_slot_boundary_validation_uses_boundary_checker
             && paper_main_family_validation_uses_bundle_checker
             && paper_main_family_boundary_validation_uses_boundary_checker
@@ -46007,6 +46530,112 @@ where
     summary_object.insert(format!("{right_label}_json_bytes"), json!(right_json_bytes));
     summary_object.insert("lean_stdout".into(), json!(lean_stdout));
     summary_object.insert("lean_stderr".into(), json!(lean_stderr));
+    summary_object.insert("accepted".into(), json!(false));
+    summary_object.insert("rejected".into(), json!(true));
+    Ok(summary)
+}
+
+#[derive(Clone, Copy)]
+struct RequiredJsonFieldPath {
+    label: &'static str,
+    path: &'static [&'static str],
+}
+
+fn remove_required_json_field(json: &mut JsonValue, field: RequiredJsonFieldPath) -> Result<()> {
+    let (leaf, parents) = field
+        .path
+        .split_last()
+        .ok_or_else(|| anyhow!("required JSON field path {} is empty", field.label))?;
+    let mut cursor = json;
+    for segment in parents {
+        cursor = cursor
+            .get_mut(*segment)
+            .ok_or_else(|| anyhow!("required JSON field path {} missing {segment}", field.label))?;
+    }
+    let object = cursor.as_object_mut().ok_or_else(|| {
+        anyhow!(
+            "required JSON field path {} does not end in an object",
+            field.label
+        )
+    })?;
+    object.remove(*leaf).ok_or_else(|| {
+        anyhow!(
+            "required JSON field path {} missing leaf {leaf}",
+            field.label
+        )
+    })?;
+    Ok(())
+}
+
+fn validate_missing_required_json_fields_case<T, F>(
+    case_name: &str,
+    artifact: &T,
+    fields: &[RequiredJsonFieldPath],
+    run_checker: F,
+    mut summary: JsonValue,
+) -> Result<JsonValue>
+where
+    T: Serialize,
+    F: Fn(&Path) -> Result<Output>,
+{
+    if !tamper_filter_matches(case_name) {
+        let summary_object = summary
+            .as_object_mut()
+            .ok_or_else(|| anyhow!("tamper summary for {} is not a JSON object", case_name))?;
+        summary_object.insert("skipped".into(), json!(true));
+        summary_object.insert(
+            "tamper_filter".into(),
+            json!(std::env::var("UO_TAMPER_FILTER").ok()),
+        );
+        return Ok(summary);
+    }
+
+    let artifact_json = serde_json::to_value(artifact)?;
+    let mut rejected_fields = Vec::with_capacity(fields.len());
+    let mut checked = Vec::with_capacity(fields.len());
+    for field in fields {
+        let mut tampered_json = artifact_json.clone();
+        remove_required_json_field(&mut tampered_json, *field)?;
+        let field_case_name = format!("{case_name}/missing_{}", field.label.replace('.', "_"));
+        let (artifact_path, artifact_json_bytes) =
+            write_temp_json(&field_case_name, &tampered_json)?;
+        if std::env::var_os("UO_TAMPER_TRACE").is_some() {
+            eprintln!("tamper-check start: {field_case_name}");
+        }
+        let output = run_checker(&artifact_path)?;
+        if std::env::var_os("UO_TAMPER_TRACE").is_some() {
+            eprintln!(
+                "tamper-check done: {field_case_name} status={}",
+                output.status
+            );
+        }
+        let lean_stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let lean_stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if output.status.success() {
+            return Err(anyhow!(
+                "Lean tamper validation unexpectedly accepted {} (artifact preserved at {})",
+                field_case_name,
+                artifact_path.display()
+            ));
+        }
+        let _ = fs::remove_file(&artifact_path);
+        checked.push(json!({
+            "field": field.label,
+            "artifact_json_bytes": artifact_json_bytes,
+            "lean_stdout": lean_stdout,
+            "lean_stderr": lean_stderr,
+            "accepted": false,
+            "rejected": true,
+        }));
+        rejected_fields.push(field.label);
+    }
+
+    let summary_object = summary
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("tamper summary for {} is not a JSON object", case_name))?;
+    summary_object.insert("checked_field_count".into(), json!(fields.len()));
+    summary_object.insert("rejected_fields".into(), json!(rejected_fields));
+    summary_object.insert("field_checks".into(), json!(checked));
     summary_object.insert("accepted".into(), json!(false));
     summary_object.insert("rejected".into(), json!(true));
     Ok(summary)

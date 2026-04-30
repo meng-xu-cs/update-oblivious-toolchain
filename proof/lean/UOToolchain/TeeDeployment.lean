@@ -10,6 +10,7 @@ deriving Repr, DecidableEq
 structure TEEView where
   entrypointId : String
   publicArgs : List String
+  publicEnv : List String
   terminationStatus : Bool
   outputShape : OutputShape
   physicalReads : List PhysicalRead
@@ -38,6 +39,7 @@ def withPublicBoundary
 def viewTEEStore (cfg : Config) (result : DeploymentResult) : TEEView :=
   { entrypointId := cfg.program.entrypoint
   , publicArgs := cfg.input.publicArgs
+  , publicEnv := cfg.input.publicEnv
   , terminationStatus := result.terminationStatus
   , outputShape := result.outputShape
   , physicalReads := result.trace.physicalReads
@@ -76,11 +78,13 @@ theorem exactUO_projects_to_teeStorage
     samePublicProjection_entrypoint_eq hPublic
   have hArgs : cfg₁.input.publicArgs = cfg₂.input.publicArgs :=
     samePublicProjection_publicArgs_eq hPublic
+  have hEnv : cfg₁.input.publicEnv = cfg₂.input.publicEnv :=
+    samePublicProjection_publicEnv_eq hPublic
   have hTerm : termination cfg₁ = termination cfg₂ :=
     hTermination cfg₁ cfg₂ hPublic
   have hOutput : outputShape cfg₁ = outputShape cfg₂ :=
     hOutputShape cfg₁ cfg₂ hPublic
-  simp [withPublicBoundary, viewTEEStore, hTrace, hEntry, hArgs, hTerm, hOutput]
+  simp [withPublicBoundary, viewTEEStore, hTrace, hEntry, hArgs, hEnv, hTerm, hOutput]
 
 def viewTEEStoreFromOramView
   (cfg : OramConfig)
@@ -92,6 +96,7 @@ def viewTEEStoreFromOramView
   | (_opcodeTrace, _logicalAccesses, _logicalWrites, physicalReads, physicalWrites, gasUsed) =>
       { entrypointId := cfg.pubData.witness.entrypointId
       , publicArgs := cfg.pubData.publicArgs
+      , publicEnv := []
       , terminationStatus := terminationStatus
       , outputShape := outputShape
       , physicalReads := physicalReads

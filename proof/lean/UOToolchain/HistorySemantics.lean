@@ -551,6 +551,7 @@ def adaptiveHistorySampleOutcome
   (terminationStatus : Bool) : SGXPublicOutcome :=
   { entrypointId := entrypointId
   , publicArgs := publicArgs
+  , publicEnv := []
   , terminationStatus := terminationStatus
   , statusPolicy := "public"
   , outputShape := { returnPresent := false, returnLength := 0 }

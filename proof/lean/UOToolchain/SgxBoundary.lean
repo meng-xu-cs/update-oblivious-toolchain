@@ -72,6 +72,7 @@ deriving Repr, DecidableEq
 structure SGXView where
   entrypointId : String
   publicArgs : List String
+  publicEnv : List String
   boundarySchedule : List BoundaryEvent
   persistentReads : List PhysicalRead
   persistentWrites : List PhysicalWrite

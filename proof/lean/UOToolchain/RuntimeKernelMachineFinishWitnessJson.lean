@@ -61,7 +61,42 @@ structure ImportedRuntimeKernelMachineFinishWitness where
   max_kernel_ops : Nat
   max_runtime_phase_event_count : Nat
   runtime_phase_events_before_finish : List ImportedRuntimeKernelRefinementEvent
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRuntimeKernelMachineFinishWitness where
+  fromJson? json := do
+    jsonRequireExactFields json importedRuntimeKernelMachineFinishWitnessFieldNames
+    pure
+      { entrypoint_id := ← jsonLookupFieldAs json "entrypoint_id"
+      , arena_bytes := ← jsonLookupFieldAs json "arena_bytes"
+      , max_stack_words := ← jsonLookupFieldAs json "max_stack_words"
+      , scratch_bytes := ← jsonLookupFieldAs json "scratch_bytes"
+      , peak_stack_words := ← jsonLookupFieldAs json "peak_stack_words"
+      , value_scratch_peak_bytes := ← jsonLookupFieldAs json "value_scratch_peak_bytes"
+      , value_scratch_live_bytes_end :=
+          ← jsonLookupFieldAs json "value_scratch_live_bytes_end"
+      , value_scratch_wipe_count := ← jsonLookupFieldAs json "value_scratch_wipe_count"
+      , hash_scratch_peak_bytes := ← jsonLookupFieldAs json "hash_scratch_peak_bytes"
+      , hash_scratch_live_bytes_end :=
+          ← jsonLookupFieldAs json "hash_scratch_live_bytes_end"
+      , hash_scratch_wipe_count := ← jsonLookupFieldAs json "hash_scratch_wipe_count"
+      , io_scratch_peak_bytes := ← jsonLookupFieldAs json "io_scratch_peak_bytes"
+      , io_scratch_live_bytes_end := ← jsonLookupFieldAs json "io_scratch_live_bytes_end"
+      , io_scratch_wipe_count := ← jsonLookupFieldAs json "io_scratch_wipe_count"
+      , resource_events := ← jsonLookupFieldAs json "resource_events"
+      , expected_kernel_steps :=
+          ← jsonLookupExplicitOptionFieldAs json "expected_kernel_steps"
+      , expected_kernel_step_index := ← jsonLookupFieldAs json "expected_kernel_step_index"
+      , public_object_ids := ← jsonLookupFieldAs json "public_object_ids"
+      , expected_public_object_ids :=
+          ← jsonLookupExplicitOptionFieldAs json "expected_public_object_ids"
+      , kernel_steps := ← jsonLookupFieldAs json "kernel_steps"
+      , max_kernel_ops := ← jsonLookupFieldAs json "max_kernel_ops"
+      , max_runtime_phase_event_count :=
+          ← jsonLookupFieldAs json "max_runtime_phase_event_count"
+      , runtime_phase_events_before_finish :=
+          ← jsonLookupFieldAs json "runtime_phase_events_before_finish"
+      }
 
 def ImportedRuntimeKernelMachineFinishWitness.projectedFinishBundle
   (witness : ImportedRuntimeKernelMachineFinishWitness) : ImportedRuntimeKernelFinishBundle :=

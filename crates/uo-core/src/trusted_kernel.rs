@@ -29,6 +29,7 @@ pub enum RuntimeTrustedKernelSlotBundleError {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeTrustedKernelSlotBundle {
     trusted_kernel_bundle: RuntimeTrustedKernelBundle,
     confidential_slot_program: ConfidentialKernelSlotProgram,

@@ -4217,6 +4217,7 @@ def RuntimeRefinementWitness.sgxView
   let microTrace := witness.reconstructedMicroTrace
   { entrypointId := witness.publicOutcome.entrypointId
   , publicArgs := witness.publicOutcome.publicArgs
+  , publicEnv := witness.publicOutcome.publicEnv
   , boundarySchedule := witness.boundarySchedule
   , persistentReads := witness.trace.physicalReads
   , persistentWrites := witness.trace.physicalWrites

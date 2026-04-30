@@ -7,12 +7,25 @@ open Lean
 
 namespace UOToolchain
 
+def importedRuntimeTrustedKernelBundleFieldNames : List String :=
+  ["runtime_seed", "controller_observer", "kernel_witness", "hidden_certificate"]
+
 structure ImportedRuntimeTrustedKernelBundle where
   runtime_seed : Option Nat
   controller_observer : ImportedRuntimeControllerObserverCertificate
   kernel_witness : Option ImportedRuntimeKernelWitness
   hidden_certificate : ImportedRuntimePathOramHiddenCertificate
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRuntimeTrustedKernelBundle where
+  fromJson? json := do
+    jsonRequireExactFields json importedRuntimeTrustedKernelBundleFieldNames
+    pure
+      { runtime_seed := ← jsonLookupExplicitOptionFieldAs json "runtime_seed"
+      , controller_observer := ← jsonLookupFieldAs json "controller_observer"
+      , kernel_witness := ← jsonLookupExplicitOptionFieldAs json "kernel_witness"
+      , hidden_certificate := ← jsonLookupFieldAs json "hidden_certificate"
+      }
 
 def ImportedRuntimeTrustedKernelBundle.toRuntimeTrustedKernelBundle
   (bundle : ImportedRuntimeTrustedKernelBundle) : RuntimeTrustedKernelBundle :=

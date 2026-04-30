@@ -36,6 +36,7 @@ def sgxViewOfTrace
   (trace : Trace) : SGXView :=
   { entrypointId := publicOutcome.entrypointId
   , publicArgs := publicOutcome.publicArgs
+  , publicEnv := publicOutcome.publicEnv
   , boundarySchedule := boundarySchedule
   , persistentReads := trace.physicalReads
   , persistentWrites := trace.physicalWrites

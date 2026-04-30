@@ -46,6 +46,7 @@ def sgxViewOfJointSample
   let storage := sgxStorageOfOramView sample.storageView
   { entrypointId := publicOutcome.entrypointId
   , publicArgs := publicOutcome.publicArgs
+  , publicEnv := publicOutcome.publicEnv
   , boundarySchedule := boundarySchedule
   , persistentReads := storage.persistentReads
   , persistentWrites := storage.persistentWrites

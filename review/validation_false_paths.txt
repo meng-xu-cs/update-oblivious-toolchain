@@ -276,6 +276,7 @@ top_level_booleans:
   runtime_kernel_slot_dsl_bundle_field_names_match: true
   runtime_kernel_slot_dsl_bundle_fields_private: true
   runtime_kernel_witness_export_prefers_stored_finish_bundle: true
+  runtime_proof_object_json_schema_requires_explicit_fields: true
   runtime_public_bridge_boundary_field_names_match: true
   runtime_public_bridge_boundary_public_bridge_theorem_present: true
   runtime_refinement_witness_constructors_private: true
