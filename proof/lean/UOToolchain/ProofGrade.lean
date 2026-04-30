@@ -879,7 +879,7 @@ theorem proofGrade_kernel_array_set_none_kernelSteps
     (hIndex : IR.evalKernelExpr cfg env index = .value (.uint idx))
     (hValue : IR.evalKernelExpr cfg env value = .value newVal)
     (hRead : cfg.readObject objectId = some (.array values))
-    (hInBounds : ¬ idx ≥ values.length)
+    (hInBounds : values[idx]? ≠ none)
     (hWrite :
       cfg.writeObject? objectId (.array (IR.Value.arraySetAt values idx newVal)) =
         some cfg') :
@@ -898,36 +898,51 @@ theorem proofGrade_kernel_map_put_none_kernelSteps_existing
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (objectId : Nat) (key value : IR.KernelExpr)
     (keyVal newVal : IR.Value)
+    (object : IR.StateObject)
     (entries : List (IR.Value × IR.Value))
     (cfg' : IR.OperationalConfig)
     (hKey : IR.evalKernelExpr cfg env key = .value keyVal)
     (hValue : IR.evalKernelExpr cfg env value = .value newVal)
+    (hObject : cfg.stateObjectById? objectId = some object)
     (hRead : cfg.readObject objectId = some (.map entries))
+    (hNoOverflow :
+      (IR.Value.mapInsertBounded entries keyVal newVal object.capacity).overflowed =
+        false)
     (hWrite :
-      cfg.writeObject? objectId (.map (IR.Value.mapInsert entries keyVal newVal)) =
+      cfg.writeObject? objectId
+          (.map (IR.Value.mapInsertBounded entries keyVal newVal object.capacity).entries) =
         some cfg') :
     (IR.evalKernelStatement cfg env oc
       (.mapPut objectId key value none)).snd.snd.kernelSteps =
       oc.kernelSteps ++
         IR.KernelStatement.expectedStep (.mapPut objectId key value none) := by
   simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
-    hKey, hValue, hRead, hWrite]
+    hKey, hValue, hObject, hRead, hNoOverflow, hWrite]
 
 theorem proofGrade_kernel_map_put_none_kernelSteps_fresh
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (objectId : Nat) (key value : IR.KernelExpr)
     (keyVal newVal : IR.Value)
+    (object : IR.StateObject)
     (cfg' : IR.OperationalConfig)
     (hKey : IR.evalKernelExpr cfg env key = .value keyVal)
     (hValue : IR.evalKernelExpr cfg env value = .value newVal)
+    (hObject : cfg.stateObjectById? objectId = some object)
     (hRead : cfg.readObject objectId = none)
-    (hWrite : cfg.writeObject? objectId (.map [(keyVal, newVal)]) = some cfg') :
+    (hKind : object.kind = IR.ContainerKind.mapKind)
+    (hNoOverflow :
+      (IR.Value.mapInsertBounded [] keyVal newVal object.capacity).overflowed =
+        false)
+    (hWrite :
+      cfg.writeObject? objectId
+          (.map (IR.Value.mapInsertBounded [] keyVal newVal object.capacity).entries) =
+        some cfg') :
     (IR.evalKernelStatement cfg env oc
       (.mapPut objectId key value none)).snd.snd.kernelSteps =
       oc.kernelSteps ++
         IR.KernelStatement.expectedStep (.mapPut objectId key value none) := by
   simp [IR.evalKernelStatement, IR.KernelStatement.expectedStep,
-    hKey, hValue, hRead, hWrite]
+    hKey, hValue, hObject, hRead, hKind, hNoOverflow, hWrite]
 
 /-! ### W4.5 program-level runtime-vs-static `kernelSteps` lift
 

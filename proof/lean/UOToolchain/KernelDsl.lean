@@ -170,14 +170,18 @@ def evalKernelExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value indexVal =>
           match indexVal with
           | .uint idx =>
-              match cfg.readObject objectId with
-              | some (.array values) =>
-                  match values[idx]? with
-                  | some v => .value v
+              match cfg.stateObjectById? objectId with
+              | some object =>
+                  match cfg.readObject objectId with
+                  | some (.array values) =>
+                      .value (Value.arrayGetD values idx object.valueType)
+                  | some _ =>
+                      .status (.evalError s!"arrayGet on non-array object {objectId}")
                   | none =>
-                      .status (.evalError s!"arrayGet index {idx} out of bounds")
-              | some _ =>
-                  .status (.evalError s!"arrayGet on non-array object {objectId}")
+                      if object.kind = .arrayKind then
+                        .value (Value.zeroForType object.valueType)
+                      else
+                        .status (.evalError s!"arrayGet on non-array object {objectId}")
               | none =>
                   .status (.evalError s!"arrayGet on unknown object {objectId}")
           | _ => .status (.evalError "arrayGet index not uint")
@@ -185,14 +189,18 @@ def evalKernelExpr (cfg : OperationalConfig) (env : LocalEnv) :
       match evalKernelExpr cfg env keyExpr with
       | .status s => .status s
       | .value keyVal =>
-          match cfg.readObject objectId with
-          | some (.map entries) =>
-              match Value.mapLookup entries keyVal with
-              | some v => .value v
+          match cfg.stateObjectById? objectId with
+          | some object =>
+              match cfg.readObject objectId with
+              | some (.map entries) =>
+                  .value (Value.mapLookupD entries keyVal object.valueType)
+              | some _ =>
+                  .status (.evalError s!"mapGet on non-map object {objectId}")
               | none =>
-                  .status (.evalError s!"mapGet missing key in object {objectId}")
-          | some _ =>
-              .status (.evalError s!"mapGet on non-map object {objectId}")
+                  if object.kind = .mapKind then
+                    .value (Value.zeroForType object.valueType)
+                  else
+                    .status (.evalError s!"mapGet on non-map object {objectId}")
           | none =>
               .status (.evalError s!"mapGet on unknown object {objectId}")
   | .keccak256 parts =>
@@ -341,9 +349,8 @@ def evalKernelStatement
                   | .uint idx =>
                       match cfg.readObject objectId with
                       | some (.array values) =>
-                          if idx ≥ values.length then
-                            let msg := s!"arraySet index {idx} out of bounds"
-                            (cfg, env, { oc with status := .evalError msg })
+                          if values[idx]? = none then
+                            (cfg, env, oc')
                           else
                             let updated := Value.array (Value.arraySetAt values idx newVal)
                             match cfg.writeObject? objectId updated with
@@ -381,24 +388,43 @@ def evalKernelStatement
               | .error s => (cfg, env, { oc with status := s })
               | .ok false => (cfg, env, oc')
               | .ok true =>
-                  match cfg.readObject objectId with
-                  | some (.map entries) =>
-                      let updated := Value.map (Value.mapInsert entries keyVal newVal)
-                      match cfg.writeObject? objectId updated with
-                      | some cfg' => (cfg', env, oc')
-                      | none =>
-                          let msg := s!"mapPut on unknown object {objectId}"
+                  match cfg.stateObjectById? objectId with
+                  | some object =>
+                      match cfg.readObject objectId with
+                      | some (.map entries) =>
+                          let result :=
+                            Value.mapInsertBounded entries keyVal newVal object.capacity
+                          if result.overflowed then
+                            (cfg, env, { oc' with status := .capacityOverflow })
+                          else
+                            let updated := Value.map result.entries
+                            match cfg.writeObject? objectId updated with
+                            | some cfg' => (cfg', env, oc')
+                            | none =>
+                                let msg := s!"mapPut on unknown object {objectId}"
+                                (cfg, env, { oc with status := .evalError msg })
+                      | some _ =>
+                          let msg := s!"mapPut on non-map object {objectId}"
                           (cfg, env, { oc with status := .evalError msg })
-                  | some _ =>
-                      let msg := s!"mapPut on non-map object {objectId}"
-                      (cfg, env, { oc with status := .evalError msg })
+                      | none =>
+                          if object.kind = .mapKind then
+                            let result :=
+                              Value.mapInsertBounded [] keyVal newVal object.capacity
+                            if result.overflowed then
+                              (cfg, env, { oc' with status := .capacityOverflow })
+                            else
+                              let updated := Value.map result.entries
+                              match cfg.writeObject? objectId updated with
+                              | some cfg' => (cfg', env, oc')
+                              | none =>
+                                  let msg := s!"mapPut on unknown object {objectId}"
+                                  (cfg, env, { oc with status := .evalError msg })
+                          else
+                            let msg := s!"mapPut on non-map object {objectId}"
+                            (cfg, env, { oc with status := .evalError msg })
                   | none =>
-                      let updated := Value.map [(keyVal, newVal)]
-                      match cfg.writeObject? objectId updated with
-                      | some cfg' => (cfg', env, oc')
-                      | none =>
-                          let msg := s!"mapPut on unknown object {objectId}"
-                          (cfg, env, { oc with status := .evalError msg })
+                      let msg := s!"mapPut on unknown object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
   | .retStmt none => (cfg, env, oc)
   | .retStmt (some value) =>
       match evalKernelExpr cfg env value with
@@ -2261,45 +2287,57 @@ theorem evalKernelExpr_status_ne_completed
       unfold evalKernelExpr at h
       cases hI : evalKernelExpr cfg env indexExpr with
       | status s' =>
-          rw [hI] at h
-          have heq : s' = s := by injection h
-          rw [← heq]
-          exact evalKernelExpr_status_ne_completed cfg env indexExpr s' hI
+          simp [hI] at h
+          have hRec := evalKernelExpr_status_ne_completed cfg env indexExpr s' hI
+          cases h
+          exact hRec
       | value iv =>
-          rw [hI] at h
+          simp [hI] at h
           cases iv with
           | uint idx =>
-              simp at h
-              cases hRead : cfg.readObject objectId with
-              | some objVal =>
-                  rw [hRead] at h
-                  cases objVal with
-                  | array values =>
-                      simp at h
-                      cases hLookup : values[idx]? with
-                      | some v => rw [hLookup] at h; simp at h
-                      | none =>
-                          rw [hLookup] at h
-                          simp at h
-                          rw [← h]
-                          exact EvalStatus_evalError_ne_completed _
-                  | uint _ =>
-                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-                  | bool _ =>
-                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-                  | bytes32 _ =>
-                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-                  | address _ =>
-                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-                  | structValue _ =>
-                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-                  | map _ =>
-                      simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              cases hObj : cfg.stateObjectById? objectId with
               | none =>
-                  rw [hRead] at h
-                  simp at h
-                  rw [← h]
+                  simp [hObj] at h
+                  cases h
                   exact EvalStatus_evalError_ne_completed _
+              | some object =>
+                  simp [hObj] at h
+                  cases hRead : cfg.readObject objectId with
+                  | none =>
+                      simp [hRead] at h
+                      by_cases hKind : object.kind = .arrayKind
+                      · simp [hKind] at h
+                      · simp [hKind] at h
+                        cases h
+                        exact EvalStatus_evalError_ne_completed _
+                  | some objVal =>
+                      cases objVal with
+                      | bool _ =>
+                          simp [hRead] at h
+                          cases h
+                          exact EvalStatus_evalError_ne_completed _
+                      | uint _ =>
+                          simp [hRead] at h
+                          cases h
+                          exact EvalStatus_evalError_ne_completed _
+                      | bytes32 _ =>
+                          simp [hRead] at h
+                          cases h
+                          exact EvalStatus_evalError_ne_completed _
+                      | address _ =>
+                          simp [hRead] at h
+                          cases h
+                          exact EvalStatus_evalError_ne_completed _
+                      | structValue _ =>
+                          simp [hRead] at h
+                          cases h
+                          exact EvalStatus_evalError_ne_completed _
+                      | array values =>
+                          simp [hRead, Value.arrayGetD] at h
+                      | map _ =>
+                          simp [hRead] at h
+                          cases h
+                          exact EvalStatus_evalError_ne_completed _
           | bool _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
           | bytes32 _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
           | address _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
@@ -2310,42 +2348,55 @@ theorem evalKernelExpr_status_ne_completed
       unfold evalKernelExpr at h
       cases hK : evalKernelExpr cfg env keyExpr with
       | status s' =>
-          rw [hK] at h
-          have heq : s' = s := by injection h
-          rw [← heq]
-          exact evalKernelExpr_status_ne_completed cfg env keyExpr s' hK
+          simp [hK] at h
+          have hRec := evalKernelExpr_status_ne_completed cfg env keyExpr s' hK
+          cases h
+          exact hRec
       | value kv =>
-          rw [hK] at h
-          cases hRead : cfg.readObject objectId with
-          | some objVal =>
-              rw [hRead] at h
-              cases objVal with
-              | map entries =>
-                  simp at h
-                  cases hLookup : Value.mapLookup entries kv with
-                  | some v => rw [hLookup] at h; simp at h
-                  | none =>
-                      rw [hLookup] at h
-                      simp at h
-                      rw [← h]
-                      exact EvalStatus_evalError_ne_completed _
-              | uint _ =>
-                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-              | bool _ =>
-                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-              | bytes32 _ =>
-                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-              | address _ =>
-                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-              | structValue _ =>
-                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-              | array _ =>
-                  simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+          simp [hK] at h
+          cases hObj : cfg.stateObjectById? objectId with
           | none =>
-              rw [hRead] at h
-              simp at h
-              rw [← h]
+              simp [hObj] at h
+              cases h
               exact EvalStatus_evalError_ne_completed _
+          | some object =>
+              simp [hObj] at h
+              cases hRead : cfg.readObject objectId with
+              | none =>
+                  simp [hRead] at h
+                  by_cases hKind : object.kind = .mapKind
+                  · simp [hKind] at h
+                  · simp [hKind] at h
+                    cases h
+                    exact EvalStatus_evalError_ne_completed _
+              | some objVal =>
+                  cases objVal with
+                  | bool _ =>
+                      simp [hRead] at h
+                      cases h
+                      exact EvalStatus_evalError_ne_completed _
+                  | uint _ =>
+                      simp [hRead] at h
+                      cases h
+                      exact EvalStatus_evalError_ne_completed _
+                  | bytes32 _ =>
+                      simp [hRead] at h
+                      cases h
+                      exact EvalStatus_evalError_ne_completed _
+                  | address _ =>
+                      simp [hRead] at h
+                      cases h
+                      exact EvalStatus_evalError_ne_completed _
+                  | structValue _ =>
+                      simp [hRead] at h
+                      cases h
+                      exact EvalStatus_evalError_ne_completed _
+                  | array _ =>
+                      simp [hRead] at h
+                      cases h
+                      exact EvalStatus_evalError_ne_completed _
+                  | map entries =>
+                      simp [hRead, Value.mapLookupD] at h
   | .keccak256 parts, s, h => by
       unfold evalKernelExpr at h
       cases hList : evalKernelExprList cfg env parts with
@@ -2620,8 +2671,8 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                       | some objVal =>
                           cases objVal with
                           | array values =>
-                              by_cases hOob : idx ≥ values.length
-                              · simp [hIdx, hVal, hRead, hOob] at hStatus
+                              by_cases hOob : values[idx]? = none
+                              · simp [hOob]
                               · cases hWrite :
                                     cfg.writeObject? objectId
                                       (Value.array (Value.arraySetAt values idx newVal)) with
@@ -2646,8 +2697,8 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                                 | some objVal =>
                                     cases objVal with
                                     | array values =>
-                                        by_cases hOob : idx ≥ values.length
-                                        · simp [hIdx, hVal, hPred, hRead, hOob] at hStatus
+                                        by_cases hOob : values[idx]? = none
+                                        · simp [hPred, hOob]
                                         · cases hWrite :
                                               cfg.writeObject? objectId
                                                 (Value.array (Value.arraySetAt values idx newVal)) with
@@ -2671,21 +2722,40 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
           | value newVal =>
               cases predicate with
               | none =>
-                  cases hRead : cfg.readObject objectId with
+                  cases hObj : cfg.stateObjectById? objectId with
                   | none =>
-                      cases hWrite :
-                          cfg.writeObject? objectId (Value.map [(keyVal, newVal)]) with
-                      | none => simp [hKey, hVal, hRead, hWrite] at hStatus
-                      | some cfg' => simp [hWrite]
-                  | some objVal =>
-                      cases objVal with
-                      | map entries =>
-                          cases hWrite :
-                              cfg.writeObject? objectId
-                                (Value.map (Value.mapInsert entries keyVal newVal)) with
-                          | none => simp [hKey, hVal, hRead, hWrite] at hStatus
-                          | some cfg' => simp [hWrite]
-                      | _ => simp [hKey, hVal, hRead] at hStatus
+                      simp [hKey, hVal, hObj] at hStatus
+                  | some object =>
+                      cases hRead : cfg.readObject objectId with
+                      | none =>
+                          by_cases hKind : object.kind = .mapKind
+                          · cases hOverflow :
+                                (Value.mapInsertBounded [] keyVal newVal object.capacity).overflowed
+                            · cases hWrite :
+                                  cfg.writeObject? objectId
+                                    (Value.map
+                                      (Value.mapInsertBounded [] keyVal newVal object.capacity).entries) with
+                              | none =>
+                                  simp [hKey, hVal, hObj, hRead, hKind, hOverflow, hWrite] at hStatus
+                              | some cfg' =>
+                                  simp [hKind, hOverflow, hWrite]
+                            · simp [hKey, hVal, hObj, hRead, hKind, hOverflow] at hStatus
+                          · simp [hKey, hVal, hObj, hRead, hKind] at hStatus
+                      | some objVal =>
+                          cases objVal with
+                          | map entries =>
+                              cases hOverflow :
+                                  (Value.mapInsertBounded entries keyVal newVal object.capacity).overflowed
+                              · cases hWrite :
+                                    cfg.writeObject? objectId
+                                      (Value.map
+                                        (Value.mapInsertBounded entries keyVal newVal object.capacity).entries) with
+                                | none =>
+                                    simp [hKey, hVal, hObj, hRead, hOverflow, hWrite] at hStatus
+                                | some cfg' =>
+                                    simp [hOverflow, hWrite]
+                              · simp [hKey, hVal, hObj, hRead, hOverflow] at hStatus
+                          | _ => simp [hKey, hVal, hObj, hRead] at hStatus
               | some predExpr =>
                   cases hPred : evalKernelExpr cfg env predExpr with
                   | status s =>
@@ -2696,23 +2766,43 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_completed
                       | bool b =>
                           cases b
                           · simp [hPred]
-                          · cases hRead : cfg.readObject objectId with
+                          · cases hObj : cfg.stateObjectById? objectId with
                             | none =>
-                                cases hWrite :
-                                    cfg.writeObject? objectId (Value.map [(keyVal, newVal)]) with
+                                simp [hKey, hVal, hPred, hObj] at hStatus
+                            | some object =>
+                                cases hRead : cfg.readObject objectId with
                                 | none =>
-                                    simp [hKey, hVal, hPred, hRead, hWrite] at hStatus
-                                | some cfg' => simp [hPred, hWrite]
-                            | some objVal =>
-                                cases objVal with
-                                | map entries =>
-                                    cases hWrite :
-                                        cfg.writeObject? objectId
-                                          (Value.map (Value.mapInsert entries keyVal newVal)) with
-                                    | none =>
-                                        simp [hKey, hVal, hPred, hRead, hWrite] at hStatus
-                                    | some cfg' => simp [hPred, hWrite]
-                                | _ => simp [hKey, hVal, hPred, hRead] at hStatus
+                                    by_cases hKind : object.kind = .mapKind
+                                    · cases hOverflow :
+                                          (Value.mapInsertBounded [] keyVal newVal object.capacity).overflowed
+                                      · cases hWrite :
+                                            cfg.writeObject? objectId
+                                              (Value.map
+                                                (Value.mapInsertBounded [] keyVal newVal object.capacity).entries) with
+                                        | none =>
+                                            simp [hKey, hVal, hPred, hObj, hRead, hKind,
+                                              hOverflow, hWrite] at hStatus
+                                        | some cfg' =>
+                                            simp [hPred, hKind, hOverflow, hWrite]
+                                      · simp [hKey, hVal, hPred, hObj, hRead, hKind,
+                                          hOverflow] at hStatus
+                                    · simp [hKey, hVal, hPred, hObj, hRead, hKind] at hStatus
+                                | some objVal =>
+                                    cases objVal with
+                                    | map entries =>
+                                        cases hOverflow :
+                                            (Value.mapInsertBounded entries keyVal newVal object.capacity).overflowed
+                                        · cases hWrite :
+                                              cfg.writeObject? objectId
+                                                (Value.map
+                                                  (Value.mapInsertBounded entries keyVal newVal object.capacity).entries) with
+                                          | none =>
+                                              simp [hKey, hVal, hPred, hObj, hRead, hOverflow,
+                                                hWrite] at hStatus
+                                          | some cfg' =>
+                                              simp [hPred, hOverflow, hWrite]
+                                        · simp [hKey, hVal, hPred, hObj, hRead, hOverflow] at hStatus
+                                    | _ => simp [hKey, hVal, hPred, hObj, hRead] at hStatus
                       | _ => simp [hKey, hVal, hPred] at hStatus
 
 /-! ### W4.5: Body-level runtime-vs-static `kernelSteps` lift
@@ -2777,6 +2867,7 @@ theorem evalKernelBody_kernelSteps_eq_expected_of_completed
             simp [List.flatMap, List.append_assoc]
       | requireFailed => simp only [hSt'] at hStatus; cases hStatus
       | abortedByUser => simp only [hSt'] at hStatus; cases hStatus
+      | capacityOverflow => simp only [hSt'] at hStatus; cases hStatus
       | unsupported _ => simp only [hSt'] at hStatus; cases hStatus
       | evalError _ => simp only [hSt'] at hStatus; cases hStatus
 

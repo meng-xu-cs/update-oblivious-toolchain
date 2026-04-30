@@ -183,14 +183,18 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value indexVal =>
           match indexVal with
           | .uint idx =>
-              match cfg.readObject objectId with
-              | some (.array values) =>
-                  match values[idx]? with
-                  | some v => .value v
+              match cfg.stateObjectById? objectId with
+              | some object =>
+                  match cfg.readObject objectId with
+                  | some (.array values) =>
+                      .value (IR.Value.arrayGetD values idx object.valueType)
+                  | some _ =>
+                      .status (.evalError s!"arrayGet on non-array object {objectId}")
                   | none =>
-                      .status (.evalError s!"arrayGet index {idx} out of bounds")
-              | some _ =>
-                  .status (.evalError s!"arrayGet on non-array object {objectId}")
+                      if object.kind = IR.ContainerKind.arrayKind then
+                        .value (IR.Value.zeroForType object.valueType)
+                      else
+                        .status (.evalError s!"arrayGet on non-array object {objectId}")
               | none =>
                   .status (.evalError s!"arrayGet on unknown object {objectId}")
           | _ => .status (.evalError "arrayGet index not uint")
@@ -198,14 +202,18 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       match evalExpr cfg env keyExpr with
       | .status s => .status s
       | .value keyVal =>
-          match cfg.readObject objectId with
-          | some (.map entries) =>
-              match IR.Value.mapLookup entries keyVal with
-              | some v => .value v
+          match cfg.stateObjectById? objectId with
+          | some object =>
+              match cfg.readObject objectId with
+              | some (.map entries) =>
+                  .value (IR.Value.mapLookupD entries keyVal object.valueType)
+              | some _ =>
+                  .status (.evalError s!"mapGet on non-map object {objectId}")
               | none =>
-                  .status (.evalError s!"mapGet missing key in object {objectId}")
-          | some _ =>
-              .status (.evalError s!"mapGet on non-map object {objectId}")
+                  if object.kind = IR.ContainerKind.mapKind then
+                    .value (IR.Value.zeroForType object.valueType)
+                  else
+                    .status (.evalError s!"mapGet on non-map object {objectId}")
           | none =>
               .status (.evalError s!"mapGet on unknown object {objectId}")
   | .structField _ _ =>
@@ -311,9 +319,8 @@ def evalStatement
                   | .uint idx =>
                       match cfg.readObject objectId with
                       | some (.array values) =>
-                          if idx ≥ values.length then
-                            let msg := s!"arraySet index {idx} out of bounds"
-                            (cfg, env, { oc with status := .evalError msg })
+                          if values[idx]? = none then
+                            (cfg, env, oc')
                           else
                             let updated :=
                               IR.Value.array (IR.Value.arraySetAt values idx newVal)
@@ -352,25 +359,43 @@ def evalStatement
               | .error s => (cfg, env, { oc with status := s })
               | .ok false => (cfg, env, oc')
               | .ok true =>
-                  match cfg.readObject objectId with
-                  | some (.map entries) =>
-                      let updated :=
-                        IR.Value.map (IR.Value.mapInsert entries keyVal newVal)
-                      match cfg.writeObject? objectId updated with
-                      | some cfg' => (cfg', env, oc')
-                      | none =>
-                          let msg := s!"mapPut on unknown object {objectId}"
+                  match cfg.stateObjectById? objectId with
+                  | some object =>
+                      match cfg.readObject objectId with
+                      | some (.map entries) =>
+                          let result :=
+                            IR.Value.mapInsertBounded entries keyVal newVal object.capacity
+                          if result.overflowed then
+                            (cfg, env, { oc' with status := .capacityOverflow })
+                          else
+                            let updated := IR.Value.map result.entries
+                            match cfg.writeObject? objectId updated with
+                            | some cfg' => (cfg', env, oc')
+                            | none =>
+                                let msg := s!"mapPut on unknown object {objectId}"
+                                (cfg, env, { oc with status := .evalError msg })
+                      | some _ =>
+                          let msg := s!"mapPut on non-map object {objectId}"
                           (cfg, env, { oc with status := .evalError msg })
-                  | some _ =>
-                      let msg := s!"mapPut on non-map object {objectId}"
-                      (cfg, env, { oc with status := .evalError msg })
+                      | none =>
+                          if object.kind = IR.ContainerKind.mapKind then
+                            let result :=
+                              IR.Value.mapInsertBounded [] keyVal newVal object.capacity
+                            if result.overflowed then
+                              (cfg, env, { oc' with status := .capacityOverflow })
+                            else
+                              let updated := IR.Value.map result.entries
+                              match cfg.writeObject? objectId updated with
+                              | some cfg' => (cfg', env, oc')
+                              | none =>
+                                  let msg := s!"mapPut on unknown object {objectId}"
+                                  (cfg, env, { oc with status := .evalError msg })
+                          else
+                            let msg := s!"mapPut on non-map object {objectId}"
+                            (cfg, env, { oc with status := .evalError msg })
                   | none =>
-                      let updated := IR.Value.map [(keyVal, newVal)]
-                      match cfg.writeObject? objectId updated with
-                      | some cfg' => (cfg', env, oc')
-                      | none =>
-                          let msg := s!"mapPut on unknown object {objectId}"
-                          (cfg, env, { oc with status := .evalError msg })
+                      let msg := s!"mapPut on unknown object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
   | .ifStmt cond thenBody elseBody =>
       match evalExpr cfg env cond with
       | .status s => (cfg, env, { oc with status := s })

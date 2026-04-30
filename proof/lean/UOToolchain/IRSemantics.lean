@@ -306,6 +306,7 @@ inductive EvalStatus where
   | completed
   | requireFailed
   | abortedByUser
+  | capacityOverflow
   | unsupported (kind : String)
   | evalError (msg : String)
   deriving Repr, DecidableEq, Inhabited
@@ -452,6 +453,13 @@ theorem committedPublicState_abortedByUser
 theorem committedPublicState_requireFailed
   (oc : Outcome) (initialPublicState candidatePublicState : ObjectStore)
   (hStatus : oc.status = EvalStatus.requireFailed) :
+  oc.committedPublicState initialPublicState candidatePublicState = initialPublicState := by
+  unfold committedPublicState
+  simp [hStatus, EvalStatus.commitsCandidate]
+
+theorem committedPublicState_capacityOverflow
+  (oc : Outcome) (initialPublicState candidatePublicState : ObjectStore)
+  (hStatus : oc.status = EvalStatus.capacityOverflow) :
   oc.committedPublicState initialPublicState candidatePublicState = initialPublicState := by
   unfold committedPublicState
   simp [hStatus, EvalStatus.commitsCandidate]
@@ -651,6 +659,24 @@ theorem binaryEq_mismatchedConstructors_runtimeStructuralFalse :
   rw [binaryEq_matches_runtimeStructuralValueEquality]
   congr
   native_decide
+
+mutual
+
+def Value.zeroForType : Ty → Value
+  | .scalar .bool => .bool false
+  | .scalar (.uint _) => .uint 0
+  | .scalar .bytes32 => .bytes32 (List.replicate 32 0)
+  | .scalar .address => .address (List.replicate 20 0)
+  | .structTy fields => .structValue (Value.zeroStructFields fields)
+  | .array elem size =>
+      .array (List.replicate size (Value.zeroForType elem))
+
+def Value.zeroStructFields : List (String × Ty) → List (String × Value)
+  | [] => []
+  | (name, ty) :: rest =>
+      (name, Value.zeroForType ty) :: Value.zeroStructFields rest
+
+end
 
 /-! ## Store ownership helpers
 
@@ -926,6 +952,30 @@ theorem OperationalConfig.readObject_public_uses_public
   simp [OperationalConfig.readObject, OperationalConfig.objectConfidential?,
     hLookup, hConf]
 
+def Value.arrayGetD
+    (values : List Value) (index : Nat) (valueType : Ty) : Value :=
+  match values[index]? with
+  | some value => value
+  | none => Value.zeroForType valueType
+
+theorem Value.arrayGetD_oob_returns_zero
+    (values : List Value) (index : Nat) (valueType : Ty)
+    (hOob : values[index]? = none) :
+    Value.arrayGetD values index valueType = Value.zeroForType valueType := by
+  simp [Value.arrayGetD, hOob]
+
+def Value.mapLookupD
+    (entries : List (Value × Value)) (key : Value) (valueType : Ty) : Value :=
+  match Value.mapLookup entries key with
+  | some value => value
+  | none => Value.zeroForType valueType
+
+theorem Value.mapLookupD_missing_returns_zero
+    (entries : List (Value × Value)) (key : Value) (valueType : Ty)
+    (hMissing : Value.mapLookup entries key = none) :
+    Value.mapLookupD entries key valueType = Value.zeroForType valueType := by
+  simp [Value.mapLookupD, hMissing]
+
 /-- Evaluator outcome for a single expression: either a value, or an
 explicit `EvalStatus` indicating why it could not be produced. -/
 inductive ExprResult where
@@ -984,14 +1034,18 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
           | .uint idx =>
               -- Look up the object's array value through the declared object
               -- map, then index into the underlying `Value.array`.
-              match cfg.readObject objectId with
-              | some (.array values) =>
-                  match values[idx]? with
-                  | some v => .value v
+              match cfg.stateObjectById? objectId with
+              | some object =>
+                  match cfg.readObject objectId with
+                  | some (.array values) =>
+                      .value (Value.arrayGetD values idx object.valueType)
+                  | some _ =>
+                      .status (.evalError s!"arrayGet on non-array object {objectId}")
                   | none =>
-                      .status (.evalError s!"arrayGet index {idx} out of bounds")
-              | some _ =>
-                  .status (.evalError s!"arrayGet on non-array object {objectId}")
+                      if object.kind = .arrayKind then
+                        .value (Value.zeroForType object.valueType)
+                      else
+                        .status (.evalError s!"arrayGet on non-array object {objectId}")
               | none =>
                   .status (.evalError s!"arrayGet on unknown object {objectId}")
           | _ => .status (.evalError "arrayGet index not uint")
@@ -1001,14 +1055,18 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value keyVal =>
           -- Look up the object's `Value.map` through the declared object map,
           -- then search its entries by key using `Value.beq`.
-          match cfg.readObject objectId with
-          | some (.map entries) =>
-              match Value.mapLookup entries keyVal with
-              | some v => .value v
+          match cfg.stateObjectById? objectId with
+          | some object =>
+              match cfg.readObject objectId with
+              | some (.map entries) =>
+                  .value (Value.mapLookupD entries keyVal object.valueType)
+              | some _ =>
+                  .status (.evalError s!"mapGet on non-map object {objectId}")
               | none =>
-                  .status (.evalError s!"mapGet missing key in object {objectId}")
-          | some _ =>
-              .status (.evalError s!"mapGet on non-map object {objectId}")
+                  if object.kind = .mapKind then
+                    .value (Value.zeroForType object.valueType)
+                  else
+                    .status (.evalError s!"mapGet on non-map object {objectId}")
           | none =>
               .status (.evalError s!"mapGet on unknown object {objectId}")
   | .structField _ _ =>
@@ -1044,12 +1102,15 @@ end
 /-! ## Store-update helpers -/
 
 /-- Replace the element at `index` in a `Value.array`'s underlying list.
-Returns the original list if `index` is out of bounds. The W4.1
-evaluator's caller turns out-of-bounds into an explicit
-`EvalStatus.evalError`. -/
+Returns the original list if `index` is out of bounds, matching the runtime's
+UO array no-op set semantics. -/
 def Value.arraySetAt (values : List Value) (index : Nat) (newVal : Value) :
     List Value :=
   values.mapIdx (fun i v => if i = index then newVal else v)
+
+structure Value.BoundedMapInsertResult where
+  entries : List (Value × Value)
+  overflowed : Bool
 
 /-- Insert or update a `(key, value)` entry in a map's entry list. If a
 matching key exists (by `Value.beq`), replace its value; otherwise
@@ -1061,6 +1122,29 @@ def Value.mapInsert (entries : List (Value × Value)) (key value : Value) :
       if Value.beq entry.fst key then (entry.fst, value) else entry)
   else
     (key, value) :: entries
+
+def Value.mapInsertBounded
+    (entries : List (Value × Value)) (key value : Value)
+    (capacity : Option Nat) : Value.BoundedMapInsertResult :=
+  if entries.any (fun entry => Value.beq entry.fst key) then
+    { entries := Value.mapInsert entries key value, overflowed := false }
+  else
+    match capacity with
+    | some cap =>
+        if entries.length < cap then
+          { entries := (key, value) :: entries, overflowed := false }
+        else
+          { entries := entries, overflowed := true }
+    | none =>
+        { entries := (key, value) :: entries, overflowed := false }
+
+theorem Value.mapInsertBounded_overflow_keeps_entries
+    (entries : List (Value × Value)) (key value : Value) (cap : Nat)
+    (hMissing : entries.any (fun entry => Value.beq entry.fst key) = false)
+    (hFull : ¬ entries.length < cap) :
+    Value.mapInsertBounded entries key value (some cap) =
+      { entries := entries, overflowed := true } := by
+  simp [Value.mapInsertBounded, hMissing, hFull]
 
 mutual
 
@@ -1152,9 +1236,8 @@ def evalStatement
                   | .uint idx =>
                       match cfg.readObject objectId with
                       | some (.array values) =>
-                          if idx ≥ values.length then
-                            let msg := s!"arraySet index {idx} out of bounds"
-                            (cfg, env, { oc with status := .evalError msg })
+                          if values[idx]? = none then
+                            (cfg, env, oc')
                           else
                             let updated := Value.array (Value.arraySetAt values idx newVal)
                             match cfg.writeObject? objectId updated with
@@ -1192,25 +1275,43 @@ def evalStatement
               | .error s => (cfg, env, { oc with status := s })
               | .ok false => (cfg, env, oc')
               | .ok true =>
-                  match cfg.readObject objectId with
-                  | some (.map entries) =>
-                      let updated := Value.map (Value.mapInsert entries keyVal newVal)
-                      match cfg.writeObject? objectId updated with
-                      | some cfg' => (cfg', env, oc')
-                      | none =>
-                          let msg := s!"mapPut on unknown object {objectId}"
+                  match cfg.stateObjectById? objectId with
+                  | some object =>
+                      match cfg.readObject objectId with
+                      | some (.map entries) =>
+                          let result :=
+                            Value.mapInsertBounded entries keyVal newVal object.capacity
+                          if result.overflowed then
+                            (cfg, env, { oc' with status := .capacityOverflow })
+                          else
+                            let updated := Value.map result.entries
+                            match cfg.writeObject? objectId updated with
+                            | some cfg' => (cfg', env, oc')
+                            | none =>
+                                let msg := s!"mapPut on unknown object {objectId}"
+                                (cfg, env, { oc with status := .evalError msg })
+                      | some _ =>
+                          let msg := s!"mapPut on non-map object {objectId}"
                           (cfg, env, { oc with status := .evalError msg })
-                  | some _ =>
-                      let msg := s!"mapPut on non-map object {objectId}"
-                      (cfg, env, { oc with status := .evalError msg })
+                      | none =>
+                          if object.kind = .mapKind then
+                            let result :=
+                              Value.mapInsertBounded [] keyVal newVal object.capacity
+                            if result.overflowed then
+                              (cfg, env, { oc' with status := .capacityOverflow })
+                            else
+                              let updated := Value.map result.entries
+                              match cfg.writeObject? objectId updated with
+                              | some cfg' => (cfg', env, oc')
+                              | none =>
+                                  let msg := s!"mapPut on unknown object {objectId}"
+                                  (cfg, env, { oc with status := .evalError msg })
+                          else
+                            let msg := s!"mapPut on non-map object {objectId}"
+                            (cfg, env, { oc with status := .evalError msg })
                   | none =>
-                      -- New map: start a fresh entries list.
-                      let updated := Value.map [(keyVal, newVal)]
-                      match cfg.writeObject? objectId updated with
-                      | some cfg' => (cfg', env, oc')
-                      | none =>
-                          let msg := s!"mapPut on unknown object {objectId}"
-                          (cfg, env, { oc with status := .evalError msg })
+                      let msg := s!"mapPut on unknown object {objectId}"
+                      (cfg, env, { oc with status := .evalError msg })
   | .ifStmt cond thenBody elseBody =>
       -- Public-conditional control flow: evaluate the condition, then
       -- recurse into the chosen branch via `evalBody`.
@@ -1375,6 +1476,21 @@ theorem evalContract_commits_initial_publicState_on_requireFailed_body
     Outcome.toPublicStateTransition, Outcome.committedPublicState,
     hStatus, EvalStatus.commitsCandidate]
 
+theorem evalContract_commits_initial_publicState_on_capacityOverflow_body
+  (cfg cfg' : OperationalConfig)
+  (fn : CompiledFunction)
+  (env env' : LocalEnv)
+  (outcome : Outcome)
+  (hEntry : cfg.entrypointFn? = some fn)
+  (hEnv : cfg.initialEnv fn = some env)
+  (hEval : evalBody cfg env Outcome.empty fn.body = (cfg', env', outcome))
+  (hStatus : outcome.status = EvalStatus.capacityOverflow) :
+  (evalContract cfg).finalPublicState = some cfg.publicState := by
+  unfold evalContract
+  simp [hEntry, hEnv, hEval, Outcome.withPublicStateTransition,
+    Outcome.toPublicStateTransition, Outcome.committedPublicState,
+    hStatus, EvalStatus.commitsCandidate]
+
 theorem publicStateTransition_requireFailed_commits_initial
   (initialPublicState candidatePublicState : ObjectStore) :
   (Outcome.toPublicStateTransition
@@ -1388,6 +1504,15 @@ theorem publicStateTransition_abortIf_commits_initial
   (initialPublicState candidatePublicState : ObjectStore) :
   (Outcome.toPublicStateTransition
       ({ Outcome.empty with status := EvalStatus.abortedByUser } : Outcome)
+      initialPublicState
+      candidatePublicState).committedPublicState =
+    initialPublicState := by
+  rfl
+
+theorem publicStateTransition_capacityOverflow_commits_initial
+  (initialPublicState candidatePublicState : ObjectStore) :
+  (Outcome.toPublicStateTransition
+      ({ Outcome.empty with status := EvalStatus.capacityOverflow } : Outcome)
       initialPublicState
       candidatePublicState).committedPublicState =
     initialPublicState := by

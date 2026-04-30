@@ -155,6 +155,25 @@ or already part of an explicit release. For non-released confidential overflow,
 the implementation must produce host-visible behavior that is equal under the
 theorem's observer equivalence.
 
+Status: Fixed. Lean now defines total object-edge semantics with
+`Value.zeroForType`, `Value.arrayGetD`, and `Value.mapLookupD`: missing map
+keys and missing stored map/array values return the declared value-type zero,
+array get returns zero out of bounds, and array set records the UO kernel step
+but performs a no-op out of bounds. Bounded map insertion is represented by
+`Value.mapInsertBounded`, whose result carries both the updated entries and an
+`overflowed` flag; overflow preserves the old entries and sets the distinct
+`EvalStatus.capacityOverflow` event rather than conflating it with user abort.
+The Sol mirror, IR evaluator, and Kernel DSL evaluator use the same helpers;
+the preservation and proof-grade kernel-step theorems were updated over the
+bounded semantics. The runtime already implements the corresponding masked
+array and bounded map/ORAM behavior; verified with `cd proof/lean && lake build
+UOToolchain.ProofGradeRoot`, `cargo test -p uo-evm
+runtime::objects::tests::uo_array_out_of_bounds_index_is_masked_no_match`,
+`cargo test -p uo-evm
+oram::tests::surrogate_get_returns_zero_for_missing_key_after_full_scan_lookup`,
+and `cargo test -p uo-evm
+oram::tests::path_oram_get_reports_working_stash_overflow_in_band`.
+
 ## F6. Equality for `bytes32` and `address` is runtime-supported but not modeled in Lean binary evaluation
 
 Review grouping: `F6`, `T1.8`, `O2.6`, `P3.4`.
