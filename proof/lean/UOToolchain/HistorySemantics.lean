@@ -17,11 +17,77 @@ structure HostCallRequest where
   publicArgs : List String
 deriving Repr, DecidableEq
 
-structure HostCallObservation where
+/-- Public rollback behavior included in the paper-main hostile-host view. -/
+structure PaperMainFinalPublicStateRollback where
+  initialPublicStateDigest : String
+  candidatePublicStateDigest : String
+  committedPublicStateDigest : String
+  publicDeltaDigest : String
+  aborted : Bool
+deriving Repr, DecidableEq
+
+/-- Declared release functions from the admitted package manifest. -/
+structure PaperMainDeclaredReleaseFunctions where
+  functions : List String
+deriving Repr, DecidableEq
+
+/-- The complete paper-facing SGX observer.  The fields intentionally name all
+host-visible components required by the direct theorem statement: public
+outcome, boundary schedule, storage trace, micro trace, final public
+state/rollback behavior, and declared release functions. -/
+structure PaperMainViewSGX where
   publicOutcome : SGXPublicOutcome
+  boundarySchedule : List BoundaryEvent
+  storageTrace : SGXStorageTrace
+  microTrace : SGXMicroTrace
+  finalPublicStateRollback : PaperMainFinalPublicStateRollback
+  releaseFunctions : PaperMainDeclaredReleaseFunctions
+deriving Repr, DecidableEq
+
+/-- Paper notation for the complete hostile-host SGX observer. -/
+abbrev View_SGX := PaperMainViewSGX
+
+def paperMainViewOfSGX
+  (finalPublicStateRollback : PaperMainFinalPublicStateRollback)
+  (releaseFunctions : PaperMainDeclaredReleaseFunctions)
+  (view : SGXView) : View_SGX :=
+  { publicOutcome := sgxPublicOutcome view
+  , boundarySchedule := view.boundarySchedule
+  , storageTrace := sgxStorageTrace view
+  , microTrace := sgxMicroTrace view
+  , finalPublicStateRollback := finalPublicStateRollback
+  , releaseFunctions := releaseFunctions
+  }
+
+structure HostCallObservation where
+  view : View_SGX
   orderedObjectSchedule : List Nat
   finalPublicState : List String
 deriving Repr, DecidableEq
+
+def HostCallObservation.publicOutcome
+  (observation : HostCallObservation) : SGXPublicOutcome :=
+  observation.view.publicOutcome
+
+def HostCallObservation.boundarySchedule
+  (observation : HostCallObservation) : List BoundaryEvent :=
+  observation.view.boundarySchedule
+
+def HostCallObservation.storageTrace
+  (observation : HostCallObservation) : SGXStorageTrace :=
+  observation.view.storageTrace
+
+def HostCallObservation.microTrace
+  (observation : HostCallObservation) : SGXMicroTrace :=
+  observation.view.microTrace
+
+def HostCallObservation.finalPublicStateRollback
+  (observation : HostCallObservation) : PaperMainFinalPublicStateRollback :=
+  observation.view.finalPublicStateRollback
+
+def HostCallObservation.releaseFunctions
+  (observation : HostCallObservation) : PaperMainDeclaredReleaseFunctions :=
+  observation.view.releaseFunctions
 
 abbrev HostTranscript := List HostCallObservation
 
@@ -253,6 +319,21 @@ than assuming stepwise equality up front.
 abbrev HostReleaseFrame := List String
 abbrev HostReleaseHistory := List HostReleaseFrame
 
+def HostReleaseFrame.fromDeclaredReleaseFunctions
+  (declared : PaperMainDeclaredReleaseFunctions) : HostReleaseFrame :=
+  declared.functions
+
+def HostReleaseHistory.fromDeclaredReleaseFunctions
+  (declared : List PaperMainDeclaredReleaseFunctions) : HostReleaseHistory :=
+  declared.map HostReleaseFrame.fromDeclaredReleaseFunctions
+
+theorem hostReleaseHistory_fromDeclaredReleaseFunctions_eq_of_declared_eq
+  {lhs rhs : List PaperMainDeclaredReleaseFunctions}
+  (hDeclared : lhs = rhs) :
+  HostReleaseHistory.fromDeclaredReleaseFunctions lhs =
+    HostReleaseHistory.fromDeclaredReleaseFunctions rhs := by
+  rw [hDeclared]
+
 abbrev AdaptiveSingleCallObservation :=
   List String → HostTranscript → HostReleaseFrame → HostCallRequest →
     HostCallObservation
@@ -413,10 +494,10 @@ theorem adaptiveHistory_stepsPublicEq_from_singleCall_aux
                 exact ih hNextState hNextTranscript hRest₁ hRest₂
 
 /-- Inductive adaptive-history noninterference.  A public strategy that chooses
-the next request from the host transcript, admitted calls at every step, equal
-initial public state, equal release history, and the single-call UO theorem
-modulo releases imply equal public transcripts, ordered object schedules, and
-final public states. -/
+the next request from the full hostile-host transcript, admitted calls at every
+step, equal initial public state, equal release history generated from declared
+release functions, and the single-call UO theorem modulo releases imply equal
+full host transcripts plus the legacy public projections. -/
 theorem adaptiveHistory_noninterference_from_singleCall
   {strategy : AdaptiveHostStrategy}
   {admitted : AdaptiveCallAdmission}
@@ -493,12 +574,26 @@ def adaptiveHistorySampleObservation
   (terminationStatus : Bool)
   (request : HostCallRequest)
   (releaseFrame : HostReleaseFrame) : HostCallObservation :=
-  { publicOutcome :=
-      adaptiveHistorySampleOutcome
-        request.entrypointId
-        request.publicArgs
-        releaseFrame
-        terminationStatus
+  { view :=
+      { publicOutcome :=
+          adaptiveHistorySampleOutcome
+            request.entrypointId
+            request.publicArgs
+            releaseFrame
+            terminationStatus
+      , boundarySchedule := []
+      , storageTrace := { persistentReads := [], persistentWrites := [] }
+      , microTrace := { pageTrace := [], exitTrace := [], sharedResourceTrace := [] }
+      , finalPublicStateRollback :=
+          { initialPublicStateDigest := "initial"
+          , candidatePublicStateDigest := request.entrypointId
+          , committedPublicStateDigest := request.entrypointId
+          , publicDeltaDigest := request.entrypointId
+          , aborted := !terminationStatus
+          }
+      , releaseFunctions :=
+          { functions := releaseFrame }
+      }
   , orderedObjectSchedule :=
       if request.entrypointId = "first" then [1] else [2]
   , finalPublicState := [request.entrypointId]
@@ -530,6 +625,7 @@ theorem adaptiveHistorySampleStrategy_second_request_depends_on_first_observatio
     , adaptiveHistorySampleFirstObservation
     , adaptiveHistorySampleObservation
     , adaptiveHistorySampleOutcome
+    , HostCallObservation.publicOutcome
     ]
 
 def adaptiveHistorySampleAdmitted : AdaptiveCallAdmission :=
@@ -581,6 +677,7 @@ example :
     , adaptiveHistorySampleObserve
     , adaptiveHistorySampleObservation
     , adaptiveHistorySampleOutcome
+    , HostCallObservation.publicOutcome
     ]
 
 theorem adaptiveHistorySampleHistory_generated :
@@ -600,6 +697,7 @@ theorem adaptiveHistorySampleHistory_generated :
     , adaptiveHistorySampleObserve
     , adaptiveHistorySampleObservation
     , adaptiveHistorySampleOutcome
+    , HostCallObservation.publicOutcome
     ]
 
 example :

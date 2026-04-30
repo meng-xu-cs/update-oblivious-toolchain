@@ -25505,6 +25505,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         repo_root().join("proof/lean/UOToolchain/RuntimeImplementationInterfaceJson.lean");
     let lean_history_semantics_path =
         repo_root().join("proof/lean/UOToolchain/HistorySemantics.lean");
+    let lean_paper_main_theorem_path =
+        repo_root().join("proof/lean/UOToolchain/PaperMainTheorem.lean");
     let lean_runtime_audit_surfaces_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeAuditSurfaces.lean");
     let lean_runtime_boundary_schema_path =
@@ -25787,6 +25789,13 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_history_semantics_path)
+            )
+        })?;
+    let lean_paper_main_theorem_source = fs::read_to_string(&lean_paper_main_theorem_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_paper_main_theorem_path)
             )
         })?;
     let lean_runtime_audit_surfaces_source = fs::read_to_string(&lean_runtime_audit_surfaces_path)
@@ -28841,6 +28850,16 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let adaptive_history_semantics_theorems_present = lean_proofgrade_root_source
         .contains("import UOToolchain.HistorySemantics")
         && lean_history_semantics_source.contains("structure HostCallObservation")
+        && lean_history_semantics_source.contains("structure PaperMainViewSGX")
+        && lean_history_semantics_source.contains("abbrev View_SGX := PaperMainViewSGX")
+        && lean_history_semantics_source.contains("view : View_SGX")
+        && lean_history_semantics_source.contains("def HostCallObservation.boundarySchedule")
+        && lean_history_semantics_source.contains("def HostCallObservation.storageTrace")
+        && lean_history_semantics_source.contains("def HostCallObservation.microTrace")
+        && lean_history_semantics_source
+            .contains("def HostReleaseHistory.fromDeclaredReleaseFunctions")
+        && lean_history_semantics_source
+            .contains("theorem hostReleaseHistory_fromDeclaredReleaseFunctions_eq_of_declared_eq")
         && lean_history_semantics_source.contains("abbrev AdaptiveHostStrategy")
         && lean_history_semantics_source.contains("def HistoryFollowsStrategyFrom")
         && lean_history_semantics_source
@@ -28848,7 +28867,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_history_semantics_source
             .contains("theorem runtimeHistory_orderedObjectSchedule_eq_of_stepwise_publicEq")
         && lean_history_semantics_source
-            .contains("theorem adaptiveHistory_nextRequest_eq_of_same_public_prefix");
+            .contains("theorem adaptiveHistory_nextRequest_eq_of_same_public_prefix")
+        && lean_paper_main_theorem_source
+            .contains("theorem paperMain_adaptiveHistory_noninterference_from_singleCall");
     let mixed_backend_ordered_schedule_theorems_present = lean_proofgrade_root_source
         .contains("import UOToolchain.HistorySemantics")
         && lean_history_semantics_source.contains("inductive RuntimeObjectBackend")

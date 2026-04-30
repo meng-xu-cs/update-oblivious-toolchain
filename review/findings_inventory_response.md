@@ -357,6 +357,19 @@ as the main attacker model. Generate release frames from manifest-declared
 release functions inside the model, and prove that equal public histories imply
 equal generated release histories under accepted packages.
 
+Status: Fixed. Adaptive histories now carry the full normalized `View_SGX` in
+each `HostCallObservation`, with projection accessors for public outcome,
+boundary schedule, storage trace, micro trace, final-public rollback behavior,
+release functions, and the legacy ordered-object/final-state projections. The
+paper-main adaptive-history theorem is routed through this full-view
+observation, while release histories are generated from declared release
+functions and are proved equal when the declared functions agree. The validation
+probe now checks the full-view observation surface and generated release-history
+theorem in addition to the adaptive strategy/history theorems. Verified with
+`cd proof/lean && lake build UOToolchain.ProofGradeRoot`,
+`cargo check -p mplus-probe`, and
+`cargo run -q -p mplus-probe -- --only kernel-model-alignment-validation --out-dir results`.
+
 ## F11. Public environment values are not bound to a real EVM/deployment context
 
 Review grouping: `F11`, `T1.12`, `O2.9`.

@@ -12,48 +12,6 @@ proof machinery; this file fixes the theorem shape readers should cite.
 
 namespace UOToolchain
 
-/-- Public rollback behavior included in the paper-main hostile-host view. -/
-structure PaperMainFinalPublicStateRollback where
-  initialPublicStateDigest : String
-  candidatePublicStateDigest : String
-  committedPublicStateDigest : String
-  publicDeltaDigest : String
-  aborted : Bool
-deriving Repr, DecidableEq
-
-/-- Declared release functions from the admitted package manifest. -/
-structure PaperMainDeclaredReleaseFunctions where
-  functions : List String
-deriving Repr, DecidableEq
-
-/-- The complete paper-facing SGX observer.  The fields intentionally name all
-host-visible components required by the direct theorem statement: public
-outcome, boundary schedule, storage trace, micro trace, final public
-state/rollback behavior, and declared release functions. -/
-structure PaperMainViewSGX where
-  publicOutcome : SGXPublicOutcome
-  boundarySchedule : List BoundaryEvent
-  storageTrace : SGXStorageTrace
-  microTrace : SGXMicroTrace
-  finalPublicStateRollback : PaperMainFinalPublicStateRollback
-  releaseFunctions : PaperMainDeclaredReleaseFunctions
-deriving Repr, DecidableEq
-
-/-- Paper notation for the complete hostile-host SGX observer. -/
-abbrev View_SGX := PaperMainViewSGX
-
-def paperMainViewOfSGX
-  (finalPublicStateRollback : PaperMainFinalPublicStateRollback)
-  (releaseFunctions : PaperMainDeclaredReleaseFunctions)
-  (view : SGXView) : View_SGX :=
-  { publicOutcome := sgxPublicOutcome view
-  , boundarySchedule := view.boundarySchedule
-  , storageTrace := sgxStorageTrace view
-  , microTrace := sgxMicroTrace view
-  , finalPublicStateRollback := finalPublicStateRollback
-  , releaseFunctions := releaseFunctions
-  }
-
 structure PaperMainViewSGXComponentsEq (lhs rhs : View_SGX) : Prop where
   publicOutcome : lhs.publicOutcome = rhs.publicOutcome
   boundarySchedule : lhs.boundarySchedule = rhs.boundarySchedule
