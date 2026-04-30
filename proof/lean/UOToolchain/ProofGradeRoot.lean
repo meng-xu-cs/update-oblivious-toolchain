@@ -34,6 +34,7 @@ import UOToolchain.RuntimeStatementTraceDiscipline
 import UOToolchain.RuntimeStoreCodecSemantics
 import UOToolchain.RuntimeStoreHelperSemantics
 import UOToolchain.RuntimeValueOpsSemantics
+import UOToolchain.RuntimeBoundarySchema
 import UOToolchain.ConfidentialFragment
 import UOToolchain.RuntimeConfidentialCoreAssurance
 import UOToolchain.RuntimeCoins

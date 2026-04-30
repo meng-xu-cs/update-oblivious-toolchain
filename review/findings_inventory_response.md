@@ -68,6 +68,24 @@ Source-drift probes remain as regression witnesses, but the security claim must
 rest on typed artifacts and proved/refined behavior rather than substring
 matching or stale prose.
 
+Status: Fixed. Runtime bridge admission now has a Rust-owned boundary schema,
+`runtime-boundary-schema-v1`, whose proof-critical obligations are classified
+as Rust visibility, generated schema, Lean theorem, or executable semantic
+refinement evidence; the only source-regression entry is explicitly marked
+non-proof-critical. `RuntimeBoundarySchema.lean` mirrors the schema, proves the
+Rust/Lean obligation IDs match, proves they are duplicate-free, and proves every
+proof-critical obligation is mechanized for the claim. The kernel-model
+alignment probe now validates the Rust schema, checks the Rust/Lean ID match,
+and gates acceptance on `runtime_boundary_schema_mechanized`. The stale unsafe
+surface prose has been replaced: theorem-adjacent production Rust now has an
+empty `unsafe` surface, while fixed-capacity helper semantics are covered by the
+schema and focused tests rather than by an unsafe-code claim. Verified with
+`cargo test -p uo-core runtime_boundary_schema`, `cargo check -p mplus-probe`,
+`cd proof/lean && lake build UOToolchain.ProofGradeRoot`,
+`cargo run -q -p mplus-probe -- --only kernel-model-alignment-validation
+--out-dir results`, `./scripts/rebuild_review_validation_false_paths.sh
+--check`, and `git diff --check`.
+
 ## F3. `path_oram_private_posmap_v1` is documented/admitted without an end-to-end theorem
 
 Review grouping: `F3`, `T1.3`, `O2.3`, `P3.2`.

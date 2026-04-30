@@ -1789,9 +1789,15 @@
       "work_package": "F16"
     },
     {
+      "name": "runtime_boundary_schema_mechanized",
+      "report_field": "kernel_model_alignment_validation.runtime_boundary_schema_mechanized",
+      "target": "the Rust-owned `runtime-boundary-schema-v1` obligation list is mirrored by Lean, has unique obligation ids, and proves every proof-critical runtime bridge obligation is Rust-visibility, generated-schema, Lean-theorem, or executable-semantic-refinement backed rather than source-regression backed",
+      "work_package": "F2"
+    },
+    {
       "name": "theorem_adjacent_unsafe_isolated_to_fixed_buffer",
       "report_field": "kernel_model_alignment_validation.theorem_adjacent_unsafe_isolated_to_fixed_buffer",
-      "target": "the only production Rust `unsafe` in theorem-adjacent crates/runtime code lives in `crates/uo-core/src/fixed_buffer.rs`, whose helpers document the fixed-prefix initialization invariants and are covered by focused tests",
+      "target": "theorem-adjacent production Rust has no `unsafe` blocks; fixed-capacity helpers are safe `Vec`-backed wrappers, and their capacity semantics are covered by the runtime boundary schema plus focused tests",
       "work_package": "F15"
     },
     {

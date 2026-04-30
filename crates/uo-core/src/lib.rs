@@ -8,6 +8,7 @@ pub mod kernel_dsl;
 pub mod manifest;
 pub mod metadata;
 pub mod observer_coverage;
+pub mod runtime_boundary_schema;
 pub mod scaling;
 pub mod shell_boundary;
 pub mod trace;
@@ -77,6 +78,11 @@ pub use observer_coverage::{
     validate_observer_coverage_table, ObserverCoverageClassification, ObserverFieldCoverage,
     ObserverFieldCoverageOverride, ObserverSchemaCoverage, OBSERVER_FIELD_COVERAGE_OVERRIDES,
     OBSERVER_SCHEMA_COVERAGE,
+};
+pub use runtime_boundary_schema::{
+    runtime_boundary_obligation_ids, runtime_boundary_schema_is_mechanized_for_claim,
+    validate_runtime_boundary_schema, RuntimeBoundaryEvidenceKind, RuntimeBoundaryObligation,
+    RUNTIME_BOUNDARY_OBLIGATIONS, RUNTIME_BOUNDARY_SCHEMA_VERSION,
 };
 pub use scaling::ScalablePathOramEvidence;
 pub use shell_boundary::{

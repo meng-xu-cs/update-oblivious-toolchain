@@ -21,19 +21,21 @@ use std::process::{self, Command, Output};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use uo_core::{
-    canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed, BackendKind,
-    BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
-    CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact,
-    ConfidentialKernelSlotProgram, ContractMetadata, LogicalEvent, NormalizedMicroTrace,
-    ProgramMode, PublicOutcomeTrace, RuntimeConfidentialCoreKernelFinishSlotBundle,
-    RuntimeKernelInterfaceBundle, RuntimeKernelMachineFinishWitness,
-    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramLeafScaffoldWitness,
-    RuntimeOramObjectWitness, RuntimePathOramTransitionKind, RuntimeRefinementWitness,
-    RuntimeShellContract, RuntimeShellTrace, SeededRuntimePaperMainFamilyBundle,
-    SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePathOramWitnessFamily,
-    SgxControllerShapeTrace, Value, WriteClass, CONFIDENTIAL_KERNEL_EXPR_PROFILES,
-    CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES,
-    CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES, CONFIDENTIAL_KERNEL_STATEMENT_PROFILES,
+    canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
+    runtime_boundary_obligation_ids, runtime_boundary_schema_is_mechanized_for_claim,
+    validate_runtime_boundary_schema, BackendKind, BoundaryEvent,
+    CanonicalFreshCoinRuntimePathOramTheoremInput, CanonicalFreshCoinRuntimePathOramWitnessFamily,
+    CompiledArtifact, ConfidentialKernelSlotProgram, ContractMetadata, LogicalEvent,
+    NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
+    RuntimeConfidentialCoreKernelFinishSlotBundle, RuntimeKernelInterfaceBundle,
+    RuntimeKernelMachineFinishWitness, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
+    RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimePathOramTransitionKind,
+    RuntimeRefinementWitness, RuntimeShellContract, RuntimeShellTrace,
+    SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainSlotFamilyBundle,
+    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value, WriteClass,
+    CONFIDENTIAL_KERNEL_EXPR_PROFILES, CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_STATEMENT_PROFILES, RUNTIME_BOUNDARY_SCHEMA_VERSION,
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
 
@@ -3010,9 +3012,15 @@ fn static_drift_check_inventory() -> JsonValue {
             "report_field": "kernel_model_alignment_validation.runtime_freshness_discipline_audit_present",
         },
         {
+            "name": "runtime_boundary_schema_mechanized",
+            "work_package": "F2",
+            "target": "the Rust-owned `runtime-boundary-schema-v1` obligation list is mirrored by Lean, has unique obligation ids, and proves every proof-critical runtime bridge obligation is Rust-visibility, generated-schema, Lean-theorem, or executable-semantic-refinement backed rather than source-regression backed",
+            "report_field": "kernel_model_alignment_validation.runtime_boundary_schema_mechanized",
+        },
+        {
             "name": "theorem_adjacent_unsafe_isolated_to_fixed_buffer",
             "work_package": "F15",
-            "target": "the only production Rust `unsafe` in theorem-adjacent crates/runtime code lives in `crates/uo-core/src/fixed_buffer.rs`, whose helpers document the fixed-prefix initialization invariants and are covered by focused tests",
+            "target": "theorem-adjacent production Rust has no `unsafe` blocks; fixed-capacity helpers are safe `Vec`-backed wrappers, and their capacity semantics are covered by the runtime boundary schema plus focused tests",
             "report_field": "kernel_model_alignment_validation.theorem_adjacent_unsafe_isolated_to_fixed_buffer",
         },
         {
@@ -25501,6 +25509,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         repo_root().join("proof/lean/UOToolchain/HistorySemantics.lean");
     let lean_runtime_audit_surfaces_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeAuditSurfaces.lean");
+    let lean_runtime_boundary_schema_path =
+        repo_root().join("proof/lean/UOToolchain/RuntimeBoundarySchema.lean");
     let lean_toolchain_path = repo_root().join("proof/lean/lean-toolchain");
     let lean_proofgrade_root_path = repo_root().join("proof/lean/UOToolchain/ProofGradeRoot.lean");
     let lean_runtime_implementation_interface_checker_path =
@@ -25780,6 +25790,13 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_runtime_audit_surfaces_path)
+            )
+        })?;
+    let lean_runtime_boundary_schema_source =
+        fs::read_to_string(&lean_runtime_boundary_schema_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_runtime_boundary_schema_path)
             )
         })?;
     let lean_toolchain_pin = fs::read_to_string(&lean_toolchain_path)
@@ -28832,6 +28849,30 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("theorem runtimeFreshnessDiscipline_allAccepted")
         && lean_runtime_audit_surfaces_source
             .contains("theorem runtimeFreshnessDiscipline_noDiagnosticsInProductionTheoremMode");
+    let rust_runtime_boundary_schema_version = RUNTIME_BOUNDARY_SCHEMA_VERSION.to_owned();
+    let rust_runtime_boundary_obligation_ids = runtime_boundary_obligation_ids()
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let lean_runtime_boundary_obligation_ids = extract_lean_string_list(
+        &lean_runtime_boundary_schema_source,
+        "runtimeBoundaryObligationIds",
+    )?;
+    let runtime_boundary_schema_validation_passes = validate_runtime_boundary_schema().is_ok();
+    let runtime_boundary_schema_rust_lean_ids_match =
+        rust_runtime_boundary_obligation_ids == lean_runtime_boundary_obligation_ids;
+    let runtime_boundary_schema_mechanized = runtime_boundary_schema_validation_passes
+        && runtime_boundary_schema_is_mechanized_for_claim()
+        && runtime_boundary_schema_rust_lean_ids_match
+        && lean_proofgrade_root_source.contains("import UOToolchain.RuntimeBoundarySchema")
+        && lean_runtime_boundary_schema_source
+            .contains("def runtimeBoundarySchemaVersion : String")
+        && lean_runtime_boundary_schema_source
+            .contains("theorem runtimeBoundaryObligations_ids_match")
+        && lean_runtime_boundary_schema_source
+            .contains("theorem runtimeBoundaryObligationIds_nodup")
+        && lean_runtime_boundary_schema_source
+            .contains("theorem runtimeBoundarySchema_allProofCriticalMechanized");
     let mut theorem_adjacent_unsafe_surface_files =
         collect_production_pattern_hits(&crates_src, "unsafe {")?;
     theorem_adjacent_unsafe_surface_files
@@ -35114,6 +35155,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && mixed_backend_ordered_schedule_theorems_present
         && host_visible_outcome_taxonomy_audit_present
         && runtime_freshness_discipline_audit_present
+        && runtime_boundary_schema_mechanized
         && theorem_adjacent_unsafe_isolated_to_fixed_buffer
         && lean_toolchain_exact_release_pinned
         && lean_lake_versions_recorded_in_manifest
@@ -35785,6 +35827,20 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             host_visible_outcome_taxonomy_audit_present,
         "runtime_freshness_discipline_audit_present":
             runtime_freshness_discipline_audit_present,
+        "rust_runtime_boundary_schema_version":
+            rust_runtime_boundary_schema_version,
+        "lean_runtime_boundary_schema_version":
+            "runtime-boundary-schema-v1",
+        "rust_runtime_boundary_obligation_ids":
+            rust_runtime_boundary_obligation_ids,
+        "lean_runtime_boundary_obligation_ids":
+            lean_runtime_boundary_obligation_ids,
+        "runtime_boundary_schema_validation_passes":
+            runtime_boundary_schema_validation_passes,
+        "runtime_boundary_schema_rust_lean_ids_match":
+            runtime_boundary_schema_rust_lean_ids_match,
+        "runtime_boundary_schema_mechanized":
+            runtime_boundary_schema_mechanized,
         "theorem_adjacent_unsafe_surface_files":
             theorem_adjacent_unsafe_surface_files,
         "expected_theorem_adjacent_unsafe_surface_files":

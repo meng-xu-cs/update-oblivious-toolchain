@@ -404,6 +404,19 @@
     "reserve_scratch",
     "wipe_scratch"
   ],
+  "lean_runtime_boundary_obligation_ids": [
+    "runtime_public_bridge_export_surface",
+    "runtime_kernel_refinement_witness_export_surface",
+    "generated_value_ops_semantics",
+    "fixed_buffer_capacity_semantics",
+    "generated_object_helper_semantics",
+    "generated_oram_codec_semantics",
+    "confidential_kernel_slot_semantics",
+    "store_codec_semantics",
+    "primitive_transcript_semantics",
+    "static_drift_regression_inventory"
+  ],
+  "lean_runtime_boundary_schema_version": "runtime-boundary-schema-v1",
   "lean_runtime_confidential_core_kernel_interface_slot_bundle_field_names": [
     "runtime_witness",
     "kernel_interface_bundle",
@@ -798,6 +811,9 @@
   "resource_event_kind_names_match": true,
   "resource_event_kind_serde_snake_case": true,
   "return_channel_crypto_evidence_pinned": true,
+  "runtime_boundary_schema_mechanized": true,
+  "runtime_boundary_schema_rust_lean_ids_match": true,
+  "runtime_boundary_schema_validation_passes": true,
   "runtime_confidential_core_bundle_api_is_explicit": true,
   "runtime_confidential_core_bundle_fields_private": true,
   "runtime_confidential_core_bundle_nonclone": true,
@@ -1773,6 +1789,19 @@
     "reserve_scratch",
     "wipe_scratch"
   ],
+  "rust_runtime_boundary_obligation_ids": [
+    "runtime_public_bridge_export_surface",
+    "runtime_kernel_refinement_witness_export_surface",
+    "generated_value_ops_semantics",
+    "fixed_buffer_capacity_semantics",
+    "generated_object_helper_semantics",
+    "generated_oram_codec_semantics",
+    "confidential_kernel_slot_semantics",
+    "store_codec_semantics",
+    "primitive_transcript_semantics",
+    "static_drift_regression_inventory"
+  ],
+  "rust_runtime_boundary_schema_version": "runtime-boundary-schema-v1",
   "rust_runtime_confidential_core_kernel_interface_slot_bundle_field_names": [
     "runtime_witness",
     "kernel_interface_bundle",
